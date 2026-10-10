@@ -24,7 +24,7 @@ export function progressOf({
 const SETTLED = new Set(["done", "not-needed"]);
 
 /** The name every caller hands the reader for an image no release manifest names. */
-const UNRELEASED_IMAGE = "unreleased";
+export const UNRELEASED_IMAGE = "unreleased";
 
 /** The release row an image's steps read under: none (Unreleased) for an unreleased image. */
 export function imageReleaseRow({ release }: { release: string }): string | null {

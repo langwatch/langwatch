@@ -239,6 +239,21 @@ describe.skipIf(!DB_URL)("UpgradeReader over the ledger tables", () => {
       expect(status).toMatchObject({ installed: "3.21.0", origin: "inferred" });
     });
 
+    /** @scenario "An upgrade by an unreleased image reads as installed unreleased" */
+    it("reads an upgrade by an unreleased image as unreleased, not a stale seed", async () => {
+      await insertRun({
+        scratch,
+        id: "run_seed",
+        kind: "seed",
+        release: "3.19.0",
+        startedAt: "2026-10-01 10:00:00",
+      });
+      await insertRun({ scratch, id: "run_up", release: null, startedAt: "2026-10-05 10:00:00" });
+      const status = await readerOver({ scratch }).status();
+      expect(status).toMatchObject({ installed: "unreleased", origin: "recorded" });
+      expect(status.state).not.toBe("unsupported");
+    });
+
     /** @scenario "An unknown step status is shown raw" */
     it("shows an unknown step status raw and does not throw", async () => {
       await insertRun({

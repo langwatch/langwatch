@@ -53,6 +53,7 @@ import {
   filterSteps,
   imageReleaseRow,
   mergeSteps,
+  UNRELEASED_IMAGE,
   viewDeclaredStep,
   viewRecordedStep,
 } from "./step-view.ts";
@@ -126,8 +127,12 @@ function pickLiveLease({ leases }: { leases: readonly LedgerLeaseRow[] }): Ledge
   return newest[0] ?? null;
 }
 
-/** The installed release: the newest succeeded run's, else the highest a settled step carries. */
-function pickInstalled({
+/**
+ * The installed release: the newest succeeded run's, else the highest a settled step carries. An
+ * upgrade by an unreleased image installed past every release, so it reads unreleased, never a
+ * stale release below the floor (as the gate's `assertCurrent` treats an unreleased build).
+ */
+export function pickInstalled({
   succeededRun,
   stepFacts,
 }: {
@@ -140,6 +145,7 @@ function pickInstalled({
       origin: succeededRun.kind === "seed" ? "inferred" : "recorded",
     };
   }
+  if (succeededRun) return { installed: UNRELEASED_IMAGE, origin: "recorded" };
   const settled = stepFacts
     .filter((step) => step.status === "done" || step.status === "not-needed")
     .flatMap((step) => (step.release === null ? [] : [step.release]));
@@ -198,7 +204,7 @@ function summariseReleases({
     .toSorted(([left], [right]) => compareReleasesNewestFirst({ left, right }))
     .map(([release, members]) => ({
       release,
-      installed: release !== null && release === installed,
+      installed: installed !== null && release === imageReleaseRow({ release: installed }),
       image: release === imageRow,
       stepCount: members.length,
       counts: countBy({ items: members, key: (step) => step.status }),

@@ -127,6 +127,14 @@ Feature: The upgrade reader answers the installation state and the ledger's rows
     When the status is read
     Then the origin is "inferred"
 
+  @unit @integration
+  Scenario: An upgrade by an unreleased image reads as installed unreleased
+    Given a seed run recorded release 3.19.0, below the floor 3.20.1
+    And a later upgrade by an image no release names succeeded
+    When the status is read
+    Then the installed release is "unreleased", recorded
+    And the state is not unsupported
+
   @integration
   Scenario: An unknown step status is shown raw
     Given a step row whose status is "quarantined"
