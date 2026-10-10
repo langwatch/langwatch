@@ -55,12 +55,24 @@ type ToastStatus = keyof typeof STATUS;
 const statusOf = (type: string | undefined): ToastStatus =>
   type && type in STATUS ? (type as ToastStatus) : "info";
 
-/** Secondary actions wear the toast's own foreground, quieter than its title, in both modes. */
+/** The action is a small pill on the title line in the toast's own foreground, in both modes. */
 export const toastActionStyle = {
   color: "inherit",
-  opacity: 0.8,
-  "&:hover": { opacity: 1 },
-  "--toast-trigger-bg": "transparent",
+  opacity: 0.92,
+  height: "5",
+  paddingInline: "2.5",
+  borderRadius: "full",
+  borderWidth: "1px",
+  borderColor: "var(--toast-border-color, var(--chakra-colors-border-muted))",
+  bg: "var(--toast-trigger-bg)",
+  fontSize: "12px",
+  fontWeight: "560",
+  lineHeight: "1",
+  "&:hover": {
+    opacity: 1,
+    bg: "color-mix(in srgb, var(--toast-trigger-bg), currentColor 12%)",
+  },
+  "&:focus-visible": { outline: "2px solid currentColor", outlineOffset: "1px" },
 } as const;
 
 function StatusGlyph({ status }: { status: ToastStatus }) {
@@ -179,18 +191,12 @@ export function Toaster({
                 {toast.title && <Toast.Title>{toast.title}</Toast.Title>}
                 {toast.description && <Toast.Description>{toast.description}</Toast.Description>}
                 {renderMeta?.(toast.meta)}
-                {toast.action && (
-                  <Toast.ActionTrigger
-                    marginTop="2"
-                    alignSelf="flex-start"
-                    fontSize="12px"
-                    fontWeight="560"
-                    css={toastActionStyle}
-                  >
-                    {toast.action.label}
-                  </Toast.ActionTrigger>
-                )}
               </Stack>
+              {toast.action && (
+                <Toast.ActionTrigger alignSelf="flex-start" flexShrink={0} css={toastActionStyle}>
+                  {toast.action.label}
+                </Toast.ActionTrigger>
+              )}
               <Toast.CloseTrigger
                 position="static"
                 alignSelf="flex-start"

@@ -35,21 +35,53 @@ const toastPanel = {
   "--toast-border-color": "colors.border.muted",
 } as const;
 
-/** A light-mode toast is deep glass tinted with its status hue: a fine rim, a glow and a gloss. */
-const toastGlass = (hue: "red" | "orange" | "green" | "blue") => {
-  const c = (n: number, alpha: string) =>
-    `color-mix(in srgb, var(--chakra-colors-${hue}-${n}) ${alpha}, transparent)`;
+/** Each status drifts toward one neighbour across the page, so it still reads as its own hue. */
+const TOAST_DRIFT = { red: "pink", orange: "yellow", green: "teal", blue: "purple" } as const;
+
+/**
+ * A light-mode toast is deep glass tinted with its status hue: a fine rim, a glow and a gloss.
+ * Its tint is its own slice of one viewport-sized field, offset by the card's placement
+ * (`--toast-shift`), so cards shift colour as they stack, fan and move.
+ */
+const toastGlass = (hue: keyof typeof TOAST_DRIFT) => {
+  const c = (n: number, alpha: string, h: string = hue) =>
+    `color-mix(in srgb, var(--chakra-colors-${h}-${n}) ${alpha}, transparent)`;
+  const drift = (n: number, alpha: string) =>
+    `color-mix(in srgb, color-mix(in srgb, var(--chakra-colors-${TOAST_DRIFT[hue]}-${n}) 55%, var(--chakra-colors-${hue}-${n})) ${alpha}, transparent)`;
+  const field = "50% calc(100% + var(--viewport-offset-bottom, 1rem) - var(--toast-shift))";
   return {
     bg: c(900, "88%"),
     backgroundImage: [
-      "linear-gradient(180deg, rgba(255, 255, 255, 0.10) 0%, transparent 45%)",
-      `radial-gradient(110% 190% at 0% 50%, ${c(500, "45%")} 0%, transparent 62%)`,
+      "linear-gradient(180deg, rgba(255, 255, 255, 0.12) 0%, transparent 45%)",
+      `radial-gradient(40% 24% at 50% 100%, ${c(500, "62%")} 0%, transparent 100%)`,
+      `linear-gradient(170deg, ${c(900, "92%")} 0%, ${c(900, "90%")} 55%, ${drift(800, "90%")} 70%, ${drift(700, "88%")} 80%, ${c(800, "88%")} 90%, ${c(700, "88%")} 100%)`,
     ].join(", "),
+    backgroundSize: "100% 100%, 100vw 100vh, 100vw 100vh",
+    backgroundPosition: `0 0, ${field}, ${field}`,
+    backgroundRepeat: "no-repeat",
     borderWidth: "1px",
     borderColor: c(400, "42%"),
     backdropFilter: "var(--lw-backdrop-blur, blur(18px) saturate(160%))",
     boxShadow: `inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 12px 32px -12px ${c(600, "55%")}, 0 2px 6px rgba(2, 6, 23, 0.18)`,
   };
+};
+
+/** A light-mode solid badge is the toast glass shrunk to a count: deep base, rim, gloss, glow. */
+const badgeGlass = {
+  color: "white",
+  bg: "var(--chakra-colors-color-palette-600)",
+  backgroundImage: [
+    "linear-gradient(180deg, rgba(255, 255, 255, 0.32) 0%, rgba(255, 255, 255, 0.08) 45%, transparent 62%)",
+    "radial-gradient(120% 80% at 50% 115%, color-mix(in srgb, var(--chakra-colors-color-palette-400) 85%, transparent) 0%, transparent 70%)",
+    "linear-gradient(180deg, transparent 40%, color-mix(in srgb, var(--chakra-colors-color-palette-800) 35%, transparent) 100%)",
+  ].join(", "),
+  boxShadow: [
+    "inset 0 0 0 1px color-mix(in srgb, var(--chakra-colors-color-palette-300) 55%, transparent)",
+    "inset 0 1px 0 rgba(255, 255, 255, 0.28)",
+    "0 1px 3px color-mix(in srgb, var(--chakra-colors-color-palette-600) 45%, transparent)",
+  ].join(", "),
+  textShadow:
+    "0 1px 1px color-mix(in srgb, var(--chakra-colors-color-palette-900) 55%, transparent)",
 };
 
 export const designSystemConfig = defineConfig({
@@ -780,6 +812,7 @@ export const designSystemConfig = defineConfig({
           minWidth: 0,
           overflow: "hidden",
         },
+        variants: { variant: { solid: { _light: badgeGlass } } },
       }),
     },
     slotRecipes: {
@@ -1289,7 +1322,8 @@ export const designSystemConfig = defineConfig({
             // loses `data-fan`) lets Chakra's full list show.
             "[data-fan] &": {
               "&[data-stack]": {
-                translate: "var(--x) calc(var(--lift) * var(--index) * 32px)",
+                translate: "var(--x) var(--toast-shift)",
+                "--toast-shift": "calc(var(--lift) * var(--index) * 32px)",
                 scale: "calc(1 - var(--index) * 0.03)",
                 height: "var(--first-height)",
                 opacity: "clamp(0, calc(var(--opacity) * (3 - var(--index))), 1)",
@@ -1301,8 +1335,11 @@ export const designSystemConfig = defineConfig({
             // card measured sizes every card behind the front, so a back card
             // measured at its 0.85 would shrink them all. It scales on mount.
             "&:not([data-mounted])": { scale: "1" },
-            // Cards glide when the stack fans out, collapses or moves up.
-            transitionProperty: "translate, scale, opacity, height, box-shadow",
+            // How far the card sits from its slot; light glass reads its tint from it.
+            "--toast-shift": "var(--y)",
+            // Cards glide when the stack fans out, collapses or moves up, and their tint with them.
+            transitionProperty:
+              "translate, scale, opacity, height, box-shadow, background-position",
             transitionDuration: "450ms",
             transitionTimingFunction: "cubic-bezier(0.22, 1, 0.36, 1)",
             "&[data-state=open]": {
@@ -1318,6 +1355,7 @@ export const designSystemConfig = defineConfig({
                 {
                   color: "white",
                   "--toast-trigger-bg": "rgba(255, 255, 255, 0.14)",
+                  "--toast-border-color": "rgba(255, 255, 255, 0.26)",
                 },
               "&[data-type=error]": toastGlass("red"),
               "&[data-type=warning]": toastGlass("orange"),
