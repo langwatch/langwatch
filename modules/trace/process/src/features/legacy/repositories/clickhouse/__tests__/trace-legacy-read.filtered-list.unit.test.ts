@@ -8,7 +8,7 @@ import type { GetAllTracesForProjectInput } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { TraceCanonicalisationService } from "#features/derivation/services/trace-canonicalisation.service";
-import { boundedSubquery } from "#features/query/repositories/clickhouse/clickhouse.trace-query-subquery.mapper";
+import { boundedSubquery } from "#features/query/rules/trace-query-subquery.rules";
 
 import { ownProof } from "../../../../../__tests__/support/authorization-proofs.fixture.ts";
 import type { TraceClickHouseClient } from "../../../../../repositories/clickhouse/clickhouse.trace-member-client.repository.ts";

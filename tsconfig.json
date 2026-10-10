@@ -142,6 +142,9 @@
       "path": "packages/clickhouse-client/tsconfig.json"
     },
     {
+      "path": "packages/clickhouse-markers/tsconfig.json"
+    },
+    {
       "path": "packages/clickhouse-migrations/tsconfig.json"
     },
     {

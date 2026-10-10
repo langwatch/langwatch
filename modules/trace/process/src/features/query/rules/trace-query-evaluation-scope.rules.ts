@@ -14,8 +14,8 @@ import {
   type Unsupported,
 } from "@langwatch/trace-contract";
 
-import { latestEvaluationRunsSubquery } from "../repositories/clickhouse/clickhouse.trace-query-subquery.mapper.ts";
 import type { TraceQueryFieldsService } from "../services/trace-query-fields.service.ts";
+import { latestEvaluationRunsSubquery } from "./trace-query-subquery.rules.ts";
 import { translateNumericField, translateStringField } from "./trace-query-translators.rules.ts";
 import { extractStringValue, nextParam, validateValueLength } from "./trace-query-values.rules.ts";
 

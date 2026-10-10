@@ -1,7 +1,3 @@
-/**
- * ADR-177 block C: the store client applies the proof.
- * Spec: specs/governance/aggregate-project.feature
- */
 import {
   AccessNotGrantedError,
   type Authorization,
@@ -10,6 +6,7 @@ import {
   narrowAuthorization,
   sealAuthorization,
 } from "@langwatch/authorization";
+import { tenantScope, tenantSet } from "@langwatch/clickhouse-markers";
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -22,12 +19,15 @@ import {
   StatementScopeError,
   singleTenantOf,
   TenantReaderClientUnavailableError,
-  tenantScope,
   tenantScopeKey,
-  tenantSet,
 } from "../authorized-reads.ts";
 import { ClickHouseQueryClient } from "../client.ts";
 import type { QueryDriver, QueryRequest } from "../query.ts";
+/**
+ * ADR-177 block C: the store client applies the proof.
+ * Spec: specs/governance/aggregate-project.feature
+ */
+import { TenantGuard } from "../tenantGuard.ts";
 
 const NOW = 1_800_000_000_000;
 const AGG = "proj_aggregate";
@@ -83,6 +83,7 @@ function windowedFence(column: string, { own = true } = {}): string {
 function clientWith() {
   const execute = vi.fn<QueryDriver["execute"]>().mockResolvedValue({ rows: [] });
   const client = new ClickHouseQueryClient({
+    tenantGuard: new TenantGuard(),
     driver: { execute, insert: async () => {}, command: async () => {} },
   });
   const resolveClient = vi.fn().mockResolvedValue(client);

@@ -1,4 +1,4 @@
-import { tenantScope, tenantSet } from "@langwatch/clickhouse-client";
+import { tenantScope, tenantSet } from "@langwatch/clickhouse-markers";
 
 /**
  * The tenant marker a subquery on `table` carries, expanded by the authorized
