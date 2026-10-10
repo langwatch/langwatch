@@ -549,7 +549,7 @@ export function RoutedToConnection({
   return (
     <AuthCard title={title}>
       <HStack gap={3}>
-        {autoStart && <Spinner size="sm" color="orange.500" />}
+        {autoStart && <Spinner size="sm" color="orange.fg" />}
         <Text data-testid="routed-to-connection">
           {autoStart
             ? `Taking you to your organization's sign-in with ${signInMethodLabel(method)}.`
