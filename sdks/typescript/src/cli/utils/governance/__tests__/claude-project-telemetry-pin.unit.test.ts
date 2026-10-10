@@ -151,6 +151,83 @@ describe("ensureClaudeProjectTelemetryPin", () => {
 			expect(written.env.OTEL_EXPORTER_OTLP_ENDPOINT).toBe(CURRENT_ENDPOINT);
 		});
 	});
+
+	describe("when a pin from a pre-#8284 CLI still carries OTEL_LOG_RAW_API_BODIES", () => {
+		it("strips the legacy flag and adds the replacement in one migration", () => {
+			// The old wiring set RAW_API_BODIES and did not know
+			// OTEL_LOG_ASSISTANT_RESPONSES; the pin must migrate on re-sync.
+			const { OTEL_LOG_ASSISTANT_RESPONSES: _new, ...preMigration } =
+				currentClaudeVars();
+			const target = claudeProjectSettingsTarget(temp.cwd);
+			installAppEnv(target, {
+				...preMigration,
+				OTEL_LOG_RAW_API_BODIES: "1",
+			});
+
+			const result = ensureClaudeProjectTelemetryPin({
+				vars: currentClaudeVars(),
+				cwd: temp.cwd,
+			});
+
+			expect(result.action).toBe("updated");
+			const written = JSON.parse(fs.readFileSync(target.path, "utf8"));
+			expect(written.env.OTEL_LOG_RAW_API_BODIES).toBeUndefined();
+			expect(written.env.OTEL_LOG_ASSISTANT_RESPONSES).toBe("1");
+		});
+	});
+
+	describe("when a migrated pin carries a deliberate OTEL_LOG_RAW_API_BODIES opt-in", () => {
+		/** @scenario "A raw-body opt-in added after the upgrade survives every refresh" */
+		it("preserves the opt-in on re-sync instead of stripping it again", () => {
+			// The pin already has OTEL_LOG_ASSISTANT_RESPONSES (migrated) and the
+			// user then added RAW_API_BODIES back for debugging. The strip is a
+			// one-time migration keyed on the absence of the new flag, so it must
+			// not fire here (#8284 review P2).
+			const target = claudeProjectSettingsTarget(temp.cwd);
+			installAppEnv(target, {
+				...currentClaudeVars(),
+				OTEL_LOG_RAW_API_BODIES: "1",
+			});
+
+			const result = ensureClaudeProjectTelemetryPin({
+				vars: currentClaudeVars(),
+				cwd: temp.cwd,
+			});
+
+			expect(result.action).toBe("unchanged");
+			const written = JSON.parse(fs.readFileSync(target.path, "utf8"));
+			expect(written.env.OTEL_LOG_RAW_API_BODIES).toBe("1");
+		});
+	});
+
+	describe("when a project file has only a hand-set OTEL_LOG_RAW_API_BODIES and no langwatch key yet", () => {
+		/** @scenario "A raw-body-only project setting is not stripped before the pin has ever been ours" */
+		it("preserves it while installing the pin alongside it", () => {
+			// hasOwnedKey is false here: the file carries none of our current
+			// keys, only a flag the user set by hand. It has never been a
+			// langwatch pin, so its RAW_API_BODIES is not "the old default"
+			// left by a pre-#8284 CLI - there is no history to migrate. The
+			// !hasOwnedKey branch of isLangwatchAuthored exists to allow
+			// WRITING such a file, not to license stripping a flag we never
+			// wrote (CodeRabbit finding on #8286).
+			const target = claudeProjectSettingsTarget(temp.cwd);
+			fs.mkdirSync(path.dirname(target.path), { recursive: true });
+			fs.writeFileSync(
+				target.path,
+				JSON.stringify({ env: { OTEL_LOG_RAW_API_BODIES: "1" } }, null, 2),
+			);
+
+			const result = ensureClaudeProjectTelemetryPin({
+				vars: currentClaudeVars(),
+				cwd: temp.cwd,
+			});
+
+			expect(result.action).toBe("updated");
+			const written = JSON.parse(fs.readFileSync(target.path, "utf8"));
+			expect(written.env.OTEL_LOG_RAW_API_BODIES).toBe("1");
+			expect(written.env.OTEL_EXPORTER_OTLP_ENDPOINT).toBe(CURRENT_ENDPOINT);
+		});
+	});
 });
 
 describe("removeClaudeProjectTelemetryPin", () => {
