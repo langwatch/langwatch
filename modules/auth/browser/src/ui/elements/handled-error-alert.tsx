@@ -54,7 +54,8 @@ export function HandledErrorAlert({
     readAuthoredMessage(error) ??
     UNKNOWN_DESCRIPTION;
   // A tip that only repeats the description says it twice; main's toasts drop it the same way.
-  const tips = (handled?.tips ?? []).filter((tip) => tip.trim() !== description.trim());
+  const sentence = typeof description === "string" ? description.trim() : null;
+  const tips = (handled?.tips ?? []).filter((tip) => tip.trim() !== sentence);
   const traceId = readErrorTraceId(error);
 
   return (
