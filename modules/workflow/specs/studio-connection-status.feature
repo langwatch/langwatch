@@ -25,16 +25,22 @@ Feature: The workflow studio shows one quiet connection status
     And the line fades away shortly after
 
   @integration
-  Scenario: Edits made while disconnected save when the connection returns
-    Given the studio is disconnected
+  Scenario: Autosave keeps saving while the engine is away
+    Given the studio's engine connection is down
     When the user edits the workflow
-    Then no save is attempted and no save failure is shown
-    And the edit is saved once the connection returns
+    Then the edit is saved to the API as usual
+
+  @integration
+  Scenario: Run waits for the engine connection
+    Given the studio's engine connection is not up
+    When the user looks at a node's run control
+    Then it is disabled with the tooltip "Waiting for the engine to connect"
+    And no "Studio is not connected yet" toast is raised
 
   @integration
   Scenario: A save that does not go through is retried, never shown as failed
-    Given the studio is connected
-    When an autosave does not go through
+    Given the studio is open
+    When an autosave to the API does not go through
     Then no save failure is shown
     And the same change is saved on the next attempt
 

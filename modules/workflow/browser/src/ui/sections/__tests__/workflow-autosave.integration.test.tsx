@@ -24,32 +24,14 @@ async function advance(ms: number) {
   });
 }
 
-function renderAutosave({
-  isConnected,
-  onSave,
-}: {
-  isConnected: boolean;
-  onSave: Parameters<typeof WorkflowAutosave>[0]["onSave"];
-}) {
-  const onRefreshVersions = vi.fn(() => Promise.resolve());
-  const view = renderWithDesignSystem(
+function renderAutosave({ onSave }: { onSave: Parameters<typeof WorkflowAutosave>[0]["onSave"] }) {
+  renderWithDesignSystem(
     <WorkflowAutosave
       isWorkflowReady
-      isConnected={isConnected}
       onSave={onSave}
-      onRefreshVersions={onRefreshVersions}
+      onRefreshVersions={vi.fn(() => Promise.resolve())}
     />,
   );
-  const reconnect = () =>
-    view.rerender(
-      <WorkflowAutosave
-        isWorkflowReady
-        isConnected
-        onSave={onSave}
-        onRefreshVersions={onRefreshVersions}
-      />,
-    );
-  return { reconnect };
 }
 
 describe("WorkflowAutosave", () => {
@@ -61,18 +43,13 @@ describe("WorkflowAutosave", () => {
     vi.useRealTimers();
   });
 
-  describe("given the studio is disconnected", () => {
-    /** @scenario Edits made while disconnected save when the connection returns */
-    it("holds the edit and saves it once the connection returns", async () => {
+  describe("given the engine connection is down", () => {
+    /** @scenario Autosave keeps saving while the engine is away */
+    it("saves the edit to the API, which the engine socket does not gate", async () => {
       const onSave = vi.fn(() => Promise.resolve({ version: "1", id: "version-1" }));
       editAfterLoad();
-      const { reconnect } = renderAutosave({ isConnected: false, onSave });
+      renderAutosave({ onSave });
 
-      await advance(60_000);
-      expect(onSave).not.toHaveBeenCalled();
-      expect(screen.queryByText(/fail/i)).toBeNull();
-
-      reconnect();
       await advance(1_000);
       expect(onSave).toHaveBeenCalledTimes(1);
     });
@@ -86,7 +63,7 @@ describe("WorkflowAutosave", () => {
         .mockRejectedValueOnce(new Error("offline"))
         .mockResolvedValue({ version: "1", id: "version-1" });
       editAfterLoad();
-      renderAutosave({ isConnected: true, onSave });
+      renderAutosave({ onSave });
 
       await advance(1_000);
       expect(onSave).toHaveBeenCalledTimes(1);

@@ -37,18 +37,15 @@ async function refreshThenMoveBaseline({
 
 /**
  * Browser-side Workflow autosave: the application provides the two transport actions,
- * this owns change detection, debounce and status. Edits queue while disconnected and
- * save once the studio is back; a save that does not go through retries, never failing.
+ * this owns change detection, debounce and status. Saves go to the API whatever the engine
+ * connection; a save that does not go through stays queued and retries, never failing.
  */
 export function WorkflowAutosave({
   isWorkflowReady,
-  isConnected,
   onSave,
   onRefreshVersions,
 }: {
   isWorkflowReady: boolean;
-  /** Whether the studio is connected; saves wait for it rather than fail. */
-  isConnected: boolean;
   onSave: (input: {
     dsl: StudioWorkflow;
     setAsLatestVersion: boolean;
@@ -62,7 +59,6 @@ export function WorkflowAutosave({
   const savedIndicatorTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const retryTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const retryDelayRef = useRef(RETRY_FIRST_MS);
-  const canSave = isWorkflowReady && isConnected;
 
   const {
     setWorkflow,
@@ -98,8 +94,7 @@ export function WorkflowAutosave({
 
   const saveIfChanged = useEffectEvent(async () => {
     clearScheduledSave();
-    // Not ready or not connected: the change stays queued until the effect re-arms.
-    if (!canSave) {
+    if (!isWorkflowReady) {
       return;
     }
 
@@ -145,7 +140,7 @@ export function WorkflowAutosave({
   });
 
   useEffect(() => {
-    if (!canSave) {
+    if (!isWorkflowReady) {
       clearScheduledSave();
       return;
     }
@@ -158,7 +153,7 @@ export function WorkflowAutosave({
     }
 
     return () => clearTimer(saveTimeoutRef);
-  }, [canSave, stateWorkflow]);
+  }, [isWorkflowReady, stateWorkflow]);
 
   useEffect(
     () => () => {

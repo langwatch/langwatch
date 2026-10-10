@@ -12,6 +12,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 vi.mock("../../../../behavior/use-workflow-store.ts", () => ({
   useWorkflowStore: (selector: (state: unknown) => unknown) =>
     selector({
+      socketStatus: "connected",
       checkCanCommitNewVersion: () => true,
       getWorkflow: () => ({ nodes: [], edges: [] }),
     }),

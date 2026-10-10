@@ -261,7 +261,7 @@ export default function OptimizationStudio() {
                     </Link>
                     <StudioWorkflowRunningStatus />
                     {!["waiting", "running"].includes(executionStatus ?? "") && (
-                      <StudioWorkflowAutosave isConnected={socketStatus === "connected"} />
+                      <StudioWorkflowAutosave />
                     )}
                   </HStack>
                   <HStack width="full" justify="center">
@@ -579,7 +579,7 @@ function StudioWorkflowNodeSelectionPanel({
   );
 }
 
-function StudioWorkflowAutosave({ isConnected }: { isConnected: boolean }) {
+function StudioWorkflowAutosave() {
   const { project } = useOrganizationTeamProject();
   const { workflow } = useLoadWorkflow();
   const autosave = workflowApi.workflow.autosave.useMutation();
@@ -615,7 +615,6 @@ function StudioWorkflowAutosave({ isConnected }: { isConnected: boolean }) {
   return (
     <WorkflowAutosave
       isWorkflowReady={!!project && !!workflow.data}
-      isConnected={isConnected}
       onSave={onSave}
       onRefreshVersions={onRefreshVersions}
     />
