@@ -177,6 +177,7 @@ export type ExecutionState = {
     status_text?: string;
     response_headers?: Record<string, string>;
     rendered_body?: string;
+    response_body?: string;
     warnings?: string[];
   };
   timestamps?: {

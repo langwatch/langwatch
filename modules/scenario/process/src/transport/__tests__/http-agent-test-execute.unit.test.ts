@@ -175,6 +175,7 @@ describe("scenarios.testHttpAgent", () => {
           status_code: 500,
           status_text: "Internal Server Error",
           response_headers: { "Content-Type": "text/plain" },
+          response_body: '{"detail":"quota exceeded"}',
         },
       });
 
@@ -186,6 +187,7 @@ describe("scenarios.testHttpAgent", () => {
         statusText: "Internal Server Error",
         error: "httpblock: upstream returned 500",
         responseHeaders: { "Content-Type": "text/plain" },
+        response: { detail: "quota exceeded" },
       });
     });
 
