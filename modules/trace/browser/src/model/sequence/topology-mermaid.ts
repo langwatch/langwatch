@@ -1,3 +1,4 @@
+import { getRawColorValue } from "@langwatch/design-system/color-mode";
 import { formatDuration } from "@langwatch/design-system/display-formatters";
 import type { SpanTreeNode } from "@langwatch/trace-contract";
 
@@ -92,17 +93,17 @@ function nearestParentNode(
 // `var(...)` refs inside classDef, so we emit resolved hex per colour
 // mode and let the surrounding effect re-render on theme change.
 const LIGHT_PALETTE = {
-  agent: { bg: "#F3E8FF", fg: "#6B21A8", stroke: "#A855F7" },
-  llm: { bg: "#DBEAFE", fg: "#1D4ED8", stroke: "#3B82F6" },
-  tool: { bg: "#D1FAE5", fg: "#047857", stroke: "#10B981" },
-  other: { bg: "#F1F5F9", fg: "#334155", stroke: "#94A3B8" },
+  agent: { bg: "purple.subtle", fg: "purple.fg", stroke: "purple.emphasized" },
+  llm: { bg: "blue.subtle", fg: "blue.fg", stroke: "blue.emphasized" },
+  tool: { bg: "green.subtle", fg: "green.fg", stroke: "green.emphasized" },
+  other: { bg: "gray.subtle", fg: "gray.fg", stroke: "gray.emphasized" },
 } as const;
 
 const DARK_PALETTE = {
-  agent: { bg: "#2E1065", fg: "#DDD6FE", stroke: "#A855F7" },
-  llm: { bg: "#172554", fg: "#BFDBFE", stroke: "#3B82F6" },
-  tool: { bg: "#022C22", fg: "#A7F3D0", stroke: "#10B981" },
-  other: { bg: "#1E293B", fg: "#CBD5E1", stroke: "#64748B" },
+  agent: { bg: "purple.subtle", fg: "purple.fg", stroke: "purple.emphasized" },
+  llm: { bg: "blue.subtle", fg: "blue.fg", stroke: "blue.emphasized" },
+  tool: { bg: "green.subtle", fg: "green.fg", stroke: "green.emphasized" },
+  other: { bg: "gray.subtle", fg: "gray.fg", stroke: "gray.emphasized" },
 } as const;
 
 function addNode({
@@ -181,7 +182,7 @@ function renderTopologySyntax({
   let syntax = "graph LR\n";
   for (const kind of ["agent", "llm", "tool", "other"] as const) {
     const color = palette[kind];
-    syntax += `  classDef ${kind} fill:${color.bg},color:${color.fg},stroke:${color.stroke},stroke-width:1px\n`;
+    syntax += `  classDef ${kind} fill:${getRawColorValue(color.bg)},color:${getRawColorValue(color.fg)},stroke:${getRawColorValue(color.stroke)},stroke-width:1px\n`;
   }
 
   for (const node of nodes) {

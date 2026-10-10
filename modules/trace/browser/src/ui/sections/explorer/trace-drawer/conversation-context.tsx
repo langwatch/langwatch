@@ -306,12 +306,12 @@ export const ConversationContext = memo(function ConversationContext({
       minWidth={0}
       // Light mode: panel bg matches the accordion sections; selected row uses the same
       // `blue.subtle` as the trace list's row-selection. Dark mode keeps the validated palette.
-      bg={{ base: "bg.surface", _dark: "bg.surface" }}
+      bg={{ base: "bg.card", _dark: "bg.card" }}
       // Bottom border doubles as the ctx ↔ viz separator when the
       // pane is expanded (the header's own borderBottom only sits at
       // the chevron line, not at the bottom of the pane).
       borderBottomWidth="1px"
-      borderColor={{ base: "gray.200", _dark: "border.muted" }}
+      borderColor={{ base: "border", _dark: "border.muted" }}
     >
       <ContextHeader
         position={ctx.position}
@@ -380,9 +380,9 @@ function ContextHeader({
       // bump paddingY by half a density step to keep the visible strip on
       // the same beat.
       paddingY={densityPaddingY + 0.5}
-      bg="bg.surface"
+      bg="bg.card"
       borderBottomWidth="1px"
-      borderColor={{ base: "gray.200", _dark: "border.muted" }}
+      borderColor={{ base: "border", _dark: "border.muted" }}
       color="fg.muted"
       transition="background 120ms ease, color 120ms ease"
       _hover={{ bg: "bg.softHover", color: "fg" }}
@@ -518,7 +518,7 @@ function ContextBody({
               paddingY={2}
               gap={2.5}
               borderBottomWidth={i === 2 ? 0 : "1px"}
-              borderColor={{ base: "gray.200", _dark: "border.muted" }}
+              borderColor={{ base: "border", _dark: "border.muted" }}
             >
               <Skeleton height="14px" width="56px" borderRadius="sm" />
               <Skeleton height="14px" width="14px" borderRadius="full" />
@@ -533,7 +533,7 @@ function ContextBody({
           paddingX={3}
           borderRadius="md"
           borderWidth="1px"
-          borderColor={{ base: "gray.200", _dark: "border.muted" }}
+          borderColor={{ base: "border", _dark: "border.muted" }}
           bg="bg.panel"
         >
           <Text textStyle="2xs" color="fg.subtle">
@@ -553,7 +553,7 @@ function ContextBody({
           // Light mode uses a deeper gray than `border.muted` so the
           // card frame reads against the white panel surface. Dark
           // mode keeps the validated muted border.
-          borderColor={{ base: "gray.200", _dark: "border.muted" }}
+          borderColor={{ base: "border", _dark: "border.muted" }}
           bg="bg.panel"
           overflow="hidden"
         >
@@ -574,7 +574,7 @@ function ContextBody({
                     textAlign="center"
                     paddingY={1}
                     borderBottomWidth="1px"
-                    borderColor={{ base: "gray.200", _dark: "border.muted" }}
+                    borderColor={{ base: "border", _dark: "border.muted" }}
                   >
                     {turnsAbove} {turnsAbove === 1 ? "turn" : "turns"} above
                   </Text>
@@ -594,7 +594,7 @@ function ContextBody({
                     textAlign="center"
                     paddingY={1}
                     borderTopWidth="1px"
-                    borderColor={{ base: "gray.200", _dark: "border.muted" }}
+                    borderColor={{ base: "border", _dark: "border.muted" }}
                   >
                     {turnsBelow} {turnsBelow === 1 ? "turn" : "turns"} below
                   </Text>
@@ -640,7 +640,7 @@ const ConversationRow = memo(function ConversationRow({
         // Border color must not be inside the opacity-dimmed scope — otherwise the
         // separator between the "Start of conversation" placeholder and the selected
         // blue row reads as a barely- visible line.
-        borderColor={{ base: "gray.200", _dark: "border.muted" }}
+        borderColor={{ base: "border", _dark: "border.muted" }}
         cursor="default"
       >
         <Flex align="center" gap={2.5} flex={1} minWidth={0} opacity={0.55}>
@@ -669,12 +669,12 @@ const ConversationRow = memo(function ConversationRow({
         // "this is the current turn" cue is consistent across
         // surfaces. Non-selected rows are white (light) / transparent
         // (dark) so the panel chrome shows through.
-        bg={isCurrent ? "blue.subtle" : { base: "bg.surface", _dark: "transparent" }}
+        bg={isCurrent ? "blue.subtle" : { base: "bg.card", _dark: "transparent" }}
         borderBottomWidth={isLast ? 0 : "1px"}
-        borderColor={{ base: "gray.200", _dark: "border.muted" }}
+        borderColor={{ base: "border", _dark: "border.muted" }}
         cursor={isCurrent ? "default" : "pointer"}
         onClick={isCurrent ? undefined : handleClick}
-        _hover={isCurrent ? undefined : { bg: { base: "gray.50", _dark: "bg.muted" } }}
+        _hover={isCurrent ? undefined : { bg: { base: "bg.subtle", _dark: "bg.muted" } }}
         transition="background 0.12s ease"
         textAlign="left"
         width="full"
@@ -707,7 +707,7 @@ const ConversationRow = memo(function ConversationRow({
             // Input / user side = blue. Matches the IOPreview's INPUT
             // label and the up-arrow chip used on the trace list rows
             // (lighter than `blue.fg` so the icon doesn't shout).
-            iconColor={{ base: "blue.500", _dark: "blue.fg" }}
+            iconColor={{ base: "blue.fg", _dark: "blue.fg" }}
             text={row.userText}
             // No bold on the input line of the current turn —
             // selection is communicated by the row's blue.subtle bg,

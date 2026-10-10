@@ -393,8 +393,8 @@ const ConversationSkeleton: React.FC<{ conversationId: string }> = ({ conversati
         paddingX={4}
         paddingY={2.5}
         borderBottomWidth="1px"
-        borderColor={{ base: "gray.200", _dark: "border.muted" }}
-        bg="bg.surface"
+        borderColor={{ base: "border", _dark: "border.muted" }}
+        bg="bg.card"
         flexShrink={0}
       >
         <Text
@@ -502,8 +502,8 @@ const ConversationHeader: React.FC<{
       paddingX={4}
       paddingY={2.5}
       borderBottomWidth="1px"
-      borderColor={{ base: "gray.200", _dark: "border.muted" }}
-      bg="bg.surface"
+      borderColor={{ base: "border", _dark: "border.muted" }}
+      bg="bg.card"
       flexShrink={0}
     >
       <Text

@@ -106,15 +106,14 @@ function MappingModeToggle({
   traceCount: number | undefined;
 }) {
   return (
-    <HStack bg="gray.100" _dark={{ bg: "gray.800" }} borderRadius="md" padding="3px" gap={0}>
+    <HStack bg="bg.nested" borderRadius="md" padding="3px" gap={0}>
       <Box
         as="button"
         onClick={(event: React.MouseEvent) => {
           event.preventDefault();
           onChange(false);
         }}
-        bg={!isThreadMapping ? "white" : "transparent"}
-        _dark={{ bg: !isThreadMapping ? "gray.700" : "transparent" }}
+        bg={!isThreadMapping ? "bg.card" : "transparent"}
         color={!isThreadMapping ? "fg" : "fg.muted"}
         fontWeight={!isThreadMapping ? "medium" : "normal"}
         borderRadius="sm"
@@ -133,8 +132,7 @@ function MappingModeToggle({
           event.preventDefault();
           onChange(true);
         }}
-        bg={isThreadMapping ? "white" : "transparent"}
-        _dark={{ bg: isThreadMapping ? "gray.700" : "transparent" }}
+        bg={isThreadMapping ? "bg.card" : "transparent"}
         color={isThreadMapping ? "fg" : "fg.muted"}
         fontWeight={isThreadMapping ? "medium" : "normal"}
         borderRadius="sm"
