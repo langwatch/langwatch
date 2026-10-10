@@ -31,7 +31,7 @@ const meshImage = (spot: number) =>
 
 /** Base carries the status; the mesh adds only a small, even variation in that same hue. */
 const MESH = {
-  banner: { base: [3, 7], spot: [2, 3], rim: [20, 30] },
+  banner: { base: [3, 7], spot: [2, 3], rim: [12, 18] },
   toast: { base: [7, 12], spot: [3, 4], rim: [26, 36] },
   outline: { base: [1, 3], spot: [1, 2], rim: [32, 42] },
   subtle: { base: [12, 18], spot: [4, 5], rim: [30, 40] },
@@ -45,12 +45,19 @@ export const statusMesh = (level: MeshLevel) => {
   const { base, spot, rim } = MESH[level];
   const edge = (amount: number) =>
     `color-mix(in srgb, var(--chakra-colors-color-palette-solid) ${amount}%, var(--chakra-colors-border-muted))`;
+  const image = (amount: number) =>
+    level === "banner"
+      ? [
+          `radial-gradient(32rem 12rem at 0% 0%, ${step("solid", amount)} 0%, transparent 100%)`,
+          `radial-gradient(24rem 10rem at 85% 100%, ${step("solid", Math.round(amount * 0.6))} 0%, transparent 100%)`,
+        ].join(", ")
+      : meshImage(amount);
   return {
     bg: {
       _light: statusTint({ color: "color-palette-solid", ground: "bg-surface", amount: base[0] }),
       _dark: statusTint({ color: "color-palette-solid", ground: "bg-panel", amount: base[1] }),
     },
-    backgroundImage: { _light: meshImage(spot[0]), _dark: meshImage(spot[1]) },
+    backgroundImage: { _light: image(spot[0]), _dark: image(spot[1]) },
     borderColor: { _light: edge(rim[0]), _dark: edge(rim[1]) },
   };
 };

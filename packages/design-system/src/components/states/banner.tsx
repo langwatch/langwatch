@@ -1,4 +1,4 @@
-import { Box, Button, type ButtonProps, chakra, HStack, Text } from "@chakra-ui/react";
+import { Box, Button, type ButtonProps, HStack, Text } from "@chakra-ui/react";
 import { AlertCircle, CheckCircle2, Info, TriangleAlert } from "lucide-react";
 import { forwardRef, type ReactNode } from "react";
 
@@ -50,7 +50,11 @@ export const BannerAction = forwardRef<HTMLButtonElement, ButtonProps>(
         size="xs"
         variant="outline"
         colorPalette="gray"
-        bg="bg.panel"
+        bg="transparent"
+        borderColor="border.muted"
+        color="fg"
+        boxShadow="none"
+        _hover={{ bg: "bg.panel", borderColor: "border" }}
         flexShrink={0}
         {...props}
       />
@@ -73,16 +77,18 @@ export function Banner({
   const Glyph = GLYPH[status];
   const top = placement === "top";
   return (
-    <HStack
+    <Box
+      display="grid"
+      gridTemplateColumns={onDismiss ? "auto minmax(0, 1fr) auto" : "auto minmax(0, 1fr)"}
+      alignItems="start"
       data-testid={testId}
       data-banner-placement={placement}
       role={status === "error" ? "alert" : "status"}
-      align="flex-start"
-      gap="2.5"
+      gap="3"
       width="full"
-      paddingY="2.5"
-      paddingStart="4"
-      paddingEnd="3"
+      paddingY={top ? "2.5" : "3"}
+      paddingStart={top ? "6" : "4"}
+      paddingEnd={top ? "4" : "3"}
       textStyle="sm"
       colorPalette={hue}
       color="fg"
@@ -101,35 +107,52 @@ export function Banner({
           : { borderRadius: "lg", borderWidth: "1px", borderColor: BANNER_MESH.borderColor }
       }
     >
-      <Box color="colorPalette.fg" display="flex" alignItems="center" height="5" flexShrink={0}>
-        {icon ?? <Glyph size={16} aria-hidden="true" />}
-      </Box>
-      <chakra.div
-        flex="1"
-        minWidth={0}
+      <Box
+        color="colorPalette.fg"
         display="flex"
-        flexDirection={top ? "row" : "column"}
-        flexWrap="wrap"
-        columnGap="1.5"
-        rowGap="0.5"
-        alignItems={top ? "baseline" : "stretch"}
+        alignItems="center"
+        height={top ? "7" : "5"}
+        aria-hidden="true"
       >
-        {title && (
-          <Text as="span" fontWeight="semibold" data-part="title">
-            {title}
-          </Text>
-        )}
-        {title && children ? " " : null}
-        {children && (
-          <Text as="span" color="inherit">
-            {children}
-          </Text>
-        )}
-      </chakra.div>
-      {action}
+        {icon ?? <Glyph size={16} />}
+      </Box>
+      <HStack align="start" gap="3" rowGap="2" flexWrap="wrap" minWidth={0}>
+        <Box
+          flex="1 1 20rem"
+          minWidth={0}
+          paddingY={top ? "1" : "0"}
+          lineHeight="5"
+          overflowWrap="anywhere"
+        >
+          {title && (
+            <Text
+              as="span"
+              display={top ? "inline" : "block"}
+              fontWeight="medium"
+              data-part="title"
+            >
+              {title}
+            </Text>
+          )}
+          {title && children && top ? " " : null}
+          {children && (
+            <Text as="span" display={top ? "inline" : "block"} color="fg">
+              {children}
+            </Text>
+          )}
+        </Box>
+        {action}
+      </HStack>
       {onDismiss && (
-        <CloseButton size="2xs" aria-label="Dismiss" onClick={onDismiss} flexShrink={0} />
+        <CloseButton
+          size="xs"
+          aria-label="Dismiss"
+          onClick={onDismiss}
+          color="fg.muted"
+          marginTop={top ? "0" : "-1"}
+          _hover={{ color: "fg", bg: "bg.panel" }}
+        />
       )}
-    </HStack>
+    </Box>
   );
 }
