@@ -1634,6 +1634,7 @@ tables, and declares its own LWQL catalogue entries for the event-table views, w
 composes (Alex, 2026-10-06, round 4, Q205). One stored event's payload (trace's offloaded fields) is
 read through a narrow single-event read seat beside the producer-only store, within main's 2-day
 window; the producer-only rule stands for everything else (Alex, 2026-10-06, round 3, Q209).
+2026-10-10: identity reads one aggregate's history through the read seat; WEB-9103.
 
 **A ClickHouse table has one owner, and others read it through that owner** (Alex, 2026-10-06,
 round 3, Q207). A plain read of another module's table is a query operation on its owner's `*Api`

@@ -48,7 +48,7 @@ const FULL_VALUE = "x".repeat(100 * 1024);
 type SeatRead = Parameters<EventReadSeat["getEvent"]>[0];
 
 /** A seat holding events per tenant and keeping every read it was asked; others are not found. */
-class RecordingSeat implements EventReadSeat {
+class RecordingSeat implements Pick<EventReadSeat, "getEvent"> {
   readonly reads: SeatRead[] = [];
   private readonly events = new Map<string, unknown>();
 
