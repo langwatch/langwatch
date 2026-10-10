@@ -237,9 +237,28 @@ func (o *Orchestrator) reapDeadStacks() {
 		}
 		dead := s.LauncherPID != 0 && !o.launcherIsOurs(s)
 		if stale := s.Stale(now, o.cfg.IdleTTL); dead || stale {
-			o.reapStack(s, dead, stale)
+			o.reapIfUnchanged(s, dead, stale)
 		}
 	}
+}
+
+// reapIfUnchanged reaps s only while no up or down holds its slug and the
+// record still names the launcher this tick judged. The tick's list can predate
+// an up that re-registered the slug, and removal is by slug, so reaping the old
+// record would take the new stack's entry and plan ("unknown stack" at hand-over).
+func (o *Orchestrator) reapIfUnchanged(s domain.Stack, dead, stale bool) {
+	if o.sem != nil {
+		release, _, ok, err := o.sem.TryAcquire("up-"+s.Slug, 1)
+		if err != nil || !ok {
+			return
+		}
+		defer release()
+	}
+	cur, ok := o.stackBySlug(s.Slug)
+	if !ok || cur.LauncherPID != s.LauncherPID || cur.LauncherStart != s.LauncherStart {
+		return
+	}
+	o.reapStack(cur, dead, stale)
 }
 
 // reapStack takes one stack off the machine: its routes first, then its
