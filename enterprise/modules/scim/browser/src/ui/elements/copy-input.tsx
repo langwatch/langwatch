@@ -63,7 +63,7 @@ export function CopyInput(
                 cursor: "pointer",
                 marginLeft: 8,
                 padding: 0,
-                color: "#888",
+                color: "var(--chakra-colors-fg-subtle)",
               }}
               aria-label={visible ? `Hide ${props.label}` : `Show ${props.label}`}
               onClick={(e) => {
