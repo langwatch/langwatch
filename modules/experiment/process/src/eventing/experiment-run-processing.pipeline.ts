@@ -9,6 +9,7 @@ import {
   definePipeline,
   type EventingSetup,
   type FoldProjectionStore,
+  type LaneAlias,
   type Projection,
   type RetentionPolicyResolver,
   type StaticPipelineDefinition,
@@ -121,6 +122,20 @@ export type ExperimentRunProcessingPipeline = StaticPipelineDefinition<
   | { name: "executeExperimentCell"; payload: ExecuteExperimentCellCommandData }
 >;
 
+/**
+ * Main's trace-side `experimentMetricsSync` reactor is this pipeline's peer lane now. The lane
+ * reads only the trace's tenant and id, so a span_received job runs as it was queued; a job of
+ * another event type is acknowledged with a log line, as scenario's `simulationMetricsSync` is.
+ */
+export const MAIN_TRACE_METRICS_LANE_ALIASES: readonly LaneAlias[] = [
+  {
+    from: "trace_processing:reactor:experimentMetricsSync",
+    to: { jobType: "subscriber", lane: "traceSpanMetricsSync" },
+    eventTypes: [SPAN_RECEIVED_EVENT_TYPE],
+    removeAfter: "3.21.0",
+  },
+];
+
 /** The run pipeline over the stores a deployment composed for it. */
 export function buildExperimentRunProcessingPipeline(
   deps: ClickhouseExperimentRunProcessingRepository,
@@ -183,7 +198,8 @@ export function buildExperimentRunProcessingPipeline(
           tenantId: String(context.tenantId),
           traceId: String(context.aggregateId),
         }),
-    });
+    })
+    .withLaneAliases(MAIN_TRACE_METRICS_LANE_ALIASES);
 
   // ADR-066 pillar 2: a row's results share one group, so a backed-up row appends them in one
   // insert. Safe to fold: each result handler derives its event from its own command alone.

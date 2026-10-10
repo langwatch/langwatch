@@ -293,3 +293,12 @@ Feature: Enterprise governance package boundary
       Given a member of the organization
       When the CLI asks for its bootstrap
       Then governance resolves the bootstrap for that member
+
+  Rule: Main's trace-side governance lanes are retired for one release
+
+    @unit
+    Scenario: Governance KPI and OCSF jobs the previous release queued on trace are acknowledged
+      Given the previous release queued jobs under "trace_processing:reactor:governanceKpisSync" and "trace_processing:reactor:governanceOcsfEventsSync"
+      When governance's activity monitor pipeline is built
+      Then it tombstones both keys for one release, naming the trace-facts pull that took their work
+      And a worker of the new release acknowledges those jobs with one log line instead of blocking their group
