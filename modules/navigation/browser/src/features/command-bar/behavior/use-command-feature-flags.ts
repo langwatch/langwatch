@@ -1,4 +1,5 @@
 import { FrontendFlags } from "@langwatch/feature-flag-contract";
+import { type ProjectNavigation, projectNavigation } from "@langwatch/project-contract";
 import { useMemo } from "react";
 
 import { useNavigationHost } from "../../../model/navigation-host.ts";
@@ -9,7 +10,6 @@ import {
   filterCommandsByProjectNavigation,
   topLevelNavigationCommands,
 } from "../model/command-catalogue.ts";
-import { useCommandProjectNavigation } from "./use-command-project-navigation.ts";
 
 /** Flags for command list, asked through host so palette and sidebar see the same answer */
 export function useCommandFeatureFlags(): CommandFeatureFlagValues {
@@ -43,4 +43,13 @@ export function useTopLevelNavigationCommands(): Command[] {
       }),
     [flags, navigation],
   );
+}
+
+/**
+ * What the current project's navigation shows; an organization page holds no project and
+ * keeps all.
+ */
+export function useCommandProjectNavigation(): ProjectNavigation {
+  const kind = useNavigationHost().project()?.kind;
+  return useMemo(() => projectNavigation(kind), [kind]);
 }

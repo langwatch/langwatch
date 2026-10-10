@@ -4,8 +4,8 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { DATASET_NORMALIZATION_SETTLED_EVENT_TYPE } from "../dataset-normalization.events.ts";
 import { datasetTrpc } from "../dataset.trpc.ts";
+import { DATASET_NORMALIZATION_SETTLED_EVENT_TYPE } from "../dataset.ts";
 
 const hintsOf = (name: "getById" | "getAll") =>
   (datasetTrpc.members[name].invalidatedBy ?? []).map((hint) =>

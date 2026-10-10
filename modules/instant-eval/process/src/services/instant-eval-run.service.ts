@@ -5,30 +5,20 @@
  */
 
 import type { LangWatchQLRunCaller } from "@langwatch/analytics-contract";
-import { type Actor, type Authorization, PermissionDeniedError } from "@langwatch/authorization";
 import {
   type InstantEvalActor,
   type InstantEvalJudgmentStatus,
   InstantEvalClassifierNotConfiguredError,
   InstantEvalNotEnabledError,
-  InstantEvalQueryInvalidError,
   type InstantEvalRunInput,
 } from "@langwatch/instant-eval-contract";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant, type Instant } from "@langwatch/time";
-import type { LangWatchQLTraceFilter } from "@langwatch/trace-contract";
 
 import type { InstantEvalJudgmentPage } from "../repositories/instant-eval-judgments.repository.ts";
 import type { InstantEvalRunRow } from "../repositories/instant-eval-run.repository.ts";
 import { instantEvalRowLimitOrRefuse } from "../rules/instant-eval-caps.rules.ts";
 import { getInstantEvalQueryCapability } from "../rules/instant-eval-query-capability.rules.ts";
-import {
-  compileInstantEvalFilter,
-  instantEvalStatementFor,
-  refuseUnsupportedShorthandFilter,
-  type InstantEvalStatement,
-} from "../rules/instant-eval-run-input.rules.ts";
-import { instantEvalShorthandWindow } from "../rules/instant-eval-shorthand.rules.ts";
 import type { InstantEvalCancelService } from "./instant-eval-cancel.service.ts";
 import type { InstantEvalCreateService } from "./instant-eval-create.service.ts";
 import type {
@@ -37,6 +27,10 @@ import type {
 } from "./instant-eval-estimate.service.ts";
 import type { InstantEvalFreeBudgetService } from "./instant-eval-free-budget.service.ts";
 import type { InstantEvalReadsService } from "./instant-eval-reads.service.ts";
+import {
+  InstantEvalRequestStatementService,
+  type InstantEvalRequestStatementPeers,
+} from "./instant-eval-request-statement.service.ts";
 import type { InstantEvalSample, InstantEvalSampleService } from "./instant-eval-sample.service.ts";
 import type {
   AcceptedInstantEvalStatement,
@@ -53,7 +47,7 @@ interface InstantEvalRunPlan {
 }
 
 /** The peers a run is resolved through, each one question wide. */
-export interface InstantEvalRunPeers {
+export interface InstantEvalRunPeers extends InstantEvalRequestStatementPeers {
   /** Whether this project may run Instant Evals at all. */
   isEnabled(input: { projectId: string }): Promise<boolean>;
   /** Whether the flag alone is on for this project, whatever judge the deployment has. */
@@ -66,26 +60,6 @@ export interface InstantEvalRunPeers {
     actor: InstantEvalActor;
   }): Promise<LangWatchQLRunCaller>;
   getPlan(input: { projectId: string }): Promise<InstantEvalRunPlan>;
-  /** The database the LangWatchQL views live in. */
-  database(): string;
-  /**
-   * A target's filter compiled against the LangWatchQL trace view, so the
-   * statement carries it and can be rerun. Absent where none is wired, and the
-   * filter is then resolved into a selection.
-   */
-  compileFilter?(input: { filter: string }): LangWatchQLTraceFilter;
-  /**
-   * The trace ids a target's filter selects through the explorer's compiler,
-   * capped at the row limit: what a field outside the trace row is judged by.
-   * Absent where none is wired, and such a filter is refused, never ignored.
-   */
-  selectTraceIds?(input: {
-    projectId: string;
-    authorization: Authorization;
-    filter: string;
-    window: { from: number; to: number };
-    limit: number;
-  }): Promise<readonly string[]>;
 }
 
 /** An estimate, with what the free budget has left when one bounds the run. */
@@ -114,11 +88,19 @@ interface InstantEvalRunUnits {
 }
 
 export class InstantEvalRunService {
+  private readonly statements: InstantEvalRequestStatementService;
+
   private constructor(
     private readonly units: InstantEvalRunUnits,
     private readonly peers: InstantEvalRunPeers,
-    private readonly now: () => Instant,
-  ) {}
+    now: () => Instant,
+  ) {
+    this.statements = InstantEvalRequestStatementService.create({
+      peers,
+      proofs: units.proofs,
+      now,
+    });
+  }
 
   static create({
     units,
@@ -358,108 +340,13 @@ export class InstantEvalRunService {
     input: InstantEvalRunInput;
     rowLimit: number;
   }): Promise<AcceptedInstantEvalStatement> {
-    const statement = await this.#statementFor({ projectId, actor, input, rowLimit });
+    const statement = await this.statements.statementFor({ projectId, actor, input, rowLimit });
 
     return this.units.statements.accept({
       caller: caller.project,
       protections: caller.protections,
       sql: statement.sql,
       ...(statement.parameters ? { parameters: statement.parameters } : {}),
-    });
-  }
-
-  async #statementFor({
-    projectId,
-    actor,
-    input,
-    rowLimit,
-  }: {
-    projectId: string;
-    actor: InstantEvalActor;
-    input: InstantEvalRunInput;
-    rowLimit: number;
-  }): Promise<InstantEvalStatement> {
-    const base = { input, database: this.peers.database(), now: this.now() };
-    const filter = this.#shorthandFilterOf(input);
-    if (filter === undefined) return instantEvalStatementFor(base);
-    const peers = this.peers;
-    if (!peers.compileFilter) {
-      return instantEvalStatementFor({
-        ...base,
-        selection: await this.#selectionFor({ projectId, actor, input, filter, rowLimit }),
-      });
-    }
-
-    const compiled = compileInstantEvalFilter({
-      compile: (input) => peers.compileFilter?.(input) ?? { kind: "empty" },
-      filter,
-    });
-    switch (compiled.kind) {
-      case "empty":
-        return instantEvalStatementFor(base);
-      case "compiled":
-        return instantEvalStatementFor({
-          ...base,
-          filter: { sql: compiled.sql, parameters: compiled.parameters },
-        });
-      case "refused":
-        throw new InstantEvalQueryInvalidError({ reason: compiled.reason, fields: ["filter"] });
-      case "unsupported":
-        // The explorer's own compiler answers what the trace view cannot.
-        if (!this.peers.selectTraceIds) {
-          refuseUnsupportedShorthandFilter(compiled);
-        }
-        return instantEvalStatementFor({
-          ...base,
-          selection: await this.#selectionFor({ projectId, actor, input, filter, rowLimit }),
-        });
-    }
-  }
-
-  /** The shorthand's filter, when the request is a shorthand that names one. */
-  #shorthandFilterOf(input: InstantEvalRunInput): string | undefined {
-    if (typeof input.sql === "string" && input.sql.trim() !== "") return undefined;
-    const filter = input.shorthand?.filter?.trim();
-    return filter === undefined || filter === "" ? undefined : filter;
-  }
-
-  /** The trace ids a target's filter selects, resolved by the explorer's own compiler. */
-  async #selectionFor({
-    projectId,
-    actor,
-    input,
-    filter,
-    rowLimit,
-  }: {
-    projectId: string;
-    actor: InstantEvalActor;
-    input: InstantEvalRunInput;
-    filter: string;
-    rowLimit: number;
-  }): Promise<readonly string[]> {
-    const shorthand = input.shorthand;
-    if (!this.peers.selectTraceIds || shorthand === undefined) {
-      throw new InstantEvalQueryInvalidError({
-        reason:
-          "This deployment cannot resolve a target's filter, so the rows it names cannot be judged. " +
-          "Send a statement with the selection written into its WHERE clause instead.",
-        fields: ["filter"],
-      });
-    }
-    const window = instantEvalShorthandWindow({ shorthand, now: this.now() });
-
-    const authorization = await this.units.proofs.mint({
-      projectId,
-      actor: proofActorOf({ projectId, actor }),
-      route: "instantEval.runs",
-    });
-
-    return this.peers.selectTraceIds({
-      projectId,
-      authorization,
-      filter,
-      window: { from: window.start.epochMilliseconds, to: window.end.epochMilliseconds },
-      limit: rowLimit,
     });
   }
 
@@ -511,15 +398,4 @@ export class InstantEvalRunService {
       );
     }
   }
-}
-
-/** Who a selection's proof is minted for: the member, or the door's actor (ruling IE-KEY-ACTOR). */
-function proofActorOf({ projectId, actor }: { projectId: string; actor: InstantEvalActor }): Actor {
-  if (actor.kind === "member") return { type: "user", id: actor.userId };
-  if (actor.actor) return actor.actor;
-  throw new PermissionDeniedError({
-    permission: "traces:view",
-    scope: { type: "project", id: projectId },
-    denialReason: "no-grant",
-  });
 }

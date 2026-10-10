@@ -1,9 +1,11 @@
 /**
- * The checks every grant write runs before it touches a row.
+ * The checks every grant write runs before it touches a row, and the refusal a
+ * failed write becomes.
  */
 
 import { isRegistryPermission } from "@langwatch/authorization";
 import {
+  DuplicateGrantError,
   GrantExpiryInPastError,
   GrantValidationError,
   type GrantRole,
@@ -12,6 +14,7 @@ import {
 
 import type { AuthzGrantRepository } from "../repositories/authz-grant.repository.ts";
 import { hasGrantEnded } from "../rules/grant-expiry.rules.ts";
+import { knownWriteFailure } from "../rules/grant-write.rules.ts";
 
 export class AuthzGrantGuardsService {
   static create({ repository }: { repository: AuthzGrantRepository }): AuthzGrantGuardsService {
@@ -27,6 +30,28 @@ export class AuthzGrantGuardsService {
    */
   static bindingNotFound(meta: Record<string, unknown>): GrantValidationError {
     return new GrantValidationError("Role binding not found", meta);
+  }
+
+  /** A write the store refused for a knowable reason is a handled error; anything else rethrows. */
+  static rethrowKnownWriteFailure(
+    error: unknown,
+    { bindingId, ...meta }: { bindingId?: string } & Record<string, unknown>,
+  ): never {
+    const failure = knownWriteFailure(error);
+    const errorMeta = { ...meta };
+    if (bindingId) {
+      errorMeta.bindingId = bindingId;
+    }
+
+    if (failure === "duplicate") {
+      throw new DuplicateGrantError(errorMeta);
+    }
+
+    if (failure === "not_found") {
+      throw AuthzGrantGuardsService.bindingNotFound(errorMeta);
+    }
+
+    throw error;
   }
 
   /** Refuses an end date already behind `nowMs`; needs no storage, so callers run it first. */

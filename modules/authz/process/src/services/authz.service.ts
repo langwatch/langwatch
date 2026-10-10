@@ -4,12 +4,9 @@
  * ADR-092 §6 step RECORD — denials emit one structured log line here. That
  */
 import {
-  AccessNotGrantedError,
-  PermissionDeniedError,
   type Actor,
   type Authorization,
   type AuthorizationPurpose,
-  type AuthzDeclaredScopeId,
   type AuthzGetDecisionInput,
   type AuthzGetProjectAnyDecisionInput,
   type AuthzPermission,
@@ -19,7 +16,6 @@ import {
   type PermissionDecision,
   type PermissionScopeArg,
   type TierOfScopeArg,
-  isAggregateProjectKind,
 } from "@langwatch/authorization";
 import {
   AuthzEngine,
@@ -68,7 +64,6 @@ import {
   AuthzScopeNotFoundError,
   type AuthzFindPermissionsBeyondCallerInput,
 } from "@langwatch/authz-contract";
-import { createLogger } from "@langwatch/observability";
 import type { Instant } from "@langwatch/time";
 import { z } from "zod";
 
@@ -132,12 +127,10 @@ export type AuthzServiceOptions = {
   /** Answers `can` at the platform; omitted = every platform question is refused. */
   platformOperators?: Pick<AuthzPlatformOperatorsService, "can">;
   /** Records a user's read of an aggregate (ADR-177 decision 9); omitted = not audited. */
-  aggregateReads?: Pick<AuthzAggregateReadAuditService, "record">;
+  aggregateReads?: Pick<AuthzAggregateReadAuditService, "auditRead">;
 };
 
 const rolePermissionListSchema = z.array(z.string());
-
-const aggregateReadAudit = createLogger("langwatch:authz:aggregate-read-audit");
 
 export class AuthzService {
   static create(options: AuthzServiceOptions): AuthzService {
@@ -211,12 +204,14 @@ export class AuthzService {
       recordDenial: (decision) => this.decisionCore.recordDenial(decision),
     });
     this.gate = AuthzPermissionGateService.create({
-      authorize: (input) => this.authorize(input),
+      check: (args) => this.check(args),
+      proofs: this.proofs,
+      collector,
+      ...(options.aggregateReads ? { aggregateReads: options.aggregateReads } : {}),
       can: (input) => this.can(input),
       canAnyByIds: (args) => this.canAnyByIds(args),
       checkByIds: (args) => this.checkByIds(args),
       getScope: (ids) => this.getScope(ids),
-      tryScopeOf: (scope) => this.tryScopeOf(scope),
     });
   }
 
@@ -260,114 +255,19 @@ export class AuthzService {
     return this.options.repository.findActiveAdministratorIds({ organizationId });
   }
 
-  async authorize<Tier extends DeclaredScopeTier, Permission extends AuthzPermission>({
-    principal,
-    permission,
-    scope,
-    proof,
-  }: {
+  /** Decides one permission and mints its witness, or refuses; see AuthzPermissionGateService. */
+  authorize<Tier extends DeclaredScopeTier, Permission extends AuthzPermission>(input: {
     principal: AuthzPrincipalRef;
     permission: Permission;
     scope: Extract<AuthzScopeRef, { type: Tier }>;
     proof?: Readonly<{ actor: Actor; purpose: AuthorizationPurpose }>;
   }): Promise<Authorized<Tier, Permission> & Readonly<{ authorization: Authorization | null }>> {
-    const resolved: AuthzScopeRef = scope;
-    if (proof && resolved.type === "project") {
-      // One engine pass decides and mints; the door does not evaluate the grants twice.
-      const authorization = await this.proofs
-        .authorize({
-          actor: proof.actor,
-          principal,
-          permission,
-          scope: { projectId: resolved.id },
-          purpose: proof.purpose,
-        })
-        .catch((error: unknown) => {
-          if (!(error instanceof AccessNotGrantedError)) throw error;
-          throw new PermissionDeniedError({ permission, scope, denialReason: "no-grant" });
-        });
-      const witness = this.mintAuthorizationWitness({
-        tier: "project",
-        id: resolved.id,
-        permission,
-      });
-      await this.auditAggregateRead({ actor: proof.actor, authorization, projectId: resolved.id });
-
-      return { ...(witness as Authorized<Tier, Permission>), authorization };
-    }
-
-    const decision = await this.check({ principal, permission, scope });
-    if (!decision.allowed) {
-      throw new PermissionDeniedError({
-        permission,
-        scope,
-        denialReason: decision.denialReason ?? "no-grant",
-      });
-    }
-
-    const authorizedScope = scope as { type: Tier; id: string };
-
-    return {
-      ...this.mintAuthorizationWitness({
-        tier: authorizedScope.type,
-        id: authorizedScope.id,
-        permission,
-      }),
-      authorization: null,
-    };
+    return this.gate.authorize(input);
   }
 
-  /**
-   * A user's read that crosses shared grants into an aggregate is audited. The audit never fails
-   * the read: a failure is logged and the read carries on.
-   */
-  private async auditAggregateRead({
-    actor,
-    authorization,
-    projectId,
-  }: {
-    actor: Actor;
-    authorization: Authorization;
-    projectId: string;
-  }): Promise<void> {
-    const audit = this.options.aggregateReads;
-    if (!audit || actor.type !== "user") return;
-    if (!authorization.grants.some((grant) => grant.kind === "shared")) return;
-    try {
-      const scope = await this.collector.findScopeRef({ projectId });
-      if (scope?.type !== "project" || !isAggregateProjectKind(scope.kind)) return;
-      await audit.record({
-        actorUserId: actor.id,
-        organizationId: authorization.scope.organizationId,
-        aggregateProjectId: projectId,
-      });
-    } catch (error) {
-      aggregateReadAudit.warn(
-        { error, projectId },
-        "aggregate read audit failed; the read carries on",
-      );
-    }
-  }
-
-  /** The only minter of a witness; the contract publishes the type and no factory. */
   /** The own-only proof for platform code reading its own project; nothing is evaluated. */
   authorizeInternal: AuthorizationService["authorizeInternal"] = (args) =>
     this.proofs.authorizeInternal(args);
-
-  private mintAuthorizationWitness<
-    Tier extends DeclaredScopeTier,
-    Permission extends AuthzPermission,
-  >({
-    tier,
-    id,
-    permission,
-  }: {
-    tier: Tier;
-    id: string;
-    permission: Permission;
-  }): Authorized<Tier, Permission> {
-    return { permission, scope: { tier, id } } as Authorized<Tier, Permission>;
-  }
 
   /** The caller's full effective permission set at a scope; see AuthzDecisionService. */
   effectivePermissions(args: {
@@ -562,24 +462,5 @@ export class AuthzService {
   /** ADR-092 §6: the walk for a decision, against the current snapshot. */
   explainDecision(args: { decision: AuthzDecision }): Promise<string[]> {
     return this.decisionCore.explainDecision(args);
-  }
-
-  /** Fail closed if an untyped caller bypasses the exclusive scope argument. */
-  private tryScopeOf(
-    scope: Partial<Record<"projectId" | "teamId" | "organizationId", string>>,
-  ): AuthzDeclaredScopeId | null {
-    if (scope.projectId) {
-      return { tier: "project", id: scope.projectId };
-    }
-
-    if (scope.teamId) {
-      return { tier: "team", id: scope.teamId };
-    }
-
-    if (scope.organizationId) {
-      return { tier: "organization", id: scope.organizationId };
-    }
-
-    return null;
   }
 }

@@ -8,7 +8,6 @@ import { defineTrpcContract } from "@langwatch/module";
 import { z } from "zod";
 
 import { datasetLimitsSchema } from "./dataset-limits.ts";
-import { DATASET_NORMALIZATION_SETTLED_EVENT_TYPE } from "./dataset-normalization.events.ts";
 import {
   datasetApiCopyInputSchema,
   datasetApiDatasetInputSchema,
@@ -21,6 +20,7 @@ import {
   datasetApiValidateNameInputSchema,
 } from "./dataset.schemas.ts";
 import {
+  DATASET_NORMALIZATION_SETTLED_EVENT_TYPE,
   appendStoredObjectToDatasetInputSchema,
   createDatasetAttachmentUploadInputSchema,
   datasetAttachmentUploadSchema,

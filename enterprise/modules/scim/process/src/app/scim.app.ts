@@ -75,7 +75,7 @@ import { nowInstant, type Instant } from "@langwatch/time";
 import { UserApi } from "@langwatch/user-contract";
 import type { ZodError, ZodType } from "zod";
 
-import type { ScimChannels } from "../channels/scim.channels.ts";
+import type { ScimChannels } from "../channels/scim-channels.registry.ts";
 import type { RequestDirectoryMoveCommandData } from "../eventing/scim-directory-move.intent.ts";
 import {
   buildScimDirectoryPipeline,

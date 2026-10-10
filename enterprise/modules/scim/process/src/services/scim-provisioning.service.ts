@@ -8,7 +8,7 @@ import {
 } from "@langwatch/enterprise-scim-contract";
 import { ScimProtocolError } from "@langwatch/enterprise-scim-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
-import { admissionSeat, seatsFree, type OrganizationApi } from "@langwatch/organization-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { UserProfile, UserApi } from "@langwatch/user-contract";
 
 import type { ScimSeatRepository } from "../repositories/scim-seat.repository.ts";
@@ -17,6 +17,7 @@ import type {
   ScimUserRecord,
   ScimUserResourceRecord,
 } from "../repositories/scim.repository.ts";
+import { ScimAdmissionService } from "./scim-admission.service.ts";
 import { ScimCostCenterService, type ScimCostCenterFacts } from "./scim-cost-center.service.ts";
 import type { ScimOrganizationAdministration } from "./scim-deprovision.service.ts";
 import type {
@@ -51,16 +52,12 @@ type ScimOrganizationUser = {
 export class ScimProvisioningService {
   private readonly prisma: ScimRepository;
   private readonly userService: ScimUserProvisioning;
-  private readonly grants: ScimGrantsService;
-  private readonly provenOffboarding: boolean;
   private readonly membershipAccess: ScimMembershipAccessService;
   private readonly listing: ScimUserListingService;
   private readonly costCenters: ScimCostCenterService;
   private readonly patches: ScimUserPatchService;
   private readonly authority: Pick<ScimDirectoryIdentityService, "assertWritable">;
-  private readonly seats: ScimSeatRepository;
-  private readonly plans: Pick<EntitlementApi, "getActivePlan">;
-  private readonly connections: ScimHeldConnections;
+  private readonly admission: ScimAdmissionService;
 
   private constructor({
     prisma,
@@ -92,12 +89,8 @@ export class ScimProvisioningService {
     connections: ScimHeldConnections;
   }) {
     this.prisma = prisma;
-    this.connections = connections;
     this.authority = authority;
-    this.seats = seats;
-    this.plans = plans;
     this.userService = users;
-    this.grants = grants;
     this.membershipAccess = ScimMembershipAccessService.create({
       prisma,
       writer,
@@ -108,7 +101,15 @@ export class ScimProvisioningService {
       provenOffboarding,
     });
     this.listing = ScimUserListingService.create(prisma);
-    this.provenOffboarding = provenOffboarding;
+    this.admission = ScimAdmissionService.create({
+      prisma,
+      grants,
+      provenOffboarding,
+      seats,
+      plans,
+      connections,
+      membershipAccess: this.membershipAccess,
+    });
     this.costCenters = ScimCostCenterService.create(costCenterFacts);
     this.patches = ScimUserPatchService.create(this.costCenters);
   }
@@ -247,7 +248,10 @@ export class ScimProvisioningService {
       returning = previous !== null && previous.deletedAt === null;
       // An account another domain vouches for is never adopted by an active push.
       const admitting = request.active !== false && !returning;
-      if (admitting && !(await this.isOnProvenDomain({ organizationId, user: existingUser }))) {
+      if (
+        admitting &&
+        !(await this.admission.isOnProvenDomain({ organizationId, user: existingUser }))
+      ) {
         return this.scimError({
           status: "409",
           scimType: "uniqueness",
@@ -267,7 +271,7 @@ export class ScimProvisioningService {
     const user = existingUser ?? (await this.userService.create({ name, email: request.userName }));
     const active = request.active !== false;
     if (active && !returning) {
-      await this.admit({ userId: user.id, organizationId });
+      await this.admission.admit({ userId: user.id, organizationId });
       await this.costCenters.sync({
         userId: user.id,
         organizationId,
@@ -284,70 +288,6 @@ export class ScimProvisioningService {
     });
 
     return scimUserOf(user, resource);
-  }
-
-  /** Whether the account's address is on a domain one of the organization's connections proved. */
-  private async isOnProvenDomain({
-    organizationId,
-    user,
-  }: {
-    organizationId: string;
-    user: UserProfile;
-  }): Promise<boolean> {
-    const email = (user.email ?? "").trim().toLowerCase();
-    const at = email.lastIndexOf("@");
-    if (at < 0) return false;
-    const domain = email.slice(at + 1);
-    const connections = await this.connections.findHeldConnections({ organizationId });
-
-    return connections.some((connection) =>
-      connection.verifiedDomains.some((proven) => proven.toLowerCase() === domain),
-    );
-  }
-
-  /** A retried create still repairs the grant beside an existing membership. */
-  private async admit({
-    userId,
-    organizationId,
-  }: {
-    userId: string;
-    organizationId: string;
-  }): Promise<void> {
-    const asserted = await this.directoryAssertedOrganizationRole({ userId, organizationId });
-    const [plan, seats] = await Promise.all([
-      this.plans.getActivePlan({ organizationId, user: { id: userId } }),
-      this.seats.countMemberSeats({ organizationId }),
-    ]);
-    const { role, pending } = admissionSeat({ requested: asserted, ...seatsFree({ plan, seats }) });
-    try {
-      await this.prisma.addMembership({ userId, organizationId, role, pending });
-    } catch (error) {
-      if (!isUniqueViolation(error)) throw error;
-    }
-
-    await this.membershipAccess.reconcileOrganizationMembership({ userId, organizationId });
-  }
-
-  /**
-   * The membership row's role, from what the directory asserts: ADMIN when a SCIM group mapped
-   * ADMIN at organization scope holds them under SCIM_V2_GRANTS, else MEMBER. A provisioned
-   * person is a member whatever else was or was not mapped; without the flag, always MEMBER.
-   */
-  private async directoryAssertedOrganizationRole({
-    userId,
-    organizationId,
-  }: {
-    userId: string;
-    organizationId: string;
-  }): Promise<"ADMIN" | "MEMBER"> {
-    if (!this.provenOffboarding) return "MEMBER";
-    const groupIds = await this.prisma.findDirectoryGroupIds({ userId, organizationId });
-    const roles = await this.grants.findDirectoryAssertedRoles({
-      organizationId,
-      userId,
-      groupIds,
-    });
-    return roles.includes("ADMIN") ? "ADMIN" : "MEMBER";
   }
 
   async getUser({ id, organizationId }: { id: string; organizationId: string }): Promise<ScimUser> {

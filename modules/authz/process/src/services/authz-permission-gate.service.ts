@@ -4,10 +4,14 @@
  * so the caller sees the permission and scope that were missing.
  */
 import {
+  AccessNotGrantedError,
   DeveloperSeatRestrictedError,
   LiteMemberRestrictedError,
   PermissionDeniedError,
   ProjectPermissionDeniedError,
+  type Actor,
+  type Authorization,
+  type AuthorizationPurpose,
   type AuthzDeclaredScopeId,
   type AuthzGetDecisionInput,
   type AuthzGetProjectAnyDecisionInput,
@@ -24,6 +28,7 @@ import {
   type AuthzCanAnyByIdsOutput,
   type AuthzCheckByIdsInput,
   type AuthzCheckByIdsOutput,
+  type AuthzDecision,
   type AuthzGetApiKeyProjectDecisionInput,
   type AuthzPrincipalRef,
   type AuthzRequireProjectPermissionInput,
@@ -31,6 +36,10 @@ import {
   type Authorized,
   AuthzScopeNotFoundError,
 } from "@langwatch/authz-contract";
+
+import type { AuthorizationService } from "./authorization.service.ts";
+import type { AuthzAggregateReadAuditService } from "./authz-aggregate-read-audit.service.ts";
+import type { AuthzCollectorService } from "./authz-collector.service.ts";
 
 type ScopeIds = {
   projectId?: string | undefined;
@@ -40,11 +49,15 @@ type ScopeIds = {
 
 /** The decision seams this gate composes, all owned by the service that constructs it. */
 type AuthzPermissionGateOptions = {
-  authorize: <Tier extends DeclaredScopeTier, Permission extends AuthzPermission>(input: {
+  check: (args: {
     principal: AuthzPrincipalRef;
-    permission: Permission;
-    scope: Extract<AuthzScopeRef, { type: Tier }>;
-  }) => Promise<Authorized<Tier, Permission>>;
+    permission: AuthzPermission;
+    scope: AuthzScopeRef;
+  }) => Promise<AuthzDecision>;
+  proofs: Pick<AuthorizationService, "authorize">;
+  collector: Pick<AuthzCollectorService, "findScopeRef">;
+  /** Records a user's read of an aggregate (ADR-177 decision 9); omitted = not audited. */
+  aggregateReads?: Pick<AuthzAggregateReadAuditService, "auditRead">;
   can: (input: {
     principal: AuthzPrincipalRef;
     permission: AuthzPermission;
@@ -57,9 +70,6 @@ type AuthzPermissionGateOptions = {
     teamId?: string | undefined;
     organizationId?: string | undefined;
   }) => Promise<AuthzScopeRef>;
-  tryScopeOf: (
-    scope: Partial<Record<"projectId" | "teamId" | "organizationId", string>>,
-  ) => AuthzDeclaredScopeId | null;
 };
 
 export class AuthzPermissionGateService {
@@ -68,6 +78,87 @@ export class AuthzPermissionGateService {
   }
 
   private constructor(private readonly deps: AuthzPermissionGateOptions) {}
+
+  /**
+   * Decides one permission and mints its witness, or refuses. With a proof on a project, one
+   * engine pass decides and mints, and a read across shared grants into an aggregate is audited.
+   */
+  async authorize<Tier extends DeclaredScopeTier, Permission extends AuthzPermission>({
+    principal,
+    permission,
+    scope,
+    proof,
+  }: {
+    principal: AuthzPrincipalRef;
+    permission: Permission;
+    scope: Extract<AuthzScopeRef, { type: Tier }>;
+    proof?: Readonly<{ actor: Actor; purpose: AuthorizationPurpose }>;
+  }): Promise<Authorized<Tier, Permission> & Readonly<{ authorization: Authorization | null }>> {
+    const resolved: AuthzScopeRef = scope;
+    if (proof && resolved.type === "project") {
+      // One engine pass decides and mints; the door does not evaluate the grants twice.
+      const authorization = await this.deps.proofs
+        .authorize({
+          actor: proof.actor,
+          principal,
+          permission,
+          scope: { projectId: resolved.id },
+          purpose: proof.purpose,
+        })
+        .catch((error: unknown) => {
+          if (!(error instanceof AccessNotGrantedError)) throw error;
+          throw new PermissionDeniedError({ permission, scope, denialReason: "no-grant" });
+        });
+      const witness = this.mintAuthorizationWitness({
+        tier: "project",
+        id: resolved.id,
+        permission,
+      });
+      await this.deps.aggregateReads?.auditRead({
+        actor: proof.actor,
+        authorization,
+        projectId: resolved.id,
+        findScope: () => this.deps.collector.findScopeRef({ projectId: resolved.id }),
+      });
+
+      return { ...(witness as Authorized<Tier, Permission>), authorization };
+    }
+
+    const decision = await this.deps.check({ principal, permission, scope });
+    if (!decision.allowed) {
+      throw new PermissionDeniedError({
+        permission,
+        scope,
+        denialReason: decision.denialReason ?? "no-grant",
+      });
+    }
+
+    const authorizedScope = scope as { type: Tier; id: string };
+
+    return {
+      ...this.mintAuthorizationWitness({
+        tier: authorizedScope.type,
+        id: authorizedScope.id,
+        permission,
+      }),
+      authorization: null,
+    };
+  }
+
+  private mintAuthorizationWitness<
+    Tier extends DeclaredScopeTier,
+    Permission extends AuthzPermission,
+  >({
+    tier,
+    id,
+    permission,
+  }: {
+    tier: Tier;
+    id: string;
+    permission: Permission;
+  }): Authorized<Tier, Permission> {
+    return { permission, scope: { tier, id } } as Authorized<Tier, Permission>;
+  }
 
   async getDecision({
     userId,
@@ -124,7 +215,7 @@ export class AuthzPermissionGateService {
       permission: Permission;
     } & PermissionScopeArg<Permission>,
   ): Promise<boolean> {
-    const scope = this.deps.tryScopeOf(check);
+    const scope = this.tryScopeOf(check);
     if (!scope) {
       return false;
     }
@@ -144,7 +235,7 @@ export class AuthzPermissionGateService {
   >(
     check: { userId: string; permission: Permission } & ScopeArg,
   ): Promise<Authorized<TierOfScopeArg<ScopeArg>, Permission>> {
-    const declaredScope = this.deps.tryScopeOf(check);
+    const declaredScope = this.tryScopeOf(check);
     let scope: AuthzScopeRef | undefined;
     try {
       if (declaredScope?.tier === "project") {
@@ -169,7 +260,7 @@ export class AuthzPermissionGateService {
       });
     }
 
-    const witness = await this.deps.authorize({
+    const witness: Authorized<DeclaredScopeTier, Permission> = await this.authorize({
       principal: { type: "user", id: check.userId },
       permission: check.permission,
       scope,
@@ -262,5 +353,24 @@ export class AuthzPermissionGateService {
           },
         }
       : { outcome: "denied" };
+  }
+
+  /** Fail closed if an untyped caller bypasses the exclusive scope argument. */
+  private tryScopeOf(
+    scope: Partial<Record<"projectId" | "teamId" | "organizationId", string>>,
+  ): AuthzDeclaredScopeId | null {
+    if (scope.projectId) {
+      return { tier: "project", id: scope.projectId };
+    }
+
+    if (scope.teamId) {
+      return { tier: "team", id: scope.teamId };
+    }
+
+    if (scope.organizationId) {
+      return { tier: "organization", id: scope.organizationId };
+    }
+
+    return null;
   }
 }
