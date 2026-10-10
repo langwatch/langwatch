@@ -4,7 +4,7 @@ The browser half of [analytics](../README.md). What a browser installs when it i
 
 <!-- readme:generated:start (tools/readmegen; edit the code, then `pnpm generate:readmes`) -->
 
-Declared in `src/analytics.web.ts:31` (`defineBrowserModule("analytics")`), exported as `analyticsWeb` at `./declaration`.
+Declared in `src/analytics.web.ts:33` (`defineBrowserModule("analytics")`), exported as `analyticsWeb` at `./declaration`.
 
 Installed by ui, from the app's generated module list (`pnpm generate:modules`).
 
@@ -41,7 +41,7 @@ Opened from lists the other modules (and `ui`, the app) whose browser source nam
 
 - `withApi(analyticsApi)`, tRPC contracts: `analytics.*`, `analytics.lwql.*`, `savedViews.*`.
 - Client packages (package.json): `@langwatch/analytics-client`, `@langwatch/feature-flag-client`, `@langwatch/langy-client`.
-- Lends: `SavedDashboardsToken`, `StarredDashboardsToken`, `FilterSidebarToken`, `CustomGraphToken`.
+- Lends: `SavedDashboardsToken`, `StarredDashboardsToken`, `DashboardPointerToken`, `LwqlReplayChartToken`, `FilterSidebarToken`, `CustomGraphToken`.
 - Host APIs it requires: `AnalyticsHostApi`.
 - Capabilities: `traceFilters`.
 

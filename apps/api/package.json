@@ -79,6 +79,7 @@
     "@langwatch/hosted-mcp-process": "workspace:*",
     "@langwatch/identity-contract": "workspace:*",
     "@langwatch/identity-process": "workspace:*",
+    "@langwatch/insight-process": "workspace:*",
     "@langwatch/instant-eval-judge-process": "workspace:*",
     "@langwatch/instant-eval-process": "workspace:*",
     "@langwatch/ksuid": "workspace:*",

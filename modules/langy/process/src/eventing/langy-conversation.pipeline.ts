@@ -212,7 +212,10 @@ export function buildLangyConversationPipeline(
 
 export const langyConversationEventing = defineEventingModule({
   pipeline: "langy_conversation_processing",
-  build: ({ app, participation }: EventingSetup<LangyRepositories, LangyModule>) =>
-    app.conversationPipeline({ participation }),
+  build: ({ app, participation, priorEvents }: EventingSetup<LangyRepositories, LangyModule>) => {
+    // Only the draining role reads the log: a sending role's event store refuses every read.
+    if (participation === "consume" && priorEvents) app.connectConversationEventLog(priorEvents);
+    return app.conversationPipeline({ participation });
+  },
   connect: ({ app, commands }) => app.connectConversationCommands(commands),
 });

@@ -189,6 +189,7 @@
   "/:project/automations/schedules",
   "/:project/datasets",
   "/:project/datasets/:id",
+  "/:project/insights",
   "/:project/online-evaluations",
   "/:project",
   "/:project/prompts"

@@ -983,6 +983,9 @@ importers:
       '@langwatch/identity-process':
         specifier: workspace:*
         version: link:../../modules/identity/process
+      '@langwatch/insight-process':
+        specifier: workspace:*
+        version: link:../../modules/insight/process
       '@langwatch/instant-eval-judge-process':
         specifier: workspace:*
         version: link:../../modules/instant-eval-judge/process
@@ -1865,6 +1868,9 @@ importers:
       '@langwatch/identity-process':
         specifier: workspace:*
         version: link:../../modules/identity/process
+      '@langwatch/insight-process':
+        specifier: workspace:*
+        version: link:../../modules/insight/process
       '@langwatch/instant-eval-judge-process':
         specifier: workspace:*
         version: link:../../modules/instant-eval-judge/process
@@ -2200,6 +2206,9 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../packages/handled-error
+      '@langwatch/insight-browser':
+        specifier: workspace:*
+        version: link:../../modules/insight/browser
       '@langwatch/integration-browser':
         specifier: workspace:*
         version: link:../../modules/integration/browser
@@ -2616,6 +2625,9 @@ importers:
       '@langwatch/identity-process':
         specifier: workspace:*
         version: link:../../modules/identity/process
+      '@langwatch/insight-process':
+        specifier: workspace:*
+        version: link:../../modules/insight/process
       '@langwatch/instant-eval-judge-process':
         specifier: workspace:*
         version: link:../../modules/instant-eval-judge/process
@@ -10011,6 +10023,180 @@ importers:
         specifier: 'catalog:'
         version: 5.0.1(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@5.0.1)(@vitest/coverage-v8@5.0.1)(@vitest/ui@5.0.1)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.3.0(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
 
+  modules/insight/browser:
+    dependencies:
+      '@langwatch/analytics-client':
+        specifier: workspace:*
+        version: link:../../analytics/client
+      '@langwatch/api':
+        specifier: workspace:*
+        version: link:../../../packages/api
+      '@langwatch/browser':
+        specifier: workspace:*
+        version: link:../../../packages/browser
+      '@langwatch/browser-host':
+        specifier: workspace:*
+        version: link:../../../packages/browser-host
+      '@langwatch/design-system':
+        specifier: workspace:*
+        version: link:../../../packages/design-system
+      '@langwatch/feature-flag-contract':
+        specifier: workspace:*
+        version: link:../../feature-flag/contract
+      '@langwatch/insight-contract':
+        specifier: workspace:*
+        version: link:../contract
+      '@langwatch/langy-client':
+        specifier: workspace:*
+        version: link:../../langy/client
+      '@langwatch/langy-contract':
+        specifier: workspace:*
+        version: link:../../langy/contract
+      '@langwatch/project-contract':
+        specifier: workspace:*
+        version: link:../../project/contract
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../../../packages/time
+      lucide-react:
+        specifier: 'catalog:'
+        version: 1.22.0(react@19.2.8)
+    devDependencies:
+      '@chakra-ui/react':
+        specifier: 'catalog:'
+        version: 3.36.0(@emotion/react@11.14.0(@types/react@19.2.18)(react@19.2.8)(supports-color@10.2.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@emotion/react':
+        specifier: 'catalog:'
+        version: 11.14.0(@types/react@19.2.18)(react@19.2.8)(supports-color@10.2.2)
+      '@langwatch/vitest-config':
+        specifier: workspace:*
+        version: link:../../../packages/vitest-config
+      '@testing-library/jest-dom':
+        specifier: 'catalog:'
+        version: 7.0.1(@testing-library/dom@10.4.1)(vitest@5.0.1)
+      '@testing-library/react':
+        specifier: 'catalog:'
+        version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@testing-library/user-event':
+        specifier: 'catalog:'
+        version: 14.6.1(@testing-library/dom@10.4.1)
+      '@types/react':
+        specifier: 'catalog:'
+        version: 19.2.18
+      '@types/react-dom':
+        specifier: 'catalog:'
+        version: 19.2.4(@types/react@19.2.18)
+      jsdom:
+        specifier: 'catalog:'
+        version: 30.0.1(@noble/hashes@2.4.0)
+      react:
+        specifier: ^19.2.7
+        version: 19.2.8
+      react-dom:
+        specifier: ^19.2.7
+        version: 19.2.8(react@19.2.8)
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
+      vitest:
+        specifier: 'catalog:'
+        version: 5.0.1(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@5.0.1)(@vitest/coverage-v8@5.0.1)(@vitest/ui@5.0.1)(jsdom@30.0.1(@noble/hashes@2.4.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.3.0(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
+
+  modules/insight/contract:
+    dependencies:
+      '@langwatch/handled-error':
+        specifier: workspace:*
+        version: link:../../../packages/handled-error
+      '@langwatch/module':
+        specifier: workspace:*
+        version: link:../../../packages/module
+      zod:
+        specifier: 'catalog:'
+        version: 4.6.5
+    devDependencies:
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
+      vitest:
+        specifier: 'catalog:'
+        version: 5.0.1(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@5.0.1)(@vitest/coverage-v8@5.0.1)(@vitest/ui@5.0.1)(jsdom@30.0.1(@noble/hashes@2.4.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.3.0(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
+
+  modules/insight/process:
+    dependencies:
+      '@langwatch/analytics-contract':
+        specifier: workspace:*
+        version: link:../../analytics/contract
+      '@langwatch/api':
+        specifier: workspace:*
+        version: link:../../../packages/api
+      '@langwatch/authz-contract':
+        specifier: workspace:*
+        version: link:../../authz/contract
+      '@langwatch/dashboard-contract':
+        specifier: workspace:*
+        version: link:../../dashboard/contract
+      '@langwatch/eventing':
+        specifier: workspace:*
+        version: link:../../../packages/eventing
+      '@langwatch/feature-flag-contract':
+        specifier: workspace:*
+        version: link:../../feature-flag/contract
+      '@langwatch/handled-error':
+        specifier: workspace:*
+        version: link:../../../packages/handled-error
+      '@langwatch/insight-contract':
+        specifier: workspace:*
+        version: link:../contract
+      '@langwatch/ksuid':
+        specifier: workspace:*
+        version: link:../../../packages/ksuid
+      '@langwatch/langy-contract':
+        specifier: workspace:*
+        version: link:../../langy/contract
+      '@langwatch/module':
+        specifier: workspace:*
+        version: link:../../../packages/module
+      '@langwatch/observability':
+        specifier: workspace:*
+        version: link:../../../packages/observability
+      '@langwatch/prisma-client':
+        specifier: workspace:*
+        version: link:../../../packages/prisma-client
+      '@langwatch/process':
+        specifier: workspace:*
+        version: link:../../../packages/process
+      '@langwatch/project-contract':
+        specifier: workspace:*
+        version: link:../../project/contract
+      '@langwatch/task':
+        specifier: workspace:*
+        version: link:../../../packages/task
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../../../packages/time
+      '@langwatch/user-contract':
+        specifier: workspace:*
+        version: link:../../user/contract
+      zod:
+        specifier: 'catalog:'
+        version: 4.6.5
+    devDependencies:
+      '@langwatch/process-stores':
+        specifier: workspace:*
+        version: link:../../../packages/process-stores
+      '@langwatch/test-harness':
+        specifier: workspace:*
+        version: link:../../../packages/test-harness
+      '@langwatch/vitest-config':
+        specifier: workspace:*
+        version: link:../../../packages/vitest-config
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
+      vitest:
+        specifier: 'catalog:'
+        version: 5.0.1(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@5.0.1)(@vitest/coverage-v8@5.0.1)(@vitest/ui@5.0.1)(jsdom@30.0.1(@noble/hashes@2.4.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.3.0(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
+
   modules/instant-eval-judge/contract:
     dependencies:
       '@langwatch/config':
@@ -11465,6 +11651,9 @@ importers:
       '@langwatch/identity-contract':
         specifier: workspace:*
         version: link:../../identity/contract
+      '@langwatch/insight-contract':
+        specifier: workspace:*
+        version: link:../../insight/contract
       '@langwatch/langy-contract':
         specifier: workspace:*
         version: link:../../langy/contract

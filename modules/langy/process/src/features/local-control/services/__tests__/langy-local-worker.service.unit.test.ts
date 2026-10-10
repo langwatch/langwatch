@@ -40,6 +40,7 @@ function buildWorker(options: { own: boolean }) {
     lastError: null,
     lastModel: "gpt-5-mini",
     eventCursor: null,
+    origin: "interactive",
   };
   const worker = LangyLocalWorkerService.create({
     runtime,

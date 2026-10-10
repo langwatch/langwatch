@@ -113,12 +113,14 @@ function makeRedis(blpopBehavior: ("wait-empty" | (() => void))[] = []): {
 function makeService({
   redis,
   currentTurnId = "turn-1",
+  origin = "interactive",
   conversationExists = true,
   appended = [],
   backendRunner,
 }: {
   redis: UiActionRedis;
   currentTurnId?: string | null;
+  origin?: "interactive" | "run";
   conversationExists?: boolean;
   appended?: { actionId: string; kind: string; payload: unknown }[];
   backendRunner?: (args: {
@@ -132,7 +134,7 @@ function makeService({
     conversations: {
       getById: async ({ id }) => {
         if (!conversationExists) throw new LangyConversationNotFoundError(id);
-        return { currentTurnId };
+        return { currentTurnId, origin };
       },
     },
     buffer: {
@@ -178,6 +180,34 @@ describe("LangyUiActionService", () => {
           payload: { targetId: "t1" },
         }),
       ).rejects.toMatchObject({ code: "langy_conversation_not_found" });
+    });
+  });
+
+  describe("when the conversation is a run's, with a turn in flight", () => {
+    /** @scenario "A UI action sent from a run conversation is refused" */
+    it("refuses with langy_ui_run_conversation, publishes nothing and runs nothing", async () => {
+      const { redis, store } = makeRedis();
+      const appended: { actionId: string; kind: string; payload: unknown }[] = [];
+      const ran: unknown[] = [];
+      const service = makeService({
+        redis,
+        origin: "run",
+        appended,
+        backendRunner: async (args) => void ran.push(args),
+      });
+
+      await expect(
+        service.dispatch({
+          ...DISPATCH,
+          kind: "workbench.duplicateTarget",
+          payload: { targetId: "t1" },
+        }),
+      ).rejects.toMatchObject({ code: "langy_ui_run_conversation", httpStatus: 409 });
+
+      expect(appended).toEqual([]);
+      expect(ran).toEqual([]);
+      expect(store.kv.size).toBe(0);
+      expect(store.lists.size).toBe(0);
     });
   });
 

@@ -1,4 +1,5 @@
 import {
+  LANGY_CONVERSATION_ORIGIN,
   LangyEgressMisconfiguredError,
   LangyModelNotConfiguredError,
   type LangyCredentialSession,
@@ -28,12 +29,46 @@ export class LangyTurnBaseDependenciesService {
     requestedConversationId: string | null;
     adoptConversationId?: boolean;
     modelOverride?: string;
+    /** A turn nobody is watching; it reads only, like every later turn of its conversation. */
+    unattended?: boolean;
   }): ReturnType<LangyTurnBaseDependenciesService["enrich"]> {
     await this.refuseOnAggregate(input);
-    const results = await this.read(input);
+    const conversation = await input.deps.conversations.ensureConversation({
+      projectId: input.projectId,
+      userId: input.userId,
+      conversationId: input.requestedConversationId,
+      ...(input.adoptConversationId ? { adoptUnknownId: true } : {}),
+    });
+    // Known before any credential is asked for, so a read-only turn never mints a GitHub token.
+    const readOnly = await this.isReadOnly(input, conversation);
+    const results = await this.read({ ...input, readOnly });
     const resolved = this.requireResolved(input.projectId, results);
 
-    return this.enrich(input, resolved);
+    return this.enrich(input, { ...resolved, conversation, readOnly });
+  }
+
+  /**
+   * Whether the turn keeps the unattended ceiling: it is unattended, or it continues a run
+   * conversation, whose history holds trace text nobody vetted. A conversation that can no
+   * longer be read is treated as a run's.
+   */
+  private async isReadOnly(
+    {
+      deps,
+      projectId,
+      userId,
+      unattended,
+    }: Parameters<LangyTurnBaseDependenciesService["resolve"]>[0],
+    conversation: { id: string; isNew: boolean },
+  ): Promise<boolean> {
+    if (unattended) return true;
+    if (conversation.isNew) return false;
+    const current = await deps.conversations.findByIdVisible({
+      id: conversation.id,
+      projectId,
+      userId,
+    });
+    return current === null || current.origin === LANGY_CONVERSATION_ORIGIN.RUN;
   }
 
   /**
@@ -52,26 +87,19 @@ export class LangyTurnBaseDependenciesService {
     if (isAggregateProjectKind(project?.kind)) throw new AggregateProjectIsReadOnlyError();
   }
 
-  private read(input: Parameters<LangyTurnBaseDependenciesService["resolve"]>[0]) {
-    const {
-      deps,
-      projectId,
-      userId,
-      session,
-      requestedConversationId,
-      adoptConversationId,
-      modelOverride,
-    } = input;
+  private read(
+    input: Parameters<LangyTurnBaseDependenciesService["resolve"]>[0] & { readOnly: boolean },
+  ) {
+    const { deps, projectId, session, modelOverride, readOnly } = input;
 
     return Promise.allSettled([
-      deps.conversations.ensureConversation({
-        projectId,
-        userId,
-        conversationId: requestedConversationId,
-        ...(adoptConversationId ? { adoptUnknownId: true } : {}),
-      }),
       modelOverride ? Promise.resolve(null) : deps.models.resolve({ projectId }),
-      deps.credentials.getOrProvision({ projectId, session, mintSessionKey: false }),
+      deps.credentials.getOrProvision({
+        projectId,
+        session,
+        mintSessionKey: false,
+        ...(readOnly ? { mintGithubToken: false } : {}),
+      }),
       deps.credentials.findEgressAllowlist({ projectId }),
       deps.credentials.resolveMirrorTier({ projectId }),
     ]);
@@ -79,14 +107,10 @@ export class LangyTurnBaseDependenciesService {
 
   private requireResolved(
     projectId: string,
-    [conversation, model, credentials, egress, mirror]: Awaited<
+    [model, credentials, egress, mirror]: Awaited<
       ReturnType<LangyTurnBaseDependenciesService["read"]>
     >,
   ) {
-    if (conversation.status === "rejected") {
-      throw conversation.reason;
-    }
-
     if (model.status === "rejected") {
       logger.warn({ error: model.reason, projectId }, "getVercelAIModel failed");
 
@@ -107,7 +131,6 @@ export class LangyTurnBaseDependenciesService {
     }
 
     return {
-      conversation: conversation.value,
       model: model.value,
       credentials: credentials.value,
       egress: egress.value,
@@ -117,15 +140,19 @@ export class LangyTurnBaseDependenciesService {
 
   private async enrich(
     input: Parameters<LangyTurnBaseDependenciesService["resolve"]>[0],
-    resolved: ReturnType<LangyTurnBaseDependenciesService["requireResolved"]>,
+    resolved: ReturnType<LangyTurnBaseDependenciesService["requireResolved"]> & {
+      conversation: { id: string; isNew: boolean };
+      readOnly: boolean;
+    },
   ) {
     const credentials = resolved.credentials;
     if (resolved.egress) {
       credentials.egressAllowlist = resolved.egress;
     }
 
+    // A read-only turn reads customer trace text for one person: none of it is copied out.
     credentials.mirrorTier =
-      resolved.mirror.status === "fulfilled" ? resolved.mirror.value : "skip";
+      resolved.mirror.status === "fulfilled" && !resolved.readOnly ? resolved.mirror.value : "skip";
     if (resolved.mirror.status === "rejected") {
       logger.warn(
         { error: resolved.mirror.reason, projectId: input.projectId },
@@ -145,6 +172,7 @@ export class LangyTurnBaseDependenciesService {
       speculativeConversation: resolved.conversation,
       credentials,
       resolvedModel: resolved.model?.modelId ?? null,
+      readOnly: resolved.readOnly,
     };
   }
 }

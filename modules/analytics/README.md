@@ -45,6 +45,6 @@ Anything else analytics needs belongs to another module and is reached through i
 
 ## Who depends on analytics
 
-[automation](../automation/README.md), [dashboard](../dashboard/README.md), [evaluation](../evaluation/README.md), [instant-eval](../instant-eval/README.md), [ops](../ops/README.md) (as a peer).
+[automation](../automation/README.md), [dashboard](../dashboard/README.md), [evaluation](../evaluation/README.md), [insight](../insight/README.md), [instant-eval](../instant-eval/README.md), [ops](../ops/README.md) (as a peer).
 
 <!-- readme:generated:end -->

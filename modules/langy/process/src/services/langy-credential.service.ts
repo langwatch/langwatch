@@ -21,6 +21,7 @@ export interface LangySessionKeyMintingService {
     session: LangyCredentialSession;
     projectId: string;
     organizationId: string;
+    ceiling?: "full" | "unattended";
   }): Promise<{ token: string; apiKeyId: string }>;
   revokeManaged(input: {
     apiKeyId: string;
@@ -76,11 +77,14 @@ export class LangyCredentialService {
     projectId,
     session,
     mintSessionKey = true,
+    mintGithubToken = true,
     repositoryFullName,
   }: {
     projectId: string;
     session: LangyCredentialSession;
     mintSessionKey?: boolean;
+    /** False for an unattended turn, which may read LangWatch and reach nothing else. */
+    mintGithubToken?: boolean;
     repositoryFullName?: string;
   }): Promise<LangyWorkerCredentials> {
     const project = await this.deps.repository.getProject(projectId);
@@ -105,12 +109,14 @@ export class LangyCredentialService {
       actorUserId: session.user.id,
     });
 
-    const github = await this.tryMintGithubToken({
-      projectId,
-      organizationId: project.organizationId,
-      session,
-      ...(repositoryFullName ? { repositoryFullName } : {}),
-    });
+    const github = mintGithubToken
+      ? await this.tryMintGithubToken({
+          projectId,
+          organizationId: project.organizationId,
+          session,
+          ...(repositoryFullName ? { repositoryFullName } : {}),
+        })
+      : {};
 
     return {
       ...(sessionKey?.token ? { langwatchApiKey: sessionKey.token } : {}),

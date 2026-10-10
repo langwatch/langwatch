@@ -30,6 +30,7 @@ const EXPECTED_PUBLIC_NAMESPACES = {
   github: "github",
   "hosted-mcp": "hosted-mcps",
   identity: "identities",
+  insight: "insights",
   "instant-eval": "instant-evals",
   "instant-eval-judge": "instant-eval-judges",
   integration: "integrations",

@@ -445,6 +445,15 @@
       "path": "apps/idpsim-web/tsconfig.json"
     },
     {
+      "path": "modules/insight/browser/tsconfig.json"
+    },
+    {
+      "path": "modules/insight/contract/tsconfig.json"
+    },
+    {
+      "path": "modules/insight/process/tsconfig.json"
+    },
+    {
       "path": "modules/instant-eval/contract/tsconfig.json"
     },
     {

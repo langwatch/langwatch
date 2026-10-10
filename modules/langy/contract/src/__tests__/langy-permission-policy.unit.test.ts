@@ -7,7 +7,13 @@
  */
 import { assert, describe, expect, it } from "vitest";
 
-import { classifyForLangy, LANGY_AUTH_SCOPE_FAMILY_NAMES } from "../langy-permission-policy.ts";
+import {
+  classifyForLangy,
+  LANGY_AUTH_SCOPE_FAMILY_NAMES,
+  langyCandidatePermissions,
+  langyUnattendedPermissions,
+  splitPermission,
+} from "../langy-permission-policy.ts";
 
 // The cross-products live at module scope rather than as loops inside the
 // `it`. Nested `describe`s already put a test body four levels deep, so a
@@ -194,6 +200,61 @@ describe("classifyForLangy", () => {
         expect(classifyForLangy("nonsense").disposition).toBe("excluded");
         expect(classifyForLangy("").disposition).toBe("excluded");
       });
+    });
+  });
+});
+
+describe("langyUnattendedPermissions", () => {
+  describe("when the ceiling of an unattended turn is read", () => {
+    /** @scenario "The unattended allowlist is pinned to what a board read needs" */
+    it("is exactly the list a board read needs, so no permission joins by accident", () => {
+      expect(langyUnattendedPermissions()).toEqual([
+        "analytics:view",
+        "traces:view",
+        "cost:view",
+        "evaluations:view",
+        "scenarios:view",
+        "annotations:view",
+        "experiments:view",
+        "prompts:view",
+        "gatewayUsage:view",
+      ]);
+    });
+
+    it("holds view permissions Langy may hold in a chat, and no other action", () => {
+      const candidates = langyCandidatePermissions();
+
+      for (const permission of langyUnattendedPermissions()) {
+        expect(splitPermission(permission).action).toBe("view");
+        expect(candidates).toContain(permission);
+      }
+    });
+
+    it.each([
+      "team:view",
+      "organization:view",
+      "project:view",
+      "auditLog:view",
+      "datasets:view",
+      "workflows:view",
+      "triggers:view",
+      "playground:view",
+      "virtualKeys:view",
+      "gatewayProviders:view",
+      "webhookEndpoints:view",
+      "complianceExport:view",
+      "secrets:view",
+    ])("leaves %s out", (permission) => {
+      expect(langyUnattendedPermissions()).not.toContain(permission);
+    });
+
+    it("is far shorter than every view permission Langy may hold", () => {
+      const everyView = langyCandidatePermissions().filter(
+        (permission) => splitPermission(permission).action === "view",
+      );
+
+      expect(everyView.length).toBeGreaterThan(langyUnattendedPermissions().length);
+      expect(everyView).toContain("auditLog:view");
     });
   });
 });

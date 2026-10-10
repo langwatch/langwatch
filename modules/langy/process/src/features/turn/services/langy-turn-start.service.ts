@@ -45,7 +45,7 @@ export class LangyTurnStartService {
   ): Promise<{ conversationId: string; turnId: string }> {
     const runtime = this.requireRuntime();
     const request = this.prepareRequest(input);
-    const { speculativeConversation, credentials, resolvedModel } =
+    const { speculativeConversation, credentials, resolvedModel, readOnly } =
       await LangyTurnBaseDependenciesService.create().resolve({
         deps: this.deps,
         projectId: input.projectId,
@@ -54,6 +54,7 @@ export class LangyTurnStartService {
         requestedConversationId: input.requestedConversationId,
         ...(input.adoptConversationId ? { adoptConversationId: true } : {}),
         ...(input.modelOverride ? { modelOverride: input.modelOverride } : {}),
+        ...(input.unattended ? { unattended: true } : {}),
       });
     const turnModel = this.requireTurnModel(input.modelOverride, resolvedModel);
     const admission = await this.deps.admission.claim({
@@ -80,6 +81,7 @@ export class LangyTurnStartService {
       credentials,
       turnModel,
       claimed,
+      readOnly,
     });
   }
 
@@ -217,6 +219,7 @@ export class LangyTurnStartService {
     credentials,
     turnModel,
     claimed,
+    readOnly,
   }: {
     input: StartConversationTurnInput;
     request: ReturnType<LangyTurnStartService["prepareRequest"]>;
@@ -224,6 +227,7 @@ export class LangyTurnStartService {
     credentials: Awaited<ReturnType<LangyTurnBaseDependenciesService["resolve"]>>["credentials"];
     turnModel: string;
     claimed: ClaimedTurn;
+    readOnly: boolean;
   }): Promise<{ conversationId: string; turnId: string }> {
     const attempt = LangyTurnAttemptService.create(
       {
@@ -237,6 +241,8 @@ export class LangyTurnStartService {
       this.deps,
     );
     try {
+      // After the claim: a replay answered above, so the same turn asked again counts nothing.
+      await input.unattended?.countTurn();
       const settled = await this.settleKickoff({
         input,
         request,
@@ -252,6 +258,8 @@ export class LangyTurnStartService {
         identity: request.identity,
         isRetry: input.isRetry,
         turnContext: input.turnContext,
+        readOnly,
+        ...(input.unattended ? { unattended: input.unattended } : {}),
         ...runtime,
         credentials,
         turnModel,

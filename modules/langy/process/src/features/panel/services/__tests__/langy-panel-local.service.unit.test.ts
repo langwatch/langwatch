@@ -29,6 +29,7 @@ const sharedByAnother: LangyConversationDetail = {
   lastError: null,
   lastModel: null,
   eventCursor: null,
+  origin: "interactive",
 };
 
 const connected: ConnectedWorkspace = {

@@ -15,7 +15,14 @@ class FakeHandledError extends HandledError {}
 const KEY: LangyKeyCaller = { actor: { type: "user", id: "owner-1" }, projectId: "project-1" };
 const SETTLED: LangyTurnSettlementWait = {
   kind: "settled",
-  settlement: { succeeded: true, outcome: "completed", text: "Hello!", error: null },
+  settlement: {
+    succeeded: true,
+    outcome: "completed",
+    text: "Hello!",
+    messageId: "message-1",
+    parts: [{ type: "text", text: "Hello!" }],
+    error: null,
+  },
 };
 
 /** Waits until the signal ends the wait, as the real settlement waiter does. */

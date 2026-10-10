@@ -13479,6 +13479,14 @@
               "available": true
             },
             {
+              "name": "Origin",
+              "type": "String",
+              "description": "Who started the conversation: `interactive` for the person in the panel, `run` for a module acting for them with nobody at the keyboard.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
               "name": "PendingHandoffTurnId",
               "type": "Nullable(String)",
               "description": "PendingHandoffTurnId",

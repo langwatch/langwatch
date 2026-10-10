@@ -1,8 +1,16 @@
-import { ApiKeyNotFoundError, type ApiKeyApi } from "@langwatch/api-key-contract";
+import {
+  ApiKeyNotFoundError,
+  LANGY_SESSION_API_KEY_NAME,
+  type ApiKeyApi,
+} from "@langwatch/api-key-contract";
+import { ALL_PERMISSIONS } from "@langwatch/authorization";
 import {
   type AuthzApi,
   type AuthzEffectivePermissionsInput,
   type AuthzEffectivePermissionsOutput,
+  AuthzEngine,
+  type AuthzScopeRef,
+  type CollectedGrants,
 } from "@langwatch/authz-contract";
 import { LangySessionKeyScopeError } from "@langwatch/langy-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
@@ -12,6 +20,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { LangySessionKeyMetrics } from "../../features/session-key/services/langy-session-key.service.ts";
 import {
   LANGY_CANDIDATE_PERMISSIONS,
+  LANGY_UNATTENDED_PERMISSIONS,
   LangySessionKeyService,
 } from "../../features/session-key/services/langy-session-key.service.ts";
 import {
@@ -304,6 +313,183 @@ describe("LangySessionKeyService", () => {
       const { mint } = holding(["organization:view"]);
 
       await expect(mint()).rejects.toBeInstanceOf(LangySessionKeyScopeError);
+    });
+  });
+
+  describe("given a key minted for a turn nobody is watching", () => {
+    const PROJECT_SCOPE: AuthzScopeRef = {
+      type: "project",
+      id: "project-1",
+      teamId: "team-1",
+      organizationId: "organization-1",
+    };
+
+    /** A member's grants as the authz module collects them; `role: null` is a removed member. */
+    const memberGrants = (role: "viewer" | "admin" | null): CollectedGrants => ({
+      principal: { type: "user", id: "user-1" },
+      organizationId: "organization-1",
+      organizationRole: role ? "MEMBER" : null,
+      isOrgMember: role !== null,
+      membershipDisabled: false,
+      bindings: role ? [{ roleKey: role, scopeType: "PROJECT", scopeId: "project-1" }] : [],
+      customRolePermissions: new Map(),
+    });
+
+    /** The real decision engine over grants the test changes, as the authz module answers. */
+    const mintingAs = (member: { grants: CollectedGrants }) => {
+      const engine = new AuthzEngine();
+      const granted: string[][] = [];
+      const apiKeys: ApiKeyApi = Object.create(null);
+      apiKeys.create = async (input) => {
+        granted.push([...(input.permissions ?? [])]);
+        return { token: "session-token", apiKey: Object.assign(Object.create(null), { id: "k" }) };
+      };
+      const authz: AuthzApi = createApiFixture<AuthzApi>();
+      authz.effectivePermissions = async ({ scope }) =>
+        ALL_PERMISSIONS.filter(
+          (permission) => engine.decide({ grants: member.grants, permission, scope }).allowed,
+        );
+      const service = createService({
+        repository: new SessionKeyRepository(),
+        apiKeys,
+        authz,
+        metrics: new SessionKeyMetrics(),
+      });
+      const mint = (ceiling?: "full" | "unattended") =>
+        service.mint({
+          session: { user: { id: "user-1" } },
+          projectId: "project-1",
+          organizationId: "organization-1",
+          ...(ceiling ? { ceiling } : {}),
+        });
+      return { engine, granted, mint };
+    };
+
+    /** @scenario "An unattended key never carries more than the person holds" */
+    it("holds what the person may view and nothing they do not hold", async () => {
+      const repository = new SessionKeyRepository();
+      const granted: string[][] = [];
+      const apiKeys: ApiKeyApi = Object.create(null);
+      apiKeys.create = async (input) => {
+        granted.push([...(input.permissions ?? [])]);
+        return { token: "session-token", apiKey: Object.assign(Object.create(null), { id: "k" }) };
+      };
+      const authz: AuthzApi = createApiFixture<AuthzApi>();
+      authz.effectivePermissions = async () => ["project:view", "traces:view", "traces:update"];
+
+      await createService({ repository, apiKeys, authz, metrics: new SessionKeyMetrics() }).mint({
+        session: { user: { id: "user-1" } },
+        projectId: "project-1",
+        organizationId: "organization-1",
+        ceiling: "unattended",
+      });
+
+      expect(LANGY_UNATTENDED_PERMISSIONS).toContain("cost:view");
+      expect(granted).toEqual([["traces:view"]]);
+    });
+
+    /** @scenario "An unattended key is owned by the person it is minted for" */
+    it("names the person as the key's owner and creator, under the Langy session name", async () => {
+      const created: Parameters<ApiKeyApi["create"]>[0][] = [];
+      const apiKeys: ApiKeyApi = Object.create(null);
+      apiKeys.create = async (input) => {
+        created.push(input);
+        return { token: "session-token", apiKey: Object.assign(Object.create(null), { id: "k" }) };
+      };
+      const authz: AuthzApi = createApiFixture<AuthzApi>();
+      authz.effectivePermissions = async () => ["analytics:view"];
+
+      await createService({
+        repository: new SessionKeyRepository(),
+        apiKeys,
+        authz,
+        metrics: new SessionKeyMetrics(),
+      }).mint({
+        session: { user: { id: "user-1" } },
+        projectId: "project-1",
+        organizationId: "organization-1",
+        ceiling: "unattended",
+      });
+
+      expect(created).toHaveLength(1);
+      expect(created[0]).toMatchObject({
+        name: LANGY_SESSION_API_KEY_NAME,
+        userId: "user-1",
+        createdByUserId: "user-1",
+        permissions: ["analytics:view"],
+      });
+    });
+
+    /** @scenario "An unattended key holds only what reading a board needs" */
+    it("holds the allowlist for a person who holds everything, and no other view", async () => {
+      const { granted, mint } = mintingAs({ grants: memberGrants("admin") });
+
+      await mint();
+      await mint("unattended");
+
+      const [chat, unattended] = granted;
+      expect(unattended).toEqual([...LANGY_UNATTENDED_PERMISSIONS]);
+      expect(unattended).toEqual(
+        expect.arrayContaining(["analytics:view", "traces:view", "cost:view"]),
+      );
+      // What the same person's chat key reads and a run's key does not.
+      for (const outside of ["project:view", "team:view", "datasets:view", "triggers:view"]) {
+        expect(chat).toContain(outside);
+        expect(unattended).not.toContain(outside);
+      }
+      expect(unattended!.some((permission) => permission.startsWith("auditLog:"))).toBe(false);
+      expect(unattended!.some((permission) => permission.startsWith("secrets:"))).toBe(false);
+    });
+
+    it("keeps the same person's chat key at the full ceiling", async () => {
+      const { granted, mint } = mintingAs({ grants: memberGrants("admin") });
+
+      await mint();
+      await mint("unattended");
+
+      const [chat, unattended] = granted;
+      expect(chat).toContain("prompts:update");
+      expect(unattended).not.toContain("prompts:update");
+      expect(unattended!.every((permission) => permission.endsWith(":view"))).toBe(true);
+      expect(unattended!.length).toBeGreaterThan(0);
+    });
+
+    /** @scenario "A member whose role was removed gets no unattended key" */
+    it("mints view permissions for a viewer, then nothing once their role is removed", async () => {
+      const member = { grants: memberGrants("viewer") };
+      const { engine, granted, mint } = mintingAs(member);
+
+      await mint("unattended");
+      const minted = granted[0]!;
+      expect(minted).toContain("traces:view");
+      expect(minted.every((permission) => permission.endsWith(":view"))).toBe(true);
+
+      member.grants = memberGrants(null);
+
+      await expect(mint("unattended")).rejects.toBeInstanceOf(LangySessionKeyScopeError);
+      expect(granted).toHaveLength(1);
+      // The key minted before the removal is capped by its owner as they are now.
+      const earlierKey: CollectedGrants = {
+        principal: { type: "apiKey", id: "k" },
+        organizationId: "organization-1",
+        organizationRole: null,
+        isOrgMember: false,
+        membershipDisabled: false,
+        bindings: [{ roleKey: "custom:k", scopeType: "PROJECT", scopeId: "project-1" }],
+        customRolePermissions: new Map([["k", minted]]),
+      };
+      expect(
+        engine.decide({ grants: earlierKey, permission: "traces:view", scope: PROJECT_SCOPE })
+          .allowed,
+      ).toBe(true);
+      expect(
+        engine.decideWithCeiling({
+          keyGrants: earlierKey,
+          ownerGrants: member.grants,
+          permission: "traces:view",
+          scope: PROJECT_SCOPE,
+        }),
+      ).toMatchObject({ allowed: false, denialReason: "owner-ceiling" });
     });
   });
 

@@ -2,6 +2,9 @@ import { describe, expect, it } from "vitest";
 
 import { classifyLangyCanaryOutcome, langyCanaryAnswer } from "../langy-canary.rules.ts";
 
+/** The answer's own message, which the classification never reads. */
+const ANSWER = { messageId: "message-1", parts: [] };
+
 describe("classifyLangyCanaryOutcome", () => {
   /** @scenario "The Langy canary classifies a settled turn as main did" */
   /** @scenario "A completed turn with text is healthy" */
@@ -13,6 +16,7 @@ describe("classifyLangyCanaryOutcome", () => {
           succeeded: true,
           outcome: "completed",
           text: "Hi!",
+          ...ANSWER,
           error: null,
         },
       }),
@@ -41,7 +45,7 @@ describe("classifyLangyCanaryOutcome", () => {
     expect(
       classifyLangyCanaryOutcome({
         kind: "settled",
-        settlement: { succeeded: true, outcome: "stopped", text: "Hi", error: null },
+        settlement: { succeeded: true, outcome: "stopped", text: "Hi", ...ANSWER, error: null },
       }),
     ).toMatchObject({ healthy: false, reason: "turn_failed" });
   });
@@ -51,7 +55,13 @@ describe("classifyLangyCanaryOutcome", () => {
     expect(
       classifyLangyCanaryOutcome({
         kind: "settled",
-        settlement: { succeeded: true, outcome: "stopped", text: "partial", error: null },
+        settlement: {
+          succeeded: true,
+          outcome: "stopped",
+          text: "partial",
+          ...ANSWER,
+          error: null,
+        },
       }),
     ).toEqual({ healthy: false, reason: "turn_failed", cause: "turn_stopped" });
   });
@@ -80,6 +90,7 @@ describe("classifyLangyCanaryOutcome", () => {
           succeeded: true,
           outcome: "completed",
           text: "  \n",
+          ...ANSWER,
           error: null,
         },
       }),

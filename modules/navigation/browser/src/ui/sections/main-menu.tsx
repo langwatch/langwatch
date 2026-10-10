@@ -10,6 +10,7 @@ import { nowInstant } from "@langwatch/time";
 import { GitPullRequest, SquareTerminal } from "lucide-react";
 import React from "react";
 
+import { InsightsNavCount } from "../../behavior/lent-insights.tsx";
 import { navigationApi } from "../../behavior/navigation-api.ts";
 import { CODING_AGENT_LINK_WINDOW_DAYS, withinDays } from "../../model/coding-agent-activity.ts";
 import { featureIcons } from "../../model/feature-icons.ts";
@@ -61,6 +62,7 @@ export const MainMenuSections = function MainMenuSections({
           showLabel={showExpanded}
         />
       )}
+      {navigation.home && <InsightsMenuLink {...sectionProps} />}
 
       <ObserveSection
         {...sectionProps}
@@ -82,6 +84,27 @@ interface ProjectSectionProps {
   showExpanded: boolean;
   project: NavigationProject | undefined;
   pathname: string;
+}
+
+/**
+ * Insights sits first, under Home: the inbox is where a day in the product starts. Hidden
+ * until `release_insights` answers on; the unread pill is the one insight lends.
+ */
+function InsightsMenuLink({ showExpanded, project, pathname }: ProjectSectionProps) {
+  const host = useNavigationHost();
+  const { enabled, isLoading } = host.featureFlag(FrontendFlags.release_insights);
+  if (isLoading || !enabled || !host.hasPermission("analytics:view")) return null;
+  return (
+    <PageMenuLink
+      path={projectNavItems.insights.path}
+      icon={featureIcons.insights.icon}
+      label={projectNavItems.insights.title}
+      project={project}
+      isActive={pathname.startsWith(projectNavItems.insights.path)}
+      showLabel={showExpanded}
+      rightElement={<InsightsNavCount />}
+    />
+  );
 }
 
 interface CodingAgentLinks {
@@ -361,6 +384,7 @@ type PageMenuLinkProps = {
   path: string;
   project?: NavigationProject;
   badgeNumber?: number;
+  rightElement?: React.ReactNode;
   isActive: boolean;
   showLabel?: boolean;
   beta?: string | boolean;
@@ -375,6 +399,7 @@ const PageMenuLink = ({
   path,
   project,
   badgeNumber,
+  rightElement,
   isActive,
   showLabel = true,
   beta,
@@ -392,6 +417,7 @@ const PageMenuLink = ({
       unavailableReason={destination.unavailableReason}
       isActive={isActive}
       badgeNumber={badgeNumber}
+      rightElement={rightElement}
       showLabel={showLabel}
       beta={beta}
       betaLabel={betaLabel}

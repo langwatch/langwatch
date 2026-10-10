@@ -33,6 +33,7 @@
     "@langwatch/feature-flag-client": "workspace:*",
     "@langwatch/feature-flag-contract": "workspace:*",
     "@langwatch/identity-contract": "workspace:*",
+    "@langwatch/insight-contract": "workspace:*",
     "@langwatch/langy-contract": "workspace:*",
     "@langwatch/navigation-client": "workspace:*",
     "@langwatch/navigation-contract": "workspace:*",
