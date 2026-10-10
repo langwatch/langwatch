@@ -5,6 +5,7 @@
  */
 
 import { Alert, Box, Spinner, Text, VStack } from "@langwatch/design-system/primitives";
+import { SkeletonRows } from "@langwatch/design-system/skeletons";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { annotationApi } from "../../behavior/annotation-api.ts";

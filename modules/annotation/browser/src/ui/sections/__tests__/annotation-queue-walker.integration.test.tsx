@@ -504,7 +504,7 @@ describe("given a reviewer walking their annotation queue", () => {
       mocks.state.step = stepAt(1, { ...unanswered, queueLoading: true });
       renderWalker({ scopeStatus: "loading" });
 
-      expect(screen.getByText("Loading your queue")).toBeTruthy();
+      expect(screen.getByLabelText("Loading your queue")).toBeTruthy();
       expect(screen.queryByText("All tasks complete")).toBeNull();
     });
 
