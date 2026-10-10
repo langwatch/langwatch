@@ -68,6 +68,10 @@ import {
 } from "./git-context";
 import { parseHookInput, readStdin } from "./hook-input";
 import {
+  readWiredExporterTarget,
+  type WiredExporterTarget,
+} from "@/cli/utils/governance/wired-target";
+import {
   defaultStateDir,
   pruneStaleState,
   readFingerprint,
@@ -155,7 +159,16 @@ export interface HookCommandOptions {
   healRevokedKey?: (params: {
     agent: string;
     rejectedToken: string | undefined;
+    rejectedTokenSource?: "cache" | "wiring";
   }) => Promise<HealOutcome>;
+  /**
+   * Reads the target the AGENT's own exporter is wired to, out of its
+   * settings file (#7958). Injectable so a test needs no home directory;
+   * defaults to the real reader.
+   */
+  readWiredTarget?: (params: {
+    agent: string;
+  }) => WiredExporterTarget | null;
 }
 
 /**
@@ -197,6 +210,7 @@ export async function hookCommand({
   claudeRegistryDir,
   readCliConfig = loadConfig,
   healRevokedKey = healRevokedIngestKey,
+  readWiredTarget = readWiredExporterTarget,
 }: HookCommandOptions): Promise<void> {
   try {
     await runHook({
@@ -210,6 +224,7 @@ export async function hookCommand({
       claudeRegistryDir,
       readCliConfig,
       healRevokedKey,
+      readWiredTarget,
     });
   } catch (error) {
     debug({ message: `hook failed: ${(error as Error).message}`, env });
@@ -227,6 +242,7 @@ async function runHook({
   claudeRegistryDir,
   readCliConfig,
   healRevokedKey,
+  readWiredTarget,
 }: {
   tool: string;
   env: NodeJS.ProcessEnv;
@@ -238,6 +254,7 @@ async function runHook({
   claudeRegistryDir?: string;
   readCliConfig: () => CliTelemetryConfig;
   healRevokedKey: NonNullable<HookCommandOptions["healRevokedKey"]>;
+  readWiredTarget: NonNullable<HookCommandOptions["readWiredTarget"]>;
 }): Promise<void> {
   const spec = TOOLS[tool.trim().toLowerCase().replace(/-/g, "_")];
   if (!spec) {
@@ -322,6 +339,23 @@ async function runHook({
     }
   }
 
+  // The record above posted with THIS CLI's key. The agent's own exporter
+  // posts with whatever its settings file holds, and the two can drift — a
+  // live cache over a revoked wiring 401s every span in silence while this
+  // hook keeps succeeding (#7958). Probe the wired target once per session
+  // so the one process that could notice actually asks.
+  await probeWiredExporter({
+    agent,
+    sessionId,
+    env,
+    fetchImpl,
+    now,
+    stateDir,
+    cliTarget: liveTarget,
+    readWiredTarget,
+    healRevokedKey,
+  });
+
   // Whatever this hook had to say about its own directory is said. Anything
   // the agent declared from a shell that could not reach the collector goes
   // out now, last, so the declared checkout is the session's current one.
@@ -332,6 +366,152 @@ async function runHook({
       (await postSessionContext({ target: liveTarget, env, payload, fetchImpl }))
         .ok,
   });
+}
+
+/**
+ * Ask the collector whether the AGENT's own exporter can still be heard.
+ *
+ * One empty batch per session, posted to the endpoint and bearer read out of
+ * the agent's settings file — the collector authenticates it like any other
+ * post and stores nothing. A 401 there is the agent's every span being
+ * refused, so it runs the same heal as the hook's own 401 (re-mint, rewrite
+ * the wiring, tell the user to restart); a repair this device cannot make on
+ * its own is reported plainly, naming the refusing endpoint.
+ *
+ * Skipped when the wiring matches the target this hook just posted with —
+ * that post already asked this exact question — and when the wiring file
+ * names no target at all. An offline probe releases its once-per-session
+ * marker so the next hook asks again.
+ */
+async function probeWiredExporter({
+  agent,
+  sessionId,
+  env,
+  fetchImpl,
+  now,
+  stateDir,
+  cliTarget,
+  readWiredTarget,
+  healRevokedKey,
+}: {
+  agent: string;
+  sessionId: string;
+  env: NodeJS.ProcessEnv;
+  fetchImpl: typeof fetch;
+  now: () => number;
+  stateDir: string;
+  cliTarget: TelemetryTarget;
+  readWiredTarget: NonNullable<HookCommandOptions["readWiredTarget"]>;
+  healRevokedKey: NonNullable<HookCommandOptions["healRevokedKey"]>;
+}): Promise<void> {
+  const wired = readWiredTarget({ agent });
+  if (!wired) return;
+  if (
+    wired.endpoint === cliTarget.endpoint &&
+    wired.token === bearerOf(cliTarget.headers)
+  ) {
+    return;
+  }
+  if (!claimProbeMarker({ stateDir, agent, sessionId })) return;
+
+  const target: TelemetryTarget = {
+    endpoint: wired.endpoint,
+    headers: { Authorization: `Bearer ${wired.token}` },
+    source: "personal",
+  };
+  const probe = await postSessionContext({
+    target,
+    env,
+    payload: { resourceLogs: [] },
+    fetchImpl,
+  });
+  if (probe.status === null) {
+    // Offline says nothing about the key. Ask again next hook.
+    releaseProbeMarker({ stateDir, agent, sessionId });
+    return;
+  }
+  if (probe.status === 401) {
+    debug({
+      message: `the agent's wired ingest key was refused by ${wired.endpoint}`,
+      env,
+    });
+    if (!claimHealWindow({ stateDir, agent, now })) return;
+    const outcome = await healRevokedKey({
+      agent,
+      rejectedToken: wired.token,
+      rejectedTokenSource: "wiring",
+    }).catch((error: Error) => {
+      debug({ message: `wired heal failed: ${error.message}`, env });
+      return { status: "failed" } as const;
+    });
+    if (outcome.status === "declined") {
+      releaseHealWindow({ stateDir, agent });
+    }
+    if (outcome.status === "healed") {
+      debug({ message: "the agent's wiring was re-minted and rewritten", env });
+      if (agent === "claude_code") notifyClaude(HEAL_NOTICE);
+    } else if (outcome.status === "expired") {
+      if (agent === "claude_code") notifyClaude(SIGNED_OUT_NOTICE);
+    } else if (agent === "claude_code") {
+      notifyClaude(wiredRefusedNotice(wired.endpoint));
+    }
+  }
+}
+
+/** What the user reads when the agent's wiring is refused and stays dead. */
+function wiredRefusedNotice(endpoint: string): string {
+  return `LangWatch: your agent's telemetry is being refused by ${endpoint}, so its spans are not being recorded. Run \`langwatch instrument claude\` to rewire this machine.`;
+}
+
+/** Where the once-per-session wired-probe marker lives. */
+function probeMarkerFile({
+  stateDir,
+  agent,
+  sessionId,
+}: {
+  stateDir: string;
+  agent: string;
+  sessionId: string;
+}): string {
+  const name = `probe-${agent}-${sessionId}`.replace(/[^A-Za-z0-9._-]/g, "_");
+  return path.join(stateDir, `${name.slice(0, 128)}.json`);
+}
+
+/**
+ * Claim this session's one wired probe, by exclusive create like the heal
+ * window. Pruned with the rest of the session state after seven days.
+ */
+function claimProbeMarker(params: {
+  stateDir: string;
+  agent: string;
+  sessionId: string;
+}): boolean {
+  const file = probeMarkerFile(params);
+  try {
+    fs.writeFileSync(file, "", { flag: "wx" });
+    return true;
+  } catch {
+    try {
+      fs.mkdirSync(params.stateDir, { recursive: true });
+      fs.writeFileSync(file, "", { flag: "wx" });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+}
+
+/** Hand the probe back: an offline answer must not spend the session's one ask. */
+function releaseProbeMarker(params: {
+  stateDir: string;
+  agent: string;
+  sessionId: string;
+}): void {
+  try {
+    fs.rmSync(probeMarkerFile(params), { force: true });
+  } catch {
+    // Nothing to release, or nothing we may remove: the next session prunes.
+  }
 }
 
 /**
