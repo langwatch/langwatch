@@ -206,7 +206,7 @@ Permission `organization:manage`. Declared at `src/transport/github-install.rest
 Answers at `/api/github/install`, `/api/v1/github/install`.
 
 ```typescript
-// Query: githubInstallStartQuerySchema, ../contract/src/github.ts:8
+// Query: githubInstallStartQuerySchema, ../contract/src/github.ts:25
 interface Query {
   organizationId: string;
   account?: string;
@@ -236,31 +236,31 @@ Public: GitHub App webhook delivery URL: protocol-mandated public endpoint; ever
 Answers at `/api/github/webhook`, `/api/v1/github/webhook`.
 
 ```typescript
-// Rawbody: "text" (inline, src/transport/github-install.rest.ts:126)
-// Response: inline, src/transport/github-install.rest.ts:129
+// Rawbody: "text" (inline, src/transport/github-install.rest.ts:127)
+// Response: inline, src/transport/github-install.rest.ts:130
 type Response = unknown;
 ```
 
 #### `GET /api/github-langy/setup` · `completeGithubInstallationOnLegacyPath`
 
-Public: GitHub App Setup URL: protocol-mandated public endpoint; all sensitive state is HMAC-signed and bound to the session that started the flow. Declared at `src/transport/github-install.rest.ts:139`.
+Public: GitHub App Setup URL: protocol-mandated public endpoint; all sensitive state is HMAC-signed and bound to the session that started the flow. Declared at `src/transport/github-install.rest.ts:140`.
 
 Answers at `/api/github-langy/setup`, `/api/v1/github-langy/setup`.
 
 ```typescript
-// Response: inline, src/transport/github-install.rest.ts:141
+// Response: inline, src/transport/github-install.rest.ts:142
 type Response = unknown;
 ```
 
 #### `POST /api/github-langy/webhook` · `receiveGithubWebhookOnLegacyPath`
 
-Public: GitHub App webhook delivery URL: protocol-mandated public endpoint; every payload is verified in-handler by its X-Hub-Signature-256 HMAC. Declared at `src/transport/github-install.rest.ts:149`.
+Public: GitHub App webhook delivery URL: protocol-mandated public endpoint; every payload is verified in-handler by its X-Hub-Signature-256 HMAC. Declared at `src/transport/github-install.rest.ts:150`.
 
 Answers at `/api/github-langy/webhook`, `/api/v1/github-langy/webhook`.
 
 ```typescript
-// Rawbody: "text" (inline, src/transport/github-install.rest.ts:150)
-// Response: inline, src/transport/github-install.rest.ts:153
+// Rawbody: "text" (inline, src/transport/github-install.rest.ts:152)
+// Response: inline, src/transport/github-install.rest.ts:155
 type Response = unknown;
 ```
 
@@ -283,7 +283,7 @@ Contract `../contract/src/github.trpc.ts:34`, router `src/transport/github.trpc.
 interface Input {
   organizationId: string;
 }
-type Output = z.infer<typeof githubConnectionStatusSchema>; // ../contract/src/github.connection.ts:23
+type Output = z.infer<typeof githubConnectionStatusSchema>; // ../contract/src/github.connection.ts:41
 
 // github.listRepos
 type Input = z.infer<typeof organizationScopeSchema>; // ../contract/src/github.trpc.ts:17
@@ -303,7 +303,7 @@ interface Input {
     prNumber: number;
   }[];
 }
-// Output: githubPullRequestLiveStatusesSchema, ../contract/src/github.connection.ts:42
+// Output: githubPullRequestLiveStatusesSchema, ../contract/src/github.connection.ts:65
 interface Output {
   statuses: {
     repositoryHost: string;
@@ -321,7 +321,7 @@ interface Input {
   organizationId: string;
   installationId: string;
 }
-// Output: githubDisconnectResultSchema, ../contract/src/github.connection.ts:38
+// Output: githubDisconnectResultSchema, ../contract/src/github.connection.ts:54
 interface Output {
   uninstallUrl: string;
 }

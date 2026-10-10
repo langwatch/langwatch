@@ -6,14 +6,14 @@ The audit log: every module records who did what through it, and an entity's his
 
 ## At a glance
 
-|                |                                                                                                        |
-| -------------- | ------------------------------------------------------------------------------------------------------ |
-| Classification | core (`modules/catalogue.json`)                                                                        |
-| Subjects       | audit-log                                                                                              |
-| Halves         | [contract](contract) · [process](process/README.md)                                                    |
-| Api token      | `AuditLogApi` = `moduleApi<AuditLogApi>()("audit-log")`, `contract/src/audit-log.ts:90` (4 operations) |
-| Other token    | `AuditLogHomeApi`, `process/src/transport/home.trpc.ts:14`                                             |
-| Installed by   | api, worker, tasks (process)                                                                           |
+|                |                                                                                                         |
+| -------------- | ------------------------------------------------------------------------------------------------------- |
+| Classification | core (`modules/catalogue.json`)                                                                         |
+| Subjects       | audit-log                                                                                               |
+| Halves         | [contract](contract) · [process](process/README.md)                                                     |
+| Api token      | `AuditLogApi` = `moduleApi<AuditLogApi>()("audit-log")`, `contract/src/audit-log.ts:107` (4 operations) |
+| Other token    | `AuditLogHomeApi`, `process/src/transport/home.trpc.ts:14`                                              |
+| Installed by   | api, worker, tasks (process)                                                                            |
 
 ## What audit-log owns
 

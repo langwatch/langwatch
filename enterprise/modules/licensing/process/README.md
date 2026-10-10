@@ -454,7 +454,7 @@ Authenticated: a self-hosted install presents its license token or activation co
 Answers at `/api/connect/v1/license/sync`.
 
 ```typescript
-// Body: licenseSyncBodySchema, ../contract/src/license-sync.ts:16
+// Body: licenseSyncBodySchema, ../contract/src/license-sync.ts:29
 interface Body {
   version: string;
   seats: {
@@ -462,7 +462,7 @@ interface Body {
     liteMembers: number;
   };
 }
-// Response: connectSyncAnswerSchema, ../contract/src/connect-install.ts:31
+// Response: connectSyncAnswerSchema, ../contract/src/connect-install.ts:38
 interface Response {
   services: string[];
   license?: string;
@@ -471,14 +471,14 @@ interface Response {
 
 #### `POST /api/connect/v1/license/activate` · `redeemActivationCode`
 
-Authenticated: a self-hosted install presents its license token or activation code as the bearer; the door verifies it and no permission names a licence holder. Credential `licence_token`. Hidden from the OpenAPI document. Declared at `src/transport/connect-host.rest.ts:62`.
+Authenticated: a self-hosted install presents its license token or activation code as the bearer; the door verifies it and no permission names a licence holder. Credential `licence_token`. Hidden from the OpenAPI document. Declared at `src/transport/connect-host.rest.ts:63`.
 
 Answers at `/api/connect/v1/license/activate`.
 
 ```typescript
-// Body: connectActivationRequestSchema, ../contract/src/license-sync.ts:31
+// Body: connectActivationRequestSchema, ../contract/src/license-sync.ts:39
 type Body = Record<string, unknown>;
-// Response: connectActivationAnswerSchema, ../contract/src/connect-install.ts:40
+// Response: connectActivationAnswerSchema, ../contract/src/connect-install.ts:54
 interface Response {
   license: string;
   planType: string;
@@ -506,7 +506,7 @@ Contract `../contract/src/connect.trpc.ts:18`, router `src/transport/connect.trp
 interface Input {
   organizationId: string;
 }
-type Output = z.infer<typeof connectStatusSchema>; // ../contract/src/connect-install.ts:183
+type Output = z.infer<typeof connectStatusSchema>; // ../contract/src/connect-install.ts:236
 
 // connect.setService
 // Input: inline, ../contract/src/connect.trpc.ts:25
@@ -515,7 +515,7 @@ interface Input {
   service: "instant_evals" | "managed_models";
   enabled: boolean;
 }
-// Output: connectServicesSetSchema, ../contract/src/connect-install.ts:198
+// Output: connectServicesSetSchema, ../contract/src/connect-install.ts:245
 interface Output {
   enabledServices: ("instant_evals" | "managed_models")[];
 }
@@ -526,7 +526,7 @@ interface Input {
   organizationId: string;
   capUsd: number;
 }
-// Output: connectCapSetSchema, ../contract/src/connect-install.ts:202
+// Output: connectCapSetSchema, ../contract/src/connect-install.ts:252
 interface Output {
   capUsd: number;
   maximumCapUsd: number;
@@ -535,7 +535,7 @@ interface Output {
 
 ### `license`
 
-Contract `../contract/src/licensing.trpc.ts:22`, router `src/transport/licensing.trpc.ts:14`.
+Contract `../contract/src/licensing.trpc.ts:27`, router `src/transport/licensing.trpc.ts:14`.
 
 | Procedure                  | Kind     | Gate                                                                                                                                                                                                                                          | Input                            | Output                        |
 | -------------------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------- | ----------------------------- |
@@ -548,16 +548,16 @@ Contract `../contract/src/licensing.trpc.ts:22`, router `src/transport/licensing
 
 ```typescript
 // license.getStatus
-// Input: licenseOrganizationQuerySchema, ../contract/src/licensing.trpc.ts:17
+// Input: licenseOrganizationQuerySchema, ../contract/src/licensing.trpc.ts:24
 interface Input {
   organizationId: string;
 }
-type Output = z.infer<typeof licenseStatusSchema>; // ../contract/src/license.ts:222
+type Output = z.infer<typeof licenseStatusSchema>; // ../contract/src/license.ts:244
 
 // license.getSsoGateStatus
-// Input: inline, ../contract/src/licensing.trpc.ts:31
+// Input: inline, ../contract/src/licensing.trpc.ts:36
 type Input = Record<string, unknown>;
-// Output: ssoGateStatusSchema, ../contract/src/license.ts:253
+// Output: ssoGateStatusSchema, ../contract/src/license.ts:283
 interface Output {
   configuredProvider: string | null;
   licensed: boolean;
@@ -565,32 +565,32 @@ interface Output {
 }
 
 // license.upload
-// Input: storeLicenseInputSchema, ../contract/src/license.commands.ts:6
+// Input: storeLicenseInputSchema, ../contract/src/license.commands.ts:12
 interface Input {
   organizationId: string;
   licenseKey: string;
 }
-type Output = z.infer<typeof licenseUploadedSchema>; // ../contract/src/license.ts:269
+type Output = z.infer<typeof licenseUploadedSchema>; // ../contract/src/license.ts:297
 
 // license.activate
-// Input: inline, ../contract/src/licensing.trpc.ts:40
+// Input: inline, ../contract/src/licensing.trpc.ts:45
 interface Input {
   organizationId: string;
   code: string;
 }
-type Output = z.infer<typeof licenseUploadedSchema>; // ../contract/src/license.ts:269
+type Output = z.infer<typeof licenseUploadedSchema>; // ../contract/src/license.ts:297
 
 // license.remove
-type Input = z.infer<typeof licenseOrganizationQuerySchema>; // ../contract/src/licensing.trpc.ts:17
-// Output: licenseRemovedSchema, ../contract/src/license.ts:274
+type Input = z.infer<typeof licenseOrganizationQuerySchema>; // ../contract/src/licensing.trpc.ts:24
+// Output: licenseRemovedSchema, ../contract/src/license.ts:304
 interface Output {
   success: true;
   removed: true;
 }
 
 // license.refresh
-type Input = z.infer<typeof licenseOrganizationQuerySchema>; // ../contract/src/licensing.trpc.ts:17
-// Output: licenseRefreshOutcomeSchema, ../contract/src/connect-install.ts:207
+type Input = z.infer<typeof licenseOrganizationQuerySchema>; // ../contract/src/licensing.trpc.ts:24
+// Output: licenseRefreshOutcomeSchema, ../contract/src/connect-install.ts:262
 type Output =
   | {
       outcome: "unchanged";

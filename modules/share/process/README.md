@@ -104,7 +104,7 @@ None: this module declares no REST family.
 
 ### `pinnedTrace`
 
-Contract `../contract/src/pinned-trace.trpc.ts:23`, router `src/transport/pinned-trace.trpc.ts:11`.
+Contract `../contract/src/pinned-trace.trpc.ts:35`, router `src/transport/pinned-trace.trpc.ts:11`.
 
 | Procedure                   | Kind     | Gate                        | Input                           | Output              |
 | --------------------------- | -------- | --------------------------- | ------------------------------- | ------------------- |
@@ -115,13 +115,13 @@ Contract `../contract/src/pinned-trace.trpc.ts:23`, router `src/transport/pinned
 
 ```typescript
 // pinnedTrace.pin
-// Input: pinnedTracePinInputSchema, ../contract/src/pinned-trace.trpc.ts:16
+// Input: pinnedTracePinInputSchema, ../contract/src/pinned-trace.trpc.ts:26
 interface Input {
   projectId: string;
   traceId: string;
   reason?: string;
 }
-// Output: pinnedTraceSchema, ../../data-retention/contract/src/data-retention.ts:55
+// Output: pinnedTraceSchema, ../../data-retention/contract/src/data-retention.ts:75
 interface Output {
   id: string;
   projectId: string;
@@ -133,17 +133,17 @@ interface Output {
 }
 
 // pinnedTrace.unpin
-// Input: pinnedTraceScopeSchema, ../contract/src/pinned-trace.trpc.ts:11
+// Input: pinnedTraceScopeSchema, ../contract/src/pinned-trace.trpc.ts:16
 interface Input {
   projectId: string;
   traceId: string;
 }
-// Output: inline, ../contract/src/pinned-trace.trpc.ts:30
+// Output: inline, ../contract/src/pinned-trace.trpc.ts:42
 type Output = unknown;
 
 // pinnedTrace.getPin
-type Input = z.infer<typeof pinnedTraceScopeSchema>; // ../contract/src/pinned-trace.trpc.ts:11
-// Output: inline, ../contract/src/pinned-trace.trpc.ts:34
+type Input = z.infer<typeof pinnedTraceScopeSchema>; // ../contract/src/pinned-trace.trpc.ts:16
+// Output: inline, ../contract/src/pinned-trace.trpc.ts:46
 type Output = {
   id: string;
   projectId: string;
@@ -155,11 +155,11 @@ type Output = {
 } | null;
 
 // pinnedTrace.listByProject
-// Input: pinnedTraceProjectInputSchema, ../contract/src/pinned-trace.trpc.ts:21
+// Input: pinnedTraceProjectInputSchema, ../contract/src/pinned-trace.trpc.ts:33
 interface Input {
   projectId: string;
 }
-// Output: inline, ../contract/src/pinned-trace.trpc.ts:38
+// Output: inline, ../contract/src/pinned-trace.trpc.ts:50
 type Output = {
   id: string;
   projectId: string;
@@ -173,7 +173,7 @@ type Output = {
 
 ### `share`
 
-Contract `../contract/src/share.trpc.ts:35`, router `src/transport/share.trpc.ts:11`.
+Contract `../contract/src/share.trpc.ts:46`, router `src/transport/share.trpc.ts:11`.
 
 | Procedure                    | Kind     | Gate                        | Input                             | Output            |
 | ---------------------------- | -------- | --------------------------- | --------------------------------- | ----------------- |
@@ -185,16 +185,16 @@ Contract `../contract/src/share.trpc.ts:35`, router `src/transport/share.trpc.ts
 
 ```typescript
 // share.listForResource
-// Input: shareListForResourceInputSchema, ../contract/src/share.trpc.ts:12
+// Input: shareListForResourceInputSchema, ../contract/src/share.trpc.ts:21
 interface Input {
   projectId: string;
   resourceType: "TRACE" | "THREAD";
   resourceId: string;
 }
-// Output: shareLinkSchema.array() (inline, ../contract/src/share.trpc.ts:43)
+// Output: shareLinkSchema.array() (inline, ../contract/src/share.trpc.ts:54)
 
 // share.createShare
-// Input: shareCreateInputSchema, ../contract/src/share.trpc.ts:22
+// Input: shareCreateInputSchema, ../contract/src/share.trpc.ts:36
 interface Input {
   projectId: string;
   resourceType: "TRACE";
@@ -203,28 +203,28 @@ interface Input {
   expiresAt?: unknown | null;
   maxViews?: number | null;
 }
-type Output = z.infer<typeof shareLinkSchema>; // ../contract/src/share.ts:11
+type Output = z.infer<typeof shareLinkSchema>; // ../contract/src/share.ts:30
 
 // share.revoke
-// Input: shareRevokeInputSchema, ../contract/src/share.trpc.ts:31
+// Input: shareRevokeInputSchema, ../contract/src/share.trpc.ts:40
 interface Input {
   projectId: string;
   id: string;
 }
-// Output: inline, ../contract/src/share.trpc.ts:52
+// Output: inline, ../contract/src/share.trpc.ts:63
 type Output = unknown;
 
 // share.countTraceShares
-// Input: shareProjectInputSchema, ../contract/src/share.trpc.ts:33
+// Input: shareProjectInputSchema, ../contract/src/share.trpc.ts:44
 interface Input {
   projectId: string;
 }
-// Output: inline, ../contract/src/share.trpc.ts:56
+// Output: inline, ../contract/src/share.trpc.ts:67
 type Output = number;
 
 // share.revokeAllTraceShares
-type Input = z.infer<typeof shareProjectInputSchema>; // ../contract/src/share.trpc.ts:33
-// Output: inline, ../contract/src/share.trpc.ts:60
+type Input = z.infer<typeof shareProjectInputSchema>; // ../contract/src/share.trpc.ts:44
+// Output: inline, ../contract/src/share.trpc.ts:71
 type Output = unknown;
 ```
 

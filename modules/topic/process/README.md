@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 The project's conversation topics, and what the last clustering run did.
 
-Peers call these through the token, declared at `../contract/src/topic.ts:106`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/topic.ts:134`; nothing else in this package is public.
 
 #### `getAll`
 
@@ -56,7 +56,7 @@ None: this module declares no REST family.
 
 ### `topics`
 
-Contract `../contract/src/topic.trpc.ts:23`, router `src/transport/topic.trpc.ts:33`.
+Contract `../contract/src/topic.trpc.ts:25`, router `src/transport/topic.trpc.ts:33`.
 
 | Procedure                        | Kind     | Gate                        | Input                     | Output                               |
 | -------------------------------- | -------- | --------------------------- | ------------------------- | ------------------------------------ |
@@ -68,11 +68,11 @@ Contract `../contract/src/topic.trpc.ts:23`, router `src/transport/topic.trpc.ts
 
 ```typescript
 // topics.getAll
-// Input: topicProjectScopeSchema, ../contract/src/topic.trpc.ts:21
+// Input: topicProjectScopeSchema, ../contract/src/topic.trpc.ts:23
 interface Input {
   projectId: string;
 }
-// Output: inline, ../contract/src/topic.trpc.ts:26
+// Output: inline, ../contract/src/topic.trpc.ts:28
 type Output = {
   id: string;
   name: string;
@@ -81,20 +81,20 @@ type Output = {
 }[];
 
 // topics.getTopicCounts
-type Input = z.infer<typeof traceFilterInputSchema>; // ../../trace/contract/src/traces.trpc.ts:91
-type Output = z.infer<typeof namedTopicCountsSchema>; // ../contract/src/topic.ts:92
+type Input = z.infer<typeof traceFilterInputSchema>; // ../../trace/contract/src/traces.trpc.ts:101
+type Output = z.infer<typeof namedTopicCountsSchema>; // ../contract/src/topic.ts:130
 
 // topics.getClusteringStatus
-type Input = z.infer<typeof topicProjectScopeSchema>; // ../contract/src/topic.trpc.ts:21
-type Output = z.infer<typeof topicClusteringStatusSchema>; // ../contract/src/topic.ts:41
+type Input = z.infer<typeof topicProjectScopeSchema>; // ../contract/src/topic.trpc.ts:23
+type Output = z.infer<typeof topicClusteringStatusSchema>; // ../contract/src/topic.ts:74
 
 // topics.getClusteringRunHistory
-type Input = z.infer<typeof topicProjectScopeSchema>; // ../contract/src/topic.trpc.ts:21
-// Output: topicClusteringRunHistoryEntrySchema.array() (inline, ../contract/src/topic.trpc.ts:39)
+type Input = z.infer<typeof topicProjectScopeSchema>; // ../contract/src/topic.trpc.ts:23
+// Output: topicClusteringRunHistoryEntrySchema.array() (inline, ../contract/src/topic.trpc.ts:41)
 
 // topics.triggerTopicClustering
-type Input = z.infer<typeof topicProjectScopeSchema>; // ../contract/src/topic.trpc.ts:21
-// Output: topicClusteringTriggerResultSchema, ../contract/src/topic.ts:85
+type Input = z.infer<typeof topicProjectScopeSchema>; // ../contract/src/topic.trpc.ts:23
+// Output: topicClusteringTriggerResultSchema, ../contract/src/topic.ts:114
 type Output =
   | {
       started: true;

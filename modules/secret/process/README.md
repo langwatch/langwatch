@@ -107,7 +107,7 @@ Permission `secrets:view`. Declared at `src/transport/secret.rest.ts:68`.
 Answers at `/api/secrets`, `/api/v1/secrets`; also, undocumented, `/api/secrets/2026-08-24`, `/api/v1/secrets/2026-08-24`, `/api/secrets/latest`, `/api/v1/secrets/latest`.
 
 ```typescript
-// Query: secretPublicListInputSchema, ../contract/src/secret-rest.schemas.ts:29
+// Query: secretPublicListInputSchema, ../contract/src/secret-rest.schemas.ts:39
 interface Query {
   projectId?: string;
 }
@@ -130,12 +130,12 @@ Permission `secrets:view`. Declared at `src/transport/secret.rest.ts:75`.
 Answers at `/api/secrets/:id`, `/api/v1/secrets/:id`; also, undocumented, `/api/secrets/2026-08-24/:id`, `/api/v1/secrets/2026-08-24/:id`, `/api/secrets/latest/:id`, `/api/v1/secrets/latest/:id`.
 
 ```typescript
-// Params: secretPublicAliasParamsSchema, ../contract/src/secret-rest.schemas.ts:34
+// Params: secretPublicAliasParamsSchema, ../contract/src/secret-rest.schemas.ts:47
 interface Params {
   id: string;
 }
-type Query = z.infer<typeof secretPublicListInputSchema>; // ../contract/src/secret-rest.schemas.ts:29
-// Response: secretPublicSchema, ../contract/src/secret-rest.schemas.ts:17
+type Query = z.infer<typeof secretPublicListInputSchema>; // ../contract/src/secret-rest.schemas.ts:39
+// Response: secretPublicSchema, ../contract/src/secret-rest.schemas.ts:28
 interface Response {
   id: string;
   projectId: string;
@@ -154,48 +154,48 @@ Permission `secrets:manage`. Declared at `src/transport/secret.rest.ts:85`.
 Answers at `/api/secrets`, `/api/v1/secrets`; also, undocumented, `/api/secrets/2026-08-24`, `/api/v1/secrets/2026-08-24`, `/api/secrets/latest`, `/api/v1/secrets/latest`.
 
 ```typescript
-// Body: secretPublicCreateInputSchema, ../contract/src/secret-rest.schemas.ts:43
+// Body: secretPublicCreateInputSchema, ../contract/src/secret-rest.schemas.ts:74
 interface Body {
   projectId?: string;
   name: string;
   value: string;
 }
-type Response = z.infer<typeof secretPublicSchema>; // ../contract/src/secret-rest.schemas.ts:17
+type Response = z.infer<typeof secretPublicSchema>; // ../contract/src/secret-rest.schemas.ts:28
 ```
 
 #### `PUT /:id` · `putApiSecretsById`
 
 Replace a project secret value
 
-Permission `secrets:manage`. Declared at `src/transport/secret.rest.ts:101`.
+Permission `secrets:manage`. Declared at `src/transport/secret.rest.ts:102`.
 
 Answers at `/api/secrets/:id`, `/api/v1/secrets/:id`; also, undocumented, `/api/secrets/2026-08-24/:id`, `/api/v1/secrets/2026-08-24/:id`, `/api/secrets/latest/:id`, `/api/v1/secrets/latest/:id`.
 
 ```typescript
-type Params = z.infer<typeof secretPublicAliasParamsSchema>; // ../contract/src/secret-rest.schemas.ts:34
-// Body: secretPublicUpdateInputSchema, ../contract/src/secret-rest.schemas.ts:52
+type Params = z.infer<typeof secretPublicAliasParamsSchema>; // ../contract/src/secret-rest.schemas.ts:47
+// Body: secretPublicUpdateInputSchema, ../contract/src/secret-rest.schemas.ts:84
 interface Body {
   projectId?: string;
   value: string;
 }
-type Response = z.infer<typeof secretPublicSchema>; // ../contract/src/secret-rest.schemas.ts:17
+type Response = z.infer<typeof secretPublicSchema>; // ../contract/src/secret-rest.schemas.ts:28
 ```
 
 #### `DELETE /:id` · `deleteApiSecretsById`
 
 Delete a project secret
 
-Permission `secrets:manage`. Declared at `src/transport/secret.rest.ts:117`.
+Permission `secrets:manage`. Declared at `src/transport/secret.rest.ts:119`.
 
 Answers at `/api/secrets/:id`, `/api/v1/secrets/:id`; also, undocumented, `/api/secrets/2026-08-24/:id`, `/api/v1/secrets/2026-08-24/:id`, `/api/secrets/latest/:id`, `/api/v1/secrets/latest/:id`.
 
 ```typescript
-type Params = z.infer<typeof secretPublicAliasParamsSchema>; // ../contract/src/secret-rest.schemas.ts:34
-// Body: secretPublicDeleteInputSchema, ../contract/src/secret-rest.schemas.ts:40
+type Params = z.infer<typeof secretPublicAliasParamsSchema>; // ../contract/src/secret-rest.schemas.ts:47
+// Body: secretPublicDeleteInputSchema, ../contract/src/secret-rest.schemas.ts:60
 interface Body {
   projectId?: string;
 }
-// Response: secretPublicDeleteOutputSchema, ../contract/src/secret-rest.schemas.ts:57
+// Response: secretPublicDeleteOutputSchema, ../contract/src/secret-rest.schemas.ts:94
 interface Response {
   id: string;
   deleted: true;
@@ -206,7 +206,7 @@ interface Response {
 
 ### `secrets`
 
-Contract `../contract/src/secret.trpc.ts:41`, router `src/transport/secret.trpc.ts:11`.
+Contract `../contract/src/secret.trpc.ts:56`, router `src/transport/secret.trpc.ts:11`.
 
 | Procedure            | Kind     | Gate                        | Input                         | Output                          |
 | -------------------- | -------- | --------------------------- | ----------------------------- | ------------------------------- |
@@ -218,48 +218,48 @@ Contract `../contract/src/secret.trpc.ts:41`, router `src/transport/secret.trpc.
 
 ```typescript
 // secrets.list
-// Input: listSecretsInputSchema, ../contract/src/secret.ts:56
+// Input: listSecretsInputSchema, ../contract/src/secret.ts:63
 interface Input {
   projectId: string;
 }
-// Output: secretSchema.array() (inline, ../contract/src/secret.trpc.ts:44)
+// Output: secretSchema.array() (inline, ../contract/src/secret.trpc.ts:59)
 
 // secrets.create
-// Input: secretTrpcCreateInputSchema, ../contract/src/secret.trpc.ts:22
+// Input: secretTrpcCreateInputSchema, ../contract/src/secret.trpc.ts:29
 interface Input {
   projectId: string;
   name: string;
   value: string;
 }
-type Output = z.infer<typeof secretSchema>; // ../contract/src/secret.ts:43
+type Output = z.infer<typeof secretSchema>; // ../contract/src/secret.ts:58
 
 // secrets.update
-// Input: secretTrpcUpdateInputSchema, ../contract/src/secret.trpc.ts:27
+// Input: secretTrpcUpdateInputSchema, ../contract/src/secret.trpc.ts:43
 interface Input {
   projectId: string;
   secretId: string;
   value: string;
 }
-// Output: secretWriteAcknowledgedSchema, ../contract/src/secret.ts:125
+// Output: secretWriteAcknowledgedSchema, ../contract/src/secret.ts:153
 interface Output {
   success: boolean;
 }
 
 // secrets.delete
-// Input: secretTrpcDeleteInputSchema, ../contract/src/secret.trpc.ts:36
+// Input: secretTrpcDeleteInputSchema, ../contract/src/secret.trpc.ts:53
 interface Input {
   projectId: string;
   secretId: string;
 }
-type Output = z.infer<typeof secretWriteAcknowledgedSchema>; // ../contract/src/secret.ts:125
+type Output = z.infer<typeof secretWriteAcknowledgedSchema>; // ../contract/src/secret.ts:153
 
 // secrets.revealOnce
-// Input: revealOnceInputSchema, ../contract/src/one-time-reveal.ts:36
+// Input: revealOnceInputSchema, ../contract/src/one-time-reveal.ts:43
 interface Input {
   organizationId: string;
   revealId: string;
 }
-// Output: revealedSecretSchema, ../contract/src/one-time-reveal.ts:44
+// Output: revealedSecretSchema, ../contract/src/one-time-reveal.ts:60
 interface Output {
   kind: "virtual_key";
   keyId: string;

@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 Portable audit write capability.
 
-Peers call these through the token, declared at `../contract/src/audit-log.ts:81`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/audit-log.ts:98`; nothing else in this package is public.
 
 #### `record`
 
@@ -52,7 +52,7 @@ None: this module declares no REST family.
 
 ### `home`
 
-Contract `../contract/src/recent-items.ts:33`, router `src/transport/home.trpc.ts:17`.
+Contract `../contract/src/recent-items.ts:37`, router `src/transport/home.trpc.ts:17`.
 
 | Procedure             | Kind  | Gate                      | Input                    | Output |
 | --------------------- | ----- | ------------------------- | ------------------------ | ------ |
@@ -60,12 +60,12 @@ Contract `../contract/src/recent-items.ts:33`, router `src/transport/home.trpc.t
 
 ```typescript
 // home.getRecentItems
-// Input: recentItemsInputSchema, ../contract/src/recent-items.ts:15
+// Input: recentItemsInputSchema, ../contract/src/recent-items.ts:20
 interface Input {
   projectId: string;
   limit?: number;
 }
-// Output: inline, ../contract/src/recent-items.ts:36
+// Output: inline, ../contract/src/recent-items.ts:40
 type Output = {
   id: string;
   type: "prompt" | "workflow" | "dataset" | "evaluation" | "annotation" | "simulation";

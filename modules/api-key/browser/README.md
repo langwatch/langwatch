@@ -15,7 +15,7 @@ Installed by ui, from the app's generated module list (`pnpm generate:modules`).
 | `pages/authorize`         | `/authorize`         | –        | –        | –          | –     |
 | `pages/mcp/authorize`     | `/mcp/authorize`     | –        | –        | –          | –     |
 | `pages/cli/auth`          | `/cli/auth`          | –        | –        | –          | –     |
-| `pages/settings/api-keys` | `/settings/api-keys` | settings | API Keys | –          | –     |
+| `pages/settings/api-keys` | `/settings/api-keys` | settings | API keys | –          | –     |
 
 A URL marked (route table) is joined from `apps/ui/src/shell/ui-route-table.ts`; the screen declares no `path`.
 

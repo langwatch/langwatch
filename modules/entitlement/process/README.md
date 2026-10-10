@@ -72,7 +72,7 @@ None: this module declares no REST family.
 
 ### `costs`
 
-Contract `../contract/src/entitlement.trpc.ts:40`, router `src/transport/organization-spend.trpc.ts:12`.
+Contract `../contract/src/entitlement.trpc.ts:45`, router `src/transport/organization-spend.trpc.ts:12`.
 
 | Procedure                                 | Kind  | Gate                           | Input                        | Output |
 | ----------------------------------------- | ----- | ------------------------------ | ---------------------------- | ------ |
@@ -80,13 +80,13 @@ Contract `../contract/src/entitlement.trpc.ts:40`, router `src/transport/organiz
 
 ```typescript
 // costs.getAggregatedCostsForOrganization
-// Input: aggregatedCostsInputSchema, ../contract/src/entitlement.trpc.ts:34
+// Input: aggregatedCostsInputSchema, ../contract/src/entitlement.trpc.ts:43
 interface Input {
   organizationId: string;
   startDate: number;
   endDate: number;
 }
-// Output: projectSpendRollupSchema.array() (inline, ../contract/src/entitlement.trpc.ts:43)
+// Output: projectSpendRollupSchema.array() (inline, ../contract/src/entitlement.trpc.ts:48)
 ```
 
 ### `plan`
@@ -99,11 +99,11 @@ Contract `../contract/src/entitlement.trpc.ts:17`, router `src/transport/plan.tr
 
 ```typescript
 // plan.getActivePlan
-// Input: entitlementOrganizationScopeSchema, ../contract/src/entitlement.schemas.ts:11
+// Input: entitlementOrganizationScopeSchema, ../contract/src/entitlement.schemas.ts:17
 interface Input {
   organizationId: string;
 }
-type Output = z.infer<typeof planSchema>; // ../contract/src/plan.ts:15
+type Output = z.infer<typeof planSchema>; // ../contract/src/plan.ts:38
 ```
 
 ### `limits`
@@ -117,17 +117,17 @@ Contract `../contract/src/entitlement.trpc.ts:23`, router `src/transport/usage-l
 
 ```typescript
 // limits.getUsage
-type Input = z.infer<typeof entitlementOrganizationScopeSchema>; // ../contract/src/entitlement.schemas.ts:11
-type Output = z.infer<typeof usageStatsSchema>; // ../contract/src/usage.ts:60
+type Input = z.infer<typeof entitlementOrganizationScopeSchema>; // ../contract/src/entitlement.schemas.ts:17
+type Output = z.infer<typeof usageStatsSchema>; // ../contract/src/usage.ts:89
 
 // limits.checkAndSendUsageLimitNotification
-// Input: sendUsageLimitWarningInputSchema, ../contract/src/entitlement.schemas.ts:26
+// Input: sendUsageLimitWarningInputSchema, ../contract/src/entitlement.schemas.ts:43
 interface Input {
   organizationId: string;
   currentMonthMessagesCount: number;
   maxMonthlyUsageLimit: number;
 }
-// Output: usageLimitWarningSchema, ../contract/src/entitlement.schemas.ts:34
+// Output: usageLimitWarningSchema, ../contract/src/entitlement.schemas.ts:55
 interface Output {
   sent: boolean;
   notificationId?: string;

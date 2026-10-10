@@ -12,7 +12,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 ## Module API (`ManagedProviderApi`)
 
-Peers call these through the token, declared at `../contract/src/managed-provider.api.ts:32`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/managed-provider.api.ts:42`; nothing else in this package is public.
 
 #### `isManagedProvider`
 
