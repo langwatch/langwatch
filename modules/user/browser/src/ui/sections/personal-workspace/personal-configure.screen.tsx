@@ -1,4 +1,5 @@
 import { Checkbox } from "@langwatch/design-system/checkbox";
+import { InlineCode } from "@langwatch/design-system/inline-code";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import {
   Badge,
@@ -284,8 +285,8 @@ function PersonalCredentialsSection({
 
           {apiKeys.length === 0 ? (
             <Text fontSize="sm" color="fg.muted">
-              No personal keys yet. Run <code>langwatch login</code> in your terminal to issue your
-              first one.
+              No personal keys yet. Run <InlineCode>langwatch login</InlineCode> in your terminal to
+              issue your first one.
             </Text>
           ) : (
             <VStack align="stretch" gap={2}>
@@ -580,7 +581,7 @@ function RevealedSecretBanner({
           </Button>
         </HStack>
         <Text fontSize="xs" color="green.800">
-          Gateway base URL: <code>{secret.baseUrl}</code>
+          Gateway base URL: <InlineCode>{secret.baseUrl}</InlineCode>
         </Text>
       </VStack>
     </Box>

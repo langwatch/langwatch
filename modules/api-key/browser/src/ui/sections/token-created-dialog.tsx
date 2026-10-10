@@ -5,6 +5,7 @@
  */
 
 import { Dialog } from "@langwatch/design-system/dialog";
+import { InlineCode } from "@langwatch/design-system/inline-code";
 import {
   Alert,
   Box,
@@ -293,7 +294,8 @@ export function TokenCreatedDialog({
               {codeTab === "bearer" && newToken && (
                 <VStack gap={1} align="stretch">
                   <Text fontSize="xs" color="fg.muted">
-                    Use the <code>Authorization</code> header plus <code>X-Project-Id</code>:
+                    Use the <InlineCode>Authorization</InlineCode> header plus{" "}
+                    <InlineCode>X-Project-Id</InlineCode>:
                   </Text>
                   <CodePreview
                     code={bearerUnmasked}
@@ -314,7 +316,8 @@ export function TokenCreatedDialog({
               {codeTab === "basic" && (
                 <VStack gap={1} align="stretch">
                   <Text fontSize="xs" color="fg.muted">
-                    Encode the project ID and token as <code>base64(projectId:token)</code>:
+                    Encode the project ID and token as{" "}
+                    <InlineCode>base64(projectId:token)</InlineCode>:
                   </Text>
                   {basicUnmasked ? (
                     <CodePreview

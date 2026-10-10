@@ -1,4 +1,5 @@
 import { Checkbox } from "@langwatch/design-system/checkbox";
+import { InlineCode } from "@langwatch/design-system/inline-code";
 import { Box, Button, HStack, Text, VStack, Wrap } from "@langwatch/design-system/primitives";
 import { modelProviderIcons } from "@langwatch/design-system/provider-icons";
 import { ProviderScopeChips } from "@langwatch/design-system/provider-scope-chips";
@@ -138,9 +139,7 @@ export function ProviderRow({
                 inputProps={{ "aria-label": `${prefix}${model}` }}
                 data-testid={`vk-model-${prefix}${model}`}
               >
-                <Text fontSize="xs" fontFamily="mono">
-                  {model}
-                </Text>
+                <InlineCode>{model}</InlineCode>
               </Checkbox>
             ))}
           </Wrap>

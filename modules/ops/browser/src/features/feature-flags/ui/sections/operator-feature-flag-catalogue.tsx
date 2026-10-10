@@ -1,3 +1,4 @@
+import { InlineCode } from "@langwatch/design-system/inline-code";
 import {
   Badge,
   Box,
@@ -114,7 +115,7 @@ export function OperatorFeatureFlagCatalogueView({
               {catalogue.families.map((family) => (
                 <Table.Row key={family.keyPrefix}>
                   <Table.Cell>
-                    <code>{family.keyPrefix}*</code>
+                    <InlineCode>{`${family.keyPrefix}*`}</InlineCode>
                   </Table.Cell>
                   <Table.Cell>
                     <ScopeBadge scope={family.scope} />

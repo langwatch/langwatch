@@ -1,4 +1,5 @@
 import { Drawer } from "@langwatch/design-system/drawer";
+import { InlineCode } from "@langwatch/design-system/inline-code";
 import {
   Alert,
   Badge,
@@ -275,13 +276,14 @@ export function IngestionTemplateInstallDrawer({
                   <Badge variant="surface" size="sm">
                     {template.displayName}
                   </Badge>{" "}
-                  environment, fire a request, and traces will land at <code>/me/traces</code>{" "}
-                  filtered by source={template.slug}.
+                  environment, fire a request, and traces will land at{" "}
+                  <InlineCode>/me/traces</InlineCode> filtered by source={template.slug}.
                 </Text>
 
                 <Text fontSize="xs" color="fg.muted">
-                  To keep this across new terminals, add these lines to your <code>~/.zshrc</code>{" "}
-                  (or <code>~/.bashrc</code>), then open a new shell.
+                  To keep this across new terminals, add these lines to your{" "}
+                  <InlineCode>~/.zshrc</InlineCode> (or <InlineCode>~/.bashrc</InlineCode>), then
+                  open a new shell.
                 </Text>
 
                 <HStack>
