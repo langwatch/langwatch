@@ -1,6 +1,6 @@
 ---
 name: llmsim
-description: "Answer every LLM call for free and deterministically with llmsim, haven's provider stand-in. Use when someone says 'run without a real model', 'no API key', 'cheap playground', 'llmsim', 'haven up +llm', 'force a 429', 'mock the LLM', 'Langy echo', or needs repeatable model output in a test or load run."
+description: "Answer every LLM call for free and deterministically with llmsim, haven's provider stand-in. Use when someone says 'run without a real model', 'no API key', 'cheap playground', 'llmsim', 'haven up +llm', 'force a 429', 'mock the LLM', 'haven llm', 'Langy echo', or needs repeatable model output in a test or load run."
 user-invocable: true
 ---
 

@@ -1,6 +1,6 @@
 ---
 name: voicesim
-description: "Run ElevenLabs voice calls locally against voicesim, haven's voice-provider stand-in. Use when someone says 'voicesim', 'haven up +voice', 'test a voice agent without ElevenLabs', 'signed URL', 'convai socket', 'fake ElevenLabs', 'voice call console', or needs a deterministic voice call in a test."
+description: "Run ElevenLabs voice calls locally against voicesim, haven's voice-provider stand-in. Use when someone says 'voicesim', 'haven up +voice', 'test a voice agent without ElevenLabs', 'signed URL', 'convai socket', 'fake ElevenLabs', 'voice call console', 'haven voice', or needs a deterministic voice call in a test."
 user-invocable: true
 ---
 

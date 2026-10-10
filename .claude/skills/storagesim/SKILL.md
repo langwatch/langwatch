@@ -1,6 +1,6 @@
 ---
 name: storagesim
-description: "Use haven's local S3, storagesim, to store, inspect and assert on uploaded files. Use when someone says 'where did the upload go', 'presigned URL', 'S3 locally', 'storagesim', 'check the object exists', 'NoSuchKey', 'storage console', or needs to load-test uploads."
+description: "Use haven's local S3, storagesim, to store, inspect and assert on uploaded files. Use when someone says 'where did the upload go', 'presigned URL', 'S3 locally', 'storagesim', 'check the object exists', 'NoSuchKey', 'storage console', 'haven storage', or needs to load-test uploads."
 user-invocable: true
 ---
 

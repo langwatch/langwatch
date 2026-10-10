@@ -1,6 +1,6 @@
 ---
 name: lambdasim
-description: "Run the studio's per-project NLP Lambda path locally with lambdasim, haven's AWS Lambda stand-in: functions, invokes and response streams answered on this stack's nlpgo. Use when someone says 'lambdasim', 'haven up +lambda', 'NLP Lambda locally', 'per-project Lambda', 'LANGWATCH_NLP_LAMBDA_CONFIG in dev', 'test the Lambda path without AWS', 'force a Lambda throttle', or 'InvokeWithResponseStream locally'."
+description: "Run the studio's per-project NLP Lambda path locally with lambdasim, haven's AWS Lambda stand-in: functions, invokes and response streams answered on this stack's nlpgo. Use when someone says 'lambdasim', 'haven up +lambda', 'haven lambda', 'NLP Lambda locally', 'per-project Lambda', 'LANGWATCH_NLP_LAMBDA_CONFIG in dev', 'test the Lambda path without AWS', 'force a Lambda throttle', or 'InvokeWithResponseStream locally'."
 user-invocable: true
 ---
 
