@@ -188,8 +188,10 @@ export class PrismaSystemMigrationStateRepository implements SystemMigrationStat
     limit: number;
     offset?: number;
   }): Promise<OpsMigrationOverview["attention"]> {
+    const migrationNames = migrationName ? [migrationName] : await this.findMigrationNames();
+    if (migrationNames.length === 0) return [];
     const rows = await this.prisma.systemMigrationTenantState.findMany({
-      where: { ...(migrationName ? { migrationName } : {}), status: { in: statuses } },
+      where: { migrationName: { in: migrationNames }, status: { in: statuses } },
       orderBy: [{ updatedAt: "desc" }, { migrationName: "asc" }, { tenantId: "asc" }],
       skip: offset,
       take: limit,
@@ -201,5 +203,17 @@ export class PrismaSystemMigrationStateRepository implements SystemMigrationStat
       report: row.report,
       updatedAt: row.updatedAt,
     }));
+  }
+
+  /** Every migration with tenant rows: the bounded set the tenant guard lets a listing span. */
+  private async findMigrationNames(): Promise<string[]> {
+    const rows = await this.prisma.$queryRaw<{ migrationName: string }[]>`
+      ${skipTenantCheck({
+        // Reads only the migration names, never a tenant's row; the listing then names them.
+        SKIP_TENANT_CHECK: true,
+      })}
+      SELECT DISTINCT "migrationName" FROM "SystemMigrationTenantState"
+    `;
+    return rows.map((row) => row.migrationName);
   }
 }

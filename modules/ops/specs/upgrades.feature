@@ -112,6 +112,12 @@ Feature: Ops shows an installation's release upgrades, read-only
     When an operator asks for the first step's parked tenants two at a time
     Then the first page holds two rows and a cursor, and the next page the last row and none
 
+  @integration
+  Scenario: The unfiltered tenant list reads every step's rows within the tenant guard
+    Given tenant rows in two steps on a Postgres guarded by the tenant check
+    When an operator lists tenants without choosing a step
+    Then both steps' rows are listed and the read is not refused
+
   @unit
   Scenario: A non-operator asking for the tenant list is refused by the door
     Given a signed-in user without ops:view
