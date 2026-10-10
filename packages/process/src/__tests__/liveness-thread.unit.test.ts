@@ -322,3 +322,34 @@ describe("given the main listener is the door", () => {
     });
   });
 });
+
+describe("given the liveness thread is serving the process port", () => {
+  describe("when the main thread's event stream says keep-alive to a request that said close", () => {
+    /** @scenario A connection the thread closes is never announced as kept alive */
+    it("answers Connection: close, so a pooling proxy's next request is served", async () => {
+      const proxyPort = await mainThreadListener((_req, res) => {
+        res.writeHead(200, { "Content-Type": "text/event-stream", Connection: "keep-alive" });
+        res.end("data: hint\n\n");
+      });
+      const thread = await bootThread({ proxyPort });
+      const port = (thread.address as AddressInfo).port;
+      const agent = new http.Agent({ keepAlive: true });
+      const ask = (path: string) =>
+        new Promise<http.IncomingMessage>((resolve, reject) => {
+          const headers = { connection: "close" };
+          const request = http.request({ host: "127.0.0.1", port, path, headers, agent }, (r) => {
+            r.resume();
+            r.on("end", () => resolve(r));
+          });
+          request.on("error", reject).end();
+        });
+
+      const stream = await ask("/api/sse/hints");
+      const next = await ask("/api/auth/session");
+      agent.destroy();
+
+      expect(stream.headers.connection).toBe("close");
+      expect(next.statusCode).toBe(200);
+    });
+  });
+});

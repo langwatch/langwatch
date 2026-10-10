@@ -4,6 +4,8 @@ import type { Duplex } from "node:stream";
 const SECRET_HEADER = /^(cookie|authorization|proxy-authorization|x-auth-token|x-api-key)\s*:/i;
 /** How much of a refused request the log line keeps. */
 const HEAD_CHARS = 400;
+/** The one line either door writes for a request it could not parse. */
+export const REFUSED_BEFORE_ROUTING = "http request refused before routing";
 
 /** Errors a closing peer causes; Node's own handler drops them without a word, and so do we. */
 export const QUIET_CLIENT_ERROR_CODES: readonly string[] = ["ECONNRESET", "EPIPE"];

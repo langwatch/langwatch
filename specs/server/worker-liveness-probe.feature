@@ -140,6 +140,13 @@ Feature: Worker liveness probe endpoint
       And one warn line names the parser's code and the request's first bytes
       And the cookie's value is not in that line
 
+    Scenario: A connection the thread closes is never announced as kept alive
+      Given the liveness thread is serving the process port
+      And the main thread answers an event stream with "Connection: keep-alive"
+      When a pooling proxy sends that request with "Connection: close"
+      Then the thread's answer says "Connection: close"
+      And the proxy's next request opens a new connection and is served
+
   Rule: Liveness boots before any stage that can block for minutes
 
     # The voice public URL tunnel (cloudflared quick tunnel) can take up to

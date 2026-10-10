@@ -5,6 +5,7 @@ import {
   CLIENT_ERROR_STATUS_LINES,
   QUIET_CLIENT_ERROR_CODES,
   redactedRequestHead,
+  REFUSED_BEFORE_ROUTING,
 } from "./client-error.ts";
 
 /** The kubelet's path; answered in the thread from the heartbeat, never proxied. */
@@ -26,6 +27,19 @@ export const HEARTBEAT_STALL_BUDGET_MS = 5 * 60 * 1000;
 export const MAIN_THREAD_PROXY_TIMEOUT_MS = 10_000;
 
 const BIND_HANDOVER_MS = 10_000;
+/**
+ * RFC 9110 7.6.1: headers that describe one connection, never relayed. A `Connection: keep-alive`
+ * relayed onto a socket the thread closes lets a pooling client send on it and get Node's 400.
+ */
+const HOP_BY_HOP_HEADERS = [
+  "connection",
+  "keep-alive",
+  "proxy-connection",
+  "transfer-encoding",
+  "te",
+  "trailer",
+  "upgrade",
+];
 /** How long a caller turned away by the upgrade console waits before trying again. */
 export const UPGRADE_RETRY_AFTER_SECONDS = 10;
 
@@ -242,6 +256,9 @@ server.on("clientError", (error, socket) => {
   const status = workerData.clientErrorStatusLines[code] || "400 Bad Request";
   socket.end("HTTP/1.1 " + status + "\\r\\nConnection: close\\r\\n\\r\\n");
 });
+// The thread owns its client's connection, so the main thread's hop-by-hop headers stay behind.
+const endToEnd = (headers) =>
+  Object.fromEntries(Object.entries(headers).filter(([name]) => !workerData.hopByHopHeaders.includes(name)));
 const proxy = (req, res) => {
   const upstream = http.request({ ...target, method: req.method, path: req.url, headers: req.headers, agent: false });
   const timer = setInterval(() => {
@@ -256,7 +273,7 @@ const proxy = (req, res) => {
   });
   upstream.on("response", (reply) => {
     clearInterval(timer);
-    res.writeHead(reply.statusCode ?? 502, reply.headers);
+    res.writeHead(reply.statusCode ?? 502, endToEnd(reply.headers));
     reply.pipe(res);
   });
   upstream.on("error", () => {
@@ -407,6 +424,7 @@ export async function startLivenessThread({
       wrongTokensPerMinute: UPGRADE_CONSOLE_WRONG_TOKENS_PER_MINUTE,
       clientErrorStatusLines: CLIENT_ERROR_STATUS_LINES,
       quietClientErrors: QUIET_CLIENT_ERROR_CODES,
+      hopByHopHeaders: HOP_BY_HOP_HEADERS,
     },
   });
   // The main loop keeps its own loopback listener, which is what holds the process open.
@@ -422,10 +440,9 @@ export async function startLivenessThread({
   thread.on("error", (error) => logger.error({ error }, "liveness thread failed"));
   thread.on("message", (message: ThreadMessage) => {
     if (message.type !== "clientError") return;
-    (logger.warn ?? logger.info)(
-      { code: message.code, head: redactedRequestHead(message.head), door: "public" },
-      "http request refused before routing",
-    );
+    const fields = { code: message.code, head: redactedRequestHead(message.head), door: "public" };
+    if (logger.warn) logger.warn(fields, REFUSED_BEFORE_ROUTING);
+    else logger.info(fields, REFUSED_BEFORE_ROUTING);
   });
   return {
     address,
