@@ -8,12 +8,13 @@ import { useColorMode } from "@langwatch/design-system/color-mode";
 import { Box } from "@langwatch/design-system/primitives";
 import type { Monaco } from "@monaco-editor/react";
 import type { editor } from "monaco-editor";
-import { lazy, Suspense, useMemo, useState } from "react";
+import { lazy, Suspense, useState } from "react";
 
 import {
   configureWidgetTypeScript,
   useWidgetRowTypes,
 } from "../../../../behavior/lw-widget-monaco.ts";
+import { useEditorValueSync } from "../../../../behavior/use-editor-value-sync.ts";
 import {
   type LwQueryColumnsByName,
   lwQueryRowTypesDts,
@@ -44,9 +45,12 @@ export function DashboardWidgetCodeEditor({
   queryColumns,
 }: DashboardWidgetCodeEditorProps) {
   const { colorMode } = useColorMode();
-  const [mounted, setMounted] = useState<{ readonly monaco: Monaco }>();
-  const rowTypes = useMemo(() => lwQueryRowTypesDts({ queries: queryColumns }), [queryColumns]);
-  useWidgetRowTypes({ mounted, dts: rowTypes });
+  const [mounted, setMounted] = useState<{
+    readonly monaco: Monaco;
+    readonly editor: editor.IStandaloneCodeEditor;
+  }>();
+  useWidgetRowTypes({ mounted, dts: lwQueryRowTypesDts({ queries: queryColumns }) });
+  useEditorValueSync({ editor: mounted?.editor, value });
 
   return (
     <Suspense
@@ -59,12 +63,14 @@ export function DashboardWidgetCodeEditor({
       <MonacoEditor
         height="100%"
         language="typescript"
-        value={value}
+        defaultValue={value}
         theme={colorMode === "dark" ? "vs-dark" : "vs"}
         onChange={(v: string | undefined) => onChange(v ?? "")}
         options={EDITOR_OPTIONS}
         beforeMount={(instance) => configureWidgetTypeScript({ monaco: instance })}
-        onMount={(_editor, instance) => setMounted({ monaco: instance })}
+        onMount={(mountedEditor, instance) =>
+          setMounted({ monaco: instance, editor: mountedEditor })
+        }
       />
     </Suspense>
   );

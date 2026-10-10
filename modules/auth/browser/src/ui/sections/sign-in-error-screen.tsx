@@ -1,14 +1,6 @@
 import { isStableAuthError, normalizeSignInErrorCode } from "@langwatch/auth-contract";
 import { Link } from "@langwatch/browser-host/link";
-import {
-  Alert,
-  Box,
-  Button,
-  HStack,
-  Spinner,
-  Text,
-  VStack,
-} from "@langwatch/design-system/primitives";
+import { Alert, Button, HStack, Spinner, Text, VStack } from "@langwatch/design-system/primitives";
 import { explainHandledError } from "@langwatch/handled-error/presentation";
 import { useEffect, useState } from "react";
 
@@ -22,6 +14,7 @@ import {
   governingConnectionFrom,
 } from "../../model/sign-in-error-code.ts";
 import { AuthCard } from "../elements/auth-card.tsx";
+import { FrontDoorLinkButton } from "../elements/front-door-link-button.tsx";
 import { FRONT_DOOR_PRIMARY_STYLE } from "../elements/front-door-primary-button.tsx";
 import { FrontDoorShell } from "./front-door-shell.tsx";
 
@@ -190,19 +183,7 @@ export function SignInErrorScreen() {
           <Spinner size="sm" color="frontDoor.detail" />
           <Text color="fg.muted">One moment.</Text>
         </HStack>
-        <Text fontSize="13px" color="fg.muted" textAlign="center">
-          If nothing happens,{" "}
-          <Box
-            asChild
-            color="fg"
-            fontWeight={600}
-            textDecoration="underline"
-            textUnderlineOffset="3px"
-          >
-            <Link href="/">go to sign in</Link>
-          </Box>
-          .
-        </Text>
+        <FrontDoorLinkButton href="/" label="Go to sign in" tone="secondary" />
       </VStack>
     </AuthCard>
   );

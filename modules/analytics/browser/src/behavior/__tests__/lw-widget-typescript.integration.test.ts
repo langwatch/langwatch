@@ -136,6 +136,20 @@ export default function Widget() {
     });
   });
 
+  describe("given widget code asking for React", () => {
+    /** @scenario "React completes with its hooks" */
+    it.each([
+      ['import { use } from "react";', 'import { use'.length],
+      ["export default () => React.", "export default () => React.".length],
+    ])("offers React's hooks in %s", async (code, offset) => {
+      const service = await languageService({ code });
+      const names = service.getCompletionsAtPosition(WIDGET_URI, offset, undefined)?.entries;
+      expect(names?.map((entry) => entry.name)).toEqual(
+        expect.arrayContaining(["useState", "useEffect", "useMemo"]),
+      );
+    });
+  });
+
   describe("given a query whose columns the last run returned", () => {
     const widget = (body: string) => `export default function Widget() {
   const { data } = LW.useChartQuery("main", {});

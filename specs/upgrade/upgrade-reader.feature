@@ -159,6 +159,13 @@ Feature: The upgrade reader answers the installation state and the ledger's rows
     Then the releases are ordered newest first with a count per status
     And the image release is marked as the image
 
+  @unit
+  Scenario: An unreleased image marks the Unreleased row as this image
+    Given an image no release names, declaring a step in no manifest and a step of release 3.20.1
+    When the releases are listed
+    Then the Unreleased row is marked as the image and lists the unlisted step
+    And release 3.20.1 is not marked as the image
+
   @integration
   Scenario: A step lists no targets before the target table exists
     Given a database whose ledger has no target table

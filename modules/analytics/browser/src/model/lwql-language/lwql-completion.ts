@@ -6,7 +6,7 @@ import type {
 } from "@langwatch/analytics-contract";
 
 import { LWQL_KEYWORDS } from "./lwql-monarch.ts";
-import { datasetsInScope, LWQL_NAMESPACE } from "./lwql-scope.ts";
+import { datasetsInScope } from "./lwql-scope.ts";
 
 export type LwqlCompletionKind =
   | "keyword"
@@ -86,17 +86,11 @@ function columnItem({
   };
 }
 
-function datasetItems({
-  datasets,
-  qualified,
-}: {
-  datasets: readonly LangWatchQLSchemaDataset[];
-  qualified: boolean;
-}): LwqlCompletionItem[] {
+function datasetItems(datasets: readonly LangWatchQLSchemaDataset[]): LwqlCompletionItem[] {
   return datasets.map((dataset, index) => ({
-    label: qualified ? `${LWQL_NAMESPACE}.${dataset.name}` : dataset.name,
+    label: dataset.name,
     kind: "table",
-    insertText: qualified ? `${LWQL_NAMESPACE}.${dataset.name}` : dataset.name,
+    insertText: dataset.name,
     isSnippet: false,
     detail: dataset.grain,
     documentation: dataset.description,
@@ -221,15 +215,14 @@ export function lwqlCompletions({
   if (!schema) return { replaceFrom, items: keywordItems() };
 
   const head = before.slice(0, replaceFrom);
-  const qualifier = QUALIFIER_TAIL.exec(head)?.[1];
-  if (qualifier?.toLowerCase() === LWQL_NAMESPACE) {
-    return { replaceFrom, items: datasetItems({ datasets: schema.views, qualified: false }) };
+  const qualified = QUALIFIER_TAIL.exec(head);
+  const beforeRelation = head.slice(0, qualified?.index ?? head.length);
+  if (RELATION_POSITION.test(beforeRelation)) {
+    return { replaceFrom, items: datasetItems(schema.views) };
   }
+  const qualifier = qualified?.[1];
   if (qualifier) {
     return { replaceFrom, items: columnItems({ schema, text, qualifier, prefix }) };
-  }
-  if (RELATION_POSITION.test(head)) {
-    return { replaceFrom, items: datasetItems({ datasets: schema.views, qualified: true }) };
   }
   return {
     replaceFrom,
