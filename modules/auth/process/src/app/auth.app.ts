@@ -474,7 +474,8 @@ export class AuthModule implements AuthApiContract {
       betterAuth: () => this.betterAuth(),
       baseUrl: () => this.baseUrl(),
       verifyBrowserSession: (input) => this.verifyBrowserSession(input),
-      resolveBrowserSession: (input) => this.resolveBrowserSession(input),
+      resolveBrowserSession: (input) =>
+        this.#sessions.resolveBrowserSession({ ...input, fresh: true }),
       revokeBrowserSession: (input) => this.revokeBrowserSession(input),
       idTokenIssuerRefusals: this.#idTokenIssuerRefusals,
       connectionIssuers,
