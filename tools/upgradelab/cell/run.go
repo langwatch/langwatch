@@ -86,6 +86,7 @@ type run struct {
 	sso                ssoSeed
 	retention          retentionState
 	legacy             legacySeed
+	legacyOrg          legacyOrgSeed
 
 	stopTraffic, stopPoller, stopSampler context.CancelFunc
 	trafficDone                          chan struct{}

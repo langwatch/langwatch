@@ -239,14 +239,20 @@ func (seeder *Seeder) Invite(ctx context.Context, email string) (string, error) 
 func (seeder *Seeder) InviteTo(ctx context.Context, email, organizationID, teamID string) (string, error) {
 	input := map[string]any{"organizationId": organizationID, "invites": []any{map[string]any{
 		"email": email, "role": "MEMBER", "teams": []any{map[string]string{"teamId": teamID, "role": "MEMBER"}}}}}
-	var created []struct{ InviteCode string }
+	// Main answers [{ invite: { inviteCode }, emailNotSent }]; a flat [{ inviteCode }] is read too.
+	var created []struct {
+		InviteCode string
+		Invite     struct{ InviteCode string }
+	}
 	if err := seeder.trpc(ctx, trpcCall{mutation: true, path: "invite.createInvites", input: input, out: &created}); err != nil {
 		return "", err
 	}
-	if len(created) == 0 || created[0].InviteCode == "" {
-		return "", fmt.Errorf("invite.createInvites made no invite for %s", email)
+	for _, each := range created {
+		if code := cmp.Or(each.Invite.InviteCode, each.InviteCode); code != "" {
+			return code, nil
+		}
 	}
-	return created[0].InviteCode, nil
+	return "", fmt.Errorf("invite.createInvites made no invite for %s", email)
 }
 
 // projectIn is the project with this slug, else the first listed, as product.mjs falls back.

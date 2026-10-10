@@ -47,6 +47,7 @@ func (cell *run) checks(ctx context.Context) error {
 	cell.report.Verdicts = append(cell.report.Verdicts, cell.hybridVerdicts(ctx)...)
 	cell.report.Verdicts = append(cell.report.Verdicts, cell.ssoVerdicts(ctx, final)...)
 	cell.report.Verdicts = append(cell.report.Verdicts, cell.legacyVerdicts(ctx, final)...)
+	cell.report.Verdicts = append(cell.report.Verdicts, cell.legacyOrgVerdict(ctx, final)...)
 	cell.report.Verdicts = append(cell.report.Verdicts, cell.retentionVerdict(ctx)...)
 	cell.report.Verdicts = append(cell.report.Verdicts, cell.drillVerdicts(final)...)
 	cell.report.Verdicts = append(cell.report.Verdicts, cell.readModelVerdict(ctx), cell.browserVerdict(), cell.storedEventsVerdict(ctx))

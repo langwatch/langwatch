@@ -157,6 +157,7 @@ func (cell *run) seedSSO(ctx context.Context) {
 		cell.sso.before = cell.ssoSignIn(ctx, "main", cell.sso.members)
 	}
 	if cell.profile.LegacySSO {
+		cell.seedLegacyOrganization(ctx) // before main's standing is read, so E10 counts the seed account's membership of it
 		cell.legacyAtMain(ctx)
 	}
 }

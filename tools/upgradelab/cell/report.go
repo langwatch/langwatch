@@ -140,6 +140,7 @@ var invariantNames = map[string]string{
 	"E8":  "a member who signed in through main's deployment-wide Auth0 signs in on head through it: same organization, same role, API keys answer",
 	"E9":  "a member signs in through their organization's own SAML connection before and after the upgrade",
 	"E10": "the seed account signs in with its password on head beside both SSO doors: same organization and role",
+	"E11": "an organization on main's old per-organization SSO (legacy columns, no connection) is grandfathered onto a connection, its member signs in on head and Ops shows the migration inventory",
 	"F1":  "empty origin: every data step ends done over zero rows (or not-needed)",
 	"R2":  "the oldest aged trace each organization keeps reads back through head's API",
 	"R1":  "aged data: no organization's age slice loses rows across the upgrade beyond what main's own retention TTL expires",
