@@ -50,18 +50,27 @@ import { useSubscriptionCurrency } from "./use-subscription-currency.ts";
 import { useSubscriptionMembers } from "./use-subscription-members.ts";
 import { UserManagementDrawer } from "./user-management-drawer.tsx";
 
+function deploymentIsSaaS(host: ReturnType<typeof useBillingHost>): boolean {
+  return host.isDeploymentSettled() && host.isSaaS();
+}
+
 function currentPlanNameFor({
   plan,
   isLicenseOverride,
   isTieredPricingModel,
   isDeveloperPlan,
+  isSaaS,
 }: {
   plan: PlanInfo;
+  isSaaS: boolean;
   isLicenseOverride: boolean;
   isTieredPricingModel: boolean;
   isDeveloperPlan: boolean;
 }): string {
-  if (isLicenseOverride) return `License: ${plan.name ?? formatPlanTypeLabel(plan.type)}`;
+  if (isLicenseOverride) {
+    const name = plan.name ?? formatPlanTypeLabel(plan.type);
+    return isSaaS ? name : `License: ${name}`;
+  }
   if (isTieredPricingModel) return plan.name ?? formatPlanTypeLabel(plan.type);
   if (isDeveloperPlan) return "Free plan";
   return "Growth plan";
@@ -274,6 +283,7 @@ export function SubscriptionPage() {
     isLicenseOverride,
     isTieredPricingModel,
     isDeveloperPlan,
+    isSaaS: deploymentIsSaaS(host),
   });
   const currentPlanPricing = currentPlanPricingFor({
     flags,

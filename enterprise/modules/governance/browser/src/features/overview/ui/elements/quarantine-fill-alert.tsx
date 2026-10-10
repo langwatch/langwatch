@@ -43,7 +43,7 @@ export function QuarantineFillAlert({
             <VStack align="start" gap={0.5} marginTop={1}>
               {stats.perSource.slice(0, 5).map((row) => (
                 <HStack key={row.ingestionSourceId ?? "unknown"} gap={2} fontSize="xs">
-                  <Text fontFamily="mono">{row.ingestionSourceId ?? "unknown source"}</Text>
+                  <Text textStyle="monoSm">{row.ingestionSourceId ?? "unknown source"}</Text>
                   <Text color="fg.muted">{row.spanCount} spans</Text>
                 </HStack>
               ))}

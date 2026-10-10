@@ -177,7 +177,7 @@ export default function UsageScreen() {
   return (
     <>
       <PageLayout.Header>
-        <PageLayout.Heading>Usage</PageLayout.Heading>
+        <PageLayout.Heading>Usage and billing</PageLayout.Heading>
         <Spacer />
         {isSaaS !== undefined && actionFor({ href: actionHref, label: actionLabel })}
       </PageLayout.Header>

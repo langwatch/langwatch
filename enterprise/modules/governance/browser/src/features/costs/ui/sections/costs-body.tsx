@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import { Banner } from "@langwatch/design-system/banner";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { Skeleton, VStack } from "@langwatch/design-system/primitives";
 import { type GovernanceCostSummary } from "@langwatch/enterprise-governance-contract";
+import { ChartNoAxesCombined } from "lucide-react";
 
 import { summaryHoldsFigures } from "../../model/measured-rows.ts";
 import { sampleCostSummary } from "../../model/sample-lanes.ts";
@@ -101,10 +103,15 @@ function CostsWithoutFigures({
   }
 
   return (
-    <Banner status="info" data-testid="cost-lanes-unavailable" title="Cost data is unavailable">
-      {data.unavailableReason === "no_cost_store"
-        ? "This deployment does not have cost storage configured, so no cost has been recorded."
-        : "No cost has been recorded for this organization yet."}
-    </Banner>
+    <NoDataInfoBlock
+      testId="cost-lanes-unavailable"
+      icon={<ChartNoAxesCombined />}
+      title="No cost recorded yet"
+      description={
+        data.unavailableReason === "no_cost_store"
+          ? "This deployment does not have cost storage configured, so no cost has been recorded."
+          : "No cost has been recorded for this organization yet."
+      }
+    />
   );
 }

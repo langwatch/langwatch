@@ -240,10 +240,10 @@ export function PlansComparisonPage({
       <PageLayout.Header>
         <PageLayout.Heading>Plans</PageLayout.Heading>
         <Spacer />
-        <Link href="/settings/subscription">
-          <PageLayout.HeaderButton>
-            <ArrowLeft size={14} /> Subscription
-          </PageLayout.HeaderButton>
+        <Link unstyled href="/settings/subscription">
+          <HStack gap={1} color="fg.muted" textStyle="bodySm">
+            <ArrowLeft size={14} aria-hidden /> Subscription
+          </HStack>
         </Link>
       </PageLayout.Header>
       <VStack gap={6} width="full" align="stretch" paddingTop={4}>

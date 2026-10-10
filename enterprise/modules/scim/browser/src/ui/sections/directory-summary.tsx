@@ -7,21 +7,18 @@ import { UpgradeRequired } from "@langwatch/design-system/access-state";
  * it does not manage. Lent to organization's Directory through `withCapabilities`.
  * Spec: specs/identity/directory-administration.feature
  */
-import {
-  Button,
-  Card,
-  HStack,
-  SimpleGrid,
-  Skeleton,
-  Text,
-  VStack,
-} from "@langwatch/design-system/primitives";
+import { Box, Button, HStack, Skeleton, Text, VStack } from "@langwatch/design-system/primitives";
 import { StatusChip, type StatusChipTone } from "@langwatch/design-system/settings-card";
-import { Tooltip } from "@langwatch/design-system/tooltip";
+import {
+  StatTile,
+  StatTileFigure,
+  StatTileGrid,
+  StatTileSkeleton,
+} from "@langwatch/design-system/stat-tile";
 import type { DirectorySummaryProps } from "@langwatch/enterprise-scim-client";
 import { HandledErrorAlert } from "@langwatch/error-views";
 import { nowInstant, readableDate } from "@langwatch/time";
-import { Boxes, Clock, Info, Plug, Plus, Users, UserX } from "lucide-react";
+import { Boxes, Clock, Plug, Plus, Users, UserX } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { useDirectoryFacts } from "../../behavior/use-directory-facts.ts";
@@ -55,36 +52,41 @@ export default function DirectorySummary({
 
   return (
     <VStack align="stretch" gap={3} width="full">
-      <SimpleGrid columns={{ base: 1, sm: 2, lg: 5 }} gap={3} data-testid="directory-summary">
-        <DirectorySources connections={facts.connections} />
-        <Fact label="Last directory change" icon={<Clock size={14} />}>
-          <FactNumber
-            muted={facts.lastPushedAtMs === null}
-            title={
-              facts.lastPushedAtMs === null
-                ? void 0
-                : readableDate(facts.lastPushedAtMs).toLocaleString()
-            }
+      <Box data-testid="directory-summary" width="full">
+        <StatTileGrid columns={5}>
+          <DirectorySources connections={facts.connections} />
+          <Fact label="Last directory change" icon={<Clock size={14} />}>
+            <FactNumber
+              muted={facts.lastPushedAtMs === null}
+              title={
+                facts.lastPushedAtMs === null
+                  ? void 0
+                  : readableDate(facts.lastPushedAtMs).toLocaleString()
+              }
+            >
+              {facts.lastPushedAtMs === null
+                ? "No push yet"
+                : relativeTime({
+                    atMs: facts.lastPushedAtMs,
+                    nowMs: nowInstant().epochMilliseconds,
+                  })}
+            </FactNumber>
+          </Fact>
+          <Fact
+            label="People it manages"
+            hint="Counted from the directory itself, so it holds even when the membership cannot be read."
+            icon={<Users size={14} />}
           >
-            {facts.lastPushedAtMs === null
-              ? "No push yet"
-              : relativeTime({ atMs: facts.lastPushedAtMs, nowMs: nowInstant().epochMilliseconds })}
-          </FactNumber>
-        </Fact>
-        <Fact
-          label="People it manages"
-          hint="Counted from the directory itself, so it holds even when the membership cannot be read."
-          icon={<Users size={14} />}
-        >
-          <FactNumber data-testid="directory-managed-people">{facts.managedPeople}</FactNumber>
-        </Fact>
-        <Fact label="Groups it sent" icon={<Boxes size={14} />}>
-          <Unavailable canRead={canReadMembership} read={facts.groups}>
-            <FactNumber>{facts.directoryGroups.length}</FactNumber>
-          </Unavailable>
-        </Fact>
-        <MembersOutsideDirectory facts={facts} canReadMembership={canReadMembership} />
-      </SimpleGrid>
+            <FactNumber data-testid="directory-managed-people">{facts.managedPeople}</FactNumber>
+          </Fact>
+          <Fact label="Groups it sent" icon={<Boxes size={14} />}>
+            <Unavailable canRead={canReadMembership} read={facts.groups}>
+              <FactNumber>{facts.directoryGroups.length}</FactNumber>
+            </Unavailable>
+          </Fact>
+          <MembersOutsideDirectory facts={facts} canReadMembership={canReadMembership} />
+        </StatTileGrid>
+      </Box>
       {facts.groups.isError && (
         <HandledErrorAlert
           error={facts.groups.error}
@@ -225,23 +227,10 @@ function Unavailable({
 }
 
 function DirectorySummarySkeleton() {
-  return (
-    <SimpleGrid columns={{ base: 1, sm: 2, lg: 5 }} gap={3} width="full" aria-busy="true">
-      {[0, 1, 2, 3, 4].map((tile) => (
-        <Card.Root key={tile} borderRadius="xl" minWidth={0}>
-          <Card.Body paddingX={4} paddingY={3}>
-            <VStack align="start" gap={1.5} minWidth={0}>
-              <Skeleton height="3" width="16" />
-              <Skeleton height="5" width="24" />
-            </VStack>
-          </Card.Body>
-        </Card.Root>
-      ))}
-    </SimpleGrid>
-  );
+  return <StatTileSkeleton columns={5} />;
 }
 
-/** One independently readable directory fact: label line, the big value, one short caption. */
+/** One independently readable directory fact: a StatTile with an optional short caption. */
 function Fact({
   label,
   hint,
@@ -250,64 +239,17 @@ function Fact({
   children,
 }: {
   label: string;
-  /** The long explanation, behind an info icon by the label. */
   hint?: string;
   caption?: ReactNode;
   icon: ReactNode;
   children: ReactNode;
 }) {
   return (
-    <Card.Root borderRadius="xl" minWidth={0} height="full">
-      <Card.Body paddingX={3} paddingY={3}>
-        <VStack align="start" gap={1} minWidth={0}>
-          <HStack gap={1.5} color="fg.muted" whiteSpace="nowrap">
-            {icon}
-            <Text fontSize="xs" fontWeight={500} lineHeight="1.3">
-              {label}
-            </Text>
-            {hint && (
-              <Tooltip content={hint}>
-                <span aria-label={hint} style={{ display: "inline-flex" }}>
-                  <Info size={12} />
-                </span>
-              </Tooltip>
-            )}
-          </HStack>
-          <HStack align="center" minWidth={0} maxWidth="full">
-            {children}
-          </HStack>
-          {caption}
-        </VStack>
-      </Card.Body>
-    </Card.Root>
+    <StatTile label={label} icon={icon} hint={hint}>
+      {children}
+      {caption}
+    </StatTile>
   );
 }
 
-/** A fact that is a number, or a phrase in its place: the tile's big figure. */
-function FactNumber({
-  children,
-  muted = false,
-  title,
-  "data-testid": testId,
-}: {
-  children: ReactNode;
-  muted?: boolean;
-  title?: string;
-  "data-testid"?: string;
-}) {
-  return (
-    <Text
-      fontSize="lg"
-      lineHeight="1.3"
-      fontWeight={muted ? 400 : 600}
-      color={muted ? "fg.muted" : void 0}
-      fontVariantNumeric="tabular-nums"
-      truncate
-      maxWidth="full"
-      title={title}
-      data-testid={testId}
-    >
-      {children}
-    </Text>
-  );
-}
+const FactNumber = StatTileFigure;

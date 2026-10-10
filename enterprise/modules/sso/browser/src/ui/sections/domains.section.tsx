@@ -98,11 +98,11 @@ export function DomainsSection({
         <Text color="fg.muted" fontSize="sm">
           No domain has been claimed yet. Add the domain your team&apos;s email addresses end in,
           for example{" "}
-          <Text as="span" fontFamily="mono">
+          <Text as="span" textStyle="monoSm">
             acme.com
           </Text>{" "}
           for somebody signing in as{" "}
-          <Text as="span" fontFamily="mono">
+          <Text as="span" textStyle="monoSm">
             jane@acme.com
           </Text>
           .
@@ -334,7 +334,7 @@ function PublishedRecord({
     <VStack align="stretch" gap={2} data-testid="connection-domain-record">
       <Text fontSize="sm">
         Publish this for{" "}
-        <Text as="span" fontFamily="mono">
+        <Text as="span" textStyle="monoSm">
           {record.domain}
         </Text>
         , then ask us to look for it. We show the value once.

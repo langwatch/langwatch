@@ -1,4 +1,5 @@
 import { Drawer } from "@langwatch/design-system/drawer";
+import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
@@ -167,7 +168,7 @@ function SyncsTable({
   onOpen: (connectionId: string) => void;
 }) {
   return (
-    <Table.Root variant="line" size="md" width="full">
+    <ListTable containerProps={{ overflowX: "auto" }}>
       <Table.Header>
         <Table.Row>
           <Table.ColumnHeader>Organization</Table.ColumnHeader>
@@ -230,7 +231,7 @@ function SyncsTable({
           </Table.Row>
         ))}
       </Table.Body>
-    </Table.Root>
+    </ListTable>
   );
 }
 

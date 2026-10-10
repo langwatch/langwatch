@@ -27,14 +27,7 @@ export function IssuerRow({
         </Text>
       </VStack>
       <HStack gap={1} minWidth={0} maxWidth="full">
-        <Text
-          fontFamily="mono"
-          fontSize="xs"
-          color="fg.muted"
-          truncate
-          maxWidth="full"
-          title={issuer}
-        >
+        <Text textStyle="monoSm" color="fg.muted" truncate maxWidth="full" title={issuer}>
           {issuer.replace(/^https?:\/\//, "")}
         </Text>
         <CopyButton
