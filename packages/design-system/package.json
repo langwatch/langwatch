@@ -528,7 +528,11 @@
           "^production",
           "jsBuild",
           "{projectRoot}/.storybook/**/*",
-          "{workspaceRoot}/apps/ui/public/**/*"
+          "{workspaceRoot}/apps/ui/public/**/*",
+          "{workspaceRoot}/apps/*/src/**/*.{ts,tsx}",
+          "{workspaceRoot}/modules/*/*/src/**/*.{ts,tsx}",
+          "{workspaceRoot}/enterprise/modules/*/*/src/**/*.{ts,tsx}",
+          "{workspaceRoot}/packages/*/src/**/*.{ts,tsx}"
         ],
         "outputs": [
           "{projectRoot}/storybook-static"

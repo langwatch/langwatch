@@ -50,7 +50,7 @@ Do not restyle an alert at the call site. `bg`, `borderColor`, `color`,
 `fontSize` on its title or description all fight the recipe, and one screen
 drifts from the rest. Margins, width and position are layout and belong to the
 call site. The workshop shows every status in every variant in both colour
-modes: `Primitives/Alert` in `pnpm --filter @langwatch/design-system storybook`.
+modes: `Feedback/Alert` in `pnpm --filter @langwatch/design-system storybook`.
 
 ## How toasts stack
 
