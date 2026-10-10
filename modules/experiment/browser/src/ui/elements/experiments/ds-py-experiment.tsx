@@ -467,7 +467,7 @@ export function DSPyExperimentRunList({
   return (
     <VStack
       align="start"
-      background="bg.surface"
+      background="bg.card"
       paddingY={size === "sm" ? 0 : 4}
       borderRightWidth="1px"
       borderColor="border.emphasized"
@@ -1492,7 +1492,7 @@ export function DSPyExperimentSummary({
       left={0}
       bottom={0}
       width="100%"
-      background="bg.surface"
+      background="bg.card"
       borderTop="1px solid"
       borderColor="border"
       paddingY={4}

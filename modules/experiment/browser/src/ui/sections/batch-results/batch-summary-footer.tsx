@@ -105,7 +105,7 @@ export function BatchSummaryFooter({
   return (
     <VStack
       width="full"
-      background="bg.surface"
+      background="bg.card"
       gap={0}
       position="sticky"
       left={0}
