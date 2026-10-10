@@ -1,4 +1,4 @@
-import { Card, Text, VStack } from "@langwatch/design-system/primitives";
+import { Card, Heading, Text, VStack } from "@langwatch/design-system/primitives";
 import type { DashboardData } from "@langwatch/ops-contract";
 import { useMemo } from "react";
 
@@ -55,11 +55,14 @@ export function OpsDashboardContent({ data }: { data: DashboardData }) {
         pausedKeys={data.pausedKeys}
       />
 
-      <Card.Root overflow="hidden">
-        <Card.Body padding={4}>
-          <Text textStyle="xs" fontWeight="medium" color="fg.muted" marginBottom={2}>
-            Throughput
+      <Card.Root variant="outline" overflow="hidden">
+        <Card.Header>
+          <Heading size="sm">Throughput</Heading>
+          <Text textStyle="sm" color="fg.muted">
+            Arrival and completion rates alongside the queue backlog.
           </Text>
+        </Card.Header>
+        <Card.Body>
           <ThroughputChart data={data} />
         </Card.Body>
       </Card.Root>

@@ -1,5 +1,6 @@
 import { PageLayout } from "@langwatch/design-system/page-layout";
-import { Skeleton, Spacer, VStack } from "@langwatch/design-system/primitives";
+import { Skeleton, VStack } from "@langwatch/design-system/primitives";
+import { StatTileSkeleton } from "@langwatch/design-system/stat-tile";
 import { HandledErrorAlert } from "@langwatch/error-views";
 import { Database } from "lucide-react";
 
@@ -32,18 +33,26 @@ export default function OpsDashboardScreen() {
 
   return (
     <>
-      <PageLayout.Header>
-        <PageLayout.Heading>Ops Dashboard</PageLayout.Heading>
-        <Spacer />
-        <PageLayout.HeaderButton onClick={() => payloadStore.open("open")}>
-          <Database size={16} /> Payload store
-        </PageLayout.HeaderButton>
-        {/* The snapshot's own age, not just the poll's health: this page can be
-            reading numbers no writer has refreshed. */}
-        <ConnectionStatusIndicator
-          status={connectionStatus}
-          computedAtMs={data?.snapshot.computedAt ?? null}
-        />
+      <PageLayout.Header
+        flexWrap="wrap"
+        actions={
+          <>
+            <ConnectionStatusIndicator
+              status={connectionStatus}
+              computedAtMs={data?.snapshot.computedAt ?? null}
+            />
+            <PageLayout.HeaderButton onClick={() => payloadStore.open("open")}>
+              <Database size={16} aria-hidden /> Payload store
+            </PageLayout.HeaderButton>
+          </>
+        }
+      >
+        <VStack align="start" gap={1} minWidth={0}>
+          <PageLayout.Heading>Ops Dashboard</PageLayout.Heading>
+          <PageLayout.Subtitle>
+            Throughput, queue health, and work that needs attention.
+          </PageLayout.Subtitle>
+        </VStack>
       </PageLayout.Header>
       <PageLayout.Container>
         {data && <OpsDashboardContent data={data} />}
@@ -55,7 +64,7 @@ export default function OpsDashboardScreen() {
         )}
         {!data && !snapshot.isError && (
           <VStack gap={3} align="stretch" aria-label="Loading metrics">
-            <Skeleton height="96px" />
+            <StatTileSkeleton columns={3} />
             <Skeleton height="240px" />
           </VStack>
         )}
