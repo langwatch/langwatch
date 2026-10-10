@@ -22,12 +22,15 @@ import {
 } from "recharts";
 
 const COLORS = {
-  staged: { stroke: "#06b6d4", fill: "#06b6d4" },
-  completed: { stroke: "#22c55e", fill: "#22c55e" },
-  failed: { stroke: "#ef4444", fill: "#ef4444" },
-  pending: "#a78bfa",
-  blocked: "#f97316",
-  parked: "#eab308",
+  staged: { stroke: "var(--chakra-colors-cyan-solid)", fill: "var(--chakra-colors-cyan-solid)" },
+  completed: {
+    stroke: "var(--chakra-colors-green-solid)",
+    fill: "var(--chakra-colors-green-solid)",
+  },
+  failed: { stroke: "var(--chakra-colors-red-solid)", fill: "var(--chakra-colors-red-solid)" },
+  pending: "var(--chakra-colors-purple-solid)",
+  blocked: "var(--chakra-colors-orange-solid)",
+  parked: "var(--chakra-colors-yellow-solid)",
 };
 
 interface ChartPoint {

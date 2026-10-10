@@ -21,7 +21,7 @@ export function ReplayStatusBanner() {
   const activeProjectionNames = parseActiveProjections(status.currentProjection);
 
   return (
-    <Card.Root borderColor="blue.200" borderWidth="1px">
+    <Card.Root borderColor="blue.muted" borderWidth="1px">
       <Card.Body padding={4}>
         <HStack justify="space-between">
           <HStack gap={2}>

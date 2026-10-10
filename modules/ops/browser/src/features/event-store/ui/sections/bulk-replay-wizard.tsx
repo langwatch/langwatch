@@ -215,7 +215,7 @@ export function BulkReplayWizard({ onReplayStarted }: { onReplayStarted: () => v
           <TenantSelector tenantIds={tenantIds} onTenantIdsChange={setTenantIds} />
         </Box>
         {!hasTenants && !allTenants && (
-          <Text textStyle="xs" color="orange.500" marginTop={2}>
+          <Text textStyle="xs" color="orange.fg" marginTop={2}>
             At least 1 tenant is required to proceed
           </Text>
         )}
@@ -504,7 +504,7 @@ function ReplayLaunchPanel({
           Dry Run (5 aggregates)
         </Button>
         {isReplayRunning && (
-          <Text textStyle="xs" color="orange.500">
+          <Text textStyle="xs" color="orange.fg">
             A replay is already running
           </Text>
         )}
@@ -515,8 +515,8 @@ function ReplayLaunchPanel({
       </Text>
 
       {dryRunResult && (
-        <Box borderLeft="2px solid" borderColor="blue.400" paddingLeft={3} paddingY={1}>
-          <Text textStyle="xs" fontWeight="medium" color="blue.500" marginBottom={1}>
+        <Box borderLeft="2px solid" borderColor="blue.fg" paddingLeft={3} paddingY={1}>
+          <Text textStyle="xs" fontWeight="medium" color="blue.fg" marginBottom={1}>
             Dry Run Result
           </Text>
           <Text textStyle="sm">{dryRunResult.message}</Text>

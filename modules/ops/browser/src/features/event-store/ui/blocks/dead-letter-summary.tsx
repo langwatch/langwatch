@@ -25,7 +25,7 @@ export function DeadLetterSummary({
     <Card.Root borderColor="border.muted" boxShadow="none">
       <Card.Body padding={4}>
         <HStack gap={2} marginBottom={3}>
-          <Box color="red.500">
+          <Box color="red.fg">
             <Skull size={16} />
           </Box>
           <Text textStyle="sm" fontWeight="medium" data-testid="dead-total">
