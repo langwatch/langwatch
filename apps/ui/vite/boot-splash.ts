@@ -1,9 +1,10 @@
 /**
- * The LangWatch loading screen as plain HTML, on screen before any script runs: over every
- * `index.html` until React has drawn, then faded off, and in place of Vite's "Bundling in
- * progress" page. It is the design system's LoadingScreen at rest, so no seam shows.
+ * The LangWatch loading screen as plain HTML with the ground's live shader inline: the same
+ * screen on Vite's "Bundling in progress" page and over every `index.html`, held until the app
+ * draws a real page, then faded off. It is the design system's LoadingScreen, so no seam shows.
  */
 import type { IncomingMessage, ServerResponse } from "node:http";
+import { fileURLToPath } from "node:url";
 
 import {
   LANG_PATH,
@@ -11,7 +12,7 @@ import {
   LOGO_PLATE_PATH,
   WATCH_PATH,
 } from "@langwatch/design-system/logo-paths";
-import type { Plugin } from "vite";
+import { build, type Plugin } from "vite";
 
 // The values of bg.page and logo.* in each mode, and the ground's static floor from
 // ambient-ground.css: no stylesheet has loaded yet, so they are written out here.
@@ -24,6 +25,9 @@ const STYLE = `<style data-boot-splash>
     background: linear-gradient(135deg, #ffffff 0%, #ffaf6e 35%, #cddcf9 72%, #ffffff 100%); }
   .lw-boot::after { content: ""; position: absolute; inset: 0; background: radial-gradient(circle 42vw
     at 50% 45%, #ffffff 0%, #ffffff 30%, rgba(255,255,255,0.7) 56%, rgba(255,255,255,0) 90%); }
+  .lw-boot-shader { position: absolute; inset: 0; opacity: 0;
+    transition: opacity 700ms ease 120ms; }
+  .lw-boot-shader[data-live] { opacity: 0.4; }
   .lw-boot svg { position: relative; z-index: 1; }
   .lw-boot .face { fill: white; } .lw-boot .mark { fill: #213b41; }
   .lw-boot .word { fill: #1d293d; } .lw-boot .word-muted { fill: #314158; }
@@ -32,6 +36,13 @@ const STYLE = `<style data-boot-splash>
     radial-gradient(circle at 50% 30%, rgba(91, 141, 239, 0.35), transparent 42%),
     radial-gradient(circle at 58% 72%, rgba(201, 123, 58, 0.22), transparent 48%); }
   .dark .lw-boot::after { display: none; }
+  .dark .lw-boot-shader { inset: auto; top: -12%; left: 50%; width: 130%; height: 124%;
+    transform: translateX(-50%);
+    -webkit-mask-image: radial-gradient(ellipse 62% 70% at 50% 42%, black 0%, black 30%,
+      rgba(0,0,0,0.55) 62%, rgba(0,0,0,0.16) 84%, transparent 100%);
+    mask-image: radial-gradient(ellipse 62% 70% at 50% 42%, black 0%, black 30%,
+      rgba(0,0,0,0.55) 62%, rgba(0,0,0,0.16) 84%, transparent 100%); }
+  .dark .lw-boot-shader[data-live] { opacity: 0.55; }
   .dark .lw-boot .face { fill: transparent; } .dark .lw-boot .mark { fill: #f1f5f9; }
   .dark .lw-boot .word { fill: #f1f5f9; } .dark .lw-boot .word-muted { fill: #cbd5e1; }
 </style>`;
@@ -58,16 +69,18 @@ const LOGO = `<svg xmlns="http://www.w3.org/2000/svg" width="186" height="45.6" 
 export const BOOT_SPLASH_HEAD = `${STYLE}\n${THEME_SCRIPT}`;
 
 /** The screen itself, fixed over the page. */
-export const BOOT_SPLASH_BODY = `<div id="lw-boot" class="lw-boot" data-testid="boot-splash" aria-busy="true">${LOGO}</div>`;
+export const BOOT_SPLASH_BODY = `<div id="lw-boot" class="lw-boot" data-testid="boot-splash" aria-busy="true"><div id="lw-boot-shader" class="lw-boot-shader" aria-hidden="true"></div>${LOGO}</div>`;
 
-// Fades the screen off once React has drawn into #root (a page with no root, as the bundling
-// page, keeps it); reduced motion drops it at once.
+// Fades the screen off once the app has drawn a real page into #root: it stays over the app's
+// own loading screen, so a slow session or API read shows one screen, not two. A page with no
+// root (the bundling page) keeps it; reduced motion drops it at once.
 const HAND_OFF_SCRIPT = `<script data-boot-splash>(function () {
   var splash = document.getElementById("lw-boot");
   var root = document.getElementById("root");
   if (!splash || !root) return;
   function leave() {
     observer.disconnect();
+    document.dispatchEvent(new Event("lw-boot:done"));
     if (matchMedia("(prefers-reduced-motion: reduce)").matches) return splash.remove();
     requestAnimationFrame(function () { requestAnimationFrame(function () {
       splash.classList.add("lw-boot--out");
@@ -75,58 +88,114 @@ const HAND_OFF_SCRIPT = `<script data-boot-splash>(function () {
       setTimeout(function () { splash.remove(); }, 720);
     }); });
   }
-  var observer = new MutationObserver(function () { if (root.firstElementChild) leave(); });
-  observer.observe(root, { childList: true });
+  function drawn() {
+    return root.firstElementChild && !root.querySelector('[data-testid="loading-screen"]');
+  }
+  var observer = new MutationObserver(function () { if (drawn()) leave(); });
+  observer.observe(root, { childList: true, subtree: true });
 })();</script>`;
+
+/** The boot ground's entry, resolved on use (a test may load this module from a non-file URL). */
+function bootGroundEntry(): string {
+  return fileURLToPath(new URL("../src/boot-ground.ts", import.meta.url));
+}
+
+/** The live mesh or warp as one classic script, from the official React-free shader package. */
+export async function bundleBootGround({ minify }: { minify: boolean }): Promise<string> {
+  const result = await build({
+    configFile: false,
+    logLevel: "silent",
+    publicDir: false,
+    build: {
+      write: false,
+      minify,
+      sourcemap: false,
+      emptyOutDir: false,
+      lib: { entry: bootGroundEntry(), formats: ["iife"], name: "langwatchBootGround" },
+    },
+  });
+  for (const output of Array.isArray(result) ? result : [result]) {
+    if (!("output" in output)) continue;
+    const chunk = output.output.find((item) => item.type === "chunk");
+    if (chunk && chunk.type === "chunk") return chunk.code;
+  }
+  throw new Error("The boot ground bundle produced no script");
+}
+
+/** The script inline, so it runs on Vite's bundling page too, where no module can load yet. */
+const groundTag = (code: string) =>
+  `<script data-boot-splash>${code.replaceAll("</script", "<\\/script")}</script>`;
 
 const FALLBACK_MARKER = "__vite_is_fallback_page__";
 
 /**
  * Vite's fallback page with our screen in its body. Its scripts stay: they reload the page
- * once the bundle is ready.
+ * once the bundle is ready, and the live ground carries on across the reload.
  */
-export function brandFallbackPage(html: string): string {
+export function brandFallbackPage({
+  html,
+  ground = "",
+}: {
+  html: string;
+  ground?: string;
+}): string {
   if (!html.includes(FALLBACK_MARKER)) return html;
+  const body = `${BOOT_SPLASH_BODY}${ground ? groundTag(ground) : ""}`;
   return html
     .replace(/<style>[\s\S]*?<\/style>/, BOOT_SPLASH_HEAD)
-    .replace(/<body>[\s\S]*<\/body>/, `<body style="margin:0">${BOOT_SPLASH_BODY}</body>`);
+    .replace(/<body>[\s\S]*<\/body>/, `<body style="margin:0">${body}</body>`);
 }
 
 /** Holds back an HTML response's body so Vite's fallback page can be rewritten whole. */
-function rewriteFallbackResponses(req: IncomingMessage, res: ServerResponse, next: () => void) {
-  if (!req.headers.accept?.includes("text/html")) return next();
-  const end = res.end.bind(res);
-  res.end = ((chunk?: unknown, ...rest: unknown[]) => {
-    if (typeof chunk === "string" || Buffer.isBuffer(chunk)) {
-      const html = chunk.toString();
-      const branded = brandFallbackPage(html);
-      if (branded !== html) {
-        res.setHeader("Content-Length", Buffer.byteLength(branded));
-        res.removeHeader("ETag");
-        return end(branded);
+function rewriteFallbackResponses({ ground }: { ground: () => Promise<string> }) {
+  return async (req: IncomingMessage, res: ServerResponse, next: () => void) => {
+    if (!req.headers.accept?.includes("text/html")) return next();
+    const code = await ground().catch(() => "");
+    const end = res.end.bind(res);
+    res.end = ((chunk?: unknown, ...rest: unknown[]) => {
+      if (typeof chunk === "string" || Buffer.isBuffer(chunk)) {
+        const html = chunk.toString();
+        const branded = brandFallbackPage({ html, ground: code });
+        if (branded !== html) {
+          res.setHeader("Content-Length", Buffer.byteLength(branded));
+          res.removeHeader("ETag");
+          return end(branded);
+        }
       }
-    }
-    return (end as (...args: unknown[]) => ServerResponse)(chunk, ...rest);
-  }) as ServerResponse["end"];
-  next();
+      return (end as (...args: unknown[]) => ServerResponse)(chunk, ...rest);
+    }) as ServerResponse["end"];
+    next();
+  };
 }
 
-export function bootSplash(): Plugin {
+export function bootSplash({
+  bundleGround = bundleBootGround,
+}: {
+  /** Builds the live ground's script; a test hands in its own. */
+  bundleGround?: typeof bundleBootGround;
+} = {}): Plugin {
+  let ground: Promise<string> | null = null;
+  let minify = false;
+  const groundScript = () => (ground ??= bundleGround({ minify }));
   return {
     name: "langwatch:boot-splash",
+    configResolved: (config) => {
+      minify = config.command === "build";
+    },
     transformIndexHtml: {
       order: "pre",
-      handler: (html) =>
+      handler: async (html) =>
         html
           .replace("</head>", `${BOOT_SPLASH_HEAD}\n  </head>`)
           .replace(
             '<div id="root"></div>',
-            `<div id="root"></div>\n    ${BOOT_SPLASH_BODY}\n    ${HAND_OFF_SCRIPT}`,
+            `<div id="root"></div>\n    ${BOOT_SPLASH_BODY}\n    ${HAND_OFF_SCRIPT}\n    ${groundTag(await groundScript())}`,
           ),
     },
     // Registered before Vite's own middlewares, so it wraps the response they send.
     configureServer: (server) => {
-      server.middlewares.use(rewriteFallbackResponses);
+      void groundScript();
+      server.middlewares.use(rewriteFallbackResponses({ ground: groundScript }));
     },
   };
 }
