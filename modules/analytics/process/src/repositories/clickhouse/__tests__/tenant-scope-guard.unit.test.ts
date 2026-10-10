@@ -48,6 +48,43 @@ describe("tenant scope guard vs the timeseries builders", () => {
     expect(checkTenantScope({ sql, params, tenantId: "tenant-a" })).toBeNull();
   });
 
+  describe("given negated filters", () => {
+    /** @scenario "Negating a span filter inverts the selection and passes the tenant guard" */
+    it.each([
+      ["a span model filter", { "spans.model": ["gpt-5-mini"] }],
+      ["a span type and a trace name filter", { "spans.type": ["llm"], "traces.name": ["a"] }],
+    ])("writes %s as NOT IN and passes the guard", (_label, filters) => {
+      resetParamCounter();
+      const { sql, params } = buildTimeseriesQuery({
+        projectId: "tenant-a",
+        ...dates,
+        series: [{ metric: "metadata.trace_id", aggregation: "cardinality" }],
+        timeScale: "full",
+        filters,
+        negateFilters: true,
+      });
+
+      expect(sql).toMatch(/ts\.TraceId NOT IN \(\s*SELECT TraceId FROM stored_spans/);
+      expect(sql).not.toMatch(/NOT \(\(?ts\.TraceId IN/);
+      expect(checkTenantScope({ sql, params, tenantId: "tenant-a" })).toBeNull();
+    });
+
+    it("keeps NOT around a filter without a subquery", () => {
+      resetParamCounter();
+      const { sql, params } = buildTimeseriesQuery({
+        projectId: "tenant-a",
+        ...dates,
+        series: [{ metric: "metadata.trace_id", aggregation: "cardinality" }],
+        timeScale: "full",
+        filters: { "traces.name": ["a"] },
+        negateFilters: true,
+      });
+
+      expect(sql).toMatch(/NOT \(ts\.TraceName IN/);
+      expect(checkTenantScope({ sql, params, tenantId: "tenant-a" })).toBeNull();
+    });
+  });
+
   it("passes buildTimeseriesQuery on the timeScale=full CTE path", () => {
     resetParamCounter();
     const { sql, params } = buildTimeseriesQuery({
