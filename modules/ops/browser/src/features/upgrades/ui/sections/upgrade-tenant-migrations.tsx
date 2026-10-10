@@ -152,7 +152,7 @@ export function UpgradeTenantMigrations() {
           size="sm"
           disabled={!canManage}
           loading={runPass.isPending}
-          onClick={() => runPass.mutate()}
+          onClick={() => runPass.mutate({})}
         >
           <Play size={14} /> Run a pass now
         </Button>

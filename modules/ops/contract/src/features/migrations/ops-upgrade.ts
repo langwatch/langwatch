@@ -352,10 +352,10 @@ export const opsUpgradeTrpc = defineTrpcContract("ops.upgrade")
   /**
    * Kick a pass now instead of waiting for the next worker boot.
    * Fire-and-forget: per-organization claims already keep two passes off the
-   * same organization.
+   * same organization. `{}` input: a void mutation sends no body over the unbatched link.
    */
   .mutation("runSystemMigrationPass")
-  .withInput(z.void())
+  .withInput(z.object({}))
   .withOutput(opsMigrationPassStartedSchema)
 
   .mutation("assertSystemMigrationLegacyWritersDrained")

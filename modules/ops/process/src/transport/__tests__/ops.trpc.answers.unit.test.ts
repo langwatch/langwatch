@@ -138,6 +138,15 @@ describe("the ops surface's declared answers", () => {
   });
 
   describe("given a write that acknowledges", () => {
+    /** @scenario An operator's "Run a pass now" is accepted with an empty input */
+    it("starts a pass from an empty input, the body the unbatched link can send", async () => {
+      const upgrade = mount(opsUpgradeTrpcTransport);
+
+      await expect(upgrade.operator.runSystemMigrationPass({})).resolves.toEqual({
+        started: true,
+      });
+    });
+
     it("answers each acknowledgement's declared shape", async () => {
       const queues = mount(opsQueueTrpcTransport, {
         unblockQueueGroup: async () => ({ wasBlocked: true }),
@@ -151,7 +160,6 @@ describe("the ops surface's declared answers", () => {
       await expect(
         eventLog.operator.dismissAnomaly({ tenantId: "project_a", kind: "rate_breaker" }),
       ).resolves.toEqual({ dismissed: true });
-      await expect(upgrade.operator.runSystemMigrationPass()).resolves.toEqual({ started: true });
       await expect(
         upgrade.operator.enrollMigrationTenant({
           organizationId: "org_acme",

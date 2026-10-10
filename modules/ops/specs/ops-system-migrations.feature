@@ -68,3 +68,10 @@ Feature: Ops runs the system migration passes and names their cohorts
     Then it runs a pass without asking the stored state
     And its later re-drives ask the stored state first
     And a first pass that fails leaves the next re-drive ungated too
+
+  # The unbatched tRPC link sends no body for a mutation without input, which the door refuses (WEB-9800).
+  @unit
+  Scenario: An operator's "Run a pass now" is accepted with an empty input
+    Given an operator on Ops > Upgrades, Tenant migrations
+    When they choose "Run a pass now" and the client sends an empty object
+    Then the door accepts it and answers that the pass started
