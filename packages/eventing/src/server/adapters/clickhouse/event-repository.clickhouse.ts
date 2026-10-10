@@ -239,6 +239,8 @@ export class EventingClickHouseEventRepository implements EventRepository {
           ...(hasLowerBound ? { occurredAtFromMs } : {}),
         },
         format: "JSONEachRow",
+        // Unbounded, this is one aggregate's whole history by its key: a fold needs all of it.
+        ...(hasLowerBound ? {} : { SKIP_COLD_SCAN_CHECK: true as const }),
       });
 
       const rows = await result.json<EventLogRow>();
