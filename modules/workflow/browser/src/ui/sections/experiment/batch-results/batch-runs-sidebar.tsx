@@ -1,4 +1,5 @@
 import { RawCheckbox as Checkbox } from "@langwatch/design-system/checkbox";
+import { FormattedDate } from "@langwatch/design-system/formatted-date";
 /**
  * BatchRunsSidebar - Sidebar component showing list of evaluation runs
  */
@@ -24,7 +25,7 @@ import {
   isRunFinished,
 } from "../../../../model/experiment/batch-evaluation-results.run-state.ts";
 import { RunDisplayName } from "../../../elements/experiment/batch-results/run-display-name.tsx";
-import { formatTimeAgo, getColorForString } from "./presentation.tsx";
+import { getColorForString } from "./presentation.tsx";
 
 /**
  * Summary data for a single evaluation run
@@ -269,7 +270,11 @@ const RunItem = ({
           {!isRunFinished(run.timestamps) && <Spinner size="xs" color="blue.fg" flexShrink={0} />}
         </HStack>
         <Text color="fg.muted" textStyle="caption">
-          {run.timestamps.createdAt ? formatTimeAgo(run.timestamps.createdAt) : "..."}
+          {run.timestamps.createdAt ? (
+            <FormattedDate value={run.timestamps.createdAt} display="auto" />
+          ) : (
+            "..."
+          )}
           {run.timestamps.stoppedAt && " · stopped"}
           {interrupted && " · interrupted"}
         </Text>

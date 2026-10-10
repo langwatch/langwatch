@@ -1,7 +1,7 @@
 import { useDrawer } from "@langwatch/browser-host/drawer";
+import { Banner } from "@langwatch/design-system/banner";
 import { CodePreview } from "@langwatch/design-system/code-preview";
 import {
-  Alert,
   Box,
   Button,
   Heading,
@@ -11,7 +11,6 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import type { ExecutionState } from "@langwatch/workflow-contract";
-import { CircleAlert } from "lucide-react";
 import numeral from "numeral";
 import { useDebounceValue } from "usehooks-ts";
 import { z } from "zod";
@@ -180,15 +179,9 @@ const renderExecutionError = (executionState: ExecutionState) => {
   return (
     <VStack width="full" align="stretch" gap={3} minWidth={0}>
       <RedactedField field="output">
-        <Alert.Root role="alert" status="error" size="sm">
-          <Alert.Indicator>
-            <CircleAlert />
-          </Alert.Indicator>
-          <Alert.Content>
-            <Alert.Title>{title}</Alert.Title>
-            <Alert.Description>{message}</Alert.Description>
-          </Alert.Content>
-        </Alert.Root>
+        <Banner status="error" title={title}>
+          {message}
+        </Banner>
         <CodePreview
           code={json ?? details}
           language={json ? "json" : "python"}

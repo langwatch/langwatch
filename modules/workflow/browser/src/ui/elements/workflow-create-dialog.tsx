@@ -1,7 +1,7 @@
 import { Dialog } from "@langwatch/design-system/dialog";
 import { Button, Grid, HStack } from "@langwatch/design-system/primitives";
 import { studioWorkflowSchema, type StudioWorkflow } from "@langwatch/workflow-contract";
-import { ChevronLeft, File, Upload } from "lucide-react";
+import { ChevronLeft, CircleCheck, File, Upload } from "lucide-react";
 import { Fragment, useEffect, useRef, useState, type DragEvent, type ReactNode } from "react";
 
 import { TEMPLATES } from "../../model/templates/templates.registry.ts";
@@ -199,12 +199,7 @@ export function WorkflowCreateDialog({
                       {renderTemplateCard({
                         testId: `new-workflow-card-${name}`,
                         name: template.name,
-                        icon:
-                          name === "blank" ? (
-                            <File color="var(--chakra-colors-fg-muted)" size={16} />
-                          ) : (
-                            template.icon
-                          ),
+                        icon: <TemplateIcon name={name} />,
                         description: template.description,
                         onClick: () => {
                           setStep({
@@ -253,4 +248,9 @@ export function WorkflowCreateDialog({
       </Dialog.Content>
     </Dialog.Root>
   );
+}
+
+function TemplateIcon({ name }: { name: string }) {
+  const Icon = name === "blank" ? File : CircleCheck;
+  return <Icon color="var(--chakra-colors-fg-muted)" size={16} />;
 }

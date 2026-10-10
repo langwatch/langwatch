@@ -1,4 +1,5 @@
-import { Alert, Box, HStack, Text } from "@langwatch/design-system/primitives";
+import { Banner } from "@langwatch/design-system/banner";
+import { Box, HStack, Text } from "@langwatch/design-system/primitives";
 import type { End, Field } from "@langwatch/workflow-contract";
 import { type Node, useUpdateNodeInternals } from "@xyflow/react";
 import { useCallback, useEffect } from "react";
@@ -167,15 +168,10 @@ export function EndPropertiesPanel({
         </Box>
       )}
       {isEvaluator && !hasResultConnected && (
-        <Alert.Root>
-          <Alert.Indicator />
-          <Alert.Content>
-            <Text>
-              Connect at least one result, usually a <b>passed</b> or a <b>score</b>, for this
-              evaluator to be useful.
-            </Text>
-          </Alert.Content>
-        </Alert.Root>
+        <Banner status="info">
+          Connect at least one result, usually a <b>passed</b> or a <b>score</b>, for this evaluator
+          to be useful.
+        </Banner>
       )}
     </BasePropertiesPanel>
   );

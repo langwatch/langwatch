@@ -1,4 +1,5 @@
-import { Button, HStack, Spacer, Spinner } from "@langwatch/design-system/primitives";
+import { Button, HStack, Spacer } from "@langwatch/design-system/primitives";
+import { SkeletonRows } from "@langwatch/design-system/skeletons";
 import { evaluatorClient } from "@langwatch/evaluator-client";
 import { type EvaluatorEditorValues, type EvaluatorOutputs } from "@langwatch/evaluator-client";
 import {
@@ -72,11 +73,7 @@ function DbEvaluatorPanel({ node, evaluatorRef }: { node: Node<Evaluator>; evalu
   );
 
   if (evaluatorQuery.isLoading) {
-    return (
-      <HStack justify="center" paddingY={8} width="full">
-        <Spinner size="md" />
-      </HStack>
-    );
+    return <SkeletonRows rows={3} />;
   }
 
   // A saved evaluator has a new updatedAt, which remounts the form onto it.

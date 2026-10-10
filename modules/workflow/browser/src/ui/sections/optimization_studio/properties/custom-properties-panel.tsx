@@ -1,7 +1,7 @@
-import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
 import { Link } from "@langwatch/browser-host/link";
 import { toaster } from "@langwatch/browser-host/toaster";
 import { Avatar } from "@langwatch/design-system/avatar";
+import { FormattedDate } from "@langwatch/design-system/formatted-date";
 import { Badge, Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { toEpochMs } from "@langwatch/time";
 import { getInputsOutputs, parseStudioWorkflow, type Custom } from "@langwatch/workflow-contract";
@@ -95,7 +95,9 @@ const CustomComponentInfo = ({ node }: { node: Node<Custom> }) => {
             ·
           </Text>
           <Text textStyle="caption" flexShrink={0}>
-            {currentVersion?.updatedAt && formatTimeAgo(toEpochMs(currentVersion.updatedAt))}
+            {currentVersion?.updatedAt && (
+              <FormattedDate value={toEpochMs(currentVersion.updatedAt)} display="auto" />
+            )}
           </Text>
         </HStack>
       </VStack>

@@ -12,10 +12,10 @@ import {
   HStack,
   Input,
   Spacer,
-  Spinner,
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { SkeletonRows } from "@langwatch/design-system/skeletons";
 import type { PromptNodeOutput } from "@langwatch/prompt-client";
 import type {
   HttpAuth,
@@ -481,11 +481,7 @@ function DbAgentPanel({ node, agentRef }: { node: Node<AgentComponent>; agentRef
   // immediately (and never the starter template).
   const hasNoSnapshot = !node.data.parameters?.length;
   if (agentQuery.isLoading && hasNoSnapshot) {
-    return (
-      <HStack justify="center" paddingY={8} width="full">
-        <Spinner size="md" />
-      </HStack>
-    );
+    return <SkeletonRows rows={3} />;
   }
 
   const typeBadge = agentTypeBadge({ agentType });
