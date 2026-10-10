@@ -15,6 +15,7 @@
  *
  * Spec: specs/ai-governance/ingestion-sources/claude-code-otlp.feature
  */
+import { InlineCode } from "@langwatch/design-system/inline-code";
 import {
   Alert,
   Box,
@@ -228,8 +229,9 @@ export function OttlEditor({
             OTTL extraction statements
           </Text>
           <Text fontSize="xs" color="fg.muted">
-            Each line maps an upstream OTLP attribute onto the canonical <code>langwatch.*</code>{" "}
-            namespace. The aigateway evaluates them in order via embedded <code>pkg/ottl</code>.
+            Each line maps an upstream OTLP attribute onto the canonical{" "}
+            <InlineCode>langwatch.*</InlineCode> namespace. The aigateway evaluates them in order
+            via embedded <InlineCode>pkg/ottl</InlineCode>.
           </Text>
         </VStack>
         <Spacer />

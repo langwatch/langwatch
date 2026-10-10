@@ -1,12 +1,13 @@
+import type { WireOf } from "@langwatch/api/web";
+import { Link } from "@langwatch/browser-host/link";
+import { CodePreview } from "@langwatch/design-system/code-preview";
+import { Dialog } from "@langwatch/design-system/dialog";
 /**
  * The snippets that call this evaluator from a customer's own code. A
  * narrowed family-local copy of the old `EvaluatorApiUsageDialog`, which
  * `EvaluatorListDrawer` still renders — deletes-only forbids repointing it.
  */
-import type { WireOf } from "@langwatch/api/web";
-import { Link } from "@langwatch/browser-host/link";
-import { CodePreview } from "@langwatch/design-system/code-preview";
-import { Dialog } from "@langwatch/design-system/dialog";
+import { InlineCode } from "@langwatch/design-system/inline-code";
 import { Box, HStack, NativeSelect, Text, VStack } from "@langwatch/design-system/primitives";
 import {
   AVAILABLE_EVALUATORS,
@@ -273,7 +274,8 @@ EOF
             {/* Help text */}
             <VStack align="start" gap={2}>
               <Text fontSize="sm" color="fg.muted">
-                Set the <code>LANGWATCH_API_KEY</code> environment variable with your API key.{" "}
+                Set the <InlineCode>LANGWATCH_API_KEY</InlineCode> environment variable with your
+                API key.{" "}
                 <Link
                   href={apiKeyLink}
                   color="blue.500"

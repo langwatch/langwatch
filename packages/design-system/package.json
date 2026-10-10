@@ -351,6 +351,10 @@
       "types": "./dist/components/brand/hero-lead-pill.d.ts",
       "default": "./src/components/brand/hero-lead-pill.tsx"
     },
+    "./inline-code": {
+      "types": "./dist/components/display/inline-code.d.ts",
+      "default": "./src/components/display/inline-code.tsx"
+    },
     "./kbd": {
       "types": "./dist/components/display/kbd.d.ts",
       "default": "./src/components/display/kbd.tsx"

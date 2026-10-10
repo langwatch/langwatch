@@ -1,5 +1,6 @@
 import { neutralizeRows } from "@langwatch/csv";
 import { FilterChips } from "@langwatch/design-system/filter-chips";
+import { InlineCode } from "@langwatch/design-system/inline-code";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import {
@@ -453,9 +454,7 @@ function UsageBreakdown({
               {data.byModel.map((row) => (
                 <Table.Row key={row.model}>
                   <Table.Cell>
-                    <Text fontFamily="mono" fontSize="xs">
-                      {row.model}
-                    </Text>
+                    <InlineCode>{row.model}</InlineCode>
                   </Table.Cell>
                   <Table.Cell>{formatBudgetUsd(row.totalUsd)}</Table.Cell>
                   <Table.Cell>{row.requests}</Table.Cell>
