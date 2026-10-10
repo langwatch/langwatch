@@ -207,6 +207,11 @@ test databases; dev data untouched). `CI=1` forces testcontainers; never set it
 locally. Only `make observability` and the sandboxed langy tiers still want a
 container, and both are opt-in.
 
+The app pins every Postgres session to `TimeZone=UTC`, whatever the server's own zone. In
+`psql` the server zone still applies (brew's is often `Europe/London`): compare
+`timestamptz` values with `now()` there, and rows written before the pin may still read
+one offset early.
+
 ## Plain `pnpm dev`
 
 `pnpm dev` matches `haven up`: it builds the UI once (the cached Nx target

@@ -39,6 +39,16 @@ Feature: Postgres access through the Prisma driver adapter
     When the driver adapter is created
     Then no pool overrides are passed and pg's own defaults apply
 
+  # The pg adapter sends a Date as an offset-less UTC string, which Postgres
+  # reads in the session TimeZone; a server outside UTC would store every
+  # instant shifted by its offset (and shift again at each DST change).
+  @unit
+  Scenario: Every session is pinned to UTC so a written instant is stored as written
+    Given a DATABASE_URL with or without a "schema" parameter
+    When the driver adapter is created
+    Then every pooled session starts with TimeZone set to UTC
+    And a schema's search_path is set alongside it
+
   @unit
   Scenario: A malformed DATABASE_URL defers failure to first use
     Given an empty or malformed DATABASE_URL
