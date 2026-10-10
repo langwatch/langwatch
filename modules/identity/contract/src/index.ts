@@ -373,6 +373,7 @@ export {
   SsoDomainProofLapsedError,
   SsoDomainProofNotFoundError,
   SsoExistingAccountUnconfirmedError,
+  SsoMemberDeactivatedError,
   SsoIssuerMismatchError,
   SsoIssuerMultiTenantError,
   SsoIssuerUnreachableError,

@@ -743,6 +743,7 @@ export const APP_ERROR_CODES = [
   "sso_issuer_multi_tenant",
   "sso_issuer_unreachable",
   "sso_license_required",
+  "sso_member_deactivated",
   "sso_migration_finalization_blocked",
   "sso_saml_metadata_invalid",
   "sso_saml_not_self_serve",

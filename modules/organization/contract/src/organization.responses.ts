@@ -277,6 +277,7 @@ export type OrganizationPendingInviteApplied =
 /** Why one member is in the organization; `unknown` renders as no chip rather than a guess. */
 export const organizationMemberProvenanceSchema = z.discriminatedUnion("source", [
   z.object({ source: z.literal("directory"), providerId: z.string().nullable() }),
+  z.object({ source: z.literal("sso"), connectionId: z.string() }),
   z.object({ source: z.literal("domain"), domain: z.string(), automatic: z.boolean() }),
   z.object({ source: z.literal("invited") }),
   z.object({ source: z.literal("unknown") }),

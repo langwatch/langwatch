@@ -178,6 +178,19 @@ describe("given a sign-in refused because an unconfirmed account holds the addre
   });
 });
 
+describe("given a sign-in refused because the directory turned the member off", () => {
+  /** @scenario "The deactivated refusal reaches the sign-in screen in plain words" */
+  it("crosses as itself and tells them to ask an administrator", () => {
+    expect(signInErrorMayCross("sso_member_deactivated")).toBe(true);
+
+    renderError("sso_member_deactivated");
+
+    expect(screen.getByText(/Your access has been turned off/i)).toBeTruthy();
+    expect(screen.getByText(/Ask an administrator of your organization/i)).toBeTruthy();
+    expect(screen.queryAllByText(/Something went wrong signing you in/i)).toHaveLength(0);
+  });
+});
+
 describe("given a sign-in method refused until an administrator approves the link", () => {
   /** @scenario "A handled refusal crosses with its own code" */
   it("crosses as a stable code, so the screen stays put and offers a sign-out, not a bounce", () => {

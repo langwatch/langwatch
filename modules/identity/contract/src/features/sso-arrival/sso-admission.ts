@@ -60,6 +60,7 @@ export type SsoUserResolution =
       code:
         | "OAuthAccountNotLinked"
         | "sso_existing_account_unconfirmed"
+        | "sso_member_deactivated"
         | "sso_domain_not_verified"
         | "identity_link_proposed"
         | "identity_jit_disabled";

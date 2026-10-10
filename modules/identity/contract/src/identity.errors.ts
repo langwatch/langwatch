@@ -971,6 +971,18 @@ export class SsoExistingAccountUnconfirmedError extends SsoAssertionRefusedError
   }
 }
 
+/** The organization's directory turned this person off: their own provider vouched for them,
+ *  so saying so names nobody else. */
+export class SsoMemberDeactivatedError extends SsoAssertionRefusedError {
+  constructor() {
+    super("sso_member_deactivated", "sso_member_deactivated", {
+      httpStatus: 403,
+      fault: "customer",
+    });
+    this.name = "SsoMemberDeactivatedError";
+  }
+}
+
 /**
  * A registration that named a protocol and then left out what that protocol
  * cannot work without. Refused at COMMAND time, before a fact is written.

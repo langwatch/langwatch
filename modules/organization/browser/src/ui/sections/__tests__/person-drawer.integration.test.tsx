@@ -140,6 +140,18 @@ describe("given a person opened from the members list", () => {
     });
   });
 
+  describe("given somebody who joined through single sign-on", () => {
+    /** @scenario "The person drawer explains a single sign-on joiner" */
+    it("says so rather than that nothing explains them", async () => {
+      state.provenance = { "user-sam": { source: "sso", connectionId: "conn_1" } };
+      renderDrawer();
+
+      expect(await screen.findByTestId("provenance-sso")).toBeInTheDocument();
+      expect(screen.getByTestId("provenance-explanation")).toHaveTextContent(/single sign-on/);
+      expect(screen.queryByText(/Nothing on record/)).toBeNull();
+    });
+  });
+
   describe("given the read that explains each member fails", () => {
     /** @scenario The drawer answers who, what and what next */
     it("still opens the person and says only that the reason could not be worked out", async () => {

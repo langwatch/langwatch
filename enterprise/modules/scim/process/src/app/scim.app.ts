@@ -39,6 +39,8 @@ import {
   type ConnectionReconciliation,
   type OrganizationReconciliation,
   type ScimDirectoryActivityEntry,
+  type ScimDirectoryMember,
+  type ScimDirectoryMembersInput,
   type ScimGroup,
   type ScimListResponse,
   type ScimConnectionRequestsInput,
@@ -569,6 +571,10 @@ export class ScimModule implements ScimApiContract {
 
   findDirectoryActivity(input: ScimConnectionRequestsInput): Promise<ScimDirectoryActivityEntry[]> {
     return this.#reconciliation.findActivity(input);
+  }
+
+  findDirectoryMembers(input: ScimDirectoryMembersInput): Promise<ScimDirectoryMember[]> {
+    return this.#reconciliation.findDirectoryMembers(input);
   }
 
   async findDirectoryRequests(input: ScimConnectionRequestsInput): Promise<ScimRequestEntry[]> {

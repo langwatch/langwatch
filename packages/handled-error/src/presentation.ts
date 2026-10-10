@@ -3350,6 +3350,11 @@ const presentations = {
     describe: () =>
       "Its address was never confirmed, so single sign-on can be added only once your organization has verified the domain, and not while your identity provider reports the address as unverified. Sign in the way you did before, or ask whoever manages single sign-on to check both.",
   },
+  sso_member_deactivated: {
+    title: "Your access has been turned off",
+    describe: () =>
+      "Your organization's directory has turned off your access. Ask an administrator of your organization.",
+  },
   identity_link_proposal_not_found: {
     title: "That waiting sign-in is no longer there",
     describe: () =>

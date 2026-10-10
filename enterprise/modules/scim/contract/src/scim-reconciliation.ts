@@ -100,6 +100,18 @@ export const scimReconciliationScopeSchema = z
   .strict();
 export type ScimReconciliationScope = z.infer<typeof scimReconciliationScopeSchema>;
 
+/** Which of these members the organization's directories created, for member provenance. */
+export const scimDirectoryMembersInputSchema = z
+  .object({ organizationId: z.string().min(1), userIds: z.array(z.string().min(1)) })
+  .strict();
+export type ScimDirectoryMembersInput = z.infer<typeof scimDirectoryMembersInputSchema>;
+
+/** One member a directory created; `providerId` is what registration called its provider. */
+export const scimDirectoryMemberSchema = z
+  .object({ userId: z.string(), providerId: z.string().nullable() })
+  .strict();
+export type ScimDirectoryMember = z.infer<typeof scimDirectoryMemberSchema>;
+
 /**
  * How many directory-caused changes the panel reads at once. A cap rather
  * than a page: a customer who needs the whole history has the audit page.

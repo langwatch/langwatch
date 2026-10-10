@@ -182,6 +182,7 @@ const LINKED_AND_CONFIRMED = {
 } as const;
 const LINKED = { action: "link", userId: USER_ID, profile: "preserve" } as const;
 const NOT_LINKED = { action: "reject", code: "OAuthAccountNotLinked" } as const;
+const DEACTIVATED = { action: "reject", code: "sso_member_deactivated" } as const;
 const UNCONFIRMED = { action: "reject", code: "sso_existing_account_unconfirmed" } as const;
 const LINK_PROPOSED = { action: "reject", code: "identity_link_proposed" } as const;
 /** Two holders of one address get a proposal; every other conflict keeps the library's refusal. */
@@ -231,12 +232,13 @@ describe("given a member this connection's directory provisioned", () => {
 
   describe("when this organization's directory holds them as inactive", () => {
     /** @scenario "An inactive directory user cannot sign in through its connection" */
+    /** @scenario "A member the directory turned off is told so" */
     it.each(["first", "linked", "changed-email"])("refuses the %s sign-in", async (kind) => {
       const { store, service } = createWorld({ inactive: true });
       if (kind !== "first") bind({ store });
       const email = kind === "changed-email" ? `renamed-${EMAIL}` : EMAIL;
 
-      await expect(service.resolveUser(assertion({ email }))).resolves.toEqual(NOT_LINKED);
+      await expect(service.resolveUser(assertion({ email }))).resolves.toEqual(DEACTIVATED);
     });
   });
 

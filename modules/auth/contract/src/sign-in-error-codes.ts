@@ -57,6 +57,8 @@ export const STABLE_AUTH_ERRORS = [
   // An unconfirmed account holds the address and this sign-in cannot vouch for it: a domain
   // proof or the provider's claim has to change (sso-link-unconfirmed-local-account.feature).
   "sso_existing_account_unconfirmed",
+  // The directory turned the person off: only an administrator can turn them back on.
+  "sso_member_deactivated",
   // The ID token's issuer is not the connection's: the connection's issuer has to change.
   "sso_issuer_mismatch",
   // The installation's sign-up policy does not admit this address: an invitation has to change.
