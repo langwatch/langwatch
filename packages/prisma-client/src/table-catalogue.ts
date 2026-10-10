@@ -649,6 +649,7 @@ export const prismaModelFieldCatalogue = {
     "planType",
     "maxMembers",
     "maxMembersLite",
+    "liteSeatsUnlimited",
     "issuedAt",
     "expiresAt",
     "source",

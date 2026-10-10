@@ -1318,7 +1318,10 @@ model IssuedLicense {
   email            String
   planType         String
   maxMembers       Int
-  maxMembersLite   Int
+  /// The lite seats sold: null when not stated or when unlimited. Never a stand-in number.
+  maxMembersLite   Int?
+  /// True when the license sells unlimited lite seats; maxMembersLite is then null.
+  liteSeatsUnlimited Boolean   @default(false)
   issuedAt         DateTime
   expiresAt        DateTime
 

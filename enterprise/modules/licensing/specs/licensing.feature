@@ -379,3 +379,38 @@ Feature: Enterprise licensing lifecycle
       When a managed-key-retired fact arrives once and then again
       Then gateway revokes that key under the fact's organisation and actor, the same revoke each time
       And a managed-key-invalidated fact asks every gateway to resolve that key's licence again
+
+  Rule: The licence registry stores unlimited lite seats as a flag, never as a number
+
+    A licence signs unlimited lite seats as a stand-in number too large for the registry's seat
+    column, so the row records `liteSeatsUnlimited` instead and leaves the seat count empty.
+
+    @unit
+    Scenario: A purchased GROWTH licence is recorded with unlimited lite seats
+      Given billing hands licensing a purchased GROWTH licence, which sells unlimited lite seats
+      When licensing records it in the registry
+      Then the row is written with liteSeatsUnlimited true and no lite seat count
+
+    @unit
+    Scenario: A licence with capped lite seats records the number
+      Given a licence that sells 5 lite seats
+      When the registry stores its seats
+      Then the row holds 5 lite seats and liteSeatsUnlimited false
+
+    @unit
+    Scenario: A licence that allows no lite seats records zero
+      Given a licence that sells 0 lite seats
+      When the registry stores its seats
+      Then the row holds 0 lite seats and liteSeatsUnlimited false
+
+    @unit
+    Scenario: A licence that states no lite seats records none
+      Given a licence signed before lite seats existed, with no lite seat count
+      When the registry stores its seats
+      Then the row holds no lite seat count and liteSeatsUnlimited false
+
+    @unit
+    Scenario: A replacement for a licence with unlimited lite seats is signed unlimited
+      Given a recorded licence with unlimited lite seats
+      When an operator reissues it without naming lite seats
+      Then the replacement licence signs unlimited lite seats and its row reads unlimited

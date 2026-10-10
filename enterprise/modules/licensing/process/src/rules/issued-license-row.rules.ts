@@ -2,11 +2,26 @@ import {
   LicenseOverageMaxRequiresOverageError,
   type LicenseTermsInput,
 } from "@langwatch/enterprise-licensing-contract";
+import { UNLIMITED } from "@langwatch/plans";
 
 import type {
   IssuedLicenseDraft,
   IssuedLicenseRecord,
 } from "../repositories/issued-license.repository.ts";
+
+type StoredLiteSeats = Pick<IssuedLicenseRecord, "maxMembersLite" | "liteSeatsUnlimited">;
+
+/** A signed license's lite seats as the row stores them: unlimited is a flag, never a number. */
+export function storedLiteSeats({ signed }: { signed: number | undefined }): StoredLiteSeats {
+  if (signed === UNLIMITED) return { maxMembersLite: null, liteSeatsUnlimited: true };
+  return { maxMembersLite: signed ?? null, liteSeatsUnlimited: false };
+}
+
+/** A stored row's lite seats as a license signs them, the inverse of `storedLiteSeats`. */
+export function signedLiteSeats(row: StoredLiteSeats): { membersLite: number | undefined } {
+  if (row.liteSeatsUnlimited) return { membersLite: UNLIMITED };
+  return { membersLite: row.maxMembersLite ?? undefined };
+}
 
 /** What the replacement inherits from the license it replaces. */
 export function replacementColumns({
@@ -41,6 +56,7 @@ export function blankIssuedLicenseRow(): Omit<
   | "planType"
   | "maxMembers"
   | "maxMembersLite"
+  | "liteSeatsUnlimited"
   | "issuedAt"
   | "expiresAt"
   | "source"

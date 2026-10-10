@@ -17,7 +17,12 @@ import type {
   IssuedLicenseRecord,
   IssuedLicenseRepository,
 } from "../repositories/issued-license.repository.ts";
-import { blankIssuedLicenseRow, replacementColumns } from "../rules/issued-license-row.rules.ts";
+import {
+  blankIssuedLicenseRow,
+  replacementColumns,
+  signedLiteSeats,
+  storedLiteSeats,
+} from "../rules/issued-license-row.rules.ts";
 import { isUniqueViolation, violationNames } from "../rules/issued-license.rules.ts";
 
 type IssuedLicenseRowDraft = {
@@ -68,7 +73,7 @@ export class IssuedLicenseWriterService {
       planType: current.planType,
       ...licenseSeats({
         members: input.maxMembers ?? current.maxMembers,
-        membersLite: input.maxMembersLite ?? current.maxMembersLite,
+        membersLite: input.maxMembersLite ?? signedLiteSeats(current).membersLite,
       }),
       maxMessagesPerMonth: input.maxMessagesPerMonth,
       expiresAt: toDate(input.expiresAt),
@@ -121,7 +126,7 @@ export class IssuedLicenseWriterService {
           members: signed.data.plan.maxMembers,
           membersLite: signed.data.plan.maxMembersLite,
         }),
-        maxMembersLite: signed.data.plan.maxMembersLite ?? 0,
+        ...storedLiteSeats({ signed: signed.data.plan.maxMembersLite }),
         issuedAt: Temporal.Instant.from(signed.data.issuedAt),
         expiresAt: Temporal.Instant.from(signed.data.expiresAt),
         tokenHash,

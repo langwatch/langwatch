@@ -17,7 +17,9 @@ export interface IssuedLicenseRecord {
   email: string;
   planType: string;
   maxMembers: number;
-  maxMembersLite: number;
+  /** Null when the license states none, or when `liteSeatsUnlimited`. */
+  maxMembersLite: number | null;
+  liteSeatsUnlimited: boolean;
   issuedAt: Instant;
   expiresAt: Instant;
   source: IssuedLicenseSource;
