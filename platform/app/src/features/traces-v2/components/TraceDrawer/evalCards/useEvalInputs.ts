@@ -1,7 +1,7 @@
 import { useMemo } from "react";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { useIsReadOnlyTrace } from "../../../context/TraceViewerContext";
+import { useTraceQueryArgs } from "../../../hooks/useTraceQueryArgs";
 import type { EvalEntry } from "./utils";
 
 export interface ResolvedEvalInputs {
@@ -28,7 +28,7 @@ export function useEvalInputs({
   eval_: EvalEntry;
   enabled: boolean;
 }): ResolvedEvalInputs {
-  const { project } = useOrganizationTeamProject();
+  const { projectId, tenantId } = useTraceQueryArgs();
   const isReadOnly = useIsReadOnlyTrace();
 
   const listInputs =
@@ -38,13 +38,15 @@ export function useEvalInputs({
     enabled &&
     !listInputs &&
     !!eval_.evaluationId &&
-    !!project?.id &&
+    !!projectId &&
     !isReadOnly;
 
   const query = api.traces.getEvaluationInputs.useQuery(
     {
-      projectId: project?.id ?? "",
+      projectId,
       evaluationId: eval_.evaluationId ?? "",
+      // On an aggregate, the member the drawer is on holds the evaluation.
+      ...(tenantId !== null ? { tenantId } : {}),
     },
     {
       enabled: needLazy,

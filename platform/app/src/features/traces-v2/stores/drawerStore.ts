@@ -26,7 +26,7 @@ export type DrawerTab = "span";
 
 type AccordionSection = "events" | "evals" | "conversation";
 
-interface TraceHistoryEntry {
+export interface TraceHistoryEntry {
   traceId: string;
   viewMode: DrawerViewMode;
   /**
@@ -36,6 +36,11 @@ interface TraceHistoryEntry {
    * back loses the hint and re-opens the drawer on a cold partition scan.
    */
   occurredAtMs?: number;
+  /**
+   * The member that owns the trace, on an aggregate, so going back reopens
+   * the same member's trace rather than whichever member sorts first.
+   */
+  tenantId?: string;
 }
 
 /**
@@ -128,6 +133,15 @@ interface DrawerState extends DrawerUrlState {
    */
   projectId: string | null;
   /**
+   * The member project that owns the open trace, when the drawer is open
+   * under an aggregate project (ADR-144 block F). Two members may hold the
+   * same trace id, so every per-trace read names the member the row was
+   * listed from, and the drawer stays on it. Unlike `projectId` it never
+   * moves the read to another project: the reads stay under the aggregate,
+   * whose proof is narrowed to this member. `null` everywhere else.
+   */
+  tenantId: string | null;
+  /**
    * Trace's approximate occurredAt (ms epoch). Threaded into per-trace
    * queries as a partition-pruning hint on `stored_spans`.
    */
@@ -163,6 +177,13 @@ interface DrawerState extends DrawerUrlState {
    * prune to the trace's weekly partitions instead of cold-scanning S3.
    */
   backfillOccurredAtMs: (occurredAtMs: number) => void;
+  /**
+   * Fill in the owning member after the fact, from the header read, when the
+   * drawer was opened without one (a deep link into an aggregate). Only sets
+   * when none is set, so it never moves the drawer off the member it opened
+   * on.
+   */
+  backfillTenantId: (tenantId: string) => void;
   closeDrawer: () => void;
   selectSpan: (spanId: string) => void;
   clearSpan: () => void;
@@ -243,11 +264,17 @@ export interface OpenTraceOptions {
    * `DrawerState.projectId`.
    */
   projectId?: string | null;
+  /**
+   * The member project that owns the trace, on an aggregate. See
+   * `DrawerState.tenantId`.
+   */
+  tenantId?: string | null;
 }
 
 interface InitialFromURL extends DrawerUrlState {
   traceId: string | null;
   projectId: string | null;
+  tenantId: string | null;
   occurredAtMs: number | null;
   isOpen: boolean;
 }
@@ -331,6 +358,15 @@ function persistLastVizTab(tab: VizTab): void {
 }
 
 /**
+ * The member a drawer link names, on an aggregate. Written only when the
+ * trace's member is not the drawer's project, so a reload of an aggregate's
+ * drawer reopens the member it was on; an empty value names none.
+ */
+function tenantIdFromParams(params: URLSearchParams): string | null {
+  return params.get("drawer.tenantId") || null;
+}
+
+/**
  * Read drawer state out of the URL synchronously at module load. Without
  * this, a hard reload onto `?drawer.open=traceV2Details&drawer.traceId=…`
  * would render the drawer once with `traceId === null` and any consumer
@@ -341,6 +377,7 @@ function readInitialFromURL(): InitialFromURL {
   const fallback: InitialFromURL = {
     traceId: null,
     projectId: null,
+    tenantId: null,
     occurredAtMs: null,
     selectedSpanId: null,
     // Summary is the friendlier landing tab for users who haven't
@@ -360,6 +397,7 @@ function readInitialFromURL(): InitialFromURL {
     const isOpen = params.get("drawer.open") === "traceV2Details";
     const traceId = params.get("drawer.traceId");
     const projectId = params.get("drawer.projectId");
+    const tenantId = tenantIdFromParams(params);
     const tRaw = params.get("drawer.t");
     const t = tRaw ? Number(tRaw) : NaN;
     const occurredAtMs = Number.isFinite(t) && t > 0 ? t : null;
@@ -387,6 +425,7 @@ function readInitialFromURL(): InitialFromURL {
     return {
       traceId,
       projectId,
+      tenantId,
       occurredAtMs,
       selectedSpanId,
       viewMode: viewModeForEditState({ viewMode, isEditing }),
@@ -610,6 +649,7 @@ export const useDrawerStore = create<DrawerState>((set, get) => ({
   paneState: readPaneStateFromStorage(),
   traceId: initial.traceId,
   projectId: initial.projectId,
+  tenantId: initial.tenantId,
   occurredAtMs: initial.occurredAtMs,
   expectedSpanCount: null,
   selectedSpanId: initial.selectedSpanId,
@@ -644,6 +684,9 @@ export const useDrawerStore = create<DrawerState>((set, get) => ({
       // chrome happens to sit in, which is the same "Trace not found" one click
       // deeper. A fresh open always starts clean because `closeTrace` clears it.
       projectId: options?.projectId ?? get().projectId,
+      // The member is the row's own: a sibling trace of another member opens
+      // with its own, and an opener that names none lets the header name it.
+      tenantId: options?.tenantId ?? null,
       occurredAtMs: occurredAtMs ?? null,
       expectedSpanCount: options?.expectedSpanCount ?? null,
       selectedSpanId: null,
@@ -662,6 +705,9 @@ export const useDrawerStore = create<DrawerState>((set, get) => ({
       return { occurredAtMs };
     }),
 
+  backfillTenantId: (tenantId) =>
+    set((s) => (s.tenantId !== null || !tenantId ? {} : { tenantId })),
+
   closeDrawer: () =>
     set({
       isOpen: false,
@@ -669,6 +715,7 @@ export const useDrawerStore = create<DrawerState>((set, get) => ({
       shortcutsOpen: false,
       traceId: null,
       projectId: null,
+      tenantId: null,
       occurredAtMs: null,
       expectedSpanCount: null,
       selectedSpanId: null,

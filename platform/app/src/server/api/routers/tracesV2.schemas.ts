@@ -154,6 +154,14 @@ export const traceHeaderSchema = z.object({
   privacy: z
     .object({ droppedCategories: z.array(z.string()).optional() })
     .nullish(),
+  /**
+   * The project that owns the trace (ADR-144 block F). On an aggregate it is
+   * the member the trace was read from, not the aggregate the page is open
+   * under; the drawer hands it back on every read that follows so the page
+   * stays on that member. Absent on a shared trace, whose viewer is told
+   * nothing about the project.
+   */
+  projectId: z.string().optional(),
 });
 
 export type TraceHeader = z.infer<typeof traceHeaderSchema>;

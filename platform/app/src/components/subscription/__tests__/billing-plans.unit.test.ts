@@ -8,9 +8,11 @@
 
 import { describe, expect, it } from "vitest";
 import { Currency } from "~/generated/prisma/client";
+import { FREE_PLAN_CREATION_CAPS } from "../../../../ee/billing/planLimits";
 import {
   buildEnterprisePlanFeatures,
   ENTERPRISE_PLAN_FEATURES,
+  FREE_PLAN_FEATURES,
   getGrowthFeatures,
   getGrowthPlanFeatures,
   WEBHOOK_FEATURE_LABEL,
@@ -92,6 +94,23 @@ describe("buildEnterprisePlanFeatures()", () => {
   describe("given a plan that says nothing about webhook endpoints", () => {
     it("lists everything, since silence is answered by the tier and not by us", () => {
       expect(buildEnterprisePlanFeatures({})).toEqual(ENTERPRISE_PLAN_FEATURES);
+    });
+  });
+});
+
+describe("FREE_PLAN_FEATURES", () => {
+  describe("when the Free plan card is shown", () => {
+    /** @scenario The Free plan card matches the pricing page */
+    it("lists the creation caps the plan enforces, as the pricing page does", () => {
+      const { maxScenarios, maxScenarioSets, maxEvaluators } =
+        FREE_PLAN_CREATION_CAPS;
+
+      expect(FREE_PLAN_FEATURES).toContain(
+        `${maxScenarios} scenarios, ${maxScenarioSets} simulations, ${maxEvaluators} custom evals`,
+      );
+      expect(FREE_PLAN_FEATURES).toContain(
+        "3 scenarios, 3 simulations, 3 custom evals",
+      );
     });
   });
 });

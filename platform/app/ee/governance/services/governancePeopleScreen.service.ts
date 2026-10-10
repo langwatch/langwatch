@@ -100,7 +100,12 @@ export class GovernancePeopleScreenService {
         this.matches.findOpenByOrganization(this.prisma, { organizationId }),
         this.accounts.findMemberNames(this.prisma, { organizationId }),
         this.departments.getAll({ organizationId }),
-        this.departments.getAssignments({ organizationId }),
+        // Only the members' departments are read here, so the project list
+        // is filtered as for a non-admin.
+        this.departments.getAssignments({
+          organizationId,
+          callerOrganizationRole: null,
+        }),
       ]);
 
     const linkByPerson = new Map(

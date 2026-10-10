@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { getApp } from "~/server/app-layer/app";
+import { projectAcceptsWrites } from "~/server/app-layer/projects/project-write-guard";
 import { DashboardService } from "../../dashboards/dashboard.service";
 import { dashboardErrorHandler } from "../../dashboards/middleware";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
@@ -111,7 +113,9 @@ export const dashboardsRouter = createTRPCRouter({
 
   /**
    * Gets or creates the first dashboard for a project.
-   * Used to ensure every project has at least one dashboard.
+   * Used to ensure every project has at least one dashboard. A query, so the
+   * mutation write guard never sees it: on an aggregate it creates nothing
+   * and returns `null` when there is no dashboard yet.
    */
   getOrCreateFirst: protectedProcedure
     .input(z.object({ projectId: z.string() }))
@@ -119,6 +123,12 @@ export const dashboardsRouter = createTRPCRouter({
     .use(dashboardErrorHandler)
     .query(async ({ ctx, input }) => {
       const service = DashboardService.create(ctx.prisma);
-      return await service.getOrCreateFirst(input.projectId);
+      return await service.getOrCreateFirst({
+        projectId: input.projectId,
+        acceptsWrites: await projectAcceptsWrites({
+          kinds: getApp().projectKinds,
+          projectId: input.projectId,
+        }),
+      });
     }),
 });

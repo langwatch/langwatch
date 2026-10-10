@@ -26,18 +26,26 @@
  * import/migration tool's, where identity must survive re-runs with no
  * caller to remember a mint.
  */
-import type { LedgerActor } from "@langwatch/actor";
-import { roleKeyForTeamRole, STORED_PRINCIPAL_KIND } from "@langwatch/authz";
+import type { GrantCondition, LedgerActor } from "@langwatch/actor";
+import {
+  PROJECT_READER_ROLE_KEY,
+  roleKeyForTeamRole,
+  STORED_PRINCIPAL_KIND,
+} from "@langwatch/authz";
 import {
   BindingMissingError,
   type BindingPrincipalWhere,
   DuplicateBindingError,
   type GrantEventSource,
+  GrantValidationError,
   grantFactToCompatBinding,
   grantRowToFact,
   type RoleBindingWrite,
 } from "@langwatch/authz-server";
-import { bindingIdentityKey } from "@langwatch/authz-server/migration";
+import {
+  bindingIdentityKey,
+  deriveGrantId,
+} from "@langwatch/authz-server/migration";
 import { HandledError } from "@langwatch/handled-error";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
@@ -58,6 +66,7 @@ import { bumpAuthzEpoch } from "./epoch";
 import { AuthzGrantNotConfirmedError } from "./errors";
 import { PrismaAuthzRevocationRepository } from "./repositories/authz-revocation.prisma.repository";
 import { liveGrants, liveRoles } from "./repositories/live-rows";
+import { sharedProjectReadsOf } from "./repositories/shared-reads.grants.repository";
 
 const logger = createLogger("langwatch:authz:ledger");
 
@@ -649,6 +658,242 @@ export class GrantsLedgerWriter {
       },
     });
     await bumpAuthzEpoch({ organizationId });
+  }
+
+  /**
+   * INSERT one shared project read (ADR-144): the reader project holds a
+   * `project-reader` grant on the member project's PROJECT scope, carrying
+   * the condition the proof will copy. The wire checks the shape; this is
+   * where storage is asked the one question the wire cannot answer, that
+   * both projects sit in this organisation. A project cannot read itself
+   * this way (its own credential is the self-grant).
+   *
+   * Idempotent by identity: a live grant for the same pair is returned as
+   * it stands rather than re-emitted, which is what lets a reconciler run
+   * twice and change nothing.
+   */
+  async attachSharedProjectGrant({
+    organizationId,
+    readerProjectId,
+    memberProjectId,
+    condition,
+    actor,
+    source = "aggregate-reconciler",
+    commandId,
+    awaitProjection = true,
+  }: {
+    organizationId: string;
+    /** The project that reads - an aggregate project. */
+    readerProjectId: string;
+    /** The project whose traces it reads. */
+    memberProjectId: string;
+    condition: GrantCondition;
+    actor: LedgerActor;
+    source?: GrantEventSource;
+    commandId?: string;
+    awaitProjection?: boolean;
+  }): Promise<{ grantId: string; wasAttached: boolean }> {
+    if (readerProjectId === memberProjectId) {
+      throw new GrantValidationError(
+        "A project cannot share a read with itself",
+        {
+          projectId: readerProjectId,
+        },
+      );
+    }
+    const projects = await this.prisma.project.findMany({
+      where: { id: { in: [readerProjectId, memberProjectId] } },
+      select: { id: true, team: { select: { organizationId: true } } },
+    });
+    for (const projectId of [readerProjectId, memberProjectId]) {
+      const row = projects.find((project) => project.id === projectId);
+      if (row?.team.organizationId !== organizationId) {
+        throw new GrantValidationError("Project is not in this organization", {
+          projectId,
+        });
+      }
+    }
+    const identity = {
+      ...sharedProjectReadsOf({ organizationId, readerProjectId }),
+      scopeId: memberProjectId,
+    };
+    const existing = await liveGrants(this.prisma).findFirst({
+      where: identity,
+      select: { id: true },
+    });
+    if (existing) return { grantId: existing.id, wasAttached: false };
+
+    const principal = { type: "project" as const, id: readerProjectId };
+    const scope = { type: "PROJECT" as const, id: memberProjectId };
+    const fresh = await this.freshGrantIdentity({
+      organizationId,
+      principal,
+      scope,
+    });
+    // A concurrent attach of the same pair landed between the read above and
+    // this one: its row is the pair's live grant, so it is returned, not
+    // shadowed by a second live row a second later.
+    if (fresh.live) return { grantId: fresh.grantId, wasAttached: false };
+    const { grantId, occurredAtMs } = fresh;
+    const { commands } = await this.commands();
+    await commands.attachGrant.send({
+      tenantId: organizationId,
+      organizationId,
+      commandId: commandId ?? newLedgerCommandId(),
+      grant: {
+        grantId,
+        principal,
+        roleKey: PROJECT_READER_ROLE_KEY,
+        scope,
+        condition,
+        source,
+        actor,
+        occurredAtMs,
+      },
+    });
+    if (awaitProjection) {
+      await this.awaitProjection({
+        what: `attach of shared read ${grantId}`,
+        organizationId,
+        check: async () => {
+          const row = await liveGrants(this.prisma).findFirst({
+            where: { id: grantId, organizationId },
+            select: { id: true },
+          });
+          return row !== null;
+        },
+      });
+    }
+    await bumpAuthzEpoch({ organizationId });
+    return { grantId, wasAttached: true };
+  }
+
+  /**
+   * The one read-your-writes wait for a batch of shared reads attached with
+   * `awaitProjection: false`, so a reconciler attaching ten members waits
+   * once rather than ten times. Bumps the epoch after the rows land: each
+   * attach bumped it on append, before its row existed, and a snapshot cached
+   * in between would otherwise miss the read until the next bump. Throws
+   * {@link AuthzGrantNotConfirmedError} when the rows do not land in time;
+   * the appends are durable either way.
+   */
+  async awaitSharedProjectGrants({
+    organizationId,
+    grantIds,
+  }: {
+    organizationId: string;
+    grantIds: readonly string[];
+  }): Promise<void> {
+    if (grantIds.length === 0) return;
+    await this.awaitProjection({
+      what: `attach of ${grantIds.length} shared read(s)`,
+      organizationId,
+      check: async () => {
+        const present = await liveGrants(this.prisma).findMany({
+          where: { organizationId, id: { in: [...grantIds] } },
+          select: { id: true },
+        });
+        return present.length === grantIds.length;
+      },
+    });
+    await bumpAuthzEpoch({ organizationId });
+  }
+
+  /**
+   * The live shared reads one reader project holds, one per member project.
+   * The condition is not read: what the reconciler compares is which members
+   * hold a row, and a row whose condition no longer parses is still a row it
+   * must be able to revoke.
+   */
+  async findLiveSharedProjectGrants({
+    organizationId,
+    readerProjectId,
+  }: {
+    organizationId: string;
+    readerProjectId: string;
+  }): Promise<Array<{ grantId: string; memberProjectId: string }>> {
+    const rows = await liveGrants(this.prisma).findMany({
+      where: sharedProjectReadsOf({ organizationId, readerProjectId }),
+      select: { id: true, scopeId: true },
+      orderBy: { scopeId: "asc" },
+    });
+    return rows.map((row) => ({
+      grantId: row.id,
+      memberProjectId: row.scopeId,
+    }));
+  }
+
+  /**
+   * The grant id an attach of this pair lands on, and the business time it
+   * encodes. The id is a function of the pair and the SECOND it was attached
+   * in, so re-attaching a pair revoked earlier in the same second derives
+   * the revoked row's id, and the attach would land on a row that stays
+   * revoked: the read never returns and the projection wait times out. A
+   * reconciler that revokes on one trigger and re-attaches on the next can do
+   * exactly that, so the fact moves past a REVOKED row to the next second.
+   *
+   * A LIVE row on the id is the same pair attached this second by someone
+   * else, and is the answer itself (`live: true`): stepping past it too is
+   * what wrote two live rows for one pair when two reconciles raced.
+   */
+  private async freshGrantIdentity({
+    organizationId,
+    principal,
+    scope,
+  }: {
+    organizationId: string;
+    principal: { type: "project"; id: string };
+    scope: { type: "PROJECT"; id: string };
+  }): Promise<{ grantId: string; occurredAtMs: number; live: boolean }> {
+    let occurredAtMs = this.now();
+    for (;;) {
+      const grantId = deriveGrantId({
+        organizationId,
+        principal,
+        scope,
+        occurredAtMs,
+      });
+      const taken = await this.prisma.grant.findFirst({
+        where: { id: grantId, organizationId },
+        select: { id: true, revokedAt: true },
+      });
+      if (!taken) return { grantId, occurredAtMs, live: false };
+      if (taken.revokedAt === null)
+        return { grantId, occurredAtMs, live: true };
+      occurredAtMs = (Math.floor(occurredAtMs / 1000) + 1) * 1000;
+    }
+  }
+
+  /**
+   * Revoke the live shared reads one reader project holds - all of them, or
+   * only those on the member projects named. Marks the rows and bumps the
+   * epoch exactly as `revokeBindings` does; returns the grant ids revoked.
+   */
+  async revokeSharedProjectGrants({
+    organizationId,
+    readerProjectId,
+    memberProjectIds,
+    actor,
+    reason,
+  }: {
+    organizationId: string;
+    readerProjectId: string;
+    memberProjectIds?: string[];
+    actor: LedgerActor;
+    reason?: string;
+  }): Promise<string[]> {
+    const rows = await liveGrants(this.prisma).findMany({
+      where: {
+        ...sharedProjectReadsOf({ organizationId, readerProjectId }),
+        ...(memberProjectIds !== undefined
+          ? { scopeId: { in: memberProjectIds } }
+          : {}),
+      },
+      select: { id: true },
+    });
+    const bindingIds = rows.map((row) => row.id);
+    await this.revokeBindings({ organizationId, bindingIds, actor, reason });
+    return bindingIds;
   }
 
   /**

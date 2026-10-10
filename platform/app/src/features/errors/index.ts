@@ -40,4 +40,7 @@ export { readHandledError } from "./logic/readHandledError";
 export type { ResolvedErrorCopy } from "./logic/resolveErrorCopy";
 export { describeError, resolveErrorCopy } from "./logic/resolveErrorCopy";
 export type { ShowErrorToastOptions } from "./logic/showErrorToast";
-export { showErrorToast } from "./logic/showErrorToast";
+export {
+  reloadingWriteOptions,
+  showErrorToast,
+} from "./logic/showErrorToast";

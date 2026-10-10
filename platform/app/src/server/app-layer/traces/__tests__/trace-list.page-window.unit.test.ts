@@ -12,18 +12,19 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { TRACE_LIST_MAX_OFFSET_ROWS } from "~/shared/traces/listWindow";
+import { ownProof } from "~/test-utils/authorizationProofs";
 import { TraceListService } from "../trace-list.service";
 
 function serviceWithRepository(findAll: ReturnType<typeof vi.fn>) {
   return new TraceListService(
     { findAll } as never,
-    { findSummariesByTraceIds: vi.fn().mockResolvedValue({}) } as never,
+    { findSummariesByTraceIds: vi.fn().mockResolvedValue([]) } as never,
     { getNamesByIds: vi.fn().mockResolvedValue(new Map()) } as never,
   );
 }
 
 const listParams = {
-  tenantId: "tenant-1",
+  authorization: ownProof({ projectId: "tenant-1" }),
   timeRange: { from: 1_700_000_000_000, to: 1_700_086_400_000 },
   sort: { columnId: "timestamp", direction: "desc" as const },
   pageSize: 50,

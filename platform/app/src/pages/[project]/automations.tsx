@@ -22,6 +22,7 @@ import {
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { ConfirmDialog } from "~/components/gateway/ConfirmDialog";
 import { HoverableBigText } from "~/components/HoverableBigText";
+import { AggregateReadOnlyGate } from "~/components/projects/AggregateReadOnlyNotice";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { SectionNavigationLayout } from "~/components/ui/layouts/SectionNavigationLayout";
 import { Link } from "~/components/ui/link";
@@ -63,6 +64,7 @@ import { automationContextChip } from "~/features/langy/logic/langyContextChips"
 import type { Monitor, TriggerAction } from "~/generated/prisma/client";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { isAggregateProjectKind } from "~/server/app-layer/projects/project-kinds";
 import { api, type RouterOutputs } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
@@ -124,6 +126,7 @@ const sectionFromPath = (pathname: string): AutomationSection => {
 
 function AutomationsPage() {
   const { project } = useOrganizationTeamProject();
+  const projectIsAggregate = isAggregateProjectKind(project?.kind);
   const { openDrawer } = useDrawer();
   const router = useRouter();
   const section = sectionFromPath(router.pathname);
@@ -609,357 +612,369 @@ function AutomationsPage() {
             {details.description}
           </Text>
 
-          {isLoading ? (
-            <Text textStyle="sm" color="fg.muted">
-              Loading...
-            </Text>
-          ) : (
-            <>
-              {section === "overview" && (
-                <VStack align="stretch" gap={8} width="full">
-                  {/* G5: the Overview had tiles, activity, and a use-case
+          {/* An aggregate (ADR-144) runs nothing of its own, and the server
+              refuses an automation created under it. */}
+          <AggregateReadOnlyGate isAggregate={projectIsAggregate}>
+            {isLoading ? (
+              <Text textStyle="sm" color="fg.muted">
+                Loading...
+              </Text>
+            ) : (
+              <>
+                {section === "overview" && (
+                  <VStack align="stretch" gap={8} width="full">
+                    {/* G5: the Overview had tiles, activity, and a use-case
                       strip, but no way to actually start creating something —
                       every other tab opens the composer from its own section
                       header. Two things can be created, because there are two
                       kinds left (ADR-093 §1): what an automation watches is
                       chosen inside its own first step, not here. */}
-                  <HStack justify="flex-end">
-                    <Menu.Root>
-                      <Menu.Trigger asChild>
-                        <Button size="sm" colorPalette="orange">
-                          <Plus size={14} aria-hidden="true" /> Create
-                        </Button>
-                      </Menu.Trigger>
-                      <Menu.Content>
-                        <Menu.Item
-                          value="automation"
-                          onClick={() => openDrawer("automation", {})}
-                        >
-                          <Box display="flex" alignItems="center" gap={2}>
-                            <Zap size={14} aria-hidden="true" />
-                            New automation
-                          </Box>
-                        </Menu.Item>
-                        <Menu.Item
-                          value="report"
-                          onClick={() =>
-                            openDrawer("automation", {
-                              initialSource: "report",
-                            })
-                          }
-                        >
-                          <Box display="flex" alignItems="center" gap={2}>
-                            <Calendar size={14} aria-hidden="true" />
-                            New report
-                          </Box>
-                        </Menu.Item>
-                      </Menu.Content>
-                    </Menu.Root>
-                  </HStack>
+                    <HStack justify="flex-end">
+                      <Menu.Root>
+                        <Menu.Trigger asChild>
+                          <Button size="sm" colorPalette="orange">
+                            <Plus size={14} aria-hidden="true" /> Create
+                          </Button>
+                        </Menu.Trigger>
+                        <Menu.Content>
+                          <Menu.Item
+                            value="automation"
+                            onClick={() => openDrawer("automation", {})}
+                          >
+                            <Box display="flex" alignItems="center" gap={2}>
+                              <Zap size={14} aria-hidden="true" />
+                              New automation
+                            </Box>
+                          </Menu.Item>
+                          <Menu.Item
+                            value="report"
+                            onClick={() =>
+                              openDrawer("automation", {
+                                initialSource: "report",
+                              })
+                            }
+                          >
+                            <Box display="flex" alignItems="center" gap={2}>
+                              <Calendar size={14} aria-hidden="true" />
+                              New report
+                            </Box>
+                          </Menu.Item>
+                        </Menu.Content>
+                      </Menu.Root>
+                    </HStack>
 
-                  <SimpleGrid columns={{ base: 1, md: 3 }} gap={4}>
-                    <StatTile
-                      label="Firing now"
-                      value={overview.firingNow}
-                      sub={
-                        overview.firingNow > 0
-                          ? "automations over their threshold"
-                          : "all clear"
-                      }
-                      alert={overview.firingNow > 0}
-                    />
-                    <StatTile
-                      label="Fired (30 days)"
-                      value={overview.fired30d.toLocaleString()}
-                      sub="across every automation"
-                    />
-                    <StatTile
-                      label="Next scheduled"
-                      value={
-                        overview.next
-                          ? (formatTimeAgo(overview.next.at) ?? "—")
-                          : "—"
-                      }
-                      sub={overview.nextName ?? "no reports queued"}
-                    />
-                  </SimpleGrid>
+                    <SimpleGrid columns={{ base: 1, md: 3 }} gap={4}>
+                      <StatTile
+                        label="Firing now"
+                        value={overview.firingNow}
+                        sub={
+                          overview.firingNow > 0
+                            ? "automations over their threshold"
+                            : "all clear"
+                        }
+                        alert={overview.firingNow > 0}
+                      />
+                      <StatTile
+                        label="Fired (30 days)"
+                        value={overview.fired30d.toLocaleString()}
+                        sub="across every automation"
+                      />
+                      <StatTile
+                        label="Next scheduled"
+                        value={
+                          overview.next
+                            ? (formatTimeAgo(overview.next.at) ?? "—")
+                            : "—"
+                        }
+                        sub={overview.nextName ?? "no reports queued"}
+                      />
+                    </SimpleGrid>
 
-                  <VStack align="stretch" gap={3} width="full">
-                    <OverviewSectionHeading
-                      title="Recent activity"
-                      summary="See what your automations and reports have done recently."
-                    />
-                    <AutomationsHistory
-                      fires={activity.data ?? []}
-                      triggers={triggers.data ?? []}
-                      isLoading={activity.isLoading}
-                      onOpenAutomation={(triggerId) =>
-                        openDrawer("viewAutomation", {
-                          automationId: triggerId,
-                        })
-                      }
-                    />
-                  </VStack>
+                    <VStack align="stretch" gap={3} width="full">
+                      <OverviewSectionHeading
+                        title="Recent activity"
+                        summary="See what your automations and reports have done recently."
+                      />
+                      <AutomationsHistory
+                        fires={activity.data ?? []}
+                        triggers={triggers.data ?? []}
+                        isLoading={activity.isLoading}
+                        onOpenAutomation={(triggerId) =>
+                          openDrawer("viewAutomation", {
+                            automationId: triggerId,
+                          })
+                        }
+                      />
+                    </VStack>
 
-                  <VStack align="stretch" gap={4} width="full">
-                    <OverviewSectionHeading
-                      title="Popular uses"
-                      summary="Start from a common workflow and tailor it to your project."
-                    />
-                    {/* Grouped by what each one watches, which is the only
+                    <VStack align="stretch" gap={4} width="full">
+                      <OverviewSectionHeading
+                        title="Popular uses"
+                        summary="Start from a common workflow and tailor it to your project."
+                      />
+                      {/* Grouped by what each one watches, which is the only
                         distinction left between them (ADR-093 §1). */}
-                    <VStack align="stretch" gap={2}>
-                      <Text
-                        textStyle="xs"
-                        fontWeight="semibold"
-                        color="fg.muted"
-                      >
-                        Watching a graph
-                      </Text>
-                      <UseCaseStrip
-                        kind="alert"
-                        showLabel={false}
-                        onOpen={(prefill) => openDrawer("automation", prefill)}
-                      />
-                    </VStack>
-                    <VStack align="stretch" gap={2}>
-                      <Text
-                        textStyle="xs"
-                        fontWeight="semibold"
-                        color="fg.muted"
-                      >
-                        Watching a trace filter
-                      </Text>
-                      <UseCaseStrip
-                        kind="automation"
-                        showLabel={false}
-                        onOpen={(prefill) => openDrawer("automation", prefill)}
-                      />
+                      <VStack align="stretch" gap={2}>
+                        <Text
+                          textStyle="xs"
+                          fontWeight="semibold"
+                          color="fg.muted"
+                        >
+                          Watching a graph
+                        </Text>
+                        <UseCaseStrip
+                          kind="alert"
+                          showLabel={false}
+                          onOpen={(prefill) =>
+                            openDrawer("automation", prefill)
+                          }
+                        />
+                      </VStack>
+                      <VStack align="stretch" gap={2}>
+                        <Text
+                          textStyle="xs"
+                          fontWeight="semibold"
+                          color="fg.muted"
+                        >
+                          Watching a trace filter
+                        </Text>
+                        <UseCaseStrip
+                          kind="automation"
+                          showLabel={false}
+                          onOpen={(prefill) =>
+                            openDrawer("automation", prefill)
+                          }
+                        />
+                      </VStack>
                     </VStack>
                   </VStack>
-                </VStack>
-              )}
-              {section === "reports" && (
-                <VStack align="stretch" gap={4}>
-                  <SectionHeader
-                    icon={<Calendar size={18} />}
-                    accent="purple"
-                    title="Reports"
-                    count={reports.length}
-                    details="A report bundles a dashboard, a single graph, or a top-N trace table into a Slack or email digest on the schedule you set."
-                    addLabel="New report"
-                    onAdd={() =>
-                      openDrawer("automation", { initialSource: "report" })
-                    }
-                  />
-                  {reports.length === 0 ? (
-                    <EmptyHint>
-                      No reports yet. Create one for a recurring Slack or email
-                      digest.
-                    </EmptyHint>
-                  ) : (
-                    <TableShell>
-                      <Table.Root variant="line" width="full">
-                        <Table.Header>
-                          <Table.Row>
-                            <Table.ColumnHeader width="20%">
-                              Name
-                            </Table.ColumnHeader>
-                            <Table.ColumnHeader width="17%">
-                              Sends
-                            </Table.ColumnHeader>
-                            <Table.ColumnHeader width="16%">
-                              Schedule
-                            </Table.ColumnHeader>
-                            <Table.ColumnHeader width="12%">
-                              <MetricHeader
-                                label="Next run"
-                                help="When this next goes out, straight from the scheduler. A paused report has no next run."
-                              />
-                            </Table.ColumnHeader>
-                            <Table.ColumnHeader width="12%">
-                              <MetricHeader
-                                label="Last run"
-                                help="The last time this was sent."
-                              />
-                            </Table.ColumnHeader>
-                            <Table.ColumnHeader width="9%">
-                              Delivery
-                            </Table.ColumnHeader>
-                            <Table.ColumnHeader width="7%">
-                              Active
-                            </Table.ColumnHeader>
-                            <Table.ColumnHeader width="7%" />
-                          </Table.Row>
-                        </Table.Header>
-                        <Table.Body>
-                          {reports.map((trigger) => {
-                            const actionParams =
-                              trigger.actionParams as TriggerActionParams;
-                            const schedule = (
-                              actionParams as {
-                                schedule?: {
-                                  cron?: string;
-                                  timezone?: string;
-                                };
-                              }
-                            ).schedule;
-                            return (
-                              // Armed, the row can be handed to Langy; its own click (open the
-                              // automation) is untouched. The chip id matches the one the
-                              // `/automations/<id>` route derives, so the row and the open
-                              // automation are one chip.
-                              <LangyContextTarget
-                                key={trigger.id}
-                                target={automationContextChip({
-                                  automationId: trigger.id,
-                                  name: trigger.name,
-                                })}
-                              >
-                                <Table.Row
-                                  data-trigger-id={trigger.id}
-                                  cursor="pointer"
-                                  _hover={{ bg: "bg.muted" }}
-                                  onClick={() =>
-                                    openDrawer("automation", {
-                                      automationId: trigger.id,
-                                    })
-                                  }
+                )}
+                {section === "reports" && (
+                  <VStack align="stretch" gap={4}>
+                    <SectionHeader
+                      icon={<Calendar size={18} />}
+                      accent="purple"
+                      title="Reports"
+                      count={reports.length}
+                      details="A report bundles a dashboard, a single graph, or a top-N trace table into a Slack or email digest on the schedule you set."
+                      addLabel="New report"
+                      onAdd={() =>
+                        openDrawer("automation", { initialSource: "report" })
+                      }
+                    />
+                    {reports.length === 0 ? (
+                      <EmptyHint>
+                        No reports yet. Create one for a recurring Slack or
+                        email digest.
+                      </EmptyHint>
+                    ) : (
+                      <TableShell>
+                        <Table.Root variant="line" width="full">
+                          <Table.Header>
+                            <Table.Row>
+                              <Table.ColumnHeader width="20%">
+                                Name
+                              </Table.ColumnHeader>
+                              <Table.ColumnHeader width="17%">
+                                Sends
+                              </Table.ColumnHeader>
+                              <Table.ColumnHeader width="16%">
+                                Schedule
+                              </Table.ColumnHeader>
+                              <Table.ColumnHeader width="12%">
+                                <MetricHeader
+                                  label="Next run"
+                                  help="When this next goes out, straight from the scheduler. A paused report has no next run."
+                                />
+                              </Table.ColumnHeader>
+                              <Table.ColumnHeader width="12%">
+                                <MetricHeader
+                                  label="Last run"
+                                  help="The last time this was sent."
+                                />
+                              </Table.ColumnHeader>
+                              <Table.ColumnHeader width="9%">
+                                Delivery
+                              </Table.ColumnHeader>
+                              <Table.ColumnHeader width="7%">
+                                Active
+                              </Table.ColumnHeader>
+                              <Table.ColumnHeader width="7%" />
+                            </Table.Row>
+                          </Table.Header>
+                          <Table.Body>
+                            {reports.map((trigger) => {
+                              const actionParams =
+                                trigger.actionParams as TriggerActionParams;
+                              const schedule = (
+                                actionParams as {
+                                  schedule?: {
+                                    cron?: string;
+                                    timezone?: string;
+                                  };
+                                }
+                              ).schedule;
+                              return (
+                                // Armed, the row can be handed to Langy; its own click (open the
+                                // automation) is untouched. The chip id matches the one the
+                                // `/automations/<id>` route derives, so the row and the open
+                                // automation are one chip.
+                                <LangyContextTarget
+                                  key={trigger.id}
+                                  target={automationContextChip({
+                                    automationId: trigger.id,
+                                    name: trigger.name,
+                                  })}
                                 >
-                                  <Table.Cell fontWeight="medium">
-                                    {trigger.name}
-                                  </Table.Cell>
-                                  <Table.Cell>
-                                    <ReportSubjectCell
-                                      actionParams={actionParams}
-                                      graphNameById={graphNameById}
-                                    />
-                                  </Table.Cell>
-                                  {/* No nowrap here: a cadence plus an IANA
+                                  <Table.Row
+                                    data-trigger-id={trigger.id}
+                                    cursor="pointer"
+                                    _hover={{ bg: "bg.muted" }}
+                                    onClick={() =>
+                                      openDrawer("automation", {
+                                        automationId: trigger.id,
+                                      })
+                                    }
+                                  >
+                                    <Table.Cell fontWeight="medium">
+                                      {trigger.name}
+                                    </Table.Cell>
+                                    <Table.Cell>
+                                      <ReportSubjectCell
+                                        actionParams={actionParams}
+                                        graphNameById={graphNameById}
+                                      />
+                                    </Table.Cell>
+                                    {/* No nowrap here: a cadence plus an IANA
                                       zone ("Weekly · Monday 09:00
                                       Europe/Amsterdam") is far wider than this
                                       column, and under a fixed layout a
                                       nowrap cell prints straight over its
                                       neighbour instead of widening. */}
-                                  <Table.Cell>
-                                    <Text textStyle="sm">
-                                      {schedule?.cron
-                                        ? describeSchedule(
-                                            schedule.cron,
-                                            schedule.timezone ?? "UTC",
-                                          )
-                                        : "Not set"}
-                                    </Text>
-                                  </Table.Cell>
-                                  <ReportRunCells
-                                    schedule={scheduleByTriggerId.get(
-                                      trigger.id,
-                                    )}
-                                    loading={reportSchedules.isLoading}
-                                  />
-                                  <Table.Cell>
-                                    {trigger.action === "SEND_SLACK_MESSAGE"
-                                      ? "Slack"
-                                      : "Email"}
-                                  </Table.Cell>
-                                  {activeCell(trigger)}
-                                  <Table.Cell>
-                                    {rowActionsMenu(trigger)}
-                                  </Table.Cell>
-                                </Table.Row>
-                              </LangyContextTarget>
-                            );
-                          })}
-                        </Table.Body>
-                      </Table.Root>
-                    </TableShell>
-                  )}
-                </VStack>
-              )}
-              {section === "automations" && (
-                <VStack align="stretch" gap={4}>
-                  <SectionHeader
-                    icon={<Zap size={18} />}
-                    accent="blue"
-                    title="Automations"
-                    count={automations.length}
-                    details="An automation watches either the traces matching your conditions or one series on an analytics graph. When it fires it posts to Slack or email, adds rows to a dataset, or queues traces for annotation."
-                    addLabel="New automation"
-                    onAdd={() => openDrawer("automation", {})}
-                  />
-                  {automations.length === 0 ? (
-                    <VStack align="stretch" gap={4}>
-                      <UseCaseStrip
-                        kind="automation"
-                        onOpen={(prefill) => openDrawer("automation", prefill)}
-                      />
-                      <UseCaseStrip
-                        kind="alert"
-                        showLabel={false}
-                        onOpen={(prefill) => openDrawer("automation", prefill)}
-                      />
-                    </VStack>
-                  ) : (
-                    <TableShell>
-                      <Table.Root variant="line" width="full">
-                        <Table.Header>
-                          <Table.Row>
-                            <Table.ColumnHeader width="19%">
-                              Name
-                            </Table.ColumnHeader>
-                            <Table.ColumnHeader width="20%">
-                              Watches
-                            </Table.ColumnHeader>
-                            <Table.ColumnHeader width="14%">
-                              Delivery
-                            </Table.ColumnHeader>
-                            <Table.ColumnHeader width="12%">
-                              <MetricHeader
-                                label="Last fired"
-                                help="When this automation last fired and ran its delivery. Automations on a digest schedule also show when the next bundled send is due."
+                                    <Table.Cell>
+                                      <Text textStyle="sm">
+                                        {schedule?.cron
+                                          ? describeSchedule(
+                                              schedule.cron,
+                                              schedule.timezone ?? "UTC",
+                                            )
+                                          : "Not set"}
+                                      </Text>
+                                    </Table.Cell>
+                                    <ReportRunCells
+                                      schedule={scheduleByTriggerId.get(
+                                        trigger.id,
+                                      )}
+                                      loading={reportSchedules.isLoading}
+                                    />
+                                    <Table.Cell>
+                                      {trigger.action === "SEND_SLACK_MESSAGE"
+                                        ? "Slack"
+                                        : "Email"}
+                                    </Table.Cell>
+                                    {activeCell(trigger)}
+                                    <Table.Cell>
+                                      {rowActionsMenu(trigger)}
+                                    </Table.Cell>
+                                  </Table.Row>
+                                </LangyContextTarget>
+                              );
+                            })}
+                          </Table.Body>
+                        </Table.Root>
+                      </TableShell>
+                    )}
+                  </VStack>
+                )}
+                {section === "automations" && (
+                  <VStack align="stretch" gap={4}>
+                    <SectionHeader
+                      icon={<Zap size={18} />}
+                      accent="blue"
+                      title="Automations"
+                      count={automations.length}
+                      details="An automation watches either the traces matching your conditions or one series on an analytics graph. When it fires it posts to Slack or email, adds rows to a dataset, or queues traces for annotation."
+                      addLabel="New automation"
+                      onAdd={() => openDrawer("automation", {})}
+                    />
+                    {automations.length === 0 ? (
+                      <VStack align="stretch" gap={4}>
+                        <UseCaseStrip
+                          kind="automation"
+                          onOpen={(prefill) =>
+                            openDrawer("automation", prefill)
+                          }
+                        />
+                        <UseCaseStrip
+                          kind="alert"
+                          showLabel={false}
+                          onOpen={(prefill) =>
+                            openDrawer("automation", prefill)
+                          }
+                        />
+                      </VStack>
+                    ) : (
+                      <TableShell>
+                        <Table.Root variant="line" width="full">
+                          <Table.Header>
+                            <Table.Row>
+                              <Table.ColumnHeader width="19%">
+                                Name
+                              </Table.ColumnHeader>
+                              <Table.ColumnHeader width="20%">
+                                Watches
+                              </Table.ColumnHeader>
+                              <Table.ColumnHeader width="14%">
+                                Delivery
+                              </Table.ColumnHeader>
+                              <Table.ColumnHeader width="12%">
+                                <MetricHeader
+                                  label="Last fired"
+                                  help="When this automation last fired and ran its delivery. Automations on a digest schedule also show when the next bundled send is due."
+                                />
+                              </Table.ColumnHeader>
+                              <Table.ColumnHeader width="11%">
+                                <MetricHeader
+                                  label="Fires (30 days)"
+                                  help="Times this automation fired in the last 30 days."
+                                />
+                              </Table.ColumnHeader>
+                              <Table.ColumnHeader width="10%">
+                                <MetricHeader
+                                  label="Status"
+                                  help="A graph-watching automation is firing while its metric is past the threshold, and back to OK when it recovers."
+                                />
+                              </Table.ColumnHeader>
+                              <Table.ColumnHeader width="7%">
+                                Active
+                              </Table.ColumnHeader>
+                              <Table.ColumnHeader width="7%" />
+                            </Table.Row>
+                          </Table.Header>
+                          <Table.Body>
+                            {automations.map((trigger) => (
+                              <AutomationRow
+                                key={trigger.id}
+                                trigger={trigger}
+                                graphJsonById={graphJsonById}
+                                statsByTriggerId={statsByTriggerId}
+                                applyChecks={applyChecks}
+                                actionItems={actionItems}
+                                triggerActionName={triggerActionName}
+                                sharedRowProps={sharedRowProps}
+                                activeCell={activeCell}
+                                rowActionsMenu={rowActionsMenu}
                               />
-                            </Table.ColumnHeader>
-                            <Table.ColumnHeader width="11%">
-                              <MetricHeader
-                                label="Fires (30 days)"
-                                help="Times this automation fired in the last 30 days."
-                              />
-                            </Table.ColumnHeader>
-                            <Table.ColumnHeader width="10%">
-                              <MetricHeader
-                                label="Status"
-                                help="A graph-watching automation is firing while its metric is past the threshold, and back to OK when it recovers."
-                              />
-                            </Table.ColumnHeader>
-                            <Table.ColumnHeader width="7%">
-                              Active
-                            </Table.ColumnHeader>
-                            <Table.ColumnHeader width="7%" />
-                          </Table.Row>
-                        </Table.Header>
-                        <Table.Body>
-                          {automations.map((trigger) => (
-                            <AutomationRow
-                              key={trigger.id}
-                              trigger={trigger}
-                              graphJsonById={graphJsonById}
-                              statsByTriggerId={statsByTriggerId}
-                              applyChecks={applyChecks}
-                              actionItems={actionItems}
-                              triggerActionName={triggerActionName}
-                              sharedRowProps={sharedRowProps}
-                              activeCell={activeCell}
-                              rowActionsMenu={rowActionsMenu}
-                            />
-                          ))}
-                        </Table.Body>
-                      </Table.Root>
-                    </TableShell>
-                  )}
-                </VStack>
-              )}
-            </>
-          )}
+                            ))}
+                          </Table.Body>
+                        </Table.Root>
+                      </TableShell>
+                    )}
+                  </VStack>
+                )}
+              </>
+            )}
+          </AggregateReadOnlyGate>
         </VStack>
       </Box>
       <ConfirmDialog
