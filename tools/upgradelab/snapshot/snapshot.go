@@ -527,6 +527,9 @@ func importTable(ctx context.Context, store ClickHouse, source tableFile) error 
 		return err
 	}
 	defer file.Close()
+	if info, err := file.Stat(); err == nil && info.Size() == 0 {
+		return nil // an empty table was captured as an empty file
+	}
 	return store.Import(ctx, source.table, file)
 }
 
