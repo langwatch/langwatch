@@ -1,38 +1,67 @@
 diff --git a/lib/tsc.js b/lib/tsc.js
-index eb869b715737e45fcf1af33d1af3157b59ba08de..2c973d62e353bed759301b730242519df15a53bb 100644
+index eb869b715737e45fcf1af33d1af3157b59ba08de..d86d4f00ebd57e2cac1ab130ad4e420bf4531a20 100644
 --- a/lib/tsc.js
 +++ b/lib/tsc.js
-@@ -2,21 +2,97 @@
+@@ -2,21 +2,126 @@
  
  import getExePath from "#getExePath";
  import { execFileSync } from "node:child_process";
-+import { mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
++import { accessSync, constants, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 +import { homedir } from "node:os";
-+import { join } from "node:path";
++import { delimiter, join } from "node:path";
  
  const exe = getExePath();
  
 -if (process.platform !== "win32" && typeof process.execve === "function") {
 -    // > v22.15.0
-+// LangWatch: every compile is capped unless the caller says otherwise, and waits for
-+// one of LANGWATCH_TSC_SLOTS (default 2) machine-wide slots, whichever worktree or
-+// tool started it (dev/docs/plans/typescript-cpu-and-check-time.md step 1).
-+process.env.GOMAXPROCS ??= "2";
-+process.env.GOMEMLIMIT ??= "2GiB";
-+
++// LangWatch: a compile takes a `typecheck` slot of haven's machine budget for its whole
++// run, and haven sets GOMAXPROCS and GOMEMLIMIT (dev/docs/plans/haven-exec-policy.md
++// section 2). Without haven it waits for one of LANGWATCH_TSC_SLOTS (default 2) lock
++// folders in ~/.cache/langwatch/tsc-slots, capped at 2 threads and ADR-100's 3GiB floor.
 +const args = process.argv.slice(2);
 +const exempt = args.some((arg) => /^(-w|--watch|-v|--version|-h|--help|--lsp)$/.test(arg));
++const held = process.env.CHECK_QUEUE_HELD || process.env.LANGWATCH_TSC_SLOT;
++const canExec = process.platform !== "win32" && typeof process.execve === "function";
++
++function findHaven() {
++    const path = (process.env.PATH ?? "").split(delimiter).filter(Boolean).map((dir) => join(dir, "haven"));
++    for (const candidate of [process.env.HAVEN_BIN, ...path]) {
++        try {
++            if (candidate && statSync(candidate).isFile()) {
++                accessSync(candidate, constants.X_OK);
++                return candidate;
++            }
++        }
++        catch {
++            // not this one
++        }
++    }
++}
++
++if (!exempt && !held && canExec) {
++    const haven = findHaven();
+     try {
+-        process.execve(exe, [exe, ...process.argv.slice(2)]);
++        if (haven) process.execve(haven, [haven, "machine", "slot", "run", "--class", "typecheck", "--label", "tsc", "--", exe, ...args]);
+     }
+     catch {
+-        // may not be available, ignore the error and fallback
++        // execve refused: fall back to the lock folder below
++    }
++}
++
++process.env.GOMAXPROCS ??= "2";
++process.env.GOMEMLIMIT ??= "3GiB";
++
 +const slots = Number(process.env.LANGWATCH_TSC_SLOTS ?? "2");
 +const slotDir = join(homedir(), ".cache", "langwatch", "tsc-slots");
 +
 +function ownerAlive(lock) {
 +    let pid;
-     try {
--        process.execve(exe, [exe, ...process.argv.slice(2)]);
++    try {
 +        pid = Number(readFileSync(join(lock, "pid"), "utf8"));
-     }
-     catch {
--        // may not be available, ignore the error and fallback
++    }
++    catch {
 +        return Date.now() - statSync(lock).mtimeMs < 10_000;
 +    }
 +    try {
@@ -78,8 +107,8 @@ index eb869b715737e45fcf1af33d1af3157b59ba08de..2c973d62e353bed759301b730242519d
 +    }
 +}
 +
-+if (exempt || !(slots > 0) || process.env.LANGWATCH_TSC_SLOT) {
-+    if (process.platform !== "win32" && typeof process.execve === "function") {
++if (exempt || !(slots > 0) || held) {
++    if (canExec) {
 +        // > v22.15.0
 +        try {
 +            process.execve(exe, [exe, ...args]);

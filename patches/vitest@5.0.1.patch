@@ -1,0 +1,108 @@
+diff --git a/vitest.mjs b/vitest.mjs
+index 02dd4714b90340442ab2b2b72a704a99c9b5e4b8..5e7752a14cd076d95b429a26536d465d50b72a2a 100755
+--- a/vitest.mjs
++++ b/vitest.mjs
+@@ -1,2 +1,102 @@
+ #!/usr/bin/env node
+-import './dist/cli.js'
++import { accessSync, constants, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
++import { homedir } from 'node:os'
++import { delimiter, join } from 'node:path'
++import { fileURLToPath } from 'node:url'
++import { isAgent, isCI } from 'std-env'
++
++// LangWatch: a run takes a `test` slot of haven's machine budget for its whole life
++// (dev/docs/plans/haven-exec-policy.md section 5); a watcher takes none. Without
++// haven a run waits for one of LANGWATCH_VITEST_SLOTS (default 2) lock folders.
++const args = process.argv.slice(2)
++const command = args.find(arg => !arg.startsWith('-'))
++const flag = (...names) => args.some(arg => names.includes(arg))
++const exempt = flag('-v', '--version', '-h', '--help') || command === 'list' || command === 'init'
++const watching = command === 'watch' || command === 'dev' || flag('-w', '--watch', '--watch=true')
++  || (command !== 'run' && command !== 'related' && !flag('--run', '--watch=false', '--no-watch')
++    && !isCI && Boolean(process.stdin.isTTY) && !isAgent)
++const held = process.env.CHECK_QUEUE_HELD || process.env.LANGWATCH_VITEST_SLOT
++
++function findHaven() {
++  const candidates = [process.env.HAVEN_BIN, ...(process.env.PATH ?? '').split(delimiter).filter(Boolean).map(dir => join(dir, 'haven'))]
++  for (const candidate of candidates) {
++    try {
++      if (candidate && statSync(candidate).isFile()) {
++        accessSync(candidate, constants.X_OK)
++        return candidate
++      }
++    }
++    catch {}
++  }
++}
++
++if (!exempt && !watching && !held && process.platform !== 'win32' && typeof process.execve === 'function') {
++  const haven = findHaven()
++  const cli = fileURLToPath(new URL('./dist/cli.js', import.meta.url))
++  try {
++    if (haven) process.execve(haven, [haven, 'machine', 'slot', 'run', '--class', 'test', '--label', 'vitest', '--', process.execPath, ...process.execArgv, cli, ...args])
++  }
++  catch {
++    // execve refused: fall back to the lock folder below
++  }
++}
++
++function ownerAlive(lock) {
++  let pid
++  try {
++    pid = Number(readFileSync(join(lock, 'pid'), 'utf8'))
++  }
++  catch {
++    return Date.now() - statSync(lock).mtimeMs < 10_000
++  }
++  try {
++    process.kill(pid, 0)
++    return true
++  }
++  catch (error) {
++    return error.code === 'EPERM'
++  }
++}
++
++function tryTake(lock) {
++  try {
++    mkdirSync(lock)
++    writeFileSync(join(lock, 'pid'), String(process.pid))
++    return true
++  }
++  catch {
++    try {
++      if (!ownerAlive(lock)) rmSync(lock, { recursive: true, force: true })
++    }
++    catch {}
++    return false
++  }
++}
++
++function acquire(slots) {
++  const slotDir = join(homedir(), '.cache', 'langwatch', 'vitest-slots')
++  mkdirSync(slotDir, { recursive: true })
++  const pause = new Int32Array(new SharedArrayBuffer(4))
++  let told = false
++  for (;;) {
++    for (let index = 0; index < slots; index++) {
++      const lock = join(slotDir, `slot-${index}`)
++      if (tryTake(lock)) return lock
++    }
++    if (!told) {
++      process.stderr.write(`vitest: waiting for a machine-wide slot (${slots} in use; LANGWATCH_VITEST_SLOTS)\n`)
++      told = true
++    }
++    Atomics.wait(pause, 0, 0, 500)
++  }
++}
++
++if (!exempt) process.env.VITEST_MAX_WORKERS ??= '2'
++const slots = Number(process.env.LANGWATCH_VITEST_SLOTS ?? '2')
++if (!exempt && !watching && !held && slots > 0) {
++  const lock = acquire(slots)
++  process.env.LANGWATCH_VITEST_SLOT = lock
++  process.on('exit', () => rmSync(lock, { recursive: true, force: true }))
++}
++
++await import('./dist/cli.js')
