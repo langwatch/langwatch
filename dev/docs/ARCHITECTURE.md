@@ -1500,7 +1500,7 @@ beside its `-- contract: retired in <release>` note, and before any schema apply
 such table still ahead into `_retired_<table>_<release>` and checks the copy holds the source's rows,
 or marks the contract step failed and applies nothing. A re-run copies only a stale archive; `upgrade
 plan` reports what would be archived. Only Postgres contracts archive so far; a goose contract that
-asks fails. A contract with no archive note behaves as before.
+asks fails. Every Postgres contract carries `-- archive: <table>` or `-- archive: none (<reason>)`; the migration-safety guard refuses one without (`contract-without-archive-note`).
 
 **An LTS is an upgrade stop, never a maintained line** (Alex, 2026-10-09, LTS-SCHEDULE). An LTS is
 named every April and October; the first is 3.20.1 (2026-10-06), the next April 2027. Only the

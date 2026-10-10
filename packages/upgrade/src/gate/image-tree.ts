@@ -99,7 +99,7 @@ const CONTRACT_NOTE = /--[ \t]*contract:[ \t]*retired in[ \t]+\S+/i;
 const AFTER_NOTE = /^[ \t]*--[ \t]*after:[ \t]*(\S+)/gim;
 
 /** A contract's `-- archive: <table>`: a table it drops, archived first (Alex, 2026-10-09). */
-const ARCHIVE_NOTE = /^[ \t]*--[ \t]*archive:[ \t]*(\S+)/gim;
+const ARCHIVE_NOTE = /^[ \t]*--[ \t]*archive:[ \t]*(?!none\b)(\S+)/gim;
 
 /** Each schema step whose SQL carries `-- contract: retired in <release>`, with that SQL. */
 function readContractSql({
