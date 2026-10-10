@@ -130,10 +130,8 @@ export function EndPropertiesPanel({
     <BasePropertiesPanel node={node} hideInputs hideOutputs hideParameters>
       {isEvaluator ? (
         <Box width="full" display="flex" flexDirection="column" gap={4}>
-          <Text fontSize="14px" fontWeight="semibold">
-            Results
-          </Text>
-          <Text fontSize="13px" color="fg.muted">
+          <Text textStyle="cardTitle">Results</Text>
+          <Text textStyle="bodySm" color="fg.muted">
             Evaluators return up to these four results. Connect the ones your workflow produces;
             unconnected results are simply omitted.
           </Text>
@@ -141,14 +139,14 @@ export function EndPropertiesPanel({
             {EVALUATOR_RESULT_FIELDS.map((field) => (
               <Box key={field.identifier} width="full">
                 <HStack gap={2} align="baseline">
-                  <Text fontFamily="mono" fontSize="14px" fontWeight="medium">
+                  <Text fontFamily="mono" textStyle="body" fontWeight="medium">
                     {field.identifier}
                   </Text>
-                  <Text fontSize="12px" color="fg.subtle">
+                  <Text textStyle="caption" color="fg.subtle">
                     {EVALUATOR_RESULT_TYPE_LABELS[field.type] ?? field.type}
                   </Text>
                 </HStack>
-                <Text fontSize="13px" color="fg.muted">
+                <Text textStyle="bodySm" color="fg.muted">
                   {EVALUATOR_RESULT_DESCRIPTIONS[field.identifier]}
                 </Text>
               </Box>

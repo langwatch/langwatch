@@ -86,7 +86,7 @@ export function WorkflowNamePopover({
       <Popover.Trigger asChild>
         <HStack cursor="pointer" _hover={{ opacity: 0.8 }} gap={1.5}>
           <WorkflowIcon icon={icon} size="md" background="none" border="none" />
-          <Text lineClamp={1} fontSize="15px" fontWeight="semibold" wordBreak="break-all">
+          <Text lineClamp={1} textStyle="sectionTitle" wordBreak="break-all">
             {name}
           </Text>
         </HStack>
@@ -97,7 +97,7 @@ export function WorkflowNamePopover({
           <VStack gap={3} align="stretch">
             <Field.Root>
               <Field.Label fontSize="xs" color="fg.muted">
-                Name and Icon
+                Name and icon
               </Field.Label>
               <HStack>
                 {renderEmojiPicker({
@@ -111,7 +111,7 @@ export function WorkflowNamePopover({
                     variant="outline"
                     size="sm"
                     onClick={() => setIsEmojiPickerOpen(true)}
-                    fontSize="18px"
+                    textStyle="metric"
                     flexShrink={0}
                   >
                     {icon}

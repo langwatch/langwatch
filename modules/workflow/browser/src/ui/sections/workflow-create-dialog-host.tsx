@@ -152,9 +152,9 @@ function NewWorkflowForm({ template, onClose }: { template: StudioWorkflow; onCl
                 emojiPicker.onClose();
               }}
             />
-            <Field.Label>Name and Icon</Field.Label>
+            <Field.Label>Name and icon</Field.Label>
             <HStack>
-              <Button variant="outline" onClick={emojiPicker.onOpen} fontSize="18px">
+              <Button variant="outline" onClick={emojiPicker.onOpen} textStyle="metric">
                 {icon}
               </Button>
               <Input
@@ -176,6 +176,9 @@ function NewWorkflowForm({ template, onClose }: { template: StudioWorkflow; onCl
         </VStack>
       </Dialog.Body>
       <Dialog.Footer>
+        <Button variant="ghost" onClick={onClose}>
+          Cancel
+        </Button>
         <Button
           type="submit"
           colorPalette="orange"

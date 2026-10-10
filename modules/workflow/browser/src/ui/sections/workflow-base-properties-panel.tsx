@@ -477,7 +477,7 @@ export function FieldsForm({
                   {camelCaseToTitleCase(field.identifier)}
                 </WorkflowPropertySectionTitle>
                 {field.optional && (
-                  <Text color="fg.muted" fontSize="12px">
+                  <Text color="fg.muted" textStyle="caption">
                     (optional)
                   </Text>
                 )}
@@ -535,7 +535,7 @@ function NodeNameInput({
 }) {
   return (
     <Input
-      fontSize="15px"
+      textStyle="body"
       marginLeft={1}
       fontWeight={500}
       variant="outline"
@@ -719,7 +719,7 @@ export function WorkflowBasePropertiesPanel({
             </HStack>
           </HStack>
           {!hideDescription && nodeDescription && (
-            <Text fontSize="12px" color="fg.muted" paddingX={2}>
+            <Text textStyle="caption" color="fg.muted" paddingX={2}>
               {nodeDescription}
             </Text>
           )}
@@ -805,7 +805,7 @@ function NodeTitle({
           },
           cursor: renamable ? "pointer" : undefined,
         }) ?? (
-          <Text fontSize="15px" fontWeight={500}>
+          <Text textStyle="body" fontWeight={500}>
             {getNodeDisplayName(node)}
           </Text>
         ))

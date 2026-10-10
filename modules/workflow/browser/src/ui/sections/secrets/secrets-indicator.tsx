@@ -50,7 +50,7 @@ export function SecretsIndicator({ projectId, onInsertSecret }: SecretsIndicator
         <HStack
           as="button"
           gap={1}
-          fontSize="13px"
+          textStyle="bodySm"
           color="fg.subtle"
           cursor="pointer"
           _hover={{ color: "fg" }}

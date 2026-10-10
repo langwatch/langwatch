@@ -1,5 +1,5 @@
 import { Dialog } from "@langwatch/design-system/dialog";
-import { Button, Grid, Heading, HStack, Separator } from "@langwatch/design-system/primitives";
+import { Button, Grid, HStack } from "@langwatch/design-system/primitives";
 import { studioWorkflowSchema, type StudioWorkflow } from "@langwatch/workflow-contract";
 import { ChevronLeft, File, Upload } from "lucide-react";
 import { Fragment, useEffect, useRef, useState, type DragEvent, type ReactNode } from "react";
@@ -187,10 +187,9 @@ export function WorkflowCreateDialog({
                     <ChevronLeft />
                   </Button>
                 )}
-                <Heading>Create new workflow</Heading>
+                <Dialog.Title>Create new workflow</Dialog.Title>
               </HStack>
             </Dialog.Header>
-            <Separator />
             <Dialog.CloseTrigger />
             {step.step === "select" ? (
               <Dialog.Body paddingY={6} marginBottom={6}>
@@ -226,7 +225,7 @@ export function WorkflowCreateDialog({
                   ))}
                   {renderTemplateCard({
                     testId: "new-workflow-card-import",
-                    name: "From Export",
+                    name: "From export",
                     icon: <Upload color="var(--chakra-colors-fg-muted)" size={16} />,
                     description: "Import a workflow from an exported JSON file",
                     dragging: fileDrop.isDragging,

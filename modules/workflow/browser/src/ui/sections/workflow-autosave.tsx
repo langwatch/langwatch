@@ -175,13 +175,13 @@ function AutosaveStatus({
       {isSaving && (
         <HStack>
           <Spinner size="xs" />
-          <Text fontSize="13px">Saving...</Text>
+          <Text textStyle="bodySm">Saving...</Text>
         </HStack>
       )}
       {showSaveError && (
         <HStack color="status.error">
           <X size={16} />
-          <Text fontSize="13px">Failed to autosave</Text>
+          <Text textStyle="bodySm">Failed to autosave</Text>
         </HStack>
       )}
       {showSaved && (
@@ -189,7 +189,7 @@ function AutosaveStatus({
           <Box color="status.success">
             <Check width="16px" height="16px" />
           </Box>
-          <Text fontSize="13px">Saved</Text>
+          <Text textStyle="bodySm">Saved</Text>
         </HStack>
       )}
     </Box>

@@ -61,7 +61,7 @@ const CustomComponentInfo = ({ node }: { node: Node<Custom> }) => {
       {currentVersion && <VersionBox version={currentVersion} minWidth="44px" />}
       <VStack align="start" width="full" gap={1}>
         <HStack>
-          <Text fontWeight={600} fontSize="13px" lineClamp={1}>
+          <Text textStyle="cardTitle" lineClamp={1}>
             {currentVersion?.commitMessage}
           </Text>
           <Link href={`/${project?.slug}/studio/${node.data.workflow_id}`} isExternal>
@@ -88,13 +88,13 @@ const CustomComponentInfo = ({ node }: { node: Node<Custom> }) => {
           <Avatar.Root size="2xs">
             <Avatar.Fallback name="jim" bg="orange.solid" color="orange.contrast" />
           </Avatar.Root>
-          <Text fontSize="12px" lineClamp={1}>
+          <Text textStyle="caption" lineClamp={1}>
             {currentVersion?.author?.name}
           </Text>
-          <Text fontSize="12px" flexShrink={0}>
+          <Text textStyle="caption" flexShrink={0}>
             ·
           </Text>
-          <Text fontSize="12px" flexShrink={0}>
+          <Text textStyle="caption" flexShrink={0}>
             {currentVersion?.updatedAt && formatTimeAgo(toEpochMs(currentVersion.updatedAt))}
           </Text>
         </HStack>

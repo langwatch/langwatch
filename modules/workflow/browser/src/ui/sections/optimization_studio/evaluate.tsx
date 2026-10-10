@@ -362,7 +362,7 @@ const DatasetSplitSelect = ({
             <Select.Item item={option} key={option.value}>
               <VStack align="start" width="full">
                 <Text>{option.label}</Text>
-                <Text fontSize="13px" color="fg.muted">
+                <Text textStyle="bodySm" color="fg.muted">
                   {option.description}
                 </Text>
               </VStack>

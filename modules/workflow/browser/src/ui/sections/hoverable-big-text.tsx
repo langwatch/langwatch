@@ -61,7 +61,7 @@ export function ExpandedTextDialog({
           background="bg.muted"
           padding={3}
           borderRadius="12px 12px 0 0"
-          fontSize="14px"
+          textStyle="body"
         >
           <HStack>
             <Switch

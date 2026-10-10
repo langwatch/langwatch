@@ -200,7 +200,7 @@ export function DatasetModal({
             <Dialog.Header>
               <HStack width="full" paddingRight={10}>
                 <Button
-                  fontSize="14px"
+                  textStyle="body"
                   fontWeight="bold"
                   color="fg.muted"
                   variant="plain"

@@ -173,7 +173,7 @@ export function WorkflowRunUntilHereDialog({
         <Dialog.Header>
           <VStack align="start" gap={1}>
             <Dialog.Title>Run until here</Dialog.Title>
-            <Text fontSize="13px" color="fg.muted">
+            <Text textStyle="bodySm" color="fg.muted">
               {dialogDescription({ view, targetNode })}
             </Text>
           </VStack>
@@ -254,7 +254,7 @@ function RunUntilHereFields({
 }) {
   if (fields.length === 0) {
     return (
-      <Text fontSize="13px" color="fg.muted">
+      <Text textStyle="bodySm" color="fg.muted">
         The entry point has no inputs, the run starts with an empty entry.
       </Text>
     );
@@ -263,7 +263,7 @@ function RunUntilHereFields({
     <VStack width="full" align="start" gap={3}>
       {fields.map((field) => (
         <Field.Root key={field.identifier} width="full">
-          <Field.Label fontSize="12px" fontFamily="mono" color="fg.muted">
+          <Field.Label textStyle="monoSm" color="fg.muted">
             {field.identifier}
           </Field.Label>
           <Input

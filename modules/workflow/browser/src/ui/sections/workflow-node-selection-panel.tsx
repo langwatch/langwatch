@@ -114,7 +114,7 @@ export function WorkflowNodeSelectionPanel({
       borderColor="border"
       zIndex={100}
       height="calc(100vh - 49px)"
-      fontSize="14px"
+      textStyle="body"
       width="300px"
       minWidth="300px"
     >
