@@ -9,7 +9,7 @@ import { renderWithDesignSystem } from "../../../testing/index.tsx";
 import { Drawer, DrawerOffsetProvider, setDrawerEndInset } from "../drawer.tsx";
 import { Drawer as StudioDrawer } from "../studio-drawer.tsx";
 
-function renderOpenDrawer(Parts: typeof Drawer) {
+function renderOpenDrawer(Parts: Pick<typeof Drawer, "Root" | "Content" | "Body">) {
   renderWithDesignSystem(
     <DrawerOffsetProvider value={{ marginTop: 48 }}>
       <Parts.Root open>

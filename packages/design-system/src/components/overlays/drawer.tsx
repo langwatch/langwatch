@@ -1,6 +1,7 @@
-import { Drawer as ChakraDrawer, Portal } from "@chakra-ui/react";
+import { Button, Drawer as ChakraDrawer, HStack, Portal, Spacer } from "@chakra-ui/react";
 import * as React from "react";
 
+import { FieldLayoutProvider } from "../forms/field-layout.ts";
 import { CloseButton } from "./close-button.tsx";
 
 const DrawerOffsetContext = React.createContext<{ marginTop?: number }>({});
@@ -27,6 +28,10 @@ export function useDrawerEndInset(): number {
   );
 }
 
+/**
+ * The panel's ground, border and radius are the recipe's: don't pass `bg`, `background` or
+ * `borderRadius` (lint proposal `no-drawer-content-ground`). Width comes from Root's `size`.
+ */
 export interface DrawerContentProps extends ChakraDrawer.ContentProps {
   portalled?: boolean;
   portalRef?: React.RefObject<HTMLElement>;
@@ -39,17 +44,21 @@ export const DrawerContent = React.forwardRef<HTMLDivElement, DrawerContentProps
     const inset = useDrawerEndInset();
     return (
       <Portal disabled={!portalled} container={portalRef}>
-        <ChakraDrawer.Positioner padding={offset} pointerEvents="none">
-          <ChakraDrawer.Content
-            ref={ref}
-            margin={2}
-            pointerEvents="auto"
-            borderRadius="lg"
-            marginTop={marginTop ?? (context.marginTop == null ? void 0 : `${context.marginTop}px`)}
-            marginEnd={inset > 0 ? `${inset}px` : undefined}
-            {...contentProps}
-          />
-        </ChakraDrawer.Positioner>
+        <FieldLayoutProvider value="stacked">
+          <ChakraDrawer.Positioner padding={offset} pointerEvents="none">
+            <ChakraDrawer.Content
+              ref={ref}
+              margin={2}
+              pointerEvents="auto"
+              borderRadius="lg"
+              marginTop={
+                marginTop ?? (context.marginTop == null ? void 0 : `${context.marginTop}px`)
+              }
+              marginEnd={inset > 0 ? `${inset}px` : undefined}
+              {...contentProps}
+            />
+          </ChakraDrawer.Positioner>
+        </FieldLayoutProvider>
       </Portal>
     );
   },
@@ -65,6 +74,47 @@ export const DrawerCloseTrigger = React.forwardRef<
     </ChakraDrawer.CloseTrigger>
   );
 });
+
+export interface DrawerActionsProps {
+  /** The one primary action, rightmost: `<Button colorPalette="orange" type="submit">`. */
+  primary?: React.ReactNode;
+  /** Closes the drawer by default; pass it when closing goes through the router. */
+  onCancel?: () => void;
+  cancelLabel?: string;
+  /** Disables Cancel while a save is in flight (ADR-018: Save is disabled only then too). */
+  busy?: boolean;
+  /** A secondary action on the left edge: Delete, Duplicate, Test connection. */
+  start?: React.ReactNode;
+}
+
+/** The drawer's footer row: `start` on the left, then Cancel (outline) and the primary. */
+export function DrawerActions({
+  primary,
+  onCancel,
+  cancelLabel = "Cancel",
+  busy = false,
+  start,
+}: DrawerActionsProps) {
+  const cancel = (
+    <Button variant="outline" onClick={onCancel} disabled={busy}>
+      {cancelLabel}
+    </Button>
+  );
+  return (
+    <ChakraDrawer.Footer>
+      <HStack width="full" gap={2}>
+        {start}
+        <Spacer />
+        {onCancel ? (
+          cancel
+        ) : (
+          <ChakraDrawer.ActionTrigger asChild>{cancel}</ChakraDrawer.ActionTrigger>
+        )}
+        {primary}
+      </HStack>
+    </ChakraDrawer.Footer>
+  );
+}
 
 /** Product adds custom sizes to Chakra's drawer recipe. */
 export type AppDrawerSize = NonNullable<ChakraDrawer.RootProps["size"]> | "2xl";
@@ -94,7 +144,10 @@ export const Drawer = {
   Header: ChakraDrawer.Header,
   Body: ChakraDrawer.Body,
   Footer: ChakraDrawer.Footer,
+  /** The standard footer: Cancel and one primary. Prefer it to a hand-built Footer. */
+  Actions: DrawerActions,
   Description: ChakraDrawer.Description,
+  /** Styled by the recipe; never restyle it (fontSize, fontWeight). */
   Title: ChakraDrawer.Title,
   ActionTrigger: ChakraDrawer.ActionTrigger,
 };

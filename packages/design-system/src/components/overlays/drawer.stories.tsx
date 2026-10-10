@@ -3,14 +3,16 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { Database } from "lucide-react";
 
 import { NoDataInfoBlock } from "../states/no-data-info-block.tsx";
+import { SkeletonRows } from "../states/skeletons.tsx";
 import { Drawer } from "./drawer.tsx";
 
 const meta = {
   title: "Overlays/Drawer",
   parameters: {
     usage: {
-      use: "Details, editing a record and multi-step forms beside the page. Drawers are routed singletons.",
-      avoid: "A quick yes or no: use Dialog. Never a drawer inside a drawer: navigate instead.",
+      use: "Details, editing a record and multi-step forms beside the page. Drawers are routed singletons. End a form with Drawer.Actions: Cancel (outline) then one orange primary, a Delete on the left via `start`. Fields inside stack on their own (Settings field).",
+      avoid:
+        "A quick yes or no: use Dialog. Never a drawer inside a drawer: navigate instead. Never `bg`, `background` or `borderRadius` on Drawer.Content, nor fontSize or fontWeight on Drawer.Title: the recipe owns them. A Spinner as the body while loading: use Skeleton rows.",
     },
   },
   component: Drawer.Root,
@@ -37,11 +39,7 @@ const meta = {
             <Text>The customer asked how to rotate a virtual key.</Text>
           </Stack>
         </Drawer.Body>
-        <Drawer.Footer>
-          <Button variant="ghost" size="sm">
-            Close
-          </Button>
-        </Drawer.Footer>
+        <Drawer.Actions primary={<Button colorPalette="orange">Save</Button>} />
       </Drawer.Content>
     </Drawer.Root>
   ),
@@ -64,9 +62,7 @@ export const Loading: Story = {
           <Drawer.Title>Trace details</Drawer.Title>
         </Drawer.Header>
         <Drawer.Body>
-          <Stack align="center" paddingY="8">
-            <Spinner />
-          </Stack>
+          <SkeletonRows rows={6} />
         </Drawer.Body>
       </Drawer.Content>
     </Drawer.Root>
@@ -88,6 +84,31 @@ export const Empty: Story = {
             icon={<Database />}
           />
         </Drawer.Body>
+      </Drawer.Content>
+    </Drawer.Root>
+  ),
+};
+
+/** The standard footer with a destructive secondary on the left edge. */
+export const ActionsWithStart: Story = {
+  render: (args) => (
+    <Drawer.Root {...args}>
+      <Drawer.Content>
+        <Drawer.CloseTrigger />
+        <Drawer.Header>
+          <Drawer.Title>Edit model provider</Drawer.Title>
+        </Drawer.Header>
+        <Drawer.Body>
+          <Text textStyle="sm">OpenAI · 4 models enabled</Text>
+        </Drawer.Body>
+        <Drawer.Actions
+          start={
+            <Button variant="ghost" colorPalette="red">
+              Remove provider
+            </Button>
+          }
+          primary={<Button colorPalette="orange">Save</Button>}
+        />
       </Drawer.Content>
     </Drawer.Root>
   ),

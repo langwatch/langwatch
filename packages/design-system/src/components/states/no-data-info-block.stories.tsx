@@ -8,8 +8,9 @@ const meta = {
   title: "Feedback/Empty state",
   parameters: {
     usage: {
-      use: "The one empty state: nothing here yet, and what to do next.",
-      avoid: "Still loading: Skeleton from primitives. A failure: Alert.",
+      use: 'The one empty state: nothing here yet, and what to do next. size="page" fills a list page; size="inline" sits in a settings band or a table body (it replaced SettingsEmptyState). It owns its height and centres itself. At most one primaryAction; none when the page header already shows that primary. Docs via docsHref.',
+      avoid:
+        "Wrapping it in Center or padding it; two solid buttons; children or docsInfo in new code. Still loading: Skeleton rows. A failure: Banner. A chart with no data: Chart empty state.",
     },
   },
   component: NoDataInfoBlock,
@@ -21,6 +22,9 @@ const meta = {
   },
   argTypes: {
     icon: { control: false },
+    size: { control: "inline-radio", options: ["page", "inline"] },
+    primaryAction: { control: false },
+    secondaryAction: { control: false },
     docsInfo: { control: false },
     children: { control: false },
   },
@@ -33,12 +37,33 @@ export const Default: Story = {};
 
 export const WithAction: Story = {
   args: {
-    children: <Button size="sm">Create a dataset</Button>,
+    primaryAction: <Button size="sm">Create a dataset</Button>,
+    secondaryAction: (
+      <Button size="sm" variant="ghost">
+        Import a CSV
+      </Button>
+    ),
   },
 };
 
 export const WithDocumentationLink: Story = {
+  args: { docsHref: "https://langwatch.ai/docs/datasets/overview" },
+};
+
+/** Inside a settings band or under a table header. */
+export const Inline: Story = {
   args: {
+    size: "inline",
+    primaryAction: <Button size="sm">Add a passkey</Button>,
+    title: "No passkeys yet",
+    description: "Sign in with your fingerprint, face or a security key.",
+  },
+};
+
+/** The old props still render; new code passes primaryAction and docsHref instead. */
+export const LegacyChildren: Story = {
+  args: {
+    children: <Button size="sm">Create a dataset</Button>,
     docsInfo: <Link href="https://langwatch.ai/docs">Read the documentation</Link>,
   },
 };

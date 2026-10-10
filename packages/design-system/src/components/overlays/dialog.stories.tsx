@@ -9,7 +9,7 @@ const meta = {
     usage: {
       use: "A short, focused task or decision that blocks the page: confirm, rename, a small form.",
       avoid:
-        "Long forms, details or anything with its own navigation: use Drawer (design/components.md).",
+        "Long forms, details or anything with its own navigation: use Drawer (design/components.md). Never fontSize, fontWeight or textStyle on Dialog.Title: the recipe owns it.",
     },
   },
   component: Dialog.Root,

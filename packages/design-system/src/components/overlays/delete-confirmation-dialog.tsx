@@ -10,7 +10,7 @@ export type DestructiveConsequence = {
 };
 
 export function DeleteConfirmationDialog({
-  title = "Are you really sure?",
+  title,
   description = "This action cannot be undone.",
   open,
   onClose,
@@ -29,7 +29,8 @@ export function DeleteConfirmationDialog({
   onValueChange,
   children,
 }: {
-  title?: string;
+  /** Names the thing and the act: "Delete dataset?", never a generic "Are you sure?". */
+  title: string;
   description?: ReactNode;
   open: boolean;
   onClose: () => void;

@@ -8,7 +8,8 @@ const meta = {
   parameters: {
     usage: {
       use: "Wide settings forms where the label and its help sit to the left of the control.",
-      avoid: "Drawers, dialogs and narrow columns: use Vertical form control.",
+      avoid:
+        'New forms: use Settings field. Never `direction="vertical"` with labelProps, borderBottomWidth or paddingY overrides: that is Settings field.',
     },
   },
   component: HorizontalFormControl,

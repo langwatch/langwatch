@@ -12,7 +12,13 @@ describe("destructive confirmation", () => {
   /** @scenario Destructive confirmation gates clicks and Enter with the same phrase */
   it("requires the phrase for both Enter and clicks and resets after reopening", () => {
     const onConfirm = vi.fn();
-    const props = { open: true, onClose: vi.fn(), onConfirm, closeOnConfirm: false };
+    const props = {
+      title: "Delete dataset?",
+      open: true,
+      onClose: vi.fn(),
+      onConfirm,
+      closeOnConfirm: false,
+    };
     const view = renderWithDesignSystem(<DeleteConfirmationDialog {...props} />);
     const input = screen.getByRole("textbox", { name: "Type delete to confirm" });
     fireEvent.keyDown(input, { key: "Enter" });
@@ -32,7 +38,13 @@ describe("destructive confirmation", () => {
   /** @scenario Loading prevents destructive confirmation */
   it("blocks Enter while the action or related items are loading", () => {
     const onConfirm = vi.fn();
-    const props = { open: true, onClose: vi.fn(), onConfirm, value: "delete" };
+    const props = {
+      title: "Delete dataset?",
+      open: true,
+      onClose: vi.fn(),
+      onConfirm,
+      value: "delete",
+    };
     const view = renderWithDesignSystem(<DeleteConfirmationDialog {...props} isLoading />);
     fireEvent.keyDown(screen.getByRole("textbox"), { key: "Enter" });
     expect(onConfirm).not.toHaveBeenCalled();
@@ -46,6 +58,7 @@ describe("destructive confirmation", () => {
   it("shows group counts, outcomes and at most five names", () => {
     renderWithDesignSystem(
       <DeleteConfirmationDialog
+        title="Delete dataset?"
         open
         onClose={vi.fn()}
         onConfirm={vi.fn()}
@@ -78,6 +91,7 @@ describe("destructive confirmation", () => {
   it("preserves exact case with opt-in whitespace trimming", () => {
     renderWithDesignSystem(
       <DeleteConfirmationDialog
+        title="Delete dataset?"
         open
         onClose={vi.fn()}
         onConfirm={vi.fn()}

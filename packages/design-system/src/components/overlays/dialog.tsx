@@ -1,6 +1,7 @@
 import { Dialog as ChakraDialog, Portal } from "@chakra-ui/react";
 import * as React from "react";
 
+import { FieldLayoutProvider } from "../forms/field-layout.ts";
 import { CloseButton } from "./close-button.tsx";
 
 export type DialogRootProps = Omit<ChakraDialog.RootProps, "size"> & {
@@ -40,9 +41,11 @@ export const DialogContent = React.forwardRef<HTMLDivElement, DialogContentProps
             background="transparent"
           />
         )}
-        <ChakraDialog.Positioner {...positionerProps}>
-          <ChakraDialog.Content ref={ref} {...contentProps} />
-        </ChakraDialog.Positioner>
+        <FieldLayoutProvider value="stacked">
+          <ChakraDialog.Positioner {...positionerProps}>
+            <ChakraDialog.Content ref={ref} {...contentProps} />
+          </ChakraDialog.Positioner>
+        </FieldLayoutProvider>
       </Portal>
     );
   },
@@ -64,6 +67,7 @@ export const DialogCloseTrigger = React.forwardRef<
 export const DialogFooter = ChakraDialog.Footer;
 export const DialogHeader = ChakraDialog.Header;
 export const DialogBody = ChakraDialog.Body;
+/** Styled by the recipe: never pass fontSize, fontWeight or textStyle (lint proposal). */
 export const DialogTitle = ChakraDialog.Title;
 export const DialogDescription = ChakraDialog.Description;
 export const DialogTrigger = ChakraDialog.Trigger;

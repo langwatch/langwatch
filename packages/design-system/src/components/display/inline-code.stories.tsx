@@ -8,7 +8,8 @@ const meta = {
   parameters: {
     usage: {
       use: "A key, path, command or identifier inside a sentence.",
-      avoid: "Several lines: use Code preview.",
+      avoid:
+        'Several lines: use Code preview. An id a person copies: Id text (ListTable.IdCell in a table). Never `fontFamily="monospace"` by hand.',
     },
   },
   component: InlineCode,
