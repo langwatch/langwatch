@@ -12,6 +12,12 @@ Feature: LangWatchQL is edited in one kit editor with its grammar, completion an
       Then completion is offered against that schema
 
     @integration
+    Scenario: The editor offers typed columns and functions alongside keywords
+      Given an editor given a schema
+      When the member asks for completion inside a statement reading a dataset
+      Then that dataset's columns are offered with their ClickHouse type, and the schema's functions and the keywords too
+
+    @integration
     Scenario: The dashboard widget reads the schema of its own project for the editor
       Given a widget query in a project
       When its schema is read

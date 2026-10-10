@@ -13,7 +13,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { SCHEMA } from "../../../model/lwql-language/__tests__/lwql-fixture.fixture.ts";
 
-type Suggestions = { suggestions: { label: string }[] };
+type Suggestion = { label: string; kind: string; detail?: string };
+type Suggestions = { suggestions: Suggestion[] };
 type Provider = { provideCompletionItems: (model: FakeModel, position: unknown) => Suggestions };
 type Marker = { message: string; startLineNumber: number; startColumn: number };
 
@@ -118,10 +119,14 @@ function mount({
   );
 }
 
-function completionLabels(): string[] {
+function completions(): Suggestion[] {
   const { provider, mounted } = recorded;
   if (!provider || !mounted) throw new Error("the editor has not mounted yet");
-  return provider.provideCompletionItems(mounted, {}).suggestions.map((s) => s.label);
+  return provider.provideCompletionItems(mounted, {}).suggestions;
+}
+
+function completionLabels(): string[] {
+  return completions().map((s) => s.label);
 }
 
 describe("LwqlEditor", () => {
@@ -138,6 +143,29 @@ describe("LwqlEditor", () => {
         await screen.findByTestId("lwql-input");
         await waitFor(() =>
           expect(completionLabels()).toEqual(["analytics.traces", "analytics.spans"]),
+        );
+      });
+    });
+  });
+
+  describe("given an editor given a schema and a statement reading a dataset", () => {
+    describe("when the member asks for completion in the WHERE clause", () => {
+      /** @scenario "The editor offers typed columns and functions alongside keywords" */
+      it("offers the dataset's columns with their type, the functions and the keywords", async () => {
+        mount({ schema: SCHEMA, value: "SELECT * FROM analytics.traces WHERE Dur" });
+        await screen.findByTestId("lwql-input");
+        await waitFor(() =>
+          expect(completions()).toEqual(
+            expect.arrayContaining([
+              expect.objectContaining({
+                label: "DurationMs",
+                kind: "Field",
+                detail: "UInt64 (ms)",
+              }),
+              expect.objectContaining({ label: "count", kind: "Function" }),
+              expect.objectContaining({ label: "WHERE", kind: "Keyword" }),
+            ]),
+          ),
         );
       });
     });
