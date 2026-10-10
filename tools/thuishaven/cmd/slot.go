@@ -291,15 +291,26 @@ func psField(pid int, field string) string {
 	return strings.TrimSpace(string(out))
 }
 
-// resolveSlotPressure measures once per invocation: the level shapes the
-// slot count and the child's environment together, and two measurements
-// could disagree across their few milliseconds.
+// resolveSlotPressure resolves the level once per invocation: it shapes the
+// slot count and the child's environment together. The daemon's published
+// level (ADR-090) is a file read; probing the machine costs ~80 ms a start.
 func resolveSlotPressure() domain.Pressure {
-	return domain.ResolveCheckPressure(
-		os.Getenv("CHECK_PRESSURE"),
-		domain.ClassifyPressure(system.New().MemStat()),
-		os.Getenv("CI"),
-	)
+	level, fresh := freshPublishedPressure(fileregistry.New(havenHome()).ReadPressure())
+	if !fresh {
+		level = domain.ClassifyPressure(system.New().MemStat())
+	}
+	return domain.ResolveCheckPressure(os.Getenv("CHECK_PRESSURE"), level, os.Getenv("CI"))
+}
+
+// freshPublishedPressure believes a record the daemon wrote recently. A
+// missing, unknown-version or stale record means no daemon is watching, and
+// the caller measures: a queue must not read that silence as green.
+func freshPublishedPressure(rec domain.PressureRecord, ok bool) (domain.Pressure, bool) {
+	now := time.Now()
+	if !ok || rec.Version != domain.PressureRecordVersion || now.Sub(rec.WrittenAt) > domain.PressureStaleAfter {
+		return domain.Green, false
+	}
+	return domain.ReadPressure(rec, ok, now), true
 }
 
 // parseSlotRun splits `[--label <name>] [--timeout <duration>] -- <command> [args…]`.

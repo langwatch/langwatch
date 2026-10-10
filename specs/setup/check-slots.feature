@@ -226,6 +226,20 @@ Feature: Machine-wide slots for whole-repo checks
     Then the forced level is used instead of measuring the machine
     And a misspelled level falls back to the measurement, like a CHECK_SLOTS typo
 
+  @unit
+  Scenario: A slot reads the published memory pressure instead of measuring it
+    Given the haven daemon published a pressure level within the last 90 seconds
+    When a slot run or slot explain resolves the level
+    Then it uses the published level
+    And it does not probe the machine's memory itself
+
+  @unit
+  Scenario: A slot measures the pressure when no fresh level is published
+    Given the published pressure record is missing, unreadable, of an unknown version or older than 90 seconds
+    When a slot run or slot explain resolves the level
+    Then it measures the machine's memory pressure itself
+    And a missing daemon never reads as a green machine
+
   # CI already runs one check per job on a machine of its own, which is why it
   # gets no queue. The same reasoning retires the pressure policy there: nobody
   # is typing on a runner, so buying back an interactive machine buys nothing

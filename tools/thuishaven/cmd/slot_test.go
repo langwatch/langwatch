@@ -739,3 +739,43 @@ func TestSignalRelayForwardsASignalThatArrivedBeforeTheChild(t *testing.T) {
 		t.Fatalf("the child must be ended by SIGTERM, got %v", exit)
 	}
 }
+
+// @scenario "A slot reads the published memory pressure instead of measuring it"
+// @scenario "A slot measures the pressure when no fresh level is published"
+func TestSlotPressureReadsThePublishedLevel(t *testing.T) {
+	now := time.Now()
+	cases := []struct {
+		name      string
+		rec       domain.PressureRecord
+		ok        bool
+		want      domain.Pressure
+		wantFresh bool
+	}{
+		{"a fresh record is believed without probing", domain.PressureRecord{Version: domain.PressureRecordVersion, Level: "red", WrittenAt: now.Add(-5 * time.Second)}, true, domain.Red, true},
+		{"a missing record is measured", domain.PressureRecord{}, false, domain.Green, false},
+		{"an unknown version is measured", domain.PressureRecord{Version: 99, Level: "red", WrittenAt: now}, true, domain.Green, false},
+		{"a stale record is measured", domain.PressureRecord{Version: domain.PressureRecordVersion, Level: "red", WrittenAt: now.Add(-domain.PressureStaleAfter - time.Second)}, true, domain.Green, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, fresh := freshPublishedPressure(tc.rec, tc.ok)
+			if got != tc.want || fresh != tc.wantFresh {
+				t.Fatalf("got %s fresh=%v, want %s fresh=%v", got, fresh, tc.want, tc.wantFresh)
+			}
+		})
+	}
+
+	t.Run("slot run reads the record the daemon wrote", func(t *testing.T) {
+		home := t.TempDir()
+		t.Setenv("LANGWATCH_PORTLESS_HOME", home)
+		t.Setenv("CHECK_PRESSURE", "")
+		t.Setenv("CI", "")
+		rec := domain.PressureRecord{Version: domain.PressureRecordVersion, Level: "amber", WrittenAt: time.Now()}
+		if err := fileregistry.New(home).WritePressure(rec); err != nil {
+			t.Fatalf("writing the record: %v", err)
+		}
+		if got := resolveSlotPressure(); got != domain.Amber {
+			t.Fatalf("resolveSlotPressure() = %s, want the published amber", got)
+		}
+	})
+}
