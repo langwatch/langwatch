@@ -66,7 +66,11 @@ describe("production main colour parity", () => {
     expect(colorSystem).toEqual(mainColours.raw);
   });
 
-  it.each(leaves(mainColours.semantic))("preserves main's %s in both modes", (name, expected) => {
+  // Chosen departures from main, each pinned by its own test below.
+  const departures = new Set(["label.fgMuted"]);
+  const kept = leaves(mainColours.semantic).filter(([name]) => !departures.has(name));
+
+  it.each(kept)("preserves main's %s in both modes", (name, expected) => {
     for (const mode of ["_light", "_dark"] satisfies Mode[]) {
       const reference = typeof expected === "string" ? expected : entry(expected, mode);
       if (typeof reference !== "string") throw new Error(`Missing main value: ${name}`);
@@ -75,6 +79,11 @@ describe("production main colour parity", () => {
       );
       expect(resolve(name, mode)).toBe(resolved);
     }
+  });
+
+  it("lifts dark compact labels to gray.400 for contrast, and keeps main's light label", () => {
+    expect(resolve("label.fgMuted", "_dark")).toBe(resolve("gray.400", "_dark"));
+    expect(resolve("label.fgMuted", "_light")).toBe(resolve("gray.500", "_light"));
   });
 
   // The card's dark ink and hairline are chosen, not main's: light still follows main.
