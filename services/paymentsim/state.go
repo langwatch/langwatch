@@ -198,6 +198,7 @@ type Session struct {
 	Created           int64             `json:"created"`
 	Currency          *string           `json:"currency"`
 	Customer          *string           `json:"customer"`
+	CustomerDetails   *CustomerDetails  `json:"customer_details"`
 	Invoice           *string           `json:"invoice"`
 	Livemode          bool              `json:"livemode"`
 	Metadata          map[string]string `json:"metadata"`
@@ -209,9 +210,16 @@ type Session struct {
 	SuccessURL        string            `json:"success_url"`
 	URL               *string           `json:"url"`
 
-	lines   []sessionLine
-	subMeta map[string]string
-	anchor  int64
+	lines         []sessionLine
+	subMeta       map[string]string
+	anchor        int64
+	customerEmail string
+}
+
+// CustomerDetails is what the buyer typed on the payment page; null until the session completes.
+type CustomerDetails struct {
+	Email *string `json:"email"`
+	Name  *string `json:"name"`
 }
 
 type sessionLine struct {

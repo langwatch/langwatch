@@ -172,6 +172,20 @@ func (s *Server) handleComplete(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusNotFound, noSuch("checkout.session", r.PathValue("id")).body())
 		return
 	}
+	var buyer struct{ Email, Name string }
+	if r.ContentLength > 0 {
+		if err := json.NewDecoder(r.Body).Decode(&buyer); err != nil {
+			controlError(w, http.StatusBadRequest, "body: %v", err)
+			return
+		}
+	}
+	if sess.Status == "open" && (buyer.Email != "" || buyer.Name != "") {
+		email := buyer.Email
+		if email == "" {
+			email = sess.customerEmail
+		}
+		sess.CustomerDetails = &CustomerDetails{Email: optional(email), Name: optional(buyer.Name)}
+	}
 	if err := s.completeCheckout(sess); err != nil {
 		writeJSON(w, err.status, err.body())
 		return

@@ -379,6 +379,9 @@ func (s *Server) completeCheckout(sess *Session) *apiError {
 		}
 		items = append(items, p)
 	}
+	if sess.CustomerDetails == nil {
+		sess.CustomerDetails = &CustomerDetails{Email: optional(sess.customerEmail)}
+	}
 	subID, invoiceID := s.st.id("sub"), s.st.nextID("in")
 	sess.Status, sess.PaymentStatus, sess.Subscription, sess.Invoice = "complete", "paid", &subID, &invoiceID
 	s.emit("checkout.session.completed", sess, nil)

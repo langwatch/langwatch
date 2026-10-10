@@ -51,6 +51,13 @@ Feature: paymentsim, a local stand-in for Stripe
       And checkout.session.completed, customer.subscription.created, invoice.finalized, invoice.paid and invoice.payment_succeeded fire in that order
 
     @unit
+    Scenario: A payment-link checkout carries the link and the buyer's details
+      Given a checkout session created with a payment link and the buyer's email
+      When the session is completed through the control API with the buyer's name
+      Then checkout.session.completed names the payment link
+      And its customer_details carry the buyer's email and name
+
+    @unit
     Scenario: Tiered prices bill graduated and volume tiers
       Given a tiered price with a capped first tier and an open second tier with a flat fee
       Then a graduated price bills each band at its own rate
