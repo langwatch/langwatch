@@ -130,6 +130,7 @@ export const dashboardTrpcTransport: TrpcRouterDeclaration<DashboardApi, typeof 
     )
 
     .procedure("star")
+    .refusedOnAggregate()
     .withPermission("analytics:view")
     .handle(async ({ app, input, actor }) =>
       app.star({
@@ -140,6 +141,7 @@ export const dashboardTrpcTransport: TrpcRouterDeclaration<DashboardApi, typeof 
     )
 
     .procedure("unstar")
+    .refusedOnAggregate()
     .withPermission("analytics:view")
     .handle(async ({ app, input, actor }) =>
       app.unstar({
@@ -150,6 +152,7 @@ export const dashboardTrpcTransport: TrpcRouterDeclaration<DashboardApi, typeof 
     )
 
     .procedure("reorderStars")
+    .refusedOnAggregate()
     .withPermission("analytics:view")
     .handle(async ({ app, input, actor }) =>
       app.reorderStars({
