@@ -217,7 +217,7 @@ export function EvaluatorSelection({
                 >
                   <VStack gap={3}>
                     <Box p={3} borderRadius="full" bg="bg.muted">
-                      <Plus size={24} color="gray" />
+                      <Plus size={24} color="var(--chakra-colors-fg-muted)" />
                     </Box>
                     <Text color="fg.muted">Create Custom Evaluator</Text>
                   </VStack>
