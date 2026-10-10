@@ -56,8 +56,8 @@ Feature: Machine-wide slots for whole-repo checks
     Then it repeats its position and how long it has waited
     And it names the runs holding the slots and how long they have held them
 
-  # Gap: main served waiters strictly first-in first-out; the Go slot polls flocks every 100 ms with whole-minute ageing, so same-class waiters race.
-  @unit @unimplemented
+  # Arrivals inside one 100 ms poll tick still race; anything later waits its turn.
+  @unit
   Scenario: Waiters are served in arrival order
     Given the limit is 1, one run holding the slot and two queued behind it
     When the holder finishes
@@ -212,12 +212,68 @@ Feature: Machine-wide slots for whole-repo checks
     And an operator's explicit GOMEMLIMIT still reaches it unchanged
 
   @unit
-  Scenario: Memory pressure halves the compiler's parallelism
-    Given the machine reports amber or red memory pressure
-    When a check runs through the queue
-    Then its GOMAXPROCS is half the cores, never below two
-    And a green machine sets no GOMAXPROCS at all
-    And an operator's explicit GOMAXPROCS still wins
+  Scenario: A run's parallelism is the units it holds, on every machine
+    When a check runs through the queue, at any pressure level
+    Then its GOMAXPROCS is the number of units it holds
+    And a green machine caps it too, because a run counted as two cores must not take ten
+
+  # --- Slot classes: one budget in core units (dev/docs/plans/haven-exec-policy.md) ---
+
+  @unit
+  Scenario: The budget is counted in core units and narrows with pressure
+    Given CHECK_SLOTS is not set on a machine with 10 cores and 64 GiB
+    When the unit budget is resolved
+    Then it is 8 units when green, 4 when amber and 2 when red
+    And an explicit CHECK_SLOTS of N is N checks of two units each
+
+  @unit
+  Scenario: Each class takes its weight in units
+    When "haven machine slot run --class <class>" starts a run
+    Then typecheck, lint and build take two units
+    And test takes its Vitest worker count, two by default and at most four
+    And a run with no --class takes two units, as one check always has
+
+  @unit
+  Scenario: A test run is told its worker count
+    When "haven machine slot run --class test" starts a run holding two units
+    Then its VITEST_MAX_WORKERS is 2 and its GOMAXPROCS is 2
+
+  @unit
+  Scenario: An operator's explicit parallelism wins, up to the units held
+    Given GOMAXPROCS or VITEST_MAX_WORKERS is set in the caller's environment
+    When a run starts through the queue
+    Then the child sees the operator's GOMAXPROCS unchanged
+    And its VITEST_MAX_WORKERS is the operator's value, capped at the units the run holds
+
+  @unit
+  Scenario: The gate and haven machine typecheck take two units of the same budget
+    Given slot runs hold part of the unit budget
+    When the hook gate or "haven machine typecheck" admits a run
+    Then it takes two units of the same budget, all or none, and names itself as a holder
+
+  @unit
+  Scenario: A run takes all of its units or none
+    Given 3 of 4 units are held
+    When a run needing 2 units tries for them
+    Then it takes none and waits, holding nothing
+
+  @unit
+  Scenario: A big run at the head of the queue is not starved by small ones
+    Given a 4-unit test run queued first and 2-unit typechecks arriving after it
+    When units free up
+    Then the typechecks let the test run go first
+
+  @unit
+  Scenario: A run inside a slot takes no second slot
+    Given a run started inside "haven machine slot run"
+    When it runs "haven machine slot run --class typecheck" itself
+    Then it runs at once without touching the budget
+
+  @unit
+  Scenario: slot explain names who holds the units
+    Given runs hold units of the budget
+    When "haven machine slot explain" runs
+    Then each holder is listed with its class, units, worktree and pid
 
   @unit
   Scenario: A forced pressure level overrides the measurement

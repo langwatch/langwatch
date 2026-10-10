@@ -689,13 +689,14 @@ var baseTable = []commandSpec{
 	},
 	{
 		name:    "slot",
-		summary: "run any command under the machine-wide check slot (`slot run -- <cmd>`, `slot explain`)",
-		args:    "run [--label <name>] [--timeout <duration>] -- <command> [args…] | explain",
+		summary: "run any command on the machine-wide check budget (`slot run [--class typecheck|test|lint|build] -- <cmd>`, `slot explain`)",
+		args:    "run [--class typecheck|test|lint|build] [--label <name>] [--timeout <duration>] -- <command> [args…] | explain",
 		maxArgs: -1,
-		// The wrapped command lives after the `--` separator; only --label and
-		// --timeout are ours, and they arrive before the `--`.
+		// The wrapped command lives after the `--` separator; only --class,
+		// --label and --timeout are ours, and they arrive before the `--`.
 		minusArgs: true,
 		flags: []flagSpec{
+			{long: "--class", value: "<class>", takesValue: true, summary: "typecheck, lint or build (2 units) or test (VITEST_MAX_WORKERS units, 2 to 4); default one 2-unit check"},
 			{long: "--label", value: "<name>", takesValue: true, summary: "how the run is named while it queues"},
 			{long: "--timeout", value: "<duration>", takesValue: true, summary: "stop the command and exit 124 once it has run this long (e.g. 10m)"},
 		},

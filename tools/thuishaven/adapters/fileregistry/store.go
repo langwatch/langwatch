@@ -554,6 +554,10 @@ type WaiterClaim struct {
 	AgentID         string            `json:"agentId,omitempty"`
 	QueuedAt        time.Time         `json:"queuedAt"`
 	OverrideHonored bool              `json:"overrideHonored,omitempty"`
+	// Class, Units and Worktree name what the run will take of the unit budget.
+	Class    string `json:"class,omitempty"`
+	Units    int    `json:"units,omitempty"`
+	Worktree string `json:"worktree,omitempty"`
 }
 
 // WaiterSnapshot is one currently-queued run, as WaiterClaim plus the pid it
@@ -650,6 +654,10 @@ func (s *Store) holdersDir(name string) string { return filepath.Join(s.home, "h
 type HolderClaim struct {
 	Label     string    `json:"label"`
 	StartedAt time.Time `json:"startedAt"`
+	// Class, Units and Worktree name what the run holds of the unit budget.
+	Class    string `json:"class,omitempty"`
+	Units    int    `json:"units,omitempty"`
+	Worktree string `json:"worktree,omitempty"`
 }
 
 // HolderSnapshot is one live slot holder, with the pid it registered under.

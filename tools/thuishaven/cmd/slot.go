@@ -49,7 +49,7 @@ const (
 
 func runSlot(ctx context.Context, _ deps, inv invocation) error {
 	if len(inv.raw) == 0 {
-		return errors.New("usage: haven machine slot run [--label <name>] [--timeout <duration>] -- <command> [args…] | haven machine slot explain")
+		return errors.New("usage: haven machine slot run [--class typecheck|test|lint|build] [--label <name>] [--timeout <duration>] -- <command> [args…] | haven machine slot explain")
 	}
 	switch inv.raw[0] {
 	case "explain":
@@ -57,20 +57,21 @@ func runSlot(ctx context.Context, _ deps, inv invocation) error {
 		reportGateOffIgnored(env)
 		pressure := resolveSlotPressure()
 		slots, source := resolveSlotLimit(pressure, env)
+		units, unitSource := resolveSlotUnits(pressure, env)
 		fmt.Printf("slots=%d source=%s\n", slots, source)
+		fmt.Printf("units=%d source=%s\n", units, unitSource)
 		fmt.Printf("pressure=%s\n", pressure)
 		fmt.Printf("gomemlimit=%s\n", domain.CheckGoMemLimit(system.New().TotalMemory(), os.Getenv("GOMEMLIMIT"), pressure))
-		if procs := domain.CheckGoMaxProcs(runtime.NumCPU(), os.Getenv("GOMAXPROCS"), pressure); procs != "" {
-			fmt.Printf("gomaxprocs=%s\n", procs)
-		}
+		fmt.Printf("gomaxprocs=%s (a check; a run gets its units)\n", domain.CheckGoMaxProcs(domain.SlotWeight(domain.ClassCheck, ""), os.Getenv("GOMAXPROCS")))
 		width, widthSource := domain.UnitTestFullWidth(system.New().TotalMemory(), runtime.NumCPU(), env.TestWorkers)
 		fmt.Printf("unit_test_full_width=%d source=%s\n", width, widthSource)
 		store := fileregistry.New(havenHome())
 		explainHolders(store)
+		explainUnitHolders(semaphore.New(havenHome()))
 		explainWaiters(store)
 		return nil
 	case "run":
-		label, limit, argv, err := parseSlotRun(inv.raw[1:])
+		args, err := parseSlotRun(inv.raw[1:])
 		if err != nil {
 			return err
 		}
@@ -79,9 +80,11 @@ func runSlot(ctx context.Context, _ deps, inv invocation) error {
 		agentID, caller, overrideHonored := resolvePriorityState(store)
 		job := &slotJob{
 			sem:             semaphore.New(havenHome()),
-			label:           label,
-			limit:           limit,
-			argv:            argv,
+			label:           args.label,
+			class:           args.class,
+			limit:           args.limit,
+			argv:            args.argv,
+			worktree:        slotWorktree(),
 			progress:        os.Stderr,
 			pressure:        resolveSlotPressure(),
 			registry:        store,
@@ -136,7 +139,8 @@ func explainWaiters(store *fileregistry.Store) {
 	for _, w := range waiters {
 		waited := now.Sub(w.QueuedAt)
 		state := domain.WaiterState{Caller: w.Caller, Waited: waited, OverrideHonored: w.OverrideHonored}
-		fmt.Printf("waiter: %s, waited %s, priority %d\n", callerLabel(w.Caller), formatSlotWait(waited), state.Priority())
+		fmt.Printf("waiter: %s, %s, %d units, worktree %s, waited %s, priority %d, command %q\n",
+			callerLabel(w.Caller), w.Class, w.Units, filepath.Base(w.Worktree), formatSlotWait(waited), state.Priority(), w.Command)
 	}
 }
 
@@ -178,6 +182,51 @@ func explainHolders(store *fileregistry.Store) {
 	if wait, ok := domain.EstimateQueuedWait(domain.QueuedWaitRequest{Held: held}, history); ok {
 		fmt.Printf("estimated_wait_if_queued_now=%s\n", domain.FormatWait(wait))
 	}
+}
+
+// explainUnitHolders prints who holds the unit budget, from the lock files
+// themselves: class, units, worktree and pid, or an unnamed unit for a run
+// (the gate, `haven machine typecheck`) that takes one file and names nothing.
+func explainUnitHolders(sem *semaphore.Semaphore) {
+	holders := sem.Holders(checkSlotName)
+	if len(holders) == 0 {
+		fmt.Println("unit holders: none")
+		return
+	}
+	now := time.Now()
+	for _, h := range holders {
+		if h.PID <= 0 {
+			fmt.Printf("unit holder: unnamed, %d unit (haven gate or machine typecheck)\n", h.Units)
+			continue
+		}
+		fmt.Printf("unit holder: %s, %d units, worktree %s, pid %d, held %s, %s\n",
+			h.Class, h.Units, filepath.Base(h.Worktree), h.PID, formatSlotWait(now.Sub(h.StartedAt)), h.Label)
+	}
+}
+
+// resolveSlotUnits is the unit budget `slot run` takes its weight from.
+func resolveSlotUnits(pressure domain.Pressure, env domain.CheckEnv) (int, string) {
+	return domain.ResolveCheckUnits(
+		domain.CheckMachine{
+			TotalRAMBytes: system.New().TotalMemory(),
+			NumCPU:        runtime.NumCPU(),
+			Pressure:      pressure,
+		},
+		env,
+	)
+}
+
+// slotWorktree names the checkout a run came from without spawning git: the
+// nearest ancestor holding a .git entry, or the working directory.
+func slotWorktree() string {
+	dir, err := os.Getwd()
+	if err != nil {
+		return ""
+	}
+	if root, ok := nearestGitAncestor(dir); ok {
+		return root
+	}
+	return dir
 }
 
 func resolveSlotLimit(pressure domain.Pressure, env domain.CheckEnv) (int, string) {
@@ -313,15 +362,22 @@ func freshPublishedPressure(rec domain.PressureRecord, ok bool) (domain.Pressure
 	return domain.ReadPressure(rec, ok, now), true
 }
 
-// parseSlotRun splits `[--label <name>] [--timeout <duration>] -- <command> [args…]`.
+// slotRunArgs is `slot run`'s own flags and the command after `--`.
+type slotRunArgs struct {
+	label string
+	class domain.SlotClass
+	limit time.Duration
+	argv  []string
+}
+
+// parseSlotRun splits `[--class <class>] [--label <name>] [--timeout <duration>] -- <command> [args…]`.
 // The `--` is required so no command flag can ever be read as ours.
-func parseSlotRun(raw []string) (label string, limit time.Duration, argv []string, err error) {
+func parseSlotRun(raw []string) (slotRunArgs, error) {
+	args := slotRunArgs{class: domain.ClassCheck}
 	rest := raw
-	for len(rest) >= 2 && (rest[0] == "--label" || rest[0] == "--timeout") {
-		if rest[0] == "--label" {
-			label = rest[1]
-		} else if limit, err = parseSlotTimeout(rest[1]); err != nil {
-			return "", 0, nil, err
+	for len(rest) >= 2 && (rest[0] == "--label" || rest[0] == "--timeout" || rest[0] == "--class") {
+		if err := args.set(rest[0], rest[1]); err != nil {
+			return slotRunArgs{}, err
 		}
 		rest = rest[2:]
 	}
@@ -329,12 +385,26 @@ func parseSlotRun(raw []string) (label string, limit time.Duration, argv []strin
 		rest = rest[1:]
 	}
 	if len(rest) == 0 {
-		return "", 0, nil, errors.New("usage: haven machine slot run [--label <name>] [--timeout <duration>] -- <command> [args…]")
+		return slotRunArgs{}, errors.New("usage: haven machine slot run [--class typecheck|test|lint|build] [--label <name>] [--timeout <duration>] -- <command> [args…]")
 	}
-	if label == "" {
-		label = rest[0]
+	if args.label == "" {
+		args.label = rest[0]
 	}
-	return label, limit, rest, nil
+	args.argv = rest
+	return args, nil
+}
+
+// set reads one of slot run's own flags.
+func (a *slotRunArgs) set(flag, value string) (err error) {
+	switch flag {
+	case "--label":
+		a.label = value
+	case "--class":
+		a.class, err = domain.ParseSlotClass(value)
+	default:
+		a.limit, err = parseSlotTimeout(value)
+	}
+	return err
 }
 
 func parseSlotTimeout(raw string) (time.Duration, error) {
@@ -348,7 +418,7 @@ func parseSlotTimeout(raw string) (time.Duration, error) {
 // slotAcquirer is what a slot job needs from the semaphore, so tests can pass
 // the real flock adapter rooted at a temp dir.
 type slotAcquirer interface {
-	TryAcquire(name string, slots int) (release func(), slot int, ok bool, err error)
+	TryAcquireUnits(name string, budget int, claim domain.SlotClaim) (release func(), ok bool, err error)
 }
 
 // waiterRegistry is what a slot job needs to register itself as queued and
@@ -368,8 +438,10 @@ type waiterRegistry interface {
 type slotJob struct {
 	sem       slotAcquirer
 	label     string
-	limit     time.Duration // zero means the command may run as long as it likes
+	class     domain.SlotClass // empty reads as domain.ClassCheck
+	limit     time.Duration    // zero means the command may run as long as it likes
 	argv      []string
+	worktree  string
 	progress  io.Writer
 	pressure  domain.Pressure
 	heartbeat time.Duration // zero means slotHeartbeat
@@ -384,10 +456,12 @@ type slotJob struct {
 	agentID         string
 	overrideHonored bool
 
-	slots     int
+	budget    int // the machine's units; zero means the gate is off
+	units     int // the units this run takes
 	queuedAt  time.Time
 	announced bool
 	lastBeat  time.Time
+	started   time.Time
 }
 
 // run waits for a machine-wide check slot, runs argv with stdio inherited,
@@ -395,10 +469,16 @@ type slotJob struct {
 // a semaphore error and the maximum wait both degrade to running anyway, with
 // a line on stderr saying so.
 func (j *slotJob) run(ctx context.Context) int {
-	j.slots, _ = resolveSlotLimit(j.pressure, slotCheckEnv())
-	if j.slots <= 0 {
-		return slotExec(ctx, j.argv, j.pressure)
+	if j.class == "" {
+		j.class = domain.ClassCheck
 	}
+	j.budget, _ = resolveSlotUnits(j.pressure, slotCheckEnv())
+	j.units = domain.SlotWeight(j.class, os.Getenv("VITEST_MAX_WORKERS"))
+	if j.budget <= 0 {
+		return slotExec(ctx, j.argv, j.runEnv())
+	}
+	// A weight over a pressured budget takes the whole budget, or it would wait forever.
+	j.units = min(j.units, j.budget)
 	j.queuedAt = time.Now()
 	release, canceled := j.wait(ctx)
 	if canceled {
@@ -423,7 +503,9 @@ func (j *slotJob) claimHolder() func() {
 	if j.registry == nil {
 		return func() {}
 	}
-	release, err := j.registry.ClaimHolder(os.Getpid(), checkSlotName, fileregistry.HolderClaim{Label: j.label, StartedAt: time.Now()})
+	release, err := j.registry.ClaimHolder(os.Getpid(), checkSlotName, fileregistry.HolderClaim{
+		Label: j.label, StartedAt: j.startedAt(), Class: string(j.class), Units: j.units, Worktree: j.worktree,
+	})
 	if err != nil {
 		return func() {}
 	}
@@ -434,11 +516,11 @@ func (j *slotJob) claimHolder() func() {
 // a stuck check fails instead of holding its caller and its slot forever.
 func (j *slotJob) exec(ctx context.Context) int {
 	if j.limit <= 0 {
-		return slotExec(ctx, j.argv, j.pressure)
+		return slotExec(ctx, j.argv, j.runEnv())
 	}
 	runCtx, cancel := context.WithTimeout(ctx, j.limit)
 	defer cancel()
-	code := slotExec(runCtx, j.argv, j.pressure)
+	code := slotExec(runCtx, j.argv, j.runEnv())
 	if ctx.Err() == nil && errors.Is(runCtx.Err(), context.DeadlineExceeded) {
 		fmt.Fprintf(j.progress, "checks: %s ran past %s and was stopped; it is stuck or the machine is overloaded.\n", j.label, j.limit)
 		return 124
@@ -459,8 +541,8 @@ func (j *slotJob) wait(ctx context.Context) (release func(), canceled bool) {
 		waited := time.Since(j.queuedAt)
 		if waited >= slotMaxWait {
 			fmt.Fprintf(j.progress,
-				"checks: no slot after %s, starting anyway. Another check may be stuck holding one of the %d slots.\n",
-				formatSlotWait(waited), j.slots)
+				"checks: no slot after %s, starting anyway. Another check may be stuck holding part of the %d units.\n",
+				formatSlotWait(waited), j.budget)
 			return nil, false
 		}
 		j.report(waited)
@@ -482,7 +564,13 @@ func (j *slotJob) attemptAcquire() (release func(), done bool) {
 	if j.shouldYieldToHigherPriority() {
 		return nil, false
 	}
-	rel, _, ok, err := j.sem.TryAcquire(checkSlotName, j.slots)
+	now := time.Now()
+	rel, ok, err := j.sem.TryAcquireUnits(checkSlotName, j.budget, domain.SlotClaim{
+		PID: os.Getpid(), Class: string(j.class), Units: j.units, Worktree: j.worktree, Label: j.label, StartedAt: now,
+	})
+	if ok {
+		j.started = now
+	}
 	if err != nil {
 		fmt.Fprintf(j.progress, "checks: queue unavailable (%v), running without a slot\n", err)
 		return nil, true
@@ -508,6 +596,9 @@ func (j *slotJob) registerWaiter() func() {
 		AgentID:         j.agentID,
 		QueuedAt:        j.queuedAt,
 		OverrideHonored: j.overrideHonored,
+		Class:           string(j.class),
+		Units:           j.units,
+		Worktree:        j.worktree,
 	})
 	if err != nil {
 		return func() {}
@@ -515,12 +606,10 @@ func (j *slotJob) registerWaiter() func() {
 	return release
 }
 
-// shouldYieldToHigherPriority reports that some other run queued for the
-// same slot right now has a strictly higher effective priority than this one
-// does - class, aging and an honored HAVEN_PRIORITY=high claim, all as
-// domain.EffectivePriority weighs them. With no registry wired this is
-// always false, which is what keeps every call site that never opted in
-// unchanged.
+// shouldYieldToHigherPriority reports that another queued run goes first: a
+// higher effective priority (domain.EffectivePriority), or the same one and
+// queued earlier (domain.WaitBehind), so a big run at the head is not starved.
+// With no registry wired this is always false: first past the flock wins.
 func (j *slotJob) shouldYieldToHigherPriority() bool {
 	if j.registry == nil {
 		return false
@@ -535,7 +624,7 @@ func (j *slotJob) shouldYieldToHigherPriority() bool {
 		}
 		others = append(others, domain.WaiterState{Caller: w.Caller, Waited: now.Sub(w.QueuedAt), OverrideHonored: w.OverrideHonored})
 	}
-	return domain.ShouldYield(self, others)
+	return domain.WaitBehind(self, others)
 }
 
 // report announces a queued run once, then heartbeats so a long wait never
@@ -544,13 +633,10 @@ func (j *slotJob) report(waited time.Duration) {
 	if !j.announced && waited >= slotAnnounceAfter {
 		j.announced = true
 		j.lastBeat = time.Now()
-		active := fmt.Sprintf("%d checks are", j.slots)
-		if j.slots == 1 {
-			active = "1 check is"
-		}
+		checks := max(1, j.budget/2)
 		fmt.Fprintf(j.progress,
-			"checks: %s already active on this machine (limit %d, set CHECK_SLOTS to change). %s queued, waiting for a free slot\n",
-			active, j.slots, j.label)
+			"checks: %d units are already active on this machine (limit %d, %d units; set CHECK_SLOTS to change). %s queued, waiting for %d units\n",
+			j.budget, checks, j.budget, j.label, j.units)
 		return
 	}
 	beat := j.heartbeat
@@ -608,15 +694,11 @@ func (j *slotJob) activeNote() string {
 	return note
 }
 
-// slotExec runs argv with stdio inherited, CHECK_SLOTS=0 with this pid in
-// CHECK_QUEUE_HELD so nothing below the slot queues behind it (the marker is
-// what agent shells honor, and it only convinces a descendant), and GOMEMLIMIT
-// (unless the operator set one) so the
-// Go-runtime tools this queue wraps degrade to slower instead of resident
-// (ADR-095); under memory pressure GOMAXPROCS is capped too, so the run leaves
-// cores for the person at the keyboard. Signals are forwarded so Ctrl-C
-// reaches the child and the slot is still released afterwards.
-func slotExec(ctx context.Context, argv []string, pressure domain.Pressure) int {
+// slotExec runs argv with stdio inherited and CHECK_SLOTS=0 plus this pid in
+// CHECK_QUEUE_HELD, so nothing below it queues again. The child gets GOMEMLIMIT
+// (ADR-095), GOMAXPROCS = its units and, for a test run, VITEST_MAX_WORKERS =
+// its units; an operator's own value of each wins. Signals are forwarded.
+func slotExec(ctx context.Context, argv []string, run slotRunEnv) int {
 	// The whole command is the caller's own argv — this is a process wrapper,
 	// running exactly what it was asked to run, as the same user.
 	cmd := exec.CommandContext(ctx, argv[0], argv[1:]...) //nolint:gosec // G204: wrapper runs the caller's own command
@@ -624,10 +706,11 @@ func slotExec(ctx context.Context, argv []string, pressure domain.Pressure) int 
 	cmd.Env = append(os.Environ(),
 		"CHECK_SLOTS=0",
 		"CHECK_QUEUE_HELD="+strconv.Itoa(os.Getpid()),
-		"GOMEMLIMIT="+domain.CheckGoMemLimit(system.New().TotalMemory(), os.Getenv("GOMEMLIMIT"), pressure),
+		"GOMEMLIMIT="+domain.CheckGoMemLimit(system.New().TotalMemory(), os.Getenv("GOMEMLIMIT"), run.pressure),
 	)
-	if procs := domain.CheckGoMaxProcs(runtime.NumCPU(), os.Getenv("GOMAXPROCS"), pressure); procs != "" {
-		cmd.Env = append(cmd.Env, "GOMAXPROCS="+procs)
+	cmd.Env = append(cmd.Env, "GOMAXPROCS="+domain.CheckGoMaxProcs(run.units, os.Getenv("GOMAXPROCS")))
+	if workers := domain.CheckVitestWorkers(run.class, run.units, os.Getenv("VITEST_MAX_WORKERS")); workers != "" {
+		cmd.Env = append(cmd.Env, "VITEST_MAX_WORKERS="+workers)
 	}
 	relay := notifySignalRelay()
 	if err := cmd.Start(); err != nil {
@@ -801,6 +884,26 @@ func slotExitCode(err error, argv0 string) int {
 	}
 	fmt.Fprintf(os.Stderr, "checks: could not run %s: %v\n", argv0, err)
 	return 127
+}
+
+// slotRunEnv is what shapes a child's limits: the level, the class and the
+// units it holds.
+type slotRunEnv struct {
+	pressure domain.Pressure
+	class    domain.SlotClass
+	units    int
+}
+
+func (j *slotJob) runEnv() slotRunEnv {
+	return slotRunEnv{pressure: j.pressure, class: j.class, units: j.units}
+}
+
+// startedAt is when the run took its units, fixed once so every claim agrees.
+func (j *slotJob) startedAt() time.Time {
+	if j.started.IsZero() {
+		j.started = time.Now()
+	}
+	return j.started
 }
 
 func formatSlotWait(d time.Duration) string {

@@ -379,6 +379,9 @@ type Semaphore interface {
 	Acquire(ctx context.Context, name string, slots int) (release func(), slot int, err error)
 	// TryAcquire takes a free slot now or reports ok=false, never waiting.
 	TryAcquire(name string, slots int) (release func(), slot int, ok bool, err error)
+	// TryAcquireUnits takes claim.Units of a `budget`-unit counter now, all or
+	// none, and records claim against them; ok=false means not enough are free.
+	TryAcquireUnits(name string, budget int, claim domain.SlotClaim) (release func(), ok bool, err error)
 }
 
 // Hygiene is the disk-reclamation surface: enumerating a repo's worktrees,

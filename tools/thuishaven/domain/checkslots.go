@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // The machine-wide check queue (specs/setup/check-slots.feature). Whole-repo
@@ -185,19 +186,138 @@ func CheckGoMemLimit(totalRAMBytes uint64, existing string, pressure Pressure) s
 }
 
 // CheckGoMaxProcs is the parallelism the queue grants the Go-runtime tools it
-// wraps. On a green machine it grants nothing: an empty string means "do not
-// set it" and the tool uses every core, which is the right spend for one run
-// on an idle machine. Under pressure it halves the cores, never below two:
-// eleven runnable threads on a machine that has to page every allocation in
-// is eleven threads taking page faults, and half of them buys back an
-// interactive machine for a modest wall-clock cost. An operator's explicit
-// GOMAXPROCS always wins, whatever the level.
-func CheckGoMaxProcs(numCPU int, existing string, pressure Pressure) string {
+// wraps: the units the run holds, on every machine (D2 in
+// dev/docs/plans/haven-exec-policy.md). A run counted as two units that
+// spreads over every core makes the budget a lie. An operator's explicit
+// GOMAXPROCS always wins.
+func CheckGoMaxProcs(units int, existing string) string {
 	if existing != "" {
 		return existing
 	}
-	if pressure == Green {
-		return ""
+	return strconv.Itoa(max(1, units))
+}
+
+// SlotClass names the kind of run on the check budget; each class has a weight
+// in core units (dev/docs/plans/haven-exec-policy.md, section 4).
+type SlotClass string
+
+const (
+	// ClassCheck is a run that names no class: one whole-repo check, as before.
+	ClassCheck SlotClass = "check"
+	// ClassTypecheck is a tsc run (two units).
+	ClassTypecheck SlotClass = "typecheck"
+	// ClassTest is a Vitest run (its worker count in units).
+	ClassTest SlotClass = "test"
+	// ClassLint is an oxlint or tsgolint run (two units).
+	ClassLint SlotClass = "lint"
+	// ClassBuild is a vite or build:types run (two units).
+	ClassBuild SlotClass = "build"
+)
+
+// ParseSlotClass reads --class; empty is ClassCheck.
+func ParseSlotClass(raw string) (SlotClass, error) {
+	switch class := SlotClass(strings.ToLower(strings.TrimSpace(raw))); class {
+	case "", ClassCheck:
+		return ClassCheck, nil
+	case ClassTypecheck, ClassTest, ClassLint, ClassBuild:
+		return class, nil
 	}
-	return strconv.Itoa(max(2, numCPU/2))
+	return "", fmt.Errorf("--class %q: want typecheck, test, lint or build", raw)
+}
+
+const (
+	// checkUnitsPerCheck is the weight of one check: typecheck, lint, build and
+	// a run with no class all take two cores.
+	checkUnitsPerCheck = 2
+	// testUnitsMax caps a test run's weight, whatever its worker count.
+	testUnitsMax = 4
+	// checkCoresReserved stay with the person at the keyboard.
+	checkCoresReserved = 2
+	// checkRAMPerUnit keeps a unit's memory share the same as a check's half.
+	checkRAMPerUnit = checkRAMPerRun / checkUnitsPerCheck
+)
+
+// SlotWeight is how many core units a run of class takes: a test run takes its
+// Vitest worker count (two unless VITEST_MAX_WORKERS says otherwise, at most
+// four), every other class takes one check's two.
+func SlotWeight(class SlotClass, vitestMaxWorkers string) int {
+	if class != ClassTest {
+		return checkUnitsPerCheck
+	}
+	workers, err := strconv.Atoi(strings.TrimSpace(vitestMaxWorkers))
+	if err != nil || workers < 1 {
+		return checkUnitsPerCheck
+	}
+	return min(workers, testUnitsMax)
+}
+
+// CheckVitestWorkers is VITEST_MAX_WORKERS for a run holding units: a test run
+// gets its units, and an operator's value only up to them, so a red budget
+// never runs four workers on two units. Other classes keep what they had.
+func CheckVitestWorkers(class SlotClass, units int, existing string) string {
+	if class != ClassTest {
+		return existing
+	}
+	units = max(1, units)
+	if asked, err := strconv.Atoi(strings.TrimSpace(existing)); err == nil && asked >= 1 {
+		return strconv.Itoa(min(asked, units))
+	}
+	return strconv.Itoa(units)
+}
+
+// UnitsPerCheck is the weight of one check that names no class, and of each
+// run the gate and `haven machine typecheck` admit.
+const UnitsPerCheck = checkUnitsPerCheck
+
+// SlotClaim is who holds part of the check budget: written into each lock file
+// a run holds and into its waiter and holder records, so explain and status can
+// name the class, units, worktree and pid behind every unit.
+type SlotClaim struct {
+	PID       int       `json:"pid"`
+	Class     string    `json:"class"`
+	Units     int       `json:"units"`
+	Worktree  string    `json:"worktree,omitempty"`
+	Label     string    `json:"label,omitempty"`
+	StartedAt time.Time `json:"startedAt"`
+}
+
+// ResolveCheckUnits is the machine-wide budget in core units, ADR-090's one
+// counter (D1). It follows ResolveCheckSlots for an explicit CHECK_SLOTS, the
+// gate-off and CI, one check being two units; derived, it is the cores less two
+// (bounded by memory) when green, half under amber, a quarter under red, and
+// never below one check.
+func ResolveCheckUnits(machine CheckMachine, env CheckEnv) (int, string) {
+	slots, source := ResolveCheckSlots(machine, env)
+	if source != "machine" && source != "pressure" {
+		return slots * checkUnitsPerCheck, source
+	}
+	green := min(machine.NumCPU-checkCoresReserved, int(machine.TotalRAMBytes/checkRAMPerUnit))
+	switch machine.Pressure {
+	case Amber:
+		return max(checkUnitsPerCheck, green/2), source
+	case Red:
+		return max(checkUnitsPerCheck, green/4), source
+	default:
+		return max(checkUnitsPerCheck, green), source
+	}
+}
+
+// QueueTieWindow is how much earlier a same-priority waiter must have queued to
+// be served first: one poll tick, inside which arrivals race as before.
+const QueueTieWindow = 100 * time.Millisecond
+
+// WaitBehind reports that self should let this tick pass: another waiter has a
+// higher priority, or the same priority and queued first. The second rule is
+// what stops a stream of two-unit runs starving a four-unit run at the head.
+func WaitBehind(self WaiterState, others []WaiterState) bool {
+	if ShouldYield(self, others) {
+		return true
+	}
+	mine := self.Priority()
+	for _, other := range others {
+		if other.Priority() == mine && other.Waited-self.Waited >= QueueTieWindow {
+			return true
+		}
+	}
+	return false
 }
