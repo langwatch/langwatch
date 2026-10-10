@@ -488,7 +488,7 @@ export const designSystemConfig = defineConfig({
             value: { _light: "{colors.gray.600}", _dark: "{colors.zinc.400}" },
           },
           bgActive: {
-            value: { _light: "{colors.gray.200}", _dark: "{colors.zinc.700}" },
+            value: "{colors.bg.selected}",
           },
           bgSelected: {
             value: {
@@ -497,7 +497,7 @@ export const designSystemConfig = defineConfig({
             },
           },
           bgHover: {
-            value: { _light: "{colors.gray.200}", _dark: "{colors.zinc.800}" },
+            value: "{colors.bg.hover}",
           },
         },
 
