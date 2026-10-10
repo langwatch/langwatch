@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import { useDrawer } from "@langwatch/browser-host/drawer";
+import { Banner } from "@langwatch/design-system/banner";
 import { CodePreview } from "@langwatch/design-system/code-preview";
 import {
   DialogBody,
@@ -15,7 +16,6 @@ import { Drawer } from "@langwatch/design-system/drawer";
 import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import {
-  Alert,
   Badge,
   Button,
   Code,
@@ -23,12 +23,12 @@ import {
   HStack,
   Input,
   Spacer,
-  Spinner,
   Tabs,
   Text,
   Textarea,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { SkeletonRows } from "@langwatch/design-system/skeletons";
 import { SmallLabel } from "@langwatch/design-system/small-label";
 import { Switch } from "@langwatch/design-system/switch";
 import type { AiToolEntry } from "@langwatch/enterprise-governance-contract";
@@ -354,7 +354,7 @@ function IngestionSourceList({
         />
       )}
 
-      {isLoading && <Spinner size="sm" />}
+      {isLoading && <SkeletonRows rows={5} label="Loading ingestion sources" />}
 
       {error ? (
         <HandledErrorAlert error={error} fallbackTitle="Couldn't load ingestion sources" />
@@ -4693,16 +4693,11 @@ function WebhookEndpointPanel({
 /** The one-shot warning, and how long the old secret keeps working. */
 function SecretGraceNotice() {
   return (
-    <Alert.Root status="warning" size="sm">
-      <Alert.Indicator />
-      <Alert.Content>
-        <Alert.Description>
-          <strong>Important:</strong> the secret above will not be shown again. We retained the
-          prior secret&apos;s hash for a 24h grace window if you&apos;re rotating, so you have time
-          to roll the new value through every upstream client.
-        </Alert.Description>
-      </Alert.Content>
-    </Alert.Root>
+    <Banner status="warning">
+      <strong>Important:</strong> the secret above will not be shown again. We retained the prior
+      secret&apos;s hash for a 24h grace window if you&apos;re rotating, so you have time to roll
+      the new value through every upstream client.
+    </Banner>
   );
 }
 

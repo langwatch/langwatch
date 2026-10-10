@@ -1,8 +1,8 @@
 import { Link } from "@langwatch/browser-host/link";
 import { AccessStateIcon } from "@langwatch/design-system/access-state";
+import { Banner } from "@langwatch/design-system/banner";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import {
-  Alert,
   Box,
   Button,
   Card,
@@ -330,18 +330,13 @@ export function PlansComparisonPage({
         </HStack>
 
         {showTieredNotice && (
-          <Alert.Root status="warning" data-testid="tiered-discontinued-notice">
-            <Alert.Indicator />
-            <Alert.Content>
-              <Alert.Description>
-                Your current pricing model has been discontinued.{" "}
-                <Link href="/settings/subscription" color="orange.fg">
-                  Update your plan
-                </Link>{" "}
-                to move to seat and usage billing.
-              </Alert.Description>
-            </Alert.Content>
-          </Alert.Root>
+          <Banner status="warning" data-testid="tiered-discontinued-notice">
+            Your current pricing model has been discontinued.{" "}
+            <Link href="/settings/subscription" color="orange.fg">
+              Update your plan
+            </Link>{" "}
+            to move to seat and usage billing.
+          </Banner>
         )}
 
         <SimpleGrid columns={{ base: 1, md: 3 }} gap={4}>

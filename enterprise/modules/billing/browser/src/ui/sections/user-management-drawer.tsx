@@ -1,21 +1,20 @@
 import { Drawer } from "@langwatch/design-system/drawer";
-/**
- * User management drawer component
- * Manages ephemeral state for planning upgrades - does NOT save to DB
- */
 import {
   Badge,
   Box,
   Button,
   Collapsible,
-  Flex,
   HStack,
   Input,
   Separator,
-  Spinner,
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+/**
+ * User management drawer component
+ * Manages ephemeral state for planning upgrades - does NOT save to DB
+ */
+import { SkeletonRows } from "@langwatch/design-system/skeletons";
 import type { MemberType } from "@langwatch/enterprise-licensing-contract";
 import { nowInstant } from "@langwatch/time";
 import { ChevronDown, Plus, Trash2 } from "lucide-react";
@@ -179,15 +178,13 @@ export function UserManagementDrawer({
     >
       <Drawer.Content bg="bg">
         <Drawer.Header>
-          <Drawer.Title>Manage Seats</Drawer.Title>
+          <Drawer.Title>Manage seats</Drawer.Title>
           <Drawer.CloseTrigger />
         </Drawer.Header>
 
         <Drawer.Body>
           {isLoading ? (
-            <Flex justifyContent="center" padding={8}>
-              <Spinner />
-            </Flex>
+            <SkeletonRows rows={6} leading label="Loading members" />
           ) : (
             <VStack align="start" gap={6} width="full">
               {/* Current Members section - collapsible */}

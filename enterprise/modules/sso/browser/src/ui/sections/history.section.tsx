@@ -69,8 +69,8 @@ export function HistorySection({
         {days.map((day) => (
           <Box key={day.key}>
             <Text
-              fontSize="11.5px"
-              fontWeight="600"
+              textStyle="caption"
+              fontWeight="semibold"
               color="fg.muted"
               paddingBottom={1.5}
               data-testid="connection-history-day"
@@ -109,7 +109,7 @@ function HistoryRow({ entry, last }: { entry: HistoryDayEntry; last: boolean }) 
       </VStack>
       <HStack gap={3} align="baseline" paddingBottom={last ? 0 : 2.5} minWidth={0} flex={1}>
         <Text
-          fontSize="11.5px"
+          textStyle="caption"
           color="fg.muted"
           flexShrink={0}
           whiteSpace="nowrap"
@@ -121,7 +121,7 @@ function HistoryRow({ entry, last }: { entry: HistoryDayEntry; last: boolean }) 
             TIME_FORMAT,
           )}
         </Text>
-        <Text fontSize="13px" lineHeight="20px" minWidth={0}>
+        <Text textStyle="bodySm" lineHeight="20px" minWidth={0}>
           {entry.summary}
         </Text>
         {/* Named rather than hidden: the weaker evidence an earlier

@@ -1,12 +1,13 @@
 import { Link } from "@langwatch/browser-host/link";
+import { Heading, HStack, Text, VStack } from "@langwatch/design-system/primitives";
+import { StatusChip } from "@langwatch/design-system/settings-card";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * The people the directory actually put here, named: the status band counts
  * them and a count is the one answer nobody can check. Two `organization:manage`
  * reads joined here: the roster for names, provenance for who the directory made.
  */
-import { Heading, HStack, Spinner, Text, VStack } from "@langwatch/design-system/primitives";
-import { StatusChip } from "@langwatch/design-system/settings-card";
+import { SkeletonRows } from "@langwatch/design-system/skeletons";
 import { HandledErrorAlert } from "@langwatch/error-views";
 
 import { directoryMembershipApi } from "../../behavior/scim-api.ts";
@@ -44,7 +45,7 @@ export function DirectoryMembers({ organizationId }: { organizationId: string })
       )}
 
       {organization.isLoading || provenance.isLoading ? (
-        <Spinner size="sm" />
+        <SkeletonRows rows={3} label="Loading members" />
       ) : (
         !failure && (
           <VStack align="stretch" gap={0} width="full" data-testid="directory-managed-members">

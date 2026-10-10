@@ -1,14 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import {
-  Alert,
-  Badge,
-  Box,
-  Button,
-  HStack,
-  Text,
-  VStack,
-} from "@langwatch/design-system/primitives";
+import { Banner, BannerAction } from "@langwatch/design-system/banner";
+import { Badge, Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { getHexColorForString } from "@langwatch/design-system/rotating-colors";
 
 import { fmtMoney } from "../../model/cost-figure-format.ts";
@@ -131,19 +124,15 @@ function SpenderFigure({ row }: { row: SpenderDisplayRow }) {
  */
 export function CostSpenderError({ onRetry }: { onRetry: () => void }) {
   return (
-    <Alert.Root status="error" data-testid="cost-spenders-error">
-      <Alert.Indicator />
-      <Alert.Content>
-        <Alert.Title>Provider-reported spend by user could not be loaded</Alert.Title>
-        <Alert.Description>
-          Something went wrong reading which users the provider named for this spend. The totals
-          above are a separate read and stand on their own.
-        </Alert.Description>
-      </Alert.Content>
-      <Button size="xs" variant="outline" onClick={onRetry} alignSelf="center">
-        Try again
-      </Button>
-    </Alert.Root>
+    <Banner
+      status="error"
+      data-testid="cost-spenders-error"
+      title="Provider-reported spend by user could not be loaded"
+      action={<BannerAction onClick={onRetry}>Try again</BannerAction>}
+    >
+      Something went wrong reading which users the provider named for this spend. The totals above
+      are a separate read and stand on their own.
+    </Banner>
   );
 }
 

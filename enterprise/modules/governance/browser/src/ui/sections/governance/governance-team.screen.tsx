@@ -1,16 +1,9 @@
 import { BackLink } from "@langwatch/design-system/back-link";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
-import {
-  Box,
-  Card,
-  HStack,
-  SimpleGrid,
-  Spinner,
-  Text,
-  VStack,
-} from "@langwatch/design-system/primitives";
+import { Box, Card, HStack, SimpleGrid, Text, VStack } from "@langwatch/design-system/primitives";
 import { getHexColorForString } from "@langwatch/design-system/rotating-colors";
+import { SkeletonRows } from "@langwatch/design-system/skeletons";
 import { StatTile, StatTileFigure } from "@langwatch/design-system/stat-tile";
 import { HandledErrorAlert } from "@langwatch/error-views";
 import { findLandingProjects } from "@langwatch/project-contract";
@@ -113,7 +106,7 @@ function GovernanceTeamDetailPage() {
               fallbackTitle="Couldn't load this team's activity"
             />
           )}
-          {activityView === "loading" && <Spinner />}
+          {activityView === "loading" && <SkeletonRows rows={3} label="Loading activity" />}
           {activityView === "missing" && (
             <Card.Root variant="showcase" padding={5}>
               <NoDataInfoBlock

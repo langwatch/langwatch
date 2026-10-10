@@ -1,6 +1,8 @@
 import { Link } from "@langwatch/browser-host/link";
 import { UpgradeRequired } from "@langwatch/design-system/access-state";
+import { Banner } from "@langwatch/design-system/banner";
 import { Dialog } from "@langwatch/design-system/dialog";
+import { FormattedDate } from "@langwatch/design-system/formatted-date";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * The provisioning tokens an organization holds, and the two acts on them.
@@ -10,7 +12,6 @@ import { Dialog } from "@langwatch/design-system/dialog";
  * Shown once when issued; unrecoverable after the dialog closes.
  */
 import {
-  Alert,
   Badge,
   Button,
   Card,
@@ -25,7 +26,6 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import { HandledErrorAlert } from "@langwatch/error-views";
-import { readableDate } from "@langwatch/time";
 import { Key, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 
@@ -130,10 +130,12 @@ export function ProvisioningTokens({
                       </Badge>
                     )}
                   </Table.Cell>
-                  <Table.Cell>{readableDate(token.createdAt).toLocaleDateString()}</Table.Cell>
+                  <Table.Cell>
+                    {<FormattedDate value={token.createdAt} display="date" />}
+                  </Table.Cell>
                   <Table.Cell>
                     {token.lastUsedAt ? (
-                      readableDate(token.lastUsedAt).toLocaleDateString()
+                      <FormattedDate value={token.lastUsedAt} display="date" />
                     ) : (
                       <VStack align="start" gap={0}>
                         <Badge size="sm" colorPalette="gray">
@@ -388,16 +390,10 @@ function GenerateTokenDialog({ tokens }: { tokens: ScimTokens }) {
                   <NativeSelect.Indicator />
                 </NativeSelect.Root>
               ) : (
-                <Alert.Root status="info">
-                  <Alert.Indicator />
-                  <Alert.Content>
-                    <Alert.Title>Waiting for single sign-on</Alert.Title>
-                    <Alert.Description>
-                      Finish setting up and activate an identity provider connection before issuing
-                      a directory sync token.
-                    </Alert.Description>
-                  </Alert.Content>
-                </Alert.Root>
+                <Banner status="info" title="Waiting for single sign-on">
+                  Finish setting up and activate an identity provider connection before issuing a
+                  directory sync token.
+                </Banner>
               )}
             </VStack>
             <VStack gap={1} align="start" width="full">

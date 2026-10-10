@@ -57,7 +57,7 @@ export function ConnectionRemovalSection({
           <Box color="red.fg" display="flex" flexShrink={0} aria-hidden="true">
             <TriangleAlert size={14} />
           </Box>
-          <Text fontSize="13.5px" fontWeight="semibold" color="red.fg">
+          <Text textStyle="bodySm" fontWeight="semibold" color="red.fg">
             Danger zone
           </Text>
         </HStack>

@@ -4,8 +4,9 @@
  */
 
 import { Link } from "@langwatch/browser-host/link";
+import { Banner } from "@langwatch/design-system/banner";
 import { PageLayout } from "@langwatch/design-system/page-layout";
-import { Alert, Spacer, Text, VStack } from "@langwatch/design-system/primitives";
+import { Spacer, Text, VStack } from "@langwatch/design-system/primitives";
 import { StatusChip } from "@langwatch/design-system/settings-card";
 import { StatTile, StatTileFigure, StatTileSkeleton } from "@langwatch/design-system/stat-tile";
 import { PlanTypes } from "@langwatch/enterprise-billing-contract";
@@ -197,15 +198,10 @@ export default function UsageScreen() {
         {isLoadingLimits && <StatTileSkeleton columns={showLiteMembers ? 4 : 3} />}
 
         {hasLimitsError && (
-          <Alert.Root status="error">
-            <Alert.Indicator />
-            <Alert.Content>
-              <Alert.Title>
-                Unable to load resource limits. Please refresh the page or contact support if the
-                issue persists.
-              </Alert.Title>
-            </Alert.Content>
-          </Alert.Root>
+          <Banner status="error">
+            Unable to load resource limits. Please refresh the page or contact support if the issue
+            persists.
+          </Banner>
         )}
 
         {hasValidLicense && licenseStatus.data && "currentMembers" in licenseStatus.data && (

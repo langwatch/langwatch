@@ -1,18 +1,11 @@
 import { Link } from "@langwatch/browser-host/link";
+import { Banner } from "@langwatch/design-system/banner";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 /**
  * InvoicesBlock — a card of recent Stripe invoices: number, date, amount,
  * status chip, and PDF download link.
  */
-import {
-  Alert,
-  Card,
-  HStack,
-  Skeleton,
-  Table,
-  Text,
-  VStack,
-} from "@langwatch/design-system/primitives";
+import { Card, HStack, Skeleton, Table, Text, VStack } from "@langwatch/design-system/primitives";
 import { type StatusChipTone, StatusChip } from "@langwatch/design-system/settings-card";
 import { SettingsSection } from "@langwatch/design-system/settings-section";
 import { Download, ExternalLink, Receipt } from "lucide-react";
@@ -78,12 +71,7 @@ export function InvoicesBlock({
       )}
 
       {invoices.isError && (
-        <Alert.Root status="error">
-          <Alert.Indicator />
-          <Alert.Content>
-            <Alert.Title>Failed to load invoices. Please try again later.</Alert.Title>
-          </Alert.Content>
-        </Alert.Root>
+        <Banner status="error">Failed to load invoices. Please try again later.</Banner>
       )}
 
       {rows?.length === 0 && (

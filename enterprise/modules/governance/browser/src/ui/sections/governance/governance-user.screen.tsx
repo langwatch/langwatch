@@ -1,16 +1,9 @@
 import { BackLink } from "@langwatch/design-system/back-link";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
-import {
-  Box,
-  Card,
-  HStack,
-  SimpleGrid,
-  Spinner,
-  Text,
-  VStack,
-} from "@langwatch/design-system/primitives";
+import { Box, Card, HStack, SimpleGrid, Text, VStack } from "@langwatch/design-system/primitives";
 import { getHexColorForString } from "@langwatch/design-system/rotating-colors";
+import { SkeletonRows } from "@langwatch/design-system/skeletons";
 import { StatTile, StatTileFigure } from "@langwatch/design-system/stat-tile";
 import { HandledErrorAlert } from "@langwatch/error-views";
 import { type TimeInput, nowInstant, toEpochMs } from "@langwatch/time";
@@ -107,7 +100,7 @@ function GovernanceUserDetailPage() {
               fallbackTitle="Couldn't load this member's activity"
             />
           )}
-          {showSpinner && <Spinner />}
+          {showSpinner && <SkeletonRows rows={3} label="Loading activity" />}
           {showNoData && (
             <>
               <Card.Root variant="showcase" padding={4}>

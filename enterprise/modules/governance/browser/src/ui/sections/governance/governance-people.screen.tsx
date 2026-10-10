@@ -11,11 +11,11 @@ import {
   Collapsible,
   HStack,
   Spacer,
-  Spinner,
   Tabs,
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { SkeletonRows } from "@langwatch/design-system/skeletons";
 import type { SpendSortField } from "@langwatch/enterprise-governance-contract";
 import { HandledErrorAlert } from "@langwatch/error-views";
 import { readHandledError } from "@langwatch/handled-error/read-handled-error";
@@ -852,7 +852,7 @@ function PeopleTableSection({
   if (isLoading) {
     return (
       <Box padding={6}>
-        <Spinner />
+        <SkeletonRows rows={5} label="Loading people" />
       </Box>
     );
   }
@@ -1276,7 +1276,7 @@ function DepartmentListPanel({
       </HStack>
       {isLoading && (
         <Box padding={4}>
-          <Spinner />
+          <SkeletonRows rows={3} label="Loading people" />
         </Box>
       )}
       {showEmpty && (

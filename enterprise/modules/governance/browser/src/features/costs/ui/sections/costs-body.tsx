@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { Alert, Skeleton, VStack } from "@langwatch/design-system/primitives";
+import { Banner } from "@langwatch/design-system/banner";
+import { Skeleton, VStack } from "@langwatch/design-system/primitives";
 import { type GovernanceCostSummary } from "@langwatch/enterprise-governance-contract";
 
 import { summaryHoldsFigures } from "../../model/measured-rows.ts";
@@ -92,30 +93,18 @@ function CostsWithoutFigures({
   // zeros here would state that nothing was spent, which we do not know.
   if (isError || !data) {
     return (
-      <Alert.Root status="error" data-testid="cost-lanes-error">
-        <Alert.Indicator />
-        <Alert.Content>
-          <Alert.Title>Cost data could not be loaded</Alert.Title>
-          <Alert.Description>
-            Something went wrong reading your cost figures. Try again in a moment. Nothing is shown
-            rather than a total we cannot stand behind.
-          </Alert.Description>
-        </Alert.Content>
-      </Alert.Root>
+      <Banner status="error" data-testid="cost-lanes-error" title="Cost data could not be loaded">
+        Something went wrong reading your cost figures. Try again in a moment. Nothing is shown
+        rather than a total we cannot stand behind.
+      </Banner>
     );
   }
 
   return (
-    <Alert.Root status="info" data-testid="cost-lanes-unavailable">
-      <Alert.Indicator />
-      <Alert.Content>
-        <Alert.Title>Cost data is unavailable</Alert.Title>
-        <Alert.Description>
-          {data.unavailableReason === "no_cost_store"
-            ? "This deployment does not have cost storage configured, so no cost has been recorded."
-            : "No cost has been recorded for this organization yet."}
-        </Alert.Description>
-      </Alert.Content>
-    </Alert.Root>
+    <Banner status="info" data-testid="cost-lanes-unavailable" title="Cost data is unavailable">
+      {data.unavailableReason === "no_cost_store"
+        ? "This deployment does not have cost storage configured, so no cost has been recorded."
+        : "No cost has been recorded for this organization yet."}
+    </Banner>
   );
 }

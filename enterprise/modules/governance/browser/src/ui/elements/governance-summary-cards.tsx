@@ -60,7 +60,7 @@ export function GovernanceSummaryCard({
       padding={4}
     >
       <VStack align="stretch" gap={2}>
-        <Text fontSize="10.5px" letterSpacing="0.1em" textTransform="uppercase" color="fg.subtle">
+        <Text textStyle="micro" letterSpacing="0.1em" textTransform="uppercase" color="fg.subtle">
           {eyebrow}
         </Text>
         {children}

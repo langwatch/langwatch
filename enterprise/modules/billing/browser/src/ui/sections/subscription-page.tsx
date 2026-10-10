@@ -3,7 +3,8 @@ import { Link } from "@langwatch/browser-host/link";
  * Cloud-only Subscription Page; lets org admins manage plans and users.
  * @see specs/licensing/subscription-page.feature
  */
-import { Alert, Skeleton, SkeletonText, Text, VStack } from "@langwatch/design-system/primitives";
+import { Banner } from "@langwatch/design-system/banner";
+import { Skeleton, SkeletonText, Text, VStack } from "@langwatch/design-system/primitives";
 import { StatusChip } from "@langwatch/design-system/settings-card";
 import { CONTACT_SALES_URL, type PlanInfo } from "@langwatch/enterprise-licensing-contract";
 import { planSeatsAndVolume } from "@langwatch/plans";
@@ -259,14 +260,9 @@ export function SubscriptionPage() {
               <Skeleton width="full" height="140px" borderRadius="lg" />
             </>
           ) : (
-            <Alert.Root status="error">
-              <Alert.Indicator />
-              <Alert.Content>
-                <Alert.Title>
-                  Failed to load subscription information. Please try again later.
-                </Alert.Title>
-              </Alert.Content>
-            </Alert.Root>
+            <Banner status="error">
+              Failed to load subscription information. Please try again later.
+            </Banner>
           )}
         </VStack>
       </>
@@ -413,18 +409,14 @@ export function SubscriptionPage() {
 /** The banner a checkout returns to, with the proration note after a plan change. */
 function SubscriptionSuccessNotice({ showUpgradeCredit }: { showUpgradeCredit: boolean }) {
   return (
-    <Alert.Root status="success" data-testid="subscription-success">
-      <Alert.Indicator />
-      <Alert.Content>
-        <Alert.Title>Subscription activated successfully!</Alert.Title>
-        {showUpgradeCredit && (
-          <Alert.Description data-testid="credit-notice">
-            Your previous plan has been prorated. Any unused credit has been applied to your account
-            and will offset future invoices.
-          </Alert.Description>
-        )}
-      </Alert.Content>
-    </Alert.Root>
+    <Banner status="success" data-testid="subscription-success" title="Subscription activated">
+      {showUpgradeCredit && (
+        <span data-testid="credit-notice">
+          Your previous plan has been prorated. Any unused credit has been applied to your account
+          and will offset future invoices.
+        </span>
+      )}
+    </Banner>
   );
 }
 

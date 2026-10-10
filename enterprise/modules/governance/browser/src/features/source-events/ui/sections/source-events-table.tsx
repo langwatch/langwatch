@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+import { Banner } from "@langwatch/design-system/banner";
 import {
-  Alert,
   Badge,
   Box,
   Button,
@@ -80,12 +80,7 @@ const formatTimeAgo = (timestampMs: number): string => {
 };
 
 function ErrorAlert({ title }: { title: string }) {
-  return (
-    <Alert.Root status="error">
-      <Alert.Indicator />
-      <Alert.Title>{title}</Alert.Title>
-    </Alert.Root>
-  );
+  return <Banner status="error">{title}</Banner>;
 }
 
 const COLUMNS = ["Time", "Type", "Actor", "Action", "Target", "Cost", "Tokens"] as const;

@@ -11,6 +11,7 @@ import { Link } from "@langwatch/browser-host/link";
  * behind them stay there — a page that reached for a code would be a second
  * place the copy lives.
  */
+import { FormattedDate } from "@langwatch/design-system/formatted-date";
 import {
   Badge,
   Box,
@@ -24,7 +25,6 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
-import { readableDate } from "@langwatch/time";
 import { Plug } from "lucide-react";
 import { type ReactNode, useState } from "react";
 
@@ -253,9 +253,11 @@ function ConnectionCard({
 
           <SimpleGrid columns={{ base: 1, md: 2 }} gap={3}>
             <Fact label="Last push from the directory">
-              {connection.lastPushedAtMs
-                ? readableDate(connection.lastPushedAtMs).toLocaleString()
-                : "No push yet"}
+              {connection.lastPushedAtMs ? (
+                <FormattedDate value={connection.lastPushedAtMs} display="datetime" />
+              ) : (
+                "No push yet"
+              )}
             </Fact>
             <Fact label="People this directory manages">{connection.managedPeople}</Fact>
           </SimpleGrid>
@@ -292,7 +294,7 @@ function DirectoryFailures({ connection }: { connection: ConnectionReconciliatio
               {failure.description}
             </Text>
             <Text fontSize="xs" color="fg.muted">
-              {readableDate(failure.occurredAtMs).toLocaleString()}
+              {<FormattedDate value={failure.occurredAtMs} display="datetime" />}
             </Text>
           </Box>
         ))}
@@ -325,7 +327,7 @@ function RecentDirectoryChanges({ changes }: { changes: DirectoryChangeRow[] }) 
             <Text fontSize="sm">{change.summary}</Text>
             <Spacer />
             <Text fontSize="xs" color="fg.muted" flexShrink={0}>
-              {readableDate(change.occurredAtMs).toLocaleString()}
+              {<FormattedDate value={change.occurredAtMs} display="datetime" />}
             </Text>
           </HStack>
         ))}

@@ -7,12 +7,12 @@ import {
   Button,
   Card,
   HStack,
-  Spinner,
   Table,
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
 import { getHexColorForString } from "@langwatch/design-system/rotating-colors";
+import { SkeletonRows } from "@langwatch/design-system/skeletons";
 import { HandledErrorAlert } from "@langwatch/error-views";
 import { type TimeInput, nowInstant, toEpochMs } from "@langwatch/time";
 import { Users } from "lucide-react";
@@ -184,7 +184,7 @@ function TeamSpendPanel({
       <Card.Root variant="showcase">
         {isLoading && (
           <Box padding={6}>
-            <Spinner />
+            <SkeletonRows rows={4} label="Loading teams" />
           </Box>
         )}
         {isEmpty && (

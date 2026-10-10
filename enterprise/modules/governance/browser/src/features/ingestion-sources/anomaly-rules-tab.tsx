@@ -9,11 +9,11 @@ import {
   HStack,
   Input,
   Spacer,
-  Spinner,
   Text,
   Textarea,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { SkeletonRows } from "@langwatch/design-system/skeletons";
 import { HandledErrorAlert } from "@langwatch/error-views";
 import { docsUrl } from "@langwatch/handled-error/docs-url";
 import { Info, Pencil, Plus, RotateCw, Trash2 } from "lucide-react";
@@ -530,7 +530,7 @@ export function AnomalyRulesTab() {
           />
         )}
 
-        {rulesQuery.isLoading && <Spinner size="sm" />}
+        {rulesQuery.isLoading && <SkeletonRows rows={3} label="Loading rules" />}
 
         {rulesQuery.error && (
           <RuleListLoadError

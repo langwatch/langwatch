@@ -74,7 +74,7 @@ export function CostFilterBar({
 
       <FilterChip
         icon={<CalendarDays size={12} />}
-        label="Time Frame"
+        label="Time frame"
         value={timeFrameLabel(frame)}
       >
         {TIME_FRAMES.map((option) => (
@@ -90,7 +90,7 @@ export function CostFilterBar({
 
       <FilterChip
         icon={<Clock size={12} />}
-        label="Time Interval"
+        label="Time interval"
         value={timeIntervalLabel(interval)}
       >
         {TIME_INTERVALS.map((option) => {

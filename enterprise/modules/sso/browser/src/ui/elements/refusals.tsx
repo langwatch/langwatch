@@ -6,7 +6,8 @@ import { resolveUiFailureCopy } from "@langwatch/browser-host/feedback";
  * wire message for a handled error IS the code, so rendering it would show an
  * administrator `sso_activation_break_glass_missing`.
  */
-import { Alert, Text } from "@langwatch/design-system/primitives";
+import { Banner } from "@langwatch/design-system/banner";
+import { Text } from "@langwatch/design-system/primitives";
 
 /**
  * A refusal from a change, ON THE PAGE, beside the control that caused it.
@@ -29,18 +30,14 @@ export function InlineRefusal({ error, what }: { error: unknown; what?: string }
   });
 
   return (
-    <Alert.Root status="error" data-testid="sso-inline-refusal">
-      <Alert.Indicator />
-      <Alert.Content>
-        <Alert.Title>{copy.title}</Alert.Title>
-        <Alert.Description>{copy.description}</Alert.Description>
-        {copy.traceId !== void 0 && (
-          <Text color="fg.subtle" fontSize="xs">
-            Reference {copy.traceId}
-          </Text>
-        )}
-      </Alert.Content>
-    </Alert.Root>
+    <Banner status="error" data-testid="sso-inline-refusal" title={copy.title}>
+      {copy.description}
+      {copy.traceId !== void 0 && (
+        <Text color="fg.subtle" textStyle="caption">
+          Reference {copy.traceId}
+        </Text>
+      )}
+    </Banner>
   );
 }
 
@@ -55,15 +52,9 @@ export function LoadFailure({ error, what }: { error: unknown; what: string }) {
   const copy = resolveUiFailureCopy({ error, fallbackTitle: "" });
 
   return (
-    <Alert.Root status="error" data-testid="sso-load-failure">
-      <Alert.Indicator />
-      <Alert.Content>
-        <Alert.Title>{copy.title}</Alert.Title>
-        <Alert.Description>
-          {copy.description} We could not load {what}.
-        </Alert.Description>
-      </Alert.Content>
-    </Alert.Root>
+    <Banner status="error" data-testid="sso-load-failure" title={copy.title}>
+      {copy.description} We could not load {what}.
+    </Banner>
   );
 }
 
@@ -96,13 +87,9 @@ export function AvailabilityRefusalNotice({
   const copy = AVAILABILITY_REFUSAL_COPY[refusal];
 
   return (
-    <Alert.Root status="info" variant="outline" data-testid="sso-availability-refusal">
-      <Alert.Indicator />
-      <Alert.Content>
-        <Alert.Title>{copy.title}</Alert.Title>
-        <Alert.Description>{copy.body}</Alert.Description>
-      </Alert.Content>
-    </Alert.Root>
+    <Banner status="info" data-testid="sso-availability-refusal" title={copy.title}>
+      {copy.body}
+    </Banner>
   );
 }
 
@@ -112,14 +99,12 @@ export function AvailabilityRefusalNotice({
  */
 export function EnterprisePlanRequiredNotice() {
   return (
-    <Alert.Root status="info" data-testid="sso-enterprise-required">
-      <Alert.Indicator />
-      <Alert.Content>
-        <Alert.Title>Single sign-on needs an Enterprise plan</Alert.Title>
-        <Alert.Description>
-          Upgrade this organization to Enterprise, and you can set single sign-on up here.
-        </Alert.Description>
-      </Alert.Content>
-    </Alert.Root>
+    <Banner
+      status="info"
+      data-testid="sso-enterprise-required"
+      title="Single sign-on needs an Enterprise plan"
+    >
+      Upgrade this organization to Enterprise, and you can set single sign-on up here.
+    </Banner>
   );
 }

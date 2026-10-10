@@ -71,7 +71,7 @@ function MeasuredHeading({ children }: { children: string }) {
       <Text as="span">{children}</Text>
       <Text
         as="span"
-        fontSize="10px"
+        textStyle="micro"
         fontWeight="normal"
         color="fg.subtle"
         textTransform="none"

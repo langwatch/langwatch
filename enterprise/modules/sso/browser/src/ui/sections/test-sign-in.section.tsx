@@ -5,7 +5,8 @@
  * IS the record, which is why this step cannot be ticked by pressing a button
  * — only by coming back. Spec: specs/identity/sso-activation.feature.
  */
-import { Alert, Button, Code, Text, VStack } from "@langwatch/design-system/primitives";
+import { Banner } from "@langwatch/design-system/banner";
+import { Button, Code, Text, VStack } from "@langwatch/design-system/primitives";
 import { format } from "@langwatch/time";
 import { ExternalLink, RefreshCw } from "lucide-react";
 
@@ -62,17 +63,11 @@ export function TestSignInSection({
       {addressNote && <TestSignInAddressNotice note={addressNote} />}
       {failure && <TestSignInFailureNotice failure={failure} />}
       {testSignIn.done && (
-        <Alert.Root status="success">
-          <Alert.Indicator />
-          <Alert.Content>
-            <Alert.Title>A sign-in through this connection worked</Alert.Title>
-            <Alert.Description>
-              {testSignIn.atMs === null
-                ? "You can test it again at any time."
-                : `The last one was on ${format(testSignIn.atMs, "d MMMM yyyy, HH:mm")}.`}
-            </Alert.Description>
-          </Alert.Content>
-        </Alert.Root>
+        <Banner status="success" title="A sign-in through this connection worked">
+          {testSignIn.atMs === null
+            ? "You can test it again at any time."
+            : `The last one was on ${format(testSignIn.atMs, "d MMMM yyyy, HH:mm")}.`}
+        </Banner>
       )}
       {canManage && (
         <TestSignInButton
@@ -98,34 +93,34 @@ export function TestSignInSection({
  */
 function TestSignInAddressNotice({ note }: { note: TestSignInAddressNote }) {
   return (
-    <Alert.Root status={note.tone} data-testid="test-sign-in-address-note">
-      <Alert.Indicator />
-      <Alert.Content>
-        <Alert.Title>
+    <Banner
+      status={note.tone}
+      data-testid="test-sign-in-address-note"
+      title={
+        <>
           {note.addressIsOffDomain
             ? "Your account is not on this connection's domain"
             : "Only one address can sign in while this is being set up"}
-        </Alert.Title>
-        <Alert.Description>
-          <VStack align="stretch" gap={2}>
-            <Text fontSize="sm">
-              Until the domain is verified and the connection is live, run this test as the person
-              whose LangWatch account registered the connection. Your current address is{" "}
-              <Code fontSize="xs">{note.yourAddress}</Code>; if that is not the registering account,
-              LangWatch will refuse the sign-in.
-            </Text>
-            {note.addressIsOffDomain && (
-              <Text fontSize="sm">
-                This connection is set up for {note.connectionDomains.join(", ")}, so an address
-                there is not accepted yet. What opens it is finishing the rest of this page: prove
-                the domain, name someone who can still get in, and say who it lets in. All three,
-                not just the domain.
-              </Text>
-            )}
-          </VStack>
-        </Alert.Description>
-      </Alert.Content>
-    </Alert.Root>
+        </>
+      }
+    >
+      <VStack align="stretch" gap={2}>
+        <Text fontSize="sm">
+          Until the domain is verified and the connection is live, run this test as the person whose
+          LangWatch account registered the connection. Your current address is{" "}
+          <Code fontSize="xs">{note.yourAddress}</Code>; if that is not the registering account,
+          LangWatch will refuse the sign-in.
+        </Text>
+        {note.addressIsOffDomain && (
+          <Text fontSize="sm">
+            This connection is set up for {note.connectionDomains.join(", ")}, so an address there
+            is not accepted yet. What opens it is finishing the rest of this page: prove the domain,
+            name someone who can still get in, and say who it lets in. All three, not just the
+            domain.
+          </Text>
+        )}
+      </VStack>
+    </Banner>
   );
 }
 

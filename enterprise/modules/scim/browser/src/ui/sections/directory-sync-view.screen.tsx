@@ -14,12 +14,12 @@ import {
   Card,
   HStack,
   SimpleGrid,
-  Spinner,
   Table,
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
 import { SearchInput } from "@langwatch/design-system/search-input";
+import { SkeletonRows } from "@langwatch/design-system/skeletons";
 import { ChevronLeft, ChevronRight, MoreVertical } from "lucide-react";
 import { useState, type ReactNode } from "react";
 
@@ -65,7 +65,7 @@ export default function DirectorySyncView() {
   return (
     <>
       <PageLayout.Header>
-        <PageLayout.Heading>Directory Sync</PageLayout.Heading>
+        <PageLayout.Heading>Directory sync</PageLayout.Heading>
       </PageLayout.Header>
       <VStack gap={6} width="full" align="start" paddingTop={4}>
         <SearchInput
@@ -112,11 +112,7 @@ function ListBody({
     );
   }
   if (isLoading) {
-    return (
-      <Box paddingY={10} textAlign="center">
-        <Spinner size="md" />
-      </Box>
-    );
+    return <SkeletonRows rows={4} label="Loading the directory" />;
   }
   return <SyncsTable syncs={syncs} onOpen={onOpen} />;
 }

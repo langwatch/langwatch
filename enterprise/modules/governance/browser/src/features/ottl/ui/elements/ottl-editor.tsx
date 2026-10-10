@@ -16,9 +16,9 @@
  *
  * Spec: specs/ai-governance/ingestion-sources/claude-code-otlp.feature
  */
+import { Banner } from "@langwatch/design-system/banner";
 import { InlineCode } from "@langwatch/design-system/inline-code";
 import {
-  Alert,
   Box,
   Button,
   HStack,
@@ -301,12 +301,7 @@ export function OttlEditor({
 
       {/* Why the dots went neutral. Rendered once for the whole editor
           because the failure belongs to the check, not to any one line. */}
-      {validationError ? (
-        <Alert.Root status="error">
-          <Alert.Indicator />
-          <Alert.Title>Couldn't check these statements</Alert.Title>
-        </Alert.Root>
-      ) : null}
+      {validationError ? <Banner status="error">Couldn't check these statements</Banner> : null}
 
       {/* The check declined to run. Not a failure, so not an alert — but it
           has to be said out loud, because the absence of red is otherwise

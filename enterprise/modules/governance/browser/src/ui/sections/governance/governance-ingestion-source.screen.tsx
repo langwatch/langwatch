@@ -1,5 +1,4 @@
 import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
-// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import { BackLink } from "@langwatch/design-system/back-link";
 import {
   DialogBody,
@@ -25,6 +24,8 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+import { SkeletonRows } from "@langwatch/design-system/skeletons";
 import { StatTile, StatTileFigure } from "@langwatch/design-system/stat-tile";
 import { HandledErrorAlert } from "@langwatch/error-views";
 import { readHandledError } from "@langwatch/handled-error/read-handled-error";
@@ -586,7 +587,7 @@ function IngestionSourceDetailPage() {
     return (
       <SourceDetailShell pageTitle={pageTitle}>
         <PageLayout.Container>
-          <Spinner size="sm" />
+          <SkeletonRows rows={4} label="Loading the source" />
         </PageLayout.Container>
       </SourceDetailShell>
     );

@@ -1,6 +1,6 @@
+import { Banner } from "@langwatch/design-system/banner";
 import { Drawer } from "@langwatch/design-system/drawer";
 import {
-  Alert,
   Box,
   Button,
   HStack,
@@ -925,20 +925,14 @@ function ModelProviderFields({
           <NativeSelect.Indicator />
         </NativeSelect.Root>
         {selectedProvider && !selectedProvider.configured && (
-          <Alert.Root status="warning" variant="surface" size="sm" marginTop={2}>
-            <Alert.Indicator />
-            <Alert.Content>
-              <Alert.Title>Provider not configured</Alert.Title>
-              <Alert.Description>
-                This provider has no enabled credential yet. Tiles will publish but VK issuance will
-                502 until you{" "}
-                <Link href="/settings/model-providers" color="orange.fg">
-                  configure it
-                </Link>
-                .
-              </Alert.Description>
-            </Alert.Content>
-          </Alert.Root>
+          <Banner status="warning" title="Provider not configured">
+            This provider has no credential yet. The tool will publish, but requests through it will
+            fail until you{" "}
+            <Link href="/settings/model-providers" color="orange.fg">
+              configure it
+            </Link>
+            .
+          </Banner>
         )}
       </FormSection>
       <FormSection label="Default label suggestion (optional)">
