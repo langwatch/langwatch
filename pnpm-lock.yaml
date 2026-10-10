@@ -281,6 +281,9 @@ catalogs:
     '@opentelemetry/semantic-conventions':
       specifier: ^1.41.1
       version: 1.43.0
+    '@paper-design/shaders':
+      specifier: ^0.0.76
+      version: 0.0.76
     '@paper-design/shaders-react':
       specifier: ^0.0.76
       version: 0.0.76
@@ -17207,6 +17210,9 @@ importers:
       '@langwatch/time':
         specifier: workspace:*
         version: link:../time
+      '@paper-design/shaders':
+        specifier: 'catalog:'
+        version: 0.0.76
       '@paper-design/shaders-react':
         specifier: 'catalog:'
         version: 0.0.76(@types/react@19.2.18)(react@19.2.8)

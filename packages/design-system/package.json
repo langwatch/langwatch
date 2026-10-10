@@ -190,6 +190,10 @@
       "types": "./dist/langwatch-endpoint-env.d.ts",
       "default": "./src/langwatch-endpoint-env.ts"
     },
+    "./ambient-ground-shader": {
+      "types": "./dist/components/brand/ambient-ground-shader.d.ts",
+      "default": "./src/components/brand/ambient-ground-shader.ts"
+    },
     "./ambient-ground": {
       "types": "./dist/components/brand/ambient-ground.d.ts",
       "default": "./src/components/brand/ambient-ground.tsx"
@@ -542,6 +546,7 @@
   "dependencies": {
     "@chakra-ui/charts": "^3.36.0",
     "@langwatch/time": "workspace:*",
+    "@paper-design/shaders": "catalog:",
     "@paper-design/shaders-react": "catalog:",
     "lodash-es": "catalog:",
     "lucide-react": "catalog:",

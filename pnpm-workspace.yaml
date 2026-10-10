@@ -57,6 +57,7 @@ catalog:
   '@opentelemetry/sdk-trace-node': 2.10.0
   '@opentelemetry/sdk-trace-web': 2.10.0
   '@opentelemetry/semantic-conventions': ^1.41.1
+  '@paper-design/shaders': ^0.0.76
   '@paper-design/shaders-react': ^0.0.76
   '@playwright/test': ^1.63.0
   '@prisma/adapter-pg': 7.10.0
