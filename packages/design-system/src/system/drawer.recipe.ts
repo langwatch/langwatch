@@ -4,6 +4,7 @@
  */
 
 import { defineSlotRecipe } from "@chakra-ui/react";
+import { drawerAnatomy } from "@chakra-ui/react/anatomy";
 
 /**
  * The scenario editor of Agent Testing. Sits between Chakra's `md` (32rem)
@@ -13,7 +14,7 @@ import { defineSlotRecipe } from "@chakra-ui/react";
 export const DRAWER_SIZE_2XL_MAX_WIDTH = "38.5rem";
 
 export const drawerSlotRecipe = defineSlotRecipe({
-  slots: ["content", "header", "body", "footer", "title", "description"],
+  slots: drawerAnatomy.keys(),
   base: {
     content: {
       maxWidth: "70%",
