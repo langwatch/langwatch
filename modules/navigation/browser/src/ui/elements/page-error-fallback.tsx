@@ -35,7 +35,7 @@ export function PageErrorFallback({
       <VStack gap={6} maxWidth="560px" width="full">
         <VStack gap={3}>
           <Box padding={3} borderRadius="full" bg="red.subtle">
-            <AlertTriangle size={28} color="var(--chakra-colors-red-400)" />
+            <AlertTriangle size={28} color="var(--chakra-colors-red-fg)" />
           </Box>
           <Heading size="md" color="fg.default">
             Something went wrong
