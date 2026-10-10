@@ -1,7 +1,7 @@
 /**
  * insight_daily_run: one aggregate per person and board, one Postgres projection (the run's
- * row), three commands and the process that hands each run to the outbox. The api and the
- * tasks send; the worker folds and carries the run out.
+ * row), the process that wakes each schedule and hands its run to the outbox, and the hourly
+ * reconcile pass. The api and the tasks send; the worker folds, wakes and carries the run out.
  * @see modules/insight/adrs/004-daily-run.md
  */
 
@@ -20,14 +20,20 @@ import {
 import type { InsightModule } from "../app/insight.app.ts";
 import type { InsightRepositories } from "../repositories/insight.repositories.ts";
 import {
+  ConfigureInsightScheduleCommand,
   RecordInsightRunStartedCommand,
   RequestInsightRunCommand,
+  RequestInsightScheduleRearmCommand,
   SettleInsightRunCommand,
+  TurnOffInsightScheduleCommand,
 } from "./insight-daily-run.commands.ts";
 import {
   INSIGHT_DAILY_RUN_EVENT_SCHEMAS,
   InsightRunRequestedEventSchema,
   InsightRunSettledEventSchema,
+  InsightScheduleConfiguredEventSchema,
+  InsightScheduleRearmRequestedEventSchema,
+  InsightScheduleTurnedOffEventSchema,
 } from "./insight-daily-run.events.ts";
 import {
   INSIGHT_DAILY_RUN_INTENT,
@@ -43,7 +49,26 @@ import {
   insightDailyRunStateSchema,
   insightRunRequested,
   insightRunSettled,
+  insightScheduleConfigured,
+  insightScheduleRearmRequested,
+  insightScheduleTurnedOff,
+  insightScheduleWake,
 } from "./insight-daily-run.process.ts";
+import {
+  INSIGHT_SCHEDULE_RECONCILE_INTENT,
+  INSIGHT_SCHEDULE_RECONCILE_LEASE_MS,
+  INSIGHT_SCHEDULE_RECONCILE_MAX_ATTEMPTS,
+  type InsightDailyScheduleReconciler,
+  reconcileSchedulesIntent,
+  reconcileSchedulesIntentSchema,
+} from "./insight-daily-schedule-reconcile.intent.ts";
+import {
+  INITIAL_INSIGHT_SCHEDULE_RECONCILE_STATE,
+  INSIGHT_SCHEDULE_RECONCILE_INTERVAL_MS,
+  INSIGHT_SCHEDULE_RECONCILE_PROCESS_NAME,
+  insightScheduleReconcileStateSchema,
+  insightScheduleReconcileWake,
+} from "./insight-daily-schedule-reconcile.process.ts";
 import {
   createInsightDailyScheduleProjection,
   type InsightDailyScheduleState,
@@ -52,6 +77,7 @@ import {
 interface InsightDailyRunPipelineDeps {
   scheduleStore: StateProjectionStore<InsightDailyScheduleState>;
   runs: InsightDailyRunExecutor;
+  reconcile: InsightDailyScheduleReconciler;
 }
 
 /** A run is a model call that takes minutes: few at once per pod, and no more leased than run. */
@@ -64,6 +90,9 @@ const defineInsightDailyRunPipeline = (deps: InsightDailyRunPipelineDeps) =>
   })
     .withEvents(INSIGHT_DAILY_RUN_EVENT_SCHEMAS)
     .withPostgresProjection(createInsightDailyScheduleProjection({ store: deps.scheduleStore }))
+    .withCommand("configureSchedule", ConfigureInsightScheduleCommand)
+    .withCommand("turnOffSchedule", TurnOffInsightScheduleCommand)
+    .withCommand("requestScheduleRearm", RequestInsightScheduleRearmCommand)
     .withCommand("requestRun", RequestInsightRunCommand)
     .withCommand("recordRunStarted", RecordInsightRunStartedCommand)
     .withCommand("settleRun", SettleInsightRunCommand)
@@ -71,13 +100,32 @@ const defineInsightDailyRunPipeline = (deps: InsightDailyRunPipelineDeps) =>
       pm
         .state(insightDailyRunStateSchema, INITIAL_INSIGHT_DAILY_RUN_STATE)
         .intent(INSIGHT_DAILY_RUN_INTENT, runBoardIntentSchema, runBoardIntent({ runs: deps.runs }))
+        .on(InsightScheduleConfiguredEventSchema, insightScheduleConfigured)
+        .on(InsightScheduleTurnedOffEventSchema, insightScheduleTurnedOff)
+        .on(InsightScheduleRearmRequestedEventSchema, insightScheduleRearmRequested)
         .on(InsightRunRequestedEventSchema, insightRunRequested)
         .on(InsightRunSettledEventSchema, insightRunSettled)
+        .onWake(insightScheduleWake)
         .outbox({
           maxAttempts: INSIGHT_DAILY_RUN_MAX_ATTEMPTS,
           leaseDurationMs: INSIGHT_DAILY_RUN_LEASE_MS,
           concurrency: RUNS_AT_ONCE,
           batchSize: RUNS_AT_ONCE,
+        }),
+    )
+    .withProcessManager(INSIGHT_SCHEDULE_RECONCILE_PROCESS_NAME, (pm) =>
+      pm
+        .state(insightScheduleReconcileStateSchema, INITIAL_INSIGHT_SCHEDULE_RECONCILE_STATE)
+        .intent(
+          INSIGHT_SCHEDULE_RECONCILE_INTENT,
+          reconcileSchedulesIntentSchema,
+          reconcileSchedulesIntent({ schedules: deps.reconcile }),
+        )
+        .schedule({ everyMs: INSIGHT_SCHEDULE_RECONCILE_INTERVAL_MS })
+        .onWake(insightScheduleReconcileWake)
+        .outbox({
+          maxAttempts: INSIGHT_SCHEDULE_RECONCILE_MAX_ATTEMPTS,
+          leaseDurationMs: INSIGHT_SCHEDULE_RECONCILE_LEASE_MS,
         }),
     )
     .build();
@@ -93,6 +141,7 @@ export function buildInsightDailyRunPipeline(
 
 export const insightDailyRunEventing = defineEventingModule({
   pipeline: INSIGHT_DAILY_RUN_PIPELINE_NAME,
-  build: ({ app }: EventingSetup<InsightRepositories, InsightModule>) => app.dailyRunPipeline(),
+  build: ({ app, processStore }: EventingSetup<InsightRepositories, InsightModule>) =>
+    app.dailyRunPipeline({ processStore }),
   connect: ({ app, commands }) => app.connectDailyRunCommands(commands),
 });

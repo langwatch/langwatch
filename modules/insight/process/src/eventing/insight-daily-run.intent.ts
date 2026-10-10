@@ -23,6 +23,10 @@ export const runBoardIntentSchema = z.object({
   runId: z.string().min(1),
   /** The instant the run is for: its dates and its filings are fixed from it. */
   slot: z.number().int().nonnegative(),
+  /** The run this one replaces: it never recorded an outcome, so this run records it first. */
+  supersedes: z
+    .object({ runId: z.string().min(1), slot: z.number().int().nonnegative() })
+    .optional(),
 });
 export type RunBoardIntent = z.infer<typeof runBoardIntentSchema>;
 

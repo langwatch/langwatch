@@ -3,7 +3,8 @@ Feature: The daily insights run
   with that person's permissions as they are when the run starts, and hands back findings.
   The insight module checks the findings and files each one in that person's inbox, unread.
   Langy only reads: filing is the one write, and the insight module does it. Every run
-  records an outcome: filed, nothing, failed or skipped.
+  records an outcome: filed, nothing, failed or skipped. A person turns the run on for a
+  board, and it then starts once per calendar date, around the hour they chose, in their zone.
 
   Background:
     Given the release_insights flag is on for the project
@@ -367,6 +368,13 @@ Feature: The daily insights run
       Then the new run is started
 
     @unit
+    Scenario: A run that replaces one that never settled names the run it replaces
+      Given a run that started longer ago than a run may take
+      When another run is started for the same person and board
+      Then the new run is handed the lost run to record
+      And a run that replaces no other names none
+
+    @unit
     Scenario: A settled run keeps its first outcome
       Given a run recorded as filed
       When the same run is settled again as failed
@@ -503,3 +511,303 @@ Feature: The daily insights run
       When the task runs
       Then one run is requested for that person on that board
       And a task run without a project, a person or a board is refused
+
+  Rule: A person turns their own daily run on, changes it and turns it off
+
+    @integration
+    Scenario: A member turns their daily run on, reads it back, changes the hour and turns it off
+      Given a member with analytics:view and a board they can open
+      When they read the board's daily run, turn it on, change the hour and turn it off
+      Then they read undecided, then on with the hour, zone and maximum they chose
+      And then the new hour, and then off with what they last chose
+
+    @integration
+    Scenario: A daily run keeps the stored board's own name, not the name that was sent
+      Given a stored board named Costs
+      When a member turns its daily run on and sends another name for it
+      Then the run's row names the board Costs
+
+    @integration
+    Scenario: No thanks from the offer stores off
+      Given a board a member never decided on
+      When they say no thanks to the offer
+      Then they read off with nothing chosen
+      And they can still turn it on
+
+    @integration
+    Scenario: A From LangWatch board can be turned on
+      Given a From LangWatch board, named by its template id
+      When a member turns its daily run on
+      Then they read on, and no stored board is read
+      And a stored board with the same id is still undecided
+
+    @integration
+    Scenario: A setting a schedule does not take is refused
+      Given an hour outside 0 to 23, a time zone that is no IANA zone name, or a maximum that is not 1, 3, 5 or 10
+      When a member sends it as their daily run's setting
+      Then it is refused before the module is asked
+      And nothing is recorded
+
+    @integration
+    Scenario: A member reads and writes only their own daily run setting
+      Given a member turned their daily run on for a board
+      When another member of the project reads the same board, and turns their own on and off
+      Then the other member reads their own setting and never the first member's
+      And the first member's setting is unchanged
+
+    @integration
+    Scenario: Another member's Only me board cannot be turned on, and answers as a board that is not there
+      Given a board its author keeps as Only me
+      When another member turns its daily run on, and one for a board that never existed
+      Then both are refused alike with dashboard_not_found, never as forbidden
+      And nothing is recorded for them, and the author can turn theirs on
+
+    @integration
+    Scenario: A daily run setting is refused while the flag is off
+      Given the release_insights flag is off for the project
+      When a member reads, turns on or turns off a board's daily run
+      Then each is refused with insights_not_enabled
+      And nothing is recorded and no board is read
+
+    @integration
+    Scenario: An aggregate project takes no daily run setting
+      Given an organisation admin on an aggregate project
+      When they turn a board's daily run on or off
+      Then each is refused as read only before the module is asked
+      And a read there answers undecided
+
+    @integration
+    Scenario: A member without analytics:view cannot read or set a daily run
+      Given a member without analytics:view on the project
+      When they read, turn on or turn off a board's daily run
+      Then each is refused as forbidden before the handler runs
+
+    @integration
+    Scenario: A daily run setting is stored per person and board in the project
+      Given two people set the same board, one on and one off
+      When each setting is read by its person's own schedule
+      Then each reads their own
+      And neither is read through the other's schedule, from another project or by an unknown id
+
+    @unit
+    Scenario: A setting and a run's outcome fold onto one row
+      Given a person turned their daily run on
+      When a run of it settles, they change it and they turn it off
+      Then the row holds what they chose beside how the last run ended, through each
+
+    @unit
+    Scenario: A setting whose schedule is not its person's and board's changes nothing
+      Given a setting or an off that names a schedule other than the one its project, person and board derive
+      When the schedule's process and its row take it
+      Then nothing is turned on or off, and no row changes
+
+  Rule: A daily run that is on runs once per calendar date, around its hour, in its own zone
+
+    @unit
+    Scenario: A schedule runs at its own minute, the same every day and spread across schedules
+      Given 600 schedules
+      When each one's minute of the hour is derived from its id
+      Then one schedule's minute is the same every time
+      And the schedules use every minute of the hour, with none crowded
+
+    @unit
+    Scenario: Turning the daily run on arms the next slot and starts no run
+      Given a person turns their daily run on for an hour
+      When that hour is still ahead today, or has passed
+      Then the slot armed is today's, or tomorrow's
+      And no run is started
+
+    @unit
+    Scenario: A daily run that is on wakes, runs, settles and arms the next day
+      Given a member turned their daily run on for a board
+      When the slot comes due and its run is carried out
+      Then one run starts for the member on that board, and files what Langy found
+      And the member reads the run's outcome beside their setting
+      And the next day's slot is armed
+
+    @unit
+    Scenario: A wake starts one run for its slot, on the path a request takes
+      Given a schedule that is on and its slot is due
+      When the wake is handled
+      Then the outbox is handed the same intent a request writes, for the person, the board and the slot
+      And the run is named by its slot
+
+    @unit
+    Scenario: A second wake for the same calendar date starts no second run
+      Given a schedule whose slot already ran today
+      When another wake comes for the same date
+      Then no run is started
+      And the next day's slot is armed
+
+    @unit
+    Scenario: A schedule that already ran for a date waits for the next date
+      Given a schedule whose last run was for today
+      When its next slot is derived, with its hour still ahead today
+      Then the slot is tomorrow's
+
+    @unit
+    Scenario: A schedule runs once on each day the clocks change
+      Given a schedule for 09:00 in a zone whose clocks go forward on one day and back on another
+      When its slots are derived across each of those days
+      Then each calendar date has one slot, at 09 on the wall clock
+
+    @unit
+    Scenario: An hour the clocks skip runs at the next valid time that day
+      Given a schedule for 02:00 in a zone whose clocks go from 02:00 to 03:00 that day
+      When its slot for that day is derived
+      Then the slot is at 03 on the wall clock that day, at the schedule's own minute
+      And the day after it is at 02 again
+
+    @unit
+    Scenario: An hour the clocks repeat runs once
+      Given a schedule for 02:00 in a zone whose clocks go from 03:00 back to 02:00 that day
+      When its slots are derived
+      Then the slot is the first of the two, and the next is the day after
+      And a wake for the second is refused once the first ran
+
+    @unit
+    Scenario: An hour changed before today's run runs today at the new hour
+      Given a schedule that has not run today
+      When the person changes its hour to one still ahead today
+      Then today's slot at the new hour is armed, and no run is started
+
+    @unit
+    Scenario: An hour changed after today's run waits for the next day
+      Given a schedule whose run already happened today
+      When the person changes its hour to one still ahead today
+      Then tomorrow's slot at the new hour is armed, and no run is started
+
+    @unit
+    Scenario: An hour changed to one that has passed starts no run and waits for the next day
+      Given a schedule that has not run today
+      When the person changes its hour to one that has passed today
+      Then tomorrow's slot is armed, and no run is started
+
+    @unit
+    Scenario: A slot missed by less than six hours still runs
+      Given a schedule whose slot came due while the fleet was down
+      When the wake is handled 5 hours 59 minutes late
+      Then the slot's run is started once, and the next day's slot is armed
+
+    @unit
+    Scenario: A slot missed by six hours or more waits for the next day
+      Given a schedule whose slot came due while the fleet was down
+      When the wake is handled 6 hours 1 minute late
+      Then no run is started
+      And the next day's slot is armed
+
+    @unit
+    Scenario: A wake while a run is in flight starts no second run
+      Given a run in flight for a board whose schedule is on
+      When the schedule's slot comes due
+      Then no second run is started, and the run in flight stands for the slot
+      And the next day's slot is armed
+
+    @unit
+    Scenario: A run that never settled is superseded by the next day's wake
+      Given a scheduled run that recorded no outcome
+      When the next day's slot comes due
+      Then the next day's run is started
+      And it is handed the lost run to record
+
+    @unit
+    Scenario: A superseded run is recorded as failed with the reason timeout
+      Given a run that replaces one that never settled
+      When the run is carried out, once or twice
+      Then the lost run is recorded once as failed with the reason timeout, before the new run's outcome
+      And the person reads the new run's outcome
+
+    @unit
+    Scenario: An operator's run leaves the schedule's wake armed
+      Given a schedule that is on
+      When an operator's run is requested and settles before the slot
+      Then the slot stays armed for today
+
+    @unit
+    Scenario: A process instance written before the schedule still reads
+      Given a schedule's process instance stored before a schedule could be turned on
+      When it is read, and a wake reaches it
+      Then it reads as a schedule nobody turned on, and no run is started
+
+  Rule: Off, and a board that is gone, stop the schedule
+
+    @unit
+    Scenario: Turning the daily run off cancels its wake
+      Given a member turned their daily run on for a board
+      When they turn it off before the slot
+      Then no wake is armed and no run starts at the slot
+      And they read off, with what they chose kept
+
+    @unit
+    Scenario: A daily run turned off and on again the same day does not run twice
+      Given a schedule whose run already happened today
+      When the person turns it off and on again for a later hour today
+      Then tomorrow's slot is armed
+
+    @unit
+    Scenario: A run that finds its board gone turns the daily run off
+      Given a member turned their daily run on for a board that was then deleted
+      When the slot's run is carried out
+      Then it is recorded as skipped with the reason board_deleted
+      And the member reads off, and no wake is armed
+
+    @unit
+    Scenario: A board that is gone turns off no daily run the person never turned on
+      Given a board a person never decided on, or said no thanks to
+      When a run finds the board gone
+      Then their setting stays as it was
+
+    @unit
+    Scenario: A From LangWatch board that is on is skipped each day and stays on
+      Given a member turned their daily run on for a From LangWatch board
+      When the slot's run is carried out
+      Then it is recorded as skipped with the reason template_board
+      And the member reads on, and the next day's slot is armed
+
+  Rule: A reconcile pass arms a schedule that lost its wake
+
+    @unit
+    Scenario: The reconcile pass runs hourly, once across the fleet
+      Given the daily run pipeline as the worker registers it
+      When the pass's process is read
+      Then it is a scheduled singleton that wakes every hour
+      And each wake hands the outbox one pass, keyed by the wake
+
+    @integration
+    Scenario: A reconcile pass reads every project's schedules that are on
+      Given schedules that are on in two projects, beside ones that are off or undecided
+      When a pass reads them, a page at a time
+      Then it reads each one that is on once, in its own project, and no other
+
+    @unit
+    Scenario: A schedule that is on with no process instance is armed by the pass
+      Given a schedule whose row is on and whose process holds no instance
+      When a pass runs
+      Then its process is asked to arm itself with the row's setting
+      And it takes the setting and arms its next slot, with no run started
+
+    @unit
+    Scenario: A schedule whose wake was lost is armed again with its own setting
+      Given a schedule that is on and whose wake was lost
+      When a pass runs
+      Then its next slot is armed again, never on a date that already ran
+      And its setting is unchanged
+
+    @unit
+    Scenario: A pass leaves an armed schedule alone
+      Given a schedule that is on with its wake armed
+      When a pass runs
+      Then nothing is asked of it
+
+    @unit
+    Scenario: A pass turns on no schedule the person turned off
+      Given a schedule the person turned off, whose row is a fold behind and still reads on
+      When a pass runs, or its request to arm arrives after the off
+      Then the schedule stays off
+
+    @unit
+    Scenario: A pass carried out twice asks each schedule once
+      Given a pass the outbox delivers twice
+      When each delivery asks a schedule to arm itself
+      Then both name the same pass
+      And one request is recorded

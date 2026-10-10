@@ -6,6 +6,8 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  configureInsightDailyRunInputSchema,
+  insightBoardDailyRunScopeSchema,
   insightRunBoardSchema,
   insightRunFindingsSchema,
   requestInsightDailyRunInputSchema,
@@ -60,6 +62,61 @@ describe("given the findings a run's answer holds", () => {
     expect(insightRunFindingsSchema.validate({ findings: [finding] })).toBe(true);
     expect(
       insightRunFindingsSchema.validate({ findings: [{ ...finding, ownerUserId: "user-2" }] }),
+    ).toBe(false);
+  });
+});
+
+describe("given the setting a person sends for a board's daily run", () => {
+  const setting = {
+    projectId: "project-1",
+    board: { kind: "dashboard", id: "dashboard-1", name: "Costs" },
+    hour: 9,
+    timezone: "Europe/Amsterdam",
+    maxInsights: 3,
+  };
+  const takes = (patch: Record<string, unknown>) =>
+    configureInsightDailyRunInputSchema.validate({ ...setting, ...patch });
+
+  it("takes every hour of the day, a named zone and each of the four maximums", () => {
+    expect([0, 9, 23].map((hour) => takes({ hour }))).toEqual([true, true, true]);
+    expect(
+      ["UTC", "Asia/Kolkata", "America/Sao_Paulo"].map((timezone) => takes({ timezone })),
+    ).toEqual([true, true, true]);
+    expect([1, 3, 5, 10].map((maxInsights) => takes({ maxInsights }))).toEqual([
+      true,
+      true,
+      true,
+      true,
+    ]);
+  });
+
+  /** @scenario "A setting a schedule does not take is refused" */
+  it.each([
+    ["an hour of 24", { hour: 24 }],
+    ["an hour below zero", { hour: -1 }],
+    ["half an hour", { hour: 9.5 }],
+    ["a zone no one knows", { timezone: "Mars/Olympus_Mons" }],
+    ["an offset in place of a zone", { timezone: "+02:00" }],
+    ["no zone", { timezone: "" }],
+    ["a maximum of 4", { maxInsights: 4 }],
+    ["a maximum of 0", { maxInsights: 0 }],
+    ["a board of an unknown kind", { board: { kind: "saved-view", id: "view-1", name: "Mine" } }],
+  ])("refuses %s", (_what, patch) => {
+    expect(takes(patch)).toBe(false);
+  });
+
+  it("carries no person: the door names the caller, and a person that was sent is dropped", () => {
+    const parsed = configureInsightDailyRunInputSchema.parse({ ...setting, userId: "user-2" });
+
+    expect(parsed).not.toHaveProperty("userId");
+  });
+
+  it("reads a board's setting by the pointer's kind and id alone", () => {
+    const scope = { projectId: "project-1", board: { kind: "template", id: "llm-costs" } };
+
+    expect(insightBoardDailyRunScopeSchema.validate(scope)).toBe(true);
+    expect(
+      insightBoardDailyRunScopeSchema.validate({ ...scope, board: { ...scope.board, name: "x" } }),
     ).toBe(false);
   });
 });

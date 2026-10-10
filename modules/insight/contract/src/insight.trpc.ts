@@ -7,7 +7,16 @@
 import { defineTrpcContract } from "@langwatch/module";
 import { z } from "zod";
 
-import { INSIGHT_PROCESSING_EVENT_TYPES } from "./insight.constants.ts";
+import {
+  configureInsightDailyRunInputSchema,
+  insightBoardDailyRunScopeSchema,
+  insightDailyRunSettingSchema,
+  turnOffInsightDailyRunInputSchema,
+} from "./insight-daily-run.ts";
+import {
+  INSIGHT_DAILY_RUN_SETTING_EVENT_TYPES,
+  INSIGHT_PROCESSING_EVENT_TYPES,
+} from "./insight.constants.ts";
 import {
   fileInsightInputSchema,
   insightEntrySchema,
@@ -35,5 +44,18 @@ export const insightTrpc = defineTrpcContract("insights")
 
   .mutation("keep")
   .withInput(insightScopeSchema)
+  .withOutput(z.void())
+
+  // The caller's own daily run on one board; refetched when it is set or a run of it settles.
+  .query("getBoardDailyRun", { invalidatedBy: INSIGHT_DAILY_RUN_SETTING_EVENT_TYPES })
+  .withInput(insightBoardDailyRunScopeSchema)
+  .withOutput(insightDailyRunSettingSchema)
+
+  .mutation("configureBoardDailyRun")
+  .withInput(configureInsightDailyRunInputSchema)
+  .withOutput(z.void())
+
+  .mutation("turnOffBoardDailyRun")
+  .withInput(turnOffInsightDailyRunInputSchema)
   .withOutput(z.void())
   .build();

@@ -68,7 +68,7 @@ function harness({ stopTurn }: { stopTurn?: Langy["stopTurn"] } = {}) {
       fileInsight: async (input) => void filed.push(input),
     }),
     runCommands: createApiFixture<
-      Pick<InsightDailyRunCommandsService, "recordRunStarted" | "settleRun">
+      Pick<InsightDailyRunCommandsService, "recordRunStarted" | "settleRun" | "turnOffSchedule">
     >({
       recordRunStarted: async () => undefined,
       settleRun: async ({ tenantId: _tenantId, occurredAt: _occurredAt, ...data }) => {

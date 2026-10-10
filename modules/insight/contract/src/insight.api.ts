@@ -1,6 +1,13 @@
 import { moduleApi } from "@langwatch/module";
 
-import type { InsightDailyRun, RequestInsightDailyRunInput } from "./insight-daily-run.ts";
+import type {
+  ConfigureInsightDailyRunInput,
+  InsightBoardDailyRunScope,
+  InsightDailyRun,
+  InsightDailyRunSetting,
+  RequestInsightDailyRunInput,
+  TurnOffInsightDailyRunInput,
+} from "./insight-daily-run.ts";
 import type { FileInsightInput, InsightEntry } from "./insight.ts";
 
 /** Who is asking. An insight is read and acted on by its owner alone. */
@@ -31,6 +38,15 @@ export interface InsightApi {
   requestDailyRun(input: RequestInsightDailyRunInput): Promise<{ requestId: string }>;
   /** The reader's own runs in the project, one per board, each with how its last run ended. */
   findDailyRuns(input: { projectId: string } & Reader): Promise<InsightDailyRun[]>;
+  /** The reader's own daily run on one board: `undecided` until they turned it on or off. */
+  getDailyRunSetting(input: InsightBoardDailyRunScope & Reader): Promise<InsightDailyRunSetting>;
+  /**
+   * Turns the reader's daily run on for a board, or changes its hour, zone or maximum. A stored
+   * board the reader cannot open answers `dashboard_not_found`, like one that does not exist.
+   */
+  configureDailyRun(input: ConfigureInsightDailyRunInput & Reader): Promise<void>;
+  /** Turns the reader's daily run off for a board; "No thanks" on the offer stores the same. */
+  turnOffDailyRun(input: TurnOffInsightDailyRunInput & Reader): Promise<void>;
 }
 
 export const InsightApi = moduleApi<InsightApi>()("insight");

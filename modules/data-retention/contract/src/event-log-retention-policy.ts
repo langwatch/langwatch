@@ -23,6 +23,8 @@ export const INDEFINITE_EVENT_TYPES = [
   "lw.automation.report_schedule.configured",
   "lw.automation.report_schedule.paused",
   "lw.automation.report_schedule.resumed",
+  "lw.insight.daily_schedule.configured",
+  "lw.insight.daily_schedule.turned_off",
   "lw.trace.first_trace_recorded",
   "lw.evaluation.ran",
   "lw.obs.ingestion_pull.configured",

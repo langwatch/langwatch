@@ -15,13 +15,20 @@ import {
   type DashboardViewer,
   DEFAULT_DASHBOARD_SCOPE,
 } from "@langwatch/dashboard-contract";
-import { createTenantId, type IntentContext } from "@langwatch/eventing";
+import {
+  buildProcessDefinition,
+  createTenantId,
+  type IntentContext,
+  ProcessManagerService,
+} from "@langwatch/eventing";
 import { HandledError } from "@langwatch/handled-error";
 import {
+  INSIGHT_DAILY_RUN_EVENT_TYPES,
   INSIGHT_DAILY_RUN_PIPELINE_NAME,
   INSIGHT_DAILY_SCHEDULE_AGGREGATE_TYPE,
   INSIGHT_RUN_FINDINGS_FENCE_TAG,
   type InsightRunBoard,
+  insightRunSettledEventDataSchema,
 } from "@langwatch/insight-contract";
 import {
   LangyIdempotencyMismatchError,
@@ -36,7 +43,12 @@ import { Temporal } from "@langwatch/time";
 import type { UserApi } from "@langwatch/user-contract";
 
 import { INSIGHT_DAILY_RUN_INTENT } from "../../eventing/insight-daily-run.intent.ts";
-import { INSIGHT_DAILY_RUN_PROCESS_NAME } from "../../eventing/insight-daily-run.process.ts";
+import {
+  INSIGHT_DAILY_RUN_PROCESS_NAME,
+  type InsightDailyRunState,
+} from "../../eventing/insight-daily-run.process.ts";
+import { INSIGHT_SCHEDULE_RECONCILE_INTENT } from "../../eventing/insight-daily-schedule-reconcile.intent.ts";
+import { INSIGHT_SCHEDULE_RECONCILE_PROCESS_NAME } from "../../eventing/insight-daily-schedule-reconcile.process.ts";
 import { dailyScheduleId } from "../../rules/insight-daily-run.rules.ts";
 import { installInsight, PROJECT } from "./insight.fixture.ts";
 
@@ -399,16 +411,29 @@ export async function installDailyRuns(world: RunWorld = runWorld()) {
   const scheduleIdOf = ({ userId = MEMBER, board = BOARD } = {}) =>
     dailyScheduleId({ projectId: PROJECT, userId, board });
 
-  /** The run's intent as the pipeline registered it, to carry out by hand. */
-  const runIntent = () => {
-    const spec = eventing.definitions
+  /** A process of the daily run pipeline as it was registered, to drive by hand. */
+  const processOf = (processName: string) => {
+    const definition = eventing.definitions
       .find(({ metadata }) => metadata.name === INSIGHT_DAILY_RUN_PIPELINE_NAME)
-      ?.processManagers.get(INSIGHT_DAILY_RUN_PROCESS_NAME)?.config.intents?.[
-      INSIGHT_DAILY_RUN_INTENT
-    ];
-    if (!spec) throw new Error("The daily run pipeline registered no runBoard intent");
+      ?.processManagers.get(processName);
+    if (!definition) throw new Error(`The daily run pipeline registered no ${processName}`);
+    return definition;
+  };
+
+  /** An intent as the pipeline registered it, to carry out by hand. */
+  const intentOf = ({ processName, intent }: { processName: string; intent: string }) => {
+    const spec = processOf(processName).config.intents?.[intent];
+    if (!spec) throw new Error(`${processName} registered no ${intent} intent`);
     return spec;
   };
+  const runIntent = () =>
+    intentOf({ processName: INSIGHT_DAILY_RUN_PROCESS_NAME, intent: INSIGHT_DAILY_RUN_INTENT });
+
+  const scheduleRefOf = (scope: { userId?: string; board?: InsightRunBoard } = {}) => ({
+    processName: INSIGHT_DAILY_RUN_PROCESS_NAME,
+    projectId: PROJECT,
+    processKey: scheduleIdOf(scope),
+  });
 
   return {
     ...installed,
@@ -419,13 +444,50 @@ export async function installDailyRuns(world: RunWorld = runWorld()) {
     scheduleIdOf,
     /** Every outbox message the schedule's process wrote, oldest first. */
     intentsOf: (scope: { userId?: string; board?: InsightRunBoard } = {}) =>
-      processStore.findMessagesByRef({
-        ref: {
-          processName: INSIGHT_DAILY_RUN_PROCESS_NAME,
-          projectId: PROJECT,
-          processKey: scheduleIdOf(scope),
-        },
-      }),
+      processStore.findMessagesByRef({ ref: scheduleRefOf(scope) }),
+    /** The schedule's process instance: its state, and the wake it has armed. */
+    instanceOf: (scope: { userId?: string; board?: InsightRunBoard } = {}) =>
+      processStore.findByRef<InsightDailyRunState>({ ref: scheduleRefOf(scope) }),
+    /** Handles every schedule wake due at `now`, as the wake worker does; answers how many. */
+    wakeDue: async ({ now }: { now: number }) => {
+      const manager = new ProcessManagerService({
+        definition: buildProcessDefinition(processOf(INSIGHT_DAILY_RUN_PROCESS_NAME).config),
+        store: processStore,
+      });
+      const due = await processStore.findDueWakes({
+        now,
+        limit: 20,
+        processNames: [INSIGHT_DAILY_RUN_PROCESS_NAME],
+      });
+      for (const wake of due) await manager.handleWake({ wake, now });
+      return due.length;
+    },
+    /** Drops the schedule's armed wake and keeps its state, as a lost wake leaves it. */
+    loseWake: async (scope: { userId?: string; board?: InsightRunBoard } = {}) => {
+      const ref = scheduleRefOf(scope);
+      const instance = await processStore.findByRef({ ref });
+      if (!instance) throw new Error("The schedule has no process instance to lose a wake on");
+      await processStore.commit({
+        ref,
+        tenantId: instance.tenantId,
+        sourceEventId: null,
+        expectedRevision: instance.revision,
+        state: instance.state,
+        nextWakeAt: null,
+        messages: [],
+        now: instance.updatedAt,
+      });
+    },
+    /** Carries one reconcile pass out, the way the outbox does for the hourly wake. */
+    reconcile: async ({ passAt }: { passAt: number }) => {
+      const spec = intentOf({
+        processName: INSIGHT_SCHEDULE_RECONCILE_PROCESS_NAME,
+        intent: INSIGHT_SCHEDULE_RECONCILE_INTENT,
+      });
+      await spec.run(spec.schema.parse({ scheduledFor: passAt }), intentContext({ attempt: 1 }));
+    },
+    /** The reconcile pass's process as the pipeline registered it. */
+    reconcileProcess: () => processOf(INSIGHT_SCHEDULE_RECONCILE_PROCESS_NAME).config,
     /** Carries one intent out the way the outbox does, on the attempt named. */
     carryOut: async (payload: unknown, { attempt = 1 }: { attempt?: number } = {}) => {
       const spec = runIntent();
@@ -439,6 +501,18 @@ export async function installDailyRuns(world: RunWorld = runWorld()) {
         context: { tenantId: createTenantId(PROJECT) },
       });
       return events.map((event) => event.type);
+    },
+    /** Every outcome one schedule's stream holds, oldest first: the run, how and why. */
+    outcomesOf: async (scope: { userId?: string; board?: InsightRunBoard } = {}) => {
+      const events = await eventStore.getEvents({
+        aggregateId: scheduleIdOf(scope),
+        aggregateType: INSIGHT_DAILY_SCHEDULE_AGGREGATE_TYPE,
+        context: { tenantId: createTenantId(PROJECT) },
+      });
+      return events
+        .filter((event) => event.type === INSIGHT_DAILY_RUN_EVENT_TYPES.RUN_SETTLED)
+        .map(({ data }) => insightRunSettledEventDataSchema.parse(data))
+        .map(({ runId, outcome, reason }) => ({ runId, outcome, reason }));
     },
   };
 }

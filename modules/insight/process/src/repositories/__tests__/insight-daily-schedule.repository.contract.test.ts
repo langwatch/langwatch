@@ -54,6 +54,10 @@ function settled(overrides: Partial<InsightDailyScheduleState> = {}): InsightDai
     boardKind: BOARD.kind,
     boardId: BOARD.id,
     boardName: BOARD.name,
+    state: "undecided",
+    hour: null,
+    timezone: null,
+    maxInsights: null,
     lastRunId: "run-1",
     lastRunAt: RAN_AT,
     lastRunOutcome: "filed",
@@ -174,6 +178,94 @@ function contractCases(backend: Backend): void {
       ]);
     });
   });
+
+  const ON = { state: "on", hour: 9, timezone: "Europe/Amsterdam", maxInsights: 5 } as const;
+
+  const settingOf = ({
+    userId,
+    scheduleId,
+    projectId = backend.projectId(),
+  }: {
+    userId: string;
+    scheduleId: string;
+    projectId?: string;
+  }) => backend.repositories().dailySchedules.findSetting({ projectId, userId, scheduleId });
+
+  describe("when two people set the same board, one on and one off", () => {
+    /** @scenario "A daily run setting is stored per person and board in the project" */
+    it("answers each person their own setting, and none through another's schedule", async () => {
+      const mine = await store(ON);
+      const theirs = await store({ userId: OTHER, state: "off", lastRunId: null, lastRunAt: null });
+
+      expect(await settingOf({ userId: OWNER, scheduleId: mine })).toEqual([
+        {
+          state: "on",
+          settings: { hour: 9, timezone: "Europe/Amsterdam", maxInsights: 5 },
+          lastRun: {
+            at: RAN_AT,
+            outcome: "filed",
+            reason: null,
+            filedCount: 2,
+            conversationId: "conversation-1",
+          },
+        },
+      ]);
+      expect(await settingOf({ userId: OTHER, scheduleId: theirs })).toEqual([
+        { state: "off", settings: null, lastRun: null },
+      ]);
+      expect(await settingOf({ userId: OTHER, scheduleId: mine })).toEqual([]);
+      expect(
+        await settingOf({ userId: OWNER, scheduleId: mine, projectId: backend.otherProjectId() }),
+      ).toEqual([]);
+      expect(await settingOf({ userId: OWNER, scheduleId: "insightschedule_none" })).toEqual([]);
+    });
+  });
+
+  describe("when schedules are on in two projects, beside ones that are off or undecided", () => {
+    /** Every page from the start, kept to the two projects this backend owns. */
+    const onSchedules = async ({ take }: { take: number }) => {
+      const mine = [backend.projectId(), backend.otherProjectId()];
+      const found = [];
+      let afterId: string | null = null;
+      for (;;) {
+        const page = await backend.repositories().dailySchedules.findOnPage({ afterId, take });
+        const last = page.at(-1);
+        if (!last) return found;
+        found.push(...page.filter(({ projectId }) => mine.includes(projectId)));
+        afterId = last.scheduleId;
+      }
+    };
+
+    /** @scenario "A reconcile pass reads every project's schedules that are on" */
+    it("pages through the ones that are on, in every project, by id and once each", async () => {
+      const here = await store(ON);
+      const there = await store({ ...ON, projectId: backend.otherProjectId(), userId: OTHER });
+      await store({
+        boardId: "dashboard-off",
+        state: "off",
+        hour: 9,
+        timezone: "UTC",
+        maxInsights: 1,
+      });
+      await store({ boardId: "dashboard-undecided" });
+      const expected = [
+        { scheduleId: here, projectId: backend.projectId(), userId: OWNER },
+        { scheduleId: there, projectId: backend.otherProjectId(), userId: OTHER },
+      ].toSorted((a, b) => (a.scheduleId < b.scheduleId ? -1 : 1));
+
+      const onePerPage = await onSchedules({ take: 1 });
+      const allAtOnce = await onSchedules({ take: 100 });
+
+      expect(onePerPage).toEqual(
+        expected.map((schedule) => ({
+          ...schedule,
+          board: BOARD,
+          settings: { hour: 9, timezone: "Europe/Amsterdam", maxInsights: 5 },
+        })),
+      );
+      expect(allAtOnce).toEqual(onePerPage);
+    });
+  });
 }
 
 describe("given the memory daily schedule repositories", () => {
@@ -229,28 +321,35 @@ describe.skipIf(!databaseUrl)("given the Postgres daily schedule repositories", 
     otherProjectId: () => otherProjectId,
   });
 
-  describe("when a row holds the columns no run writes yet", () => {
-    it("leaves the schedule's own columns at their defaults", async () => {
+  describe("when a row is folded with and without a setting", () => {
+    const storedRow = async (state: InsightDailyScheduleState) => {
       const scheduleId = dailyScheduleId({ projectId, userId: OWNER, board: BOARD });
       await PostgresInsightRepositories.create({
         prisma: database(),
-      }).dailyScheduleProjection.store(folded(settled()), {
+      }).dailyScheduleProjection.store(folded(state), {
         tenantId: createTenantId(projectId),
         aggregateId: scheduleId,
         key: scheduleId,
       });
-
-      const row = await database().insightDailyScheduleProjection.findFirst({
+      return database().insightDailyScheduleProjection.findFirst({
         where: { id: scheduleId, projectId },
       });
+    };
 
-      expect(row).toMatchObject({
+    it("keeps the schedule's own columns at their defaults for a row only a run wrote", async () => {
+      expect(await storedRow(settled())).toMatchObject({
         state: "undecided",
         hour: null,
         timezone: null,
         maxInsights: null,
         lastRunRenewed: null,
       });
+    });
+
+    it("writes the setting into the schedule's own columns", async () => {
+      const setting = { state: "on", hour: 17, timezone: "Asia/Kolkata", maxInsights: 10 } as const;
+
+      expect(await storedRow(settled(setting))).toMatchObject({ ...setting, lastRunRenewed: null });
     });
   });
 });

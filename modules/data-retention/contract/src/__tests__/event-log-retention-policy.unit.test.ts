@@ -113,6 +113,8 @@ describe("classifyEventLogRowRetention", () => {
       ["authz_aggregate_read", "lw.authz.aggregate_read"],
       ["billing_report", "some.ordinary.event"],
       ["trigger", "lw.automation.report_schedule.configured"],
+      ["insight_daily_schedule", "lw.insight.daily_schedule.configured"],
+      ["insight_daily_schedule", "lw.insight.daily_schedule.turned_off"],
     ])("classifies %s (%s) as indefinite", (aggregateType, eventType) => {
       expect(
         classifyEventLogRowRetention({ AggregateType: aggregateType, EventType: eventType }),
@@ -126,6 +128,8 @@ describe("classifyEventLogRowRetention", () => {
       ["evaluation_lifecycle", "lw.evaluation.lifecycle_completed"],
       ["ingestion_pull", "lw.obs.ingestion_pull.run_completed"],
       ["ingestion_pull", "lw.obs.ingestion_pull.people_listed"],
+      ["insight_daily_schedule", "lw.insight.daily_schedule.run_settled"],
+      ["insight_daily_schedule", "lw.insight.daily_schedule.rearm_requested"],
     ])("ages %s's per-run row (%s) with the traces category", (aggregateType, eventType) => {
       expect(
         classifyEventLogRowRetention({ AggregateType: aggregateType, EventType: eventType }),

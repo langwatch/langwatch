@@ -1,7 +1,9 @@
 import {
   insightRunBoardSchema,
+  insightRunMaxInsightsSchema,
   insightRunOutcomeSchema,
   insightRunReasonSchema,
+  insightScheduleStateSchema,
 } from "@langwatch/insight-contract";
 import type { Prisma } from "@langwatch/prisma-client/generated";
 
@@ -10,8 +12,8 @@ import type { InsightDailyScheduleState } from "../../eventing/insight-daily-sch
 export type InsightDailyScheduleRow = Prisma.InsightDailyScheduleProjectionGetPayload<object>;
 
 /**
- * The kind, the outcome and the reason are TEXT, so the read narrows them back; an unknown
- * one refuses loudly.
+ * The kind, the state, the outcome and the reason are TEXT and the maximum an integer, so the
+ * read narrows them back; an unknown one refuses loudly.
  */
 export function dailyScheduleStateFromRow(row: InsightDailyScheduleRow): InsightDailyScheduleState {
   const board = insightRunBoardSchema.parse({
@@ -24,6 +26,11 @@ export function dailyScheduleStateFromRow(row: InsightDailyScheduleRow): Insight
     boardKind: board.kind,
     boardId: board.id,
     boardName: board.name,
+    state: insightScheduleStateSchema.parse(row.state),
+    hour: row.hour,
+    timezone: row.timezone,
+    maxInsights:
+      row.maxInsights === null ? null : insightRunMaxInsightsSchema.parse(row.maxInsights),
     lastRunId: row.lastRunId,
     lastRunAt: row.lastRunAt,
     lastRunOutcome:

@@ -75,9 +75,11 @@ describe("the daily run process", () => {
       );
 
       expect(evolution.state).toEqual({
+        ...INITIAL_INSIGHT_DAILY_RUN_STATE,
         lastRequestId: "run-1",
-        pendingRun: { runId: "run-1", since: T0 },
+        pendingRun: { runId: "run-1", since: T0, slot: T0 },
       });
+      expect(evolution.nextWakeAt).toBeNull();
       expect(evolution.intents).toEqual([
         {
           intentType: "runBoard",
@@ -100,7 +102,7 @@ describe("the daily run process", () => {
         context(T0 + 120_000),
       );
 
-      expect(again).toEqual({ state, intents: [] });
+      expect(again).toEqual({ state, nextWakeAt: null, intents: [] });
       expect(afterSettle.intents).toEqual([]);
     });
   });
@@ -118,10 +120,14 @@ describe("the daily run process", () => {
         context(T0 + 180_000),
       );
 
-      expect(during).toEqual({ state, intents: [] });
+      expect(during).toEqual({ state, nextWakeAt: null, intents: [] });
       expect(afterSettle.state.pendingRun).toBeNull();
       expect(next.intents).toHaveLength(1);
-      expect(next.state.pendingRun).toEqual({ runId: "run-3", since: T0 + 180_000 });
+      expect(next.state.pendingRun).toEqual({
+        runId: "run-3",
+        since: T0 + 180_000,
+        slot: T0 + 180_000,
+      });
     });
 
     it("keeps waiting when another run's outcome arrives", () => {
@@ -139,7 +145,27 @@ describe("the daily run process", () => {
       const lost = insightRunRequested(inFlight(), requested("run-2"), context(T0 + longest));
 
       expect(lost.intents).toHaveLength(1);
-      expect(lost.state.pendingRun).toEqual({ runId: "run-2", since: T0 + longest });
+      expect(lost.state.pendingRun).toEqual({
+        runId: "run-2",
+        since: T0 + longest,
+        slot: T0 + longest,
+      });
+    });
+
+    /** @scenario "A run that replaces one that never settled names the run it replaces" */
+    it("hands the new run the lost run to record, and names none when no run was lost", () => {
+      const first = insightRunRequested(
+        INITIAL_INSIGHT_DAILY_RUN_STATE,
+        requested("run-1"),
+        context(T0),
+      );
+      const lost = insightRunRequested(first.state, requested("run-2"), context(T0 + longest));
+
+      expect(first.intents?.[0]?.payload).not.toHaveProperty("supersedes");
+      expect(lost.intents?.[0]?.payload).toMatchObject({
+        runId: "run-2",
+        supersedes: { runId: "run-1", slot: T0 },
+      });
     });
 
     it("still holds the board one moment before that", () => {
@@ -169,7 +195,11 @@ describe("given a run event that names a schedule other than its own", () => {
       context(T0, at),
     );
 
-    expect(evolution).toEqual({ state: INITIAL_INSIGHT_DAILY_RUN_STATE, intents: [] });
+    expect(evolution).toEqual({
+      state: INITIAL_INSIGHT_DAILY_RUN_STATE,
+      nextWakeAt: null,
+      intents: [],
+    });
   });
 
   it("keeps holding the board when an outcome names another schedule", () => {

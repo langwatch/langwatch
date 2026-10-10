@@ -18,6 +18,9 @@ import { dailyScheduleId } from "../../rules/insight-daily-run.rules.ts";
 import {
   InsightRunRequestedEventSchema,
   InsightRunSettledEventSchema,
+  InsightScheduleConfiguredEventSchema,
+  InsightScheduleRearmRequestedEventSchema,
+  InsightScheduleTurnedOffEventSchema,
 } from "../insight-daily-run.events.ts";
 import {
   applyInsightDailyRunEvent,
@@ -69,6 +72,10 @@ describe("given a run that settled", () => {
       boardKind: "dashboard",
       boardId: "dashboard-1",
       boardName: "Costs",
+      state: "undecided",
+      hour: null,
+      timezone: null,
+      maxInsights: null,
       lastRunId: "run-1",
       lastRunAt: T0 + 60_000,
       lastRunOutcome: "filed",
@@ -153,7 +160,133 @@ describe("given a run that was only requested", () => {
       data: { ...SCHEDULE, requestId: "run-1", maxInsights: 3 },
     });
 
-    expect(PROJECTION.eventTypes).toEqual([INSIGHT_DAILY_RUN_EVENT_TYPES.RUN_SETTLED]);
+    expect(PROJECTION.eventTypes).not.toContain(INSIGHT_DAILY_RUN_EVENT_TYPES.RUN_REQUESTED);
     expect(applyInsightDailyRunEvent(PROJECTION.init(), requested)).toBe(PROJECTION.init());
+  });
+});
+
+const SETTINGS = { hour: 9, timezone: "Europe/Amsterdam", maxInsights: 5 } as const;
+
+const configured = (at: number, data: Record<string, unknown> = {}) =>
+  InsightScheduleConfiguredEventSchema.parse({
+    ...envelope(at),
+    type: INSIGHT_DAILY_RUN_EVENT_TYPES.CONFIGURED,
+    data: { ...SCHEDULE, ...SETTINGS, ...data },
+  });
+
+const turnedOff = (at: number, data: Record<string, unknown> = {}) =>
+  InsightScheduleTurnedOffEventSchema.parse({
+    ...envelope(at),
+    type: INSIGHT_DAILY_RUN_EVENT_TYPES.TURNED_OFF,
+    data: { ...SCHEDULE, by: "person", reason: null, ...data },
+  });
+
+describe("given a person turned their daily run on", () => {
+  const on = applyInsightDailyRunEvent(PROJECTION.init(), configured(T0));
+
+  /** @scenario "A setting and a run's outcome fold onto one row" */
+  it("folds the setting onto the row, and a run's outcome beside it", () => {
+    const ran = applyInsightDailyRunEvent(on, settled(T0 + 60_000));
+
+    expect(on).toMatchObject({
+      userId: "user-1",
+      boardKind: "dashboard",
+      boardId: "dashboard-1",
+      boardName: "Costs",
+      state: "on",
+      ...SETTINGS,
+      lastRunId: null,
+    });
+    expect(ran).toMatchObject({ state: "on", ...SETTINGS, lastRunId: "run-1", lastRunFiled: 2 });
+  });
+
+  it("reads the changed hour, zone and maximum, and keeps the last run", () => {
+    const ran = applyInsightDailyRunEvent(on, settled(T0 + 60_000));
+
+    const changed = applyInsightDailyRunEvent(
+      ran,
+      configured(T0 + 120_000, { hour: 17, timezone: "UTC", maxInsights: 1 }),
+    );
+
+    expect(changed).toMatchObject({
+      state: "on",
+      hour: 17,
+      timezone: "UTC",
+      maxInsights: 1,
+      lastRunId: "run-1",
+      lastRunOutcome: "filed",
+    });
+  });
+
+  describe("when they turn it off", () => {
+    it("reads off, and keeps what they chose and how the last run ended", () => {
+      const ran = applyInsightDailyRunEvent(on, settled(T0 + 60_000));
+
+      const off = applyInsightDailyRunEvent(ran, turnedOff(T0 + 120_000));
+
+      expect(off).toMatchObject({ state: "off", ...SETTINGS, lastRunOutcome: "filed" });
+    });
+  });
+
+  describe("when a run finds the board gone and turns the schedule off", () => {
+    it("reads off", () => {
+      const off = applyInsightDailyRunEvent(
+        on,
+        turnedOff(T0 + 120_000, { by: "system", reason: "board_deleted" }),
+      );
+
+      expect(off).toMatchObject({ state: "off", ...SETTINGS });
+    });
+  });
+
+  it("folds nothing for a reconcile pass's request to arm", () => {
+    const rearm = InsightScheduleRearmRequestedEventSchema.parse({
+      ...envelope(T0 + 120_000),
+      type: INSIGHT_DAILY_RUN_EVENT_TYPES.REARM_REQUESTED,
+      data: { ...SCHEDULE, hour: 23, timezone: "UTC", maxInsights: 1 },
+    });
+
+    expect(PROJECTION.eventTypes).not.toContain(INSIGHT_DAILY_RUN_EVENT_TYPES.REARM_REQUESTED);
+    expect(applyInsightDailyRunEvent(on, rearm)).toBe(on);
+  });
+});
+
+describe("given a board a person never decided on", () => {
+  /** @scenario "No thanks from the offer stores off" */
+  it("reads off with nothing chosen once they say no", () => {
+    const off = applyInsightDailyRunEvent(PROJECTION.init(), turnedOff(T0));
+
+    expect(off).toMatchObject({
+      userId: "user-1",
+      boardId: "dashboard-1",
+      state: "off",
+      hour: null,
+      timezone: null,
+      maxInsights: null,
+    });
+  });
+
+  /** @scenario "A board that is gone turns off no daily run the person never turned on" */
+  it("stays undecided when a run finds the board gone, and stays off when it was off", () => {
+    const bySystem = turnedOff(T0 + 60_000, { by: "system", reason: "board_deleted" });
+    const off = applyInsightDailyRunEvent(PROJECTION.init(), turnedOff(T0));
+
+    expect(applyInsightDailyRunEvent(PROJECTION.init(), bySystem)).toBe(PROJECTION.init());
+    expect(applyInsightDailyRunEvent(off, bySystem)).toBe(off);
+  });
+});
+
+describe("given a setting on a stream that is not its person's and board's", () => {
+  /** @scenario "A setting whose schedule is not its person's and board's changes nothing" */
+  it.each([
+    ["another person", { userId: "user-2" }],
+    ["another board", { board: { ...BOARD, id: "dashboard-2" } }],
+  ])("folds nothing for a setting or an off that names %s", (_what, other) => {
+    const on = applyInsightDailyRunEvent(PROJECTION.init(), configured(T0));
+
+    expect(applyInsightDailyRunEvent(PROJECTION.init(), configured(T0, other))).toBe(
+      PROJECTION.init(),
+    );
+    expect(applyInsightDailyRunEvent(on, turnedOff(T0 + 60_000, other))).toBe(on);
   });
 });

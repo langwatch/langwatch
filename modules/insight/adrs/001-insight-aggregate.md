@@ -40,13 +40,14 @@ does not light up the filer's own badge.
 
 ## Public surfaces and transports
 
-One tRPC router, `insight`, in `process/src/transport/insight.trpc.ts`: `getAll`,
-`file`, `markSeen`, `archive` and `keep`. Each takes `analytics:view`
-([ADR-003](./003-personal-insights.md)), and the four writes are refused on the
-aggregate. There is no REST route: the action under a Langy answer calls `file` from
-the browser. The browser half lends the shell a bell and a sidebar count. The
-operator task `insight-daily-run-request` asks for one run
-([ADR-004](./004-daily-run.md)).
+One tRPC router, `insight`, in `process/src/transport/insight.trpc.ts`. The inbox:
+`getAll`, `file`, `markSeen`, `archive` and `keep`. A person's daily run on a board:
+`getBoardDailyRun`, `configureBoardDailyRun` and `turnOffBoardDailyRun`
+([ADR-004](./004-daily-run.md)). Each takes `analytics:view`
+([ADR-003](./003-personal-insights.md)) and answers for the caller alone, and the six
+writes are refused on the aggregate. There is no REST route: the action under a Langy
+answer calls `file` from the browser. The browser half lends the shell a bell and a
+sidebar count. The operator task `insight-daily-run-request` asks for one run.
 
 ## Dependencies
 
@@ -68,10 +69,13 @@ not used. Nothing is deleted when a member leaves.
 ## Runtime and registration
 
 `insightProcessModule` is listed for the api, the worker and the tasks runner. The
-worker folds both pipelines, and the daily run reaches its outbox from the run
-process manager. Every procedure and command checks the `release_insights` flag
-for the project and throws `insights_not_enabled` while it is off. No cron
-exists yet: a run starts only from the operator task.
+worker folds both pipelines and hosts the daily run pipeline's two process managers.
+`dailyInsightsSchedule` is keyed by person and board: it arms each schedule's wake and
+hands a run to its outbox, from a wake or from the operator task.
+`dailyInsightsScheduleReconcile` is a scheduled singleton that arms, hourly, any
+schedule that is on with no wake. There is no cron route and no timer. Every procedure
+and command checks the `release_insights` flag for the project and throws
+`insights_not_enabled` while it is off.
 
 ## Environment and configuration
 
@@ -82,7 +86,9 @@ feature-flag module, and the repositories and clients are handed in at compositi
 
 Two handled errors, both in the contract. `insight_not_found` (404) answers an
 unknown insight and another person's insight alike (ADR-003).
-`insights_not_enabled` (403) answers a call while the flag is off.
+`insights_not_enabled` (403) answers a call while the flag is off. Turning a daily run
+on for a stored board the caller cannot open answers the dashboard module's own
+`dashboard_not_found` (404).
 
 ## Contracts and validation
 

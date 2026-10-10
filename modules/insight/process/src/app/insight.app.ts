@@ -6,15 +6,19 @@
 import { AnalyticsApi } from "@langwatch/analytics-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
 import { DashboardApi } from "@langwatch/dashboard-contract";
-import type { EventingCommands } from "@langwatch/eventing";
+import type { EventingCommands, ProcessStore } from "@langwatch/eventing";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import {
+  type ConfigureInsightDailyRunInput,
   InsightApi,
   type FileInsightInput,
+  type InsightBoardDailyRunScope,
   type InsightDailyRun,
+  type InsightDailyRunSetting,
   type InsightEntry,
   type InsightApi as InsightApiContract,
   type RequestInsightDailyRunInput,
+  type TurnOffInsightDailyRunInput,
 } from "@langwatch/insight-contract";
 import { LangyApi } from "@langwatch/langy-contract";
 import type { FeatureSetup } from "@langwatch/process";
@@ -33,6 +37,7 @@ import type { InsightRepositories } from "../repositories/insight.repositories.t
 import { InsightCommandsService } from "../services/insight-commands.service.ts";
 import { InsightDailyRunCommandsService } from "../services/insight-daily-run-commands.service.ts";
 import { InsightDailyRunService } from "../services/insight-daily-run.service.ts";
+import { InsightDailyScheduleReconcileService } from "../services/insight-daily-schedule-reconcile.service.ts";
 import { InsightDailyScheduleService } from "../services/insight-daily-schedule.service.ts";
 import { InsightRolloutService } from "../services/insight-rollout.service.ts";
 import { InsightRunGateService } from "../services/insight-run-gate.service.ts";
@@ -41,7 +46,8 @@ import { InsightService } from "../services/insight.service.ts";
 
 type InsightSetup = FeatureSetup<typeof InsightModule.dependencies, undefined, InsightRepositories>;
 
-type ReaderScope = { projectId: string; insightId: string; userId: string };
+type Reader = { userId: string };
+type ReaderScope = { projectId: string; insightId: string } & Reader;
 
 export class InsightModule implements InsightApiContract {
   static readonly contract = InsightApi;
@@ -63,6 +69,7 @@ export class InsightModule implements InsightApiContract {
   readonly #rollout: InsightRolloutService;
   readonly #pipeline: InsightPipelineDefinition;
   readonly #dailySchedules: InsightDailyScheduleService;
+  readonly #scheduleReconcile: InsightDailyScheduleReconcileService;
   readonly #dailyRunCommands: InsightDailyRunCommandsService;
   readonly #dailyRunPipeline: InsightDailyRunPipelineDefinition;
 
@@ -72,6 +79,7 @@ export class InsightModule implements InsightApiContract {
     rollout: InsightRolloutService;
     pipeline: InsightPipelineDefinition;
     dailySchedules: InsightDailyScheduleService;
+    scheduleReconcile: InsightDailyScheduleReconcileService;
     dailyRunCommands: InsightDailyRunCommandsService;
     dailyRunPipeline: InsightDailyRunPipelineDefinition;
   }) {
@@ -80,6 +88,7 @@ export class InsightModule implements InsightApiContract {
     this.#rollout = parts.rollout;
     this.#pipeline = parts.pipeline;
     this.#dailySchedules = parts.dailySchedules;
+    this.#scheduleReconcile = parts.scheduleReconcile;
     this.#dailyRunCommands = parts.dailyRunCommands;
     this.#dailyRunPipeline = parts.dailyRunPipeline;
   }
@@ -106,6 +115,10 @@ export class InsightModule implements InsightApiContract {
       insightCommands: commands,
       runCommands: dailyRunCommands,
     });
+    const scheduleReconcile = InsightDailyScheduleReconcileService.create({
+      schedules: repositories.dailySchedules,
+      commands: dailyRunCommands,
+    });
     return new InsightModule({
       insights: InsightService.create({ insights: repositories.insights, commands }),
       commands,
@@ -117,11 +130,14 @@ export class InsightModule implements InsightApiContract {
       dailySchedules: InsightDailyScheduleService.create({
         schedules: repositories.dailySchedules,
         commands: dailyRunCommands,
+        dashboards: dependencies.dashboards,
       }),
+      scheduleReconcile,
       dailyRunCommands,
       dailyRunPipeline: buildInsightDailyRunPipeline({
         scheduleStore: repositories.dailyScheduleProjection,
         runs,
+        reconcile: scheduleReconcile,
       }),
     });
   }
@@ -136,8 +152,16 @@ export class InsightModule implements InsightApiContract {
     this.#commands.connect(commands);
   }
 
-  /** The pipeline `insight_daily_run` registers, built once by {@link create}. */
-  dailyRunPipeline(): InsightDailyRunPipelineDefinition {
+  /**
+   * The pipeline `insight_daily_run` registers, built once by {@link create}. The process that
+   * hosts it lends its process store, which the reconcile pass reads each schedule's wake from.
+   */
+  dailyRunPipeline({
+    processStore,
+  }: {
+    processStore: ProcessStore;
+  }): InsightDailyRunPipelineDefinition {
+    this.#scheduleReconcile.connect(processStore);
     return this.#dailyRunPipeline;
   }
 
@@ -184,5 +208,22 @@ export class InsightModule implements InsightApiContract {
   async findDailyRuns(input: { projectId: string; userId: string }): Promise<InsightDailyRun[]> {
     await this.#rollout.assertEnabled(input);
     return this.#dailySchedules.findForUser(input);
+  }
+
+  async getDailyRunSetting(
+    input: InsightBoardDailyRunScope & Reader,
+  ): Promise<InsightDailyRunSetting> {
+    await this.#rollout.assertEnabled(input);
+    return this.#dailySchedules.getSetting(input);
+  }
+
+  async configureDailyRun(input: ConfigureInsightDailyRunInput & Reader): Promise<void> {
+    await this.#rollout.assertEnabled(input);
+    await this.#dailySchedules.configure(input);
+  }
+
+  async turnOffDailyRun(input: TurnOffInsightDailyRunInput & Reader): Promise<void> {
+    await this.#rollout.assertEnabled(input);
+    await this.#dailySchedules.turnOff(input);
   }
 }

@@ -8,8 +8,9 @@
 ## Context
 
 ADR-003 left one writer missing: "a scheduled run will file for a named person". This
-ADR decides what that run is, before any schedule exists. An operator asks for one run
-with a task; a later slice wakes the same run on a schedule.
+ADR decides what that run is and what wakes it. A person turns the run on for a board,
+and their schedule wakes it once a day; an operator asks for one run with a task. Both
+start the same run.
 
 A run reads customer trace text with nobody watching. That text may carry
 instructions. So the run is built on two facts that do not depend on Langy behaving:
@@ -20,9 +21,9 @@ for.
 
 **One aggregate per person and board.** `insight_daily_schedule`, in the pipeline
 `insight_daily_run`. Its id is derived from the project, the person and the board
-pointer, so there is one by construction. Its events are `run_requested`,
-`run_started` and `run_settled`. The schedule's own events (on, off, hour) join the
-same stream in the next slice.
+pointer, so there is one by construction. Its stream holds the schedule's setting
+(`configured`, `turned_off`), each run (`run_requested`, `run_started`, `run_settled`)
+and a reconcile pass's request to arm (`rearm_requested`).
 
 **The board is a pointer.** `{ kind: "dashboard" | "template", id, name }`. A stored
 board is read through the dashboard module, as the person: every read names the board
@@ -90,6 +91,49 @@ project, person and board derive.
 under a title that names the board and the day, with the origin `run`, and it sends
 no push notification.
 
+**The setting is the person's own.** Per person and per board: `undecided` until they
+choose, then `on` with an hour (0 to 23), an IANA time zone and a maximum (1, 3, 5 or
+10), or `off`. Three procedures read it, turn it on or change it, and turn it off; "No
+thanks" on the offer is the same off. Each takes `analytics:view` and names no person,
+so a caller reaches their own setting alone, an administrator included. The writes are
+refused on an aggregate, and all three while `release_insights` is off. Any board may be
+turned on, a From LangWatch board too. A stored board is read as the person when they
+turn it on, so one they cannot open answers `dashboard_not_found`, like one that does
+not exist; a template's pointer is kept as sent, since no server reads the catalogue.
+Turning off asks no board, so the run of a board that is gone can still be turned off.
+The row keeps what they last chose while the run is off. There is no cap on how many
+boards a person turns on.
+
+**The schedule is a wake per person and board.** The aggregate's process manager,
+`dailyInsightsSchedule`, is keyed by the schedule and arms `nextWakeAt` itself, as a
+report's schedule does. A slot is the chosen hour and a minute fixed by a digest of the
+schedule id, read in the stored zone with `nextCronFireAt`, so "09:00" is "around
+09:00" and one hour's schedules spread over it. A schedule runs once per calendar date
+in its zone: the state keeps the slot of the last wake that ran, and no slot is armed or
+taken on that date again. The cron helper answers the wall clock: an hour the clocks
+skip runs at the next valid time that day, and an hour they repeat names its first
+occurrence only. Every handler re-derives the wake from the state, so a setting changed
+during the day arms from that instant: today when the new hour is ahead and no run
+happened today, else tomorrow, and never a run at once. A wake handled six hours or
+more after its slot starts nothing and waits for the next day. Off cancels the wake.
+
+**A wake and a request start a run the same way.** Both write the one `runBoard` intent
+the outbox carries to the run. While a run for the board is in flight neither starts a
+second, and for a wake the run in flight stands for that date. A run that outlived every
+attempt's lease is superseded: the new run is handed its id, and records it as `failed`
+with `timeout` before its own outcome. A scheduled run is named by its slot. An
+operator's run is no scheduled run and takes no date from the schedule. A run that ends
+`skipped` with `board_deleted` turns the schedule off (`turned_off` by `system`), for a
+schedule that is on and no other; a run on a template keeps ending `skipped` with
+`template_board` and the schedule stays on.
+
+**A reconcile pass arms what lost its wake.** `dailyInsightsScheduleReconcile` is a
+scheduled singleton on the same pipeline, hourly and once across the fleet, as topic
+clustering's schedule seed is. A pass reads every row that is on, in every project, and
+asks the process of each one with no wake armed to arm itself (`rearm_requested`). The
+process arms from its own setting, takes the row's only when it never had one, and
+stays off when the person turned it off since. A pass changes no setting.
+
 ## Consequences
 
 - The module gains five peers: `LangyApi`, `DashboardApi`, `AuthzApi`, `UserApi` and
@@ -98,10 +142,19 @@ no push notification.
   reads the board over REST as the author too. The run's key is a Langy session key the
   author owns, and the dashboard doors read a key a person owns as that person
   (dashboards-v2.feature AC196). It is not a key no person owns, which has no viewer.
-- `InsightDailyScheduleProjection` is created with the schedule's columns (`state`,
-  `hour`, `timezone`, `maxInsights`) and `lastRunRenewed`, which nothing writes yet,
-  so the next slices add no column to a projection table.
-- A run reads calendar days in UTC until a schedule carries the person's timezone.
+- `InsightDailyScheduleProjection` was created with the schedule's columns (`state`,
+  `hour`, `timezone`, `maxInsights`), which the setting now writes, so the schedule
+  needed no migration. Nothing writes `lastRunRenewed` yet.
+- A run still reads calendar days in UTC. The schedule's zone decides when a run starts,
+  not which day it reads.
+- A setting changed while a slot is due replaces that slot: the next one is derived from
+  the change, by the same rule as any change of hour.
+- A schedule that a missing board turned off stays off when the board comes back, for
+  instance when its author makes it Only me and then shares it again.
+- A lost wake is armed again within the hour, for the next slot: the slot it missed is
+  not run late by the pass.
+- The process's state gained the schedule's fields, each with a default, so an instance
+  written before them still reads.
 - Langy's command line fills the window of a stored query (`langwatch query --start --end`)
   but not its step: `query` has no flag for `dashboard_context_granularity_seconds`, and a
   reserved name passed as `--param` is refused. The brief tells Langy to write the step into
@@ -112,4 +165,5 @@ no push notification.
   placed on a board are not listed, so a board that holds only those is `board_empty`.
 - Daily runs on From LangWatch boards need the template catalogue, or the part of it
   a brief needs, readable on the server. Until then they are skipped, visibly.
-- The run events are per-run rows and age with the `traces` retention class.
+- The run events and a pass's request are per-run rows and age with the `traces`
+  retention class. `configured` and `turned_off` are a person's setting and never expire.

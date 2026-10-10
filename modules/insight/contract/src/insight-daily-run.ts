@@ -84,23 +84,92 @@ export const insightRunReasonSchema = z.enum([
 ]);
 export type InsightRunReason = z.infer<typeof insightRunReasonSchema>;
 
+/** How a run ended, as its person reads it. */
+const insightLastRunSchema = z.object({
+  /** Epoch milliseconds. */
+  at: z.number(),
+  outcome: insightRunOutcomeSchema,
+  reason: insightRunReasonSchema.nullable(),
+  filedCount: z.number().int().nonnegative(),
+  conversationId: z.string().nullable(),
+});
+
 /** One person's run on one board, as they read it: the board and how the last run ended. */
 export const insightDailyRunSchema = z.object({
   id: z.string(),
   board: insightRunBoardSchema,
   /** Null until a run settled. */
-  lastRun: z
-    .object({
-      /** Epoch milliseconds. */
-      at: z.number(),
-      outcome: insightRunOutcomeSchema,
-      reason: insightRunReasonSchema.nullable(),
-      filedCount: z.number().int().nonnegative(),
-      conversationId: z.string().nullable(),
-    })
-    .nullable(),
+  lastRun: insightLastRunSchema.nullable(),
 });
 export type InsightDailyRun = z.infer<typeof insightDailyRunSchema>;
+
+/** The hour of the day a schedule runs at, read in its own time zone. */
+export const insightRunHourSchema = z.number().int().min(0).max(23);
+
+/** Whether the runtime knows the zone by name. An offset such as `+02:00` is not a zone. */
+function isKnownTimezone(timezone: string): boolean {
+  if (!/^[A-Za-z]/.test(timezone)) return false;
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: timezone });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** An IANA zone name, such as `Europe/Amsterdam` or `UTC`. */
+const insightRunTimezoneSchema = z
+  .string()
+  .min(1)
+  .max(64)
+  .refine(isKnownTimezone, { message: "The time zone must be an IANA zone name." });
+
+/** What a person chose for a board's daily run: when it runs and how much it may file. */
+export const insightRunSettingsSchema = z.object({
+  hour: insightRunHourSchema,
+  timezone: insightRunTimezoneSchema,
+  maxInsights: insightRunMaxInsightsSchema,
+});
+export type InsightRunSettings = z.infer<typeof insightRunSettingsSchema>;
+
+/** `undecided`: the person was never asked, or closed the offer without an answer. */
+export const INSIGHT_SCHEDULE_STATES = ["undecided", "off", "on"] as const;
+export const insightScheduleStateSchema = z.enum(INSIGHT_SCHEDULE_STATES);
+export type InsightScheduleState = z.infer<typeof insightScheduleStateSchema>;
+
+/**
+ * One person's daily run setting on one board, as they alone read it. `settings` is what they
+ * last chose, kept while the run is off, and null until they turned it on once.
+ */
+export const insightDailyRunSettingSchema = z.object({
+  state: insightScheduleStateSchema,
+  settings: insightRunSettingsSchema.nullable(),
+  /** Null until a run settled. */
+  lastRun: insightLastRunSchema.nullable(),
+});
+export type InsightDailyRunSetting = z.infer<typeof insightDailyRunSettingSchema>;
+
+/** Which board's daily run a person reads: the pointer's kind and id, no name. */
+export const insightBoardDailyRunScopeSchema = z.object({
+  ...insightProjectScopeSchema.shape,
+  board: z.object({ kind: z.enum(["dashboard", "template"]), id: boardPointerShape.id }).strict(),
+});
+export type InsightBoardDailyRunScope = z.infer<typeof insightBoardDailyRunScopeSchema>;
+
+/** Turns a board's daily run on, or changes when it runs and how much it may file. */
+export const configureInsightDailyRunInputSchema = z.object({
+  ...insightProjectScopeSchema.shape,
+  board: insightRunBoardSchema,
+  ...insightRunSettingsSchema.shape,
+});
+export type ConfigureInsightDailyRunInput = z.infer<typeof configureInsightDailyRunInputSchema>;
+
+/** Turns a board's daily run off; also what "No thanks" on the offer stores. */
+export const turnOffInsightDailyRunInputSchema = z.object({
+  ...insightProjectScopeSchema.shape,
+  board: insightRunBoardSchema,
+});
+export type TurnOffInsightDailyRunInput = z.infer<typeof turnOffInsightDailyRunInputSchema>;
 
 export const requestInsightDailyRunInputSchema = z.object({
   ...insightProjectScopeSchema.shape,

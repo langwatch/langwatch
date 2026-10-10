@@ -33,4 +33,18 @@ export const insightTrpcTransport: TrpcRouterDeclaration<InsightApi, typeof insi
     .refusedOnAggregate()
     .withPermission("analytics:view")
     .handle(({ app, input, actor }) => app.keepInsight({ ...input, userId: actor.id }))
+
+    .procedure("getBoardDailyRun")
+    .withPermission("analytics:view")
+    .handle(({ app, input, actor }) => app.getDailyRunSetting({ ...input, userId: actor.id }))
+
+    .procedure("configureBoardDailyRun")
+    .refusedOnAggregate()
+    .withPermission("analytics:view")
+    .handle(({ app, input, actor }) => app.configureDailyRun({ ...input, userId: actor.id }))
+
+    .procedure("turnOffBoardDailyRun")
+    .refusedOnAggregate()
+    .withPermission("analytics:view")
+    .handle(({ app, input, actor }) => app.turnOffDailyRun({ ...input, userId: actor.id }))
     .build();

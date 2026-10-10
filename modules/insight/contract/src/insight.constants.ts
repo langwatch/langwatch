@@ -56,22 +56,35 @@ export const INSIGHTS_FLAG = "release_insights";
 
 /**
  * The daily run pipeline's names. One aggregate per person and board, the project is the
- * tenant, and the run's request, start and outcome ride on its stream.
+ * tenant, and the schedule's setting and each run's request, start and outcome ride on its stream.
  * @see modules/insight/adrs/004-daily-run.md
  */
 export const INSIGHT_DAILY_RUN_EVENT_TYPES = {
+  CONFIGURED: "lw.insight.daily_schedule.configured",
+  TURNED_OFF: "lw.insight.daily_schedule.turned_off",
+  REARM_REQUESTED: "lw.insight.daily_schedule.rearm_requested",
   RUN_REQUESTED: "lw.insight.daily_schedule.run_requested",
   RUN_STARTED: "lw.insight.daily_schedule.run_started",
   RUN_SETTLED: "lw.insight.daily_schedule.run_settled",
 } as const;
 
+/** What changes a person's read of their daily run on a board: its setting and its last run. */
+export const INSIGHT_DAILY_RUN_SETTING_EVENT_TYPES = [
+  INSIGHT_DAILY_RUN_EVENT_TYPES.CONFIGURED,
+  INSIGHT_DAILY_RUN_EVENT_TYPES.TURNED_OFF,
+  INSIGHT_DAILY_RUN_EVENT_TYPES.RUN_SETTLED,
+] as const;
+
 export const INSIGHT_DAILY_RUN_COMMAND_TYPES = {
+  CONFIGURE: "lw.insight.daily_schedule.configure",
+  TURN_OFF: "lw.insight.daily_schedule.turn_off",
+  REQUEST_REARM: "lw.insight.daily_schedule.request_rearm",
   REQUEST_RUN: "lw.insight.daily_schedule.request_run",
   RECORD_RUN_STARTED: "lw.insight.daily_schedule.record_run_started",
   SETTLE_RUN: "lw.insight.daily_schedule.settle_run",
 } as const;
 
-/** One calendar version for the three run events. */
+/** One calendar version for every event of the daily run pipeline. */
 export const INSIGHT_DAILY_RUN_EVENT_VERSION = "2026-10-10";
 
 export const INSIGHT_DAILY_SCHEDULE_PROJECTION_VERSION = "2026-10-10";

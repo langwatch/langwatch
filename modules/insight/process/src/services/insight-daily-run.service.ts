@@ -93,7 +93,10 @@ type InsightDailyRunMembers = Readonly<{
   insights: Pick<InsightRepository, "findForReader">;
   queries: Pick<InsightRunQueryService, "keepValid">;
   insightCommands: Pick<InsightCommandsService, "fileInsight">;
-  runCommands: Pick<InsightDailyRunCommandsService, "recordRunStarted" | "settleRun">;
+  runCommands: Pick<
+    InsightDailyRunCommandsService,
+    "recordRunStarted" | "settleRun" | "turnOffSchedule"
+  >;
   /** Injected by tests that cannot wait ten minutes. */
   turnDeadlineMs?: number;
 }>;
@@ -112,6 +115,7 @@ export class InsightDailyRunService implements InsightDailyRunExecutor {
   async run(input: RunInput): Promise<void> {
     let conversationId: string | null = null;
     try {
+      await this.settleSuperseded(input);
       const ready = await this.prepare(input);
       if ("outcome" in ready) return await this.settle(input, ready);
       const turn = await this.start(input, ready);
@@ -298,18 +302,42 @@ export class InsightDailyRunService implements InsightDailyRunExecutor {
     }
   }
 
-  private async settle(input: RunInput, end: RunEnd): Promise<void> {
-    const { projectId, scheduleId, userId, runId, slot } = input;
-    const { board = input.board, ...result } = end;
+  /**
+   * The run this one replaces never recorded an outcome, so it is recorded as lost before this
+   * run's own. A repeat records it once: the outcome is keyed by the run it names.
+   */
+  private async settleSuperseded(input: RunInput): Promise<void> {
+    const { projectId, scheduleId, userId, board, supersedes } = input;
+    if (!supersedes) return;
     await this.members.runCommands.settleRun({
       tenantId: projectId,
       occurredAt: nowInstant().epochMilliseconds,
       scheduleId,
       userId,
       board,
+      ...supersedes,
+      ...failed("timeout", null),
+    });
+  }
+
+  private async settle(input: RunInput, end: RunEnd): Promise<void> {
+    const { projectId, scheduleId, userId, runId, slot } = input;
+    const { board = input.board, ...result } = end;
+    const envelope = { tenantId: projectId, scheduleId, userId, board };
+    await this.members.runCommands.settleRun({
+      ...envelope,
+      occurredAt: nowInstant().epochMilliseconds,
       runId,
       slot,
       ...result,
+    });
+    if (result.reason !== "board_deleted") return;
+    // The board is gone for this person, so the schedule on it has nothing left to read.
+    await this.members.runCommands.turnOffSchedule({
+      ...envelope,
+      occurredAt: nowInstant().epochMilliseconds,
+      by: "system",
+      reason: result.reason,
     });
   }
 }

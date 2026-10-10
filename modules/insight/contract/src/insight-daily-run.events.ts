@@ -7,6 +7,7 @@ import { z } from "zod";
 
 import {
   insightRunBoardSchema,
+  insightRunHourSchema,
   insightRunMaxInsightsSchema,
   insightRunOutcomeSchema,
   insightRunReasonSchema,
@@ -47,3 +48,28 @@ export const insightRunSettledEventDataSchema = z.object({
   conversationId: z.string().min(1).nullable(),
 });
 export type InsightRunSettledEventData = z.infer<typeof insightRunSettledEventDataSchema>;
+
+/**
+ * What the schedule runs with: the person turned it on or changed it, or a reconcile pass
+ * hands its process the row's settings again. The zone was checked at the door, so a stored
+ * event parses whatever zones a later runtime knows.
+ */
+export const insightScheduleConfiguredEventDataSchema = z.object({
+  ...scheduleRefShape,
+  hour: insightRunHourSchema,
+  timezone: z.string().min(1).max(64),
+  maxInsights: insightRunMaxInsightsSchema,
+});
+export type InsightScheduleConfiguredEventData = z.infer<
+  typeof insightScheduleConfiguredEventDataSchema
+>;
+
+/** The daily run is off. `system`: a run found the board gone, and `reason` says how it ended. */
+export const insightScheduleTurnedOffEventDataSchema = z.object({
+  ...scheduleRefShape,
+  by: z.enum(["person", "system"]),
+  reason: insightRunReasonSchema.nullable(),
+});
+export type InsightScheduleTurnedOffEventData = z.infer<
+  typeof insightScheduleTurnedOffEventDataSchema
+>;
