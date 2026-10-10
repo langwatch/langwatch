@@ -157,6 +157,8 @@ export interface CheckupDeps {
   readonly email: {
     readonly provider: string | null;
     readonly smtpConfigured: boolean;
+    /** The transport logs in to the relay; an internal relay often takes none. */
+    readonly smtpSendsCredentials: boolean;
     readonly verifySmtp: () => Promise<void>;
   };
   readonly modelProviders: () => Promise<
@@ -668,9 +670,9 @@ export class CheckupService {
   ): Promise<CheckVerdict> {
     switch (id) {
       case "reach_connect_host":
-        return this.reach((await this.deps.connect()).licenseHost);
+        return this.reachLangWatch("licenseHost");
       case "reach_gateway_host":
-        return this.reach((await this.deps.connect()).gatewayHost);
+        return this.reachLangWatch("gatewayHost");
       case "gateway_control_plane":
         return this.gatewayControlPlane();
       case "storage_probe":
@@ -699,6 +701,25 @@ export class CheckupService {
       default:
         return notAskedFor();
     }
+  }
+
+  /**
+   * A LangWatch host is probed only while Connect is allowed: with
+   * LANGWATCH_CONNECT_DISABLED set the install opens no connection to
+   * LangWatch, and a reachability probe is a connection too.
+   */
+  private async reachLangWatch(
+    which: "licenseHost" | "gatewayHost",
+  ): Promise<CheckVerdict> {
+    const connect = await this.deps.connect();
+    if (connect.deployment === "off") {
+      return {
+        outcome: "unchecked",
+        detail:
+          "Not run. LANGWATCH_CONNECT_DISABLED is set, so this install opens no connection to LangWatch.",
+      };
+    }
+    return this.reach(connect[which]);
   }
 
   private async reach(host: string): Promise<CheckVerdict> {
@@ -800,7 +821,9 @@ export class CheckupService {
       await this.deps.email.verifySmtp();
       return {
         outcome: "verified",
-        detail: "The SMTP server accepted a connection and the credentials.",
+        detail: this.deps.email.smtpSendsCredentials
+          ? "The SMTP server accepted a connection and the credentials."
+          : "The SMTP server accepted a connection.",
       };
     } catch (error) {
       return {

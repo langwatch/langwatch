@@ -6,6 +6,7 @@
  * and key mint are fakes.
  */
 import { describe, expect, it, vi } from "vitest";
+import { featureFlagService } from "~/server/featureFlag";
 import {
   LangyConversationIdUnadoptableError,
   LangyModelNotConfiguredError,
@@ -17,6 +18,18 @@ import {
 } from "../langy-turn.service";
 import { LangySessionKeyScopeError } from "../langyApiKey";
 import type { LangyWorkerPort } from "../langyWorker";
+
+const logger = vi.hoisted(() => ({
+  debug: vi.fn(),
+  info: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+  child: vi.fn(),
+}));
+vi.mock("@langwatch/observability", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@langwatch/observability")>()),
+  createLogger: () => logger,
+}));
 
 const SESSION = {
   user: { id: "user-1" },
@@ -60,6 +73,7 @@ function makeDeps(over: Partial<LangyTurnServiceDeps> = {}) {
     conversations,
     credentials,
     resolveModel: vi.fn(async () => ({ modelId: "openai/gpt-5-mini" })),
+    projectKinds: { kindOf: vi.fn(async () => "application") },
     worker: { probe, warm, dispatch, cancel },
     tokenBuffer: null,
     reservePermit: vi.fn(async () => ({
@@ -156,6 +170,35 @@ describe("LangyTurnService.warmConversationWorker", () => {
     });
   });
 
+  describe("given a skill is gated off for the user by a feature flag", () => {
+    /** @scenario The warm and the turn's probe carry the same disabled skills */
+    it("warms and probes a worker with that skill disabled", async () => {
+      // Flag off => `dashboard-widgets` is gated off, as it is for the turn.
+      const flags = vi
+        .spyOn(featureFlagService, "isEnabled")
+        .mockResolvedValue(false);
+      try {
+        const { deps, mocks } = makeDeps();
+        const service = LangyTurnService.create(deps);
+
+        await service.warmConversationWorker(warmInput());
+
+        const probeArgs = mocks.probe.mock.calls[0]![0] as {
+          disabledSkillIds?: string[];
+        };
+        const warmArgs = mocks.warm.mock.calls[0]![0] as {
+          credentials: { disabledSkillIds?: string[] };
+        };
+        expect(probeArgs.disabledSkillIds).toContain("dashboard-widgets");
+        expect(warmArgs.credentials.disabledSkillIds).toEqual(
+          probeArgs.disabledSkillIds,
+        );
+      } finally {
+        flags.mockRestore();
+      }
+    });
+  });
+
   describe("given a matching worker is already live", () => {
     /** @scenario A warm that finds a live matching worker mints nothing */
     it("mints no key and dispatches no warm", async () => {
@@ -249,6 +292,36 @@ describe("LangyTurnService.warmConversationWorker", () => {
       expect(result).toEqual({ conversationId: null, warmed: false });
       expect(mocks.mintSessionKey).not.toHaveBeenCalled();
       expect(mocks.warm).not.toHaveBeenCalled();
+    });
+
+    it("skips the warm on an aggregate project and writes no conversation", async () => {
+      const { deps, mocks } = makeDeps({
+        projectKinds: { kindOf: vi.fn(async () => "aggregate") },
+      });
+      const service = LangyTurnService.create(deps);
+
+      const result = await service.warmConversationWorker(warmInput());
+
+      expect(result.warmed).toBe(false);
+      expect(mocks.ensureConversation).not.toHaveBeenCalled();
+      expect(mocks.warm).not.toHaveBeenCalled();
+    });
+
+    it("logs the aggregate refusal at debug, not as a warning", async () => {
+      logger.debug.mockClear();
+      logger.warn.mockClear();
+      const { deps } = makeDeps({
+        projectKinds: { kindOf: vi.fn(async () => "aggregate") },
+      });
+      const service = LangyTurnService.create(deps);
+
+      await service.warmConversationWorker(warmInput());
+
+      expect(logger.warn).not.toHaveBeenCalled();
+      expect(logger.debug).toHaveBeenCalledWith(
+        expect.objectContaining({ code: "aggregate_project_is_read_only" }),
+        expect.any(String),
+      );
     });
 
     it("skips the warm when no model is configured", async () => {

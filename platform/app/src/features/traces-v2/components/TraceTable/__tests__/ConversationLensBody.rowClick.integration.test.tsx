@@ -30,6 +30,13 @@ vi.mock("~/hooks/useDrawer", () => ({
   useDrawer: () => ({ openDrawer: openDrawerMock }),
 }));
 
+/** The project the page is on: a plain project, or an aggregate. */
+const page = vi.hoisted(() => ({ projectId: "project-plain" }));
+
+vi.mock("~/hooks/useOrganizationTeamProject", () => ({
+  useOrganizationTeamProject: () => ({ project: { id: page.projectId } }),
+}));
+
 // The expanded row's turns come from their own conversation-scoped query;
 // nothing here needs them to land, only whether the row asked to expand.
 vi.mock("../../../hooks/useConversationTurns", () => ({
@@ -43,6 +50,7 @@ function conversationRow(
 ): ConversationGroup {
   return mapSessionGroupToConversationGroup({
     conversationId: "conv-1",
+    projectId: "project-plain",
     traceCount: 4,
     totalCost: 1.5,
     totalTokens: 90_000,
@@ -97,6 +105,7 @@ const expandToggle = () =>
 
 beforeEach(() => {
   openDrawerMock.mockClear();
+  page.projectId = "project-plain";
   useDrawerStore.getState().closeDrawer();
   // The open rows are page state in the store, so each case starts closed.
   useExplorerStore.getState().setExpandedRows([]);
@@ -134,6 +143,23 @@ describe("given the conversations lens is showing grouped rows", () => {
       expect(useDrawerStore.getState().traceId).toBe("trace-latest");
       expect(useDrawerStore.getState().occurredAtMs).toBe(LAST_ACTIVITY_MS);
       expect(expandToggle()).toHaveAccessibleName("Expand turns");
+    });
+  });
+
+  describe("when the reader clicks a session row on an aggregate project", () => {
+    it("opens the drawer on the member the session belongs to, and names it in the link", async () => {
+      page.projectId = "project-aggregate";
+      const user = userEvent.setup();
+      renderBody([conversationRow({ projectId: "project-member" })]);
+
+      await user.click(firstRow());
+
+      expect(openDrawerMock).toHaveBeenCalledWith("traceV2Details", {
+        traceId: "trace-latest",
+        t: String(LAST_ACTIVITY_MS),
+        tenantId: "project-member",
+      });
+      expect(useDrawerStore.getState().tenantId).toBe("project-member");
     });
   });
 

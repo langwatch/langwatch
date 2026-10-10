@@ -30,6 +30,15 @@ export class InMemoryUsers implements IdentityUsersRepository {
     return this.emails.get(userId) ?? null;
   }
 
+  /** Every address this double holds counts as verified. */
+  async findVerifiedLegacyEmail({
+    userId,
+  }: {
+    userId: string;
+  }): Promise<string | null> {
+    return this.emails.get(userId) ?? null;
+  }
+
   /** The production comparison: case-insensitive equality against the column
    *  as stored, never a re-normalization of it. */
   async findUserIdByEmail({

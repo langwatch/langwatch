@@ -698,6 +698,49 @@ describe("Feature: Organization members and invites REST API", () => {
       ).toBeNull();
     });
 
+    /** @scenario The management API accepts the Developer seat */
+    it("creates a Developer invite and lists it with no teams", async () => {
+      const email = `invitee-developer-${ns}@example.com`;
+      const create = await app.request("/api/organization/invites", {
+        method: "POST",
+        headers: authHeaders(),
+        body: JSON.stringify({
+          invites: [{ email, role: "DEVELOPER" }],
+        }),
+      });
+      expect(create.status).toBe(201);
+
+      const response = await app.request("/api/organization/invites", {
+        headers: authHeaders(),
+      });
+      const invite = (await response.json()).invites.find(
+        (entry: { email: string }) => entry.email === email,
+      );
+      expect(invite).toMatchObject({ role: "DEVELOPER", teams: [] });
+    });
+
+    /** @scenario A Developer cannot be given a role on a shared team */
+    it("refuses a Developer invite that names a team, naming the seat", async () => {
+      const response = await app.request("/api/organization/invites", {
+        method: "POST",
+        headers: authHeaders(),
+        body: JSON.stringify({
+          invites: [
+            {
+              email: `invitee-developer-team-${ns}@example.com`,
+              role: "DEVELOPER",
+              teams: [{ teamId: teamAId, role: "VIEWER" }],
+            },
+          ],
+        }),
+      });
+
+      expect(response.status).toBe(409);
+      expect((await response.json()).code).toBe(
+        "developer_seat_no_shared_access",
+      );
+    });
+
     /** @scenario A duplicate pending invite is refused */
     it("refuses a second pending invite for the same address", async () => {
       const email = `invitee-dup-${ns}@example.com`;

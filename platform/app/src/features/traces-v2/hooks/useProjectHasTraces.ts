@@ -1,4 +1,5 @@
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { hasTracesToShow } from "~/server/app-layer/projects/project-kinds";
 
 interface ProjectHasTracesResult {
   /**
@@ -15,6 +16,9 @@ interface ProjectHasTracesResult {
    * for the truly-never-sent case; a project that's gone quiet in the
    * last 30 days is a different state with different copy and gets the
    * `EmptyFilterState` ("No traces in this window") instead.
+   *
+   * An aggregate project (ADR-144) is never sent a trace and reads its
+   * members' instead, so it always counts as having traces.
    */
   hasAnyTraces: boolean | undefined;
   isLoading: boolean;
@@ -23,5 +27,5 @@ interface ProjectHasTracesResult {
 export function useProjectHasTraces(): ProjectHasTracesResult {
   const { project, isLoading } = useOrganizationTeamProject();
   if (!project) return { hasAnyTraces: undefined, isLoading };
-  return { hasAnyTraces: project.firstMessage, isLoading: false };
+  return { hasAnyTraces: hasTracesToShow(project), isLoading: false };
 }

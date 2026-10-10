@@ -67,22 +67,29 @@ type wireEvent struct {
 	Event   string   `json:"event"`
 	Segment int      `json:"segment"`
 	Missing []string `json:"missing"`
+	// retrying: a model call failed for a transient reason and is made again
+	// after DelayMs; Attempt counts retries from 1 up to MaxAttempts.
+	Attempt     int   `json:"attempt"`
+	MaxAttempts int   `json:"maxAttempts"`
+	DelayMs     int64 `json:"delayMs"`
 }
 
 // Event type discriminants (wrapper -> manager).
 const (
-	eventReady       = "ready"
-	eventPong        = "pong"
-	eventTurnStarted = "turn_started"
-	eventDelta       = "delta"
-	eventReasoning   = "reasoning"
-	eventToolStart   = "tool_start"
-	eventToolUpdate  = "tool_update"
-	eventToolEnd     = "tool_end"
-	eventPlan        = "plan"
-	eventGuidedTurn  = "guided_turn"
-	eventTurnDone    = "turn_done"
-	eventHandoff     = "handoff"
+	eventReady        = "ready"
+	eventPong         = "pong"
+	eventTurnStarted  = "turn_started"
+	eventDelta        = "delta"
+	eventReasoning    = "reasoning"
+	eventToolStart    = "tool_start"
+	eventToolUpdate   = "tool_update"
+	eventToolEnd      = "tool_end"
+	eventPlan         = "plan"
+	eventGuidedTurn   = "guided_turn"
+	eventRetrying     = "retrying"
+	eventRetrySettled = "retry_settled"
+	eventTurnDone     = "turn_done"
+	eventHandoff      = "handoff"
 )
 
 // guided_turn event kinds, logged under these names so a log grep finds them.

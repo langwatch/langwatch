@@ -539,3 +539,32 @@ func TestPlaygroundProxy_NilDispatcherFallsBackTo501(t *testing.T) {
 		t.Errorf("body = %s, want herr-formatted error envelope", respBody)
 	}
 }
+
+// TestFilterPassthroughHeaders_StripsTheInternalSecret keeps the credential
+// the app authenticates this hop with out of the upstream call.
+//
+// This list is a denylist over everything else, so a new internal header is
+// forwarded by default. On a passthrough call the upstream is a model provider
+// or a customer-configured endpoint, which makes "forwarded by default" the
+// wrong default for a secret of ours. RequireInternalSecret has already
+// consumed the header by the time a request reaches here, so nothing
+// downstream needs it.
+func TestFilterPassthroughHeaders_StripsTheInternalSecret(t *testing.T) {
+	in := http.Header{}
+	in.Set(InternalSecretHeader, "shared-with-the-app")
+	in.Set("Accept", "application/json")
+
+	out := filterPassthroughHeaders(in)
+
+	for name, value := range out {
+		if strings.EqualFold(name, InternalSecretHeader) {
+			t.Errorf("%s must not be forwarded upstream, got %q", InternalSecretHeader, value)
+		}
+		if value == "shared-with-the-app" {
+			t.Errorf("header %q carries the internal secret upstream", name)
+		}
+	}
+	if out["Accept"] != "application/json" {
+		t.Errorf("Accept lost while stripping the secret: %v", out)
+	}
+}

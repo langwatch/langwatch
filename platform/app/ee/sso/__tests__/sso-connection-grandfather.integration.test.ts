@@ -140,7 +140,10 @@ function grandfather() {
         platformOperators: new AdminEmailPlatformOperators(
           new PrismaIdentityUsersRepository(prisma),
         ),
-        licenseAuthority: new LicenseDomainClaimAuthority(() => false),
+        licenseAuthority: new LicenseDomainClaimAuthority({
+          isHosted: () => false,
+          organizations: { countOrganizations: async () => 1 },
+        }),
       }),
       ledger,
     ),
@@ -273,7 +276,10 @@ describe("the sso connection grandfather migration against Postgres", () => {
             platformOperators: new AdminEmailPlatformOperators(
               new PrismaIdentityUsersRepository(prisma),
             ),
-            licenseAuthority: new LicenseDomainClaimAuthority(() => false),
+            licenseAuthority: new LicenseDomainClaimAuthority({
+              isHosted: () => false,
+              organizations: { countOrganizations: async () => 1 },
+            }),
           }),
           ledger,
         ),

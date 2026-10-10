@@ -108,7 +108,7 @@ export interface SignUpVerificationDeps {
   mailer: SignUpVerificationMailer;
   directory: SignUpAccountDirectory;
   /** Builds the link the email carries, from a minted token. */
-  buildVerificationUrl(input: { token: string }): string;
+  buildVerificationUrl(input: { token: string; callbackUrl?: string }): string;
   now?: () => Date;
   mintToken?: () => string;
 }
@@ -243,8 +243,16 @@ export class SignUpVerificationService {
    * asking twice sends twice and both links work until one is spent, which is
    * the behavior a person who cannot find the first email expects.
    */
-  async requestVerification({ email }: { email: string }): Promise<void> {
-    await this.issueLink({ email, passwordHash: null });
+  async requestVerification({
+    email,
+    callbackUrl,
+  }: {
+    email: string;
+    /** Where the screen was going once through; rides on the link so a
+     *  fresh tab lands where the first one was headed. */
+    callbackUrl?: string;
+  }): Promise<void> {
+    await this.issueLink({ email, passwordHash: null, callbackUrl });
   }
 
   /**
@@ -462,9 +470,11 @@ export class SignUpVerificationService {
   private async issueLink({
     email,
     passwordHash,
+    callbackUrl,
   }: {
     email: string;
     passwordHash: string | null;
+    callbackUrl?: string;
   }): Promise<void> {
     const normalized = normalizeIdentifierValue(email);
     const token = this.mintToken();
@@ -477,7 +487,7 @@ export class SignUpVerificationService {
 
     await this.deps.mailer.sendVerificationLink({
       email: normalized,
-      verificationUrl: this.deps.buildVerificationUrl({ token }),
+      verificationUrl: this.deps.buildVerificationUrl({ token, callbackUrl }),
     });
   }
 

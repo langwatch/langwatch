@@ -72,6 +72,11 @@ vi.mock("~/utils/api", () => ({
     sharedTrace: {
       get: { useQuery: () => ({ data: undefined, isLoading: false }) },
     },
+    identity: {
+      myTestArrival: {
+        useQuery: () => ({ data: undefined, isPending: false }),
+      },
+    },
     organization: {
       getAll: {
         useQuery: () => ({

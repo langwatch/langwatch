@@ -3,7 +3,7 @@
  *
  * See specs/licensing/sso-license-gating.feature — license activation is a
  * paid entry point, but the SSO gate is decided once per process (ADR-027),
- * so the activation flow must tell self-hosted admins a restart is required.
+ * so the activation flow tells self-hosted admins SSO turns on within a minute.
  */
 
 import { renderHook } from "@testing-library/react";
@@ -30,7 +30,7 @@ const {
 }));
 
 // A full-page reload used to run in the same tick as the toast below and tore
-// it off the screen — the restart instruction is the one thing an operator has
+// it off the screen — the SSO line is the one thing an operator has
 // to read. `trpc.invalidate()` replaced it, and this keeps the regression
 // guarded: the hook must not reload.
 //
@@ -109,8 +109,8 @@ describe("useLicenseActions", () => {
   });
 
   describe("when an activation code is redeemed on a self-hosted deployment", () => {
-    /** @scenario Activating a license takes effect at the next restart */
-    it("says the same thing as a pasted license, restart line included", () => {
+    /** @scenario Activating a license turns SSO on without a restart */
+    it("says the same thing as a pasted license, SSO line included", () => {
       publicEnvData.current = { IS_SAAS: false };
 
       renderActions();
@@ -119,7 +119,7 @@ describe("useLicenseActions", () => {
       expect(toaster.create).toHaveBeenCalledWith(
         expect.objectContaining({
           title: "License activated",
-          description: expect.stringContaining("restart the server"),
+          description: expect.stringContaining("within a minute"),
           type: "success",
         }),
       );
@@ -127,8 +127,8 @@ describe("useLicenseActions", () => {
   });
 
   describe("when a license is activated on a self-hosted deployment", () => {
-    /** @scenario Activating a license takes effect at the next restart */
-    it("tells the admin a restart is required to enable SSO", () => {
+    /** @scenario Activating a license turns SSO on without a restart */
+    it("tells the admin SSO turns on within a minute", () => {
       publicEnvData.current = { IS_SAAS: false };
 
       renderHook(() =>
@@ -143,7 +143,7 @@ describe("useLicenseActions", () => {
       expect(toaster.create).toHaveBeenCalledWith(
         expect.objectContaining({
           title: "License activated",
-          description: expect.stringContaining("restart the server"),
+          description: expect.stringContaining("within a minute"),
           type: "success",
         }),
       );
@@ -172,8 +172,8 @@ describe("useLicenseActions", () => {
   });
 
   describe("when the environment has not resolved yet", () => {
-    /** @scenario Activating a license takes effect at the next restart */
-    it("still tells the admin to restart, because only a confirmed IS_SAAS means Cloud", () => {
+    /** @scenario Activating a license turns SSO on without a restart */
+    it("still tells the admin when SSO turns on, because only a confirmed IS_SAAS means Cloud", () => {
       publicEnvData.current = undefined;
 
       renderHook(() =>
@@ -187,14 +187,14 @@ describe("useLicenseActions", () => {
 
       expect(toaster.create).toHaveBeenCalledWith(
         expect.objectContaining({
-          description: expect.stringContaining("restart the server"),
+          description: expect.stringContaining("within a minute"),
         }),
       );
     });
   });
 
   describe("when the confirmation has to survive long enough to be read", () => {
-    /** @scenario The restart instruction outlives the activation it belongs to */
+    /** @scenario The SSO instruction outlives the activation it belongs to */
     it("leaves the page in place after activation and refreshes plan state instead", () => {
       publicEnvData.current = { IS_SAAS: false };
 
@@ -203,7 +203,7 @@ describe("useLicenseActions", () => {
 
       expect(toaster.create).toHaveBeenCalledWith(
         expect.objectContaining({
-          description: expect.stringContaining("restart the server"),
+          description: expect.stringContaining("within a minute"),
         }),
       );
       expect(reloadPage).not.toHaveBeenCalled();

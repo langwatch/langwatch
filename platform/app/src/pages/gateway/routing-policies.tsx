@@ -12,7 +12,11 @@ import { useMemo, useState } from "react";
 
 import AiGatewayLayout from "~/components/gateway/AiGatewayLayout";
 import { ConfirmDialog } from "~/components/gateway/ConfirmDialog";
-import { PermissionRequiredNotice } from "~/components/PermissionRequiredNotice";
+import {
+  isPermissionRefusal,
+  PermissionRefusedNotice,
+  PermissionRequiredNotice,
+} from "~/components/PermissionRequiredNotice";
 import {
   RoutingPoliciesTable,
   type RoutingPolicyRow,
@@ -45,6 +49,7 @@ export function RoutingPoliciesPage() {
     { organizationId },
     { enabled: !!organizationId, refetchOnWindowFocus: false },
   );
+  const cannotRead = isPermissionRefusal(policiesQuery.error);
 
   const [policyToDelete, setPolicyToDelete] = useState<RoutingPolicyRow | null>(
     null,
@@ -71,35 +76,37 @@ export function RoutingPoliciesPage() {
 
         {policiesQuery.isLoading && <Spinner size="sm" />}
 
-        <HandledErrorAlert
-          error={policiesQuery.error}
-          fallbackTitle="Couldn't load routing policies"
-        />
+        <PolicyListFailure error={policiesQuery.error} />
 
         {/* "Publish a default policy" is an instruction, so it is only shown
             to whoever can carry it out. */}
-        {canManage && !policiesQuery.isLoading && !hasAnyDefault && (
-          <NoDefaultNotice
-            hasPolicies={policies.length > 0}
-            onAddOrganizationPolicy={() => openNew("organization", true)}
+        {canManage &&
+          !cannotRead &&
+          !policiesQuery.isLoading &&
+          !hasAnyDefault && (
+            <NoDefaultNotice
+              hasPolicies={policies.length > 0}
+              onAddOrganizationPolicy={() => openNew("organization", true)}
+            />
+          )}
+
+        {!cannotRead && (
+          <RoutingPoliciesTable
+            policies={policies}
+            resolveScopeNames={resolveScopeNames}
+            onNew={(level) => openNew(level)}
+            onEdit={(policy) =>
+              openDrawer("routingPolicy", { policyId: policy.id })
+            }
+            onSetDefault={(policy) =>
+              setDefault.mutate({ organizationId, id: policy.id })
+            }
+            onDelete={setPolicyToDelete}
+            canManage={canManage}
           />
         )}
 
-        <RoutingPoliciesTable
-          policies={policies}
-          resolveScopeNames={resolveScopeNames}
-          onNew={(level) => openNew(level)}
-          onEdit={(policy) =>
-            openDrawer("routingPolicy", { policyId: policy.id })
-          }
-          onSetDefault={(policy) =>
-            setDefault.mutate({ organizationId, id: policy.id })
-          }
-          onDelete={setPolicyToDelete}
-          canManage={canManage}
-        />
-
-        {!canManage && (
+        {!canManage && !cannotRead && (
           <PermissionRequiredNotice
             permission="routingPolicies:manage"
             detail="You can read the policies and the tiers they publish. Creating, editing, and deleting need this grant."
@@ -284,3 +291,24 @@ export default withFeatureFlagGuard("release_ui_ai_governance_enabled", {
     layoutComponent: AiGatewayLayout,
   })(RoutingPoliciesPage),
 );
+
+/**
+ * A refusal is not a failed load: it reads as no access. Any other failure
+ * keeps the load error.
+ */
+function PolicyListFailure({ error }: { error: unknown }) {
+  if (isPermissionRefusal(error)) {
+    return (
+      <PermissionRefusedNotice
+        error={error}
+        detail="Routing policies are read at the organization level."
+      />
+    );
+  }
+  return (
+    <HandledErrorAlert
+      error={error}
+      fallbackTitle="Couldn't load routing policies"
+    />
+  );
+}

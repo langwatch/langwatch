@@ -9,16 +9,48 @@ import {
 } from "@chakra-ui/react";
 import type React from "react";
 import { LuCheckCheck, LuExternalLink } from "react-icons/lu";
+import { isAggregateProjectKind } from "~/server/app-layer/projects/project-kinds";
 import { CopyableInputWithPrefix } from "../../features/onboarding/components/sections/observability/CopyableInputWithPrefix";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { usePublicEnv } from "../../hooks/usePublicEnv";
 import { trackEvent } from "../../utils/tracking";
 import { useIntegrationChecks } from "../IntegrationChecks";
+import { AggregateReadOnlyNotice } from "../projects/AggregateReadOnlyNotice";
 import { Link } from "../ui/link";
 import { toaster } from "../ui/toaster";
 import ObservabilityCard from "./ObservabilityCard";
 
+/**
+ * The setup page's card. An aggregate (ADR-144) owns no key and is never sent
+ * a trace, so it gets no key to copy and no first trace to wait for.
+ */
 const APICard: React.FC = () => {
+  const { project } = useOrganizationTeamProject();
+  return isAggregateProjectKind(project?.kind) ? (
+    <AggregateSetupCard />
+  ) : (
+    <ProjectKeyCard />
+  );
+};
+
+const AggregateSetupCard: React.FC = () => (
+  <VStack
+    minH="80px"
+    boxShadow="sm"
+    borderRadius="xl"
+    bg="bg"
+    p={4}
+    gap={2}
+    align="stretch"
+  >
+    <Heading size="md" textAlign="left">
+      Connect to LangWatch
+    </Heading>
+    <AggregateReadOnlyNotice />
+  </VStack>
+);
+
+const ProjectKeyCard: React.FC = () => {
   const { project } = useOrganizationTeamProject();
   const publicEnv = usePublicEnv();
   const integrationChecks = useIntegrationChecks();

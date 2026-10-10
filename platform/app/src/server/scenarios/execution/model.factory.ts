@@ -7,6 +7,7 @@
 
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { defaultSettingsMiddleware, wrapLanguageModel } from "ai";
+import { nlpgoInternalHeaders } from "../../nlpgo/internalSecret";
 import type { LiteLLMParams } from "./types";
 
 interface CreateModelFromParamsInput {
@@ -156,12 +157,15 @@ function withReasoningOffRetry(
 export function createModelFromParams(input: CreateModelFromParamsInput) {
   const { litellmParams, nlpServiceUrl } = input;
   const providerKey = litellmParams.model.split("/")[0] || undefined;
-  const headers = Object.fromEntries(
-    Object.entries(litellmParams).map(([key, value]) => [
-      `x-litellm-${key}`,
-      value,
-    ]),
-  );
+  const headers = {
+    ...Object.fromEntries(
+      Object.entries(litellmParams).map(([key, value]) => [
+        `x-litellm-${key}`,
+        value,
+      ]),
+    ),
+    ...nlpgoInternalHeaders(),
+  };
 
   const vercelProvider = createOpenAICompatible({
     name: providerKey ?? "unknown",

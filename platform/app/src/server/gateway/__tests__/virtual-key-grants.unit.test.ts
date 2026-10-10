@@ -65,4 +65,30 @@ describe("virtual key visibility from grants", () => {
       ]),
     ).toBe(false);
   });
+
+  /** @scenario A Developer never sees the organisation's gateway keys */
+  it("hides organization-scoped keys from a Developer and a Lite Member, who share in nothing", async () => {
+    for (const seat of ["DEVELOPER", "EXTERNAL"] as const) {
+      const fixture = credentialFixture();
+      fixture.memberships.set(USER, { role: seat, disabledAt: null });
+      const access = await loadMembershipSet(fixture.prisma, ORG, USER);
+      expect(access.isOrgMember).toBe(false);
+      expect(
+        isVisibleToMembership(access, [
+          { scopeType: "ORGANIZATION", scopeId: ORG },
+        ]),
+      ).toBe(false);
+    }
+  });
+
+  it("shows organization-scoped keys to a Full member through membership alone", async () => {
+    const fixture = credentialFixture();
+    fixture.memberships.set(USER, { role: "MEMBER", disabledAt: null });
+    const access = await loadMembershipSet(fixture.prisma, ORG, USER);
+    expect(
+      isVisibleToMembership(access, [
+        { scopeType: "ORGANIZATION", scopeId: ORG },
+      ]),
+    ).toBe(true);
+  });
 });

@@ -88,6 +88,10 @@ class Users implements IdentityUsersRepository {
     return null;
   }
 
+  async findVerifiedLegacyEmail(): Promise<string | null> {
+    return null;
+  }
+
   async findUserIdByEmail(): Promise<string | null> {
     return null;
   }

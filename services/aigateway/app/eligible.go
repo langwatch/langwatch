@@ -248,8 +248,14 @@ func (choice credentialChoice) options() reachable {
 //
 // Past that the model is refused, because the only thing left is sending it to
 // several vendors that each said they do not serve it.
+//
+// Credentials that only serve an explicitly prefixed model (the
+// LangWatch-managed models slot) take no part in any of the four steps. With
+// such a credential as the key's only provider, a bare model is refused the
+// same way an unplaceable one is.
 func (choice credentialChoice) forBareModel(ctx context.Context) ([]domain.Credential, error) {
 	model := choice.resolved.ModelID
+	choice.creds = filterCredentials(choice.creds, domain.Credential.ServesBareModels)
 	if out := choice.narrowToBareModel(model); len(out) > 0 {
 		return out, nil
 	}
@@ -457,8 +463,8 @@ func instanceNotReachable(ctx context.Context, handle string, options reachable)
 }
 
 // modelNotRecognized is the block when a bare model name matches nothing the
-// key can place and the key holds more than one provider that said what it
-// serves.
+// key can place: the key holds more than one provider that said what it
+// serves, or holds only providers that serve prefixed names alone.
 func modelNotRecognized(ctx context.Context, model string, options reachable) error {
 	return herr.New(ctx, domain.ErrModelNotRecognized, herr.M{
 		"message": fmt.Sprintf(

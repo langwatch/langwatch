@@ -107,6 +107,13 @@ Feature: The checkup page of a self-hosted install
     And the row names LANGWATCH_CONNECT_DISABLED
 
   @unit
+  Scenario: Connect switched off by the deployment probes no LangWatch host
+    Given the deployment sets LANGWATCH_CONNECT_DISABLED
+    When someone asks for the connect host and gateway host reach checks
+    Then no connection is opened to either host
+    And both rows read not checked, naming LANGWATCH_CONNECT_DISABLED
+
+  @unit
   Scenario: A connected install shows its last sync
     Given the organization holds a connected license that synced an hour ago
     When the checkup runs
@@ -149,6 +156,14 @@ Feature: The checkup page of a self-hosted install
     When the explicit storage check runs
     Then one object is written and then deleted
     And the storage row reads pass
+
+  @unit
+  Scenario: The SMTP check mentions credentials only when it sent some
+    Given an SMTP relay that accepts the connection
+    When the explicit SMTP check runs with an SMTP user configured
+    Then the row says the server accepted a connection and the credentials
+    When the explicit SMTP check runs with no SMTP user configured
+    Then the row says the server accepted a connection, with no mention of credentials
 
   @unit
   Scenario: A canary that needs an input it was not given is not checked

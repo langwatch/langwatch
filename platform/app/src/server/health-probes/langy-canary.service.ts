@@ -49,6 +49,7 @@ import {
   type TurnSettlement,
 } from "~/server/app-layer/langy/streaming/awaitTurnSettlement";
 import type { Session } from "~/server/auth";
+import { probeCauseOf } from "./probe-cause";
 
 const logger = createLogger("langwatch:langy-canary");
 
@@ -64,7 +65,7 @@ export type LangyCanaryReason = "timeout" | "turn_failed" | "empty_reply";
 /** The pure verdict of one settled turn. */
 export type LangyCanaryVerdict =
   | { healthy: true }
-  | { healthy: false; reason: LangyCanaryReason };
+  | { healthy: false; reason: LangyCanaryReason; cause?: string };
 
 /** A settled canary outcome: the verdict plus the turn it came from. */
 export type LangyCanaryOutcome = LangyCanaryVerdict & {
@@ -119,8 +120,12 @@ export function classifyLangyCanaryOutcome(
 ): LangyCanaryVerdict {
   if (!settlement) return { healthy: false, reason: "timeout" };
   if (settlement.outcome === "awaiting_user") return { healthy: true };
-  if (!settlement.succeeded || settlement.outcome !== "completed") {
-    return { healthy: false, reason: "turn_failed" };
+  if (!settlement.succeeded) {
+    const cause = probeCauseOf(settlement.error);
+    return { healthy: false, reason: "turn_failed", ...(cause && { cause }) };
+  }
+  if (settlement.outcome !== "completed") {
+    return { healthy: false, reason: "turn_failed", cause: "turn_stopped" };
   }
   if (settlement.text.trim().length === 0) {
     return { healthy: false, reason: "empty_reply" };
@@ -202,9 +207,11 @@ export async function runLangyCanary(
       { error, ...started },
       "Langy canary could not start or follow its turn",
     );
+    const cause = probeCauseOf(error);
     return {
       healthy: false,
       reason: "turn_failed",
+      ...(cause && { cause }),
       ...started,
       durationMs: deps.now() - startedAt,
     };
