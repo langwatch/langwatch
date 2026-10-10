@@ -91,6 +91,13 @@ Feature: tRPC framework boundary
     Then nothing is logged as an SSE handler error
 
   @unit
+  Scenario: A live subscription whose own signal aborted is the stream closing, not a failure
+    Given a subscription whose request signal aborted before its stream rejected with an abort
+    When the stream is being served
+    Then nothing is logged as an SSE handler error
+    And a genuine failure on a live signal is still logged as an SSE handler error
+
+  @unit
   Scenario: A slow call is raised without burying the log
     Given a call succeeds slower than its budget
     When it is recorded

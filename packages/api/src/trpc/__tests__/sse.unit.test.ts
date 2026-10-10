@@ -103,3 +103,50 @@ describe("a live subscription the client closed", () => {
     expect(records.filter((record) => record.level === "error")).toEqual([]);
   });
 });
+
+describe("a live subscription whose signal aborted before the stream started", () => {
+  /** @scenario "A live subscription whose own signal aborted is the stream closing, not a failure" */
+  it("logs nothing at error, while a genuine failure on a live signal still does", async () => {
+    const records: LogRecord[] = [];
+    const client = new AbortController();
+    client.abort();
+
+    const laneFailing = (failure: Error) =>
+      SseLane.create({
+        members: {
+          createCaller: async () => ({
+            presence: {
+              cursors: async function* () {
+                await Promise.reject(failure);
+                yield undefined;
+              },
+            },
+          }),
+          procedureTypeAt: () => "subscription",
+        },
+        logger: recordingLogger(records),
+      });
+
+    const open = (lane: SseLane, signal: AbortSignal) =>
+      lane.answer(
+        new Request("http://api.test/api/sse/presence/cursors", {
+          headers: { "sec-fetch-site": "same-origin" },
+          signal,
+        }),
+        new Headers(),
+      );
+
+    const aborted = await open(
+      laneFailing(new DOMException("The operation was aborted", "AbortError")),
+      client.signal,
+    );
+    await aborted.text();
+
+    expect(records.filter((record) => record.level === "error")).toEqual([]);
+
+    const failed = await open(laneFailing(new Error("boom")), new AbortController().signal);
+    await failed.text();
+
+    expect(records.filter((record) => record.level === "error")).toHaveLength(1);
+  });
+});
