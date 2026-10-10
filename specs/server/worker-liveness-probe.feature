@@ -132,6 +132,14 @@ Feature: Worker liveness probe endpoint
       # The api serves through this thread too: a long poll or a slow export
       # is work in progress, not a stall.
 
+    @unit
+    Scenario: A request no door can parse is answered as Node would and named once in the log
+      Given the liveness thread is serving the process port
+      When a caller sends a request the HTTP parser refuses, with a cookie
+      Then the response is Node's own 400 and the connection closes
+      And one warn line names the parser's code and the request's first bytes
+      And the cookie's value is not in that line
+
   Rule: Liveness boots before any stage that can block for minutes
 
     # The voice public URL tunnel (cloudflared quick tunnel) can take up to

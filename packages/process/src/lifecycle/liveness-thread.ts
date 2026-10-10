@@ -1,6 +1,12 @@
 import type { AddressInfo } from "node:net";
 import { Worker } from "node:worker_threads";
 
+import {
+  CLIENT_ERROR_STATUS_LINES,
+  QUIET_CLIENT_ERROR_CODES,
+  redactedRequestHead,
+} from "./client-error.ts";
+
 /** The kubelet's path; answered in the thread from the heartbeat, never proxied. */
 export const LIVENESS_PATH = "/healthz";
 /** Answered in the thread once the main thread latched ready; until then the main thread says. */
@@ -225,6 +231,17 @@ const server = http.createServer((req, res) => {
   }
   proxy(req, res);
 });
+// Node's default answers, kept, plus a word to the main thread naming what failed to parse.
+server.on("clientError", (error, socket) => {
+  const code = error && error.code;
+  if (!workerData.quietClientErrors.includes(code)) {
+    const head = error.rawPacket ? Buffer.from(error.rawPacket).subarray(0, 2048).toString("latin1") : "";
+    parentPort.postMessage({ type: "clientError", code: code, head: head });
+  }
+  if (!socket.writable) return socket.destroy();
+  const status = workerData.clientErrorStatusLines[code] || "400 Bad Request";
+  socket.end("HTTP/1.1 " + status + "\\r\\nConnection: close\\r\\n\\r\\n");
+});
 const proxy = (req, res) => {
   const upstream = http.request({ ...target, method: req.method, path: req.url, headers: req.headers, agent: false });
   const timer = setInterval(() => {
@@ -330,10 +347,12 @@ type ThreadMessage =
   | { type: "closed" }
   | { type: "lifted" }
   | { type: "retry" }
-  | { type: "stragglers" };
+  | { type: "stragglers" }
+  | { type: "clientError"; code?: string; head: string };
 
 export type LivenessLogger = Readonly<{
   info: (obj: object, msg: string) => void;
+  warn?: (obj: object, msg: string) => void;
   error: (obj: object, msg: string) => void;
 }>;
 
@@ -386,6 +405,8 @@ export async function startLivenessThread({
       retryPath: UPGRADE_RETRY_PATH,
       consoleCookie: UPGRADE_CONSOLE_COOKIE,
       wrongTokensPerMinute: UPGRADE_CONSOLE_WRONG_TOKENS_PER_MINUTE,
+      clientErrorStatusLines: CLIENT_ERROR_STATUS_LINES,
+      quietClientErrors: QUIET_CLIENT_ERROR_CODES,
     },
   });
   // The main loop keeps its own loopback listener, which is what holds the process open.
@@ -399,6 +420,13 @@ export async function startLivenessThread({
   }
   const exited = new Promise<void>((resolve) => thread.once("exit", () => resolve()));
   thread.on("error", (error) => logger.error({ error }, "liveness thread failed"));
+  thread.on("message", (message: ThreadMessage) => {
+    if (message.type !== "clientError") return;
+    (logger.warn ?? logger.info)(
+      { code: message.code, head: redactedRequestHead(message.head), door: "public" },
+      "http request refused before routing",
+    );
+  });
   return {
     address,
     liftConsole: async () => {

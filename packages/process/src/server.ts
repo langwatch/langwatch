@@ -3,6 +3,11 @@ import type { AddressInfo } from "node:net";
 import process from "node:process";
 import type { Duplex } from "node:stream";
 
+import {
+  answerClientError,
+  isLoggedClientError,
+  redactedRequestHead,
+} from "./lifecycle/client-error.ts";
 import { GracefulShutdown } from "./lifecycle/graceful-shutdown.ts";
 import { drainHttpServer } from "./lifecycle/http-drain.ts";
 import {
@@ -17,6 +22,9 @@ import {
 } from "./lifecycle/liveness-thread.ts";
 import { HTTP_CLOSE_PHASE_MS, HTTP_DRAIN_GRACE_MS } from "./lifecycle/shutdown-deadline.ts";
 import { ResourceScope } from "./resource-scope.ts";
+
+/** A parse failure as Node reports it on `clientError`. */
+type ClientError = Error & { code?: string; rawPacket?: Buffer };
 
 /** What this package needs of a logger, so it depends on no logging implementation. */
 export interface ServerLogger {
@@ -233,6 +241,21 @@ export class Server {
     await this.livenessThread?.liftConsole();
   }
 
+  /** Node's own answer to a request it could not parse, with one line saying what it was. */
+  private refuseUnparsed(error: ClientError, socket: Duplex): void {
+    if (isLoggedClientError(error.code)) {
+      (this.logger.warn ?? this.logger.info)(
+        {
+          code: error.code,
+          head: redactedRequestHead(error.rawPacket?.toString("latin1") ?? ""),
+          door: "main",
+        },
+        "http request refused before routing",
+      );
+    }
+    answerClientError({ code: error.code, socket });
+  }
+
   private openHealth(): Promise<void> {
     this.healthOpening ??= Promise.resolve(this.health?.start?.());
     return this.healthOpening;
@@ -247,6 +270,9 @@ export class Server {
         );
         listener.on("upgrade", (request: IncomingMessage, socket: Duplex, head: Buffer) =>
           this.handleUpgrade(request, socket, head),
+        );
+        listener.on("clientError", (error: ClientError, socket: Duplex) =>
+          this.refuseUnparsed(error, socket),
         );
         if (this.livenessOffLoop) {
           this.livenessThread = await this.startOffLoop(listener, port ?? 0);
