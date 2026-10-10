@@ -142,10 +142,7 @@ beforeAll(async () => {
     resolveClient: async () => ch,
     clickhouse: authorizedClickHouseFor(ch),
   });
-  spanTree = ClickHouseTraceSpanRepository.create({
-    resolveClient: async () => ch,
-    clickhouse: authorizedClickHouseFor(ch),
-  });
+  spanTree = ClickHouseTraceSpanRepository.create({ clickhouse: authorizedClickHouseFor(ch) });
 
   await insert([
     spanRow({

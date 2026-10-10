@@ -17,6 +17,7 @@ const CONVERTED_REPOSITORIES = [
   "span-storage.repository.ts",
   "trace-metrics-analytics.repository.ts",
   "session-groups.repository.ts",
+  "trace-span.repository.ts",
 ];
 
 /** Every template literal's text, each line tagged with where it sits in the file. */

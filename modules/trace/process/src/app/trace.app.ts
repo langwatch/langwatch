@@ -869,6 +869,7 @@ type TraceTreeCompositionOptions = {
   eventDerivation?: TraceEventDerivation;
   payloads: TracePayloadReaderRepository;
   fullIo: TraceFullIo;
+  authorize: FoldReadAuthorizer;
 };
 
 /** Trace implements its public API and the collector's internal transport seam. */
@@ -1096,6 +1097,10 @@ export class TraceModule implements TraceApi, CollectorApp {
           }),
           payloads: options.repositories.eventPayloads,
           fullIo: TraceReadFullIoService.create(ioExtractionService),
+          authorize: foldReadAuthorizer({
+            authz: options.protections.authz,
+            codePath: FOLD_READ_CODE_PATH,
+          }),
         });
 
     return {
@@ -1241,6 +1246,7 @@ export class TraceModule implements TraceApi, CollectorApp {
         options.payloads,
         options.fullIo,
       ),
+      authorize: options.authorize,
     });
   }
 
