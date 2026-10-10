@@ -1744,7 +1744,7 @@ overview and the impersonation limit override take `ops:view`; onboard, addCommi
 markPaidOutOfBand take `ops:manage`. A view-only operator reads and is refused on every write.
 **Operator bootstrap** (Alex, 2026-10-01): a one-time upgrade migration grants users named by a still-set
 `ADMIN_EMAILS`, else the oldest active org admin on a one-organization install, else nobody (logged; recovery
-task). Cloud never bootstraps: staff are seeded at cutover. A set `ADMIN_EMAILS` after that only warns.
+task). Cloud never bootstraps: staff are seeded at cutover. On a self-hosted install the first user to sign up is recorded as the seed's decision (`first-user`) from user's `lw.user.created` fact, whatever `ADMIN_EMAILS` says, while nobody holds the grant and they are the only user; the seed's one-key record and latch grant at most one (Alex, 2026-10-10).
 A set `ADMIN_EMAILS` never falls back to an org admin: the seed waits, unlatched, until a named verified
 user exists. Users with no organization yet also wait; only a decision latches (Alex, 2026-10-01).
 Deactivating a user ends their sessions and CLI tokens before user's fact is sent, without an outbox;

@@ -112,11 +112,49 @@ Feature: Platform operators are seeded once, recovered by a task and managed on 
     When the seed runs
     Then nobody is granted
 
-  @unit @operator-seed
-  Scenario: A set ADMIN_EMAILS only warns at boot
-    Given ADMIN_EMAILS is set
-    When ops boots
-    Then a warning says it grants nothing and names the Operators page and the task
+  # ============================================================================
+  # The first user (Alex, 2026-10-10): a self-hosted install's first sign-up operates
+  # ============================================================================
+
+  @unit @operator-first-user
+  Scenario: The first user of a self-hosted install becomes a platform operator
+    Given a self-hosted install where nobody holds the platform-operator grant
+    And ADMIN_EMAILS names somebody else
+    When user's created fact arrives for the install's only user
+    Then ops records the seed's decision naming that user, by the rule first-user
+    And the recorded decision grants them as the system, as every seeded grant is
+
+  @unit @operator-first-user
+  Scenario: A second user never becomes an operator by signing up
+    Given a self-hosted install where nobody holds the grant yet
+    And another user already exists
+    When user's created fact arrives for the second user
+    Then nothing is recorded and nobody is granted
+
+  @unit @operator-first-user
+  Scenario: The hosted service never makes its first user an operator
+    Given the hosted service
+    When user's created fact arrives for its only user
+    Then nothing is recorded and nobody is granted
+
+  @unit @operator-first-user
+  Scenario: An existing operator means no first-user grant
+    Given a self-hosted install where somebody already holds the grant
+    When user's created fact arrives for a user
+    Then nothing is recorded and the holders stay as they were
+
+  @unit @operator-first-user
+  Scenario: Two users signing up at once never both become operators
+    Given two users are created at once on a self-hosted install nobody operates
+    When both created facts arrive
+    Then a fact that finds more than one user records nothing
+    And the seed's single recorded decision grants at most one user, however many records arrive
+
+  @unit @operator-first-user
+  Scenario: A backfilled or stale creation fact grants nobody
+    Given user's created fact is a backfilled one, or names a user since erased or deactivated
+    When it arrives
+    Then nothing is recorded and nobody is granted
 
   # ============================================================================
   # The recovery task

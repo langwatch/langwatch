@@ -874,11 +874,6 @@ export class OpsModule implements OpsApi {
       logger,
     });
 
-    const { adminEmails } = setup.config;
-    for (const warning of PlatformOperatorsService.bootWarnings({ adminEmails })) {
-      logger.warn(warning);
-    }
-
     const platformOperators = PlatformOperatorsService.create({
       authz: dependencies.authz,
       users: dependencies.users,
@@ -2046,9 +2041,16 @@ export class OpsModule implements OpsApi {
     return this.#platformOperators().seedFromAdminEmails({ settings: operatorSeed, dryRun });
   }
 
+  /** user's created fact: a self-hosted install's first user is recorded as the seed's decision. */
+  grantFirstUserPlatformOperator(input: { userId: string; backfilled: boolean }): Promise<boolean> {
+    const { operatorSeed } = this.#dependencies;
+    if (!operatorSeed) throw new OpsCapabilityUnavailableError("the platform-operator seed");
+    return this.#platformOperators().grantFirstUser({ ...input, settings: operatorSeed });
+  }
+
   /** The grants `ops_platform_operator_seed`'s recorded decision asks for, as the system. */
   grantSeededPlatformOperators(decision: {
-    via: "admin-emails" | "sole-organization-admin" | "none";
+    via: "admin-emails" | "sole-organization-admin" | "first-user" | "none";
     userIds: string[];
   }): Promise<void> {
     return this.#platformOperators().grantSeeded(decision);
@@ -2060,7 +2062,7 @@ export class OpsModule implements OpsApi {
       send(input: {
         tenantId: string;
         occurredAt: number;
-        via: "admin-emails" | "sole-organization-admin" | "none";
+        via: "admin-emails" | "sole-organization-admin" | "first-user" | "none";
         userIds: string[];
       }): Promise<unknown>;
     };
