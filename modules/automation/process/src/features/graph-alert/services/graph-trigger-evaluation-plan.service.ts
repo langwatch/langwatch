@@ -203,7 +203,7 @@ export class GraphTriggerEvaluationPlanService {
       startDate: startDate.epochMilliseconds,
       endDate: endDate.epochMilliseconds,
       filters: (filters ?? {}) as TimeseriesInputType["filters"],
-      series: [{ ...series, name: void 0 }],
+      series: [timeseriesSeries(series)],
       // Not the graph's `groupBy`: the threshold is one number, and only the
       // database can compute it across every group (summing per-group values
       // adds averages and counts an array grouping once per group).
@@ -258,6 +258,20 @@ type TimeseriesPipeline = {
   field: "trace_id" | "user_id" | "thread_id" | "customer_id";
   aggregation: "sum" | "avg" | "min" | "max";
 };
+
+/** Analytics takes only its own series fields; a saved series also carries display ones. */
+function timeseriesSeries(series: GraphSeries): GraphSeries {
+  const { metric, key, subkey, aggregation, pipeline, filters, asPercent } = series;
+  return {
+    metric,
+    aggregation,
+    ...(key !== undefined && { key }),
+    ...(subkey !== undefined && { subkey }),
+    ...(pipeline !== undefined && { pipeline }),
+    ...(filters !== undefined && { filters }),
+    ...(asPercent !== undefined && { asPercent }),
+  };
+}
 
 export type GraphSeries = {
   name?: string;

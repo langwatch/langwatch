@@ -1,3 +1,4 @@
+import { analyticsTimeseriesInputSchema } from "@langwatch/analytics-contract";
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
@@ -36,6 +37,7 @@ function requestFor({ groupBy }: { groupBy?: string }): GraphEvaluationRequest {
             series: [
               {
                 name: "Average completion time",
+                colorSet: "blueTones",
                 metric: "performance.completion_time",
                 aggregation: "avg",
               },
@@ -60,6 +62,20 @@ describe("GraphTriggerEvaluationPlanService.createPlan", () => {
       const input = (plan as { timeseriesInput: TimeseriesInputType }).timeseriesInput;
       expect(input.groupBy).toBeUndefined();
       expect(input.series).toHaveLength(1);
+    });
+  });
+
+  describe("given a saved series carrying its display name and colour set", () => {
+    /** @scenario "A graph alert queries its series without the chart's display fields" */
+    it("asks analytics with only the query fields, which its input schema accepts", async () => {
+      const plan = await GraphTriggerEvaluationPlanService.create().createPlan(requestFor({}));
+
+      const input = (plan as { timeseriesInput: TimeseriesInputType }).timeseriesInput;
+      expect(input.series[0]).toEqual({
+        metric: "performance.completion_time",
+        aggregation: "avg",
+      });
+      expect(analyticsTimeseriesInputSchema.validate(input)).toBe(true);
     });
   });
 });
