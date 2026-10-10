@@ -1,4 +1,3 @@
-import type { AuthzApi } from "@langwatch/authz-contract";
 import type { GatewayApi } from "@langwatch/gateway-contract";
 import { ResourceScope } from "@langwatch/process";
 import type { RateLimiter } from "@langwatch/process-stores";
@@ -39,7 +38,6 @@ describe.skipIf(!TEST_DATABASE_URL)("the install's hosted provider slot in produ
       const cleared: string[] = [];
       const app = await LicensingModule.create({
         dependencies: {
-          scopes: createApiFixture<AuthzApi>(),
           gateway: createApiFixture<GatewayApi>({
             clearConnectUpstreamInternal: async ({ organizationId }) => {
               cleared.push(organizationId);

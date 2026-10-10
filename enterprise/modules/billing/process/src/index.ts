@@ -40,7 +40,6 @@ export type {
   ConnectedSeatChangeRecord,
   PendingRenewal,
 } from "./repositories/connected-billing.repository.ts";
-export type { ConnectedBillingTerms } from "./features/connected-billing/services/connected-billing.service.ts";
 export type {
   CommitDrawdown,
   ConnectedCustomer,

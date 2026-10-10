@@ -7,12 +7,7 @@ import type {
   IssueActivationCodeInput,
   IssuedActivationCode,
 } from "./activation-code.ts";
-import type {
-  ConnectedSeats,
-  ContractTerms,
-  HostedCaller,
-  HostedUsageAnswer,
-} from "./connect-hosted.ts";
+import type { ConnectedSeats, ContractTerms } from "./connect-hosted.ts";
 import type {
   ActivationAnswer,
   ConnectClassifyAnswer,
@@ -214,8 +209,6 @@ export interface LicensingApi {
     hostnameOptOut?: boolean;
   }): Promise<void>;
 
-  /** What the caller spent against each budget that applies to it, for billing's contract spend. */
-  getHostedUsage(input: { caller: HostedCaller }): Promise<HostedUsageAnswer>;
   /** What a customer's licenses add up to commercially, right now. */
   getContractTerms(input: { organizationId: string }): Promise<ContractTerms>;
   /** The seats a connected customer holds and last reported, for its statement and overview. */

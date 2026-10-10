@@ -2914,6 +2914,9 @@ importers:
       '@langwatch/enterprise-billing-contract':
         specifier: workspace:*
         version: link:../contract
+      '@langwatch/enterprise-connect-contract':
+        specifier: workspace:*
+        version: link:../../connect/contract
       '@langwatch/enterprise-licensing-contract':
         specifier: workspace:*
         version: link:../../licensing/contract
@@ -4128,6 +4131,9 @@ importers:
       '@langwatch/enterprise-nurturing-contract':
         specifier: workspace:*
         version: link:../contract
+      '@langwatch/enterprise-saas-contract':
+        specifier: workspace:*
+        version: link:../../saas/contract
       '@langwatch/evaluation-contract':
         specifier: workspace:*
         version: link:../../../../modules/evaluation/contract
@@ -4278,12 +4284,18 @@ importers:
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../../packages/api
+      '@langwatch/authz-contract':
+        specifier: workspace:*
+        version: link:../../../../modules/authz/contract
       '@langwatch/enterprise-licensing-contract':
         specifier: workspace:*
         version: link:../../licensing/contract
       '@langwatch/enterprise-saas-contract':
         specifier: workspace:*
         version: link:../contract
+      '@langwatch/eventing':
+        specifier: workspace:*
+        version: link:../../../../packages/eventing
       '@langwatch/module':
         specifier: workspace:*
         version: link:../../../../packages/module
@@ -4302,9 +4314,6 @@ importers:
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../../packages/time
-      posthog-node:
-        specifier: 'catalog:'
-        version: 5.48.1(rxjs@7.8.2)
       zod:
         specifier: 'catalog:'
         version: 4.6.5

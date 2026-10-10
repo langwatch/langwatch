@@ -19,11 +19,9 @@ import {
   hostedCapAnswerSchema,
   hostedClassifyAnswerSchema,
   hostedServiceEnvelopeSchema,
-} from "@langwatch/enterprise-connect-contract";
-import {
   hostedUsageAnswerSchema,
   type HostedCaller,
-} from "@langwatch/enterprise-licensing-contract";
+} from "@langwatch/enterprise-connect-contract";
 import { resolveRequestBound } from "@langwatch/plans";
 
 /**

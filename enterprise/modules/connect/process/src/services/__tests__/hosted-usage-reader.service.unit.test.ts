@@ -1,4 +1,5 @@
 import { type AuthzApi, AuthzScopeNotFoundError } from "@langwatch/authz-contract";
+import { CONTRACT_BUDGET_EXTERNAL_ID } from "@langwatch/enterprise-connect-contract";
 import type {
   GatewayApi,
   GatewayBudgetResolutionTarget,
@@ -14,7 +15,6 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
-import { CONTRACT_BUDGET_EXTERNAL_ID } from "../contract-budget-store.service.ts";
 import { HostedUsageReaderService } from "../hosted-usage-reader.service.ts";
 
 const AT = Temporal.Instant.from("2026-09-29T00:00:00Z");

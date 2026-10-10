@@ -1,5 +1,4 @@
 import { SYSTEM_ACTORS } from "@langwatch/authorization";
-import { AuthzApi } from "@langwatch/authz-contract";
 import { isReleaseBuild, releaseVersionOf } from "@langwatch/config";
 import { parseOutboundProxyConfig } from "@langwatch/egress";
 import {
@@ -33,8 +32,6 @@ import {
   type ConnectStatus,
   type InstanceIdentityView,
   type ContractTerms,
-  type HostedCaller,
-  type HostedUsageAnswer,
   type IncomingUsageReport,
   type SelfHostedInstanceDetail,
   type SelfHostedInstancePage,
@@ -102,8 +99,6 @@ import { ContractBudgetService } from "../services/contract-budget.service.ts";
 import type { ContractBudgets } from "../services/contract-budget.service.ts";
 import { DomainClaimAuthorityService } from "../services/domain-claim-authority.service.ts";
 import { HostedServicesService } from "../services/hosted-services.service.ts";
-import { HostedUsageReaderService } from "../services/hosted-usage-reader.service.ts";
-import type { HostedUsageReader } from "../services/hosted-usage-reader.service.ts";
 import { InstanceIdentityService } from "../services/instance-identity.service.ts";
 import { LicenseRefreshService } from "../services/license-refresh.service.ts";
 import { LicenseRegistryService } from "../services/license-registry.service.ts";
@@ -163,8 +158,6 @@ export class LicensingModule implements LicensingApiContract {
   static readonly dependencies = {
     /** Where an install's hosted provider slot is kept: a gateway fact licensing writes. */
     gateway: GatewayApi,
-    /** Whose team a hosted caller's project belongs to, for the usage billing reads. */
-    scopes: AuthzApi,
   };
   static readonly config = licensingConfig;
   /**
@@ -305,7 +298,6 @@ export class LicensingModule implements LicensingApiContract {
         gateway: dependencies.gateway,
         signingKey: licensePrivateKey,
       }),
-      hosted: hostedServicesOverPeers(dependencies),
       instances: selfHostedInstancesOver({ repositories }),
       cryptography,
       logger,
@@ -685,10 +677,6 @@ export class LicensingModule implements LicensingApiContract {
     return this.#refresh.refresh(input.organizationId);
   }
 
-  getHostedUsage(input: { caller: HostedCaller }): Promise<HostedUsageAnswer> {
-    return this.#hosted.usage(input);
-  }
-
   getContractTerms(input: { organizationId: string }): Promise<ContractTerms> {
     return this.#contractBudgets.termsOf(input.organizationId);
   }
@@ -777,13 +765,11 @@ type LicenseRegistryParts = Readonly<{
 
 function licenseRegistryParts({
   infrastructure,
-  hosted,
   instances,
   cryptography,
   logger,
 }: {
   infrastructure: LicenseRegistryInfrastructure;
-  hosted: HostedServicesInfrastructure;
   instances: SelfHostedInstancesInfrastructure;
   cryptography: LicenseCryptography;
   logger?: LicenseLogger;
@@ -839,8 +825,6 @@ function licenseRegistryParts({
     }),
     hosted: HostedServicesService.create({
       licenses: infrastructure.repository,
-      usage: hosted.usage,
-      contractBudgets,
       now,
     }),
     sync: LicenseSyncService.create({
@@ -911,25 +895,6 @@ function licenseRegistryOver({
     },
     signingKey: () => signingKey,
     systemActorId,
-  };
-}
-
-/**
- * The hosted usage billing reads, over the gateway's budgets and authz's scopes. The hosted routes,
- * their judge, their spend and the contract budget's writes are the connect module's.
- */
-function hostedServicesOverPeers({
-  gateway,
-  scopes,
-}: {
-  gateway: Pick<
-    GatewayApi,
-    "listBudgetsWithHealth" | "findVirtualKeyById" | "resolveApplicableBudgets"
-  >;
-  scopes: Pick<AuthzApi, "getScope">;
-}): HostedServicesInfrastructure {
-  return {
-    usage: HostedUsageReaderService.create({ gateway, scopes }),
   };
 }
 
@@ -1082,11 +1047,6 @@ function connectInstallParts({
     }),
   };
 }
-
-/** The hosted usage licensing still answers billing, on every deployment. */
-type HostedServicesInfrastructure = Readonly<{
-  usage: HostedUsageReader;
-}>;
 
 /** Everything the license registry needs from the rest of the deployment. */
 type LicenseRegistryInfrastructure = Readonly<{

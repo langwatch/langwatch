@@ -6,6 +6,7 @@ import type { BillingRepositories } from "../billing.repositories.ts";
 import { OrganizationPricingRepository } from "../organization-pricing.repository.ts";
 import { MemoryBillingOrganizationRepository } from "./memory.billing-account-facts.repository.ts";
 import { MemoryBillingCheckpointRepository } from "./memory.billing-checkpoint.repository.ts";
+import { MemoryBillingContractBudgetRepository } from "./memory.billing-contract-budget.repository.ts";
 import { MemoryBillingGatewaySpendRepository } from "./memory.billing-gateway-spend.repository.ts";
 import { MemoryBillingProjectDirectoryRepository } from "./memory.billing-project-directory.repository.ts";
 import { MemoryBillingReportOrganizationRepository } from "./memory.billing-report-organization.repository.ts";
@@ -68,6 +69,7 @@ export class MemoryBillingRepositories {
     return {
       checkpoints: MemoryBillingCheckpointRepository.create(store),
       connectedBilling: MemoryConnectedBillingRepository.create(store),
+      contractBudgets: MemoryBillingContractBudgetRepository.create(store),
       duplicateSubscriptionsReports: MemoryDuplicateSubscriptionsReportRepository.create(store),
       gatewaySpend: MemoryBillingGatewaySpendRepository.create(store),
       organizations: MemoryBillingOrganizationRepository.create(store),

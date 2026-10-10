@@ -5,7 +5,21 @@
  * snake_case, because the gateway relays the answer byte for byte.
  */
 
+import { CONNECT_SERVICES } from "@langwatch/enterprise-licensing-contract";
 import { z } from "zod";
+
+/** The `externalId` connect writes on the one gateway budget a customer's contract caps. */
+export const CONTRACT_BUDGET_EXTERNAL_ID = "connect-contract";
+
+/**
+ * Who the gateway resolved the caller to. Never read from the caller's body: a
+ * key that could name another organization would be a claim nothing checks.
+ */
+export interface HostedCaller {
+  virtualKeyId: string;
+  organizationId: string;
+  projectId: string | null;
+}
 
 /** What the gateway sends: the resolved caller, and the caller's own JSON. */
 export const hostedServiceEnvelopeSchema = z.object({
@@ -44,6 +58,39 @@ export const hostedCapAnswerSchema = z.object({
   maximum_cap_usd: z.number(),
 });
 
+const hostedBudgetSchema = z.object({
+  id: z.string(),
+  scope: z.string(),
+  window: z.string(),
+  on_breach: z.enum(["block", "warn"]),
+  cap_usd: z.number(),
+  /** Null when live spend could not be read. Never zero in that case. */
+  spent_usd: z.number().nullable(),
+  remaining_usd: z.number().nullable(),
+  period_started_at: z.string(),
+  is_contract: z.boolean(),
+});
+
+/** The contract budget, with the commercial terms behind it. */
+const hostedContractSchema = z.object({
+  ...hostedBudgetSchema.shape,
+  commit_usd: z.number(),
+  maximum_cap_usd: z.number(),
+  overage_enabled: z.boolean(),
+  term_ends_at: z.string().nullable(),
+});
+
+export const hostedUsageAnswerSchema = z.object({
+  services: z.array(z.enum(CONNECT_SERVICES)),
+  spend_available: z.boolean(),
+  read_at: z.string(),
+  contract: hostedContractSchema.nullable(),
+  budgets: z.array(hostedBudgetSchema),
+});
+
+export type HostedBudgetWire = z.infer<typeof hostedBudgetSchema>;
+export type HostedContractWire = z.infer<typeof hostedContractSchema>;
+export type HostedUsageAnswer = z.infer<typeof hostedUsageAnswerSchema>;
 export type HostedVerdict = z.infer<typeof hostedVerdictSchema>;
 export type HostedClassifyAnswer = z.infer<typeof hostedClassifyAnswerSchema>;
 export type HostedCapAnswer = z.infer<typeof hostedCapAnswerSchema>;

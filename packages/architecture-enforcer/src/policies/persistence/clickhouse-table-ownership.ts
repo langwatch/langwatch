@@ -181,6 +181,13 @@ export const DECLARED_OWNERSHIP: DeclaredOwnership = {
         "billing sums a connected customer's confirmed spend per request type for its statement and term cap (round 37 D5, EF-5)",
     },
     {
+      table: "gateway_budget_ledger_events",
+      owner: "gateway",
+      readers: ["billing"],
+      reason:
+        "billing sums the contract budget's bucket since its window opened, the spend the gateway enforces (C3a D5, Alex 2026-10-10)",
+    },
+    {
       table: "log_records",
       owner: "log",
       readers: ["trace"],

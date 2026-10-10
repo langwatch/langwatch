@@ -1,4 +1,3 @@
-import type { AuthzApi } from "@langwatch/authz-contract";
 import {
   type LicenseData,
   type LicensingServerConfig,
@@ -270,7 +269,6 @@ export function createTestLicensingApp(
   const secrets = options.secrets ?? {};
   return LicensingModule.create({
     dependencies: {
-      scopes: createApiFixture<AuthzApi>(),
       gateway: createApiFixture<GatewayApi>(),
       ...options.dependencies,
     },

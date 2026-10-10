@@ -2,6 +2,7 @@
 
 import type { BillingAccountFactsRepository } from "./billing-account-facts.repository.ts";
 import type { BillingCheckpointRepository } from "./billing-checkpoint.repository.ts";
+import type { BillingContractBudgetRepository } from "./billing-contract-budget.repository.ts";
 import type { BillingGatewaySpendRepository } from "./billing-gateway-spend.repository.ts";
 import type { BillingOrganizationCacheRepository } from "./billing-organization-cache.repository.ts";
 import type { BillingProjectDirectoryRepository } from "./billing-project-directory.repository.ts";
@@ -20,6 +21,8 @@ import type { BillingSubscriptionRepository } from "./subscription.repository.ts
 export interface BillingRepositories {
   readonly checkpoints: BillingCheckpointRepository;
   readonly connectedBilling: ConnectedBillingRepository;
+  /** Gateway's contract budget rows, through gateway's share (C3a D5, R40). */
+  readonly contractBudgets: BillingContractBudgetRepository;
   readonly duplicateSubscriptionsReports: DuplicateSubscriptionsReportRepository;
   /** Gateway's spend ledger, through gateway's share (round 37 D5). */
   readonly gatewaySpend: BillingGatewaySpendRepository;
