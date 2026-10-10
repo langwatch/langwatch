@@ -3,7 +3,6 @@ import {
   type AnnotationQueueItemStatus,
 } from "@langwatch/annotation-contract";
 /** One table renders every annotations view. */
-import { Link } from "@langwatch/browser-host/link";
 import { downloadCsv } from "@langwatch/csv/download";
 import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
@@ -480,13 +479,6 @@ export function AnnotationList({
         {copy.showStatusFilter && (
           <StatusFilterMenu value={statusFilter} onChange={setStatusFilter} />
         )}
-        <AnnotationColumnsMenu
-          columns={columnOptions}
-          choices={columnChoices.choices}
-          onColumnVisibleChange={columnChoices.setColumnVisible}
-          onReset={columnChoices.resetColumns}
-          hasChoices={columnChoices.hasChoices}
-        />
         <ListPeriodControl
           reading={{ period, mode: periodMode }}
           query={query}
@@ -494,9 +486,21 @@ export function AnnotationList({
           waitsForPick={!isPageProvidedRows && !rangeIsPicked}
           clearable={!isPageProvidedRows}
         />
-        <PageLayout.HeaderButton onClick={onExport ?? exportPage}>
-          {exportLabel ?? "Export"} <Download size={16} />
-        </PageLayout.HeaderButton>
+        {!showEmptyState && (
+          <>
+            <AnnotationColumnsMenu
+              columns={columnOptions}
+              choices={columnChoices.choices}
+              onColumnVisibleChange={columnChoices.setColumnVisible}
+              onReset={columnChoices.resetColumns}
+              hasChoices={columnChoices.hasChoices}
+            />
+
+            <PageLayout.HeaderButton onClick={onExport ?? exportPage}>
+              {exportLabel ?? "Export"} <Download size={16} />
+            </PageLayout.HeaderButton>
+          </>
+        )}
       </SectionNavigationHeader>
 
       {isLoading && <AnnotationTableSkeleton />}
@@ -504,19 +508,7 @@ export function AnnotationList({
         <NoDataInfoBlock
           title={emptyNotice?.title ?? copy.noDataTitle}
           description={emptyNotice?.description ?? copy.noDataDescription}
-          docsInfo={
-            <Text>
-              To get started with annotations, please visit our{" "}
-              <Link
-                href="https://docs.langwatch.ai/features/annotations"
-                isExternal
-                color="orange.fg"
-              >
-                documentation
-              </Link>
-              .
-            </Text>
-          }
+          docsHref="https://docs.langwatch.ai/features/annotations"
           icon={<SquarePen />}
         />
       )}
