@@ -36,6 +36,7 @@ vi.mock("../../../behavior/sso-api.ts", () => {
           getHistory: { invalidate: () => {} },
           breakGlassBindings: { invalidate: () => {} },
         },
+        ssoConnections: { invalidate: () => {} },
       }),
       ssoSetup: {
         getSetup: {
@@ -44,6 +45,9 @@ vi.mock("../../../behavior/sso-api.ts", () => {
         register: mutation("register"),
         startLegacyMigration: mutation("startLegacyMigration"),
         setArrivals: mutation("setArrivals"),
+      },
+      ssoConnections: {
+        startLegacyMigration: mutation("operatorStartLegacyMigration"),
       },
     },
   };
