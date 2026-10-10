@@ -145,7 +145,7 @@ function Header({
         flexWrap="nowrap"
         css={{
           "& h1": {
-            fontSize: size === "lg" ? "20px" : "15px",
+            textStyle: size === "lg" ? "pageTitle" : "pageTitleCompact",
             lineHeight: "28px",
             height: "28px",
             margin: 0,
@@ -180,12 +180,10 @@ function Heading({ children, ...props }: PropsWithChildren<HeadingProps>) {
   return (
     <ChakraHeading
       as="h1"
-      fontSize={size === "lg" ? "20px" : "15px"}
+      textStyle={size === "lg" ? "pageTitle" : "pageTitleCompact"}
       lineHeight="28px"
       height="28px"
       flexShrink={0}
-      fontWeight="semibold"
-      letterSpacing="-0.01em"
       minWidth={0}
       truncate
       {...props}
@@ -196,7 +194,7 @@ function Heading({ children, ...props }: PropsWithChildren<HeadingProps>) {
 }
 
 function Subtitle(props: ChakraTextProps) {
-  return <Text color="fg.muted" fontSize="xs" lineHeight="short" {...props} />;
+  return <Text color="fg.muted" textStyle="caption" {...props} />;
 }
 
 // Content component

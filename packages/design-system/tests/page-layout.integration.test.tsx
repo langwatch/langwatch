@@ -138,7 +138,7 @@ describe("area-owned header geometry", () => {
     expect(getComputedStyle(screen.getByTestId("tool")).height).toBe(
       "var(--chakra-sizes-page-header-sm)",
     );
-    expect(getComputedStyle(screen.getByRole("heading")).fontSize).toBe("15px");
+    expect(getComputedStyle(screen.getByRole("heading")).fontSize).toBe("16px");
     expect(getComputedStyle(screen.getByRole("button")).height).toBe("28px");
   });
 });

@@ -130,7 +130,7 @@ export function WorkflowCardDisplay({
       <Text paddingX={4} color="fg" fontSize="sm" fontWeight={!description ? 500 : undefined}>
         {description ?? name}
       </Text>
-      <Text paddingX={4} color="fg.subtle" fontSize="12px">
+      <Text paddingX={4} color="fg.subtle" textStyle="caption">
         {updatedAtLabel}
       </Text>
     </WorkflowCardBase>

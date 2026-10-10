@@ -53,20 +53,14 @@ export function SettingsCard({
                   {leading}
                 </Box>
               )}
-              <Text
-                as="h2"
-                fontSize="13.5px"
-                fontWeight="640"
-                letterSpacing="-0.005em"
-                lineHeight="1.35"
-              >
+              <Text as="h2" textStyle="cardTitle">
                 {title}
               </Text>
               <Spacer />
               {badge}
             </HStack>
             {hint && (
-              <Text fontSize="11.5px" lineHeight="1.55" color="fg.muted">
+              <Text textStyle="caption" color="fg.muted">
                 {hint}
               </Text>
             )}
@@ -108,11 +102,9 @@ export function SettingRow({
       data-testid={testId}
     >
       <Box minWidth={0}>
-        <Text fontSize="13px" fontWeight="500" lineHeight="1.4">
-          {label}
-        </Text>
+        <Text textStyle="label">{label}</Text>
         {hint && (
-          <Text fontSize="11.5px" lineHeight="1.5" color="fg.muted" marginTop={0.5}>
+          <Text textStyle="caption" color="fg.muted" marginTop={0.5}>
             {hint}
           </Text>
         )}
@@ -302,7 +294,7 @@ export function OverviewDetail({
 }) {
   return (
     <SettingRow label={label} hint={hint}>
-      <Box fontSize="13px">{children}</Box>
+      <Box textStyle="bodySm">{children}</Box>
     </SettingRow>
   );
 }

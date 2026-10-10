@@ -169,7 +169,7 @@ export const VariablesSection = ({
     <VStack align="stretch" gap={3} width="full">
       {/* Header */}
       <HStack width="full">
-        <Text fontSize="xs" fontWeight="bold" textTransform="uppercase" color="fg.muted">
+        <Text textStyle="eyebrow" color="fg.muted">
           {title}
         </Text>
         <Spacer />
@@ -280,7 +280,7 @@ function VariableList({
   renderSourceIcon,
 }: VariableListProps) {
   return variables.length === 0 ? (
-    <Text fontSize="13px" color="fg.subtle">
+    <Text textStyle="bodySm" color="fg.subtle">
       No variables defined
     </Text>
   ) : (
@@ -438,8 +438,7 @@ const VariableRow = ({
           onKeyDown={handleKeyDown}
           size="sm"
           width="100px"
-          fontFamily="mono"
-          fontSize="13px"
+          textStyle="mono"
 
           borderColor={hasError ? "border.error" : undefined}
           data-testid={`variable-name-input-${variable.identifier}`}
@@ -447,8 +446,7 @@ const VariableRow = ({
       ) : (
         <HStack gap={1}>
           <Text
-            fontFamily="mono"
-            fontSize="13px"
+            textStyle="mono"
             cursor={readOnly ? "default" : "pointer"}
             onClick={readOnly ? undefined : onStartEdit}
             border="1px solid"
@@ -511,8 +509,7 @@ const VariableRow = ({
               size="sm"
               flex={1}
               minWidth={0}
-              fontFamily="mono"
-              fontSize="13px"
+              textStyle="mono"
               variant="flushed"
               borderColor="border"
               autoresize

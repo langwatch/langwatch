@@ -165,8 +165,7 @@ const COMPACT_TRIGGER = {
     minHeight: "32px",
     paddingInlineStart: "10px",
     paddingInlineEnd: "32px",
-    fontSize: "13px",
-    lineHeight: "20px",
+    textStyle: "bodySm",
   },
   "& [data-part=indicator] svg": { width: "14px", height: "14px" },
 } as const;
@@ -925,7 +924,7 @@ function SelectedScope({
         <Box display="flex" flexShrink={0} color="fg.muted">
           <ScopeIcon scopeType={option.scopeType} size={14} />
         </Box>
-        <Text truncate maxWidth="full" color="fg" fontSize="13px" lineHeight="20px">
+        <Text truncate maxWidth="full" color="fg" textStyle="bodySm">
           {option.label}
         </Text>
       </HStack>

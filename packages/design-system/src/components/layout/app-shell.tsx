@@ -300,7 +300,7 @@ export function CommandBarFooter({ isMac }: { isMac: boolean }) {
       paddingX={{ base: 4, md: 5 }}
       paddingY={2.5}
       gap={5}
-      fontSize="12px"
+      textStyle="caption"
       color="fg.muted"
     >
       {hints.map(([keys, action]) => (
@@ -354,7 +354,7 @@ export function CommandBarInput({
         outline="none"
         boxShadow="none"
         background="transparent"
-        fontSize={hero ? "16px" : "15px"}
+        fontSize="md"
         lineHeight="1.5"
         height="auto"
         padding={0}
@@ -373,8 +373,7 @@ export function CommandBarGroup({ label, children }: { label: string; children: 
   return (
     <VStack align="stretch" gap={0}>
       <Text
-        fontSize="12px"
-        fontWeight="normal"
+        textStyle="caption"
         color="fg.muted"
         paddingX={{ base: 4, md: 5 }}
         paddingTop={3.5}
@@ -429,17 +428,17 @@ export function CommandBarItem({
         <Icon size={18} />
       </Box>
       <HStack flex={1} gap={2} overflow="hidden">
-        <Text fontSize="14px" fontWeight="medium" color="fg.default" truncate>
+        <Text textStyle="body" fontWeight="medium" color="fg.default" truncate>
           {label}
         </Text>
         {description ? (
-          <Text fontSize="12px" color="fg.subtle" truncate>
+          <Text textStyle="caption" color="fg.subtle" truncate>
             {description}
           </Text>
         ) : null}
       </HStack>
       {meta ? (
-        <Text fontSize="11px" color="fg.muted" flexShrink={0}>
+        <Text textStyle="micro" color="fg.muted" flexShrink={0}>
           {meta}
         </Text>
       ) : null}
@@ -461,7 +460,7 @@ export function CommandBarHint({ hint }: { hint: ReactNode }) {
       paddingX={{ base: 4, md: 5 }}
       paddingY={2.5}
       gap={2.5}
-      fontSize="12px"
+      textStyle="caption"
       color="fg.muted"
     >
       <Box color="yellow.500" flexShrink={0}>

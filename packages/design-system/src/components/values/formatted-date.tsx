@@ -107,7 +107,7 @@ export function DateFormats({
   return (
     <VStack align="stretch" gap={2} data-testid="date-formats">
       <Box>
-        <Text fontSize="13px" lineHeight="20px" fontWeight="medium" color="fg">
+        <Text textStyle="label" color="fg">
           {d.heading}
         </Text>
         <Text textStyle="xs" lineHeight="18px" color="fg.muted">

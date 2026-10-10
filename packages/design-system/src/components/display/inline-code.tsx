@@ -60,8 +60,7 @@ const NEUTRAL = {
   borderWidth: 0,
   bg: "bg.control",
   color: "fg",
-  fontSize: "12px",
-  lineHeight: "16px",
+  textStyle: "monoSm",
 } as const;
 
 /**
