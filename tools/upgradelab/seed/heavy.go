@@ -1,6 +1,7 @@
 package seed
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -20,7 +21,7 @@ type HeavyInput struct {
 	Seed                 int64
 	Anchor               time.Time
 	Spans                int // 0 is seedgen's medium: about 300k
-	Workers              int // concurrent doors; default 32 (8 left main's api idle, waiting on round trips)
+	Workers              int // concurrent doors; default 8: requests carry up to 500 spans, so 32 timed out and starved the grants projection
 	Log                  io.Writer
 }
 
@@ -60,7 +61,7 @@ func Heavy(ctx context.Context, in HeavyInput) (HeavyResult, error) {
 	if err != nil {
 		return result, err
 	}
-	run := &heavyRun{door: door, plan: plan, live: live, workers: max(in.Workers, 32), count: count}
+	run := &heavyRun{door: door, plan: plan, live: live, workers: cmp.Or(in.Workers, defaultHeavyWorkers), count: count}
 	return result, errors.Join(append(run.telemetry(ctx), run.product(ctx)...)...)
 }
 
@@ -130,7 +131,7 @@ func (pool *chunkPool) fail(err error) {
 
 func (pool *chunkPool) drain(ctx context.Context, chunks <-chan seedgen.Action) {
 	for chunk := range chunks {
-		reply, err := pool.door.Send(ctx, chunk)
+		reply, err := sendRetrying(ctx, pool.door, chunk)
 		if err != nil {
 			pool.fail(fmt.Errorf("%s: %w", chunk.Kind, err))
 		}
@@ -183,7 +184,7 @@ type heavyOrgInput struct {
 func heavyOrg(ctx context.Context, door *seedgen.Door, in heavyOrgInput) []error {
 	label := strconv.Itoa(in.index)
 	name := fmt.Sprintf("Heavy %s %s", in.persona, label)
-	reply, _ := door.Send(ctx, seedgen.Action{Kind: seedgen.KindProductOrg, Input: marshal(map[string]string{"orgName": name, "projectName": "heavy " + label})})
+	reply, _ := sendRetrying(ctx, door, seedgen.Action{Kind: seedgen.KindProductOrg, Input: marshal(map[string]string{"orgName": name, "projectName": "heavy " + label})})
 	in.count(seedgen.KindProductOrg, reply)
 	if !reply.OK {
 		return []error{fmt.Errorf("kind %s for %s refused: %s", seedgen.KindProductOrg, name, reply.Code)}
@@ -201,7 +202,7 @@ func heavyOrg(ctx context.Context, door *seedgen.Door, in heavyOrgInput) []error
 		if action.Kind == seedgen.KindProductSuite {
 			action.Input = marshal(map[string]any{"projectId": projectID, "name": "heavy suite " + label, "scenarioIds": []string{scenarioID}})
 		}
-		reply, _ = door.Send(ctx, action)
+		reply, _ = sendRetrying(ctx, door, action)
 		in.count(action.Kind, reply)
 		if action.Kind == seedgen.KindProductScenario {
 			scenarioID = reply.Refs["id"]
@@ -265,4 +266,26 @@ func heavyActions(projectID, label string) []seedgen.Action {
 func marshal(value any) json.RawMessage {
 	data, _ := json.Marshal(value)
 	return data
+}
+
+const (
+	defaultHeavyWorkers = 8
+	heavyAttempts       = 5
+)
+
+// sendRetrying resends a retryable refusal (a timeout, a 5xx such as an unconfirmed grant) with doubling back-off.
+func sendRetrying(ctx context.Context, door *seedgen.Door, action seedgen.Action) (seedgen.Reply, error) {
+	wait := 2 * time.Second
+	for attempt := 1; ; attempt++ {
+		reply, err := door.Send(ctx, action)
+		if err != nil || reply.OK || !reply.Retryable || attempt == heavyAttempts {
+			return reply, err
+		}
+		select {
+		case <-ctx.Done():
+			return reply, ctx.Err()
+		case <-time.After(wait):
+		}
+		wait *= 2
+	}
 }

@@ -153,7 +153,7 @@ func (cell *run) seedTier(ctx context.Context) error {
 		return fmt.Errorf("seed account: %w", err)
 	}
 	email, password := generate.SeedAccount(cell.options.Seed)
-	cell.seeder = seed.NewSeeder(seed.ProductInput{AppURL: cell.url(), Email: email, Password: password, Label: cell.options.Name()})
+	cell.seeder = seed.NewSeeder(seed.ProductInput{AppURL: cell.url(), Email: email, Password: password, Label: cell.options.Name(), Skip: freePlanSkips(shape)})
 	if err := cell.seeder.Seed(ctx); err != nil {
 		cell.report.Notes = append(cell.report.Notes, "product seeds: "+err.Error())
 	}
@@ -328,4 +328,12 @@ func signIn(ctx context.Context, origin, email, password string) (string, error)
 		}
 	}
 	return "", fmt.Errorf("sign in as the restored seed account answered %d with no session cookie", response.StatusCode)
+}
+
+// freePlanSkips is the kinds a cloud shape's free-plan organization refuses (retention is paid-plan, 403).
+func freePlanSkips(shape string) []string {
+	if shape == "saas" || shape == "hybrid" {
+		return []string{"retention"}
+	}
+	return nil
 }

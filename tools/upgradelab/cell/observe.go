@@ -139,57 +139,11 @@ func PhaseAt(timeline []PhaseChange, atMs int64) string {
 	return phase
 }
 
-// queueDepthScript sums the waiting work in Redis: lists, sorted sets and streams, never a
-// completed, failed or bookkeeping key (the gq ready index and stats, known pipelines). ponytail: KEYS over a test-sized db; SCAN if a tier grows.
-const queueDepthScript = `local total = 0
-for _, key in ipairs(redis.call('KEYS', '*')) do
-  if not (string.find(key, ':completed$') or string.find(key, ':failed$') or string.find(key, ':events$') or string.find(key, ':meta$') or string.find(key, ':repeat$') or string.find(key, ':stalled') or string.find(key, 'dedup') or string.find(key, 'lock') or string.find(key, 'known%-pipelines') or string.find(key, ':gq:stats:') or string.find(key, ':gq:ready$')) then
-    local kind = redis.call('TYPE', key).ok
-    if kind == 'zset' then total = total + redis.call('ZCARD', key)
-    elseif kind == 'list' then total = total + redis.call('LLEN', key)
-    elseif kind == 'stream' then total = total + redis.call('XLEN', key) end
-  end -- if
-end -- for
-return total`
-
 // QueueSample is one reading of the waiting work.
 type QueueSample struct {
 	AtMs  int64 `json:"atMs"`
 	Depth int   `json:"depth"`
 	Left  int   `json:"cutJobsLeft"` // jobs present at the cut still waiting; -1 unread
-}
-
-// QueueDepth reads the cell's Redis once.
-func QueueDepth(ctx context.Context, port string) (int, error) {
-	out, err := exec.CommandContext(ctx, "redis-cli", "-p", port, "EVAL", queueDepthScript, "0").Output() // #nosec G204 -- fixed script.
-	if err != nil {
-		return 0, fmt.Errorf("redis-cli EVAL: %w", err)
-	}
-	return strconv.Atoi(strings.TrimSpace(string(out)))
-}
-
-// queueJobsScript is queueDepthScript's key filter, listing the waiting jobs where it counts them.
-var queueJobsScript = strings.NewReplacer(
-	"local total = 0", "local rows = {}",
-	"total = total + redis.call('ZCARD', key)", "for _, m in ipairs(redis.call('ZRANGE', key, 0, -1)) do table.insert(rows, key .. ' ' .. m) end",
-	"total = total + redis.call('LLEN', key)", "for i, m in ipairs(redis.call('LRANGE', key, 0, -1)) do table.insert(rows, key .. ' #' .. i .. m) end",
-	"total = total + redis.call('XLEN', key)", "for _, m in ipairs(redis.call('XRANGE', key, '-', '+')) do table.insert(rows, key .. ' ' .. m[1]) end",
-	"return total", "return rows",
-).Replace(queueDepthScript)
-
-// QueueJobs lists every waiting job as "key member", with the same exclusions as the depth.
-func QueueJobs(ctx context.Context, port string) (map[string]struct{}, error) {
-	out, err := exec.CommandContext(ctx, "redis-cli", "-p", port, "EVAL", queueJobsScript, "0").Output() // #nosec G204 -- fixed script.
-	if err != nil {
-		return nil, fmt.Errorf("redis-cli EVAL: %w", err)
-	}
-	jobs := map[string]struct{}{}
-	for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
-		if line != "" {
-			jobs[line] = struct{}{}
-		}
-	}
-	return jobs, nil
 }
 
 // QueueLeft is the jobs of cut still waiting in now.
@@ -221,35 +175,6 @@ func LeftByKind(left []string) string {
 	}
 	slices.Sort(rows)
 	return strings.Join(rows, "; ")
-}
-
-// TopQueueKeys names the longest keys, so a report reader can judge what the depth counted.
-func TopQueueKeys(ctx context.Context, port string) string {
-	script := `local rows = {}
-for _, key in ipairs(redis.call('KEYS', '*')) do
-  local kind = redis.call('TYPE', key).ok
-  local size = 0
-  if kind == 'zset' then size = redis.call('ZCARD', key) elseif kind == 'list' then size = redis.call('LLEN', key) elseif kind == 'stream' then size = redis.call('XLEN', key) end
-  if size > 0 then table.insert(rows, key .. ' ' .. kind .. ' ' .. size) end -- if
-end -- for
-return rows`
-	out, _ := exec.CommandContext(ctx, "redis-cli", "-p", port, "EVAL", script, "0").Output() // #nosec G204 -- fixed script.
-	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
-	return strings.Join(lines[:min(len(lines), 25)], "\n")
-}
-
-// QueueByKind groups the group-queue's waiting jobs by job kind (the group key without tenant and
-// aggregate): jobs, groups and when the earliest and latest are due, from the zset scores (ms).
-func QueueByKind(ctx context.Context, port string) string {
-	script := `local rows = {}
-for _, key in ipairs(redis.call('KEYS', '*:gq:group:*:jobs')) do
-  local first = redis.call('ZRANGE', key, 0, 0, 'WITHSCORES')
-  local last = redis.call('ZRANGE', key, -1, -1, 'WITHSCORES')
-  if first[2] then table.insert(rows, key .. ' ' .. redis.call('ZCARD', key) .. ' ' .. first[2] .. ' ' .. last[2]) end -- if
-end -- for
-return rows`
-	out, _ := exec.CommandContext(ctx, "redis-cli", "-p", port, "EVAL", script, "0").Output() // #nosec G204 -- fixed script.
-	return groupQueueKinds(string(out), time.Now().UnixMilli())
 }
 
 type queueKind struct {

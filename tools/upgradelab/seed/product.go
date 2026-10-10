@@ -28,11 +28,13 @@ var sessionCookie = regexp.MustCompile(`(?:__Secure-)?better-auth\.session_token
 type ProductInput struct {
 	AppURL, Email, Password, Label string
 	Client                         *http.Client
+	Skip                           []string // kinds not seeded, e.g. retention where the free plan refuses it
 }
 
 // ProductContext is what the seed's own setup learned from the old app's answers.
 type ProductContext struct {
 	OrganizationID, ProjectID, TraceID, Label, APIKey, ScenarioID string
+	TeamID, ProjectSlug                                           string
 }
 
 // productDoor is one kind's tRPC create input, its read-back query and the marker the answer must hold.
@@ -120,6 +122,9 @@ func (seeder *Seeder) Seed(ctx context.Context) error {
 	}
 	var refused []error
 	for _, kind := range seedableKinds() {
+		if slices.Contains(seeder.input.Skip, kind.Kind) {
+			continue
+		}
 		if kind.Kind == "suite" {
 			// A suite needs a scenario to hold; main's own scenarios.create makes one.
 			scenario := map[string]any{"projectId": seeder.Context.ProjectID, "name": "rehearsal scenario " + seeder.Context.Label, "situation": "upgrade rehearsal seed"}
@@ -188,6 +193,7 @@ func (seeder *Seeder) signIn(ctx context.Context) error {
 
 type organization struct {
 	Teams []struct {
+		ID       string    `json:"id"`
 		Projects []project `json:"projects"`
 	} `json:"teams"`
 }
@@ -208,7 +214,34 @@ func (seeder *Seeder) prepare(ctx context.Context) error {
 	if seeder.Context.ProjectID == "" {
 		return errors.New("organization.getAll lists no project")
 	}
+	seeder.Context.TeamID, seeder.Context.ProjectSlug = teamOf(organizations, seeder.Context.ProjectID)
 	return seeder.ingestTrace(ctx)
+}
+
+// teamOf is the team holding the project, and the project's slug.
+func teamOf(organizations []organization, projectID string) (string, string) {
+	for _, each := range organizations {
+		for _, team := range each.Teams {
+			if index := slices.IndexFunc(team.Projects, func(p project) bool { return p.ID == projectID }); index >= 0 {
+				return team.ID, team.Projects[index].Slug
+			}
+		}
+	}
+	return "", ""
+}
+
+// Invite asks main to invite email as a plain MEMBER of the seed team and returns the invite code.
+func (seeder *Seeder) Invite(ctx context.Context, email string) (string, error) {
+	input := map[string]any{"organizationId": seeder.Context.OrganizationID, "invites": []any{map[string]any{
+		"email": email, "role": "MEMBER", "teams": []any{map[string]string{"teamId": seeder.Context.TeamID, "role": "MEMBER"}}}}}
+	var created []struct{ InviteCode string }
+	if err := seeder.trpc(ctx, trpcCall{mutation: true, path: "invite.createInvites", input: input, out: &created}); err != nil {
+		return "", err
+	}
+	if len(created) == 0 || created[0].InviteCode == "" {
+		return "", fmt.Errorf("invite.createInvites made no invite for %s", email)
+	}
+	return created[0].InviteCode, nil
 }
 
 // projectIn is the project with this slug, else the first listed, as product.mjs falls back.

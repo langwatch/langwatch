@@ -3,6 +3,7 @@ package seedgen
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -51,6 +52,9 @@ func (d *Door) Send(ctx context.Context, action Action) (Reply, error) {
 	request.Header.Set("Content-Type", "application/json")
 	request.Header.Set("Authorization", "Bearer "+key)
 	response, err := d.http().Do(request)
+	if errors.Is(err, context.DeadlineExceeded) && ctx.Err() == nil {
+		return Reply{ID: action.ID, Code: "timeout", Retryable: true}, nil
+	}
 	if err != nil {
 		return Reply{}, err
 	}
@@ -68,7 +72,7 @@ func (d *Door) Send(ctx context.Context, action Action) (Reply, error) {
 
 func (d *Door) http() *http.Client {
 	d.once.Do(func() {
-		d.client = &http.Client{Timeout: time.Minute, Transport: &http.Transport{TLSClientConfig: havenrun.LocalTLSConfig()}}
+		d.client = &http.Client{Timeout: 3 * time.Minute, Transport: &http.Transport{TLSClientConfig: havenrun.LocalTLSConfig()}}
 	})
 	return d.client
 }

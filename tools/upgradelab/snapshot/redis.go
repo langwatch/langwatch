@@ -87,7 +87,21 @@ func (redis *RedisRESP) session(ctx context.Context, work func(*respConn) error)
 	return work(client)
 }
 
+// busyFor bounds how long a BUSY reply (a script holding Redis) is retried.
+const busyFor = 2 * time.Minute
+
 func (client *respConn) do(args ...string) (any, error) {
+	giveUp := time.Now().Add(busyFor)
+	for {
+		reply, err := client.send(args...)
+		if err == nil || !strings.HasPrefix(err.Error(), "redis: BUSY") || time.Now().After(giveUp) {
+			return reply, err
+		}
+		time.Sleep(500 * time.Millisecond)
+	}
+}
+
+func (client *respConn) send(args ...string) (any, error) {
 	var request strings.Builder
 	fmt.Fprintf(&request, "*%d\r\n", len(args))
 	for _, arg := range args {
