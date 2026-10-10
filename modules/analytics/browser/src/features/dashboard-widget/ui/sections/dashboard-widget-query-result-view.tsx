@@ -4,7 +4,7 @@
  * the Queries tab's own standalone Run button (`useDashboardWidgetExecutor`).
  */
 
-import { Box, Table, Text } from "@langwatch/design-system/primitives";
+import { Alert, Box, Table, Text } from "@langwatch/design-system/primitives";
 
 import { formatNumber } from "../../../../model/format.ts";
 import type { QueryLastRun } from "../../behavior/use-dashboard-widget-executor.ts";
@@ -32,16 +32,14 @@ export function DashboardWidgetQueryResultView({ run }: DashboardWidgetQueryResu
 
   if (run.error) {
     return (
-      <Box
-        fontSize="12px"
-        color="red.fg"
-        borderWidth="1px"
-        borderColor="red.subtle"
-        borderRadius="md"
-        padding={2}
-      >
-        {run.error.title} [{run.error.code}]: {run.error.message}
-      </Box>
+      <Alert.Root status="error" size="sm">
+        <Alert.Indicator />
+        <Alert.Content>
+          <Alert.Description>
+            {run.error.title} [{run.error.code}]: {run.error.message}
+          </Alert.Description>
+        </Alert.Content>
+      </Alert.Root>
     );
   }
 
