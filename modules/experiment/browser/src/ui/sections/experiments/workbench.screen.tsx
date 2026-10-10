@@ -25,7 +25,7 @@ import { type ProposalHandlers } from "../../../model/langy/langy-proposal-handl
 import { AutosaveStatus } from "../../../ui/elements/experiments-v3/autosave-status.tsx";
 import { EditableHeading } from "../../../ui/elements/experiments-v3/editable-heading.tsx";
 import { WorkbenchRowsCutBanner } from "../../../ui/elements/experiments-v3/workbench-rows-cut-banner.tsx";
-import { WorkbenchStaleBanner } from "../../../ui/elements/experiments-v3/workbench-stale-banner.tsx";
+import { WorkbenchStaleStatus } from "../../../ui/elements/experiments-v3/workbench-stale-status.tsx";
 import { EvaluationsV3Table } from "../../../ui/sections/experiments-v3/evaluations-v3-table.tsx";
 import { HistoryButton } from "../../../ui/sections/experiments-v3/history-button.tsx";
 import { PromptTemplateFieldsProvider } from "../../../ui/sections/experiments-v3/prompt-template-fields-provider.tsx";
@@ -209,12 +209,20 @@ export default function ExperimentsWorkbenchPage() {
             <EditableHeading value={name} onSave={setName} isLoading={isLoadingExperiment} />
             <Spacer />
             <HStack gap={2}>
-              <AutosaveStatus
-                evaluationState={autosaveStatus.evaluation}
-                datasetState={autosaveStatus.dataset}
-                evaluationError={autosaveStatus.evaluationError}
-                datasetError={autosaveStatus.datasetError}
-              />
+              {staleWorkbench ? (
+                <WorkbenchStaleStatus
+                  actorLabel={staleWorkbench.actorLabel}
+                  isDirty={isDirty}
+                  onReload={reloadStaleWorkbench}
+                />
+              ) : (
+                <AutosaveStatus
+                  evaluationState={autosaveStatus.evaluation}
+                  datasetState={autosaveStatus.dataset}
+                  evaluationError={autosaveStatus.evaluationError}
+                  datasetError={autosaveStatus.datasetError}
+                />
+              )}
               <UndoRedo />
               <TableSettingsMenu disabled={isLoadingExperiment} />
               <HistoryButton disabled={isLoadingExperiment} />
@@ -222,13 +230,6 @@ export default function ExperimentsWorkbenchPage() {
               <RunEvaluationButton disabled={isLoadingExperiment || isLoadingDatasets} />
             </HStack>
           </HStack>
-
-          {staleWorkbench && (
-            <WorkbenchStaleBanner
-              actorLabel={staleWorkbench.actorLabel}
-              onReload={reloadStaleWorkbench}
-            />
-          )}
 
           {activeRowsCut && <WorkbenchRowsCutBanner cut={activeRowsCut} />}
 
