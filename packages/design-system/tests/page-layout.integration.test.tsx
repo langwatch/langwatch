@@ -116,7 +116,7 @@ describe("area-owned header geometry", () => {
       expect(row.dataset.headerSize).toBe("lg");
       expect(style.height).toBe("var(--chakra-sizes-page-header-lg)");
       expect(style.maxHeight).toBe(style.height);
-      expect(style.paddingInline).toBe("var(--chakra-spacing-6)");
+      expect(style.paddingInline).toBe("var(--page-inset, var(--chakra-spacing-6))");
       expect(style.paddingTop).toBe("1px");
       expect(style.flexWrap).toBe("nowrap");
       const title = getComputedStyle(screen.getByRole("heading", { name: `Title ${count}` }));
