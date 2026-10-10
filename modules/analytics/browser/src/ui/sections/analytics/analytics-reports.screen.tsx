@@ -1,13 +1,6 @@
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
-import {
-  Alert,
-  Box,
-  Button,
-  HStack,
-  Skeleton,
-  Text,
-  VStack,
-} from "@langwatch/design-system/primitives";
+import { PageLayout } from "@langwatch/design-system/page-layout";
+import { Alert, Box, HStack, Skeleton, Text, VStack } from "@langwatch/design-system/primitives";
 import { useFeatureFlag } from "@langwatch/feature-flag-client";
 import { FrontendFlags } from "@langwatch/feature-flag-contract";
 import { Plus } from "lucide-react";
@@ -215,21 +208,22 @@ function ReportsContent() {
     <AnalyticsLayout
       title={dashboardTitle}
       railEntry="reports"
+      activeDashboardId={activeDashboardId}
       analyticsHeaderProps={{
         isEditable: canRenameDashboard,
         onTitleSave: handleTitleSave,
       }}
+      primaryAction={
+        project && canAddChart ? (
+          <AddChartButton
+            opensDrawer={customChartPlaygroundEnabled}
+            href={addChartUrl}
+            onOpenDrawer={() => setIsAddChartOpen(true)}
+          />
+        ) : null
+      }
       extraHeaderButtons={
-        <>
-          <DashboardAutoRefreshMenu option={autoRefresh.option} onChange={autoRefresh.setOption} />
-          {project && canAddChart ? (
-            <AddChartButton
-              opensDrawer={customChartPlaygroundEnabled}
-              href={addChartUrl}
-              onOpenDrawer={() => setIsAddChartOpen(true)}
-            />
-          ) : null}
-        </>
+        <DashboardAutoRefreshMenu option={autoRefresh.option} onChange={autoRefresh.setOption} />
       }
     >
       {/* The workbench builder's own save path is disabled while the
@@ -331,21 +325,16 @@ function AddChartButton({
 }) {
   if (opensDrawer) {
     return (
-      <Button
-        colorPalette="orange"
-        size="sm"
-        data-testid="analytics-add-chart"
-        onClick={onOpenDrawer}
-      >
+      <PageLayout.HeaderButton primary data-testid="analytics-add-chart" onClick={onOpenDrawer}>
         <Plus /> Add chart
-      </Button>
+      </PageLayout.HeaderButton>
     );
   }
   return (
     <Link href={href} asChild>
-      <Button colorPalette="orange" size="sm" data-testid="analytics-add-chart">
+      <PageLayout.HeaderButton primary data-testid="analytics-add-chart">
         <Plus /> Add chart
-      </Button>
+      </PageLayout.HeaderButton>
     </Link>
   );
 }

@@ -33,12 +33,16 @@ export default function AnalyticsLayout({
   children,
   title,
   railEntry,
+  activeDashboardId,
   analyticsHeaderProps,
+  primaryAction,
   extraHeaderButtons,
 }: PropsWithChildren<{
   title: string;
   railEntry?: AnalyticsRailEntry;
+  activeDashboardId?: string;
   analyticsHeaderProps?: Omit<AnalyticsHeaderProps, "title">;
+  primaryAction?: React.ReactNode;
   extraHeaderButtons?: React.ReactNode;
 }>) {
   const host = useAnalyticsHost();
@@ -64,7 +68,9 @@ export default function AnalyticsLayout({
     {
       label: "Custom",
       links: [],
-      extra: project?.slug ? <CustomDashboardsSection projectSlug={project.slug} /> : null,
+      extra: project?.slug ? (
+        <CustomDashboardsSection projectSlug={project.slug} activeDashboardId={activeDashboardId} />
+      ) : null,
     },
   ];
   const activeHref =
@@ -79,6 +85,7 @@ export default function AnalyticsLayout({
           <AnalyticsHeader
             title={title}
             {...analyticsHeaderProps}
+            primaryAction={primaryAction}
             extraHeaderButtons={extraHeaderButtons}
           />
         }

@@ -4,7 +4,7 @@
  */
 
 import { Menu } from "@langwatch/design-system/menu";
-import { Button } from "@langwatch/design-system/primitives";
+import { PageLayout } from "@langwatch/design-system/page-layout";
 import { RefreshCw } from "lucide-react";
 
 import {
@@ -23,9 +23,9 @@ export function DashboardAutoRefreshMenu({
   return (
     <Menu.Root>
       <Menu.Trigger asChild>
-        <Button variant="ghost" size="sm" aria-label="Auto-refresh">
+        <PageLayout.HeaderButton aria-label="Auto-refresh">
           <RefreshCw size={14} /> Auto-refresh: {DASHBOARD_AUTO_REFRESH_LABEL[option]}
-        </Button>
+        </PageLayout.HeaderButton>
       </Menu.Trigger>
       <Menu.Content>
         {DASHBOARD_AUTO_REFRESH_OPTIONS.map((key) => (
