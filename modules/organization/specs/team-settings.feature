@@ -32,3 +32,9 @@ Feature: The team settings page reads as main's does
     Given a team the reader may edit, with one admin member
     When a new name is typed into the name field and Enter is pressed
     Then the team is saved with the new name and its members unchanged, with no save button
+
+  @integration
+  Scenario: An archived team's address says the team was not found
+    Given a team that has been archived
+    When its settings address is opened
+    Then the page says the team was not found, with no loading skeleton
