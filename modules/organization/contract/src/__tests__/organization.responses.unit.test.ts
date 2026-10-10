@@ -7,6 +7,7 @@ import {
   organizationMemberRecordSchema,
   organizationUserRowsSchema,
 } from "../organization.responses.ts";
+import { auditImpersonationMetadataSchema } from "../organization.ts";
 
 describe("organizationAuditLogPageSchema", () => {
   /** @scenario "An audit log entry declares the before and after states main served" */
@@ -33,6 +34,8 @@ describe("organizationAuditLogPageSchema", () => {
           targetId: "budget_1",
           before: { limit: 1 },
           after: { limit: 2 },
+          actorUserId: null,
+          actorUser: null,
         },
       ],
     };
@@ -171,5 +174,16 @@ describe("organizationMemberRecordSchema", () => {
       "name",
     ]);
     expect(read).not.toHaveProperty("teamMemberships");
+  });
+});
+
+describe("auditImpersonationMetadataSchema", () => {
+  /** @scenario An impersonated entry names the operator as well as the person */
+  it("reads the operator the tRPC door wrote, and nothing from other metadata", () => {
+    expect(auditImpersonationMetadataSchema.safeParse({ impersonatorId: "op-2" }).data).toEqual({
+      impersonatorId: "op-2",
+    });
+    expect(auditImpersonationMetadataSchema.validate({ other: 1 })).toBe(false);
+    expect(auditImpersonationMetadataSchema.validate(null)).toBe(false);
   });
 });

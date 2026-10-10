@@ -248,6 +248,11 @@ const organizationAuditLogEntrySchema = z
     targetId: z.string().nullable(),
     before: z.unknown(),
     after: z.unknown(),
+    actorUserId: z.string().nullable(),
+    actorUser: z
+      .object({ id: z.string().min(1), name: z.string().nullable(), email: z.string().nullable() })
+      .strict()
+      .nullable(),
   })
   .strict();
 

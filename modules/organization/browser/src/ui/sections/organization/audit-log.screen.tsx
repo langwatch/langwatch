@@ -15,7 +15,6 @@ import {
   Input,
   NativeSelect,
   Spacer,
-  Table,
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
@@ -25,7 +24,7 @@ import type { EnrichedAuditLog as StoredEnrichedAuditLog } from "@langwatch/orga
 /** An audit row as the browser receives it: its instant is an ISO string. */
 type EnrichedAuditLog = WireOf<StoredEnrichedAuditLog>;
 import { neutralizeFormula, neutralizeRows } from "@langwatch/csv";
-import { nowInstant } from "@langwatch/time";
+import { nowInstant, toDate } from "@langwatch/time";
 import { ArrowLeft, Download, ScrollText, Search } from "lucide-react";
 import Parse from "papaparse";
 import { useMemo, useState } from "react";
@@ -47,7 +46,7 @@ import {
   withAuditPageSize,
   withoutAuditTarget,
 } from "../../../model/audit-log-filters.ts";
-import { groupAuditRuns, auditOptionalColumns } from "../../../model/audit-log-rows.ts";
+import { auditFeedDays, groupAuditRuns } from "../../../model/audit-log-rows.ts";
 import {
   auditPeriodLabel,
   auditPeriodQuery,
@@ -55,7 +54,7 @@ import {
 } from "../../../model/audit-period.ts";
 import { disambiguateLabels } from "../../../model/disambiguate-labels.ts";
 import { useOrganizationHost } from "../../../model/organization-host.ts";
-import { AuditLogRunRow } from "../../../ui/blocks/audit-log-run-row.tsx";
+import { AuditLogEntry } from "../../../ui/blocks/audit-log-entry.tsx";
 import { AuditPaginationFooter } from "../../../ui/elements/audit-pagination-footer.tsx";
 import { AuditPeriodPicker } from "../../../ui/elements/audit-period-picker.tsx";
 import { Link } from "../../../ui/elements/organization-link.tsx";
@@ -67,10 +66,10 @@ function auditLogsView({
 }: {
   isLoading: boolean;
   rowCount: number;
-}): "loading" | "empty" | "table" {
+}): "loading" | "empty" | "feed" {
   if (isLoading) return "loading";
   if (rowCount === 0) return "empty";
-  return "table";
+  return "feed";
 }
 
 export default function AuditLogScreen() {
@@ -150,7 +149,6 @@ export default function AuditLogScreen() {
     team.projects.map((project) => ({ id: project.id, label: project.name, teamName: team.name })),
   );
 
-  const columns = auditOptionalColumns(rows);
   const projectLabel = (projectId: string) =>
     projects.find((project) => project.id === projectId)?.label ?? projectId;
 
@@ -309,40 +307,32 @@ export default function AuditLogScreen() {
             />
           </Box>
         )}
-        {logsView === "table" && (
+        {logsView === "feed" && (
           <>
-            <Box
-              width="full"
-              overflowX="auto"
-              borderWidth="1px"
-              borderColor="border"
-              borderRadius="lg"
-            >
-              <Table.Root variant="line" size="sm" width="full">
-                <Table.Header>
-                  <Table.Row bg="bg.subtle">
-                    <Table.ColumnHeader width="8" paddingRight={0} />
-                    <Table.ColumnHeader>Time</Table.ColumnHeader>
-                    <Table.ColumnHeader>Actor</Table.ColumnHeader>
-                    <Table.ColumnHeader>Action</Table.ColumnHeader>
-                    {columns.target && <Table.ColumnHeader>Target</Table.ColumnHeader>}
-                    {columns.project && <Table.ColumnHeader>Project</Table.ColumnHeader>}
-                  </Table.Row>
-                </Table.Header>
-                <Table.Body>
-                  {groupAuditRuns(rows).map((run) => (
-                    <AuditLogRunRow
-                      key={run.id}
-                      run={run}
-                      columns={columns}
-                      projectLabel={projectLabel}
-                      projectSlug={scope.projectSlug}
-                      scopeProjectId={scope.projectId ?? void 0}
-                    />
+            <VStack width="full" align="stretch" gap={0} data-testid="audit-log-feed">
+              {auditFeedDays({ runs: groupAuditRuns(rows), now: toDate(now) }).map((day) => (
+                <Box key={day.label} as="section" aria-label={day.label}>
+                  <Text
+                    fontSize="xs"
+                    fontWeight="semibold"
+                    color="fg.muted"
+                    textTransform="uppercase"
+                    letterSpacing="wider"
+                    paddingX={3}
+                    paddingTop={3}
+                    paddingBottom={1}
+                    borderBottomWidth="1px"
+                    borderColor="border.muted"
+                    marginBottom={1}
+                  >
+                    {day.label}
+                  </Text>
+                  {day.runs.map((run) => (
+                    <AuditLogEntry key={run.id} run={run} projectLabel={projectLabel} />
                   ))}
-                </Table.Body>
-              </Table.Root>
-            </Box>
+                </Box>
+              ))}
+            </VStack>
 
             {totalHits > 0 && (
               <AuditPaginationFooter
