@@ -11,6 +11,7 @@ import { InMemoryProcessStore } from "@langwatch/eventing";
 import { explainHandledError } from "@langwatch/handled-error/presentation";
 import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import type { ProjectApi } from "@langwatch/project-contract";
+import type { ShareApi } from "@langwatch/share-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
@@ -48,16 +49,13 @@ function buildInstanceAdmin(connectionDecides = true) {
       }),
       instanceAdmin: PrismaInstanceAdminRepository.create(refuseEveryQuery as never),
     },
-    accounts: {
-      deactivateUser: () => Promise.reject(new Error("unreached")),
-      changeUserEmail: () => Promise.reject(new Error("unreached")),
-    },
     audit: new AuditStub(),
     sessions: createApiFixture<AuthApi>(),
     accounts: createApiFixture<AuthApi>(),
     auditLog: createApiFixture<AuditLogApi>(),
     authz: createApiFixture<AuthzApi>(),
     users: new TestUserApi(),
+    shares: createApiFixture<ShareApi>(),
     ssoRouting: { connectionDecides: async () => connectionDecides },
     scheduler: {
       schedules: createApiFixture<AutomationApi>(),
