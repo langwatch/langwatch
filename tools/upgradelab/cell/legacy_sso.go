@@ -35,9 +35,9 @@ type legacySeed struct {
 }
 
 // startIdentityProxy puts idpsim behind TLS: main's Auth0 provider keeps only the issuer's host and forces
-// https. The certificate is the cell's own; both releases trust it through NODE_EXTRA_CA_CERTS.
+// https. The proxy serves a leaf signed by the cell's own CA; both releases trust the CA through NODE_EXTRA_CA_CERTS.
 func (cell *run) startIdentityProxy() error {
-	certificate, pemBytes, err := selfSignedCertificate()
+	certificate, pemBytes, err := proxyCertificates()
 	if err != nil {
 		return err
 	}
@@ -63,25 +63,41 @@ func (cell *run) startIdentityProxy() error {
 	return nil
 }
 
-// selfSignedCertificate is a CA-capable certificate for 127.0.0.1 and localhost, valid for a week.
-func selfSignedCertificate() (tls.Certificate, []byte, error) {
-	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+// proxyCertificates is a CA for the cell and a leaf it signed for 127.0.0.1 and localhost, valid for a week: the
+// leaf to serve and the CA's PEM to trust. Node refuses a self-signed CA served as its own leaf.
+func proxyCertificates() (tls.Certificate, []byte, error) {
+	caKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
 		return tls.Certificate{}, nil, err
 	}
-	serial, err := rand.Int(rand.Reader, big.NewInt(1<<62))
+	caTemplate := certificateTemplate("upgradelab cell CA")
+	caTemplate.IsCA, caTemplate.KeyUsage = true, x509.KeyUsageCertSign|x509.KeyUsageCRLSign
+	caDER, err := x509.CreateCertificate(rand.Reader, caTemplate, caTemplate, &caKey.PublicKey, caKey)
 	if err != nil {
 		return tls.Certificate{}, nil, err
 	}
-	template := &x509.Certificate{SerialNumber: serial, Subject: pkix.Name{CommonName: "upgradelab idpsim"},
-		NotBefore: time.Now().Add(-time.Hour), NotAfter: time.Now().Add(7 * 24 * time.Hour),
-		IsCA: true, BasicConstraintsValid: true, KeyUsage: x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
-		ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth}, IPAddresses: []net.IP{net.ParseIP("127.0.0.1")}, DNSNames: []string{"localhost"}}
-	der, err := x509.CreateCertificate(rand.Reader, template, template, &key.PublicKey, key)
+	ca, err := x509.ParseCertificate(caDER)
 	if err != nil {
 		return tls.Certificate{}, nil, err
 	}
-	return tls.Certificate{Certificate: [][]byte{der}, PrivateKey: key}, pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der}), nil
+	leafKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		return tls.Certificate{}, nil, err
+	}
+	leafTemplate := certificateTemplate("upgradelab idpsim")
+	leafTemplate.KeyUsage, leafTemplate.ExtKeyUsage = x509.KeyUsageDigitalSignature, []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth}
+	leafTemplate.IPAddresses, leafTemplate.DNSNames = []net.IP{net.ParseIP("127.0.0.1")}, []string{"localhost"}
+	leafDER, err := x509.CreateCertificate(rand.Reader, leafTemplate, ca, &leafKey.PublicKey, caKey)
+	if err != nil {
+		return tls.Certificate{}, nil, err
+	}
+	return tls.Certificate{Certificate: [][]byte{leafDER, caDER}, PrivateKey: leafKey}, pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: caDER}), nil
+}
+
+func certificateTemplate(name string) *x509.Certificate {
+	serial, _ := rand.Int(rand.Reader, big.NewInt(1<<62))
+	return &x509.Certificate{SerialNumber: serial, Subject: pkix.Name{CommonName: name}, BasicConstraintsValid: true,
+		NotBefore: time.Now().Add(-time.Hour), NotAfter: time.Now().Add(7 * 24 * time.Hour)}
 }
 
 // legacyAuth0Env is idpsim's own `legacy env` for tenant 1 as Auth0, under main's variable names: what an

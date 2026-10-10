@@ -13,9 +13,11 @@ mkdirSync(stateDir, { recursive: true });
 const emit = (record) => console.log(JSON.stringify({ phase, ...record }));
 const shown = async (page) =>
   `${new URL(page.url()).pathname}: ${(await page.innerText("body").catch(() => "")).replace(/\s+/g, " ").slice(0, 200)}`;
-// A member of another organization (the SAML one) lands on that organization's project.
+// Signed in: on the member's project (the SAML one has its own), or on /me, the personal page a
+// member with no project of their own lands on.
 const onProject = (at, member) =>
-  at.origin === new URL(url).origin && at.pathname.split("/")[1] === (member?.project ?? project);
+  at.origin === new URL(url).origin &&
+  [member?.project ?? project, "me"].includes(at.pathname.split("/")[1]);
 const atAuth = (at) => at.pathname.startsWith("/auth/");
 const stateFile = (member) => join(stateDir, `${member.email.replace(/[^a-z0-9]+/gi, "-")}.json`);
 
@@ -23,7 +25,8 @@ async function newContext(browser, storageState) {
   const context = await browser.newContext({
     viewport: { width: 1440, height: 900 },
     storageState,
-    // Legacy-sso cells put idpsim behind the cell's own TLS certificate.
+    // Legacy-sso cells put idpsim behind a leaf of the cell's own CA; Chromium reads only the OS
+    // store, so the browser waives the check the releases make through NODE_EXTRA_CA_CERTS.
     ignoreHTTPSErrors: true,
   });
   // The lab has no internet: web fonts answer empty CSS so a stalled DNS lookup never holds
@@ -150,24 +153,28 @@ async function signIn(browser, member) {
       .fill(member.email, { timeout: 30_000 });
     await page.locator('button[type="submit"]').first().click();
     step = "identity provider";
-    const left = await page
-      .waitForURL((at) => !atAuth(at), { timeout: 20_000 })
-      .then(
-        () => true,
-        () => false,
-      );
-    if (!left) {
-      // A method picker rather than a redirect: the deployment's provider by name.
-      await page
-        .getByRole("button", { name: /continue with|sign in with|single sign-on|sso|oidc|openid/i })
-        .first()
-        .click({ timeout: 5_000 });
-      await page.waitForURL((at) => !atAuth(at), { timeout: 30_000 });
+    // Under load the redirect can outlast any fixed wait, so whichever comes first: the page
+    // leaves /auth, or a method picker offers the deployment's provider by name.
+    const picker = page
+      .getByRole("button", { name: /continue with|sign in with|single sign-on|sso|oidc|openid/i })
+      .first();
+    const first = await Promise.race([
+      page
+        .waitForURL((at) => !atAuth(at), { timeout: 45_000, waitUntil: "commit" })
+        .then(() => "left"),
+      picker.waitFor({ state: "visible", timeout: 45_000 }).then(() => "picker"),
+    ]).catch(() => "neither");
+    if (first !== "left" && atAuth(new URL(page.url()))) {
+      await picker.click({ timeout: 5_000 }).catch((error) => {
+        if (atAuth(new URL(page.url()))) throw error;
+      });
+      await page.waitForURL((at) => !atAuth(at), { timeout: 30_000, waitUntil: "commit" });
     }
     step = "landing";
     const landed = (at) => onProject(at, member);
-    await page.waitForURL(landed, { timeout: 30_000 }).catch(() => undefined);
-    if (!landed(new URL(page.url())) && member.inviteCode && phase === "main") {
+    await page.waitForURL(landed, { timeout: 30_000, waitUntil: "commit" }).catch(() => undefined);
+    const onOwnProject = new URL(page.url()).pathname.split("/")[1] === (member.project ?? project);
+    if (!onOwnProject && member.inviteCode && phase === "main") {
       step = "accept invite";
       const answer = await page.request.post(`${url}/api/trpc/invite.acceptInvite`, {
         data: { json: { inviteCode: member.inviteCode } },
@@ -175,7 +182,9 @@ async function signIn(browser, member) {
       });
       if (!answer.ok()) step += ` (answered ${answer.status()})`;
       await page.goto(`${url}/`, { timeout: 30_000, waitUntil: "domcontentloaded" });
-      await page.waitForURL(landed, { timeout: 30_000 }).catch(() => undefined);
+      await page
+        .waitForURL(landed, { timeout: 30_000, waitUntil: "commit" })
+        .catch(() => undefined);
     }
     const ok = landed(new URL(page.url()));
     if (ok && phase === "main") await context.storageState({ path: stateFile(member) });

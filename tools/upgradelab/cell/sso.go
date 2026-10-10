@@ -237,6 +237,9 @@ func (cell *run) ssoSignIn(ctx context.Context, phase string, members []ssoMembe
 	defer cancel()
 	command := exec.CommandContext(runCtx, "node", script, string(args)) // #nosec G204 -- harness-written script.
 	command.Dir = filepath.Join(cell.options.HeadDir, "apps", "ui")
+	if cell.stores.IDPCA != "" {
+		command.Env = append(os.Environ(), "NODE_EXTRA_CA_CERTS="+cell.stores.IDPCA)
+	}
 	output, err := command.Output()
 	var results []SSOResult
 	scanner := bufio.NewScanner(bytes.NewReader(output))

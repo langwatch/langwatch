@@ -22,6 +22,9 @@ func TestLegacyProfileBootsMainsAuth0OnTheProxy(t *testing.T) {
 			t.Errorf("%s = %q, want %q", key, env[key], value)
 		}
 	}
+	if provider, ok := env["AUTH_PROVIDER"]; ok {
+		t.Errorf("AUTH_PROVIDER %q outranks main's NEXTAUTH_PROVIDER", provider)
+	}
 	if _, ok := env["OIDC_ISSUER"]; ok {
 		t.Error("an Auth0 deployment's .env holds no OIDC_ISSUER")
 	}
@@ -32,19 +35,26 @@ func TestLegacyProfileBootsMainsAuth0OnTheProxy(t *testing.T) {
 }
 
 func TestProxyCertificateCoversLoopback(t *testing.T) {
-	_, pemBytes, err := selfSignedCertificate()
+	served, pemBytes, err := proxyCertificates()
 	if err != nil {
 		t.Fatal(err)
 	}
 	block, _ := pem.Decode(pemBytes)
-	certificate, err := x509.ParseCertificate(block.Bytes)
+	ca, err := x509.ParseCertificate(block.Bytes)
 	if err != nil {
 		t.Fatal(err)
 	}
+	leaf, err := x509.ParseCertificate(served.Certificate[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !ca.IsCA || leaf.IsCA || leaf.Equal(ca) {
+		t.Fatalf("the trusted PEM is the CA and the served certificate a leaf it signed: ca %v leaf %v", ca.IsCA, leaf.IsCA)
+	}
 	pool := x509.NewCertPool()
-	pool.AddCert(certificate)
-	if _, err := certificate.Verify(x509.VerifyOptions{Roots: pool, DNSName: "127.0.0.1"}); err != nil {
-		t.Errorf("trusting the PEM must verify 127.0.0.1: %v", err)
+	pool.AddCert(ca)
+	if _, err := leaf.Verify(x509.VerifyOptions{Roots: pool, DNSName: "127.0.0.1"}); err != nil {
+		t.Errorf("trusting the PEM must verify the leaf for 127.0.0.1: %v", err)
 	}
 }
 
