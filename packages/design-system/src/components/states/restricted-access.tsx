@@ -1,31 +1,25 @@
-import {
-  Box,
-  Button,
-  Center,
-  HStack,
-  Heading,
-  Skeleton,
-  Stack,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Button, Center, Circle, HStack, Heading, Stack, Text } from "@chakra-ui/react";
 import { Check, Copy, Lock } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { useState } from "react";
 
-import { InlineCode } from "../display/inline-code.tsx";
 import { toaster } from "../overlays/toaster.tsx";
 
 export type RestrictedAccessProps = {
-  /** The permission the viewer is missing. */
+  /** The permission the viewer is missing, as `resource:action`. */
   permission: string;
-  /** What the viewer cannot open, as a noun phrase: "this page", "the directory". */
+  /** What the viewer cannot open, as a noun phrase: "this page", "directory provisioning". */
   area?: string;
   /** Who is asking, written into the copied request when known. */
   requesterName?: string;
-  /** The page's own skeleton to blur behind the card; a neutral placeholder when absent. */
-  backdrop?: ReactNode;
   "data-testid"?: string;
 };
+
+/** `datasets:view` reads "view datasets"; `model-providers:manage`, "manage model providers". */
+export function describePermission(permission: string): string {
+  const [resource = permission, action] = permission.split(":");
+  const subject = resource.replace(/[-_]/g, " ");
+  return action ? `${action} ${subject}` : subject;
+}
 
 /** The words an admin needs to grant the access: who, what, and where. */
 export function accessRequestText({
@@ -46,23 +40,11 @@ export function accessRequestText({
   ].join("\n");
 }
 
-function Placeholder() {
-  return (
-    <VStack align="stretch" gap={4} padding={6} aria-hidden>
-      <Skeleton height="8" width="40%" />
-      <Skeleton height="24" />
-      <Skeleton height="24" />
-      <Skeleton height="24" width="70%" />
-    </VStack>
-  );
-}
-
-/** Restricted content: the page blurred behind a plain dialog naming the grant and how to ask. */
+/** In place of a page the viewer's role cannot open: what is missing, and who can grant it. */
 export function RestrictedAccess({
   permission,
   area = "this page",
   requesterName,
-  backdrop,
   "data-testid": testId,
 }: RestrictedAccessProps) {
   const [copied, setCopied] = useState(false);
@@ -83,52 +65,31 @@ export function RestrictedAccess({
   };
 
   return (
-    <Box position="relative" minHeight="60vh" overflow="hidden" data-testid={testId}>
-      <Box filter="blur(6px)" opacity={0.5} pointerEvents="none" userSelect="none" aria-hidden>
-        {backdrop ?? <Placeholder />}
-      </Box>
-      <Center position="absolute" inset={0} padding={{ base: 4, md: 6 }}>
-        <Stack
-          role="note"
-          gap={4}
-          width="full"
-          maxWidth="420px"
-          padding={{ base: 5, md: 6 }}
-          borderRadius="l3"
-          borderWidth="1px"
-          borderColor="border.muted"
-          background="bg.panel"
-          boxShadow="lg"
-        >
-          <HStack gap={3} align="center">
-            <Center
-              boxSize={9}
-              flexShrink={0}
-              borderRadius="l2"
-              background="bg.muted"
-              color="fg.muted"
-            >
-              <Lock size={16} aria-hidden />
-            </Center>
-            <Heading as="h2" size="md">
-              You need access to {area}
-            </Heading>
-          </HStack>
-          <Text fontSize="sm" color="fg.muted" lineHeight="1.6">
-            Your role doesn't include <InlineCode>{permission}</InlineCode>. Copy a request and send
-            it to an organization admin, who can grant it.
+    <Center minHeight="60vh" padding={8} data-testid={testId}>
+      <Stack gap={5} align="center" maxWidth="520px" textAlign="center">
+        <Circle size={12} background="orange.subtle" color="orange.fg">
+          <Lock size={20} aria-hidden />
+        </Circle>
+        <Stack gap={2} align="center">
+          <Heading size="lg">You don't have access to {area}</Heading>
+          <Text color="fg.muted">
+            Your role doesn't let you {describePermission(permission)}. An admin of your
+            organization can give you access.
           </Text>
-          <HStack justify="end" gap={2} paddingTop={1} flexWrap="wrap">
-            <Button size="sm" variant="ghost" onClick={() => window.history.back()}>
-              Go back
-            </Button>
-            <Button size="sm" variant="outline" onClick={copyRequest}>
-              {copied ? <Check aria-hidden /> : <Copy aria-hidden />}
-              {copied ? "Copied" : "Copy access request"}
-            </Button>
-          </HStack>
         </Stack>
-      </Center>
-    </Box>
+        <HStack gap={2} justify="center" flexWrap="wrap">
+          <Button size="sm" variant="solid" colorPalette="orange" onClick={copyRequest}>
+            {copied ? <Check aria-hidden /> : <Copy aria-hidden />}
+            {copied ? "Request copied" : "Copy access request"}
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => window.history.back()}>
+            Go back
+          </Button>
+        </HStack>
+        <Text fontSize="xs" color="fg.subtle">
+          Missing permission: {permission}
+        </Text>
+      </Stack>
+    </Center>
   );
 }
