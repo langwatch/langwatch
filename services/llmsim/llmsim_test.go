@@ -291,7 +291,7 @@ func TestJSONSchemaOutput(t *testing.T) {
 // @scenario "A json_object response follows the fields its prompt names"
 func TestJSONObjectFollowsPrompt(t *testing.T) {
 	srv := newTestServer(t)
-	system := "Respond with a JSON object.\\n\\n1. **name**: a short name\\n2. **situation**: a context\\n3. **criteria**: 3-6 success criteria"
+	system := "Respond with a JSON object.\\n\\n1. **name**: a short name (3-6 words, e.g., Angry refund request)\\n2. **situation**: a context\\n3. **criteria**: 3-6 success criteria"
 	body := `{"model":"m","response_format":{"type":"json_object"},"messages":[{"role":"system","content":"` + system + `"},{"role":"user","content":"An angry customer."}]}`
 	var got struct {
 		Name      string   `json:"name"`

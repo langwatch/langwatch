@@ -12,7 +12,7 @@ import (
 var (
 	embeddedSchemaMarker = "JSON schema:"
 	boldFieldLine        = regexp.MustCompile(`(?m)^[ \t]*(?:\d+\.[ \t]*)?\*\*([A-Za-z_][A-Za-z0-9_]*)\*\*[^\n]*`)
-	listHint             = regexp.MustCompile(`\b\d+\s*-\s*\d+\s+\w+|\blist\b`)
+	listHint             = regexp.MustCompile(`\b\d+\s*-\s*\d+\s+(?:[a-z]+\s+)?(?:criteria|items|steps|examples|points|bullets|questions|options)\b|\blist\b`)
 )
 
 // promptObjectSchema is the object schema a json_object request's prompt
