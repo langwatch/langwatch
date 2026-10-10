@@ -167,7 +167,8 @@ export function LicenseDetailsCard({
     <>
       {isExpired && <LapsedLicenseNotice maxMembers={status.maxMembers} />}
       {!isValid && !isExpired && <InvalidLicenseNotice />}
-      <StatTileGrid columns={liteSeats ? 5 : 4}>
+      {/* Four across even with a Lite seats tile: a fifth wraps, so no figure is cut short. */}
+      <StatTileGrid columns={4}>
         <StatTile label="Plan" icon={<Layers size={14} />} data-testid="license-plan">
           <StatTileFigure>{status.planName}</StatTileFigure>
         </StatTile>
