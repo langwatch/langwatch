@@ -1,5 +1,5 @@
-import { Button, HStack, Icon, Text } from "@langwatch/design-system/primitives";
-import { LuExternalLink, LuLightbulb } from "react-icons/lu";
+import { Alert, Button, Icon, Text } from "@langwatch/design-system/primitives";
+import { LuExternalLink } from "react-icons/lu";
 
 import { exactModelMatchRegex } from "../../../../../model/model-cost-regex.ts";
 
@@ -27,24 +27,23 @@ function modelCostMappingUrl(model: string): string {
  */
 export function UnmappedCostSuggestion({ model }: { model: string }) {
   return (
-    <HStack
-      gap={2}
+    <Alert.Root
+      status="info"
+      size="sm"
       marginBottom={2}
-      paddingX={3}
-      paddingY={2}
-      borderRadius="sm"
-      bg="blue.subtle"
-      align="center"
+      alignItems="center"
       data-testid="unmapped-cost-suggestion"
     >
-      <Icon as={LuLightbulb} boxSize={4} color="blue.fg" flexShrink={0} />
-      <Text textStyle="xs" color="blue.fg" flex={1} minWidth={0}>
-        This span has token counts but no cost mapped for{" "}
-        <Text as="span" fontFamily="mono" fontWeight="semibold">
-          {model}
-        </Text>
-        .
-      </Text>
+      <Alert.Indicator />
+      <Alert.Content>
+        <Alert.Description>
+          This span has token counts but no cost mapped for{" "}
+          <Text as="span" fontFamily="mono" fontWeight="semibold">
+            {model}
+          </Text>
+          .
+        </Alert.Description>
+      </Alert.Content>
       <Button
         size="2xs"
         variant="outline"
@@ -55,6 +54,6 @@ export function UnmappedCostSuggestion({ model }: { model: string }) {
         Add cost mapping
         <Icon as={LuExternalLink} boxSize={3} />
       </Button>
-    </HStack>
+    </Alert.Root>
   );
 }
