@@ -34,7 +34,7 @@ export function PageErrorFallback({
     <Center minHeight="60vh" padding={8}>
       <VStack gap={6} maxWidth="560px" width="full">
         <VStack gap={3}>
-          <Box padding={3} borderRadius="full" bg="red.500/10">
+          <Box padding={3} borderRadius="full" bg="red.subtle">
             <AlertTriangle size={28} color="var(--chakra-colors-red-400)" />
           </Box>
           <Heading size="md" color="fg.default">
@@ -93,7 +93,7 @@ export function PageErrorFallback({
               whiteSpace="pre-wrap"
               wordBreak="break-word"
               bg="bg.panel"
-              color="red.400"
+              color="red.fg"
               borderRadius={0}
             >
               {stack ?? message}
