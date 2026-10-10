@@ -1,16 +1,19 @@
+import { DetailDrawerHeader } from "@langwatch/design-system/detail-drawer-header";
 import { Drawer } from "@langwatch/design-system/drawer";
+import { ListPageSkeleton } from "@langwatch/design-system/list-page";
 import {
   Badge,
-  Box,
+  Alert,
+  Card,
   Button,
   HStack,
   Progress,
   Separator,
-  Stat,
-  Status,
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { CompactStat } from "@langwatch/design-system/stat-tile";
+import { HandledErrorAlert } from "@langwatch/error-views";
 import { nowInstant, toEpochMs } from "@langwatch/time";
 import { useMemo } from "react";
 
@@ -55,24 +58,13 @@ export function ReplayProgressDrawer({ open, onClose }: { open: boolean; onClose
     >
       <Drawer.Content>
         <Drawer.Header>
-          <Drawer.Title>
-            <HStack gap={2}>
-              <Status.Root colorPalette={stateColor} size="sm">
-                <Status.Indicator />
-              </Status.Root>
-              Replay {status?.state ?? "idle"}
-            </HStack>
-          </Drawer.Title>
+          <DetailDrawerHeader kind="Event replay" title={`Replay ${status?.state ?? "idle"}`}>
+            <Badge colorPalette={stateColor}>{status?.state ?? "idle"}</Badge>
+          </DetailDrawerHeader>
           <Drawer.CloseTrigger />
         </Drawer.Header>
         <Drawer.Body>
-          {!status || status.state === "idle" ? (
-            <Text textStyle="sm" color="fg.muted">
-              No replay is currently running.
-            </Text>
-          ) : (
-            <ReplayStatusDetail status={status} stateColor={stateColor} />
-          )}
+          <ReplayReadState query={statusQuery} stateColor={stateColor} />
         </Drawer.Body>
         <Drawer.Footer>
           <HStack gap={2} width="full">
@@ -104,6 +96,35 @@ export function ReplayProgressDrawer({ open, onClose }: { open: boolean; onClose
         </Drawer.Footer>
       </Drawer.Content>
     </Drawer.Root>
+  );
+}
+
+function ReplayReadState({
+  query,
+  stateColor,
+}: {
+  query: ReturnType<typeof useReplayStatus>;
+  stateColor: string;
+}) {
+  if (query.isPending) return <ListPageSkeleton label="Loading replay progress" />;
+  if (query.isError && !query.data)
+    return <HandledErrorAlert error={query.error} fallbackTitle="Replay progress could not load" />;
+  if (!query.data || query.data.state === "idle")
+    return (
+      <Text textStyle="sm" color="fg.muted">
+        No replay is currently running.
+      </Text>
+    );
+  return (
+    <>
+      {query.isError && (
+        <HandledErrorAlert
+          error={query.error}
+          fallbackTitle="Replay progress could not refresh; showing the last snapshot"
+        />
+      )}
+      <ReplayStatusDetail status={query.data} stateColor={stateColor} />
+    </>
   );
 }
 
@@ -178,29 +199,21 @@ function ReplayStatusDetail({ status, stateColor }: { status: ReplayStatus; stat
 
       <Separator />
 
-      {/* Stats grid */}
-      <HStack gap={4} flexWrap="wrap">
-        <Stat.Root>
-          <Stat.Label>Events</Stat.Label>
-          <Stat.ValueText textStyle="lg">{status.eventsProcessed.toLocaleString()}</Stat.ValueText>
-        </Stat.Root>
-        <Stat.Root>
-          <Stat.Label>Projections</Stat.Label>
-          <Stat.ValueText textStyle="lg">{status.projectionNames.length}</Stat.ValueText>
-        </Stat.Root>
-        {throughputRate !== null && (
-          <Stat.Root>
-            <Stat.Label>Events/s</Stat.Label>
-            <Stat.ValueText textStyle="lg">{throughputRate.toLocaleString()}</Stat.ValueText>
-          </Stat.Root>
-        )}
-        <Stat.Root>
-          <Stat.Label>Elapsed</Stat.Label>
-          <Stat.ValueText textStyle="lg">
-            {status.startedAt ? formatDuration(status.startedAt, status.completedAt) : "—"}
-          </Stat.ValueText>
-        </Stat.Root>
-      </HStack>
+      <Card.Root variant="subtle">
+        <Card.Body>
+          <HStack gap={4} wrap="wrap">
+            <CompactStat label="Events" value={status.eventsProcessed.toLocaleString()} />
+            <CompactStat label="Projections" value={String(status.projectionNames.length)} />
+            {throughputRate !== null && (
+              <CompactStat label="Events/s" value={throughputRate.toLocaleString()} />
+            )}
+            <CompactStat
+              label="Elapsed"
+              value={status.startedAt ? formatDuration(status.startedAt, status.completedAt) : "—"}
+            />
+          </HStack>
+        </Card.Body>
+      </Card.Root>
 
       {/* Projection list */}
       <VStack align="stretch" gap={1}>
@@ -233,14 +246,13 @@ function ReplayStatusDetail({ status, stateColor }: { status: ReplayStatus; stat
 
       {/* Error */}
       {status.error && (
-        <Box padding={3} borderRadius="md" bg="red.subtle" borderWidth="1px" borderColor="red.200">
-          <Text textStyle="xs" fontWeight="medium" color="red.fg" marginBottom={1}>
-            Error
-          </Text>
-          <Text textStyle="xs" color="red.fg">
-            {status.error}
-          </Text>
-        </Box>
+        <Alert.Root status="error">
+          <Alert.Indicator />
+          <Alert.Content>
+            <Alert.Title>Error</Alert.Title>
+            <Alert.Description overflowWrap="anywhere">{status.error}</Alert.Description>
+          </Alert.Content>
+        </Alert.Root>
       )}
     </VStack>
   );
