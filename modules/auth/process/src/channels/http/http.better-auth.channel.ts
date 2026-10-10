@@ -950,6 +950,16 @@ type BetterAuthTransportOptions = Readonly<{
   mintClaims: Pick<IdentityApi, "claimsForMint">;
 }>;
 
+/** Each plugin the instance may mount; named so the options type stays short in emit. */
+type TransportPlugin =
+  | typeof samlOwnOriginRepost
+  | ReturnType<typeof twoFactor>
+  | ReturnType<typeof passkey>
+  | ReturnType<typeof sso>
+  | ReturnType<typeof signUpConfirmationPlugin>;
+
+type TransportOptions = ReturnType<typeof createAuthOptions> & { plugins: TransportPlugin[] };
+
 /** The options the deployment's ONE Better Auth instance is built from. */
 const transportOptions = ({
   announcements,
@@ -982,7 +992,9 @@ const transportOptions = ({
   idTokenIssuerRefusals,
   mintClaims,
   callbackEvidence,
-}: BetterAuthTransportOptions & { callbackEvidence: SessionCallbackEvidenceChannel }) => {
+}: BetterAuthTransportOptions & {
+  callbackEvidence: SessionCallbackEvidenceChannel;
+}): TransportOptions => {
   const passwordResetSession = PasswordResetSessionChannel.create();
   const authOptions = createAuthOptions({
     repo: database,
@@ -1052,7 +1064,7 @@ const transportOptions = ({
   } satisfies BetterAuthOptions;
 };
 
-export type BetterAuthTransport = Auth<ReturnType<typeof transportOptions>>;
+export type BetterAuthTransport = Auth<TransportOptions>;
 
 /** Builds the deployment's ONE Better Auth instance; each request it handles opens its
  *  own callback-evidence slot, so a session is attributed only to its own callback. */
