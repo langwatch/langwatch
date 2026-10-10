@@ -58,7 +58,9 @@ export type ServingVerdict =
       command: typeof UPGRADE_COMMAND;
       refusal: string;
     }>
-  | Readonly<{ admitted: false; outcome: "no-clickhouse"; refusal: string }>;
+  | Readonly<{ admitted: false; outcome: "no-clickhouse"; refusal: string }>
+  /** No ledger, and this role may not create one (Alex, 2026-10-10, option a). */
+  | Readonly<{ admitted: false; outcome: "ledger-not-creatable"; refusal: string }>;
 
 /** The highest floor any upgrade run recorded, or null when none did (plan 3.2). */
 export function ledgerFloor({

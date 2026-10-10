@@ -131,3 +131,24 @@ Feature: An upgrade never sticks in the gate, the background runner or the statu
   Scenario: The gate's connection gives up on a statement that never answers
     Given the gate's own Postgres connection
     Then every statement on it carries a server-side and a client-side timeout
+
+  # Alex, 2026-10-10 (option a): the gate asks Postgres whether its role may create the ledger.
+  @unit
+  Scenario: A database role that cannot create the upgrade ledger is refused by name
+    Given a database with no upgrade ledger
+    And a role with neither CREATE on the database nor a ledger schema it may create tables in
+    When the api or the worker asks its gate
+    Then it refuses to serve, naming the missing privilege, the ledger schema and the upgrade docs
+    And the worker runs no upgrade
+
+  @unit
+  Scenario: A missing upgrade ledger the role can create is upgrading, not refused
+    Given a database with no upgrade ledger and a role that may create it
+    When the api asks its gate
+    Then it reports the installation as upgrading
+
+  @unit
+  Scenario: An upgrading api keeps its gate connection through a refusal or an unreadable ledger
+    Given an api whose gate answered that the installation is upgrading
+    When a later ask is refused or cannot read the ledger
+    Then the gate keeps its connection, so the api's next ask can still read the ledger

@@ -37,6 +37,26 @@ export class UpgradeRunnerRepository {
     return rows[0]?.present === true;
   }
 
+  /**
+   * Whether this role may create the ledger (`createLedgerTablesSql`): CREATE on the ledger schema
+   * when an operator pre-created it, else CREATE on the database (Alex, 2026-10-10, option a).
+   */
+  async ledgerCreatable(): Promise<boolean> {
+    const { rows } = await this.postgres.query<{ creatable: boolean }>(
+      `SELECT COALESCE(
+          (SELECT has_schema_privilege(n."oid", 'CREATE') FROM pg_namespace n WHERE n."nspname" = $1),
+          has_database_privilege(current_database(), 'CREATE')
+        ) AS "creatable"`,
+      [await this.ledgerSchema()],
+    );
+    return rows[0]?.creatable === true;
+  }
+
+  /** The ledger's own Postgres schema for this installation, as `<schema>_upgrade_ledger`. */
+  async ledgerSchema(): Promise<string> {
+    return (await ledgerTables({ postgres: this.postgres })).schema;
+  }
+
   async prismaHistoryExists(): Promise<boolean> {
     const { rows } = await this.postgres.query<{ present: boolean }>(
       `SELECT to_regclass('_prisma_migrations') IS NOT NULL AS present`,

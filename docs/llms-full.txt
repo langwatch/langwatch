@@ -70057,6 +70057,10 @@ description: "How to upgrade LangWatch to the latest version"
 4. **Keep `CREDENTIALS_SECRET` unchanged.** A new value makes stored provider keys and integration secrets unreadable and invalidates API keys. To replace it, follow [Rotating the credentials secret](/self-hosting/security#rotating-the-credentials-secret) as a separate change, not during an upgrade
 5. **Write the version 2 queue format first.** This release reads only version 2 GroupQueue jobs and drops a job an older release wrote in the earlier format. Before upgrading, set `GROUP_QUEUE_ENVELOPE_WRITES_ENABLED=true` on the running release and roll it out, or pause traffic and let the queue drain. After the upgrade, remove that variable and `ES_FOLD_TRUST_ABSENT_MISS`: this release reads neither
 
+### Database privileges
+
+The upgrade keeps its ledger in its own Postgres schema, `<schema>_upgrade_ledger`, beside the installation's. The `DATABASE_URL` role needs `CREATE` on the database to create it, or you can create that schema beforehand, owned by the role. Without either, the api and the worker refuse to start and name the missing privilege.
+
 ## Automatic identity and access migration
 
 Identity and access migrations run automatically after each upgrade,

@@ -151,13 +151,13 @@ export function upgradeGateOver({
     (await findFailedSteps()).filter(({ id }) => blocking.has(id));
   const findLeaseHolder = () => liveLeaseHolder({ runner });
   const findRefusal = async () => refusedRunVerdict({ runs: await findRuns(), release });
-  let closed: Promise<void> | null = null;
-  const closeOnce = () => (closed ??= close());
+  const connection = gateConnection({ close });
   return {
     async admit(): Promise<ServingVerdict> {
       try {
         const verdict =
-          role === "worker"
+          (await uncreatableLedger({ runner })) ??
+          (role === "worker"
             ? await admitAfterFirstInstall({
                 gate,
                 firstInstall,
@@ -172,11 +172,11 @@ export function upgradeGateOver({
                 release,
                 findFailedSteps: findBlockingFailures,
                 findRuns,
-              });
-        if (closesOn(verdict)) await closeOnce();
+              }));
+        await connection.answered(verdict);
         return verdict;
       } catch (error) {
-        await closeOnce();
+        await connection.failed();
         throw error;
       }
     },
@@ -184,7 +184,7 @@ export function upgradeGateOver({
       try {
         await gate.release();
       } finally {
-        await closeOnce();
+        await connection.close();
       }
     },
     serving: () => gate.serving(),
@@ -289,8 +289,48 @@ export type UpgradeLeaseHolder = () => Promise<Pick<
   "owner" | "host" | "image"
 > | null>;
 
+/** Where a role that cannot create the ledger is sent (Alex, 2026-10-10, option a). */
+export const UPGRADE_DOCS = "docs/self-hosting/upgrade.mdx";
+
+/** The refusal of a role that can neither create the ledger schema nor write a pre-created one. */
+export function ledgerNotCreatableRefusal({ schema }: { schema: string }): string {
+  return (
+    `the upgrade ledger does not exist and the DATABASE_URL role cannot create it: grant the role ` +
+    `CREATE on the database, or create the schema "${schema}" owned by the role beforehand ` +
+    `(${UPGRADE_DOCS}), then start this process again.`
+  );
+}
+
+/** A missing ledger this role may create is the worker's to create; one it may not is refused. */
+async function uncreatableLedger({
+  runner,
+}: {
+  runner: Pick<UpgradeRunnerRepository, "ledgerExists" | "ledgerCreatable" | "ledgerSchema">;
+}): Promise<ServingVerdict | null> {
+  if ((await runner.ledgerExists()) || (await runner.ledgerCreatable())) return null;
+  const refusal = ledgerNotCreatableRefusal({ schema: await runner.ledgerSchema() });
+  return { admitted: false, outcome: "ledger-not-creatable", refusal };
+}
+
 /** An upgrading api keeps the connection: it asks again over it. */
 const closesOn = (verdict: ServingVerdict) => !verdict.admitted && verdict.outcome !== "upgrading";
+
+/** Closes on a refusal or an error, except once the api asks on over it, until `release`. */
+function gateConnection({ close }: { close: () => Promise<void> }) {
+  let closed: Promise<void> | null = null;
+  let askingOn = false;
+  const closeOnce = () => (closed ??= close());
+  return {
+    close: closeOnce,
+    answered: async (verdict: ServingVerdict) => {
+      askingOn ||= verdict.outcome === "upgrading";
+      if (closesOn(verdict) && !askingOn) await closeOnce();
+    },
+    failed: async () => {
+      if (!askingOn) await closeOnce();
+    },
+  };
+}
 
 async function liveLeaseHolder({ runner }: { runner: UpgradeRunnerRepository }) {
   if (!(await runner.ledgerExists())) return null;
