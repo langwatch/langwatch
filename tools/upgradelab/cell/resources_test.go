@@ -93,3 +93,27 @@ func TestBrowserFindingsCountsThirdPartyNoiseApart(t *testing.T) {
 		t.Errorf("findings %+v tolerated %v err %v", findings, tolerated, err)
 	}
 }
+
+// @scenario "Main's tab reconnecting its tRPC WebSocket just after the switch is tolerated"
+func TestMainTabAcrossSwitchIsWindowedAfterTheSwitch(t *testing.T) {
+	ws := BrowserRecord{Kind: "console", AtMs: 1_010, Text: "WebSocket connection to 'ws://x/api/trpc-ws' failed: Unexpected response code: 404"}
+	if !mainTabAcrossSwitch(ws, 1_000) {
+		t.Error("reconnect just after the switch not tolerated")
+	}
+	for name, mutate := range map[string]func(BrowserRecord) BrowserRecord{
+		"before the switch": func(r BrowserRecord) BrowserRecord { r.AtMs = 900; return r },
+		"a minute after":    func(r BrowserRecord) BrowserRecord { r.AtMs = 61_001; return r },
+		"another socket": func(r BrowserRecord) BrowserRecord {
+			r.Text = "WebSocket connection to 'ws://x/api/other' failed"
+			return r
+		},
+		"a failed http request": func(r BrowserRecord) BrowserRecord { r.Kind = "http"; return r },
+	} {
+		if mainTabAcrossSwitch(mutate(ws), 1_000) {
+			t.Errorf("%s tolerated", name)
+		}
+	}
+	if mainTabAcrossSwitch(ws, -1) {
+		t.Error("tolerated before the switch is known")
+	}
+}

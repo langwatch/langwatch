@@ -85,6 +85,13 @@ Feature: Each soak round proves the upgrade is safe on production-shaped data un
     And a 503 without Retry-After, another status or code, or any time outside that window stays a finding
 
   @unit
+  Scenario: Main's tab reconnecting its tRPC WebSocket just after the switch is tolerated
+    Given the walker's tab loaded main's UI before the switch
+    When main's UI reconnects its tRPC WebSocket within a minute after the switch and head refuses it
+    Then it is counted apart, since head serves no tRPC WebSocket and its UI opens none
+    And the same failure before the switch, later than a minute after, or on another socket stays a finding
+
+  @unit
   Scenario: Only listed log signatures are accepted, the upgrade error only between the switch and ready
     Given an error line in head's api or worker log
     When it matches an accepted signature

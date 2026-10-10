@@ -460,6 +460,13 @@ func expectedWhileStepsRun(record BrowserRecord, switched, ready int64) bool {
 		strings.Contains(record.Text, "upgrade_in_progress") && switched >= 0 && ready >= 0 && record.AtMs >= switched && record.AtMs <= ready
 }
 
+// mainTabAcrossSwitch: main's UI, loaded before the switch, reconnects its tRPC WebSocket to head, which
+// serves none and whose UI opens none; tolerated for a minute after the switch, a finding after that.
+func mainTabAcrossSwitch(record BrowserRecord, switched int64) bool {
+	return record.Kind == "console" && strings.Contains(record.Text, "/api/trpc-ws") && switched >= 0 &&
+		record.AtMs >= switched && record.AtMs <= switched+60_000
+}
+
 // browserNoise is a console error or failed request the lab tolerates: every Match substring in the
 // record's url or text. Reason is printed in the report; they are counted apart from findings.
 type browserNoise struct {
@@ -490,6 +497,8 @@ func BrowserFindings(path string, switched, ready int64) (walks, expected int, t
 		case expectedWhileStepsRun(record, switched, ready):
 			expected++
 		case record.Kind == "walkerror":
+		case mainTabAcrossSwitch(record, switched):
+			tolerated["/api/trpc-ws (main's tab, open across the switch, reconnecting)"]++
 		default:
 			if noise, ok := accepted(record); ok {
 				tolerated[noise.Match[0]+" ("+noise.Reason+")"]++
