@@ -531,6 +531,7 @@ function SetupJourneySteps({
           organizationId={organizationId}
           connectionId={connectionId}
           canManage={canManage}
+          live={connection.state === "ACTIVE"}
           provesWithLicense={licenseProves}
           evidence={domainEvidenceOf(connection)}
           claims={domainClaimsOf(view.claims)}
