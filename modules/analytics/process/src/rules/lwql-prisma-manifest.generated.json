@@ -3153,6 +3153,15 @@
           "documentation": "user | invite-accepted, on a withdrawal."
         },
         {
+          "name": "connectionId",
+          "columnName": "connectionId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "The SSO connection a single sign-on arrival was admitted through; null otherwise."
+        },
+        {
           "name": "occurredAt",
           "columnName": "occurredAt",
           "type": "DateTime",

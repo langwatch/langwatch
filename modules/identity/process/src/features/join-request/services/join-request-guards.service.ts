@@ -111,6 +111,7 @@ export class JoinRequestGuardsService {
           expiresAtMs: data.expiresAtMs,
           notifyAdmins: data.notifyAdmins,
           origin: data.origin,
+          connectionId: data.connectionId,
           actor: data.actor,
         },
       },

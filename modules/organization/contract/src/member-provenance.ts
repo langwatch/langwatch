@@ -58,3 +58,15 @@ export function memberProvenanceFor({
     }),
   );
 }
+
+/** Identity answers single sign-on arrivals beside domain admissions; a connection id marks one. */
+export function splitJoinAdmissions(
+  answered: readonly (MemberDomainAdmission & { connectionId: string | null })[],
+): { ssoAdmissions: MemberSsoAdmission[]; admissions: MemberDomainAdmission[] } {
+  return {
+    ssoAdmissions: answered.flatMap(({ userId, connectionId }) =>
+      connectionId === null ? [] : [{ userId, connectionId }],
+    ),
+    admissions: answered.filter((admission) => admission.connectionId === null),
+  };
+}

@@ -11,6 +11,10 @@ export type LastWayInWarning = {
   message: string;
 };
 
+/** Said in place of a passkey offer where an organization's single sign-on governs sign-in. */
+export const SSO_HANDLES_SIGN_IN =
+  "Your organization's single sign-on handles sign-in for this account.";
+
 type LinkedAccount = { provider: string; providerAccountId: string };
 
 /**

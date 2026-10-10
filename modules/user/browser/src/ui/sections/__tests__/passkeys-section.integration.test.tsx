@@ -17,6 +17,7 @@ const { state } = vi.hoisted(() => ({
     accounts: [] as { id: string; provider: string; providerAccountId: string }[],
     hasPassword: false,
     nudgeReadAt: 1,
+    governedBySso: false,
   },
 }));
 
@@ -27,6 +28,11 @@ vi.mock("../../../behavior/personal-workspace-api.ts", () => {
       hasPassword: { useQuery: () => ({ data: { hasPassword: state.hasPassword } }) },
       secureAccountNudge: { useQuery: () => ({ dataUpdatedAt: state.nudgeReadAt }) },
     },
+    identity: {
+      mySignInGovernance: {
+        useQuery: () => ({ data: { governedBySso: state.governedBySso } }),
+      },
+    },
   };
   return { personalWorkspaceApi: api, api };
 });
@@ -35,6 +41,7 @@ beforeEach(() => {
   state.accounts = [];
   state.hasPassword = false;
   state.nudgeReadAt = 1;
+  state.governedBySso = false;
 });
 
 const LAPTOP = {
@@ -323,5 +330,18 @@ describe("given the account-security nudge created a passkey outside the card", 
 
       expect(await screen.findByText("Work laptop")).toBeTruthy();
     });
+  });
+});
+
+describe("given an account whose organization's single sign-on governs sign-in", () => {
+  /** @scenario "A person whose organization's single sign-on governs sign-in is not offered a passkey" */
+  it("offers no passkey and says single sign-on handles sign-in", async () => {
+    state.governedBySso = true;
+    renderSection({ passkeys: [] });
+
+    expect(await screen.findByTestId("passkeys-sso-governed")).toHaveTextContent(
+      "Your organization's single sign-on handles sign-in for this account.",
+    );
+    expect(screen.queryByTestId("create-passkey")).toBeNull();
   });
 });

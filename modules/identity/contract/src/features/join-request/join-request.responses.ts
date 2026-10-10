@@ -103,4 +103,6 @@ export const identityDomainAdmissionSchema = z.object({
   userId: z.string(),
   domain: z.string(),
   automatic: z.boolean(),
+  /** Set when single sign-on admitted them on arrival, naming the connection. */
+  connectionId: z.string().nullable(),
 });

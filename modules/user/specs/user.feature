@@ -345,3 +345,11 @@ Feature: Canonical user lifecycle
       Given a reader without "langy:create", or where Langy is not rolled out
       When the personal workspace host is asked whether the assistant can be asked
       Then it answers no
+
+  @integration
+  Scenario: A person whose organization's single sign-on governs sign-in is not offered a passkey
+    Given one of "ivy"'s confirmed addresses routes to "acme"'s single sign-on connection
+    When "ivy" opens her Passkeys settings, or the account-security offer appears after sign-in
+    Then neither offers to create a passkey
+    And each says "Your organization's single sign-on handles sign-in for this account."
+    And the offer still includes two-step verification when that is on offer

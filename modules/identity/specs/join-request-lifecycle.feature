@@ -27,3 +27,12 @@ Feature: Join request lifecycle
     When organization's invitation batch fact is delivered twice
     Then both deliveries share one deduplication id keyed by the batch
     And the request is resolved once
+
+  @unit
+  Scenario: Single sign-on records the arrival it admitted
+    Given "acme"'s connection admits arrivals on "acme.com"
+    When "ivy" first signs in through it and single sign-on creates her membership
+    Then a join request for "ivy" is recorded, approved by the "sso-arrival" policy
+    And it names the connection she came in through
+    And no second membership is attached and no administrator is mailed
+    And a failure to record it still leaves her a member

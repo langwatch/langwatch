@@ -514,6 +514,7 @@ export const prismaModelFieldCatalogue = {
     "resolvedByType",
     "resolvedById",
     "withdrawalCause",
+    "connectionId",
     "occurredAt",
     "lastEventId",
     "acceptedAt",

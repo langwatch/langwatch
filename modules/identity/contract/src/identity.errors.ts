@@ -974,6 +974,8 @@ export class SsoExistingAccountUnconfirmedError extends SsoAssertionRefusedError
 /** The organization's directory turned this person off: their own provider vouched for them,
  *  so saying so names nobody else. */
 export class SsoMemberDeactivatedError extends SsoAssertionRefusedError {
+  declare readonly code: "sso_member_deactivated";
+
   constructor() {
     super("sso_member_deactivated", "sso_member_deactivated", {
       httpStatus: 403,

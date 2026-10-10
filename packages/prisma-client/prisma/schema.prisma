@@ -961,6 +961,8 @@ model JoinRequest {
   resolvedById      String?
   /// user | invite-accepted, on a withdrawal.
   withdrawalCause   String?
+  /// The SSO connection a single sign-on arrival was admitted through; null otherwise.
+  connectionId      String?
   occurredAt        DateTime
   lastEventId       String
   acceptedAt        DateTime

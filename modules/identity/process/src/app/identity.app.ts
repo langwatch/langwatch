@@ -88,6 +88,7 @@ import { MfaGuardsService } from "../features/mfa/services/mfa-guards.service.ts
 import { OrganizationMfaNotifierService } from "../features/mfa/services/organization-mfa-notifier.service.ts";
 import { OrganizationMfaService } from "../features/mfa/services/organization-mfa.service.ts";
 import { TwoStepAccountService } from "../features/mfa/services/two-step-account.service.ts";
+import { SignInGovernanceService } from "../features/signin/services/sign-in-governance.service.ts";
 import { SignUpIdentifierService } from "../features/signin/services/sign-up-identifier.service.ts";
 import { SignInAccountLookupService } from "../features/signin/services/signin-account-lookup.service.ts";
 import { SignInRouterService } from "../features/signin/services/signin-router.service.ts";
@@ -978,9 +979,14 @@ export class IdentityModule
   }
 
   readonly #parts: IdentityAppParts;
+  readonly #signInGovernance: SignInGovernanceService;
 
   private constructor(parts: IdentityAppParts) {
     this.#parts = parts;
+    this.#signInGovernance = SignInGovernanceService.create({
+      identifiers: parts.accountIdentifiers,
+      router: parts.signInRouter,
+    });
   }
 
   resolveEmail(input: { userId: string }): Promise<IdentityEmailResolution> {
@@ -1037,6 +1043,11 @@ export class IdentityModule
     profile: Readonly<Record<string, unknown>>;
   }): Promise<void> {
     return this.#parts.microsoftAccountRekey.moveOnSignIn(input);
+  }
+
+  /** Whether an organization's single sign-on governs this person's own sign-in. */
+  isSignInGovernedBySso(input: { userId: string }): Promise<boolean> {
+    return this.#signInGovernance.isGovernedBySso(input);
   }
 
   routeSignIn(

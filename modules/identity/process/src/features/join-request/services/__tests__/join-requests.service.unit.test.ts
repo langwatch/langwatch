@@ -491,6 +491,32 @@ describe("given a domain that admits colleagues automatically", () => {
     });
   });
 
+  describe("when single sign-on has already made somebody a member", () => {
+    /** @scenario "Single sign-on records the arrival it admitted" */
+    it("records it as a request the sso-arrival policy approved, naming the connection", async () => {
+      const { service, requests, membership } = harness({ isMember: true });
+
+      await service.recordSsoArrival({
+        userId: "user_ivy",
+        organizationId: "org_acme",
+        domain: "acme.com",
+        connectionId: "conn_okta",
+      });
+
+      expect(requests.requestJoin).toHaveBeenCalledWith(
+        expect.objectContaining({
+          connectionId: "conn_okta",
+          matchedVia: "sso-connection-domain",
+          notifyAdmins: false,
+        }),
+      );
+      expect(requests.approveJoin).toHaveBeenCalledWith(
+        expect.objectContaining({ resolvedBy: { type: "policy", id: "sso-arrival" } }),
+      );
+      expect(membership.attachDefaultMembership).not.toHaveBeenCalled();
+    });
+  });
+
   describe("when the deployment is unlicensed", () => {
     /** @scenario Losing the license stops automatic joining without stranding members */
     it("admits nobody automatically and leaves asking available", async () => {

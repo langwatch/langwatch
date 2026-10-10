@@ -2,6 +2,7 @@ import { SYSTEM_ACTORS } from "@langwatch/authorization";
 import {
   DEFAULT_JOIN_REQUEST_ORIGIN,
   DOMAIN_AUTO_JOIN_POLICY_ID,
+  SSO_ARRIVAL_POLICY_ID,
   isPublicEmailDomain,
   type JoinLookupDecision,
   JoinNotAvailableError,
@@ -199,6 +200,7 @@ export class JoinRequestsService {
       expiresAtMs: occurredAtMs + JOIN_REQUEST_EXPIRY_MS,
       notifyAdmins: true,
       origin,
+      connectionId: null,
     });
 
     return { joinRequestId, state: "PENDING" };
@@ -238,9 +240,55 @@ export class JoinRequestsService {
       notifyAdmins: true,
       // No browser made this and no terminal claimed it: a sign-in did.
       origin: DEFAULT_JOIN_REQUEST_ORIGIN,
+      connectionId: null,
     });
 
     return { raised: true, joinRequestId };
+  }
+
+  /**
+   * A membership single sign-on already created, recorded as a request the
+   * `sso-arrival` policy approved: the person is a member, so nothing is attached.
+   */
+  async recordSsoArrival({
+    userId,
+    organizationId,
+    domain,
+    connectionId,
+  }: {
+    userId: string;
+    organizationId: string;
+    domain: string;
+    connectionId: string;
+  }): Promise<void> {
+    const joinRequestId = newJoinRequestId();
+    const occurredAtMs = this.now();
+    const policyActor = { type: "system" as const, id: SYSTEM_ACTORS.joinRequests };
+    await this.deps.requests.requestJoin({
+      tenantId: organizationId,
+      organizationId,
+      joinRequestId,
+      commandId: newJoinRequestCommandId(),
+      occurredAtMs,
+      actor: policyActor,
+      userId,
+      domain,
+      matchedVia: "sso-connection-domain",
+      expiresAtMs: occurredAtMs + JOIN_REQUEST_EXPIRY_MS,
+      notifyAdmins: false,
+      origin: DEFAULT_JOIN_REQUEST_ORIGIN,
+      connectionId,
+    });
+    await this.resolution.resolveApproved({
+      joinRequestId,
+      organizationId,
+      userId,
+      origin: DEFAULT_JOIN_REQUEST_ORIGIN,
+      resolvedBy: { type: "policy", id: SSO_ARRIVAL_POLICY_ID },
+      actor: policyActor,
+      approvedByUserId: null,
+      occurredAtMs,
+    });
   }
 
   /**
@@ -289,6 +337,7 @@ export class JoinRequestsService {
       expiresAtMs: occurredAtMs + JOIN_REQUEST_EXPIRY_MS,
       notifyAdmins: false,
       origin,
+      connectionId: null,
     });
 
     await this.resolution.resolveApproved({

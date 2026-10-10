@@ -109,6 +109,7 @@ function requestJoin(): { command: JoinRequestCommand; facts: JoinRequestFactInp
     expiresAtMs: T0 + 1_000,
     notifyAdmins: true,
     origin: "web" as const,
+    connectionId: null,
   };
   return {
     command: { type: REQUEST_JOIN_COMMAND_TYPE, data },
@@ -124,6 +125,7 @@ function requestJoin(): { command: JoinRequestCommand; facts: JoinRequestFactInp
           expiresAtMs: T0 + 1_000,
           notifyAdmins: true,
           origin: "web",
+          connectionId: null,
           actor: ACTOR,
         },
       },

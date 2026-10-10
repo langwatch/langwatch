@@ -289,6 +289,7 @@ export interface LwqlPrismaRows {
     readonly resolvedByType: "String?";
     readonly resolvedById: "String?";
     readonly withdrawalCause: "String?";
+    readonly connectionId: "String?";
     readonly occurredAt: "DateTime";
     readonly lastEventId: "String";
     readonly acceptedAt: "DateTime";

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { memberProvenanceFor } from "../member-provenance.ts";
+import { memberProvenanceFor, splitJoinAdmissions } from "../member-provenance.ts";
 
 describe("memberProvenanceFor", () => {
   describe("given members who arrived three different ways", () => {
@@ -57,6 +57,21 @@ describe("memberProvenanceFor", () => {
           invitedUserIds: [],
         }),
       ).toEqual({ ivy: { source: "sso", connectionId: "conn_1" } });
+    });
+  });
+});
+
+describe("splitJoinAdmissions", () => {
+  /** @scenario "A member single sign-on admitted is explained by that connection" */
+  it("separates single sign-on arrivals from domain admissions by their connection", () => {
+    expect(
+      splitJoinAdmissions([
+        { userId: "ivy", domain: "acme.com", automatic: false, connectionId: "conn_1" },
+        { userId: "sam", domain: "acme.com", automatic: true, connectionId: null },
+      ]),
+    ).toEqual({
+      ssoAdmissions: [{ userId: "ivy", connectionId: "conn_1" }],
+      admissions: [{ userId: "sam", domain: "acme.com", automatic: true, connectionId: null }],
     });
   });
 });

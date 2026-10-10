@@ -27,6 +27,9 @@ export type JoinResolverType = z.infer<typeof joinResolverTypeSchema>;
  *  can say which policy admitted somebody rather than "a policy did". */
 export const DOMAIN_AUTO_JOIN_POLICY_ID = "domain-auto" as const;
 
+/** The policy id a single sign-on arrival's recorded admission resolves with. */
+export const SSO_ARRIVAL_POLICY_ID = "sso-arrival" as const;
+
 export const joinResolverSchema = z.object({
   type: joinResolverTypeSchema,
   /** The admin's user id, the policy id, or the invitation id. */
@@ -96,6 +99,9 @@ export const joinRequestedPayloadSchema = z.object({
   /** Where the request was made. Defaulted so a fact written before origins
    *  existed folds to the same row the column default gives a replay. */
   origin: joinRequestOriginSchema.default(DEFAULT_JOIN_REQUEST_ORIGIN),
+  /** The connection a single sign-on arrival came in through. Defaulted so an
+   *  older fact folds to the null the column holds for it. */
+  connectionId: z.string().min(1).nullable().default(null),
   actor: ledgerActorSchema,
 });
 export type JoinRequestedPayload = z.infer<typeof joinRequestedPayloadSchema>;
@@ -184,6 +190,8 @@ export interface JoinRequestAggregateState {
   resolvedById: string | null;
   /** Why it was withdrawn, when it was. */
   withdrawalCause: JoinWithdrawalCause | null;
+  /** The connection a single sign-on arrival came in through; null otherwise. */
+  connectionId: string | null;
 }
 
 export function emptyJoinRequest({
@@ -206,6 +214,7 @@ export function emptyJoinRequest({
     resolvedByType: null,
     resolvedById: null,
     withdrawalCause: null,
+    connectionId: null,
   };
 }
 
@@ -237,6 +246,7 @@ export function reduceJoinRequest({
         domain: fact.data.domain,
         matchedVia: fact.data.matchedVia,
         origin: fact.data.origin,
+        connectionId: fact.data.connectionId,
         state: "PENDING",
         expiresAtMs: fact.data.expiresAtMs,
         createdAtMs: fact.occurredAt,

@@ -4,7 +4,7 @@
  * directory claims and identity's join admissions (round 24 EF-3).
  */
 import { identityClient } from "@langwatch/identity-client";
-import { memberProvenanceFor } from "@langwatch/organization-contract";
+import { memberProvenanceFor, splitJoinAdmissions } from "@langwatch/organization-contract";
 import { useMemo } from "react";
 
 import { directoryMembershipApi, scimApi } from "./scim-api.ts";
@@ -59,7 +59,7 @@ export function useMemberProvenance({
             userIds: invited.data.memberUserIds,
             invitedUserIds: invited.data.invitedUserIds,
             directoryMembers: claims.flatMap((page) => page.data ?? []),
-            admissions: pages.flatMap((page) => page.data ?? []),
+            ...splitJoinAdmissions(pages.flatMap((page) => page.data ?? [])),
           })
         : undefined,
     // oxlint-disable-next-line react-hooks/exhaustive-deps -- keyed on what the answers are

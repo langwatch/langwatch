@@ -426,6 +426,7 @@ export {
 export {
   DEFAULT_JOIN_REQUEST_ORIGIN,
   DOMAIN_AUTO_JOIN_POLICY_ID,
+  SSO_ARRIVAL_POLICY_ID,
   emptyJoinRequest,
   isPendingJoinRequest,
   JOIN_APPROVED_EVENT_TYPE,
