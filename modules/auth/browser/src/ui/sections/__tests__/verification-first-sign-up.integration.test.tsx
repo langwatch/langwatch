@@ -614,6 +614,25 @@ describe("given the sign-up screen", () => {
     });
   });
 
+  describe("when the expired link's refusal carries the same sentence as a tip", () => {
+    /** @scenario An expired verification link offers a resend, nothing else */
+    it("says it once", async () => {
+      searchParamsRef.current = new URLSearchParams("verify=stale-token");
+      completeVerificationMock.mockRejectedValue({
+        code: "identity_verification_expired",
+        status: 410,
+        tips: ["Request a new verification email and use the newest link."],
+      });
+
+      renderScreen();
+
+      expect(await screen.findByText(/that verification link has expired/i)).toBeTruthy();
+      expect(
+        screen.getAllByText("Request a new verification email and use the newest link."),
+      ).toHaveLength(1);
+    });
+  });
+
   describe("when the address already has an account", () => {
     /** @scenario Sign-up with an address that already has an account becomes a log-in */
     it("turns into the log-in step with the address already in it", async () => {
