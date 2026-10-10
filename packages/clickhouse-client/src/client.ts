@@ -83,7 +83,12 @@ export class ClickHouseQueryClient {
     const withReport = () =>
       this.reported({
         operation: "query",
-        params: { query: request.sql, query_params: request.params, table: request.table },
+        params: {
+          query: request.sql,
+          query_params: request.params,
+          table: request.table,
+          SKIP_COLD_SCAN_CHECK: request.SKIP_COLD_SCAN_CHECK,
+        },
         task: withRetries,
       });
 
