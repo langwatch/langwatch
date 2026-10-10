@@ -110,14 +110,13 @@ function browserUiHostServicesHook({
 }: UiRootHostServices) {
   return function useBrowserUiHostServices({
     transport,
-    feedback,
   }: {
     transport: UiFeatureApiTransport;
     feedback: UiFeedback;
   }): UiSessionHostServices {
     const { pathname, search } = useLocation();
     const isPublicRoute = organization.isUiPublicRoute(pathname);
-    const sessionReading = auth.useUiSessionReading({ feedback, isPublicRoute });
+    const sessionReading = auth.useUiSessionReading({ isPublicRoute });
     const scopeReading = organization.useUiScopeReading({ transport, session: sessionReading });
     const session = auth.useBrowserUiSession({
       transport,

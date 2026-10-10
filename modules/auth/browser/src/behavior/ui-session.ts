@@ -11,7 +11,7 @@ import {
   refusedOnAggregate,
 } from "@langwatch/authorization";
 import { useUiAddress } from "@langwatch/browser-host/address";
-import type { UiActor, UiFeedback } from "@langwatch/browser-host/capabilities";
+import type { UiActor } from "@langwatch/browser-host/capabilities";
 import { UiSession } from "@langwatch/browser-host/capabilities";
 import { uiLeaveTo } from "@langwatch/browser-host/navigation";
 import type {
@@ -132,16 +132,13 @@ export class BrowserUiSession extends UiSession {
 
 /**
  * Who is here, and nothing else — the first of the composition's four calls.
- * A refused read is told through `feedback` because nobody else sees it, and
- * a visitor whose read answered "nobody" is sent to sign in from here.
+ * A failed read is never "signed out": the shell's reconnecting screen holds
+ * the reader and reads again. Only an answer of "nobody" sends them to sign in.
  */
 export function useUiSessionReading({
-  feedback,
   isPublicRoute,
   authClient,
 }: {
-  /** Where a refused session read is told, since nobody else sees it. */
-  feedback: UiFeedback;
   /** Whether this address renders without a session — the scope host service reads it. */
   isPublicRoute: boolean;
   /** The deployment's own client unless a test answers with a recorded session. */
@@ -162,20 +159,12 @@ export function useUiSessionReading({
     refetchOnWindowFocus: false,
   });
   const actor = session.data?.actor ?? null;
-  const failure = session.data?.failure ?? null;
   const isAnswered = session.isSuccess && session.data.unreachable !== true;
 
   // Remembered preferences are the answered reader's own; before paint, so none flash.
   useLayoutEffect(() => {
     if (isAnswered) setUiStorageReader(actor?.id);
   }, [isAnswered, actor?.id]);
-
-  // Once, per failed read, rather than once per render: the query holds its
-  // answer, so the effect only re-runs when a re-read failed again.
-  useEffect(() => {
-    if (!failure) return;
-    feedback.failed({ error: failure, fallbackTitle: "Couldn't check your session" });
-  }, [failure, feedback]);
 
   const departure = uiSignedOutDeparture({
     actor,
@@ -250,7 +239,7 @@ const NO_PERMISSIONS_ON_A_PUBLIC_PAGE: UiSessionSnapshot["permissions"] = {
 function readSession(query: UseQueryResult<UiSessionResponse>): UiSessionReading {
   if (query.isLoading) return { status: "loading", user: null };
   if (query.data?.unreachable) return { status: "offline", user: null };
-  if (query.isError || query.data?.failure) return { status: "error", user: null };
+  if (query.isError) return { status: "error", user: null };
   const actor = query.data?.actor;
   if (actor) return { status: "authenticated", user: actor };
   return { status: "anonymous", user: null };

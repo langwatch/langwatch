@@ -14,7 +14,7 @@ import { useEffect } from "react";
  */
 export function isUiSessionRefusal(error: unknown): boolean {
   const handled = readHandledError(error);
-  if (handled) return handled.code === "session_read_failed" || handled.httpStatus === 401;
+  if (handled) return handled.httpStatus === 401;
 
   const data = (error as { data?: { httpStatus?: unknown; code?: unknown } } | null)?.data;
   return data?.httpStatus === 401 || data?.code === "UNAUTHORIZED";

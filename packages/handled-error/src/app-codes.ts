@@ -703,7 +703,6 @@ export const APP_ERROR_CODES = [
   "self_hosted_instance_not_found",
   "service_unavailable",
   "session_is_current",
-  "session_read_failed",
   "share_link_exhausted",
   "share_link_expired",
   "share_link_forbidden",

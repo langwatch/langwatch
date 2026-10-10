@@ -2983,15 +2983,6 @@ const presentations = {
       "Signing out of this one is a different action. Use the sign-out control instead.",
   },
 
-  session_read_failed: {
-    // Read by somebody who has just been shown a sign-in screen they did not
-    // ask for. The words have to explain that: we could not find out whether
-    // they were signed in, so we treated them as signed out.
-    title: "We couldn't check whether you're signed in",
-    describe: () =>
-      "You've been signed out for now because we couldn't reach the service that answers that. Reload the page in a moment, and log in again if it still asks.",
-  },
-
   subscription_service_unavailable: {
     // Not a blip: this is raised only when a Stripe-dependent action runs on a
     // self-hosted deployment, where there is no billing provider at all. The
