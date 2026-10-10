@@ -1,8 +1,21 @@
 import { CodePreview } from "@langwatch/design-system/code-preview";
 import { Badge, Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 
-import { prettyBody } from "../../model/http-body-language.ts";
+import { httpBodyLanguage, prettyBody } from "../../model/http-body-language.ts";
 import { CollapsibleSection, CopyButton } from "../elements/http-test-components.tsx";
+
+function bodyPreview({
+  body,
+  headers,
+}: {
+  body: string;
+  headers?: { key: string; value: string }[];
+}) {
+  const pretty = prettyBody({ body });
+  if (pretty.language === "json") return pretty;
+  const language = httpBodyLanguage({ headers });
+  return { code: body, language: language === "xml" ? "xml" : "text" };
+}
 
 export function HttpTestRequestPreview({
   url,
@@ -49,7 +62,7 @@ export function HttpTestRequestPreview({
             </Text>
             <CopyButton text={body} label="Copy body" />
           </HStack>
-          <CodePreview {...prettyBody({ body })} filename="body" maxHeight="200px" />
+          <CodePreview {...bodyPreview({ body, headers })} filename="body" maxHeight="200px" />
         </Box>
       </VStack>
     </CollapsibleSection>

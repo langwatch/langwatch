@@ -74,6 +74,12 @@ Feature: Platform administration package boundary
     Then the service refuses with its stable scheduler error
     And no audit entry is written for the refused control
 
+  @unit
+  Scenario: Pause and Resume name a report schedule in human words
+    Given a schedule whose target type is the internal reportTrigger
+    When the pause or resume confirmation is worded
+    Then it opens with a capital letter and says "report schedule"
+
   # ADR-090: the writer runs in every serving role so dashboard freshness never
   # depends on worker health; one pod holds the lease and publishes for all.
   @unit

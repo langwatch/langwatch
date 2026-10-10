@@ -155,7 +155,9 @@ export function SyncedChatInput({ inProgress, onSend, isVisible = true, onStop }
   return (
     <Box
       width="full"
-      paddingX={4}
+      paddingLeft={4}
+      // Leaves the bottom-right corner to Langy's launcher (46px at 20px) so it never covers Send.
+      paddingRight={20}
       paddingBottom={3}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}

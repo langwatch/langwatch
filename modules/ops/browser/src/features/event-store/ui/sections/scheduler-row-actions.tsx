@@ -6,7 +6,11 @@ import { useEffect, useState } from "react";
 import { api } from "../../../../behavior/ops-api.ts";
 import { useOpsToaster, useShowErrorToast } from "../../../../behavior/ops-feedback.ts";
 import { ConfirmDialog } from "../../../../ui/elements/ops-confirm-dialog.tsx";
-import { canRunNow, type SchedulerJobStatus } from "../../model/scheduler-presentation.ts";
+import {
+  canRunNow,
+  targetNoun,
+  type SchedulerJobStatus,
+} from "../../model/scheduler-presentation.ts";
 type PendingAction = "pause" | "resume" | "clear" | "run" | null;
 
 /** Per-row controls (ADR-091). Confirmations name PROJECT (cross-tenant; risk is
@@ -134,7 +138,7 @@ function SchedulerConfirmations({
   // is the only one gated on a resolved name — `canRunNow` withholds it
   // otherwise, which is why this falls back for the reversible controls only.
   const project = tenant ?? "this project";
-  const target = `this ${targetType}`;
+  const target = `This ${targetNoun({ targetType })}`;
 
   return (
     <>
@@ -236,7 +240,7 @@ function RunNowConfirmation({
       isLoading={busy}
       confirmDisabled={typed.trim() !== project}
       title="Run this schedule now?"
-      description={`This ${targetType} will run for ${project} as soon as a worker picks it up, exactly as a scheduled run would. Anything it delivers goes to that project.`}
+      description={`This ${targetNoun({ targetType })} will run for ${project} as soon as a worker picks it up, exactly as a scheduled run would. Anything it delivers goes to that project.`}
     >
       <TargetIdentity targetId={targetId} />
       <Field.Root marginTop={4}>
