@@ -34,7 +34,9 @@ describe("Postgres annotation queues", () => {
   describe("when traces are queued for a queue and a user", () => {
     /** @scenario "queues and queue items are stored under strict KSUIDs" */
     it("mints a distinct annotationqueueitem KSUID for every row", async () => {
-      const createMany = vi.fn().mockResolvedValue({ count: 0 });
+      const createMany = vi
+        .fn<(args: { data: { id?: string }[] }) => Promise<{ count: number }>>()
+        .mockResolvedValue({ count: 0 });
       const updateMany = vi.fn().mockResolvedValue({ count: 0 });
       const $transaction = vi.fn(async (run: (transaction: never) => Promise<unknown>) =>
         run({ annotationQueueItem: { createMany, updateMany } } as never),
@@ -51,9 +53,7 @@ describe("Postgres annotation queues", () => {
         createdByUserId: "creator-1",
       });
 
-      const ids = createMany.mock.calls.flatMap(([{ data }]: [{ data: { id?: string }[] }]) =>
-        data.map((row) => row.id),
-      );
+      const ids = createMany.mock.calls.flatMap(([{ data }]) => data.map((row) => row.id));
       expect(ids).toHaveLength(4);
       expect(new Set(ids).size).toBe(4);
       expect(ids.map(resourceOf)).toEqual(Array(4).fill("annotationqueueitem"));
