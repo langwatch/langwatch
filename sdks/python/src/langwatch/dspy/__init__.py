@@ -307,14 +307,11 @@ class LangWatchDSPy:
                     response["prompt"] = entry["prompt"]
                 if "messages" in entry:
                     response["messages"] = entry["messages"]
-                if "model" in lm_response:
-                    response["model"] = lm_response["model"]
-                if "choices" in lm_response:
-                    response["choices"] = lm_response["choices"]
-                if (
-                    not "_hidden_params" in lm_response
-                    or "additional_headers" not in lm_response["_hidden_params"]
-                ):
+                if safe_get(lm_response, "model") is not None:
+                    response["model"] = safe_get(lm_response, "model")
+                if safe_get(lm_response, "choices") is not None:
+                    response["choices"] = safe_get(lm_response, "choices")
+                if safe_get(lm_response, "_hidden_params", "additional_headers") is None:
                     response["cached"] = True
                 llm_call["response"] = response
 
