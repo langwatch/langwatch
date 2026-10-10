@@ -50,7 +50,9 @@ function PlannedReleases({ releases }: { releases: readonly PlannedRelease[] }) 
               <Table.Cell key={group}>
                 <Wrap gap={1}>
                   {release[group].map((stepId) => (
-                    <InlineCode key={stepId}>{stepId}</InlineCode>
+                    <InlineCode key={stepId} variant="neutral">
+                      {stepId}
+                    </InlineCode>
                   ))}
                 </Wrap>
               </Table.Cell>
@@ -120,7 +122,7 @@ export function UpgradePreview({ preview }: { preview: UpgradePreviewView }) {
             {plan.stopAt && (
               <Alert.Description>
                 <HStack gap={2}>
-                  <InlineCode>{plan.stopAt}</InlineCode>
+                  <InlineCode variant="neutral">{plan.stopAt}</InlineCode>
                   <CopyButton value={plan.stopAt} label="Copy release" />
                 </HStack>
               </Alert.Description>
