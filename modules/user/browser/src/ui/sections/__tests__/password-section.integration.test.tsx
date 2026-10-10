@@ -50,6 +50,10 @@ vi.mock("../../../behavior/personal-workspace-api.ts", () => {
       },
     },
     auth: {
+      unlinkAccount: mutation((input) => {
+        calls.unlinkAccount(input);
+        return { ok: true };
+      }),
       changePassword: mutation((input) => {
         calls.changePassword(input);
         if (state.changeRejectsWith) throw state.changeRejectsWith;
@@ -61,10 +65,6 @@ vi.mock("../../../behavior/personal-workspace-api.ts", () => {
       }),
     },
     user: {
-      unlinkAccount: mutation((input) => {
-        calls.unlinkAccount(input);
-        return { ok: true };
-      }),
       hasPassword: {
         useQuery: () => ({ data: { hasPassword: state.hasPassword }, isLoading: false }),
       },

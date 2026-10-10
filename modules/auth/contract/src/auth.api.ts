@@ -12,6 +12,7 @@ import type {
   UserProfile,
   ChangeOwnPasswordInput,
   SetOwnFirstPasswordInput,
+  UnlinkUserAccountInput,
   CreatedUser,
   RegisterCredentialAccountInput,
 } from "@langwatch/user-contract";
@@ -219,10 +220,12 @@ export interface AuthApi {
   deactivateAccount(input: { userId: string; caller: UserCaller }): Promise<void>;
   /** Writes the address through user, then ends every session that cached the old one. */
   changeUserEmail(input: UpdateUserEmailInput): Promise<UserProfile>;
-  /** Fills an empty credential slot through user, then ends every other session (D-A1U-4). */
+  /** Fills an empty credential slot, then ends every other session (D-A1U-4). */
   setOwnFirstPassword(input: SetOwnFirstPasswordInput): Promise<void>;
   /** Verifies the current password and replaces it, then ends every other session. */
   changeOwnPassword(input: ChangeOwnPasswordInput): Promise<void>;
+  /** Removes one of the caller's own sign-in methods, never the last (ported from `user.*`). */
+  unlinkOwnAccount(input: UnlinkUserAccountInput): Promise<void>;
   /**
    * The signup form's door (D-A1U-2): the origin, the mode, the throttle and the sign-up
    * policy, then the address proof is spent and user mints the account.

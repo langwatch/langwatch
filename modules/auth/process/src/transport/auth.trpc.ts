@@ -301,6 +301,14 @@ export const authTrpcTransport: TrpcRouterDeclaration<AuthApi, typeof authTrpc> 
 
     return { success: true as const };
   })
+
+  .procedure("unlinkAccount")
+  .noPermission({ reason: OWN_ACCOUNT })
+  .handle(async ({ app, actor, input }) => {
+    await app.unlinkOwnAccount({ userId: actor.id, accountId: input.accountId });
+
+    return { success: true as const };
+  })
   .build();
 
 /**

@@ -78,6 +78,7 @@ import {
   UserApi,
   type ChangeOwnPasswordInput,
   type SetOwnFirstPasswordInput,
+  type UnlinkUserAccountInput,
   type CreatedUser,
   type RegisterCredentialAccountInput,
   type UpdateUserEmailInput,
@@ -130,6 +131,7 @@ import type { AuthRateLimitRepository } from "../repositories/auth-rate-limit.re
 import type { AuthRepositories } from "../repositories/auth.repositories.ts";
 import type { AuthSessionPoll } from "../rules/auth-session-poll.rules.ts";
 import { mountedSocialMethodIds } from "../rules/mounted-social-methods.rules.ts";
+import { providerAccountIssuer } from "../rules/provider-account-issuer.rules.ts";
 import { queryCacheKeyDeriver } from "../rules/query-cache-key.rules.ts";
 import { keyedIdentifierHasher } from "../rules/sign-in-identifier-hash.rules.ts";
 import { buildSignUpVerificationUrl } from "../rules/signup-verification-link.rules.ts";
@@ -153,7 +155,8 @@ import {
   type LegacySsoAccessConnections,
   type LegacySsoAccessMemberships,
 } from "../services/legacy-sso-access.service.ts";
-import { OwnPasswordService } from "../services/own-password.service.ts";
+import { type CredentialAccounts, OwnPasswordService } from "../services/own-password.service.ts";
+import { OwnSignInMethodService } from "../services/own-sign-in-method.service.ts";
 import { PriorSessionService } from "../services/prior-session.service.ts";
 import { ProjectAuthTokenService } from "../services/project-auth-token.service.ts";
 import {
@@ -202,8 +205,6 @@ type AuthAppPeers = Readonly<{
     | "recordDeactivated"
     | "isOperator"
     | "hasPassword"
-    | "setFirstPassword"
-    | "rotatePassword"
     | "registerCredentialAccount"
   >;
 }>;
@@ -314,6 +315,7 @@ export class AuthModule implements AuthApiContract {
   /** The account writes that end credentials: deactivation and an address change. */
   readonly #accounts: AccountLifecycleService;
   readonly #ownPasswords: OwnPasswordService;
+  readonly #ownSignInMethods: OwnSignInMethodService;
   readonly #registrations: CredentialRegistrationService;
   /** This deployment's sign-in mode, set once the provider secrets resolve. */
   #authProviders: AuthProviderService | null = null;
@@ -450,11 +452,14 @@ export class AuthModule implements AuthApiContract {
         revokeCliTokens: (input) => this.revokeCliTokens(input),
       },
     });
+    const credentialAccounts = betterAuthCredentialAccounts(() => this.betterAuth());
     this.#ownPasswords = OwnPasswordService.create({
       users: dependencies.users,
+      credentials: credentialAccounts,
       auth: this,
       issuesOwnPasswords: () => this.#issuesOwnPasswords,
     });
+    this.#ownSignInMethods = OwnSignInMethodService.create({ credentials: credentialAccounts });
     this.#registrations = CredentialRegistrationService.create({
       users: dependencies.users,
       organizations: dependencies.organizations,
@@ -1061,6 +1066,10 @@ export class AuthModule implements AuthApiContract {
     return this.#ownPasswords.change(input);
   }
 
+  unlinkOwnAccount(input: UnlinkUserAccountInput): Promise<void> {
+    return this.#ownSignInMethods.unlink(input);
+  }
+
   registerCredentialAccount(input: RegisterCredentialAccountInput): Promise<CreatedUser> {
     return this.#registrations.register(input);
   }
@@ -1266,6 +1275,41 @@ function buildSignUpVerification({
     isEmailUnconfigured,
     now,
   });
+}
+
+/** Better Auth's account storage, the way its own change- and set-password endpoints write. */
+function betterAuthCredentialAccounts(
+  betterAuth: () => Promise<BetterAuthTransport>,
+): CredentialAccounts {
+  const context = async () => (await betterAuth()).$context;
+  return {
+    findCredential: async ({ userId }) => {
+      const account = await (await context()).internalAdapter.findCredentialAccount(userId);
+      return account ? { id: account.id, passwordHash: account.password ?? null } : null;
+    },
+    listAccountIds: async ({ userId }) =>
+      (await (await context()).internalAdapter.findAccounts(userId)).map((account) => account.id),
+    writePassword: async ({ accountId, passwordHash }) => {
+      await (await context()).internalAdapter.updateAccount(accountId, { password: passwordHash });
+    },
+    linkPassword: async ({ userId, passwordHash }) => {
+      await (
+        await context()
+      ).internalAdapter.linkAccount({
+        userId,
+        providerId: "credential",
+        issuer: providerAccountIssuer({ connectionIssuer: undefined, provider: "credential" }),
+        accountId: userId,
+        password: passwordHash,
+      });
+    },
+    deleteAccount: async ({ accountId }) => {
+      await (await context()).internalAdapter.deleteAccount(accountId);
+    },
+    hashPassword: async ({ password }) => (await context()).password.hash(password),
+    passwordMatches: async ({ password, hash }) =>
+      (await context()).password.verify({ password, hash }),
+  };
 }
 
 /** The two-factor plugin on the deployment's one Better Auth instance (main's protocol adapter). */

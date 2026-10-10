@@ -53,7 +53,6 @@ describe("the user tRPC surface", () => {
         "setAvatar",
         "setLastHomePath",
         "setNotificationPreference",
-        "unlinkAccount",
         "updateLastLogin",
         "updateName",
       ]);
@@ -79,7 +78,6 @@ describe("the user tRPC surface", () => {
         dismissSecureAccountNudge: "mutation",
         updateName: "mutation",
         setAvatar: "mutation",
-        unlinkAccount: "mutation",
       });
     });
 

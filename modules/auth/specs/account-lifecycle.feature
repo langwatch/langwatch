@@ -52,9 +52,25 @@ Feature: Account changes that end credentials
 
     @unit
     Scenario: The password procedures answer on auth's namespace
-      When a signed-in person calls auth.setPassword or auth.changePassword for their own account
-      Then auth writes the password through user as themselves
-      And the answer is success, as user.setPassword and user.changePassword answered before
+      When a signed-in person calls auth.setPassword, auth.changePassword or auth.unlinkAccount for their own account
+      Then auth acts on the account as themselves
+      And the answer is success, as user.setPassword, user.changePassword and user.unlinkAccount answered before
+
+  Rule: Credential writes go through Better Auth's account storage, where sign-in reads
+
+    @unit
+    Scenario: A changed password is the one sign-in accepts
+      Given an account that signs in with password "P"
+      When its holder changes the password from "P" to "Q"
+      Then signing in with "Q" succeeds
+      And signing in with "P" is refused
+
+    @unit
+    Scenario: A removed sign-in method no longer signs in
+      Given an account holding a password and a linked provider
+      When its holder removes the linked provider
+      Then the account storage sign-in reads no longer holds it
+      And removing the last remaining way in is refused
 
   Rule: An address change writes through user, then ends the sessions that cached the old one
 
