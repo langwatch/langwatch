@@ -12,7 +12,7 @@ import { SavedViewsBar } from "./saved-views-bar.tsx";
 export function SavedViewsScope({ children }: { children: ReactNode }) {
   return (
     <SavedViewsProvider>
-      <Box width="full" flexShrink={0} display="flex" flexDirection="column">
+      <Box width="full" flex="1" minHeight={0} display="flex" flexDirection="column">
         {children}
         <SavedViewsBar />
       </Box>
