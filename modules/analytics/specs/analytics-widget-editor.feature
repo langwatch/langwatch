@@ -18,6 +18,12 @@ Feature: The dashboard widget editor knows the runtime its code runs in
       When the editor's TypeScript worker checks it
       Then it reports a diagnostic naming the mistake
 
+    @integration
+    Scenario: The LW global completes with its members and their types
+      Given widget code that has typed `LW.`
+      When the editor's TypeScript worker is asked for completion
+      Then every LW member is offered, and useChartQuery carries its typed signature
+
   Rule: Every name the frame provides is declared
 
     @unit
