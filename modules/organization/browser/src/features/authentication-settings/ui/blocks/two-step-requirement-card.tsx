@@ -5,7 +5,7 @@ import { AccessState } from "@langwatch/design-system/access-state";
  * switch stays available for turning it off after an Enterprise plan lapses.
  * Spec: specs/identity/mfa-and-session-shape.feature
  */
-import { Alert, Box, Button, HStack, Text } from "@langwatch/design-system/primitives";
+import { Alert, Box, Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { SettingsCard } from "@langwatch/design-system/settings-card";
 import { Switch } from "@langwatch/design-system/switch";
 import { Tooltip } from "@langwatch/design-system/tooltip";
@@ -45,8 +45,23 @@ export function TwoStepRequirementCard({
       title="Require two-step verification"
       hint="A code, a passkey, or one their identity provider confirms. Turning it on signs nobody out."
       badge={
-        <HStack gap={2}>
-          {planLocked && <EnterprisePlanBadge data-testid="two-step-requirement-plan-badge" />}
+        planLocked ? <EnterprisePlanBadge data-testid="two-step-requirement-plan-badge" /> : void 0
+      }
+      actions={
+        <HStack
+          width="full"
+          justify="space-between"
+          gap={3}
+          borderTopWidth="1px"
+          borderColor="border.muted"
+          paddingTop={3}
+        >
+          <VStack align="start" gap={0}>
+            <Text fontSize="sm">Require two-step verification</Text>
+            <Text color="fg.muted" fontSize="xs">
+              Changes apply immediately.
+            </Text>
+          </VStack>
           {/* The tooltip hangs off a wrapper: a disabled switch takes no pointer events. */}
           <Tooltip content={explanation} disabled={!planLocked || mfaRequired}>
             <Box>

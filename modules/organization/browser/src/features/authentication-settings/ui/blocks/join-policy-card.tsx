@@ -5,7 +5,7 @@ import { AccessState } from "@langwatch/design-system/access-state";
  * setting stays selectable after a lapse so it can always be closed.
  * Spec: specs/identity/domain-auto-join.feature
  */
-import { Box, Button, Input, Text, VStack } from "@langwatch/design-system/primitives";
+import { Box, Button, HStack, Input, Text, VStack } from "@langwatch/design-system/primitives";
 import { RawRadioGroup as RadioGroup } from "@langwatch/design-system/radio";
 import { SettingsCard } from "@langwatch/design-system/settings-card";
 import { Tooltip } from "@langwatch/design-system/tooltip";
@@ -69,36 +69,35 @@ function JoinerSeatOptions({
   onSelect: (seat: JoinerRole) => void;
 }) {
   return (
-    <VStack align="stretch" gap={2}>
+    <VStack
+      align="stretch"
+      gap={2}
+      marginTop={2}
+      paddingTop={4}
+      borderTopWidth="1px"
+      borderColor="border.muted"
+    >
       <Text fontSize="13px" fontWeight="500">
         Seat for people who join
       </Text>
       <RadioGroup.Root
         value={seat}
-        colorPalette="orange"
+        aria-label="Seat for people who join"
+        size="sm"
+        colorPalette="gray"
         onValueChange={(event) => onSelect((event.value ?? "MEMBER") as JoinerRole)}
       >
-        <VStack align="stretch" gap={3}>
+        <VStack align="stretch" gap={1}>
           {JOINER_SEAT_OPTIONS.map((option) => (
             <RadioGroup.Item
               key={option.value}
               value={option.value}
               disabled={saving}
-              paddingX={2.5}
-              paddingY={2}
-              borderWidth="1px"
-              borderColor="border.muted"
-              borderRadius="md"
-              background="bg.panel"
-              transition="background 0.15s ease, border-color 0.15s ease"
-              _hover={{ borderColor: "border.emphasized" }}
-              _checked={{
-                borderColor: "colorPalette.solid",
-                background: "bg.muted",
-              }}
+              paddingY={1.5}
+              alignItems="start"
             >
               <RadioGroup.ItemHiddenInput data-testid={`joiner-seat-${option.value}`} />
-              <RadioGroup.ItemIndicator />
+              <RadioGroup.ItemIndicator marginTop={0.5} />
               <RadioGroup.ItemText>
                 <VStack align="start" gap={0}>
                   <Text fontSize="13px" fontWeight="500" lineHeight="1.4">
@@ -171,21 +170,29 @@ export function JoinPolicyCard({
       hint="Choose how people can join without an invitation."
       badge={planLocked ? <EnterprisePlanBadge data-testid="join-policy-plan-badge" /> : undefined}
       actions={
-        <Button
-          size="sm"
-          colorPalette="orange"
-          loading={saving}
-          disabled={unchanged || isLocked(selected)}
-          onClick={() =>
-            onSave({
-              domainJoin: selected,
-              domains: parsedDomains,
-              ...(seatToSave === undefined ? {} : { joinerRole: seatToSave }),
-            })
-          }
+        <HStack
+          width="full"
+          justify="flex-end"
+          borderTopWidth="1px"
+          borderColor="border.muted"
+          paddingTop={3}
         >
-          Save
-        </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            loading={saving}
+            disabled={unchanged || isLocked(selected)}
+            onClick={() =>
+              onSave({
+                domainJoin: selected,
+                domains: parsedDomains,
+                ...(seatToSave === undefined ? {} : { joinerRole: seatToSave }),
+              })
+            }
+          >
+            Save
+          </Button>
+        </HStack>
       }
       data-testid="join-policy-card"
     >
@@ -206,12 +213,14 @@ export function JoinPolicyCard({
 
       <RadioGroup.Root
         value={selected}
-        colorPalette="orange"
+        aria-label="Joining your organization"
+        size="sm"
+        colorPalette="gray"
         onValueChange={(event) =>
           setSelected(OPTIONS.find((option) => option.value === event.value)?.value ?? "request")
         }
       >
-        <VStack align="stretch" gap={3}>
+        <VStack align="stretch" gap={1}>
           {OPTIONS.map((option) => (
             // The tooltip hangs off a wrapper: a disabled radio takes no pointer events.
             <Tooltip key={option.value} content={explanation} disabled={!isLocked(option.value)}>
@@ -220,21 +229,11 @@ export function JoinPolicyCard({
                   width="full"
                   value={option.value}
                   disabled={saving || isLocked(option.value)}
-                  paddingX={2.5}
-                  paddingY={2}
-                  borderWidth="1px"
-                  borderColor="border.muted"
-                  borderRadius="md"
-                  background="bg.panel"
-                  transition="background 0.15s ease, border-color 0.15s ease"
-                  _checked={{
-                    borderColor: "colorPalette.solid",
-                    background: "bg.muted",
-                  }}
-                  _hover={{ borderColor: "border.emphasized" }}
+                  paddingY={1.5}
+                  alignItems="start"
                 >
                   <RadioGroup.ItemHiddenInput data-testid={`join-policy-${option.value}`} />
-                  <RadioGroup.ItemIndicator />
+                  <RadioGroup.ItemIndicator marginTop={0.5} />
                   <RadioGroup.ItemText>
                     <VStack align="start" gap={0}>
                       <Text fontSize="13px" fontWeight="500" lineHeight="1.4">
@@ -259,6 +258,8 @@ export function JoinPolicyCard({
           </Text>
           <Input
             value={domains}
+            size="sm"
+            aria-label="Verified domains"
             placeholder="acme.com"
             disabled={isLocked("auto")}
             onChange={(event) => setDomains(event.target.value)}

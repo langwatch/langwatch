@@ -6,8 +6,7 @@ import type { SignInSecuritySettings } from "@langwatch/auth-contract";
 import { Alert, Button, HStack, Input, Text, VStack } from "@langwatch/design-system/primitives";
 import { RawRadioGroup as RadioGroup } from "@langwatch/design-system/radio";
 import { SettingsCard } from "@langwatch/design-system/settings-card";
-import { LockKeyhole, Timer } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { useState } from "react";
 
 const OFFERED_ATTEMPTS = 5;
 const OFFERED_LOCKOUT_MINUTES = 30;
@@ -46,34 +45,6 @@ type CardProps = {
   onSave: (next: SignInSecuritySettings) => void;
 };
 
-function PolicyCard({
-  title,
-  hint,
-  leading,
-  actions,
-  testId,
-  children,
-}: {
-  title: string;
-  hint: string;
-  leading: ReactNode;
-  actions: ReactNode;
-  testId: string;
-  children: ReactNode;
-}) {
-  return (
-    <SettingsCard
-      title={title}
-      hint={hint}
-      leading={leading}
-      actions={actions}
-      data-testid={testId}
-    >
-      {children}
-    </SettingsCard>
-  );
-}
-
 function RuleOptions({
   options,
   testIdPrefix,
@@ -82,23 +53,11 @@ function RuleOptions({
   testIdPrefix: string;
 }) {
   return (
-    <VStack align="stretch" gap={3}>
+    <VStack align="stretch" gap={1}>
       {options.map((option) => (
-        <RadioGroup.Item
-          key={option.value}
-          value={option.value}
-          paddingX={2.5}
-          paddingY={2}
-          borderWidth="1px"
-          borderColor="border.muted"
-          borderRadius="md"
-          background="bg.panel"
-          transition="background 0.15s ease, border-color 0.15s ease"
-          _checked={{ borderColor: "colorPalette.solid", background: "bg.muted" }}
-          _hover={{ borderColor: "border.emphasized" }}
-        >
+        <RadioGroup.Item key={option.value} value={option.value} paddingY={1.5} alignItems="start">
           <RadioGroup.ItemHiddenInput data-testid={`${testIdPrefix}-${option.value}`} />
-          <RadioGroup.ItemIndicator />
+          <RadioGroup.ItemIndicator marginTop={0.5} />
           <RadioGroup.ItemText>
             <VStack align="start" gap={0}>
               <Text fontSize="13px" fontWeight="500" lineHeight="1.4">
@@ -172,21 +131,29 @@ function SaveAction({
   effect: string;
   testId: string;
 }) {
-  if (!changed) return null;
   return (
-    <HStack gap={2} flexWrap="wrap">
+    <HStack
+      width="full"
+      gap={3}
+      justify="space-between"
+      flexWrap="wrap"
+      borderTopWidth="1px"
+      borderColor="border.muted"
+      paddingTop={3}
+    >
+      <Text color="fg.muted" fontSize="xs" flex="1">
+        {effect}
+      </Text>
       <Button
         size="sm"
-        colorPalette="orange"
+        variant="outline"
         loading={saving}
+        disabled={!changed}
         onClick={onSave}
         data-testid={testId}
       >
         Save
       </Button>
-      <Text color="fg.muted" fontSize="11.5px">
-        {effect}
-      </Text>
     </HStack>
   );
 }
@@ -201,11 +168,10 @@ export function SignInLockoutCard({ settings, saving, onSave }: CardProps) {
     (locking && minutes !== settings.lockoutMinutes);
 
   return (
-    <PolicyCard
+    <SettingsCard
       title="Account lockout"
       hint="Protect accounts after repeated failed sign-ins."
-      leading={<LockKeyhole size={14} />}
-      testId="sign-in-lockout-card"
+      data-testid="sign-in-lockout-card"
       actions={
         <SaveAction
           changed={changed}
@@ -219,10 +185,12 @@ export function SignInLockoutCard({ settings, saving, onSave }: CardProps) {
       }
     >
       <RadioGroup.Root
+        aria-label="Account lockout"
         value={locking ? "lock" : "never"}
         onValueChange={(event) => setAttempts(event.value === "lock" ? OFFERED_ATTEMPTS : 0)}
         disabled={saving}
-        colorPalette="orange"
+        size="sm"
+        colorPalette="gray"
       >
         <RuleOptions options={LOCKOUT_OPTIONS} testIdPrefix="sign-in-lockout" />
       </RadioGroup.Root>
@@ -247,7 +215,7 @@ export function SignInLockoutCard({ settings, saving, onSave }: CardProps) {
           />
         </VStack>
       )}
-    </PolicyCard>
+    </SettingsCard>
   );
 }
 
@@ -261,11 +229,10 @@ export function SessionLimitCard({ settings, saving, onSave }: CardProps) {
   const maximumIsUnreachable = maximum > 0 && maximum < idle;
 
   return (
-    <PolicyCard
+    <SettingsCard
       title="Session limits"
       hint="Choose when browser sessions should end."
-      leading={<Timer size={14} />}
-      testId="session-limit-card"
+      data-testid="session-limit-card"
       actions={
         <SaveAction
           changed={changed && !maximumIsUnreachable}
@@ -283,6 +250,7 @@ export function SessionLimitCard({ settings, saving, onSave }: CardProps) {
       }
     >
       <RadioGroup.Root
+        aria-label="Session limits"
         value={bounded ? "bounded" : "unbounded"}
         onValueChange={(event) => {
           const next = event.value === "bounded";
@@ -290,7 +258,8 @@ export function SessionLimitCard({ settings, saving, onSave }: CardProps) {
           if (!next) setMaximum(0);
         }}
         disabled={saving}
-        colorPalette="orange"
+        size="sm"
+        colorPalette="gray"
       >
         <RuleOptions options={SESSION_OPTIONS} testIdPrefix="session-limit" />
       </RadioGroup.Root>
@@ -331,6 +300,6 @@ export function SessionLimitCard({ settings, saving, onSave }: CardProps) {
           />
         </VStack>
       )}
-    </PolicyCard>
+    </SettingsCard>
   );
 }
