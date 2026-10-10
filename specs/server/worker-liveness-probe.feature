@@ -140,6 +140,11 @@ Feature: Worker liveness probe endpoint
       And one warn line names the parser's code and the request's first bytes
       And the cookie's value is not in that line
 
+    Scenario: A process that composed no telemetry still writes its server's lines
+      Given an api embedded beside the worker, which owns the process's telemetry
+      When its server writes a line, such as a refused request
+      Then the line goes to the process's logger under the api's name, once
+
     Scenario: A connection the thread closes is never announced as kept alive
       Given the liveness thread is serving the process port
       And the main thread answers an event stream with "Connection: keep-alive"
