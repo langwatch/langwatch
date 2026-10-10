@@ -136,3 +136,33 @@ describe("PlaygroundContent tab state", () => {
     });
   });
 });
+
+describe("given the trace editor has no selected span", () => {
+  beforeEach(() => useTraceStore.setState({ trace: createDefaultTrace(), selectedSpanId: null }));
+  afterEach(cleanup);
+
+  it("adds and selects an LLM span from the empty state", async () => {
+    renderWithOpsHost(
+      <FoundryRuntimeProvider transport={transport}>
+        <PlaygroundContent />
+      </FoundryRuntimeProvider>,
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Add LLM span" }));
+    expect(screen.queryByText("Select a span to edit")).toBeNull();
+    expect(screen.getByRole("button", { name: "Indent span" })).toBeTruthy();
+    expect(useTraceStore.getState().trace.spans).toHaveLength(2);
+  });
+
+  it("selects an existing span with the keyboard", async () => {
+    renderWithOpsHost(
+      <FoundryRuntimeProvider transport={transport}>
+        <PlaygroundContent />
+      </FoundryRuntimeProvider>,
+    );
+    const span = screen.getByRole("button", { name: /^chat-completion/ });
+    span.focus();
+    await userEvent.keyboard("{Enter}");
+    expect(span.getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByRole("button", { name: "Indent span" })).toBeTruthy();
+  });
+});

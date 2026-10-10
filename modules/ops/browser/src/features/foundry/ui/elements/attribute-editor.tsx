@@ -41,7 +41,7 @@ export function AttributeEditor({
             onChange={(e) => updateValue(key, e.target.value)}
           />
           <Button
-            size="xs"
+            size="sm"
             variant="ghost"
             color="fg.muted"
             _hover={{ color: "red.400" }}
@@ -66,7 +66,7 @@ export function AttributeEditor({
           onKeyDown={(e) => e.key === "Enter" && addAttribute()}
           placeholder="attribute.key"
         />
-        <Button size="xs" variant="outline" onClick={addAttribute} disabled={!newKey}>
+        <Button size="sm" variant="outline" onClick={addAttribute} disabled={!newKey}>
           <Plus size={12} /> Add
         </Button>
       </Flex>

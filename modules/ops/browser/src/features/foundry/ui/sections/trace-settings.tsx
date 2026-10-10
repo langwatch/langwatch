@@ -7,24 +7,25 @@ export function TraceSettings({ compact = false }: { compact?: boolean }) {
   const updateTrace = useTraceStore((s) => s.updateTrace);
 
   return (
-    <Box p={3}>
+    <Box p={4}>
       <Text
         fontSize="xs"
         fontWeight="medium"
-        textTransform="uppercase"
-        letterSpacing="wider"
+        textTransform="none"
+        letterSpacing="normal"
         color="fg.muted"
         mb={2}
       >
-        Trace Settings
+        Trace settings
       </Text>
       <VStack gap={2} align="stretch">
         <Box>
           <Text fontSize="xs" color="fg.subtle" mb={1}>
-            service.name
+            Service name
           </Text>
           <Input
             size="sm"
+            aria-label="Service name"
             value={trace.resourceAttributes["service.name"] ?? ""}
             onChange={(e) =>
               updateTrace({
@@ -38,10 +39,11 @@ export function TraceSettings({ compact = false }: { compact?: boolean }) {
         </Box>
         <Box>
           <Text fontSize="xs" color="fg.subtle" mb={1}>
-            user_id
+            User ID
           </Text>
           <Input
             size="sm"
+            aria-label="User ID"
             value={trace.metadata.userId ?? ""}
             onChange={(e) =>
               updateTrace({
@@ -58,10 +60,11 @@ export function TraceSettings({ compact = false }: { compact?: boolean }) {
           <>
             <Box>
               <Text fontSize="xs" color="fg.subtle" mb={1}>
-                thread_id
+                Thread ID
               </Text>
               <Input
                 size="sm"
+                aria-label="Thread ID"
                 value={trace.metadata.threadId ?? ""}
                 onChange={(e) =>
                   updateTrace({
@@ -76,10 +79,11 @@ export function TraceSettings({ compact = false }: { compact?: boolean }) {
             </Box>
             <Box>
               <Text fontSize="xs" color="fg.subtle" mb={1}>
-                labels
+                Labels
               </Text>
               <Input
                 size="sm"
+                aria-label="Labels"
                 value={trace.metadata.labels?.join(", ") ?? ""}
                 onChange={(e) =>
                   updateTrace({

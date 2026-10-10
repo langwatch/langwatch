@@ -132,12 +132,12 @@ function BulkActionBar({
   return (
     <HStack gap={2}>
       <Spacer />
-      <Button size="xs" variant="outline" data-testid="dead-redrive-shown" onClick={onRedriveAll}>
+      <Button size="sm" variant="outline" data-testid="dead-redrive-shown" onClick={onRedriveAll}>
         <RotateCcw size={12} />
         Redrive shown ({shownCount})
       </Button>
       <Button
-        size="xs"
+        size="sm"
         variant="outline"
         colorPalette="red"
         data-testid="dead-discard-shown"
@@ -245,11 +245,11 @@ function Pager({
         {start}–{end} of {total}
       </Text>
       <HStack gap={2}>
-        <Button size="xs" variant="outline" disabled={page === 1} onClick={() => onPage(page - 1)}>
+        <Button size="sm" variant="outline" disabled={page === 1} onClick={() => onPage(page - 1)}>
           Previous
         </Button>
         <Button
-          size="xs"
+          size="sm"
           variant="outline"
           disabled={end >= total}
           onClick={() => onPage(page + 1)}

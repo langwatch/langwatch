@@ -1,4 +1,5 @@
 import { Link } from "@langwatch/browser-host/link";
+import { ListTable } from "@langwatch/design-system/list-table";
 import { Box, HStack, Table, Text } from "@langwatch/design-system/primitives";
 import type { ReactNode } from "react";
 
@@ -43,7 +44,10 @@ export function PausedSchedulesSection({
         )}
       </HStack>
       <Table.ScrollArea>
-        <Table.Root
+        <ListTable
+          density="compact"
+          columnRules={false}
+          containerProps={{ overflowX: "auto" }}
           size="sm"
           variant="line"
           css={{ "& tr:last-child td": { borderBottom: "none" } }}
@@ -72,7 +76,7 @@ export function PausedSchedulesSection({
               </Table.Row>
             ))}
           </Table.Body>
-        </Table.Root>
+        </ListTable>
       </Table.ScrollArea>
     </Box>
   );

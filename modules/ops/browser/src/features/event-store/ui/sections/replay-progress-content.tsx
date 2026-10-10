@@ -1,4 +1,3 @@
-import { Stat } from "@langwatch/design-system/primitives";
 import { Link } from "@langwatch/browser-host/link";
 import {
   Badge,
@@ -11,13 +10,13 @@ import {
   SimpleGrid,
   Spinner,
   Status,
+  Stat,
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
 import type { ReplayHistoryEntry, ReplayStatus } from "@langwatch/ops-contract";
 import { nowInstant, toEpochMs, readableDate } from "@langwatch/time";
 import { ArrowLeft } from "lucide-react";
-import { useMemo } from "react";
 
 import { api } from "../../../../behavior/ops-api.ts";
 import { useOpsPermission } from "../../../../behavior/ops-session.ts";
@@ -143,11 +142,8 @@ function LiveRunView({
   hasAccess: boolean;
   cancelMutation: { isPending: boolean; mutate: () => void };
 }) {
-  const activeProjectionNames = useMemo(
-    () => parseActiveProjections(status.currentProjection),
-    [status.currentProjection],
-  );
-  const activeProjections = useMemo(() => new Set(activeProjectionNames), [activeProjectionNames]);
+  const activeProjectionNames = parseActiveProjections(status.currentProjection);
+  const activeProjections = new Set(activeProjectionNames);
 
   return (
     <VStack align="stretch" gap={4}>
@@ -195,7 +191,7 @@ function LiveRunView({
               </HStack>
               {isRunning && hasAccess && (
                 <Button
-                  size="xs"
+                  size="sm"
                   colorPalette="red"
                   variant="outline"
                   loading={cancelMutation.isPending}
@@ -356,13 +352,13 @@ function HistoricalRunView({
 
 /** Aggregates, events, throughput and elapsed time of one replay run. */
 function ReplayStatBar({ status }: { status: ReplayStatus }) {
-  const throughputRate = useMemo(() => {
+  const throughputRate = (() => {
     if (!status.startedAt || !status.eventsProcessed) return null;
     const end = status.completedAt ? toEpochMs(status.completedAt) : nowInstant().epochMilliseconds;
     const elapsed = (end - toEpochMs(status.startedAt)) / 1000;
     if (elapsed < 1) return null;
     return Math.round(status.eventsProcessed / elapsed);
-  }, [status.startedAt, status.completedAt, status.eventsProcessed]);
+  })();
 
   return (
     <SimpleGrid columns={4} gap={1}>

@@ -26,7 +26,7 @@ export function RAGSpanEditor({ span }: { span: SpanConfig }) {
                 Context {i + 1}
               </Text>
               <Button
-                size="xs"
+                size="sm"
                 variant="ghost"
                 color="fg.muted"
                 _hover={{ color: "red.400" }}
@@ -66,7 +66,7 @@ export function RAGSpanEditor({ span }: { span: SpanConfig }) {
           </Box>
         ))}
         <Button
-          size="xs"
+          size="sm"
           variant="outline"
           onClick={() =>
             updateSpan(span.id, {

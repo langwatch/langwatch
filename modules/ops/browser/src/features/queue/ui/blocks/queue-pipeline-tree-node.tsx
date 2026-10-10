@@ -89,7 +89,7 @@ export function PipelineTreeNode({
             {directlyPaused && (
               <Button
                 variant="ghost"
-                size="2xs"
+                size="sm"
                 colorPalette="green"
                 onClick={() => onUnpause(path)}
               >
@@ -97,12 +97,7 @@ export function PipelineTreeNode({
               </Button>
             )}
             {!directlyPaused && !paused && (
-              <Button
-                variant="ghost"
-                size="2xs"
-                colorPalette="orange"
-                onClick={() => onPause(path)}
-              >
+              <Button variant="ghost" size="sm" colorPalette="orange" onClick={() => onPause(path)}>
                 <Pause size={10} />
               </Button>
             )}

@@ -1,6 +1,8 @@
 import { Link as RoutedLink } from "@langwatch/browser-host/link";
 import { Drawer } from "@langwatch/design-system/drawer";
+import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import {
   Badge,
   Box,
@@ -17,7 +19,7 @@ import {
 } from "@langwatch/design-system/primitives";
 import { Switch } from "@langwatch/design-system/switch";
 import { nowInstant, toDate } from "@langwatch/time";
-import { MoreVertical, Pencil, UserCheck } from "lucide-react";
+import { MoreVertical, Pencil, SearchX, UserCheck } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useDebounce } from "use-debounce";
 
@@ -104,7 +106,14 @@ export default function UsersView() {
           onPageChange: setPage,
         }}
       >
-        <Table.Root variant="line" size="md" width="full">
+        <ListTable
+          density="compact"
+          columnRules={false}
+          containerProps={{ overflowX: "auto" }}
+          variant="line"
+          size="sm"
+          width="full"
+        >
           <Table.Header>
             <Table.Row>
               <Table.ColumnHeader>ID</Table.ColumnHeader>
@@ -122,9 +131,11 @@ export default function UsersView() {
             {list.data?.data.length === 0 && (
               <Table.Row>
                 <Table.Cell colSpan={9}>
-                  <Text color="fg.muted" textAlign="center" paddingY={6}>
-                    No users match your search.
-                  </Text>
+                  <NoDataInfoBlock
+                    icon={<SearchX />}
+                    title="No users match your search."
+                    description="Try a different search or clear the filter to see all records."
+                  />
                 </Table.Cell>
               </Table.Row>
             )}
@@ -179,7 +190,7 @@ export default function UsersView() {
               </Table.Row>
             ))}
           </Table.Body>
-        </Table.Root>
+        </ListTable>
       </AdminTable>
 
       <UserEditDrawer user={editing} onClose={() => setEditing(null)} />
@@ -397,7 +408,7 @@ function UserEditDrawer({ user, onClose }: { user: AdminUser | null; onClose: ()
     >
       <Drawer.Content>
         <Drawer.Header>
-          <Drawer.Title>Edit User</Drawer.Title>
+          <Drawer.Title>Edit user</Drawer.Title>
         </Drawer.Header>
         <Drawer.CloseTrigger />
         <Drawer.Body>
@@ -489,7 +500,7 @@ function RefChipList({
   }
   if (!Array.isArray(refs) || refs.length === 0) return <EmptyCell />;
   return (
-    <Wrap gap={1}>
+    <Wrap gap={1} minWidth="180px" maxWidth="240px">
       {refs.map((ref) => (
         <ChakraLink
           key={ref.id}
@@ -503,6 +514,7 @@ function RefChipList({
               as="span"
               paddingX={2}
               paddingY={0.5}
+              whiteSpace="nowrap"
               borderRadius="md"
               borderWidth="1px"
               borderColor="border.emphasized"
@@ -538,7 +550,11 @@ function ToggleRow({
           </Text>
         </VStack>
         <Spacer />
-        <Switch checked={checked} onCheckedChange={(e) => onChange(e.checked)} />
+        <Switch
+          colorPalette="accent"
+          checked={checked}
+          onCheckedChange={(e) => onChange(e.checked)}
+        />
       </HStack>
     </Field.Root>
   );

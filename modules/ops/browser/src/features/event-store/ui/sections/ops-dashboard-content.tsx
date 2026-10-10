@@ -1,6 +1,5 @@
 import { Card, Heading, Text, VStack } from "@langwatch/design-system/primitives";
 import type { DashboardData } from "@langwatch/ops-contract";
-import { useMemo } from "react";
 
 import { api } from "../../../../behavior/ops-api.ts";
 import {
@@ -25,7 +24,7 @@ import { StatStrip } from "./stat-strip.tsx";
  */
 export function OpsDashboardContent({ data }: { data: DashboardData }) {
   const queuesQuery = api.ops.listQueues.useQuery(undefined, {});
-  const queueNames = useMemo(() => (queuesQuery.data ?? []).map((q) => q.name), [queuesQuery.data]);
+  const queueNames = (queuesQuery.data ?? []).map((q) => q.name);
 
   // Read here as well as in AnomaliesCard so the health line can collapse both
   // all-clear states into one row. React Query serves both from one fetch.
@@ -55,7 +54,7 @@ export function OpsDashboardContent({ data }: { data: DashboardData }) {
         pausedKeys={data.pausedKeys}
       />
 
-      <Card.Root variant="outline" overflow="hidden">
+      <Card.Root variant="outline" overflow="hidden" borderColor="border.muted" boxShadow="none">
         <Card.Header>
           <Heading size="sm">Throughput</Heading>
           <Text textStyle="sm" color="fg.muted">

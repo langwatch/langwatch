@@ -1,4 +1,6 @@
+import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import {
   Badge,
   Box,
@@ -11,7 +13,7 @@ import {
 } from "@langwatch/design-system/primitives";
 import type { IdentityLookupAnswer, LookupPerson } from "@langwatch/identity-contract";
 import { nowInstant } from "@langwatch/time";
-import { MoreVertical } from "lucide-react";
+import { MoreVertical, Search } from "lucide-react";
 import { useState } from "react";
 import { useDebounce } from "use-debounce";
 
@@ -55,7 +57,7 @@ export default function IdentityLookupView() {
   return (
     <>
       <AdminTable
-        title="Identity Lookup"
+        title="Identity lookup"
         searchValue={search}
         onSearchChange={setSearch}
         searchPlaceholder="Type the email address the support case is about"
@@ -65,10 +67,11 @@ export default function IdentityLookupView() {
       >
         <VStack align="stretch" gap={8} width="full" padding={6}>
           {address.length === 0 && (
-            <Text color="fg.muted">
-              Type an email address to see how sign-in would route it, who holds it, and what is
-              waiting on a human.
-            </Text>
+            <NoDataInfoBlock
+              icon={<Search />}
+              title="Look up an identity"
+              description="Type an email address to see how sign-in would route it, who holds it, and what is waiting on a human."
+            />
           )}
           {lookup.data && (
             <>
@@ -164,7 +167,14 @@ function PeopleTable({
       <Heading size="sm" paddingBottom={2}>
         People holding this address
       </Heading>
-      <Table.Root variant="line" size="md" width="full">
+      <ListTable
+        density="compact"
+        columnRules={false}
+        containerProps={{ overflowX: "auto" }}
+        variant="line"
+        size="sm"
+        width="full"
+      >
         <Table.Header>
           <Table.Row>
             <Table.ColumnHeader>Person</Table.ColumnHeader>
@@ -225,7 +235,7 @@ function PeopleTable({
             </Table.Row>
           ))}
         </Table.Body>
-      </Table.Root>
+      </ListTable>
     </Box>
   );
 }
@@ -255,7 +265,7 @@ function PersonRowActions({
     <Menu.Root>
       <Menu.Trigger asChild>
         <Button
-          size="xs"
+          size="sm"
           variant="ghost"
           aria-label={`Actions for ${person.name ?? person.userId}`}
           onClick={(event) => event.stopPropagation()}

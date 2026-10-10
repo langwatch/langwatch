@@ -69,7 +69,7 @@ export function SchedulerRowActions({
           <IconButton
             aria-label="Schedule actions"
             variant="ghost"
-            size="xs"
+            size="sm"
             data-testid="scheduler-row-actions"
           >
             <MoreVertical size={14} />

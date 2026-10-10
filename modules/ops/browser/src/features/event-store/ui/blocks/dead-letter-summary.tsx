@@ -22,7 +22,7 @@ export function DeadLetterSummary({
 }) {
   const fleetTotal = byProcess.reduce((sum, row) => sum + row.count, 0);
   return (
-    <Card.Root>
+    <Card.Root borderColor="border.muted" boxShadow="none">
       <Card.Body padding={4}>
         <HStack gap={2} marginBottom={3}>
           <Box color="red.500">
@@ -35,7 +35,7 @@ export function DeadLetterSummary({
         </HStack>
         <HStack gap={2} flexWrap="wrap">
           <Button
-            size="xs"
+            size="sm"
             variant={selected === undefined ? "solid" : "outline"}
             onClick={() => onSelect(undefined)}
           >
@@ -44,7 +44,7 @@ export function DeadLetterSummary({
           {byProcess.map((row) => (
             <Button
               key={row.processName}
-              size="xs"
+              size="sm"
               data-testid={`dead-filter-${row.processName}`}
               variant={selected === row.processName ? "solid" : "outline"}
               onClick={() => onSelect(row.processName)}

@@ -48,13 +48,13 @@ export default function OpsDashboardScreen() {
         }
       >
         <VStack align="start" gap={1} minWidth={0}>
-          <PageLayout.Heading>Ops Dashboard</PageLayout.Heading>
+          <PageLayout.Heading>Ops dashboard</PageLayout.Heading>
           <PageLayout.Subtitle>
             Throughput, queue health, and work that needs attention.
           </PageLayout.Subtitle>
         </VStack>
       </PageLayout.Header>
-      <PageLayout.Container>
+      <PageLayout.Container paddingY={5} maxWidth="full">
         {data && <OpsDashboardContent data={data} />}
         {!data && snapshot.isError && (
           <HandledErrorAlert

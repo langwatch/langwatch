@@ -309,6 +309,7 @@ function RuleEditorRow({
         <Field.Label fontSize="xs">Enabled</Field.Label>
         <HStack height="32px" alignItems="center">
           <Switch
+            colorPalette="accent"
             checked={rule.enabled}
             onCheckedChange={(details) => onChange({ enabled: details.checked })}
           />

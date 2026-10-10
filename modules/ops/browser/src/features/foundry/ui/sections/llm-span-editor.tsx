@@ -119,7 +119,7 @@ export function LLMSpanEditor({ span }: { span: SpanConfig }) {
               placeholder="Message content..."
             />
             <Button
-              size="xs"
+              size="sm"
               variant="ghost"
               color="fg.muted"
               _hover={{ color: "red.400" }}
@@ -131,7 +131,7 @@ export function LLMSpanEditor({ span }: { span: SpanConfig }) {
           </Flex>
         ))}
         <Button
-          size="xs"
+          size="sm"
           variant="outline"
           onClick={() =>
             updateLLM({

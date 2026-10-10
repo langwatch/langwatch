@@ -93,7 +93,7 @@ export function PromptSpanEditor({ span }: { span: SpanConfig }) {
               placeholder="value"
             />
             <Button
-              size="xs"
+              size="sm"
               variant="ghost"
               color="fg.muted"
               _hover={{ color: "red.400" }}
@@ -108,7 +108,7 @@ export function PromptSpanEditor({ span }: { span: SpanConfig }) {
           </Flex>
         ))}
         <Button
-          size="xs"
+          size="sm"
           variant="outline"
           onClick={() =>
             updatePrompt({

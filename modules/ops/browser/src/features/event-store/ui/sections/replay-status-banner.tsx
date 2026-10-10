@@ -42,7 +42,7 @@ export function ReplayStatusBanner() {
           <HStack gap={2}>
             {status.runId && (
               <Button
-                size="xs"
+                size="sm"
                 variant="outline"
                 onClick={() => router.push(`/ops/projections/${status.runId}`)}
               >
@@ -51,7 +51,7 @@ export function ReplayStatusBanner() {
             )}
             {hasAccess && (
               <Button
-                size="xs"
+                size="sm"
                 colorPalette="red"
                 variant="outline"
                 loading={cancelMutation.isPending}
