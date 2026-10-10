@@ -60,7 +60,7 @@ export function PromptingTechniqueWrapper({
     ref: string;
   };
 }) {
-  const { ComponentIcon, useColorModeValue } = useWorkflowNodeHost();
+  const { ComponentIcon } = useWorkflowNodeHost();
   const { node, setNode, deleteNode, deselectAllNodes } = useWorkflowStore((state) => ({
     node: decoratedBy?.ref ? state.nodes.find((node) => node.id === decoratedBy.ref) : void 0,
     setNode: state.setNode,
@@ -68,10 +68,7 @@ export function PromptingTechniqueWrapper({
     deselectAllNodes: state.deselectAllNodes,
   }));
   const hovered = false;
-  const wrapperShadow = useColorModeValue(
-    "0px 0px 4px 0px rgba(0, 0, 0, 0.1)",
-    "0px 0px 4px 0px rgba(0, 0, 0, 0.3)",
-  );
+  const wrapperShadow = "sm";
 
   if (!node) {
     return children;

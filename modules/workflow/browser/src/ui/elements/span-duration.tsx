@@ -9,7 +9,7 @@ const YELLOW_AFTER_MS = 10 * 1000;
 
 function durationColor(duration: number): string {
   if (duration > RED_AFTER_MS) return "red";
-  if (duration > YELLOW_AFTER_MS) return "yellow.600";
+  if (duration > YELLOW_AFTER_MS) return "yellow.fg";
   return "green";
 }
 

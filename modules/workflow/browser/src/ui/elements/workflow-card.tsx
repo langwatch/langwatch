@@ -55,7 +55,7 @@ export function WorkflowCardActions({
         <Menu.Item value="copy" onClick={onCopy}>
           <Copy size={16} /> Replicate to another project
         </Menu.Item>
-        <Menu.Item value="delete" color="red.500" onClick={onDelete}>
+        <Menu.Item value="delete" color="red.fg" onClick={onDelete}>
           <Trash2 size={16} /> Delete
         </Menu.Item>
       </Menu.Content>

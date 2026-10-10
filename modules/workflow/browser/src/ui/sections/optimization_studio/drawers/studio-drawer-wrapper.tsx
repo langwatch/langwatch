@@ -234,14 +234,14 @@ export function StudioDrawerWrapper({ node, children, onClose, footer }: StudioD
                 height: `${fullPanelHeight}px`,
                 marginTop: 0,
                 borderRadius: 0,
-                boxShadow: "0 0 0 rgba(0,0,0,0)",
+                boxShadow: "0 0 0 transparent",
               }}
               animate={{
                 right: `${middlePoint}px`,
                 height: `${fullPanelHeight - 40}px`,
                 marginTop: "20px",
                 borderRadius: "8px",
-                boxShadow: "0 0 10px rgba(0,0,0,0.1)",
+                boxShadow: "var(--chakra-shadows-md)",
               }}
               transition={{ duration: 0.4, ease: "easeInOut", delay: 0.1 }}
               style={{
@@ -296,7 +296,7 @@ export function StudioDrawerWrapper({ node, children, onClose, footer }: StudioD
               left={0}
               height="100%"
               width="100%"
-              background="rgba(0,0,0,0.1)"
+              background="bg.scrim"
               zIndex={98}
               onClick={() => setPropertiesExpanded(false)}
             />

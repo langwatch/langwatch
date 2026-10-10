@@ -39,18 +39,18 @@ function executionStatusIcon({
 
   if (status === "error" || hasEvaluatorError(node)) {
     return (
-      <Box color="red.500">
+      <Box color="red.fg">
         <X size={iconSize} />
       </Box>
     );
   }
 
   if (status === "success") {
-    let color = "green.500";
+    let color = "green.fg";
     if (checkIsEvaluator(node)) {
       const outputStatus = node.data.execution_state?.outputs?.status;
       if (outputStatus === "skipped") {
-        color = "yellow.500";
+        color = "yellow.fg";
       }
     }
 
@@ -63,7 +63,7 @@ function executionStatusIcon({
 
   if (status === "skipped") {
     return (
-      <Box color="gray.400" data-testid="node-status-skipped">
+      <Box color="fg.subtle" data-testid="node-status-skipped">
         <MinusCircle size={iconSize} />
       </Box>
     );

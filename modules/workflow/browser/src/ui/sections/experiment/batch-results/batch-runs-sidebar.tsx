@@ -113,8 +113,8 @@ const resolveRunColor = ({
   interrupted: boolean;
   runColors: Record<string, string>;
 }): string => {
-  if (run.timestamps.stoppedAt) return "red.400";
-  if (interrupted) return "orange.400";
+  if (run.timestamps.stoppedAt) return "red.fg";
+  if (interrupted) return "orange.fg";
   return runColors[run.runId] ?? getColorForString("colors", run.runId).color;
 };
 
@@ -266,7 +266,7 @@ const RunItem = ({
               v{run.workflowVersion.version}
             </Text>
           )}
-          {!isRunFinished(run.timestamps) && <Spinner size="xs" color="blue.500" flexShrink={0} />}
+          {!isRunFinished(run.timestamps) && <Spinner size="xs" color="blue.fg" flexShrink={0} />}
         </HStack>
         <Text color="fg.muted" fontSize="12px">
           {run.timestamps.createdAt ? formatTimeAgo(run.timestamps.createdAt) : "..."}

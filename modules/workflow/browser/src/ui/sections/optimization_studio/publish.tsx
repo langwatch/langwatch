@@ -572,7 +572,7 @@ function PublishModalContent({
 
   if (!versions.data) {
     return (
-      <Dialog.Content borderTop="5px solid" borderColor="green.400">
+      <Dialog.Content borderTop="5px solid" borderColor="green.emphasized">
         <Dialog.Header>
           <Dialog.Title fontWeight={600}>Publish Workflow</Dialog.Title>
         </Dialog.Header>
@@ -598,7 +598,7 @@ function PublishModalContent({
         as="form"
         onSubmit={form.handleSubmit(onSubmit)}
         borderTop="5px solid"
-        borderColor="green.400"
+        borderColor="green.emphasized"
       >
         <Dialog.Header>
           <Dialog.Title fontWeight={600}>Publish Workflow</Dialog.Title>
@@ -606,7 +606,7 @@ function PublishModalContent({
         <Dialog.CloseTrigger />
         <Dialog.Body>
           <VStack align="start" width="full" gap={10}>
-            <Text fontSize="15px" color="black">
+            <Text fontSize="15px" color="fg">
               Publish your workflow to make it available via API, as a component to other workflows,
               or as a custom evaluator.
             </Text>

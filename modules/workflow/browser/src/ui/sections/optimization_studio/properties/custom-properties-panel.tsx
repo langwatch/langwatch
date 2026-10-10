@@ -86,7 +86,7 @@ const CustomComponentInfo = ({ node }: { node: Node<Custom> }) => {
         </HStack>
         <HStack>
           <Avatar.Root size="2xs">
-            <Avatar.Fallback name="jim" bg="orange.400" color="white" />
+            <Avatar.Fallback name="jim" bg="orange.solid" color="orange.contrast" />
           </Avatar.Root>
           <Text fontSize="12px" lineClamp={1}>
             {currentVersion?.author?.name}

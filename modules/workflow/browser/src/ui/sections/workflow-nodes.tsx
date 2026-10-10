@@ -8,6 +8,7 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { system } from "@langwatch/design-system/system";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type {
   Component,
@@ -92,8 +93,8 @@ function NodeInputs({
               height: "8px",
               background: "var(--chakra-colors-bg)",
               borderRadius: "100%",
-              border: `1px solid #FF8309`,
-              boxShadow: `0px 0px ${selected ? "4px" : "2px"} 0px #FF8309`,
+              border: `1px solid var(--chakra-colors-accent-solid)`,
+              boxShadow: `0px 0px ${selected ? "4px" : "2px"} 0px var(--chakra-colors-accent-solid)`,
             }}
           />
           <Text>{input.identifier}</Text>
@@ -109,7 +110,7 @@ function NodeInputs({
           gap={1}
           paddingX={2}
           paddingY={1}
-          background="green.50"
+          background="green.subtle"
           borderRadius="8px"
           width="full"
           position="relative"
@@ -125,8 +126,8 @@ function NodeInputs({
               height: "9px",
               background: "var(--chakra-colors-bg)",
               borderRadius: "100%",
-              border: "1px solid #22C55E",
-              boxShadow: "0px 0px 4px 0px #22C55E",
+              border: "1px solid var(--chakra-colors-green-solid)",
+              boxShadow: "0px 0px 4px 0px var(--chakra-colors-green-solid)",
             }}
           />
           <Text color="green.fg">{GATE_FIELD}</Text>
@@ -173,8 +174,8 @@ function NodeOutputs({
                 height: "8px",
                 background: "var(--chakra-colors-bg)",
                 borderRadius: "100%",
-                border: `1px solid #2B6CB0`,
-                boxShadow: `0px 0px ${selected ? "4px" : "2px"} 0px #2B6CB0`,
+                border: `1px solid var(--chakra-colors-blue-fg)`,
+                boxShadow: `0px 0px ${selected ? "4px" : "2px"} 0px var(--chakra-colors-blue-fg)`,
               }}
             />
           )}
@@ -215,7 +216,7 @@ export function NodeSectionTitle({
   );
 }
 
-export const selectionColor = "#2F8FFB";
+export const selectionColor = system.token.var("colors.blue.focusRing");
 
 export const isExecutableComponent = (node: Pick<Node<Component>, "type">) => {
   return node.type !== "entry" && node.type !== "prompting_technique";
@@ -235,7 +236,7 @@ export const ComponentNode = forwardRef(function ComponentNode(
   },
   ref: Ref<HTMLDivElement>,
 ) {
-  const { ComponentIcon, LLMModelDisplay, useColorModeValue } = useWorkflowNodeHost();
+  const { ComponentIcon, LLMModelDisplay } = useWorkflowNodeHost();
   const {
     node,
     hoveredNodeId,
@@ -303,10 +304,7 @@ export const ComponentNode = forwardRef(function ComponentNode(
 
   const llmParams = props.data.parameters?.filter((p) => p.type === "llm") ?? [];
 
-  const nodeShadow = useColorModeValue(
-    `0px 0px 4px 0px rgba(0, 0, 0, ${isHovered ? "0.2" : "0.1"})`,
-    `0px 0px 4px 0px rgba(0, 0, 0, ${isHovered ? "0.5" : "0.3"})`,
-  );
+  const nodeShadow = isHovered ? "md" : "sm";
 
   const hoveredOutlineColor = isHovered ? "gray.emphasized" : "none";
 

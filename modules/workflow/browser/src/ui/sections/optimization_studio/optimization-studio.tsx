@@ -424,12 +424,8 @@ export default function OptimizationStudio() {
 }
 
 function ReactFlowBackground() {
-  const bgColor = useColorModeValue(useColorRawValue("gray.100"), useColorRawValue("gray.900"));
-  // Hardcoded to the pre-redesign grays (old gray.300 in light, a subtle dark
-  // in dark). The theme gray scale shifted to darker Chakra v3 defaults, which
-  // turned the canvas dots into a heavy grid; pin them so the texture stays the
-  // light, subtle one it was for years rather than tracking the token.
-  const dotColor = useColorModeValue("#E5E7EB", "#2d2d3d");
+  const bgColor = useColorRawValue("bg.page");
+  const dotColor = useColorRawValue("border");
 
   return (
     <Background
@@ -454,9 +450,9 @@ function controlsMarginLeft({
 }
 
 function statusCircleColor({ status }: { status: string }): string {
-  if (status === "connected") return "green.500";
-  if (status === "disconnected") return "red.300";
-  return "yellow.500";
+  if (status === "connected") return "green.fg";
+  if (status === "disconnected") return "red.fg";
+  return "yellow.fg";
 }
 
 function StatusCircle({ status, tooltip }: { status: string; tooltip?: string | React.ReactNode }) {

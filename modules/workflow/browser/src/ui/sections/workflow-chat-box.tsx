@@ -140,8 +140,8 @@ export function WorkflowChatBox({
                   marginBottom={2}
                 >
                   <Text
-                    bg="blue.500"
-                    color="white"
+                    bg="blue.solid"
+                    color="blue.contrast"
                     padding={2}
                     borderRadius="lg"
                     whiteSpace="pre-wrap"

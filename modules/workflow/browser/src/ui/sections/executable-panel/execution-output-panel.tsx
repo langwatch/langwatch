@@ -164,7 +164,7 @@ const renderExecutionError = (executionState: ExecutionState) => {
       <Text fontSize="13px" fontWeight="bold" textTransform="uppercase" color="fg.muted">
         Error
       </Text>
-      <OutputBox color="red.700" value={executionState.error ?? "No error message captured"} />
+      <OutputBox color="red.fg" value={executionState.error ?? "No error message captured"} />
     </VStack>
   );
 };
@@ -178,10 +178,10 @@ function outputTextColor({
   isFail: boolean;
   isSuccess: boolean;
 }): string {
-  if (isSkipped) return "yellow.600";
-  if (isFail) return "red.600";
-  if (isSuccess) return "green.600";
-  return "gray.600";
+  if (isSkipped) return "yellow.fg";
+  if (isFail) return "red.fg";
+  if (isSuccess) return "green.fg";
+  return "fg.muted";
 }
 
 /**
@@ -201,7 +201,7 @@ const renderExecutionOutputs = (executionState: ExecutionState, nodeType?: strin
     const isConditionTrue = "true" in outputs ? outputs.true : !(outputs.false as boolean);
     return (
       <VStack width="full" align="start" gap={3}>
-        <Text fontSize="13px" fontWeight="bold" textTransform="uppercase" color="gray.600">
+        <Text fontSize="13px" fontWeight="bold" textTransform="uppercase" color="fg.muted">
           Condition
         </Text>
         <OutputBox value={isConditionTrue} />

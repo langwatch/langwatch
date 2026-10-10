@@ -67,20 +67,23 @@ describe("the Workflow node host port", () => {
       expect(result.current.useEntryDatasetTotal(undefined)).toBe(42);
     });
 
-    /** @scenario "Canvas node renderers use explicit application host ports" */
-    it("has the default edge take its colour from the injected port", () => {
-      const useColorModeValue = vi.fn((_light: string, _dark: string) => "rgb(1, 2, 3)");
-
-      const { container } = render(
-        <WorkflowNodeHostProvider value={hostWith({ useColorModeValue })}>
-          <svg>
-            <WorkflowEdge {...edgeProps} />
-          </svg>
-        </WorkflowNodeHostProvider>,
+    it("draws ordinary and selected edges with semantic colours", () => {
+      const { container, rerender } = render(
+        <svg>
+          <WorkflowEdge {...edgeProps} />
+        </svg>,
       );
-
-      expect(useColorModeValue).toHaveBeenCalledWith("#DDDDDD", "#3d3d4d");
-      expect(container.querySelector("path")?.getAttribute("style")).toContain("rgb(1, 2, 3)");
+      expect(container.querySelector("path")?.getAttribute("style")).toContain(
+        "var(--chakra-colors-border)",
+      );
+      rerender(
+        <svg>
+          <WorkflowEdge {...edgeProps} selected />
+        </svg>,
+      );
+      expect(container.querySelector("path")?.getAttribute("style")).toContain(
+        "var(--chakra-colors-blue-focus-ring)",
+      );
     });
   });
 });

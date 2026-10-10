@@ -692,7 +692,7 @@ function fieldFrameStyle(isMissing: boolean) {
     borderColor: "border",
     background: undefined,
     paddingX: undefined,
-    focusBorderColor: "blue.500",
+    focusBorderColor: "blue.focusRing",
     focusShadow: "var(--chakra-colors-blue-500) 0px 1px 0px 0px",
     placeholderColor: undefined,
     testId: undefined,
@@ -949,10 +949,10 @@ function PathBreadcrumb({ path }: { path: string[] }) {
       borderRadius="4px"
       marginBottom={1}
     >
-      <Text fontSize="xs" color="blue.600">
+      <Text fontSize="xs" color="blue.fg">
         {path.map((s) => s.replace(/_/g, " ")).join(" → ")}
       </Text>
-      <Text fontSize="xs" color="blue.400">
+      <Text fontSize="xs" color="blue.fg">
         →
       </Text>
     </HStack>

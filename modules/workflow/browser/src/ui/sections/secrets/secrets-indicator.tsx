@@ -47,9 +47,9 @@ export function SecretsIndicator({ projectId, onInsertSecret }: SecretsIndicator
           as="button"
           gap={1}
           fontSize="13px"
-          color="gray.400"
+          color="fg.subtle"
           cursor="pointer"
-          _hover={{ color: "white" }}
+          _hover={{ color: "fg" }}
           paddingX={2}
           paddingY={1}
           borderRadius="md"
@@ -97,7 +97,7 @@ export function SecretsIndicator({ projectId, onInsertSecret }: SecretsIndicator
                     target="_blank"
                     rel="noopener noreferrer"
                     fontSize="xs"
-                    color="blue.500"
+                    color="blue.fg"
                   >
                     Add secrets in Settings{" "}
                     <LuExternalLink

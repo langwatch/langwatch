@@ -296,7 +296,7 @@ export function EvaluateModalContent({
         as="form"
         onSubmit={form.handleSubmit(onSubmit)}
         borderTop="5px solid"
-        borderTopColor="green.400"
+        borderTopColor="green.emphasized"
       >
         <Dialog.Header>
           <Dialog.Title fontWeight={600}>Evaluate Workflow</Dialog.Title>
