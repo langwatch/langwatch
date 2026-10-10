@@ -67,7 +67,7 @@ export function CustomAttributeRules({
                 placeholder="gen_ai.prompt.*"
                 value={row.pattern}
                 aria-label={`Attribute pattern ${index + 1}`}
-                borderColor={error ? "red.500" : undefined}
+                borderColor={error ? "red.fg" : undefined}
                 onChange={(event) => update(index, { pattern: event.target.value })}
               />
               <Select.Root
@@ -102,7 +102,7 @@ export function CustomAttributeRules({
               </Button>
             </HStack>
             {error && (
-              <Text fontSize="xs" color="red.500">
+              <Text fontSize="xs" color="red.fg">
                 {error}
               </Text>
             )}
