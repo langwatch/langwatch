@@ -457,6 +457,13 @@ Feature: SsoConnection - enterprise SSO becomes an aggregate with a guarded life
     And the organization satisfies activation's break-glass precondition
 
   @unit
+  Scenario: Granting a holder who already has a live way back in renews it
+    Given somebody holds a live way back in
+    When an administrator grants that same person a way back in again
+    Then the earlier grant is superseded by the new one
+    And the person holds one live way back in
+
+  @unit
   Scenario: A way back in is never open-ended
     Given an administrator granting a way back in
     When the end date is in the past or further out than ninety days
