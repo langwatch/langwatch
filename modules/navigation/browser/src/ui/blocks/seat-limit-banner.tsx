@@ -30,7 +30,7 @@ export function SeatLimitBanner({
               Contact sales
             </NavigationLink>
           ) : (
-            <NavigationLink href={planManagementHref}>Upgrade your plan</NavigationLink>
+            <NavigationLink href={planManagementHref}>Compare plans</NavigationLink>
           )}
         </BannerAction>
       }

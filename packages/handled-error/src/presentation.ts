@@ -1741,8 +1741,9 @@ const presentations = {
     describe: () => "Pick a name no other team in this organization uses.",
   },
   lite_member_restricted: {
-    title: "Your account doesn't include this",
-    describe: () => "Ask an admin on your team to upgrade your access.",
+    title: "You don't have access to this",
+    describe: () =>
+      "Your role doesn't include this action. Ask an organization admin to give you access.",
   },
   personal_project_key_required: {
     // Reached with a key in hand, so the answer is which key to use instead.
@@ -2351,7 +2352,7 @@ const presentations = {
     // Names the permission when the server sent one, for the same reason
     // `project_permission_denied` does: "ask an admin for access" is an
     // errand with no address, whereas the exact grant can be forwarded as-is.
-    title: "You don't have permission to do this",
+    title: "You don't have access to this",
     describe: (error) => {
       const permission = str(error, "required_permission", "");
       return permission
@@ -2399,7 +2400,7 @@ const presentations = {
     // `project_permission_denied`: the exact grant can be forwarded as-is.
     // Lite-member denials carry their own client modal via the middleware's
     // cause; this copy is what everyone else reads.
-    title: "You don't have permission to do this",
+    title: "You don't have access to this",
     describe: (error) => {
       const permission = str(error, "permission", "");
       return permission

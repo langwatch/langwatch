@@ -1,4 +1,5 @@
 import { Link } from "@langwatch/browser-host/link";
+import { AccessStateIcon } from "@langwatch/design-system/access-state";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import {
   Alert,
@@ -53,7 +54,7 @@ const getPlanColumns = (currency: Currency): PlanColumn[] => [
     id: "free",
     name: "Free",
     subtitle: "For teams getting started",
-    actionLabel: "Get Started",
+    actionLabel: "Get started",
     actionHref: "/settings/subscription",
     actionColor: "blue",
     features: FREE_PLAN_FEATURES,
@@ -62,7 +63,7 @@ const getPlanColumns = (currency: Currency): PlanColumn[] => [
     id: "growth",
     name: "Growth",
     subtitle: "Seat and usage pricing for growing teams",
-    actionLabel: "Get Started",
+    actionLabel: "Get started",
     actionHref: "/settings/subscription",
     actionColor: "orange",
     features: getGrowthPlanFeatures(currency),
@@ -71,7 +72,7 @@ const getPlanColumns = (currency: Currency): PlanColumn[] => [
     id: "enterprise",
     name: "Enterprise",
     subtitle: "Regulated and high-volume deployments",
-    actionLabel: "Contact Sales",
+    actionLabel: "Contact sales",
     actionHref: CONTACT_SALES_URL,
     actionColor: "blue",
     features: ENTERPRISE_PLAN_FEATURES,
@@ -134,7 +135,7 @@ function PlanCardActions({
     }
 
     return (
-      <Button asChild width="full" colorPalette="orange" variant="outline">
+      <Button asChild width="full" colorPalette="orange" variant="solid">
         <Link unstyled href="/settings/subscription">
           Upgrade now
         </Link>
@@ -146,7 +147,7 @@ function PlanCardActions({
     return (
       <Button asChild width="full" colorPalette="muted" variant="outline">
         <Link href={CONTACT_SALES_URL} isExternal>
-          Contact Sales
+          Contact sales
         </Link>
       </Button>
     );
@@ -178,15 +179,11 @@ function PlanCard({
       bg="bg.panel"
       borderRadius="2xl"
       height="full"
-      transition="all 0.2s ease-in-out"
-      _hover={{
-        transform: "scale(1.02)",
-        boxShadow: "lg",
-      }}
     >
       <Card.Body paddingY={6} paddingX={6}>
         <VStack align="stretch" gap={5} height="full">
-          <VStack align="start" gap={1}>
+          <VStack align="start" gap={3}>
+            {plan.id !== "free" && <AccessStateIcon kind="upgrade" compact />}
             <HStack gap={2}>
               <Heading as="h2" size="xl">
                 {plan.name}
@@ -204,11 +201,7 @@ function PlanCard({
           <VStack align="start" gap={2} flex={1}>
             {plan.features.map((feature) => (
               <HStack key={feature} align="start" gap={2}>
-                <Check
-                  size={14}
-                  style={{ marginTop: "4px", flexShrink: 0 }}
-                  color="var(--chakra-colors-blue-500)"
-                />
+                <Check size={14} style={{ marginTop: "4px", flexShrink: 0 }} aria-hidden />
                 <Text fontSize="sm" color="fg.muted">
                   {feature}
                 </Text>
@@ -302,13 +295,13 @@ export function PlansComparisonPage({
                 borderRadius="full"
                 fontSize="sm"
                 fontWeight={billingPeriod === opt.value ? "semibold" : "normal"}
-                color={billingPeriod === opt.value ? "orange.500" : "fg.muted"}
+                color={billingPeriod === opt.value ? "orange.fg" : "fg.muted"}
                 bg={billingPeriod === opt.value ? "bg.panel" : "transparent"}
                 boxShadow={billingPeriod === opt.value ? "xs" : "none"}
                 transition="all 0.15s ease-in-out"
                 cursor="pointer"
                 _hover={{
-                  color: billingPeriod === opt.value ? "orange.500" : "fg",
+                  color: billingPeriod === opt.value ? "orange.fg" : "fg",
                 }}
               >
                 {opt.label}
@@ -321,8 +314,8 @@ export function PlansComparisonPage({
               variant="subtle"
               size="sm"
               _hover={{
-                bgColor: "orange.400",
-                color: "bg.muted",
+                bgColor: "bg.emphasized",
+                color: "fg",
               }}
               onClick={() =>
                 setSelectedCurrency(

@@ -1,13 +1,12 @@
-import { Lent } from "@langwatch/browser-host/lent";
+import { Link } from "@langwatch/browser-host/link";
+import { UpgradeRequired } from "@langwatch/design-system/access-state";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { InlineCode } from "@langwatch/design-system/inline-code";
 import { Menu } from "@langwatch/design-system/menu";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import {
-  Alert,
   Badge,
-  Box,
   Button,
   Card,
   HStack,
@@ -16,7 +15,6 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
-import { ContactSalesToken } from "@langwatch/enterprise-billing-client";
 import { readableDate } from "@langwatch/time";
 import {
   History,
@@ -183,20 +181,14 @@ function WebhooksUpsell() {
       </PageLayout.Header>
       <PageLayout.Container>
         <VStack gap={6} width="full" align="start">
-          <Alert.Root status="info">
-            <Alert.Indicator />
-            <Alert.Content>
-              <Alert.Title>Enterprise Feature</Alert.Title>
-              <Alert.Description>
-                Webhook endpoints stream signed events (gateway billing, budgets, key lifecycle) to
-                your systems with durable retries and delivery history. Available on Enterprise
-                plans.
-              </Alert.Description>
-            </Alert.Content>
-          </Alert.Root>
-          <Box width="full">
-            <Lent of={ContactSalesToken} props={{}} />
-          </Box>
+          <UpgradeRequired
+            feature="Webhooks"
+            actions={
+              <Button asChild colorPalette="orange" size="sm">
+                <Link href="/settings/plans">Compare plans</Link>
+              </Button>
+            }
+          />
         </VStack>
       </PageLayout.Container>
     </>

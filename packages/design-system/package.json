@@ -138,6 +138,10 @@
       "types": "./dist/components/brand/langy-mark.d.ts",
       "default": "./src/components/brand/langy-mark.tsx"
     },
+    "./access-state": {
+      "types": "./dist/components/states/access-state.d.ts",
+      "default": "./src/components/states/access-state.tsx"
+    },
     "./restricted-access": {
       "types": "./dist/components/states/restricted-access.d.ts",
       "default": "./src/components/states/restricted-access.tsx"

@@ -3,6 +3,7 @@
  */
 
 import type { ResolvedUiFailureCopy } from "@langwatch/browser-host/feedback";
+import { AccessState } from "@langwatch/design-system/access-state";
 import { Button, Center, Heading, Spinner, Stack, Text } from "@langwatch/design-system/primitives";
 import { RestrictedAccess } from "@langwatch/design-system/restricted-access";
 import { ErrorActions } from "@langwatch/error-views";
@@ -19,13 +20,17 @@ export function UiPageLoading() {
 /** When a flag a page is behind is off: the address exists, this page does not. */
 export function UiPageNotFound() {
   return (
-    <Center minHeight="60vh" padding={8}>
-      <Stack gap={3} align="center" maxWidth="480px" textAlign="center">
-        <Heading size="lg">This page is not here</Heading>
-        <Text color="fg.muted">
-          The address is wrong, or this part of LangWatch is not switched on for your organization.
-        </Text>
-      </Stack>
+    <Center minHeight="50vh" padding={{ base: 4, md: 8 }}>
+      <AccessState
+        kind="unavailable"
+        title="This page is not here"
+        description="The address may have changed, or this page isn't available for your organization. Go back to continue."
+        actions={
+          <Button size="sm" colorPalette="orange" onClick={() => window.history.back()}>
+            Go back
+          </Button>
+        }
+      />
     </Center>
   );
 }

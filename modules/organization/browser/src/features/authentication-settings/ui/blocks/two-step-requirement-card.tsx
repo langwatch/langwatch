@@ -1,14 +1,14 @@
 import { Link } from "@langwatch/browser-host/link";
+import { AccessState } from "@langwatch/design-system/access-state";
 /**
  * Whether every member must prove a second factor. The server enforces it; the
  * switch stays available for turning it off after an Enterprise plan lapses.
  * Spec: specs/identity/mfa-and-session-shape.feature
  */
-import { Alert, Box, HStack, Text } from "@langwatch/design-system/primitives";
+import { Alert, Box, Button, HStack, Text } from "@langwatch/design-system/primitives";
 import { SettingsCard } from "@langwatch/design-system/settings-card";
 import { Switch } from "@langwatch/design-system/switch";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { Lock } from "lucide-react";
 
 import { EnterprisePlanBadge } from "../../../../ui/elements/enterprise-plan-badge.tsx";
 
@@ -64,17 +64,18 @@ export function TwoStepRequirementCard({
       data-testid="two-step-requirement-card"
     >
       {planLocked && (
-        <HStack gap={2} align="start" data-testid="two-step-requirement-plan-notice">
-          <Box color="fg.muted" marginTop="1px" flexShrink={0}>
-            <Lock size={14} />
-          </Box>
-          <Text color="fg.muted" fontSize="xs">
-            {explanation}{" "}
-            <Link href={planLink.href} colorPalette="orange" color="colorPalette.fg">
-              {planLink.label}
-            </Link>
-          </Text>
-        </HStack>
+        <AccessState
+          kind="upgrade"
+          compact
+          title="Requiring two-step verification needs Enterprise"
+          description={explanation}
+          data-testid="two-step-requirement-plan-notice"
+          actions={
+            <Button asChild size="sm" colorPalette="orange">
+              <Link href={planLink.href}>{planLink.label}</Link>
+            </Button>
+          }
+        />
       )}
 
       <Text fontSize="sm" data-testid="two-step-held-count">

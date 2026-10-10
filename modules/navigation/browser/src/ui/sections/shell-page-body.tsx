@@ -1,10 +1,10 @@
+import { Banner, BannerAction } from "@langwatch/design-system/banner";
 /**
  * Shell page body: content card interior. Moved from platform/app.
  * Drawer/announcements/analytics moved or removed; the saved-views strip is analytics' own.
  */
-
-import { Banner, BannerAction } from "@langwatch/design-system/banner";
 import { Box, type StackProps, VStack } from "@langwatch/design-system/primitives";
+import { RestrictedAccess } from "@langwatch/design-system/restricted-access";
 import type { NavigationTeam } from "@langwatch/navigation-contract";
 import { useEffect, type ReactNode } from "react";
 import { ErrorBoundary } from "react-error-boundary";
@@ -236,13 +236,11 @@ export const ShellPageBody = ({
       (host.teamAccessWaiting({
         organizationName: organization?.name ?? "your organization",
       }) ?? (
-        <Banner status="warning" placement="top">
-          You are not part of any team in this organization. Ask your administrator to add you, or{" "}
-          <NavigationLink href="/" textDecoration="underline">
-            go back to your home page
-          </NavigationLink>
-          .
-        </Banner>
+        <RestrictedAccess
+          area="this organization's projects"
+          description="You are not part of any team in this organization. Ask an organization admin to add you to a team so you can open its projects."
+          onBack={() => host.navigate("/")}
+        />
       ))
     );
 
@@ -268,7 +266,7 @@ export const ShellPageBody = ({
             action={
               <BannerAction asChild>
                 <NavigationLink href={planManagementHref(deployment.isSaaS)}>
-                  Upgrade your plan
+                  Compare plans
                 </NavigationLink>
               </BannerAction>
             }

@@ -1,4 +1,5 @@
 import { Link } from "@langwatch/browser-host/link";
+import { UpgradeRequired } from "@langwatch/design-system/access-state";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * How accounts arrive, beside how people sign in: how much of the membership
@@ -91,9 +92,16 @@ export default DirectoryOverviewCard;
 function DirectoryReadFailure({ error }: { error: unknown }) {
   if (isEnterpriseGateError(error)) {
     return (
-      <Text fontSize="13px" color="fg.muted" data-testid="directory-card-enterprise-gate">
-        Directory sync is an Enterprise feature. Contact sales to upgrade.
-      </Text>
+      <UpgradeRequired
+        feature="Directory sync"
+        compact
+        data-testid="directory-card-enterprise-gate"
+        actions={
+          <Button asChild size="sm" colorPalette="orange">
+            <Link href="/settings/plans">Compare plans</Link>
+          </Button>
+        }
+      />
     );
   }
   return (

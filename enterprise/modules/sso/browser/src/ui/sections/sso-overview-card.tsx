@@ -1,4 +1,5 @@
 import { Link } from "@langwatch/browser-host/link";
+import { UpgradeRequired } from "@langwatch/design-system/access-state";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * How everyone signs in, on the Authentication overview: the live connection
@@ -314,9 +315,16 @@ export function SingleSignOnPreviewCard({
       }
     >
       {enterpriseRequired && (
-        <Text fontSize="13px" color="fg.muted" data-testid="sso-card-enterprise-gate">
-          Single sign-on is an Enterprise feature. Contact sales to upgrade.
-        </Text>
+        <UpgradeRequired
+          feature="Single sign-on"
+          compact
+          data-testid="sso-card-enterprise-gate"
+          actions={
+            <Button asChild size="sm" colorPalette="orange">
+              <Link href="/settings/plans">Compare plans</Link>
+            </Button>
+          }
+        />
       )}
 
       <OverviewDetail label="What it does">

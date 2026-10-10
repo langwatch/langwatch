@@ -135,7 +135,7 @@ describe("given a plan that does not carry directory sync", () => {
     state.readError = { data: { error: { code: "enterprise_plan_required" } } };
     renderWithScimHost(<DirectorySummary organizationId="org-1" canReadMembership />);
 
-    expect(screen.getByText("Directory sync is an Enterprise feature")).toBeInTheDocument();
+    expect(screen.getByText("Directory sync on Enterprise")).toBeInTheDocument();
     expect(screen.queryByTestId("directory-summary")).not.toBeInTheDocument();
   });
 });

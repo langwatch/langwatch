@@ -1,16 +1,16 @@
 import { Link } from "@langwatch/browser-host/link";
+import { AccessState } from "@langwatch/design-system/access-state";
 /**
  * How people join without an invitation. Opening policies need the Enterprise plan; the saved
  * setting stays selectable after a lapse so it can always be closed.
  * Spec: specs/identity/domain-auto-join.feature
  */
-import { Box, Button, HStack, Input, Text, VStack } from "@langwatch/design-system/primitives";
+import { Box, Button, Input, Text, VStack } from "@langwatch/design-system/primitives";
 import { RawRadioGroup as RadioGroup } from "@langwatch/design-system/radio";
 import { SettingsCard } from "@langwatch/design-system/settings-card";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { DEFAULT_DOMAIN_JOIN_SETTING } from "@langwatch/identity-contract";
 import type { DomainJoinSetting, JoinerRole } from "@langwatch/identity-contract";
-import { Lock } from "lucide-react";
 import { useState } from "react";
 
 import { EnterprisePlanBadge } from "../../../../ui/elements/enterprise-plan-badge.tsx";
@@ -190,17 +190,18 @@ export function JoinPolicyCard({
       data-testid="join-policy-card"
     >
       {planLocked && (
-        <HStack gap={2} align="start" data-testid="join-policy-notice">
-          <Box color="fg.muted" marginTop="1px" flexShrink={0}>
-            <Lock size={14} />
-          </Box>
-          <Text color="fg.muted" fontSize="xs" lineHeight="1.55">
-            {explanation}{" "}
-            <Link href={planLink.href} colorPalette="orange" color="colorPalette.fg">
-              {planLink.label}
-            </Link>
-          </Text>
-        </HStack>
+        <AccessState
+          kind="upgrade"
+          compact
+          title="Joining without an invitation requires Enterprise"
+          description={explanation}
+          data-testid="join-policy-notice"
+          actions={
+            <Button asChild size="sm" colorPalette="orange">
+              <Link href={planLink.href}>{planLink.label}</Link>
+            </Button>
+          }
+        />
       )}
 
       <RadioGroup.Root
