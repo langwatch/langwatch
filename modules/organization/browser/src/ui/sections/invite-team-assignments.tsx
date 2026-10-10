@@ -1,8 +1,9 @@
 import {
   Box,
   Button,
+  Card,
   createListCollection,
-  HStack,
+  Heading,
   Table,
   Text,
   VStack,
@@ -43,9 +44,9 @@ type TeamAssignmentsProps = {
 };
 
 /**
- * The invite's team rows: a table once a team is staged, otherwise the
- * button to stage one. A Developer seat (ADR-171) joins no team, so it gets
- * a notice instead of either.
+ * The invite's team rows, in the team drawer's row editor: a card holding a
+ * row per staged team and the button to stage one more. A Developer seat
+ * (ADR-171) joins no team, so it gets a notice instead.
  */
 export function InviteTeamAssignments(props: TeamAssignmentsProps) {
   const { control, teamOptions, orgRole } = props;
@@ -67,30 +68,19 @@ export function InviteTeamAssignments(props: TeamAssignmentsProps) {
   if (orgRole === OrganizationUserRole.DEVELOPER) {
     return <DeveloperNoTeamNotice />;
   }
-  if (fields.length === 0) {
-    return (
-      <NoTeamAssignments
-        isLiteSeat={orgRole === OrganizationUserRole.EXTERNAL}
-        canAddTeam={canAddTeam}
-        onAddTeam={addTeam}
-      />
-    );
-  }
   return (
-    <VStack align="start" gap={2} width="100%">
-      <HStack justify="space-between" width="100%">
-        <Text fontSize="sm" fontWeight="medium" color="fg">
-          Team Assignments
-        </Text>
-        <Button type="button" size="sm" variant="ghost" onClick={addTeam} disabled={!canAddTeam}>
-          <Plus size={14} /> Add team
-        </Button>
-      </HStack>
+    <VStack align="start" gap={3} width="100%" marginTop={2}>
+      <Heading>Team Assignments</Heading>
+      {fields.length === 0 && orgRole === OrganizationUserRole.EXTERNAL && (
+        <LiteMemberNeedsTeamWarning />
+      )}
       <TeamAssignmentTable
         {...props}
         rowIds={fields.map((field) => field.id)}
         optionsFor={optionsFor}
         onRemove={remove}
+        canAddTeam={canAddTeam}
+        onAddTeam={addTeam}
       />
     </VStack>
   );
@@ -127,70 +117,60 @@ function LiteMemberNeedsTeamWarning() {
   );
 }
 
-function NoTeamAssignments({
-  isLiteSeat,
-  canAddTeam,
-  onAddTeam,
-}: {
-  isLiteSeat: boolean;
-  canAddTeam: boolean;
-  onAddTeam: () => void;
-}) {
-  return (
-    <VStack align="start" gap={2} width="100%">
-      {isLiteSeat && <LiteMemberNeedsTeamWarning />}
-      <HStack gap={2}>
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          onClick={onAddTeam}
-          disabled={!canAddTeam}
-        >
-          <Plus size={14} /> Add team
-        </Button>
-      </HStack>
-    </VStack>
-  );
-}
-
 function TeamAssignmentTable({
   rowIds,
   optionsFor,
   onRemove,
+  canAddTeam,
+  onAddTeam,
   ...rowProps
 }: TeamAssignmentsProps & {
   rowIds: string[];
   optionsFor: (exceptIndex?: number) => TeamOption[];
   onRemove: (index: number) => void;
+  canAddTeam: boolean;
+  onAddTeam: () => void;
 }) {
   return (
-    <Box paddingX={4} paddingY={3} backgroundColor="bg.muted" borderRadius="xl" width="100%">
-      <Table.Root width="100%">
-        <Table.Header>
-          <Table.Row backgroundColor="transparent">
-            <Table.ColumnHeader paddingLeft={0} paddingTop={0}>
-              Team
-            </Table.ColumnHeader>
-            <Table.ColumnHeader paddingLeft={0} paddingTop={0}>
-              Role
-            </Table.ColumnHeader>
-            <Table.ColumnHeader paddingLeft={0} paddingRight={0} paddingTop={0} width="50px" />
-          </Table.Row>
-        </Table.Header>
-        <Table.Body>
-          {rowIds.map((rowId, teamIndex) => (
-            <TeamAssignmentRow
-              key={rowId}
-              {...rowProps}
-              teamIndex={teamIndex}
-              options={optionsFor(teamIndex)}
-              onRemove={() => onRemove(teamIndex)}
-            />
-          ))}
-        </Table.Body>
-      </Table.Root>
-    </Box>
+    <Card.Root width="full" overflow="hidden">
+      <Card.Body paddingY={0} paddingX={0}>
+        <Table.Root variant="line" width="full">
+          {rowIds.length > 0 && (
+            <Table.Header>
+              <Table.Row>
+                <Table.ColumnHeader width="48%">Team</Table.ColumnHeader>
+                <Table.ColumnHeader>Role</Table.ColumnHeader>
+                <Table.ColumnHeader width="60px" />
+              </Table.Row>
+            </Table.Header>
+          )}
+          <Table.Body>
+            {rowIds.map((rowId, teamIndex) => (
+              <TeamAssignmentRow
+                key={rowId}
+                {...rowProps}
+                teamIndex={teamIndex}
+                options={optionsFor(teamIndex)}
+                onRemove={() => onRemove(teamIndex)}
+              />
+            ))}
+            <Table.Row>
+              <Table.Cell colSpan={3}>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={onAddTeam}
+                  disabled={!canAddTeam}
+                >
+                  <Plus size={18} /> Add team
+                </Button>
+              </Table.Cell>
+            </Table.Row>
+          </Table.Body>
+        </Table.Root>
+      </Card.Body>
+    </Card.Root>
   );
 }
 
@@ -209,11 +189,11 @@ function TeamAssignmentRow({
   onRemove: () => void;
 }) {
   return (
-    <Table.Row backgroundColor="transparent">
-      <Table.Cell paddingLeft={0}>
+    <Table.Row>
+      <Table.Cell>
         <TeamSelect teamIndex={teamIndex} control={control} options={options} />
       </Table.Cell>
-      <Table.Cell paddingLeft={0}>
+      <Table.Cell>
         <TeamRoleSelect
           teamIndex={teamIndex}
           control={control}
@@ -223,16 +203,15 @@ function TeamAssignmentRow({
           isInviterAdmin={isInviterAdmin}
         />
       </Table.Cell>
-      <Table.Cell paddingLeft={0} paddingRight={0} paddingY={2}>
+      <Table.Cell paddingLeft={0} paddingY={2}>
         <Button
           type="button"
-          size="sm"
-          colorPalette="red"
           variant="ghost"
+          color="red.fg"
           aria-label="Remove team assignment"
           onClick={onRemove}
         >
-          <Trash2 size={16} />
+          <Trash2 size={18} />
         </Button>
       </Table.Cell>
     </Table.Row>
@@ -264,7 +243,7 @@ function TeamSelect({
             if (val) field.onChange(val);
           }}
         >
-          <Select.Trigger background="bg" width="full">
+          <Select.Trigger width="full">
             <Select.ValueText placeholder="Select team" />
           </Select.Trigger>
           <Select.Content paddingY={2}>
@@ -349,7 +328,7 @@ function TeamRoleSelect({
             onValueChange={handleValueChange}
             disabled={customRoles.isLoading}
           >
-            <Select.Trigger background="bg" width="full">
+            <Select.Trigger width="full">
               <Select.ValueText placeholder="Select role" />
             </Select.Trigger>
             <Select.Content paddingY={2} width="320px">

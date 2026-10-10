@@ -38,12 +38,15 @@ export function GovernanceHeroGround({ children }: { children: ReactNode }) {
 
   return (
     <Box position="relative" width="full">
+      {/* Both bleed layers sit at zIndex -1, lighting the page from behind so the header row
+          they reach is never washed out (#8318); the screen's zIndex 1 column holds them. */}
       {/* The colour, bright enough to read as light. Blurred on light mode
           only — the same blur on dark just muddies a field that already
           reads as depth. */}
       <Box
         aria-hidden
         position="absolute"
+        zIndex={-1}
         insetInline={BLEED_INLINE}
         insetBlock={BLEED_BLOCK}
         pointerEvents="none"
@@ -74,6 +77,7 @@ export function GovernanceHeroGround({ children }: { children: ReactNode }) {
       <Box
         aria-hidden
         position="absolute"
+        zIndex={-1}
         insetInline={BLEED_INLINE}
         insetBlock={BLEED_BLOCK}
         pointerEvents="none"
