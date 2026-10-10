@@ -486,3 +486,43 @@ func TestConsoleIsServedAtTheRoot(t *testing.T) {
 		t.Fatalf("a path the console does not own answered %d", code)
 	}
 }
+
+func TestIDsDoNotRepeatAcrossRestarts(t *testing.T) {
+	create := func(base int) string {
+		s, err := NewServer(Config{CatalogPath: catalog, IDBase: base})
+		if err != nil {
+			t.Fatal(err)
+		}
+		srv := httptest.NewServer(s.Handler())
+		t.Cleanup(srv.Close)
+		req, _ := http.NewRequestWithContext(t.Context(), http.MethodPost, srv.URL+"/v1/customers", strings.NewReader("email=a@b.test"))
+		req.Header.Set("Authorization", "Bearer sk_test_paymentsim")
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		res, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer res.Body.Close()
+		var out map[string]any
+		_ = json.NewDecoder(res.Body).Decode(&out)
+		return out["id"].(string)
+	}
+	first, restarted := create(1000), create(2000)
+	if first == restarted {
+		t.Fatalf("a restarted sim reused %s", first)
+	}
+	if got := create(0); got != "cus_sim000001" {
+		t.Fatalf("a zero base keeps ids deterministic, got %s", got)
+	}
+}
+
+func TestLoadConfigStartsIDsPastEarlierRuns(t *testing.T) {
+	t.Setenv("PAYMENTSIM_ID_BASE", "")
+	if LoadConfig().IDBase <= 0 {
+		t.Fatal("the default id base is the start time")
+	}
+	t.Setenv("PAYMENTSIM_ID_BASE", "7")
+	if got := LoadConfig().IDBase; got != 7 {
+		t.Fatalf("id base %d", got)
+	}
+}
