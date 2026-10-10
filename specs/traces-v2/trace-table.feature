@@ -148,7 +148,7 @@ Rule: Toolbar strip
   @unimplemented
   Scenario: Toolbar renders the expected controls
     Then the toolbar shows lens tabs flushed left
-    And the right cluster includes (in order): tour button, live indicator, time range picker, columns dropdown, grouping selector, density toggle, find button, keyboard shortcuts button
+    And the right side holds two clusters: filters, save view, time range picker, live indicator; then View menu, columns dropdown, export, tour button and a More menu (automate, keyboard shortcuts)
     And the toolbar row is 36px minimum height
 
   @integration
@@ -157,7 +157,7 @@ Rule: Toolbar strip
 
   @integration
   Scenario: Grouping selector shows checkmark on selected item
-    When the user opens the grouping dropdown
+    When the user opens the View menu
     Then the selected grouping has a checkmark (not a radio circle)
 
   @integration

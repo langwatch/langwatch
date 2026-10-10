@@ -22,7 +22,7 @@ Rule: Grouping selector dropdown
 
   Scenario: Grouping selector appears in the toolbar
     When the Observe page loads
-    Then a grouping dropdown appears on the right side of the toolbar (Layers icon + chevron)
+    Then a View menu (Layers icon, "View" label, chevron) appears on the right side of the toolbar
 
   Scenario: Grouping selector defaults to flat for the All lens
     When the user views the "All" lens
@@ -30,23 +30,23 @@ Rule: Grouping selector dropdown
     And the trigger renders as an outline button (the visual cue for the flat state)
 
   Scenario: Grouping selector lists all grouping options
-    When the user opens the grouping dropdown
+    When the user opens the View menu
     Then the options are "Flat", "By Conversation", "By Service", "By User", and "By Model"
 
   Scenario: Selecting a grouping transforms the table
-    When the user selects "By Model" from the grouping dropdown
+    When the user selects "By Model" from the View menu
     Then the table renders as grouped sections by model
     And the change is recorded as a draft on the active lens (orange dot appears)
 
   Scenario: Selector trigger reflects the active grouping
     When the user selects a non-flat grouping
     Then the trigger switches to the "subtle" button variant
-    And its `aria-label` reads "Group rows — currently <Label>" (e.g. "By Service")
-    # The trigger does NOT show a "Group: by X" text label — only an icon + chevron.
+    And its `aria-label` reads "View options. Rows <Label>, <Density> density." (e.g. "By Service")
+    # The trigger shows the Layers icon, a "View" label and a chevron, not a "Group: by X" label.
 
   Scenario: Selecting flat restores the ungrouped table
     Given the user has selected "By Model" grouping
-    When the user selects "Flat" from the grouping dropdown
+    When the user selects "Flat" from the View menu
     Then the table renders as a flat list of traces
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -96,7 +96,7 @@ Rule: Grouping is editable on every lens (no lock today)
 
   Scenario: Saving a custom lens with a chosen grouping
     Given the user views the "All" lens
-    When the user selects "By Model" from the grouping dropdown
+    When the user selects "By Model" from the View menu
     And saves the changes as a new custom lens
     Then the new custom lens persists with grouping "by-model"
 
