@@ -6,7 +6,14 @@ import { describe, expect, it } from "vitest";
 
 import { holdUpgradeLease, DEFAULT_LEASE_TIMING } from "../runner-lease.ts";
 
-const lease = { name: "upgrade" };
+const lease = {
+  name: "upgrade",
+  owner: "me",
+  image: "x",
+  host: "h",
+  heartbeatAt: new Date(0),
+  expiresAt: new Date(60_000),
+};
 
 function hold({ renewed }: { renewed: boolean }) {
   return holdUpgradeLease({
