@@ -38,7 +38,13 @@ export const userTrpcTransport: TrpcRouterDeclaration<UserApi, typeof userTrpc> 
   userTrpc,
 )
   .procedure("getAvatarUrl")
-  .noPermission({ reason: ANY_SIGNED_IN })
+  .noPermission({
+    reason: ANY_SIGNED_IN,
+    allow: {
+      projectId:
+        "part of the avatar object's address; the read serves only an avatar-purpose, user-owned object",
+    },
+  })
   .handle(({ app, input }) => app.getAvatarUrl(input))
 
   .procedure("getTraceExplorerTourPreference")
