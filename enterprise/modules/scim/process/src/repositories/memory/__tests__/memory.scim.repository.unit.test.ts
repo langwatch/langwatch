@@ -83,6 +83,32 @@ describe("MemoryScimRepository", () => {
     });
   });
 
+  describe("when a directory has deactivated somebody it claimed", () => {
+    it("no longer counts them among the people it manages", async () => {
+      const { repository } = clocked();
+      for (const userId of ["user_kept", "user_gone"]) {
+        await repository.rememberDirectoryIdentity({
+          organizationId: "org_acme",
+          connectionId: "conn_1",
+          userId,
+          externalId: null,
+          releasedConnectionIds: [],
+        });
+        await repository.saveUserResource({
+          organizationId: "org_acme",
+          userId,
+          userName: `${userId}@acme.test`,
+          name: null,
+          active: userId === "user_kept",
+        });
+      }
+
+      const owned = await repository.findDirectoryOwnership({ connectionIds: ["conn_1"] });
+
+      expect(owned.map((row) => row.userId)).toEqual(["user_kept"]);
+    });
+  });
+
   describe("when a directory writes a person", () => {
     it("keeps one resource per organization and person, and a deletion is a tombstone", async () => {
       const { repository } = clocked();

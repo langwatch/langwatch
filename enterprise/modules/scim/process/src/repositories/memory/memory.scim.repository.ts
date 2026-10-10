@@ -683,6 +683,11 @@ export class MemoryScimRepository extends ScimRepository {
     const owned = new Map<string, ScimDirectoryOwnership>();
     for (const row of [...this.directoryUsers, ...this.directoryIdentities]) {
       if (!input.connectionIds.includes(row.connectionId)) continue;
+      // Somebody the directory deactivated is no longer one it manages here.
+      const resource = this.resources.find(
+        (held) => held.organizationId === row.organizationId && held.userId === row.userId,
+      );
+      if (resource && !resource.active) continue;
       owned.set(`${row.connectionId}\u0000${row.userId}`, {
         connectionId: row.connectionId,
         userId: row.userId,
