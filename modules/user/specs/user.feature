@@ -361,3 +361,10 @@ Feature: Canonical user lifecycle
     When "ivy" opens her Password settings
     Then they do not offer to set a password
     And say "Your organization's single sign-on handles sign-in for this account."
+
+  @integration
+  Scenario: An account its single sign-on created is governed through its own address
+    Given "ivy" signed up through "acme"'s single sign-on connection and has no address attached
+    And her account address routes to that connection
+    When "ivy" opens her Password settings
+    Then they do not offer to set a password

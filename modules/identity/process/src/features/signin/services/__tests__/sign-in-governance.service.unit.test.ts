@@ -26,9 +26,11 @@ const redirect = (connectionId?: string): RoutingDecision => ({
 function governance({
   identifiers,
   route,
+  accountEmail,
 }: {
   identifiers: AccountIdentifier[];
   route: (identifier: string | null) => RoutingDecision;
+  accountEmail?: string;
 }) {
   const router = {
     route: vi.fn(async ({ identifier }: { identifier: string | null }) => route(identifier)),
@@ -37,6 +39,7 @@ function governance({
     router,
     service: SignInGovernanceService.create({
       identifiers: { listIdentifiers: async () => identifiers },
+      accountAddress: async () => (accountEmail ? { email: accountEmail } : null),
       router,
     }),
   };
@@ -72,5 +75,17 @@ describe("whether single sign-on governs somebody's own sign-in", () => {
 
     await expect(service.isGovernedBySso({ userId: "user_ivy" })).resolves.toBe(false);
     expect(router.route).not.toHaveBeenCalled();
+  });
+
+  /** @scenario "An account its single sign-on created is governed through its own address" */
+  it("is governed when the account's own address routes there, with no identifier attached", async () => {
+    const { service, router } = governance({
+      identifiers: [],
+      accountEmail: "ivy@acme.com",
+      route: (identifier) => (identifier === "ivy@acme.com" ? redirect("conn_okta") : redirect()),
+    });
+
+    await expect(service.isGovernedBySso({ userId: "user_ivy" })).resolves.toBe(true);
+    expect(router.route).toHaveBeenCalledWith({ identifier: "ivy@acme.com", breakGlass: false });
   });
 });

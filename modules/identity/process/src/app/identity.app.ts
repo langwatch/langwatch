@@ -238,6 +238,7 @@ type IdentityAppParts = {
   twoStepAccounts: TwoStepAccountService;
   organizationMfa: OrganizationMfaService;
   signInRouter: SignInRouterService;
+  signInGovernance: SignInGovernanceService;
   pipelines: IdentityPipelineBuilders;
 };
 
@@ -793,6 +794,10 @@ export class IdentityModule
           }),
         })
       : null;
+    const accountAddress = async ({ userId }: { userId: string }) => {
+      const user = await setup.dependencies.users.findById({ id: userId });
+      return user?.email ? { email: user.email, confirmed: user.emailVerified } : null;
+    };
     const signInRouter = SignInRouterService.create({
       legacy: legacyDomainRouting,
       domains: connectionDomainRouting,
@@ -818,6 +823,18 @@ export class IdentityModule
       beforeAccountDelete: (account) => bridge.beforeAccountDelete(account),
     };
 
+    const accountIdentifiers = AccountIdentifiersService.create({
+      heads: setup.repositories.heads,
+      identity,
+      ceremony: verification,
+      mail: setup.channels.addressConfirmationMail,
+      rateLimiter: setup.repositories.rateLimits,
+      sessions: setup.channels.authReads,
+      accountAddress,
+      hasMailDelivery: async () =>
+        (await setup.dependencies.notifications.getMailDelivery()).provider !== undefined,
+    });
+
     return new IdentityModule({
       emails,
       ceremonies: hookCeremonies,
@@ -831,20 +848,7 @@ export class IdentityModule
         heads: setup.repositories.heads,
         identifiers: CryptoIdentifierIdentityService.create(),
       }),
-      accountIdentifiers: AccountIdentifiersService.create({
-        heads: setup.repositories.heads,
-        identity,
-        ceremony: verification,
-        mail: setup.channels.addressConfirmationMail,
-        rateLimiter: setup.repositories.rateLimits,
-        sessions: setup.channels.authReads,
-        accountAddress: async ({ userId }) => {
-          const user = await setup.dependencies.users.findById({ id: userId });
-          return user?.email ? { email: user.email, confirmed: user.emailVerified } : null;
-        },
-        hasMailDelivery: async () =>
-          (await setup.dependencies.notifications.getMailDelivery()).provider !== undefined,
-      }),
+      accountIdentifiers,
       microsoftAccountRekey: MicrosoftAccountRekeyService.create({
         accounts: setup.repositories.accountRekey,
       }),
@@ -929,6 +933,11 @@ export class IdentityModule
           ),
       }),
       signInRouter,
+      signInGovernance: SignInGovernanceService.create({
+        identifiers: accountIdentifiers,
+        accountAddress,
+        router: signInRouter,
+      }),
       pipelines: {
         eventing: identityEventing,
         stores: eventStores,
@@ -979,14 +988,9 @@ export class IdentityModule
   }
 
   readonly #parts: IdentityAppParts;
-  readonly #signInGovernance: SignInGovernanceService;
 
   private constructor(parts: IdentityAppParts) {
     this.#parts = parts;
-    this.#signInGovernance = SignInGovernanceService.create({
-      identifiers: parts.accountIdentifiers,
-      router: parts.signInRouter,
-    });
   }
 
   resolveEmail(input: { userId: string }): Promise<IdentityEmailResolution> {
@@ -1047,7 +1051,7 @@ export class IdentityModule
 
   /** Whether an organization's single sign-on governs this person's own sign-in. */
   isSignInGovernedBySso(input: { userId: string }): Promise<boolean> {
-    return this.#signInGovernance.isGovernedBySso(input);
+    return this.#parts.signInGovernance.isGovernedBySso(input);
   }
 
   routeSignIn(
