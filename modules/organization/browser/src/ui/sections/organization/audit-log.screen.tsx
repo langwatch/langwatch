@@ -23,6 +23,7 @@ import type { EnrichedAuditLog as StoredEnrichedAuditLog } from "@langwatch/orga
 /** An audit row as the browser receives it: its instant is an ISO string. */
 type EnrichedAuditLog = WireOf<StoredEnrichedAuditLog>;
 import { neutralizeFormula, neutralizeRows } from "@langwatch/csv";
+import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import { currentTimeZone, nowInstant, toDate, type Instant } from "@langwatch/time";
 import { ArrowLeft, Download, Lock, ScrollText, Search } from "lucide-react";
 import Parse from "papaparse";
@@ -112,6 +113,44 @@ function auditProjectTree({
     ],
     projects,
   };
+}
+
+/**
+ * The page in place of the table: an upsell below Enterprise, or, when a project grant showed the
+ * entry but the organization-wide read refuses, who can see it. Null when the table renders.
+ */
+function auditLogNotice({ isEnterprise, error }: { isEnterprise: boolean; error: unknown }) {
+  const refused = readHandledError(error)?.code === "permission_denied";
+  if (isEnterprise && !refused) return null;
+  return (
+    <>
+      <PageLayout.Header>
+        <PageLayout.Heading>Audit log</PageLayout.Heading>
+      </PageLayout.Header>
+      {isEnterprise ? (
+        <NoDataInfoBlock
+          size="page"
+          icon={<Lock />}
+          title="Only organization admins can see the audit log"
+          description="It shows what every member did across the organization, so an organization admin can open it for you."
+          testId="audit-log-admins-only"
+        />
+      ) : (
+        <NoDataInfoBlock
+          size="page"
+          icon={<Lock />}
+          title="Audit log is included in Enterprise"
+          description="See who changed what across your organization, and when, in a trail you can search and export."
+          testId="audit-log-enterprise-upsell"
+          primaryAction={
+            <Button asChild colorPalette="orange" size="sm">
+              <Link href="/settings/plans">See plans</Link>
+            </Button>
+          }
+        />
+      )}
+    </>
+  );
 }
 
 /** The first batch, then every later one until the history or the batches run out. */
@@ -240,27 +279,8 @@ export default function AuditLogScreen() {
     return <SettingsRowsSkeleton rows={8} />;
   }
 
-  if (!isEnterprise) {
-    return (
-      <>
-        <PageLayout.Header>
-          <PageLayout.Heading>Audit log</PageLayout.Heading>
-        </PageLayout.Header>
-        <NoDataInfoBlock
-          size="page"
-          icon={<Lock />}
-          title="Audit log is included in Enterprise"
-          description="See who changed what across your organization, and when, in a trail you can search and export."
-          testId="audit-log-enterprise-upsell"
-          primaryAction={
-            <Button asChild colorPalette="orange" size="sm">
-              <Link href="/settings/plans">See plans</Link>
-            </Button>
-          }
-        />
-      </>
-    );
-  }
+  const notice = auditLogNotice({ isEnterprise, error: auditLogs.error });
+  if (notice) return notice;
 
   const feed = matchesNobody ? undefined : auditLogs.data;
   const rows: EnrichedAuditLog[] = feed?.auditLogs ?? [];

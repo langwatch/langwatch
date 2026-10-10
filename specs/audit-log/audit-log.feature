@@ -218,6 +218,15 @@ Feature: Unified Audit Log
   # The trail shows every member's actions, so reading it is an administrator's by
   # default. The menu entry, the page and the read all ask the one grant, "auditLog:view".
 
+  @integration
+  Scenario: A reader without the organization-wide grant is told who can see the audit log
+    Given grace is a team Admin, so her project grant offers her the audit log entry and page
+    And she holds no "auditLog:view" for the whole organization
+    When she opens `/settings/audit-log` and the read is refused
+    Then the page keeps its "Audit log" header
+    And says "Only organization admins can see the audit log" in one sentence
+    And shows neither an error nor an empty table
+
   @unit
   Scenario: Only a reader holding the audit-log grant may open the audit trail
     Given bob holds "organization:manage" and not "auditLog:view"
