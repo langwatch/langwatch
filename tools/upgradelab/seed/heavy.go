@@ -76,11 +76,11 @@ func heavyPlan(in HeavyInput) (*seedgen.Plan, error) {
 	return seedgen.NewPlan(flags)
 }
 
-// telemetry deals each plan project's cells to the tenancy's live projects in order, and sends the
-// chunks from a pool of workers.
+// telemetry deals each plan project's cells to the tenancy's live projects in order, packs their
+// chunks into requests up to seedgen's bounds, and sends them from a pool of workers.
 func (run *heavyRun) telemetry(ctx context.Context) []error {
 	chunks := make(chan seedgen.Action, run.workers)
-	pool := &chunkPool{door: run.door, count: run.count}
+	pool := &chunkPool{door: run.door, count: run.count, packer: &seedgen.Packer{Now: time.Now()}}
 	for range run.workers {
 		pool.wg.Go(func() { pool.drain(ctx, chunks) })
 	}
@@ -93,6 +93,10 @@ func (run *heavyRun) telemetry(ctx context.Context) []error {
 			owner[step.Cell.Project] = run.live[len(owner)%len(run.live)].ID
 		}
 		pool.deal(dealt{plan: run.plan, step: step, project: owner[step.Cell.Project]}, chunks)
+	}
+	requests := pool.packer.Flush()
+	for i := range requests {
+		chunks <- requests[i]
 	}
 	close(chunks)
 	pool.wg.Wait()
@@ -110,11 +114,12 @@ type heavyRun struct {
 }
 
 type chunkPool struct {
-	door  *seedgen.Door
-	count func(string, seedgen.Reply)
-	wg    sync.WaitGroup
-	mu    sync.Mutex
-	errs  []error
+	door   *seedgen.Door
+	count  func(string, seedgen.Reply)
+	packer *seedgen.Packer // only deal touches it, from one goroutine
+	wg     sync.WaitGroup
+	mu     sync.Mutex
+	errs   []error
 }
 
 func (pool *chunkPool) fail(err error) {
@@ -146,7 +151,14 @@ func (pool *chunkPool) deal(cell dealt, chunks chan<- seedgen.Action) {
 			return
 		}
 		chunk.Project = cell.project
-		chunks <- chunk
+		closed, err := pool.packer.Add(chunk)
+		if err != nil {
+			pool.fail(err)
+			return
+		}
+		for i := range closed {
+			chunks <- closed[i]
+		}
 	}
 }
 

@@ -244,6 +244,14 @@ Feature: Each soak round proves the upgrade is safe on production-shaped data un
     And every product and REST kind with a door is created in each new organization
     And a refused kind is named while the others are still created
 
+  @unit
+  Scenario: A heavy seed packs cells into requests up to the chunk bounds without changing a single id or timestamp
+    Given a plan's telemetry chunks, each one cell of one project
+    When the heavy seed packs them into requests
+    Then each request holds one project, one kind, and only backdated or only normal chunks
+    And no request passes 500 spans, 1,000 records or 4 MB
+    And the packed requests carry exactly the spans, records and points the chunks did, ids and timestamps included
+
   # Self-hosted install paths (W4): tools/upgradelab/selfhosted and cell/selfhosted.go.
   @unit
   Scenario: A self-hosted run performs the upgrade guide's commands in order and names each deviation

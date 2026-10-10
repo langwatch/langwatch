@@ -23,6 +23,8 @@ type Action struct {
 	Key     string          `json:"key"`
 	Input   json.RawMessage `json:"input"`
 	At      string          `json:"at,omitempty"`
+	// Count is a telemetry chunk's spans, records or points, for the Packer; never on the wire.
+	Count int `json:"-"`
 }
 
 // Reply is the runner's answer to one action: an ack (OK, Refs) or a refusal (Code, Retryable).
