@@ -43,26 +43,17 @@ export type SectionNavigationGroup = {
 const mix = (token: string, alpha: string) =>
   `color-mix(in srgb, var(--chakra-colors-${token}) ${alpha}, transparent)`;
 
-/** Frosted glass: a sheen over a tinted ground; the card behind is opaque, so the rail tints it. */
+/** Faint glass over the card: the page ground, thinned, with a hairline to the content. */
 const RAIL_GLASS = {
   background: {
-    _light: `linear-gradient(180deg, ${mix("bg-panel", "75%")}, ${mix("bg-panel", "20%")}), radial-gradient(140% 45% at 0% 0%, ${mix("orange-100", "40%")}, transparent 70%), ${mix("bg-page", "var(--lw-panel-alpha, 80%)")}`,
-    _dark: `linear-gradient(180deg, ${mix("fg", "5%")}, ${mix("fg", "1%")}), ${mix("bg-muted", "var(--lw-panel-alpha, 70%)")}`,
+    _light: `linear-gradient(180deg, ${mix("bg-page", "100%")}, ${mix("bg-page", "70%")})`,
+    _dark: `linear-gradient(180deg, ${mix("fg", "4%")}, ${mix("fg", "1%")}), ${mix("bg-muted", "var(--lw-panel-alpha, 70%)")}`,
   },
-  boxShadow: {
-    _light: `inset -1px 0 0 ${mix("bg-panel", "80%")}, inset 0 1px 0 var(--chakra-colors-bg-panel)`,
-    _dark: `inset -1px 0 0 ${mix("fg", "4%")}, inset 0 1px 0 ${mix("fg", "6%")}`,
-  },
-  border: { _light: "border.muted", _dark: "border" },
+  border: "border",
 };
-/** The current or hovered link: a brighter chip of the same glass. */
-const LINK_CHIP = {
-  background: { _light: mix("bg-panel", "85%"), _dark: mix("fg", "9%") },
-  boxShadow: {
-    _light: `0 0 0 1px ${mix("border", "70%")}, 0 1px 2px ${mix("fg", "6%")}, inset 0 1px 0 var(--chakra-colors-bg-panel)`,
-    _dark: `0 0 0 1px ${mix("fg", "6%")}, inset 0 1px 0 ${mix("fg", "8%")}`,
-  },
-};
+/** The current link wears the main sidebar's active fill; hover is a lighter step of it. */
+const LINK_ACTIVE = { background: "nav.bgActive", color: "fg" };
+const LINK_HOVER = { background: mix("nav-bg-active", "55%"), color: "fg" };
 
 /** One rail entry; exported for a list a page owns in a group's `extra`, so it reads the same. */
 export function SectionNavigationItem({
@@ -95,14 +86,25 @@ export function SectionNavigationItem({
         display="flex"
         width="full"
         paddingX={2}
-        paddingY={1}
+        paddingY={1.5}
         borderRadius="lg"
-        {...(active ? LINK_CHIP : {})}
-        fontWeight={active ? "medium" : void 0}
-        _hover={{ ...LINK_CHIP, textDecoration: "none" }}
+        color="nav.fg"
+        transition="background-color 0.15s ease-in-out, color 0.15s ease-in-out"
+        {...(active ? LINK_ACTIVE : {})}
+        fontWeight={active ? "semibold" : void 0}
+        _hover={{ ...(active ? LINK_ACTIVE : LINK_HOVER), textDecoration: "none" }}
       >
         <HStack gap={2} minWidth={0} flex={1}>
-          {link.icon}
+          {link.icon ? (
+            <Box
+              as="span"
+              display="flex"
+              flexShrink={0}
+              color={active ? "accent.fg" : "nav.fgMuted"}
+            >
+              {link.icon}
+            </Box>
+          ) : null}
           {collapsed ? null : (
             <Text fontSize="sm" truncate title={link.label} flex={1}>
               {link.label}
@@ -152,12 +154,13 @@ export function SectionNavigationAddRow({ add }: { add: SectionNavigationAdd }) 
       gap={2}
       flexShrink={0}
       paddingX={2}
-      paddingY={1}
+      paddingY={1.5}
       borderRadius="lg"
       textAlign="left"
       cursor="pointer"
       color="fg.muted"
-      _hover={{ ...LINK_CHIP, color: "fg" }}
+      transition="background-color 0.15s ease-in-out, color 0.15s ease-in-out"
+      _hover={LINK_HOVER}
     >
       <Plus size={14} />
       <Text fontSize="sm" truncate>
@@ -196,7 +199,6 @@ export function SectionNavigationRail({
       minWidth={{ base: 0, md: `${width}px` }}
       flexShrink={0}
       background={RAIL_GLASS.background}
-      boxShadow={RAIL_GLASS.boxShadow}
       backdropFilter="var(--lw-backdrop-blur, blur(12px) saturate(1.35))"
       borderRightWidth={{ base: 0, md: "1px" }}
       borderRightColor={RAIL_GLASS.border}
@@ -225,7 +227,7 @@ export function SectionNavigationRail({
       <Stack
         direction={{ base: "row", md: "column" }}
         alignItems="stretch"
-        gap={{ base: 1, md: 3 }}
+        gap={{ base: 1, md: 4 }}
         flex={1}
         minHeight={0}
         overflowX={{ base: "auto", md: "visible" }}
@@ -236,15 +238,18 @@ export function SectionNavigationRail({
             key={run.label ?? index}
             direction={{ base: "row", md: "column" }}
             alignItems="stretch"
-            gap={1}
+            gap={0.5}
           >
             {run.label && !collapsed ? (
               <Text
                 display={{ base: "none", md: "block" }}
-                fontSize="xs"
-                color="fg.subtle"
+                fontSize="2xs"
+                fontWeight="semibold"
+                letterSpacing="0.06em"
+                textTransform="uppercase"
+                color="nav.fgMuted"
                 paddingX={2}
-                paddingTop={1}
+                paddingBottom={1}
               >
                 {run.label}
               </Text>

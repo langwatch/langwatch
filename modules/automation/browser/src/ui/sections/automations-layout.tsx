@@ -5,6 +5,7 @@
  */
 
 import { PageLayout } from "@langwatch/design-system/page-layout";
+import { Spacer } from "@langwatch/design-system/primitives";
 import {
   SectionNavigationFrame,
   type SectionNavigationLink,
@@ -34,6 +35,7 @@ export function AutomationsLayout({
   title,
   basePath,
   section = "overview",
+  actions,
   children,
 }: {
   /** The page heading, rendered in the content column beside the rail. */
@@ -41,6 +43,8 @@ export function AutomationsLayout({
   basePath: string;
   /** The tab this page is. */
   section?: AutomationSection;
+  /** The page's own buttons, at the header's end. */
+  actions?: ReactNode;
   children: ReactNode;
 }) {
   const host = useAutomationHost();
@@ -57,6 +61,12 @@ export function AutomationsLayout({
       header={
         <PageLayout.Header>
           <PageLayout.Heading>{title}</PageLayout.Heading>
+          {actions ? (
+            <>
+              <Spacer />
+              {actions}
+            </>
+          ) : null}
         </PageLayout.Header>
       }
       links={links}
