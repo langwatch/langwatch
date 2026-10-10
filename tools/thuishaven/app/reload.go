@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -71,15 +72,27 @@ func (o *Orchestrator) Reload(ctx context.Context, p UpParams, name string) erro
 // reloadUI rebuilds a built-UI stack's bundle and swaps it in; it returns once
 // the swap is done, so the next page load is the new build.
 func (o *Orchestrator) reloadUI(ctx context.Context, st domain.Stack) error {
+	if err := o.buildUIBundle(ctx, st, os.Stdout); err != nil {
+		return err
+	}
+	fmt.Println("  ui bundle swapped in — reload the page")
+	return nil
+}
+
+// buildUIBundle runs the one-shot UI build into out. A built-UI stack
+// (still or --watch) swaps the bundle in whole; an HMR stack has none.
+func (o *Orchestrator) buildUIBundle(ctx context.Context, st domain.Stack, out io.Writer) error {
 	if st.Refresh == domain.RefreshHMR {
 		return fmt.Errorf("stack %q serves the UI from Vite with HMR, which reloads itself — `haven up` or `haven up --watch` serves a build", st.Slug)
 	}
+	if o.uiBuild != nil {
+		return o.uiBuild(ctx, st.WorktreeDir, out)
+	}
 	cmd := exec.CommandContext(ctx, "sh", "-c", UIBuildShell)
-	cmd.Dir, cmd.Stdout, cmd.Stderr = st.WorktreeDir, os.Stdout, os.Stderr
+	cmd.Dir, cmd.Stdout, cmd.Stderr = st.WorktreeDir, out, out
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("building apps/ui: %w", err)
 	}
-	fmt.Println("  ui bundle swapped in — reload the page")
 	return nil
 }
 

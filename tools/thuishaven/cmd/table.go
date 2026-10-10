@@ -327,7 +327,7 @@ var baseTable = []commandSpec{
 	},
 	{
 		name:    "restart",
-		summary: "bounce one supervised service (or all) without tearing the stack down",
+		summary: "bounce one supervised service (or all) without tearing the stack down; `restart ui` on a built-UI stack rebuilds the bundle and swaps it in, no backend restart",
 		args:    "[service]",
 		maxArgs: 1,
 		flags: []flagSpec{

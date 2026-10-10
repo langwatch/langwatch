@@ -54,6 +54,7 @@ each one. Langy stays its own lane.
 haven restart api                 # restart the whole lane
 haven reload [app|api|worker]     # apply changes to a still stack in place
 haven reload ui                   # built UI: rebuild the bundle and swap it in
+haven restart ui                  # same on a still or --watch stack (no backend restart); under --hmr it bounces the Vite lane
 ```
 
 ## Stack modes

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -32,6 +33,8 @@ type Orchestrator struct {
 	obs   Observability
 	hyg   Hygiene
 	sem   Semaphore
+	// uiBuild replaces the one-shot UI build in tests; nil runs UIBuildShell.
+	uiBuild func(ctx context.Context, dir string, out io.Writer) error
 	// daemon is the up's line to the daemon, which starts every keeper.
 	daemon DaemonClient
 	// keeperRespawns is when the daemon last respawned each slug's keeper, for
