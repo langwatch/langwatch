@@ -58,6 +58,7 @@ import { IngestionSourcesTable } from "../../../features/ingestion-sources/inges
 import {
   gatedSourceTypeOptions,
   isOttlEnabledSourceType,
+  needsIngestSecret,
   NON_ENTERPRISE_INGESTION_SOURCE_CAP,
   routesConversations,
   SOURCE_TYPE_LABEL,
@@ -2011,6 +2012,8 @@ function SourceEditBody({
   // and narrowing `sourceType` is what lets the pull fields below take it as a
   // `SourceType` instead of re-asserting one.
   const isPullMode = isEditablePullSource(sourceType);
+  // The row menu offers Rotate secret only for these (needsIngestSecret).
+  const hasRotatableSecret = !!sourceType && needsIngestSecret({ sourceType });
   // Read here rather than left to the field's own early return, because the
   // Advanced group has to know whether it holds anything before it offers
   // itself — a disclosure that opens onto an empty box is worse than none.
@@ -2069,9 +2072,9 @@ function SourceEditBody({
       />
 
       <Text fontSize="xs" color="fg.muted">
-        {isPullMode
-          ? "Source type is immutable after create: archive and recreate to change it."
-          : "Source type and ingest secret are immutable after create. Use “Rotate secret” for the secret; archive + recreate to change source type."}
+        {hasRotatableSecret
+          ? "Source type and ingest secret are immutable after create. Use “Rotate secret” for the secret; archive + recreate to change source type."
+          : "Source type is immutable after create: archive and recreate to change it."}
       </Text>
     </VStack>
   );
