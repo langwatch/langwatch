@@ -37,6 +37,10 @@ gets the same answer, at no cost. Code: `services/llmsim`, console `apps/llmsim-
 - The seed gives the OpenAI provider custom models `error-429` and `error-500` (on a newly created row), so any member can pick them in a model selector.
 - `X-Llmsim-Seed` pins or (`random`) varies the answer; `X-Llmsim-Mode: langy` echoes.
 - `response_format` json_schema and forced tools get schema-valid output.
+- Scripted tool calls, on any model when the request offers tools (and in Langy mode): each
+  `/tool <name> <json args>` line of the last user message is a call with exactly those
+  arguments, in order; `/next` starts the turn after the tool results; other lines are text.
+  Type it into Langy's chat to make Langy call one of its tools (`bash`, `read`, …) your way.
 - Agentic runs: `tools` in the model name (`markov-tools`) or `X-Llmsim-Tools: auto` makes
   an auto tool choice always call a tool (the one the last user message names, else a
   seeded pick, schema-valid args); after a tool result it answers text. Chat, responses

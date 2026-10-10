@@ -291,6 +291,9 @@ func (s *Server) answer(h http.Header, req request) reply {
 		rep = reply{Mode: "canned", Text: text, Finish: "stop"}
 	} else if strings.EqualFold(h.Get(HeaderMode), "langy") || strings.Contains(req.model, "langy-echo") {
 		rep = langy(req, r)
+	} else if scriptedTools(req) {
+		rep = langy(req, r)
+		rep.Mode = "scripted"
 	} else {
 		rep = s.markovReply(req, r, toolsMode(h, req.model))
 	}
@@ -305,6 +308,18 @@ func (s *Server) answer(h http.Header, req request) reply {
 	}
 	rep.Out = max(rep.Out, 1)
 	return rep
+}
+
+// scriptedTools is true when tools are offered and the last user message holds
+// "/tool <name> <json args>" lines: any model then makes exactly those calls, so an
+// agent whose model cannot be switched to langy-echo can still be steered.
+func scriptedTools(req request) bool {
+	user := lastUserTurn(req.turns)
+	if len(req.tools) == 0 || user < 0 {
+		return false
+	}
+	_, scripted := parseScript(req.turns[user].text)
+	return scripted
 }
 
 // toolsMode makes an unforced (auto) tool choice always call a tool: the

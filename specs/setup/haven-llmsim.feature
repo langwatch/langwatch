@@ -109,6 +109,14 @@ Feature: llmsim, a local LLM provider stand-in run by haven
     Then the answer makes exactly those tool calls with exactly those arguments, in order
     And any other lines become the answer's text
 
+  # Bound by services/llmsim/llmsim_test.go. An agent whose model is fixed (Langy's agent
+  # runs on the project's default model) can still be steered to one exact call.
+  Scenario: Any model makes the tool calls a scripted message names
+    Given the request offers tools and its model is not langy-echo
+    When the last user message holds "/tool <name> <json args>" lines
+    Then the answer makes exactly those tool calls with exactly those arguments, in order
+    And a message without such lines keeps the model's usual answer
+
   Scenario: Langy mode echoes a tool result back
     Given the script's tool calls have been answered with tool results
     When the script has a "/next" step left
