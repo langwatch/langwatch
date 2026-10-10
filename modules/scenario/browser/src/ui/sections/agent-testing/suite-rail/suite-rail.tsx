@@ -24,7 +24,6 @@ import type {
   ExternalSetEntry,
   TestSuiteEntry,
 } from "../../../../model/agent-testing/cases/test-cases.ts";
-import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
 import type { Period, PeriodMode, RelativePresetKey } from "../../../../model/analytics/period.ts";
 import { SuiteArchiveDialog } from "../../../elements/suite/dialogs/suite-archive-dialog.tsx";
 import type { SuiteLastRun } from "../cases/use-test-cases-data.ts";
@@ -91,7 +90,7 @@ export function SuiteRail(props: SuiteRailProps) {
       query: {},
     });
   const iconOf = (as: typeof Folder, label?: string) => (
-    <Icon as={as} boxSize="14px" color={FG_MUTED} flexShrink={0} aria-label={label} />
+    <Icon as={as} boxSize="14px" color="fg.muted" flexShrink={0} aria-label={label} />
   );
 
   const suiteEntries: RailEntry[] = props.isLoading

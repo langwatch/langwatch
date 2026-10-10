@@ -16,7 +16,6 @@ import {
   evaluationsOf,
   isAwaitingEvaluations,
 } from "../../../../model/agent-testing/results/evaluation-summaries.ts";
-import { FG_MUTED, ROW_HOVER_BG } from "../../../../model/agent-testing/shared/design.ts";
 import { buildDisplayTitle } from "../../../../model/suite/run-history-transforms.ts";
 import {
   EvaluatorPill,
@@ -139,7 +138,7 @@ function StopRunButton({
       size="xs"
       variant="outline"
       height="24px"
-      fontSize="11px"
+      textStyle="micro"
       paddingX={2}
       gap={1}
       aria-label={`Stop ${displayName}`}
@@ -167,8 +166,8 @@ function RowEvaluators({ scenarioRun }: { scenarioRun: ScenarioRunData }) {
     if (!isAwaitingEvaluations(scenarioRun)) return null;
     return (
       <HStack gap={1.5} data-testid="run-result-evaluators-grading">
-        <Spinner size="xs" color={FG_MUTED} />
-        <Text fontSize="12px" fontWeight="medium" color={FG_MUTED}>
+        <Spinner size="xs" color="fg.muted" />
+        <Text textStyle="caption" fontWeight="medium" color="fg.muted">
           Grading
         </Text>
       </HStack>
@@ -207,7 +206,7 @@ function RowCaller({ scenarioRun }: { scenarioRun: ScenarioRunData }) {
   const kind = runCallerKind(scenarioRun);
   if (!kind) return null;
   return (
-    <Text fontSize="12px" color={FG_MUTED}>
+    <Text textStyle="caption" color="fg.muted">
       {callerLabel(kind)}
     </Text>
   );
@@ -243,7 +242,7 @@ export function RunResultRow({
       paddingX={4}
       paddingY="10px"
       cursor="pointer"
-      _hover={{ background: ROW_HOVER_BG }}
+      _hover={{ background: "bg.muted/40" }}
       onClick={() => onScenarioRunClick(scenarioRun)}
       data-testid={`run-result-row-${scenarioRun.scenarioRunId}`}
     >
@@ -262,7 +261,7 @@ export function RunResultRow({
             onScenarioRunClick(scenarioRun);
           }}
         >
-          <Text fontSize="12.5px" fontWeight="medium" color="fg" truncate>
+          <Text textStyle="bodySm" fontWeight="medium" color="fg" truncate>
             {displayName}
           </Text>
         </chakra.button>

@@ -308,7 +308,7 @@ function CreateModalIdleBody({
           <Box>
             <Text
               mb={2}
-              fontSize="11px"
+              textStyle="micro"
               fontWeight="bold"
               color="fg.muted"
               letterSpacing="0.1em"

@@ -32,7 +32,6 @@ import {
 import { Play, X } from "lucide-react";
 
 import type { TestSuiteEntry } from "../../../../model/agent-testing/cases/test-cases.ts";
-import { FG_MUTED, QUIET_BUTTON_SHADOW } from "../../../../model/agent-testing/shared/design.ts";
 import { CustomizeChips } from "../../../elements/agent-testing/shared/customize-chips.tsx";
 import {
   DIALOG_FIELD_STYLE,
@@ -94,7 +93,7 @@ export function CaseModalHeader({
   return (
     <Drawer.Header>
       <Drawer.Title>{isEditing ? "Edit scenario" : "New scenario"}</Drawer.Title>
-      <Text fontSize="12px" color={FG_MUTED} marginTop={0.5}>
+      <Text textStyle="caption" color="fg.muted" marginTop={0.5}>
         {CASE_MODAL_SUBTITLE}
       </Text>
       {isEditing && scenarioId && (
@@ -204,7 +203,7 @@ function SituationAndCriteria({
           value={draft.criteria}
           onChange={(event) => setDraft({ criteria: event.target.value })}
         />
-        <Text marginTop={1} fontSize="11px" color={FG_MUTED}>
+        <Text marginTop={1} textStyle="micro" color="fg.muted">
           The judge scores each line as pass or fail on the finished conversation.
         </Text>
       </Box>
@@ -255,7 +254,7 @@ function SuiteFieldControl({
           aria-label={identifier}
           inputProps={{ "data-testid": `${testId}-switch` }}
         />
-        <Text fontSize="12.5px" fontWeight="medium" fontFamily="mono">
+        <Text textStyle="bodySm" fontWeight="medium" fontFamily="mono">
           {identifier}
         </Text>
       </HStack>
@@ -281,7 +280,7 @@ function SuiteFieldControl({
           minHeight={FIELD_HEIGHT.min}
           maxHeight={FIELD_HEIGHT.max}
           fontFamily="mono"
-          fontSize="12px"
+          textStyle="caption"
           aria-label={identifier}
           value={fieldText(value)}
           onChange={(event) => onChange(event.target.value)}
@@ -316,8 +315,8 @@ function StrayFieldsBlock({
         paddingY={2}
       >
         {Object.entries(values).map(([identifier, value]) => (
-          <HStack key={identifier} gap={2} fontSize="12px">
-            <Text fontFamily="mono" color={FG_MUTED} flexShrink={0}>
+          <HStack key={identifier} gap={2} textStyle="caption">
+            <Text fontFamily="mono" color="fg.muted" flexShrink={0}>
               {identifier}
             </Text>
             <Text flex={1} minWidth={0} truncate color="fg.subtle">
@@ -328,8 +327,8 @@ function StrayFieldsBlock({
               display="flex"
               alignItems="center"
               cursor="pointer"
-              color={FG_MUTED}
-              boxShadow={QUIET_BUTTON_SHADOW}
+              color="fg.muted"
+              boxShadow="none"
               _hover={{ color: "red.fg" }}
               title="Remove"
               aria-label={`Remove ${identifier}`}
@@ -480,7 +479,7 @@ export function CaseModalFooter({ editor }: { editor: CaseEditorState }) {
       flexWrap="wrap"
     >
       <HStack gap={1.5} flexWrap="wrap">
-        <Text fontSize="12px" fontWeight="medium" color={FG_MUTED}>
+        <Text textStyle="caption" fontWeight="medium" color="fg.muted">
           Labels
         </Text>
         <TagList
@@ -558,7 +557,7 @@ function TurnsBlock({
           />
         </Box>
       </Grid>
-      <Text fontSize="11px" color={FG_MUTED}>
+      <Text textStyle="micro" color="fg.muted">
         Max turns caps the conversation. Min turns keeps the judge from ending the test early.
       </Text>
     </VStack>
@@ -626,7 +625,7 @@ function CallerVoiceBlock({
 
   return (
     <VStack align="stretch" gap={3} data-testid="case-caller-voice-block">
-      <Text fontSize="11px" color={FG_MUTED}>
+      <Text textStyle="micro" color="fg.muted">
         Used when this scenario runs against a voice agent.
       </Text>
       <Box>

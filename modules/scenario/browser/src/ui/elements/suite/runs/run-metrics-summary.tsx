@@ -56,8 +56,8 @@ type RunMetricsSummaryProps = {
 };
 
 const PILL_SIZES = {
-  sm: { height: undefined, paddingX: 2, paddingY: 1, fontSize: "12px" },
-  md: { height: "32px", paddingX: 2.5, paddingY: 0, fontSize: "12.5px" },
+  sm: { height: undefined, paddingX: 2, paddingY: 1, textStyle: "caption" },
+  md: { height: "32px", paddingX: 2.5, paddingY: 0, textStyle: "bodySm" },
 } as const;
 
 function useInteractiveTooltip(closeDelay: number) {
@@ -96,7 +96,7 @@ function TooltipContent({ summary }: { summary: RunGroupSummary }) {
     !summary.agentLatencyStats && summary.averageAgentLatencyMs !== null;
 
   return (
-    <VStack align="stretch" gap={0} fontSize="12px" minWidth="220px" color="fg">
+    <VStack align="stretch" gap={0} textStyle="caption" minWidth="220px" color="fg">
       <VStack align="stretch" gap={2} padding={2}>
         {/* Pass Rate */}
         <HStack justify="space-between">
@@ -235,7 +235,7 @@ export function RunMetricsSummary({ summary, size = "sm" }: RunMetricsSummaryPro
     >
       <HStack
         gap={2}
-        fontSize={pill.fontSize}
+        textStyle={pill.textStyle}
         color="fg.muted"
         height={pill.height}
         paddingX={pill.paddingX}

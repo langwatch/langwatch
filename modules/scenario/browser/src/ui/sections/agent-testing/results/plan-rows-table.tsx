@@ -16,7 +16,6 @@ import type {
   RunPlanScopeKind,
 } from "../../../../behavior/agent-testing/results/run-plans.ts";
 import { useNow } from "../../../../behavior/use-now.ts";
-import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
 import type { TargetKind } from "../../../../model/target-kind.ts";
 import { FromCodeBadge } from "../../../elements/agent-testing/shared/from-code-badge.tsx";
 import { PassRateText } from "../../../elements/agent-testing/shared/pass-rate-text.tsx";
@@ -64,7 +63,7 @@ function TargetsCell({
   return (
     <HStack gap={1.5} minWidth={0} data-testid="plan-targets">
       {label ? <TargetMark kind={kind} testId="plan-targets-mark" /> : null}
-      <Text fontSize="11.5px" color={FG_MUTED} truncate>
+      <Text textStyle="caption" color="fg.muted" truncate>
         {label}
       </Text>
     </HStack>
@@ -77,11 +76,11 @@ function ScopeCell({ plan }: { plan: RunPlan }) {
       <Icon
         as={SCOPE_ICONS[plan.scopeKind]}
         boxSize="13px"
-        color={FG_MUTED}
+        color="fg.muted"
         flexShrink={0}
         aria-hidden
       />
-      <Text fontSize="11.5px" color={FG_MUTED} truncate>
+      <Text textStyle="caption" color="fg.muted" truncate>
         {plan.scopeLabel}
       </Text>
     </HStack>
@@ -132,7 +131,7 @@ function LastRunCell({
 }) {
   if (!group || group.lastRunAt === null) {
     return (
-      <Text fontSize="11.5px" color={FG_MUTED} truncate>
+      <Text textStyle="caption" color="fg.muted" truncate>
         nothing in {days} days
       </Text>
     );
@@ -143,8 +142,8 @@ function LastRunCell({
 
   return (
     <Text
-      fontSize="11.5px"
-      color={FG_MUTED}
+      textStyle="caption"
+      color="fg.muted"
       fontVariantNumeric="tabular-nums"
       truncate
       data-testid="plan-last-run"
@@ -293,7 +292,7 @@ export function PlanRowsTable({
           >
             <HStack gap={1.5} minWidth={0}>
               <Text
-                fontSize="12.5px"
+                textStyle="bodySm"
                 fontWeight="medium"
                 color="fg"
                 truncate

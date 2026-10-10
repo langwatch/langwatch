@@ -14,7 +14,6 @@ import {
   CASE_EDITOR_DRAWER_SIZE,
   SUITE_EDITOR_DRAWER,
 } from "../../../../model/agent-testing/cases/drawer-keys.ts";
-import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
 import { CustomizeChips } from "../../../elements/agent-testing/shared/customize-chips.tsx";
 import {
   DIALOG_FIELD_STYLE,
@@ -39,7 +38,7 @@ function SuiteEditorHeader({ storedName }: { storedName: string }) {
   return (
     <Drawer.Header>
       <Drawer.Title>Edit test suite</Drawer.Title>
-      <Text fontSize="12px" color={FG_MUTED} marginTop={0.5}>
+      <Text textStyle="caption" color="fg.muted" marginTop={0.5}>
         {storedName || SUITE_EDITOR_SUBTITLE}
       </Text>
       <Drawer.CloseTrigger />

@@ -7,7 +7,6 @@
 import { Box, Text } from "@langwatch/design-system/primitives";
 import type { ScenarioRunData } from "@langwatch/scenario-contract";
 
-import { FG_MUTED, TABLE_HEADER_BG } from "../../../../model/agent-testing/shared/design.ts";
 import { TargetLegend } from "../../../elements/agent-testing/shared/target-dot.tsx";
 import { RunMetricsSummary } from "../../../elements/suite/runs/run-metrics-summary.tsx";
 import { comparisonColumns } from "./comparison-columns.ts";
@@ -53,7 +52,7 @@ function TargetColumnHeader({
       letterSpacing="normal"
       data-testid={`comparison-column-${target.key}`}
     >
-      <TargetLegend color={target.color} label={target.label} fontSize="11.5px" isWrapped />
+      <TargetLegend color={target.color} label={target.label} textStyle="caption" isWrapped />
       <RunMetricsSummary summary={summary} size="sm" />
     </Box>
   );
@@ -77,14 +76,14 @@ function MatrixHeader({
       alignItems="flex-start"
       paddingX={4}
       paddingY={2.5}
-      background={TABLE_HEADER_BG}
+      background="bg.muted/50"
       borderBottomWidth="1px"
       borderBottomColor="border"
-      fontSize="10.5px"
+      textStyle="micro"
       fontWeight="semibold"
       textTransform="uppercase"
       letterSpacing="0.025em"
-      color={FG_MUTED}
+      color="fg.muted"
     >
       <Text as="span" paddingTop="2px">
         Scenario

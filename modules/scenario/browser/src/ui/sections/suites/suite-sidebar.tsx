@@ -571,12 +571,12 @@ function SuiteListItem({
     >
       <VStack align="start" gap={0} flex={1} overflow="hidden" textAlign="left">
         <HStack gap={1.5} width="full">
-          <Text fontSize="13px" fontWeight="medium" lineClamp={1}>
+          <Text textStyle="bodySm" fontWeight="medium" lineClamp={1}>
             {suite.name || "<empty>"}
           </Text>
           <Spacer />
           {runSummary?.lastRunTimestamp && (
-            <Text fontSize="11px" color="fg.subtle" flexShrink={0} whiteSpace="nowrap">
+            <Text textStyle="micro" color="fg.subtle" flexShrink={0} whiteSpace="nowrap">
               {formatTimeAgoCompact(runSummary.lastRunTimestamp, now)}
             </Text>
           )}
@@ -659,12 +659,12 @@ function ExternalSetListItem({
     >
       <VStack align="start" gap={0} flex={1} overflow="hidden" textAlign="left">
         <HStack gap={1.5} width="full">
-          <Text fontSize="13px" fontWeight="medium" lineClamp={1}>
+          <Text textStyle="bodySm" fontWeight="medium" lineClamp={1}>
             {externalSet.scenarioSetId || "<empty>"}
           </Text>
           <Spacer />
           {externalSet.lastRunTimestamp && (
-            <Text fontSize="11px" color="fg.subtle" flexShrink={0} whiteSpace="nowrap">
+            <Text textStyle="micro" color="fg.subtle" flexShrink={0} whiteSpace="nowrap">
               {formatTimeAgoCompact(externalSet.lastRunTimestamp, now)}
             </Text>
           )}

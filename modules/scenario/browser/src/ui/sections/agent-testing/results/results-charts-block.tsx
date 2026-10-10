@@ -7,7 +7,6 @@
 import { Box, Grid, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import type { AtomCost, ResultTotals, SeriesBucket } from "@langwatch/scenario-contract";
 
-import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
 import { formatCost } from "../../../../model/suite/formatters.ts";
 import {
   formatPassRate,
@@ -40,11 +39,11 @@ function Stat({
       paddingY={2.5}
       data-testid={testId}
     >
-      <Text fontSize="11px" fontWeight="semibold" color={FG_MUTED}>
+      <Text textStyle="micro" fontWeight="semibold" color="fg.muted">
         {label}
       </Text>
       <Text
-        fontSize="22px"
+        textStyle="metric"
         lineHeight="1"
         fontWeight="semibold"
         marginTop={1}
@@ -54,7 +53,7 @@ function Stat({
         {value}
       </Text>
       {note ? (
-        <Text fontSize="10.5px" color={FG_MUTED} marginTop={1.5}>
+        <Text textStyle="micro" color="fg.muted" marginTop={1.5}>
           {note}
         </Text>
       ) : null}
@@ -78,7 +77,7 @@ function PassRateOverTimeChart({ buckets }: { buckets: SeriesBucket[] }) {
       paddingY={3}
       data-testid="results-pass-rate-chart"
     >
-      <Text fontSize="11px" fontWeight="semibold" color={FG_MUTED}>
+      <Text textStyle="micro" fontWeight="semibold" color="fg.muted">
         Pass rate over time
       </Text>
 
@@ -93,10 +92,10 @@ function PassRateOverTimeChart({ buckets }: { buckets: SeriesBucket[] }) {
             justify="flex-end"
           >
             <Text
-              fontSize="10.5px"
+              textStyle="micro"
               fontWeight="medium"
               fontVariantNumeric="tabular-nums"
-              color={bucket.isEmpty ? FG_MUTED : "fg"}
+              color={bucket.isEmpty ? "fg.muted" : "fg"}
             >
               {bucket.isEmpty ? "-" : formatPassRate(bucket.passRate)}
             </Text>
@@ -119,8 +118,8 @@ function PassRateOverTimeChart({ buckets }: { buckets: SeriesBucket[] }) {
             key={bucket.label}
             flex={1}
             minWidth={0}
-            fontSize="10px"
-            color={FG_MUTED}
+            textStyle="micro"
+            color="fg.muted"
             textAlign="center"
             truncate
           >

@@ -10,7 +10,6 @@ import type { ScenarioRunData } from "@langwatch/scenario-contract";
 import { Square } from "lucide-react";
 
 import { isCancellableStatus } from "../../../../behavior/suites/use-cancel-scenario-run.ts";
-import { FG_MUTED, ROW_HOVER_BG } from "../../../../model/agent-testing/shared/design.ts";
 import { LastResultLabel } from "../../../elements/agent-testing/shared/last-result-label.tsx";
 import { ResultMetricsInline } from "../../../elements/agent-testing/shared/result-metrics-inline.tsx";
 import { type BatchTarget, runsOfTarget } from "./use-batch-targets.ts";
@@ -57,7 +56,7 @@ function StopRunButton({
       size="xs"
       variant="outline"
       height="22px"
-      fontSize="11px"
+      textStyle="micro"
       paddingX={2}
       gap={1}
       aria-label="Stop"
@@ -96,7 +95,7 @@ function RunLine({
         paddingX={1.5}
         paddingY={1}
         marginX={-1.5}
-        _hover={{ background: ROW_HOVER_BG }}
+        _hover={{ background: "bg.muted/40" }}
         onClick={() => onScenarioRunClick(scenarioRun)}
         data-testid={`comparison-run-${scenarioRun.scenarioRunId}`}
       >
@@ -145,7 +144,7 @@ function MatrixCell({
       data-testid={`comparison-cell-${scenario.scenarioId}-${target.key}`}
     >
       {runs.length === 0 ? (
-        <Text fontSize="11.5px" color={FG_MUTED} paddingTop="5px">
+        <Text textStyle="caption" color="fg.muted" paddingTop="5px">
           {NOT_IN_RUN_LABEL}
         </Text>
       ) : (
@@ -180,7 +179,7 @@ export function MatrixRow({
       paddingY="10px"
       data-testid={`comparison-row-${scenario.scenarioId}`}
     >
-      <Text fontSize="12.5px" fontWeight="medium" color="fg" paddingTop="5px" truncate>
+      <Text textStyle="bodySm" fontWeight="medium" color="fg" paddingTop="5px" truncate>
         {scenario.name}
       </Text>
 

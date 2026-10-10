@@ -10,11 +10,6 @@ import type { ResultGroup } from "@langwatch/scenario-contract";
 import { ChevronDown, ChevronRight } from "lucide-react";
 
 import { useNow } from "../../../../behavior/use-now.ts";
-import {
-  FG_MUTED,
-  GROUP_HEADER_BG,
-  ROW_HOVER_BG,
-} from "../../../../model/agent-testing/shared/design.ts";
 import type { TargetKind } from "../../../../model/target-kind.ts";
 import { FromCodeBadge } from "../../../elements/agent-testing/shared/from-code-badge.tsx";
 import { passRateColor } from "../../../elements/agent-testing/shared/pass-rate-color.ts";
@@ -50,7 +45,7 @@ function Verdict({ row }: { row: ResultRow }) {
   return (
     <Text
       as="span"
-      fontSize="11.5px"
+      textStyle="caption"
       fontWeight="semibold"
       whiteSpace="nowrap"
       color={passRateColor(passRate)}
@@ -87,17 +82,17 @@ function RunLine({
       paddingRight={4}
       paddingLeft={11}
       cursor="pointer"
-      _hover={{ background: ROW_HOVER_BG }}
+      _hover={{ background: "bg.muted/40" }}
       onClick={() => onOpenRun(row)}
       data-testid={`results-run-line-${row.executionId}`}
     >
-      <Text flex={1} minWidth={0} fontSize="12px" fontWeight="medium" color="fg" truncate>
+      <Text flex={1} minWidth={0} textStyle="caption" fontWeight="medium" color="fg" truncate>
         {show === "plan" ? row.planName : row.scenarioName}
       </Text>
-      <Text width="200px" flexShrink={0} fontSize="11.5px" color={FG_MUTED} truncate>
+      <Text width="200px" flexShrink={0} textStyle="caption" color="fg.muted" truncate>
         {resolveTargetName(row.targetKey)}
       </Text>
-      <Text width="70px" flexShrink={0} fontSize="11px" color={FG_MUTED} whiteSpace="nowrap">
+      <Text width="70px" flexShrink={0} textStyle="micro" color="fg.muted" whiteSpace="nowrap">
         {formatTimeAgoCompact(row.runAt, now)}
       </Text>
       <Box width="76px" flexShrink={0}>
@@ -145,7 +140,7 @@ function GroupSummaryRow({
       onClick={() => onToggleOpen(group.key)}
       testId={`results-group-row-${group.key}`}
     >
-      <Box color={FG_MUTED} display="flex" alignItems="center">
+      <Box color="fg.muted" display="flex" alignItems="center">
         {isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
       </Box>
 
@@ -156,17 +151,22 @@ function GroupSummaryRow({
             testId={`results-group-target-mark-${group.key}`}
           />
         ) : null}
-        <Text fontSize="12.5px" fontWeight="medium" color="fg" truncate>
+        <Text textStyle="bodySm" fontWeight="medium" color="fg" truncate>
           {title}
         </Text>
         {isCodeTarget ? <FromCodeBadge /> : null}
       </HStack>
 
-      <Text fontSize="11.5px" color={FG_MUTED} truncate>
+      <Text textStyle="caption" color="fg.muted" truncate>
         {middleColumnText({ group, isScenario })}
       </Text>
 
-      <Text fontSize="12px" color={FG_MUTED} textAlign="right" fontVariantNumeric="tabular-nums">
+      <Text
+        textStyle="caption"
+        color="fg.muted"
+        textAlign="right"
+        fontVariantNumeric="tabular-nums"
+      >
         {group.runCount}
       </Text>
 
@@ -202,7 +202,7 @@ function GroupRunList({
       paddingY={1}
       borderTopWidth="1px"
       borderTopColor="border.muted"
-      background={GROUP_HEADER_BG}
+      background="bg.muted/30"
       data-testid={`results-group-expanded-${group.key}`}
     >
       {ordered.slice(0, EXPANDED_RUN_LIMIT).map((row) => (
@@ -216,13 +216,13 @@ function GroupRunList({
         />
       ))}
       {ordered.length > EXPANDED_RUN_LIMIT ? (
-        <Text fontSize="11px" color={FG_MUTED} paddingX={4} paddingY={1.5}>
+        <Text textStyle="micro" color="fg.muted" paddingX={4} paddingY={1.5}>
           {ordered.length - EXPANDED_RUN_LIMIT} older runs are not listed. Narrow the period to see
           them.
         </Text>
       ) : null}
       {ordered.length === 0 ? (
-        <Text fontSize="11px" color={FG_MUTED} paddingX={4} paddingY={1.5}>
+        <Text textStyle="micro" color="fg.muted" paddingX={4} paddingY={1.5}>
           The runs behind this row are still loading.
         </Text>
       ) : null}
@@ -349,16 +349,16 @@ export function FlatRowsTable({ rows, resolveTargetName, onOpenRun, hasMore }: F
             onClick={() => onOpenRun(row)}
             testId={`results-flat-row-${row.executionId}`}
           >
-            <Text fontSize="12.5px" fontWeight="medium" color="fg" truncate>
+            <Text textStyle="bodySm" fontWeight="medium" color="fg" truncate>
               {row.scenarioName}
             </Text>
-            <Text fontSize="11.5px" color={FG_MUTED} truncate>
+            <Text textStyle="caption" color="fg.muted" truncate>
               {row.planName}
             </Text>
-            <Text fontSize="11.5px" color={FG_MUTED} truncate>
+            <Text textStyle="caption" color="fg.muted" truncate>
               {resolveTargetName(row.targetKey)}
             </Text>
-            <Text fontSize="11.5px" color={FG_MUTED} whiteSpace="nowrap">
+            <Text textStyle="caption" color="fg.muted" whiteSpace="nowrap">
               {formatTimeAgoCompact(row.runAt, now)}
             </Text>
             <Verdict row={row} />

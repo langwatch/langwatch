@@ -28,7 +28,7 @@ export function ScenarioLabelFilter({
       <Tag size={triggerSize === "header" ? 16 : 13} />
       Labels
       {hasActiveFilters && (
-        <Text as="span" fontSize="12px" ml={1}>
+        <Text as="span" textStyle="caption" ml={1}>
           ({activeLabels.length})
         </Text>
       )}

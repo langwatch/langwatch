@@ -13,7 +13,6 @@ import type {
   EvaluatorSummary,
   RunEvaluation,
 } from "../../../../model/agent-testing/results/evaluation-summaries.ts";
-import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
 import { SCENARIO_RUN_STATUS_CONFIG } from "../../../../model/scenario-run-status-config.ts";
 import { formatPassRate, PASS_RATE_AMBER_COLOR, passRateColor } from "./pass-rate-color";
 
@@ -64,14 +63,14 @@ const PILL_SIZES = {
     height: undefined,
     paddingX: 2,
     paddingY: 0.5,
-    fontSize: "11px",
+    textStyle: "micro",
     dot: "6px",
   },
   md: {
     height: "32px",
     paddingX: 2.5,
     paddingY: 0,
-    fontSize: "12px",
+    textStyle: "caption",
     dot: "8px",
   },
 } as const;
@@ -150,9 +149,9 @@ export function EvaluatorPill({ evaluatorId, name, reading, size = "sm" }: Evalu
     >
       <Text
         as="span"
-        fontSize={sizes.fontSize}
+        textStyle={sizes.textStyle}
         fontWeight="medium"
-        color={FG_MUTED}
+        color="fg.muted"
         truncate
         maxWidth="180px"
       >
@@ -171,10 +170,10 @@ export function EvaluatorPill({ evaluatorId, name, reading, size = "sm" }: Evalu
         ) : null}
         <Text
           as="span"
-          fontSize={sizes.fontSize}
+          textStyle={sizes.textStyle}
           fontWeight="semibold"
           fontVariantNumeric="tabular-nums"
-          color={muted ? FG_MUTED : "fg"}
+          color={muted ? "fg.muted" : "fg"}
         >
           {text}
         </Text>

@@ -7,7 +7,6 @@
 import { Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { Check, FileText, Folder } from "lucide-react";
 
-import { FG_MUTED, QUIET_BUTTON_SHADOW } from "../../../../model/agent-testing/shared/design.ts";
 import type { TargetValue } from "../../../../model/scenario-target.ts";
 
 /** One prompt as the picker lists it. */
@@ -55,7 +54,7 @@ function PromptRow({
       as="button"
       cursor="pointer"
       textAlign="left"
-      boxShadow={QUIET_BUTTON_SHADOW}
+      boxShadow="none"
       borderWidth="1px"
       borderColor={isActive ? "blue.fg" : "transparent"}
       background={isActive ? "blue.subtle" : undefined}
@@ -70,10 +69,10 @@ function PromptRow({
     >
       <FileText size={15} color="var(--chakra-colors-green-fg)" />
       <Box minWidth={0} flex={1}>
-        <Text fontSize="12.5px" fontWeight="medium" truncate>
+        <Text textStyle="bodySm" fontWeight="medium" truncate>
           {prompt.handle ?? prompt.id}
         </Text>
-        <Text fontSize="11px" color={FG_MUTED} truncate>
+        <Text textStyle="micro" color="fg.muted" truncate>
           v{prompt.version}
         </Text>
       </Box>
@@ -99,7 +98,7 @@ function PromptTestSuiteGroup({
       {testSuite !== "default" && (
         <HStack gap={1.5} paddingX={1} marginBottom={-0.5}>
           <Folder size={11} color="var(--chakra-colors-fg-muted)" />
-          <Text fontSize="11px" fontWeight="semibold" color={FG_MUTED}>
+          <Text textStyle="micro" fontWeight="semibold" color="fg.muted">
             {testSuite}
           </Text>
         </HStack>
@@ -150,7 +149,7 @@ export function PromptPicker({
         />
       ))}
       {prompts.length === 0 && (
-        <Text fontSize="12px" color={FG_MUTED} paddingX={1} paddingY={2}>
+        <Text textStyle="caption" color="fg.muted" paddingX={1} paddingY={2}>
           No saved prompts in this project yet.
         </Text>
       )}

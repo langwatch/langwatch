@@ -11,7 +11,6 @@ import { Lock, LockOpen, Plus, X } from "lucide-react";
 
 import type { DeclaredParameter } from "../../../../behavior/suites/use-run-suite.ts";
 import type { ParameterRow } from "../../../../model/agent-testing/run/parameter-rows.ts";
-import { FG_MUTED, QUIET_BUTTON_SHADOW } from "../../../../model/agent-testing/shared/design.ts";
 import { DIALOG_FIELD_STYLE } from "../../../elements/agent-testing/shared/dialog-fields.tsx";
 import { ParameterLineField } from "./parameter-line-field.tsx";
 import { errorOnRow, type ParameterFieldError } from "./parameter-suggestions.ts";
@@ -88,11 +87,11 @@ export function ParameterRowsEditor({
         alignItems="center"
         gap={1}
         marginTop={0.5}
-        fontSize="11.5px"
+        textStyle="caption"
         fontWeight="medium"
-        color={FG_MUTED}
+        color="fg.muted"
         cursor="pointer"
-        boxShadow={QUIET_BUTTON_SHADOW}
+        boxShadow="none"
         _hover={{ color: "fg" }}
         aria-label={secretOnly ? "Add a secret parameter" : "Add a parameter"}
         disabled={disabled}
@@ -193,7 +192,7 @@ function RowValueField({
         flex={1}
         minWidth={0}
         fontFamily="mono"
-        fontSize="12px"
+        textStyle="caption"
         type="password"
         autoComplete="new-password"
         placeholder="value"
@@ -255,9 +254,9 @@ function RemoveRowButton({
       type="button"
       display="flex"
       alignItems="center"
-      color={FG_MUTED}
+      color="fg.muted"
       cursor="pointer"
-      boxShadow={QUIET_BUTTON_SHADOW}
+      boxShadow="none"
       _hover={{ color: "red.fg" }}
       title="Remove"
       aria-label={`Remove parameter ${index + 1}`}
@@ -294,7 +293,7 @@ function DeclaredSecretRow({
           minWidth={0}
           background="bg.muted"
         >
-          <Text fontFamily="mono" fontSize="12px" truncate>
+          <Text fontFamily="mono" textStyle="caption" truncate>
             {definition.name}
           </Text>
           {definition.description && (
@@ -309,7 +308,7 @@ function DeclaredSecretRow({
           flex={1}
           minWidth={0}
           fontFamily="mono"
-          fontSize="12px"
+          textStyle="caption"
           type="password"
           autoComplete="new-password"
           required
@@ -363,10 +362,10 @@ function LockToggle({
         height="22px"
         borderRadius="md"
         // A closed lock reads at a glance; an open one stays out of the way.
-        color={isSecret ? "fg" : FG_MUTED}
+        color={isSecret ? "fg" : "fg.muted"}
         opacity={isSecret ? 1 : 0.5}
         background={isSecret ? "bg.muted" : "transparent"}
-        boxShadow={QUIET_BUTTON_SHADOW}
+        boxShadow="none"
         cursor={disabled ? "default" : "pointer"}
         _hover={disabled ? undefined : { color: "fg", opacity: 1 }}
         aria-label={label}
@@ -384,7 +383,7 @@ function LockToggle({
 function MissingValueMessage({ testId }: { testId: string }) {
   return (
     <Text
-      fontSize="11px"
+      textStyle="micro"
       color="red.fg"
       paddingLeft={`calc(${NAME_COLUMN_WIDTH} + var(--chakra-spacing-2))`}
       data-testid={`run-dialog-parameter-error-${testId}`}

@@ -384,7 +384,7 @@ describe("<RunDialog/>", () => {
     renderDialog(suiteSubject());
 
     const setup = screen.getByTestId("run-dialog-setup-agent");
-    expect(setup).toHaveTextContent("Setup agent");
+    expect(setup).toHaveTextContent("Set up agent");
     await user.click(setup);
     expect(mockOpenDrawer).toHaveBeenCalledWith("agentTypeSelector");
   });

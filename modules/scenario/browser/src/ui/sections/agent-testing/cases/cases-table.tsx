@@ -21,11 +21,6 @@ import { format } from "@langwatch/time";
 import { MoreVertical } from "lucide-react";
 
 import { type TestCase } from "../../../../model/agent-testing/cases/test-cases.ts";
-import {
-  FG_MUTED,
-  ROW_HOVER_BG,
-  TABLE_HEADER_BG,
-} from "../../../../model/agent-testing/shared/design.ts";
 import type { Period } from "../../../../model/analytics/period.ts";
 import { RunCaseButton } from "../../../elements/agent-testing/cases/run-case-button.tsx";
 import { TagList } from "../../../elements/tag-list.tsx";
@@ -98,14 +93,14 @@ function TableHeaderRow({
       alignItems="center"
       paddingX={4}
       paddingY={2}
-      background={TABLE_HEADER_BG}
+      background="bg.muted/50"
       borderBottomWidth="1px"
       borderBottomColor="border"
-      fontSize="10.5px"
+      textStyle="micro"
       fontWeight="semibold"
       textTransform="uppercase"
       letterSpacing="0.025em"
-      color={FG_MUTED}
+      color="fg.muted"
     >
       {children}
     </Box>
@@ -217,7 +212,7 @@ function CaseRow({
       paddingX={4}
       paddingY="10px"
       cursor="pointer"
-      _hover={{ background: ROW_HOVER_BG }}
+      _hover={{ background: "bg.muted/40" }}
       onClick={handleRowClick}
       data-testid={`case-row-${testCase.name}`}
     >
@@ -245,7 +240,7 @@ function CaseRow({
             onRowClick(testCase);
           }}
         >
-          <Text fontSize="12.5px" fontWeight="medium" color="fg" truncate>
+          <Text textStyle="bodySm" fontWeight="medium" color="fg" truncate>
             {testCase.name}
           </Text>
         </chakra.button>
@@ -430,14 +425,14 @@ export function ExternalCasesTable({
             paddingX={4}
             paddingY="10px"
             cursor="pointer"
-            _hover={{ background: ROW_HOVER_BG }}
+            _hover={{ background: "bg.muted/40" }}
             onClick={() => onRowClick(externalCase.scenarioId)}
             data-testid={`external-case-row-${externalCase.name}`}
           >
-            <Text fontSize="12.5px" fontWeight="medium" color="fg" truncate>
+            <Text textStyle="bodySm" fontWeight="medium" color="fg" truncate>
               {externalCase.name}
             </Text>
-            <Text fontSize="11px" color={FG_MUTED} whiteSpace="nowrap" textAlign="right">
+            <Text textStyle="micro" color="fg.muted" whiteSpace="nowrap" textAlign="right">
               {format(externalCase.lastRunAt, "MMM d, HH:mm")}
             </Text>
           </chakra.button>

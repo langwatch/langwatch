@@ -10,7 +10,6 @@ import { Folder } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import type { TestSuiteEntry } from "../../../../model/agent-testing/cases/test-cases.ts";
-import { FG_MUTED, QUIET_BUTTON_SHADOW } from "../../../../model/agent-testing/shared/design.ts";
 import { SmallButton } from "../../../elements/agent-testing/shared/small-button.tsx";
 
 export type MoveToSuiteSelectionBarProps = {
@@ -89,14 +88,14 @@ function MoveToSuiteDialog({
     >
       <Dialog.Content bg="bg.panel" maxWidth="420px" data-testid="cases-move-to-suite-dialog">
         <Dialog.Header borderBottomWidth="1px" borderColor="border" paddingX={5} paddingY={3.5}>
-          <Dialog.Title fontSize="14px" fontWeight="semibold">
+          <Dialog.Title textStyle="body" fontWeight="semibold">
             Move to test suite
           </Dialog.Title>
           <Dialog.CloseTrigger />
         </Dialog.Header>
         <Dialog.Body paddingX={5} paddingY={4}>
           <VStack align="stretch" gap={3}>
-            <Text fontSize="12px" color={FG_MUTED}>
+            <Text textStyle="caption" color="fg.muted">
               Move {selectedCount === 1 ? "1 scenario" : `${selectedCount} scenarios`} to
             </Text>
             <NativeSelect.Root size="sm">
@@ -124,11 +123,11 @@ function MoveToSuiteDialog({
             paddingX={3}
             height="28px"
             borderRadius="lg"
-            fontSize="12px"
+            textStyle="caption"
             fontWeight="medium"
-            color={FG_MUTED}
+            color="fg.muted"
             cursor="pointer"
-            boxShadow={QUIET_BUTTON_SHADOW}
+            boxShadow="none"
             _hover={{ background: "bg.muted", color: "fg" }}
           >
             Cancel

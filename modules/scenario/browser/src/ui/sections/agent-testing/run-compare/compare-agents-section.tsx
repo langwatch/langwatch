@@ -16,7 +16,6 @@ import { Plus, X } from "lucide-react";
 
 import type { DeclaredParameter } from "../../../../behavior/suites/use-run-suite.ts";
 import { agentHasDevTunnel } from "../../../../model/agent-dev-tunnel.ts";
-import { FG_MUTED, QUIET_BUTTON_SHADOW } from "../../../../model/agent-testing/shared/design.ts";
 import {
   DIALOG_FIELD_STYLE,
   FieldLabel,
@@ -55,11 +54,11 @@ function AddTargetButton({ onAddRow, isBusy }: { onAddRow: () => void; isBusy: b
       alignItems="center"
       gap={1}
       marginTop={0.5}
-      fontSize="11.5px"
+      textStyle="caption"
       fontWeight="medium"
-      color={FG_MUTED}
+      color="fg.muted"
       cursor="pointer"
-      boxShadow={QUIET_BUTTON_SHADOW}
+      boxShadow="none"
       _hover={{ color: "fg" }}
       disabled={isBusy}
       onClick={onAddRow}
@@ -73,7 +72,7 @@ function AddTargetButton({ onAddRow, isBusy }: { onAddRow: () => void; isBusy: b
 
 function DuplicateTargetsError() {
   return (
-    <Text fontSize="11px" color="red.fg" data-testid="run-dialog-compare-error">
+    <Text textStyle="micro" color="red.fg" data-testid="run-dialog-compare-error">
       {DUPLICATE_TARGETS_MESSAGE}
     </Text>
   );
@@ -81,7 +80,7 @@ function DuplicateTargetsError() {
 
 function CompareHint() {
   return (
-    <Text fontSize="11px" color={FG_MUTED} data-testid="run-dialog-compare-hint">
+    <Text textStyle="micro" color="fg.muted" data-testid="run-dialog-compare-hint">
       {COMPARE_HINT}
     </Text>
   );
@@ -206,7 +205,7 @@ function CompareTargetRow({
       <NativeSelect.Root size="sm" flex="0 0 180px" disabled={isBusy}>
         <NativeSelect.Field
           {...DIALOG_FIELD_STYLE}
-          fontSize="12px"
+          textStyle="caption"
           aria-label={`Agent of target ${position}`}
           value={row.target.id}
           onChange={(event) => {
@@ -244,9 +243,9 @@ function CompareTargetRow({
         display="flex"
         alignItems="center"
         marginTop="6px"
-        color={FG_MUTED}
+        color="fg.muted"
         cursor="pointer"
-        boxShadow={QUIET_BUTTON_SHADOW}
+        boxShadow="none"
         _hover={{ color: "red.fg" }}
         title="Remove"
         aria-label={`Remove target ${position}`}

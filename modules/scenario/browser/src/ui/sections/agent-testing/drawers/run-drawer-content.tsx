@@ -206,7 +206,7 @@ function PendingVerdictLine({ message }: { message: string }) {
       paddingX={14}
       data-testid="run-verdict-pending"
     >
-      <Text fontSize="12px" color="fg.muted" textAlign="center">
+      <Text textStyle="caption" color="fg.muted" textAlign="center">
         {message}
       </Text>
     </VStack>

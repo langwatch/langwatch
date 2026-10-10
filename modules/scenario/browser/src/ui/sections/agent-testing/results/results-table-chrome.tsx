@@ -6,12 +6,6 @@
 import { Box, chakra, Text } from "@langwatch/design-system/primitives";
 import type { ReactNode } from "react";
 
-import {
-  FG_MUTED,
-  ROW_HOVER_BG,
-  TABLE_HEADER_BG,
-} from "../../../../model/agent-testing/shared/design.ts";
-
 /** The card every results table sits in. */
 export function ResultsTableCard({ children, testId }: { children: ReactNode; testId?: string }) {
   return (
@@ -46,14 +40,14 @@ export function ResultsTableHead({
       alignItems="center"
       paddingX={4}
       paddingY={2}
-      background={TABLE_HEADER_BG}
+      background="bg.muted/50"
       borderBottomWidth="1px"
       borderBottomColor="border"
-      fontSize="10.5px"
+      textStyle="micro"
       fontWeight="semibold"
       textTransform="uppercase"
       letterSpacing="0.025em"
-      color={FG_MUTED}
+      color="fg.muted"
     >
       {headings.map((heading) => (
         <Text key={heading.key} as="span" textAlign={heading.align}>
@@ -103,7 +97,7 @@ export function ResultsTableRow({
       paddingX={4}
       paddingY={paddingY}
       cursor={onClick ? "pointer" : undefined}
-      _hover={onClick ? { background: ROW_HOVER_BG } : undefined}
+      _hover={onClick ? { background: "bg.muted/40" } : undefined}
       onClick={onClick}
       data-testid={testId}
     >
@@ -116,8 +110,8 @@ export function ResultsTableRow({
 export function ResultsTableEmptyLine({ text }: { text: string }) {
   return (
     <Text
-      fontSize="12.5px"
-      color={FG_MUTED}
+      textStyle="bodySm"
+      color="fg.muted"
       textAlign="center"
       paddingX={4}
       paddingY={10}
@@ -134,8 +128,8 @@ export function ResultsTableEmptyLine({ text }: { text: string }) {
 export function ResultsTableTruncationLine({ text }: { text: string }) {
   return (
     <Text
-      fontSize="11px"
-      color={FG_MUTED}
+      textStyle="micro"
+      color="fg.muted"
       borderTopWidth="1px"
       borderTopColor="border"
       paddingX={4}

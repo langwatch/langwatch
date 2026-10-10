@@ -17,7 +17,6 @@ import {
 import { RefreshCw } from "lucide-react";
 
 import { HandledErrorAlert } from "../../../../behavior/errors.tsx";
-import { FG_MUTED, TABLE_HEADER_BG } from "../../../../model/agent-testing/shared/design.ts";
 import type { Period, RelativePresetKey } from "../../../../model/analytics/period.ts";
 import { ContentColumn } from "../../../elements/agent-testing/shared/content-column.tsx";
 import { SmallButton } from "../../../elements/agent-testing/shared/small-button.tsx";
@@ -65,7 +64,7 @@ export function RunsLoadingSkeleton() {
     >
       <Box
         height="32px"
-        background={TABLE_HEADER_BG}
+        background="bg.muted/50"
         borderBottomWidth="1px"
         borderBottomColor="border"
       />
@@ -123,10 +122,10 @@ export function NoRunInPeriod({
 
   return (
     <VStack align="center" gap={3} paddingY={10}>
-      <Text fontSize="12.5px" fontWeight="medium" textAlign="center">
+      <Text textStyle="bodySm" fontWeight="medium" textAlign="center">
         No run in this period
       </Text>
-      <Text fontSize="12.5px" color={FG_MUTED} textAlign="center">
+      <Text textStyle="bodySm" color="fg.muted" textAlign="center">
         This run plan has no run inside the selected period.
       </Text>
       <SmallButton onClick={() => setRelativePeriod(wider.key)} data-testid="widen-period-button">
@@ -149,14 +148,14 @@ export function WaitingForFirstRun({
 
   return (
     <VStack align="center" gap={3} paddingY={10} data-testid="waiting-for-first-run">
-      <Spinner size="sm" color={FG_MUTED} />
-      <Text fontSize="12.5px" fontWeight="medium" textAlign="center">
+      <Spinner size="sm" color="fg.muted" />
+      <Text textStyle="bodySm" fontWeight="medium" textAlign="center">
         Waiting for the first result
       </Text>
-      <Text fontSize="12.5px" color={FG_MUTED} textAlign="center" maxWidth="360px">
+      <Text textStyle="bodySm" color="fg.muted" textAlign="center" maxWidth="360px">
         This run has not reported a scenario yet. The results appear here as they arrive.
       </Text>
-      <Text fontSize="11.5px" color={FG_MUTED} textAlign="center">
+      <Text textStyle="caption" color="fg.muted" textAlign="center">
         Looking for an older run instead?
       </Text>
       <SmallButton onClick={() => setRelativePeriod(wider.key)} data-testid="widen-period-button">

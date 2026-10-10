@@ -9,7 +9,6 @@ import { Text, VStack } from "@langwatch/design-system/primitives";
 import type { EvaluatorAttachment, EvaluatorInputSpec } from "@langwatch/scenario-contract";
 
 import type { AttachableEvaluator } from "../../../../model/agent-testing/evaluators/attachment-rules.ts";
-import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
 import { FieldLabel } from "../../../elements/agent-testing/shared/dialog-fields.tsx";
 import { EvaluatorPillRow } from "../../../elements/agent-testing/shared/evaluator-pill.tsx";
 import { RemoveBlockButton } from "../../../elements/agent-testing/shared/remove-block-button.tsx";
@@ -50,7 +49,7 @@ function InheritedSuiteEvaluators({
 }) {
   return (
     <VStack align="stretch" gap={1} data-testid={`run-dialog-inherited-${suite.suiteId}`}>
-      <Text fontSize="11px" color={FG_MUTED}>
+      <Text textStyle="micro" color="fg.muted">
         {inheritedLabel(suite.suiteName)}
       </Text>
       <EvaluatorPillRow>
@@ -111,7 +110,7 @@ export function RunEvaluatorsSection({
         ))}
         <VStack align="stretch" gap={1}>
           {inherited.length > 0 && (
-            <Text fontSize="11px" color={FG_MUTED}>
+            <Text textStyle="micro" color="fg.muted">
               On this run
             </Text>
           )}

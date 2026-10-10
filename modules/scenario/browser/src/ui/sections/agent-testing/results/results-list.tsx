@@ -11,7 +11,6 @@ import { FlaskConical, Plus } from "lucide-react";
 
 import type { RunPlan } from "../../../../behavior/agent-testing/results/run-plans.ts";
 import type { AgentTestingRoutingState } from "../../../../behavior/agent-testing/use-agent-testing-routing.ts";
-import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
 /**
  * The Results tab list: the filter row, the charts it drives, and the table.
  * @see specs/features/agent-testing/results-tabs.feature
@@ -47,11 +46,11 @@ function ResultsHeader({
       {/* The count sits on the title's baseline. Centred, a smaller line beside
           a larger one reads as lifted off it. */}
       <HStack gap={2} alignItems="baseline" minWidth={0}>
-        <Text fontSize="14px" fontWeight="semibold" color="fg">
+        <Text textStyle="body" fontWeight="semibold" color="fg">
           Test Runs
         </Text>
         {executionCount !== undefined && (
-          <Text fontSize="11.5px" color={FG_MUTED}>
+          <Text textStyle="caption" color="fg.muted">
             {executionCount === 1 ? "1 execution" : `${executionCount} executions`}
           </Text>
         )}

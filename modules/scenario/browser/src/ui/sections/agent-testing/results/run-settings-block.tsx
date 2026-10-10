@@ -8,7 +8,6 @@ import { Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import type { ReactNode } from "react";
 
 import { LLMModelDisplay } from "../../../../behavior/lent-model-provider.tsx";
-import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
 import { TargetMark } from "../../../elements/agent-testing/shared/target-mark.tsx";
 import type { RunSettingParameter, RunSettings } from "./run-settings.ts";
 import type { BatchTarget } from "./use-batch-targets.ts";
@@ -37,8 +36,8 @@ function SettingRow({
   return (
     <HStack align="center" gap={3} width="full" minHeight={ROW_HEIGHT} data-testid={testId}>
       <Text
-        fontSize="11.5px"
-        color={FG_MUTED}
+        textStyle="caption"
+        color="fg.muted"
         width={LABEL_WIDTH}
         minWidth={LABEL_WIDTH}
         flexShrink={0}
@@ -64,9 +63,11 @@ function ModelRow({
   return (
     <SettingRow label={label} testId={testId}>
       {model ? (
-        <LLMModelDisplay model={model} fontSize="12px" />
+        <Box textStyle="caption">
+          <LLMModelDisplay model={model} />
+        </Box>
       ) : (
-        <Text fontSize="12px" color={FG_MUTED}>
+        <Text textStyle="caption" color="fg.muted">
           {PROJECT_DEFAULT_MODEL}
         </Text>
       )}
@@ -80,7 +81,7 @@ function ParameterChip({ name, value }: { name: string; value: string }) {
     <Text
       as="code"
       fontFamily="mono"
-      fontSize="11.5px"
+      textStyle="caption"
       background="bg.muted"
       borderRadius="sm"
       paddingX={1.5}
@@ -131,11 +132,11 @@ function TargetsRow({
               color={isComparison ? target.color : undefined}
               testId={`run-settings-mark-${target.key}`}
             />
-            <Text fontSize="12px">{target.name}</Text>
+            <Text textStyle="caption">{target.name}</Text>
             {target.environmentLabel ? (
               <Text
-                fontSize="11.5px"
-                color={FG_MUTED}
+                textStyle="caption"
+                color="fg.muted"
                 data-testid={`run-settings-target-environment-${target.key}`}
               >
                 {target.environmentLabel}
@@ -143,8 +144,8 @@ function TargetsRow({
             ) : null}
             {instanceOf(target) ? (
               <Text
-                fontSize="11.5px"
-                color={FG_MUTED}
+                textStyle="caption"
+                color="fg.muted"
                 data-testid={`run-settings-target-instance-${target.key}`}
               >
                 {`served by ${instanceOf(target)}`}
@@ -201,7 +202,7 @@ export function RunSettingsBlock({
     >
       {startedRow ? (
         <SettingRow label="Started" testId="run-settings-started">
-          <Text fontSize="12px">{startedRow}</Text>
+          <Text textStyle="caption">{startedRow}</Text>
         </SettingRow>
       ) : null}
 
@@ -226,7 +227,7 @@ export function RunSettingsBlock({
 
       {settings.repeatCount > 1 ? (
         <SettingRow label="Repeat" testId="run-settings-repeat">
-          <Text fontSize="12px">{settings.repeatCount} times</Text>
+          <Text textStyle="caption">{settings.repeatCount} times</Text>
         </SettingRow>
       ) : null}
 

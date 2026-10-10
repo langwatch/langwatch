@@ -9,7 +9,6 @@ import type { ScenarioRunData } from "@langwatch/scenario-contract";
 
 import { isCancellableStatus } from "../../../../behavior/suites/use-cancel-scenario-run.ts";
 import { runHasEvaluators } from "../../../../model/agent-testing/results/evaluation-summaries.ts";
-import { FG_MUTED, TABLE_HEADER_BG } from "../../../../model/agent-testing/shared/design.ts";
 import { anyRunHasCaller } from "./caller-display.ts";
 import { RunResultRow } from "./run-result-row.tsx";
 
@@ -80,14 +79,14 @@ export function RunResultsTable({
         alignItems="center"
         paddingX={4}
         paddingY={2}
-        background={TABLE_HEADER_BG}
+        background="bg.muted/50"
         borderBottomWidth="1px"
         borderBottomColor="border"
-        fontSize="10.5px"
+        textStyle="micro"
         fontWeight="semibold"
         textTransform="uppercase"
         letterSpacing="0.025em"
-        color={FG_MUTED}
+        color="fg.muted"
         data-testid="run-results-table-header"
       >
         <Text as="span">Result</Text>

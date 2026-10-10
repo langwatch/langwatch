@@ -199,7 +199,7 @@ function RunParameterFields({
       paddingTop={4}
     >
       <Text
-        fontSize="11px"
+        textStyle="micro"
         fontWeight="bold"
         textTransform="uppercase"
         color="fg.muted"
@@ -254,7 +254,7 @@ function RunParameterField({
           size="sm"
           flex={1}
           fontFamily="mono"
-          fontSize="13px"
+          textStyle="bodySm"
           type={isSecret ? "password" : "text"}
           autoComplete={isSecret ? "new-password" : undefined}
           required={isSecret}

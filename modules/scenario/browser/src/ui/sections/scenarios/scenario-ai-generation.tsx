@@ -249,7 +249,7 @@ export function ScenarioAIGeneration({ form }: ScenarioAIGenerationProps) {
               padding={2.5}
             >
               <Text
-                fontSize="10px"
+                textStyle="micro"
                 fontWeight="bold"
                 color="fg.muted"
                 letterSpacing="0.08em"

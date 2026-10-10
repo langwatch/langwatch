@@ -7,7 +7,6 @@
 import { Box, Grid, HStack, Input, Text, VStack } from "@langwatch/design-system/primitives";
 import { MAX_REPEAT_COUNT } from "@langwatch/suite-contract";
 
-import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
 import {
   DIALOG_FIELD_STYLE,
   FieldLabel,
@@ -82,21 +81,21 @@ export function RepeatCountSection({
         borderRadius="lg"
         paddingX={3}
         paddingY={2.5}
-        fontSize="12.5px"
+        textStyle="bodySm"
       >
         <Input
           {...DIALOG_FIELD_STYLE}
           type="number"
           width="56px"
           paddingX={2}
-          fontSize="12px"
+          textStyle="caption"
           aria-label="Repeat count"
           min={1}
           max={MAX_REPEAT_COUNT}
           value={repeatCount}
           onChange={(event) => onChange(Number(event.target.value))}
         />
-        <Text color={FG_MUTED}>times per scenario and target (max {MAX_REPEAT_COUNT})</Text>
+        <Text color="fg.muted">times per scenario and target (max {MAX_REPEAT_COUNT})</Text>
       </HStack>
     </VStack>
   );

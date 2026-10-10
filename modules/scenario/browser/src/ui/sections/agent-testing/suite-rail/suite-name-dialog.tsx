@@ -72,7 +72,12 @@ export function SuiteNameDialog({
             }}
           />
           {problem && (
-            <Text paddingTop={2} fontSize="12px" color="red.fg" data-testid="suite-name-problem">
+            <Text
+              paddingTop={2}
+              textStyle="caption"
+              color="red.fg"
+              data-testid="suite-name-problem"
+            >
               {problem}
             </Text>
           )}

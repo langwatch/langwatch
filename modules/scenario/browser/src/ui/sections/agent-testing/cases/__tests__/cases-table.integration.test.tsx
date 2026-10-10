@@ -1084,7 +1084,7 @@ describe("the scenarios table", () => {
       expect(empty).toHaveTextContent("Connect the agent you want to test");
       expect(screen.queryByTestId("agent-testing-first-suite-empty")).not.toBeInTheDocument();
 
-      await user.click(within(empty).getByRole("button", { name: "Setup agent" }));
+      await user.click(within(empty).getByRole("button", { name: "Set up agent" }));
       expect(props.onConnectAgent).toHaveBeenCalled();
     });
 

@@ -107,7 +107,7 @@ function RunDialogHeader({ subject }: { subject: RunDialogSubject }) {
       paddingY={3.5}
       display="block"
     >
-      <Dialog.Title fontSize="14px" fontWeight="semibold">
+      <Dialog.Title textStyle="body" fontWeight="semibold">
         {dialogTitle(subject)}
       </Dialog.Title>
       <Dialog.CloseTrigger />
