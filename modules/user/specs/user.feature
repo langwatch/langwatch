@@ -142,6 +142,14 @@ Feature: Canonical user lifecycle
     And an active account whose log ends in a reactivation, or holds no deactivation, records nothing
 
   @unit
+  Scenario: The standing step reads user's log from a process that only sends commands
+    Given a process whose event store refuses every read, as the one running background steps does
+    And an account whose log holds a deactivation and then a reactivation
+    When the account's standing facts are read
+    Then they are answered through the event read seat, oldest first, in the account's own tenant
+    And the same read through the lifecycle pipeline's own event store is refused by name
+
+  @unit
   Scenario: Running the standing step twice records once
     Given the standing step has run
     When it runs again

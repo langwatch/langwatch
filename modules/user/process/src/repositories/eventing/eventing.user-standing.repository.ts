@@ -1,14 +1,19 @@
-import type { EventingParticipation, OwnEventStore } from "@langwatch/eventing";
-import { USER_DEACTIVATED_EVENT_TYPE, USER_REACTIVATED_EVENT_TYPE } from "@langwatch/user-contract";
+import { createTenantId, type EventReadSeat } from "@langwatch/eventing";
+import {
+  USER_AGGREGATE_TYPE,
+  USER_DEACTIVATED_EVENT_TYPE,
+  USER_REACTIVATED_EVENT_TYPE,
+} from "@langwatch/user-contract";
 
 import type {
   UserDeactivatedEvent,
   UserReactivatedEvent,
 } from "../../eventing/user-lifecycle.events.ts";
 import type { UserStandingFact } from "../../rules/user-standing.rules.ts";
-import type { UserStandingRepository } from "../user-standing.repository.ts";
+import { UserStandingRepository } from "../user-standing.repository.ts";
 
-type UserLifecycleEventReads = Pick<OwnEventStore, "read">;
+/** The one read this repository takes off eventing's read seat. */
+type UserLifecycleEventReads = Pick<EventReadSeat, "getEvents">;
 type UserStandingEvent = UserDeactivatedEvent | UserReactivatedEvent;
 
 const USER_STANDING_EVENT_TYPES: ReadonlySet<unknown> = new Set([
@@ -17,40 +22,27 @@ const USER_STANDING_EVENT_TYPES: ReadonlySet<unknown> = new Set([
 ]);
 
 /**
- * User's own lifecycle log, read through the user_lifecycle pipeline's own store (record §7,
- * Alex, 2026-10-05), kept once the process builds the pipeline; a read before then refuses.
+ * User's own lifecycle log, read through eventing's read seat, which answers in a process that
+ * only sends commands too: the standing step runs in one.
  */
-export class EventingUserStandingRepository implements UserStandingRepository {
-  static create(): EventingUserStandingRepository {
-    return new EventingUserStandingRepository();
+export class EventingUserStandingRepository extends UserStandingRepository {
+  static create(deps: { eventReadSeat: UserLifecycleEventReads }): EventingUserStandingRepository {
+    return new EventingUserStandingRepository(deps.eventReadSeat);
   }
 
-  #eventStore: UserLifecycleEventReads | undefined;
-
-  private constructor() {}
-
-  /** A build only to be listed keeps nothing: in a producer role it runs after registration. */
-  keep(input: {
-    participation: EventingParticipation;
-    eventStore: UserLifecycleEventReads | undefined;
-  }): void {
-    if (input.participation === "describe" || input.eventStore === void 0) return;
-    this.#eventStore = input.eventStore;
+  private constructor(private readonly eventReadSeat: UserLifecycleEventReads) {
+    super();
   }
 
   /** The account's deactivated and reactivated facts, oldest first. */
   async findStandingFacts({ userId }: { userId: string }): Promise<UserStandingFact[]> {
-    if (!this.#eventStore) {
-      // A plain Error on purpose (error doctrine): the caller cannot act on an absent log.
-      throw new Error("user's user_lifecycle pipeline cannot read: never built over a store");
-    }
-    const events = await this.#eventStore.read({
-      tenantId: userId,
+    const events: readonly unknown[] = await this.eventReadSeat.getEvents({
+      tenantId: createTenantId(userId),
+      aggregateType: USER_AGGREGATE_TYPE,
       aggregateId: userId,
-      accepts: isUserStandingEvent,
     });
 
-    return events.map((event): UserStandingFact => ({
+    return events.filter(isUserStandingEvent).map((event): UserStandingFact => ({
       type: event.type === USER_DEACTIVATED_EVENT_TYPE ? "deactivated" : "reactivated",
       occurredAt: event.data.occurredAt,
     }));
