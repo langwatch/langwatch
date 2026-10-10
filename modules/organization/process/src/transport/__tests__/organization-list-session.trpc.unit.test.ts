@@ -6,13 +6,16 @@
  */
 import type { Authorize } from "@langwatch/api/access";
 import { SessionReader, type SessionCaller } from "@langwatch/api/hosting";
-import { bindTrpcFact, composeTrpcRouters, TrpcHost } from "@langwatch/api/trpc";
+import { bindTrpcMiddlewareContext, composeTrpcRouters, TrpcHost } from "@langwatch/api/trpc";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
 import { describe, expect, it, vi } from "vitest";
 
-import { organizationSessionPersonFact, organizationTrpcTransport } from "../organization.trpc.ts";
+import {
+  organizationSessionPersonContext,
+  organizationTrpcTransport,
+} from "../organization.trpc.ts";
 
 function served({ session }: { session: SessionCaller | null }) {
   const listVisibleOrganizations = vi.fn<OrganizationApi["listVisibleOrganizations"]>(
@@ -22,8 +25,8 @@ function served({ session }: { session: SessionCaller | null }) {
     sessions: SessionReader.create({ verify: async () => session }),
     authz: createApiFixture<Authorize>({ checkScopeLineage: async () => ({ kind: "consistent" }) }),
     entitlements: { holds: async () => true },
-    facts: [
-      bindTrpcFact(organizationSessionPersonFact, (ctx) =>
+    middlewareContext: [
+      bindTrpcMiddlewareContext(organizationSessionPersonContext, (ctx) =>
         ctx.session?.user
           ? {
               name: ctx.session.user.name ?? null,

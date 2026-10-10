@@ -193,7 +193,7 @@ import { PageLayout } from "@langwatch/design-system/page-layout";
 
 ```tsx
 // Primary actions
-<Button colorPalette="blue">Save</Button>
+<Button colorPalette="orange">Save</Button>
 
 // Secondary actions
 <Button variant="outline">Cancel</Button>

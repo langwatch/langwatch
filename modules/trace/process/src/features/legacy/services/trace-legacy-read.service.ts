@@ -1,3 +1,4 @@
+import type { Authorization } from "@langwatch/authorization";
 import { createLogger } from "@langwatch/observability";
 import type {
   Protections,
@@ -27,6 +28,7 @@ import type { TraceEditOverlayService } from "../../edit-overlay/services/trace-
 import type { TraceBlobStoreService } from "../../media/services/trace-blob-store.service.ts";
 import { TraceReadEnrichmentService } from "../../read/services/trace-read-enrichment.service.ts";
 import type { TraceLegacyReadRepository } from "../repositories/trace-legacy-read.repository.ts";
+import type { LegacyTraceMappingService } from "./legacy-trace-mapping.service.ts";
 
 /**
  * Minimum prefix length we will attempt to resolve. Shorter strings fall through to "not found" —
@@ -101,20 +103,28 @@ export interface BlobResolutionDeps {
 export class TraceLegacyReadService {
   private readonly tracer = getLangWatchTracer("langwatch.traces.service");
   private readonly logger = createLogger("langwatch:traces:service");
-  private constructor(
-    private readonly enrichment: TraceReadEnrichmentService,
-    private readonly clickHouseService: TraceLegacyReadRepository,
-    // Required, so it comes before the optional tail: every single-trace read
-    // resolves the evaluations behind it.
-    private readonly evaluationRuns: Pick<
-      TraceEvaluationRunsReadRepository,
-      "findTraceEvaluations"
-    >,
-  ) {}
+  private readonly enrichment: TraceReadEnrichmentService;
+  private readonly clickHouseService: TraceLegacyReadRepository;
+  private readonly mapping: LegacyTraceMappingService;
+  /** Every single-trace read resolves the evaluations behind it. */
+  private readonly evaluationRuns: Pick<TraceEvaluationRunsReadRepository, "findTraceEvaluations">;
+
+  private constructor(parts: {
+    enrichment: TraceReadEnrichmentService;
+    clickHouseService: TraceLegacyReadRepository;
+    mapping: LegacyTraceMappingService;
+    evaluationRuns: Pick<TraceEvaluationRunsReadRepository, "findTraceEvaluations">;
+  }) {
+    this.enrichment = parts.enrichment;
+    this.clickHouseService = parts.clickHouseService;
+    this.mapping = parts.mapping;
+    this.evaluationRuns = parts.evaluationRuns;
+  }
 
   static create({
     traceCanonicalisation,
     traceRead,
+    mapping,
     editOverlay,
     logRecordStorage,
     evaluationRuns,
@@ -122,25 +132,34 @@ export class TraceLegacyReadService {
     traceCanonicalisation: TraceCanonicalisationService;
     /** The composed trace store; the composition root picks the implementation. */
     traceRead: TraceLegacyReadRepository;
+    /** The legacy read's rows as legacy traces: canonical IO, offloaded bodies, protections. */
+    mapping: LegacyTraceMappingService;
     /** Reviewer corrections, applied only where a caller opts in. */
     editOverlay: TraceEditOverlayService;
     logRecordStorage?: TraceLogRecordReader;
     /** Evaluation's shared runs (R40); every single-trace read resolves its evaluations. */
     evaluationRuns: Pick<TraceEvaluationRunsReadRepository, "findTraceEvaluations">;
   }): TraceLegacyReadService {
-    return new TraceLegacyReadService(
-      TraceReadEnrichmentService.create({ traceCanonicalisation, editOverlay, logRecordStorage }),
-      traceRead,
+    return new TraceLegacyReadService({
+      enrichment: TraceReadEnrichmentService.create({
+        traceCanonicalisation,
+        editOverlay,
+        logRecordStorage,
+      }),
+      clickHouseService: traceRead,
+      mapping,
       evaluationRuns,
-    );
+    });
   }
 
   async findById({
+    authorization,
     projectId,
     traceId,
     protections,
     opts,
   }: {
+    authorization: Authorization;
     projectId: string;
     traceId: string;
     protections: Protections;
@@ -158,7 +177,8 @@ export class TraceLegacyReadService {
             withEditOverlay: opts?.withEditOverlay,
           });
 
-        const traces = await this.clickHouseService.findTracesWithSpans({
+        const traces = await this.mapping.findTracesWithSpans({
+          authorization,
           projectId,
           traceIds: [traceId],
           protections,
@@ -196,7 +216,8 @@ export class TraceLegacyReadService {
           }
 
           span.setAttribute("trace.id.prefix.resolved", candidates[0]!);
-          const resolved = await this.clickHouseService.findTracesWithSpans({
+          const resolved = await this.mapping.findTracesWithSpans({
+            authorization,
             projectId,
             traceIds: [candidates[0]!],
             protections,
@@ -213,12 +234,14 @@ export class TraceLegacyReadService {
 
   /** @param occurredAt bounds the partition scan. */
   async getTracesWithSpans({
+    authorization,
     projectId,
     traceIds,
     protections,
     occurredAt,
     opts,
   }: {
+    authorization: Authorization;
     projectId: string;
     traceIds: string[];
     protections: Protections;
@@ -231,7 +254,8 @@ export class TraceLegacyReadService {
         attributes: { "tenant.id": projectId, "trace.count": traceIds.length },
       },
       async () => {
-        const traces = await this.clickHouseService.findTracesWithSpans({
+        const traces = await this.mapping.findTracesWithSpans({
+          authorization,
           projectId,
           traceIds,
           protections,
@@ -249,11 +273,13 @@ export class TraceLegacyReadService {
   }
 
   async getTracesByThreadId({
+    authorization,
     projectId,
     threadId,
     protections,
     opts,
   }: {
+    authorization: Authorization;
     projectId: string;
     threadId: string;
     protections: Protections;
@@ -263,7 +289,8 @@ export class TraceLegacyReadService {
       "TraceService.getTracesByThreadId",
       { attributes: { "tenant.id": projectId, "thread.id": threadId } },
       async () => {
-        const traces = await this.clickHouseService.findTracesByThreadId({
+        const traces = await this.mapping.findTracesByThreadId({
+          authorization,
           projectId,
           threadId,
           protections,
@@ -283,17 +310,14 @@ export class TraceLegacyReadService {
   getAllTracesForProject = async (
     input: GetAllTracesForProjectInput,
     protections: Protections,
-    options: GetAllTracesForProjectOptions = {},
+    /** `ownRead` is the own-only proof the span, evaluation and event reads go through. */
+    options: GetAllTracesForProjectOptions & { ownRead: Authorization },
   ): Promise<TracesForProjectResult> => {
     return this.tracer.withActiveSpan(
       "TraceService.getAllTracesForProject",
       { attributes: { "tenant.id": input.projectId } },
       async () => {
-        const result = await this.clickHouseService.listAllTracesForProject(
-          input,
-          protections,
-          options,
-        );
+        const result = await this.mapping.listAllTracesForProject(input, protections, options);
         if (!options.includeSpans) {
           return result;
         }
@@ -348,11 +372,13 @@ export class TraceLegacyReadService {
   }
 
   async getTracesWithSpansByThreadIds({
+    authorization,
     projectId,
     threadIds,
     protections,
     opts,
   }: {
+    authorization: Authorization;
     projectId: string;
     threadIds: string[];
     protections: Protections;
@@ -367,7 +393,8 @@ export class TraceLegacyReadService {
         },
       },
       async () => {
-        const traces = await this.clickHouseService.findTracesWithSpansByThreadIds({
+        const traces = await this.mapping.findTracesWithSpansByThreadIds({
+          authorization,
           projectId,
           threadIds,
           protections,

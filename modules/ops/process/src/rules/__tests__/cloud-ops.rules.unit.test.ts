@@ -24,15 +24,27 @@ describe("decideCloudOps", () => {
   describe("given the deployment did not ask", () => {
     /** @scenario "Cloud admin is on only when asked for and the licence key matches the release" */
     it("is off with no key, and off with the matching key", () => {
-      const off = { asked: false, builtInPublicKey: release.publicKey };
+      const off = { asked: false, isLocalDevelopment: false, builtInPublicKey: release.publicKey };
 
       expect(decideCloudOps({ ...off, privateKey: void 0 })).toBe(false);
       expect(decideCloudOps({ ...off, privateKey: release.privateKey })).toBe(false);
     });
+
+    /** @scenario "Cloud admin is always on on a developer's local stack" */
+    it("is on with no key on a local development stack", () => {
+      expect(
+        decideCloudOps({
+          asked: false,
+          isLocalDevelopment: true,
+          privateKey: void 0,
+          builtInPublicKey: release.publicKey,
+        }),
+      ).toBe(true);
+    });
   });
 
   describe("given the deployment asked", () => {
-    const asked = { asked: true, builtInPublicKey: release.publicKey };
+    const asked = { asked: true, isLocalDevelopment: false, builtInPublicKey: release.publicKey };
 
     /** @scenario "Cloud admin is on only when asked for and the licence key matches the release" */
     it("is on with the key that pairs with the built-in public key", () => {

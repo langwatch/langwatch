@@ -5,10 +5,10 @@
  */
 import { ApiKeyPermissionDeniedError } from "@langwatch/api-key-contract";
 import {
-  bindRestMiddleware,
+  bindMiddlewareContext,
   canonicalErrorResponse,
   createRestRuntime,
-  projectRestFacts,
+  projectRequestContext,
 } from "@langwatch/api/rest";
 import type { AuthzPermission } from "@langwatch/authorization";
 import type { ExperimentApi } from "@langwatch/experiment-contract";
@@ -58,8 +58,8 @@ function buildApi(options: {
     app: () => app,
     credential: "project",
     onError: canonicalErrorResponse,
-    facts: [
-      bindRestMiddleware(projectRestFacts, () => ({
+    middlewareContext: [
+      bindMiddlewareContext(projectRequestContext, () => ({
         projectSlug: "project-one",
         viewerUserId: null,
         actorId: "project-key-1",

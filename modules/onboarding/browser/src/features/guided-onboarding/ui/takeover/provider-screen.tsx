@@ -184,7 +184,7 @@ export function ProviderScreen({
           </Dialog.Body>
           <Dialog.Footer borderTop="1px solid" borderColor="border" gap={2}>
             <Button
-              variant="ghost"
+              variant="outline"
               size="sm"
               color="fg.muted"
               onClick={() => {

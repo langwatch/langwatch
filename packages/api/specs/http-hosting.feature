@@ -70,3 +70,10 @@ Feature: HTTP hosting for API and browser surfaces
     When /index.html is requested
     Then a bare shell answers carrying the public config meta
     And any other document path still answers 404
+
+  @unit
+  Scenario: A REST request the client aborted is not logged as a failure
+    Given a REST route whose handler fails because its client closed the request
+    When the boundary renders that failure
+    Then nothing is logged as a failed REST request
+    And a server fault on a request still open is logged as before

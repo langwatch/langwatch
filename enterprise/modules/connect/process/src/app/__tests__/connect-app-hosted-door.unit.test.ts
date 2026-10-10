@@ -63,14 +63,15 @@ async function hostedFamily(options: { licensed?: boolean; instantEval?: Instant
       project: closed,
       organization: closed,
       api_key: closed,
-      scim_token: closed,
       instance_admin: closed,
       browser: closed,
     },
     bearers: () => closed,
     audit: { record: async () => undefined },
   });
-  runtime.mount(connectHostedRest.router(), () => state.provided, { facts: state.facts });
+  runtime.mount(connectHostedRest.router(), () => state.provided, {
+    middlewareBindings: state.middlewareBindings,
+  });
 
   const call = (signature: string, operation = "instant-evals-classify") =>
     runtime.app.request(

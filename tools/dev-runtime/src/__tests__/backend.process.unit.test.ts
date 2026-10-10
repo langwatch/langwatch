@@ -3,6 +3,7 @@ import { EventEmitter } from "node:events";
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  backendHalfOf,
   disposeGeneration,
   drainBackend,
   listenersAddedSince,
@@ -35,7 +36,7 @@ describe("given the backend process hosts both applications", () => {
       let apiStarted = (): void => {};
       const apiStarting = new Promise<void>((resolve) => (apiStarted = resolve));
 
-      const halves = await startBackend({
+      const booted = await startBackend({
         startWorker: async () => {
           order.push("worker.start");
           await apiStarting;
@@ -50,7 +51,7 @@ describe("given the backend process hosts both applications", () => {
       });
 
       expect(order).toEqual(["worker.start", "api.start", "worker.upgraded"]);
-      expect(halves).toEqual({ api, worker });
+      expect(booted).toEqual({ halves: { api, worker } });
     });
 
     /** @scenario "One observability graph is set up and shared by both applications" */
@@ -88,20 +89,22 @@ describe("given the backend process hosts both applications", () => {
       expect(order).toEqual(["worker.close"]);
     });
 
-    /** @scenario "A half-started backend drains what it did start" */
-    it("closes the API when the worker refuses to boot", async () => {
+    /** @scenario "A worker that fails to boot never takes the api down" */
+    it("keeps the API serving and names the worker's failure", async () => {
       const order: string[] = [];
       const { api } = halfSpies(order);
 
-      await expect(
-        startBackend({
-          startWorker: async () => {
-            throw new Error("upgrade failed");
-          },
-          startApi: async () => api,
-        }),
-      ).rejects.toThrow("upgrade failed");
-      expect(order).toEqual(["api.close"]);
+      const booted = await startBackend({
+        startWorker: async () => {
+          throw new TypeError("register is not a function");
+        },
+        startApi: async () => api,
+      });
+
+      expect(booted.halves.api).toBe(api);
+      expect(booted.workerFailure).toBeInstanceOf(TypeError);
+      expect(backendHalfOf(booted.workerFailure)).toBe("worker");
+      expect(order).toEqual([]);
     });
   });
 

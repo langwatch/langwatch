@@ -1,6 +1,7 @@
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
+import { TraceLegacyReadClickHouseRepository } from "../../features/legacy/repositories/clickhouse/trace-legacy-read.repository.ts";
 import { ClickHouseTraceAttributeSpendRepository } from "../clickhouse/clickhouse.trace-attribute-spend.repository.ts";
 import { ClickHouseTraceAttributedRollupRepository } from "../clickhouse/clickhouse.trace-attributed-rollup.repository.ts";
 import { ClickHouseTraceClusteringSampleRepository } from "../clickhouse/clickhouse.trace-clustering-sample.repository.ts";
@@ -55,6 +56,8 @@ export class PostgresTraceRepositories {
     const traceClickHouse = MemberTraceClickHouseClientRepository.resolverFor(members.clickhouse);
     const clickhouse = MemberTraceClickHouseClientRepository.authorizedFor(members.clickhouse);
     const storage = { resolveClient: traceClickHouse, clickhouse };
+    const annotations = PrismaTraceAnnotationsRepository.create(members.prisma);
+    const annotationScores = PrismaTraceAnnotationScoresRepository.create(members.prisma);
 
     return {
       editOverlay: PrismaTraceEditOverlayRepository.create(members.prisma),
@@ -81,8 +84,13 @@ export class PostgresTraceRepositories {
         resolveClient: traceClickHouse,
       }),
       evaluationRuns: ClickHouseTraceEvaluationRunsRepository.create(storage),
-      annotations: PrismaTraceAnnotationsRepository.create(members.prisma),
-      annotationScores: PrismaTraceAnnotationScoresRepository.create(members.prisma),
+      annotations,
+      annotationScores,
+      legacyRead: TraceLegacyReadClickHouseRepository.create({
+        resolveClickHouseClient: traceClickHouse,
+        clickhouse,
+        annotations: { rows: annotations, scores: annotationScores },
+      }),
       list: TraceListClickHouseRepository.create({ clickhouse }),
       sessionGroups: SessionGroupsClickHouseRepository.create({ clickhouse }),
       clusteringSample: ClickHouseTraceClusteringSampleRepository.create({

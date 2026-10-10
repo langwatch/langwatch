@@ -193,7 +193,8 @@ export const experimentsTrpc = defineTrpcContract("experiments")
 
   // ── The experiments a project lists ──────────────────────────────
 
-  .query("getExperimentBySlugOrId")
+  // A Studio run creates its experiment before the run starts, so a waiting panel finds it then.
+  .query("getExperimentBySlugOrId", { invalidatedBy: ["lw.experiment_run.started"] })
   .withInput(experimentIdOrSlugInputSchema)
   .withOutput(experimentSchema)
 

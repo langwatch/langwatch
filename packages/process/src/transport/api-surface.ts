@@ -26,25 +26,19 @@ import {
 } from "@langwatch/api/hosting";
 import { ClientAddress, SecurityHeaders, type StorageEndpoints } from "@langwatch/api/policy";
 import {
-  bindRestMiddleware,
   BrowserSessionIdentity,
   canonicalErrorAnswer,
-  defineRestMiddleware,
   IdempotencyLedger,
   type IdempotentRunner,
-  projectCredentialOfRequest,
-  projectRestFacts,
   RestHost,
-  type RestTransportMiddlewareBinding,
 } from "@langwatch/api/rest";
 import {
-  bindTrpcFact,
-  defineTrpcFact,
+  bindTrpcMiddlewareContext,
+  defineMiddlewareContext,
   SseLane,
   TrpcHost,
   type TrpcRequestContext,
 } from "@langwatch/api/trpc";
-import type { RestResolvedProjectCredential } from "@langwatch/authorization";
 import type { Logger } from "@langwatch/observability";
 import type { ProcessMemberSource } from "@langwatch/process-stores";
 import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
@@ -136,13 +130,11 @@ class ApiSurface {
       identities: {
         ...this.door.identities,
         browser: this.#browserDoor(),
-        scim_token: unboundDirectoryDoor(),
         instance_admin: this.composition.instanceAdmin,
       },
       audit: this.door.audit.rest,
       idempotency,
       rateLimiter,
-      facts: this.#restFacts(),
       entitlements: this.door.entitlements,
       authz: this.door.authz,
     });
@@ -156,7 +148,7 @@ class ApiSurface {
       errorCausePayload: { payloadFor: browserCausePayload },
       audit: this.door.audit.trpc,
       throttle: rateLimiter ? { limiter: rateLimiter, policies: {} } : void 0,
-      facts: this.#trpcFacts(),
+      middlewareContext: this.#trpcMiddlewareContext(),
       sessionVersions: this.door.authz,
       entitlements: this.door.entitlements,
     });
@@ -207,42 +199,13 @@ class ApiSurface {
     });
   }
 
-  #restFacts(): readonly RestTransportMiddlewareBinding[] {
+  #trpcMiddlewareContext() {
     return [
-      bindRestMiddleware(
-        unsubscribeCallerAddress,
-        (context) => ClientAddress.resolvedFor(context.req.raw) ?? null,
+      bindTrpcMiddlewareContext(
+        callerEmailContext,
+        (ctx: TrpcRequestContext) => ctx.session?.user.email ?? null,
       ),
-
-      bindRestMiddleware(adminAuthSession, async (context) => {
-        const caller = await this.sessions.read(context.req.raw);
-
-        return caller?.authSessionId ? { id: caller.authSessionId } : null;
-      }),
-      bindRestMiddleware(adminAuditRequest, (context) => {
-        const headers: Record<string, string> = {};
-        context.req.raw.headers.forEach((value, name) => {
-          headers[name] = value;
-        });
-
-        return { headers, remoteAddress: ClientAddress.resolvedFor(context.req.raw) ?? undefined };
-      }),
-      bindRestMiddleware(projectRestFacts, (context) => {
-        const credential = projectCredentialOfRequest(context.req.raw);
-
-        return {
-          projectSlug: credential.project.slug,
-          viewerUserId: credential.type === "legacyProjectKey" ? null : credential.userId,
-          actorId: actorIdOf(credential),
-        };
-      }),
-    ];
-  }
-
-  #trpcFacts() {
-    return [
-      bindTrpcFact(callerEmailFact, (ctx: TrpcRequestContext) => ctx.session?.user.email ?? null),
-      bindTrpcFact(organizationSessionPersonFact, (ctx: TrpcRequestContext) =>
+      bindTrpcMiddlewareContext(organizationSessionPersonContext, (ctx: TrpcRequestContext) =>
         ctx.session?.user
           ? {
               name: ctx.session.user.name ?? null,
@@ -251,7 +214,7 @@ class ApiSurface {
             }
           : null,
       ),
-      bindTrpcFact(opsOperatorFact, (ctx: TrpcRequestContext) =>
+      bindTrpcMiddlewareContext(opsOperatorContext, (ctx: TrpcRequestContext) =>
         ctx.session?.user
           ? {
               id: ctx.session.user.id,
@@ -266,12 +229,15 @@ class ApiSurface {
             }
           : null,
       ),
-      bindTrpcFact(gatewaySessionFact, (ctx: TrpcRequestContext) => ctx.session ?? null),
-      bindTrpcFact(
-        currencyRequestHeadersFact,
+      bindTrpcMiddlewareContext(
+        gatewaySessionContext,
+        (ctx: TrpcRequestContext) => ctx.session ?? null,
+      ),
+      bindTrpcMiddlewareContext(
+        currencyRequestHeadersContext,
         (ctx: TrpcRequestContext) => ctx.req?.headers ?? null,
       ),
-      bindTrpcFact(shareViewerFact, (ctx: TrpcRequestContext) => {
+      bindTrpcMiddlewareContext(shareViewerContext, (ctx: TrpcRequestContext) => {
         const userAgent = ctx.req?.headers["user-agent"];
         return {
           userId: ctx.tryActor()?.id ?? null,
@@ -322,23 +288,6 @@ export function instanceAdminDoor(options: {
   return bearerDoor({ name: "instance-admin", token: options.isSaas ? void 0 : options.token });
 }
 
-/** The scim module binds this door on its own families (§4); unbound, it admits nobody. */
-function unboundDirectoryDoor(): RestIdentity {
-  return {
-    authenticate: () => {
-      throw new Error("The SCIM door asks no permission of the bearer it was opened on.");
-    },
-    identify: () => Promise.reject(new SurfaceUnverifiedError("scimToken")),
-  };
-}
-
-function actorIdOf(resolved: RestResolvedProjectCredential): string {
-  if (resolved.type === "legacyProjectKey") return resolved.project.id;
-  if (resolved.type === "cliAccessToken") return resolved.userId;
-
-  return resolved.userId ?? resolved.apiKeyId;
-}
-
 /** A cause with no body of its own (`toResponseBody`, read by TrpcHost) that names a limit. */
 function browserCausePayload(cause: unknown): Record<string, unknown> | null {
   const limit = cause as { limitType?: string; current?: number; max?: number } | undefined;
@@ -348,27 +297,18 @@ function browserCausePayload(cause: unknown): Record<string, unknown> | null {
     : null;
 }
 
-const unsubscribeCallerAddress = defineRestMiddleware(
-  "unsubscribeCallerAddress",
-  z.string().nullable(),
+const callerEmailContext = defineMiddlewareContext("callerEmail", z.string().nullable());
+const organizationSessionPersonContext = defineMiddlewareContext(
+  "organizationSessionPerson",
+  z.unknown(),
 );
-
-const adminAuthSession = defineRestMiddleware(
-  "adminAuthSession",
-  z.object({ id: z.string() }).nullable(),
+const opsOperatorContext = defineMiddlewareContext("opsOperator", z.unknown());
+const currencyRequestHeadersContext = defineMiddlewareContext(
+  "currencyRequestHeaders",
+  z.unknown(),
 );
-
-const adminAuditRequest = defineRestMiddleware(
-  "adminAuditRequest",
-  z.object({ headers: z.record(z.string(), z.string()), remoteAddress: z.string().optional() }),
-);
-
-const callerEmailFact = defineTrpcFact("callerEmail", z.string().nullable());
-const organizationSessionPersonFact = defineTrpcFact("organizationSessionPerson", z.unknown());
-const opsOperatorFact = defineTrpcFact("opsOperator", z.unknown());
-const currencyRequestHeadersFact = defineTrpcFact("currencyRequestHeaders", z.unknown());
-const gatewaySessionFact = defineTrpcFact("gatewaySession", z.unknown());
-const shareViewerFact = defineTrpcFact(
+const gatewaySessionContext = defineMiddlewareContext("gatewaySession", z.unknown());
+const shareViewerContext = defineMiddlewareContext(
   "shareViewer",
   z.object({ userId: z.string().nullable(), userAgent: z.string().nullable() }),
 );

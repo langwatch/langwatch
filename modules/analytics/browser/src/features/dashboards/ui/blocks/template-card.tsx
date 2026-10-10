@@ -17,7 +17,7 @@ import { Bot, Check, Plus } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { useAnalyticsHost } from "../../../../model/analytics-host.ts";
-import { opensElsewhere } from "../../../../ui/elements/analytics-menu-link.tsx";
+import { opensElsewhere } from "../../../../ui/elements/analytics-link.tsx";
 import { AGENT_KIND_CHIP_LABELS, TRUNK_QUESTIONS } from "../../catalogue/index.ts";
 import type { LibraryTemplate } from "../../model/template-library.ts";
 import { TRUNK_ICONS, TRUNK_PALETTES } from "./catalogue-filters.tsx";

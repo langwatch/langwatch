@@ -14,7 +14,7 @@ export { gatewayCacheRuleTrpcTransport } from "./transport/gateway-cache-rule.tr
 export { gatewayGuardrailTrpcTransport } from "./transport/gateway-guardrail.trpc.ts";
 export { gatewayUsageTrpcTransport } from "./transport/gateway-usage.trpc.ts";
 export { gatewaySpendEventTrpcTransport } from "./transport/gateway-spend-event.trpc.ts";
-export { gatewaySessionFact, virtualKeyTrpcTransport } from "./transport/virtual-key.trpc.ts";
+export { gatewaySessionContext, virtualKeyTrpcTransport } from "./transport/virtual-key.trpc.ts";
 export type {
   GatewayUsageProjects,
   GatewayUsageVirtualKeys,

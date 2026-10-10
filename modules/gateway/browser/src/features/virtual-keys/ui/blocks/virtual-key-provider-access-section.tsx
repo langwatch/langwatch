@@ -1,5 +1,6 @@
 import { Checkbox } from "@langwatch/design-system/checkbox";
 import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
+import { InlineCode } from "@langwatch/design-system/inline-code";
 import { HStack, Spinner, Text, VStack } from "@langwatch/design-system/primitives";
 import { SmallLabel } from "@langwatch/design-system/small-label";
 import { useMemo } from "react";
@@ -190,11 +191,8 @@ export function VirtualKeyProviderAccessSection({
             No model providers reachable from this ownership.
           </Text>
           <Text fontSize="xs" color="fg.muted">
-            Add one at{" "}
-            <Text as="span" fontFamily="mono">
-              /settings/model-providers
-            </Text>{" "}
-            first; the key cannot route requests without a provider.
+            Add one at <InlineCode>/settings/model-providers</InlineCode> first; the key cannot
+            route requests without a provider.
           </Text>
         </VStack>
       )}

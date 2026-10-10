@@ -75,7 +75,6 @@ describe("judgeWebhookUrl refusals", () => {
       "https://10.0.0.5/hook",
       "https://172.16.0.1/hook",
       "https://192.168.1.1/hook",
-      "https://169.254.169.254/hook",
       "https://0.0.0.0/hook",
       "https://100.64.0.1/hook",
     ])("refuses %s permanently rather than as a retryable DNS failure", (url) => {
@@ -91,7 +90,7 @@ describe("judgeWebhookUrl refusals", () => {
      * host list never matches its bracketed spelling.
      */
     /** @scenario "A private or loopback address is refused terminally" */
-    it.each(["https://[::1]/hook", "https://[fd00:ec2::254]/hook", "https://[fe80::1]/hook"])(
+    it.each(["https://[::1]/hook", "https://[fe80::1]/hook"])(
       "refuses %s permanently, brackets stripped",
       (url) => {
         expect(reasonOf(url)).toMatch(/private or loopback/i);
@@ -103,6 +102,33 @@ describe("judgeWebhookUrl refusals", () => {
     /** @scenario "The escape hatch relaxes the origin and the local-address block, and nothing else" */
     it("admits a loopback destination", () => {
       expect(judge("http://127.0.0.1:4101/hook", true)).toEqual({ admitted: true });
+    });
+  });
+
+  describe("when the host is a cloud metadata endpoint, by address, alias or name", () => {
+    const metadataUrls = [
+      "https://169.254.169.254/latest/meta-data",
+      "https://169.254.170.2/v2/credentials",
+      "https://[::ffff:169.254.169.254]/latest/meta-data",
+      "https://[::ffff:a9fe:a9fe]/latest/meta-data",
+      "https://[fd00:ec2::254]/latest/meta-data",
+      "https://168.63.129.16/machine",
+      "https://100.100.100.200/latest/meta-data",
+      "https://192.0.0.192/opc/v2/instance",
+      "https://metadata.google.internal/computeMetadata/v1",
+      "https://metadata.google.internal./computeMetadata/v1",
+      "https://METADATA.GOOG/computeMetadata/v1",
+      "https://metadata/computeMetadata/v1",
+    ];
+
+    /** @scenario "A cloud metadata destination is refused whatever the escape hatch says" */
+    it.each(metadataUrls)("refuses %s with the escape hatch off", (url) => {
+      expect(reasonOf(url)).toMatch(/cloud metadata endpoint/i);
+    });
+
+    /** @scenario "A cloud metadata destination is refused whatever the escape hatch says" */
+    it.each(metadataUrls)("refuses %s with the escape hatch on", (url) => {
+      expect(reasonOf(url.replace("https:", "http:"), true)).toMatch(/cloud metadata endpoint/i);
     });
   });
 });

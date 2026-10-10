@@ -244,6 +244,7 @@ const DEFAULT_GO_TEST_ROOTS: string[] = [
   "services/outboundsim",
   "services/paymentsim",
   "services/telemetrysim",
+  "services/lambdasim",
   "tools/diffsuite",
   "tools/fuzz",
   "tools/workerrun",
@@ -336,7 +337,6 @@ const LEGACY_UNBOUND: string[] = [
   "specs/langy/langy-followup-suggestions.feature",
   "specs/langy/langy-frontend-realtime.feature",
   "specs/langy/langy-github-prs.feature",
-  "specs/langy/langy-plan-progress.feature",
   "specs/langy/langy-projection-independent-reactions.feature",
 ];
 
@@ -390,7 +390,6 @@ const LEGACY_INERT: string[] = [
   "specs/ai-gateway/governance/routing-policy-scope-cascade.feature",
   "specs/ai-gateway/governance/self-hosted-setup.feature",
   "specs/ai-gateway/governance/template-cross-bind-guard.feature",
-  "specs/ai-gateway/governance/template-ottl-authoring.feature",
   "specs/ai-gateway/governance/template-ottl-principal-guard.feature",
   "specs/ai-gateway/governance/vk-config-bundle.feature",
   "specs/ai-gateway/governance/vk-personal-scope.feature",

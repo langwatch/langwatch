@@ -89,7 +89,7 @@ export class SsoArrivalService {
 
       const organization = await this.deps.memberships.findOrganization({ organizationId });
       if (organization) {
-        await this.joinOrganization({ user, org: organization, domain });
+        await this.joinOrganization({ user, org: organization, domain, connectionId });
         await this.adoptIdentity(user.id);
       }
     } catch (error) {
@@ -114,10 +114,12 @@ export class SsoArrivalService {
     user,
     org,
     domain,
+    connectionId,
   }: {
     user: SsoArrivingUser;
     org: JoinedOrganization;
     domain: string;
+    connectionId: string;
   }): Promise<void> {
     const invite = await this.deps.memberships.applyPendingInvite({
       userId: user.id,
@@ -133,6 +135,9 @@ export class SsoArrivalService {
       organizationId: org.id,
       userId: user.id,
     });
+    if (written.outcome === "created") {
+      await this.recordArrival({ userId: user.id, organizationId: org.id, domain, connectionId });
+    }
     if (written.seat === "DEVELOPER" || written.pending) {
       // A Developer seat gets no grant, so the row is the admission (ADR-171); a pending one
       // waits for a seat, shown to admins. Only the arrival that created it announces.
@@ -148,6 +153,23 @@ export class SsoArrivalService {
     // A Lite seat is worth an organization-wide Viewer, as a SCIM create grants it.
     const role = written.seat === "EXTERNAL" ? "VIEWER" : "MEMBER";
     await this.resumeAdmission({ user, organizationId: org.id, domain, role });
+  }
+
+  /** Says how they got here for member provenance; the membership stands either way. */
+  private async recordArrival(args: {
+    userId: string;
+    organizationId: string;
+    domain: string;
+    connectionId: string;
+  }): Promise<void> {
+    try {
+      await this.deps.joinRequests?.recordSsoArrival(args);
+    } catch (error) {
+      logger.warn(
+        { error, userId: args.userId, connectionId: args.connectionId },
+        "a single sign-on arrival was admitted but not recorded, so its member reads as unexplained",
+      );
+    }
   }
 
   /**

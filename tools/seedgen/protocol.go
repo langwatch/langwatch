@@ -23,6 +23,8 @@ type Action struct {
 	Key     string          `json:"key"`
 	Input   json.RawMessage `json:"input"`
 	At      string          `json:"at,omitempty"`
+	// Count is a telemetry chunk's spans, records or points, for the Packer; never on the wire.
+	Count int `json:"-"`
 }
 
 // Reply is the runner's answer to one action: an ack (OK, Refs) or a refusal (Code, Retryable).
@@ -32,6 +34,8 @@ type Reply struct {
 	Refs      map[string]string `json:"refs,omitempty"`
 	Code      string            `json:"code,omitempty"`
 	Retryable bool              `json:"retryable,omitempty"`
+	// Existing says the action found what it names instead of creating it (a re-run).
+	Existing bool `json:"existing,omitempty"`
 }
 
 // WriteAction writes one action as an NDJSON line.

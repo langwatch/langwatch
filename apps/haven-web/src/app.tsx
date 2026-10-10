@@ -65,7 +65,7 @@ export const App = () => {
   return (
     <ToastProvider>
       {route.kind === "home" ? (
-        <StackHomeApp slug={route.slug} />
+        <StackHomeApp slug={route.slug} tab={route.tab} sub={route.sub} navigate={navigate} />
       ) : (
         <HubApp route={route} navigate={navigate} />
       )}

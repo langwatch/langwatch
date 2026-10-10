@@ -85,7 +85,7 @@ function referencePaths(config: Record<string, unknown>, key: string): string[] 
   });
 }
 
-function workspaceGlobs(root: string): string[] {
+export function workspaceGlobs(root: string): string[] {
   // The `packages:` block of pnpm-workspace.yaml is a flat list of quoted globs;
   // reading it by hand keeps this derivation free of a YAML dependency.
   const manifest = join(root, "pnpm-workspace.yaml");
@@ -126,7 +126,7 @@ function namedChild(directory: string, segment: string): string[] {
   return statSync(candidate).isDirectory() ? [candidate] : [];
 }
 
-function expandGlob(root: string, pattern: string): string[] {
+export function expandGlob(root: string, pattern: string): string[] {
   let directories = [root];
   for (const segment of pattern.split("/")) {
     directories = directories.flatMap((directory) =>

@@ -39,7 +39,7 @@
     "@langwatch/upgrade": "workspace:*",
     "@trpc/server": "catalog:",
     "ioredis": "catalog:",
-    "nanoid": "^6.0.0",
+    "nanoid": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {

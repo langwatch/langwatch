@@ -59,13 +59,13 @@ async function buildEventFamily(
         })),
     },
   });
-  const { runtime, projectFacts } = createScenarioRestTestRuntime({
+  const { runtime, projectContext } = createScenarioRestTestRuntime({
     authenticated: options.authenticated,
   });
   const mounted = runtime.mount(scenarioEventsRest.router(), {
     app: () => world.app,
     onError: canonicalErrorResponse,
-    facts: [projectFacts],
+    middlewareContext: [projectContext],
   });
 
   return {

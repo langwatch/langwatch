@@ -15,6 +15,7 @@ import { MANAGEMENT_API_VERSION } from "../addressing.ts";
 import { BearerIdentity } from "../bearer-identity.ts";
 import { defineRestRouter } from "../declaration.ts";
 import { RestHost } from "../host.ts";
+import { bindRestCredential } from "../request.ts";
 import type { RestProtocolRefusal } from "../response-kind.ts";
 
 const PROTOCOL = "application/example+json";
@@ -158,7 +159,6 @@ function mounted() {
       project: closed,
       organization: closed,
       api_key: closed,
-      scim_token: door,
       instance_admin: closed,
       browser: closed,
     },
@@ -166,7 +166,9 @@ function mounted() {
     audit: { record: async () => {} },
   });
 
-  host.mount(directory.router(), () => app);
+  host.mount(directory.router(), () => app, {
+    middlewareBindings: [bindRestCredential("scim_token", () => door)],
+  });
 
   return { host: host.app, app };
 }

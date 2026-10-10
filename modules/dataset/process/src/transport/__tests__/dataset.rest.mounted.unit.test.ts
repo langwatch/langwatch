@@ -1,11 +1,11 @@
 /** REST endpoints mounted with real requests, stubbed application. */
 
 import {
-  bindRestMiddleware,
+  bindMiddlewareContext,
   canonicalErrorResponse,
   createRestRuntime,
   NotFoundError,
-  projectRestFacts,
+  projectRequestContext,
   UnauthorizedError,
 } from "@langwatch/api/rest";
 import {
@@ -117,8 +117,8 @@ function mount(overrides: Partial<DatasetApi> = {}, options: { refuse?: boolean 
     app: () => stub,
     credential: "project",
     onError: canonicalErrorResponse,
-    facts: [
-      bindRestMiddleware(projectRestFacts, () => ({
+    middlewareContext: [
+      bindMiddlewareContext(projectRequestContext, () => ({
         projectSlug: "project-one",
         viewerUserId: null,
         actorId: "user-1",

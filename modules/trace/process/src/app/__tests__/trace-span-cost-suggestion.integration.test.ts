@@ -7,6 +7,7 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { baseSpanSchema, lLMSpanSchema, type Span } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
+import { ownProof } from "../../__tests__/support/authorization-proofs.fixture.ts";
 import { SpanCostSuggestionService } from "../../features/span/services/span-cost-suggestion.service.ts";
 import { openProtections } from "../../repositories/clickhouse/__tests__/open-protections.ts";
 import type { TraceViewerProtectionService } from "../../services/trace-viewer-protection.service.ts";
@@ -82,6 +83,7 @@ async function readDetail({ span, rules = [] }: { span: Span; rules?: ModelCost[
   });
   const detail = await app.readSpanDetailForViewer({
     projectId: PROJECT_ID,
+    authorization: ownProof({ projectId: PROJECT_ID }),
     traceId: TRACE_ID,
     spanId: SPAN_ID,
     viewerUserId: "viewer-1",

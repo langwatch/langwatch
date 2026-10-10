@@ -170,14 +170,14 @@ func (o *Orchestrator) monitorLoop(ctx context.Context) {
 			cycles++
 			// Every ~10 min, prune orphaned git worktree admin entries — the only
 			// disk hygiene safe to do unattended (it never touches a live tree).
-			// node_modules reclamation stays explicit (`haven prune --yes`).
+			// node_modules reclamation stays explicit (`haven machine clean --yes`).
 			if o.hyg != nil && o.cfg.RepoRoot != "" && cycles%60 == 1 {
 				o.hyg.PruneGitWorktrees(o.cfg.RepoRoot)
 			}
 			// Every ~10 min, refresh the idle clock of every registered stack's
 			// databases, and prune databases whose worktree has not been up in
 			// DBIdleTTL — the unattended counterpart of the interactive reclaim in
-			// `haven clean` (`down` itself never discards data).
+			// `haven machine clean` (`down` itself never discards data).
 			if cycles%60 == 1 {
 				o.reapTestContainers(ctx)
 				// Fail closed: this clock guards destructive pruning, so if any

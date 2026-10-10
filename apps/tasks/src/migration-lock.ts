@@ -1,45 +1,68 @@
-import { createLogger } from "@langwatch/observability";
+import { randomUUID } from "node:crypto";
+import { hostname } from "node:os";
 
-export function migrationLockKey(): string {
-  let hash = 0xcbf29ce484222325n;
-  for (const byte of Buffer.from("langwatch:migrations", "utf8")) {
-    hash = BigInt.asUintN(64, (hash ^ BigInt(byte)) * 0x100000001b3n);
+import { createLogger } from "@langwatch/observability";
+import { type UpgradePostgres, UpgradeLedgerRepository } from "@langwatch/upgrade";
+import {
+  DEFAULT_LEASE_TIMING,
+  holdUpgradeLease,
+  type UpgradeLeaseTiming,
+  UpgradeRunnerRepository,
+} from "@langwatch/upgrade/runner";
+
+/** What the legacy tasks call themselves on the lease, so `upgrade` can say who holds it. */
+export const LEGACY_TASKS_IMAGE = "pnpm task (legacy tasks)";
+
+type LeaseLedger = Pick<UpgradeLedgerRepository, "acquireLease" | "renewLease" | "releaseLease">;
+
+/**
+ * Runs the legacy tasks under the one timed upgrade lease, so they and `upgrade` never overlap
+ * (dev/docs/ARCHITECTURE.md, "No stuck states"): waits for a live holder as `upgrade` does, then
+ * refuses naming it.
+ */
+export async function holdTasksLease({
+  ledger,
+  runner,
+  run,
+  timing = DEFAULT_LEASE_TIMING,
+  host = hostname(),
+}: {
+  ledger: LeaseLedger;
+  runner: Pick<UpgradeRunnerRepository, "findLease">;
+  run: () => Promise<void>;
+  timing?: UpgradeLeaseTiming;
+  host?: string;
+}): Promise<void> {
+  const logger = createLogger("langwatch:tasks");
+  const held = await holdUpgradeLease({
+    ledger,
+    runner,
+    identity: { owner: `${host}:${randomUUID()}`, image: LEGACY_TASKS_IMAGE, host },
+    timing,
+    log: {
+      info: (message, fields) => logger.info(fields ?? {}, message),
+      warn: (message, fields) => logger.warn(fields ?? {}, message),
+    },
+    signal: new AbortController().signal,
+    work: run,
+  });
+  if (!held.acquired) {
+    const holder = held.holder
+      ? `${held.holder.owner} on ${held.holder.host} (${held.holder.image})`
+      : "another runner";
+    throw new Error(
+      `refusing to run the tasks: the upgrade lease is held by ${holder}. Run them again once it finishes; \`pnpm task upgrade status\` shows an upgrade's run`,
+    );
   }
-  return BigInt.asIntN(64, hash).toString();
+  if (held.lost) throw new Error("the upgrade lease was lost while the tasks ran; run them again");
 }
 
-/** Runs `run` under the advisory lock, on a connection from the given pool. */
+/** The tasks' lease over the database they migrate; the ledger tables are created first. */
 export async function holdMigrationLock(
-  pool: { connect(): Promise<PoolClient> },
+  postgres: UpgradePostgres,
   run: () => Promise<void>,
 ): Promise<void> {
-  const client = await pool.connect();
-  let held = false;
-  try {
-    const result = await client.query<{ locked: boolean }>(
-      "SELECT pg_try_advisory_lock($1::bigint) AS locked",
-      [migrationLockKey()],
-    );
-    held = result.rows[0]?.locked === true;
-    if (!held) {
-      createLogger("langwatch:tasks").info("waiting for migration lock held by another runner");
-      await client.query("SELECT pg_advisory_lock($1::bigint)", [migrationLockKey()]);
-      held = true;
-    }
-    await run();
-  } finally {
-    try {
-      if (held) {
-        await client.query("SELECT pg_advisory_unlock($1::bigint)", [migrationLockKey()]);
-      }
-    } finally {
-      client.release();
-    }
-  }
+  const ledger = UpgradeLedgerRepository.create({ postgres });
+  await ledger.createTables();
+  await holdTasksLease({ ledger, runner: UpgradeRunnerRepository.create({ postgres }), run });
 }
-
-/** Just the part of a pg pool client this lock uses. */
-type PoolClient = {
-  query<Row>(text: string, values?: readonly unknown[]): Promise<{ rows: Row[] }>;
-  release(): void;
-};

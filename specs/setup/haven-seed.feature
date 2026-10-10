@@ -1,4 +1,4 @@
-Feature: haven seed fills a stack with every kind of data, at any size, without running out of memory
+Feature: haven db seed fills a stack with every kind of data, at any size, without running out of memory
   A developer needs a stack that looks lived in: every persona, every state, weeks of history,
   sized from one span to about two million. One deterministic generator (tools/seedgen) plans it;
   configuration, lifecycle and bulk telemetry go through installed module APIs in the tasks
@@ -25,7 +25,7 @@ Feature: haven seed fills a stack with every kind of data, at any size, without 
     Given the tiny seed has not drained after 60 seconds
     When "haven up" reaches its wait limit
     Then it reports the stack ready and that the seed continues in the background
-    And "haven seed status" shows the seed's progress until it finishes
+    And "haven db status" shows the seed's progress until it finishes
 
   @integration @unimplemented
   Scenario: haven up leaves a stack with data alone
@@ -39,11 +39,11 @@ Feature: haven seed fills a stack with every kind of data, at any size, without 
     When I run "haven up" on an empty stack
     Then only the fixed local identity is seeded
 
-  # --- haven seed on demand --------------------------------------------------------------
+  # --- haven db seed on demand --------------------------------------------------------------
 
   @integration @unimplemented
-  Scenario: haven seed takes size, history, personas and seed
-    When I run "haven seed --size small --days 30 --persona startup,enterprise --seed 7"
+  Scenario: haven db seed takes size, history, personas and seed
+    When I run "haven db seed --size small --days 30 --persona startup,enterprise --seed 7"
     Then the startup and enterprise personas are seeded at the small tier
     And their telemetry spans the 30 days before the anchor
     And the run manifest records the flags, the anchor and the recipe version
@@ -56,30 +56,30 @@ Feature: haven seed fills a stack with every kind of data, at any size, without 
   @integration @unimplemented
   Scenario: Seeding again with the same seed adds nothing
     Given a stack seeded with seed 7
-    When I run "haven seed" with the same flags and seed 7
+    When I run "haven db seed" with the same flags and seed 7
     Then every action finds its record by natural key and creates nothing new
 
   @unit
   Scenario: Any telemetry size from one span to two million is accepted
-    When I run "haven seed --spans 1" or "haven seed --spans 2000000"
+    When I run "haven db seed --spans 1" or "haven db seed --spans 2000000"
     Then the plan holds exactly that many spans, with logs and metric points in proportion
 
   @unit
   Scenario: Bad flags are refused before anything is written
-    When I run "haven seed --size huge" or "haven seed --days 0" or "haven seed --persona nosuch"
+    When I run "haven db seed --size huge" or "haven db seed --days 0" or "haven db seed --persona nosuch"
     Then the command exits 2 naming the flag and the values it accepts
     And no store is touched
 
   @unit
   Scenario: A dry run prints the plan without writing
-    When I run "haven seed --size medium --dry-run"
+    When I run "haven db seed --size medium --dry-run"
     Then it prints the counts per kind, the estimated rows and bytes per store and the expected duration
     And no store is touched
 
   @unit
-  Scenario: haven seed returns the logins and the credentials haven made up
+  Scenario: haven db seed returns the logins and the credentials haven made up
     Given a stack that is up
-    When "haven seed" finishes
+    When "haven db seed" finishes
     Then it prints the app URL, the seeded admin login, the organization, team and project slugs,
       the project API key, the personal access token, the SCIM token and the instance admin key
     And every secret value is masked unless "--reveal" is given
@@ -88,7 +88,7 @@ Feature: haven seed fills a stack with every kind of data, at any size, without 
   @unit
   Scenario: The access block lists every seeded org and its logins
     Given a seed whose run record holds the ids the product returned
-    When "haven seed" prints its access block
+    When "haven db seed" prints its access block
     Then it lists each org the product created, with its id, persona and member logins
     And an org or user the product never returned an id for is not listed
     And every login's password is the one dev password, masked unless "--reveal" is given
@@ -101,42 +101,57 @@ Feature: haven seed fills a stack with every kind of data, at any size, without 
     And each org's owner admits the admin with an admin role on the org and its main team
 
   @unit
-  Scenario: haven seed creates the orgs it is asked for
-    When I run "haven seed --org name=acme,users=4 --org name=globex,persona=enterprise"
+  Scenario: haven db seed creates the orgs it is asked for
+    When I run "haven db seed --org name=acme,users=4 --org name=globex,persona=enterprise"
     Then exactly those orgs are planned, named as asked, each with its owner and users
     And a malformed name, an unknown key, a plan that is not built yet or a user count out of range is refused naming --org
 
   @unit
-  Scenario: haven seed --into sends telemetry into one existing project
-    When I run "haven seed --into <org-id>/<project-id>"
+  Scenario: haven db seed gives a test stack a second, a Free and an Enterprise org
+    When I run "haven db seed --org name=sso-test-org,plan=licence,owner=admin@acme1.test --org name=free-test-org,plan=free,users=1 --org name=enterprise-test-org,plan=licence,persona=enterprise"
+    Then each licence org is issued an Enterprise licence signed by the stack's dev key, before its retention or members
+    And the free org gets no licence and holds no more full seats than the Free plan allows
+    And the sso-test-org owner is admin@acme1.test, so idpsim tenant 1 can be bound to it
+    And the seeded admin is a member of every one of them
+
+  @unit
+  Scenario: An org asked for with admin=no is one the seeded admin is outside
+    When I run "haven db seed --org name=sso-test-org,plan=licence,owner=admin@acme1.test,admin=no --org name=free-test-org"
+    Then sso-test-org is created and licensed without admitting the seeded admin
+    And the seeded admin still joins free-test-org
+    And an admin= value other than no or yes is refused naming --org
+
+  @unit
+  Scenario: haven db seed --into sends telemetry into one existing project
+    When I run "haven db seed --into <org-id>/<project-id>"
     Then no user, org, project or membership is created
     And every telemetry chunk lands in that project
     And --into with --org, or without a project, is refused naming --into
 
   @unit
   Scenario: Old telemetry lands at its own time so retention can be tested
-    When I run "haven seed --days 30 --age 90d"
+    When I run "haven db seed --days 30 --age 90d"
     Then every trace, log and metric is timed between 120 and 90 days ago
     And the data goes through the owners' ingest, so tenancy and the retention policy apply to it
     And an age that is negative, not whole days, or reaching past 365 days with --days is refused naming --age
 
   @unit
   Scenario: Each project gets long conversations whose turns share one conversation id
-    When I run "haven seed --conversations 2 --turns 15"
+    When I run "haven db seed --conversations 2 --turns 15"
     Then each project gets two conversations of fifteen turns, one trace per turn, minutes apart
     And every turn carries its conversation's gen_ai.conversation.id
     And their spans come out of the span budget, so the span count stays exact
     And a budget too small for them seeds none, and bad counts are refused naming the flag
 
   @unit
-  Scenario: haven seed refuses a stack that is not up
+  Scenario: haven db seed refuses a stack that is not up
     Given the stack's api or worker is not running
-    When I run "haven seed"
+    When I run "haven db seed"
     Then the command exits 2 naming the process that is down and "haven up"
 
   @integration @unimplemented
   Scenario: Reset empties the stack before seeding
-    When I run "haven seed --reset --yes"
+    When I run "haven db seed --reset --yes"
     Then the stack's stores are emptied and the seed starts from an empty stack
 
   # --- Paths: module APIs, batched ingest, a door slice ----------------------------------
@@ -192,7 +207,29 @@ Feature: haven seed fills a stack with every kind of data, at any size, without 
   Scenario: A seed that stays paused stops with a checkpoint and resumes later
     Given sending has been paused for 10 minutes
     Then the seed exits 4 "stalled", naming the signal and its value
-    And "haven seed --resume" continues from the last acknowledged action without duplicating data
+    And "haven db seed --resume" continues from the last acknowledged action without duplicating data
+
+  @unit
+  Scenario: The seed waits only for its own data to land
+    Given the stack's worker also holds other tenants' jobs and jobs deferred by minutes
+    When the seed has sent its last action
+    Then it waits until none of its own organizations' or projects' jobs are due or running
+    And a job deferred past a minute (trace origin's fallback) is counted, not waited on
+    And a job group of the seed's the worker blocked fails the run, naming it
+
+  @unit
+  Scenario: Identity lands before telemetry and a temporary refusal is retried
+    When a seed sends its organizations, members and grants, then its telemetry
+    Then no telemetry is sent until every identity action has answered
+    And an identity action refused as retryable is sent again with back-off
+    And one still refused is left unacknowledged, so a re-run sends it again
+    And a project an earlier run made is not sent its telemetry again, so a re-run duplicates nothing
+
+  @unit
+  Scenario: A failed seed says why on its last line
+    When seedgen exits non-zero
+    Then haven's last line names seedgen's reason, and "haven db status" shows it too
+    And plain output such as a build note or the run summary shows line by line, never as one error line
 
   @unit
   Scenario: The seed refuses a plan that cannot fit
@@ -226,7 +263,7 @@ Feature: haven seed fills a stack with every kind of data, at any size, without 
 
   @integration @unimplemented
   Scenario: History past 31 days uses the internal backdated path
-    When I run "haven seed --days 90"
+    When I run "haven db seed --days 90"
     Then spans up to 90 days old are stored through the in-process backdated input
     And the public OTLP door still drops a span older than 31 days
 
@@ -234,7 +271,7 @@ Feature: haven seed fills a stack with every kind of data, at any size, without 
 
   @integration @unimplemented
   Scenario Outline: Each persona is seeded with its characteristic data
-    When I run "haven seed --persona <persona>"
+    When I run "haven db seed --persona <persona>"
     Then the run report lists <evidence> as present
 
     Examples:
@@ -246,7 +283,7 @@ Feature: haven seed fills a stack with every kind of data, at any size, without 
 
   @integration @unimplemented
   Scenario: Private organizations get their own ClickHouse and bucket while Postgres stays shared
-    When I run "haven seed --size small --private 1"
+    When I run "haven db seed --size small --private 1"
     Then haven creates a private ClickHouse database and a private bucket for one organization
     And routes that organization to them and restarts the api and worker with the routes loaded
     And the organization's telemetry lands only on its private targets
@@ -254,7 +291,7 @@ Feature: haven seed fills a stack with every kind of data, at any size, without 
   @integration @unimplemented
   Scenario: The isolation check finds a leak
     Given a private organization's telemetry row exists on the shared ClickHouse
-    When I run "haven seed isolation"
+    When I run "haven db seed isolation"
     Then it exits 1 naming the table, the tenant and the target it should be on
 
   @integration @unimplemented
@@ -274,7 +311,7 @@ Feature: haven seed fills a stack with every kind of data, at any size, without 
   @integration @unimplemented
   Scenario: Under strict mode a missing optional service fails the run
     Given langevals is not running
-    When I run "haven seed --strict"
+    When I run "haven db seed --strict"
     Then the seed exits 1 naming the evaluator kinds that could not run and langevals
 
   # --- Snapshot cache --------------------------------------------------------------------
@@ -309,15 +346,15 @@ Feature: haven seed fills a stack with every kind of data, at any size, without 
   @integration @unimplemented
   Scenario: Live mode keeps a gentle stream through the public APIs
     Given a seeded stack
-    When I run "haven seed --live"
+    When I run "haven db seed --live"
     Then a seed-live lane sends traces, logs, metrics and gateway calls through the public doors at 30 traces a minute
-    And it shows in "haven status" and stops with "haven seed --live --stop" or the stack
+    And it shows in "haven status" and stops with "haven db seed --live --stop" or the stack
 
   @unit @unimplemented
   Scenario: Live mode needs a seed first
     Given a stack with no seed manifest
-    When I run "haven seed --live"
-    Then it exits 2 asking me to run "haven seed" first
+    When I run "haven db seed --live"
+    Then it exits 2 asking me to run "haven db seed" first
 
   # --- Coverage --------------------------------------------------------------------------
 
@@ -337,7 +374,7 @@ Feature: haven seed fills a stack with every kind of data, at any size, without 
   Scenario: The run-time coverage check names a covered item that produced no rows
     Given a seed has drained
     And an item mapped to a generator has no rows
-    When "haven seed coverage" runs
+    When "haven db seed coverage" runs
     Then the item is reported as a gap by id, with its generator
 
   @integration @unimplemented

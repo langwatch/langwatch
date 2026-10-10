@@ -46,6 +46,7 @@ async function gatewayHolding({ rotateAt }: { rotateAt: string[] }) {
       traces: createApiFixture({}),
       oneTimeReveals: createApiFixture({}),
       apiKeys: createApiFixture({}),
+      licensing: createApiFixture({}),
     },
     repositories,
     config: {

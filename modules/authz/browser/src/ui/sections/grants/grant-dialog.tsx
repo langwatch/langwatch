@@ -103,7 +103,8 @@ export function GrantDialog({
 
   return (
     <Dialog.Root open onOpenChange={(event) => !event.open && onClose()}>
-      <Dialog.Content bg="bg" maxWidth="560px">
+      <Dialog.Content maxWidth="560px">
+        <Dialog.CloseTrigger />
         <Dialog.Header>
           <Dialog.Title>{editing ? "Change role" : "Grant a role"}</Dialog.Title>
         </Dialog.Header>
@@ -206,7 +207,7 @@ export function GrantDialog({
             Cancel
           </Button>
           <Button
-            colorPalette="blue"
+            colorPalette="orange"
             disabled={!canSubmit}
             data-testid="grant-submit"
             loading={isSaving}

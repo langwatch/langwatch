@@ -17,6 +17,19 @@ Feature: Bindings are never unique
     Then nothing is written and the existing grant is answered as the duplicate
 
   @unit
+  Scenario: Identical skipping grants applied inside the projection lag leave one live grant
+    Given two attaches of the same binding both asked to skip before either landed
+    When the fold applies both
+    Then one live grant holds the binding
+    And revoking that grant leaves the binding unheld
+
+  @unit
+  Scenario: A skipping attach dropped by the fold answers the held grant as the duplicate
+    Given an identical grant lands while a skipping attach waits for its projection
+    When the fold drops the attach
+    Then the attach answers the held grant as the duplicate
+
+  @unit
   Scenario: Changing a binding to a role a sibling already holds is written
     Given a user holds Member and Admin on the same team as two bindings
     When an administrator changes the Member binding to Admin

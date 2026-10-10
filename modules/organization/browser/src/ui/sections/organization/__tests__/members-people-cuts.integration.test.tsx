@@ -4,6 +4,7 @@
  * @see specs/identity/directory-administration.feature
  */
 import "@testing-library/jest-dom/vitest";
+import { FrontendFlags } from "@langwatch/feature-flag-contract";
 import { cleanup, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -108,10 +109,13 @@ vi.mock("../../../../behavior/use-department-column.ts", () => ({
   }),
 }));
 
-const renderPeople = (query: Record<string, string> = {}) =>
+const renderPeople = (
+  query: Record<string, string> = {},
+  flags: ReadonlySet<string> = new Set([FrontendFlags.join_requests.name]),
+) =>
   renderWithOrganizationHost(
     <MembersScreen />,
-    new FakeOrganizationHost({ grants: new Set(["organization:manage"]), query }),
+    new FakeOrganizationHost({ grants: new Set(["organization:manage"]), query, flags }),
   );
 
 /** A cut chip, by the accessible name FilterChips builds from label and count. */
@@ -289,6 +293,15 @@ describe("given the directory's people tab", () => {
 
       expect(cut(/^Invited/)).toHaveAttribute("aria-pressed", "true");
       expect(screen.getAllByTestId("invite-row")).toHaveLength(3);
+    });
+  });
+
+  describe("when join requests are switched off", () => {
+    it("shows no Waiting to join cut, and a link to it lands on everybody", () => {
+      renderPeople({ people: "waiting" }, new Set());
+
+      expect(screen.queryByRole("button", { name: /^Waiting to join/ })).not.toBeInTheDocument();
+      expect(cut(/^Everybody/)).toHaveAttribute("aria-pressed", "true");
     });
   });
 

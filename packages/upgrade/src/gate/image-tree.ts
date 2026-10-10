@@ -2,7 +2,7 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import type { ManifestStep } from "../manifest/manifest.ts";
+import type { ManifestStep, ReleaseManifest } from "../manifest/manifest.ts";
 import {
   gooseStepId,
   prismaStepId,
@@ -57,6 +57,23 @@ export function imageGateSteps({
   };
 }
 
+/**
+ * The release this image is (IMAGE-IDENTITY): the newest stamped manifest only when the tree
+ * ships no step beyond the stamped ones, else null, "unreleased".
+ * Spec: specs/upgrade/release-manifests.feature.
+ */
+export function imageRelease({
+  manifests,
+  tree,
+}: {
+  manifests: readonly ReleaseManifest[];
+  tree: ReleaseTreeSteps;
+}): string | null {
+  const stamped = new Set(manifests.flatMap((manifest) => manifest.steps.map(({ id }) => id)));
+  const unstamped = [...treeStepIds({ tree })].some((id) => !stamped.has(id));
+  return unstamped ? null : (manifests.at(-1)?.release ?? null);
+}
+
 /** Every Prisma folder and goose file this image ships, as steps (ids per blitz plan 5.3). */
 export function imageSteps({
   release,
@@ -82,7 +99,7 @@ const CONTRACT_NOTE = /--[ \t]*contract:[ \t]*retired in[ \t]+\S+/i;
 const AFTER_NOTE = /^[ \t]*--[ \t]*after:[ \t]*(\S+)/gim;
 
 /** A contract's `-- archive: <table>`: a table it drops, archived first (Alex, 2026-10-09). */
-const ARCHIVE_NOTE = /^[ \t]*--[ \t]*archive:[ \t]*(\S+)/gim;
+const ARCHIVE_NOTE = /^[ \t]*--[ \t]*archive:[ \t]*(?!none\b)(\S+)/gim;
 
 /** Each schema step whose SQL carries `-- contract: retired in <release>`, with that SQL. */
 function readContractSql({

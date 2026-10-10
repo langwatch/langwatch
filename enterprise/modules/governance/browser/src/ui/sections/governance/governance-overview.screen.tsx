@@ -54,7 +54,16 @@ function GovernanceOverviewPage() {
   return (
     <GovernanceLayout pageTitle="AI Governance · LangWatch">
       <PageLayout.Container>
-        <VStack align="stretch" gap={8} width="full" maxW={HOME_MEASURE} marginX="auto">
+        {/* zIndex 1 is load-bearing: the stacking context the hero's zIndex -1 light sits in. */}
+        <VStack
+          align="stretch"
+          gap={8}
+          width="full"
+          maxW={HOME_MEASURE}
+          marginX="auto"
+          position="relative"
+          zIndex={1}
+        >
           <HStack gap={2} height="48px">
             <PageLayout.Heading>AI Governance</PageLayout.Heading>
             <Badge colorPalette="purple" size="sm" variant="surface">

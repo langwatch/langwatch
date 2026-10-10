@@ -27,7 +27,17 @@ type TenancyInput struct {
 	Seed   int64
 	Anchor time.Time
 	Cloud  bool
+	// Volume is "S" (default) or "M": seedgen's medium tier shape, 12 organizations and 48 projects.
+	Volume string
 }
+
+// volume is how many rows each tier lays out.
+type volume struct{ orgs, teams, projects, users int }
+
+var volumes = map[string]volume{"": {3, 6, 12, 40}, "S": {3, 6, 12, 40}, "M": {12, 24, 48, 400}}
+
+// subscriptionStatuses cycle over M's organizations: the rare states main can hold besides ACTIVE.
+var subscriptionStatuses = []string{"ACTIVE", "ACTIVE", "PENDING", "FAILED", "CANCELLED"}
 
 // Tenancy is the S tier's organizations, teams, projects and users, ids snap_<cell>_<kind>_<n>.
 type Tenancy struct {
@@ -68,8 +78,8 @@ type User struct {
 
 // Subscription is one ACTIVE paid subscription row (cloud shapes only).
 type Subscription struct {
-	ID, OrganizationID, Plan string
-	StartDate                time.Time
+	ID, OrganizationID, Plan, Status string
+	StartDate                        time.Time
 }
 
 // PickParams are the three things a draw derives from, and its range [0, N).
@@ -92,6 +102,7 @@ type tenancyBuilder struct {
 	cell     string
 	start    time.Time
 	orgCount int
+	size     volume
 }
 
 func (builder tenancyBuilder) id(kind string, n int) string {
@@ -107,11 +118,12 @@ func (builder tenancyBuilder) pick(kind string, n, size int) int {
 	return Pick(PickParams{Seed: builder.input.Seed, Kind: kind, Index: n, N: size})
 }
 
-// BuildTenancy lays out the S tier: 3 organizations (hybrid 4), 6 teams, 12 projects, 40 users.
+// BuildTenancy lays out the tier: S is 3 organizations (hybrid 4), 6 teams, 12 projects, 40 users; M is 12 (hybrid 14), 24, 48, 400.
 func BuildTenancy(input TenancyInput) Tenancy {
-	builder := tenancyBuilder{input: input, cell: strings.ReplaceAll(input.Shape, "-", ""), start: input.Anchor.AddDate(0, -1, 0), orgCount: 3}
+	size := volumes[input.Volume]
+	builder := tenancyBuilder{input: input, cell: strings.ReplaceAll(input.Shape, "-", ""), start: input.Anchor.AddDate(0, -1, 0), orgCount: size.orgs, size: size}
 	if input.Shape == "hybrid" {
-		builder.orgCount = 4
+		builder.orgCount++
 	}
 	tenancy := Tenancy{Cell: builder.cell, withVerified: input.Cloud}
 	tenancy.Organizations = builder.organizations()
@@ -137,8 +149,12 @@ func (builder tenancyBuilder) organizations() []Organization {
 func (builder tenancyBuilder) subscriptions() []Subscription {
 	var subscriptions []Subscription
 	for n := 1; n <= builder.orgCount; n++ {
+		status := "ACTIVE"
+		if builder.input.Volume == "M" {
+			status = subscriptionStatuses[(n-1)%len(subscriptionStatuses)]
+		}
 		subscriptions = append(subscriptions, Subscription{
-			ID: builder.id("sub", n), OrganizationID: builder.id("org", n), Plan: paidPlans[builder.pick("sub", n, len(paidPlans))], StartDate: builder.instant("sub", n),
+			ID: builder.id("sub", n), OrganizationID: builder.id("org", n), Plan: paidPlans[builder.pick("sub", n, len(paidPlans))], Status: status, StartDate: builder.instant("sub", n),
 		})
 	}
 	return subscriptions
@@ -146,7 +162,7 @@ func (builder tenancyBuilder) subscriptions() []Subscription {
 
 func (builder tenancyBuilder) users() []User {
 	var users []User
-	for n := 1; n <= 40; n++ {
+	for n := 1; n <= builder.size.users; n++ {
 		state := userStates[(n-1)%len(userStates)]
 		if n > len(userStates) {
 			state = userStates[builder.pick("user", n, len(userStates))]
@@ -165,7 +181,7 @@ func (builder tenancyBuilder) users() []User {
 
 func (builder tenancyBuilder) teams() []Team {
 	var teams []Team
-	for n := 1; n <= 6; n++ {
+	for n := 1; n <= builder.size.teams; n++ {
 		org := (n-1)%builder.orgCount + 1
 		team := Team{ID: builder.id("team", n), Name: fmt.Sprintf("Snapshot Team %d", n), Slug: fmt.Sprintf("snap-%s-team-%d", builder.cell, n),
 			OrganizationID: builder.id("org", org), CreatedAt: builder.instant("team", n)}
@@ -179,7 +195,7 @@ func (builder tenancyBuilder) teams() []Team {
 
 func (builder tenancyBuilder) projects(teams []Team) []Project {
 	var projects []Project
-	for n := 1; n <= 12; n++ {
+	for n := 1; n <= builder.size.projects; n++ {
 		team := &teams[(n-1)%len(teams)]
 		projects = append(projects, Project{
 			ID: builder.id("project", n), Name: fmt.Sprintf("Snapshot Project %d", n), Slug: fmt.Sprintf("snap-%s-project-%d", builder.cell, n),

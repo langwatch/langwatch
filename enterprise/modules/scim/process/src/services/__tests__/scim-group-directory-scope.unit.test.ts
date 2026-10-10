@@ -13,6 +13,7 @@ import { fromDate } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
 import { GrantsFake } from "../../__tests__/support/grants-fake.ts";
+import { MemoryScimRepository } from "../../repositories/memory/memory.scim.repository.ts";
 import type {
   ScimGroupMembershipRecord,
   ScimGroupRecord,
@@ -396,6 +397,48 @@ describe("a group belongs to the connection that pushed it", () => {
 
       expect(refusal).toBeInstanceOf(ScimWriteOutsideConnectionError);
       expect(repository.renameGroup).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when a directory token names a group made in LangWatch", () => {
+    function langwatchGroup() {
+      const repository = MemoryScimRepository.create();
+      repository.groups.push(group({ scimSource: null, connectionId: null }));
+
+      return { repository, service: serviceOver(repository) };
+    }
+    const scope = { externalScimId: "group-1", organizationId: ORGANIZATION, connectionId: OKTA };
+
+    /** @scenario "A group made in LangWatch is out of a directory token's reach by id" */
+    it("answers not found to a read, a patch and a delete, and leaves the group as it was", async () => {
+      const { repository, service } = langwatchGroup();
+      const patchRequest = {
+        schemas: ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+        Operations: [{ op: "replace" as const, path: "displayName", value: "Renamed" }],
+      };
+
+      const refusals = await Promise.all([
+        service.getGroup(scope).catch((error: unknown) => error),
+        service.updateGroup({ ...scope, patchRequest }).catch((error: unknown) => error),
+        service.deleteGroup(scope).catch((error: unknown) => error),
+      ]);
+
+      for (const refusal of refusals) {
+        expect(refusal).toBeInstanceOf(ScimProtocolError);
+        expect((refusal as ScimProtocolError).response.status).toBe("404");
+      }
+      expect(repository.groups).toEqual([group({ scimSource: null, connectionId: null })]);
+    });
+
+    /** @scenario "A group made in LangWatch is out of a directory token's reach by id" */
+    it("stays out of reach of a token that belongs to no connection", async () => {
+      const { service } = langwatchGroup();
+
+      const refusal = await service
+        .getGroup({ ...scope, connectionId: null })
+        .catch((error: unknown) => error);
+
+      expect((refusal as ScimProtocolError).response.status).toBe("404");
     });
   });
 

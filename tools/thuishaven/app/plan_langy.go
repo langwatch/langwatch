@@ -144,7 +144,7 @@ func (o *Orchestrator) langyChild(st domain.Stack, opts PlanOptions, base []stri
 			// accepted reduced isolation (troubleshooting gotcha 3).
 			"LANGY_EGRESS_REQUIRE_TLS=false",
 			// The manager spawns this worktree's own built wrapper binary
-			// (`pnpm --filter @langwatch/langyworker build:binary`). Without an
+			// (`nx run @langwatch/langyworker:build:binary`). Without an
 			// explicit path it falls back to bare `langy-worker` on PATH, which
 			// no dev machine has: every spawn then fails with exec-not-found,
 			// which reads as a bug instead of a setup gap.
@@ -153,7 +153,7 @@ func (o *Orchestrator) langyChild(st domain.Stack, opts PlanOptions, base []stri
 	}
 }
 
-const langyWorkerBuildCommand = "pnpm --filter @langwatch/langyworker build:binary"
+const langyWorkerBuildCommand = nxCacheEnv + "pnpm exec nx run @langwatch/langyworker:build:binary --outputStyle=static"
 
 func langyWorkerBinaryPath(repoRoot string) string {
 	return filepath.Join(repoRoot, ".bin", "langy-worker", "langy-worker")
@@ -167,7 +167,7 @@ func (o *Orchestrator) ensureLangyWorkerBinary(ctx context.Context, st domain.St
 		return
 	}
 	if _, err := exec.LookPath("bun"); err != nil {
-		fmt.Println("  langyagent: bun is missing: run `haven install`. Langy is off for this run.")
+		fmt.Println("  langyagent: bun is missing: run `haven self install`. Langy is off for this run.")
 		o.log.Warn("bun is missing — skipping langyagent", zap.Error(err))
 		opts.Selection.Langy = false
 		return

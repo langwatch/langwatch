@@ -3,7 +3,11 @@
  * namespace: the run belongs to experiment, the address to the public API.
  * Spec: modules/experiment/specs/workflow-evaluation-trigger.feature.
  */
-import { defineRestRouter, MANAGEMENT_API_VERSION, projectRestFacts } from "@langwatch/api/rest";
+import {
+  defineRestRouter,
+  MANAGEMENT_API_VERSION,
+  projectRequestContext,
+} from "@langwatch/api/rest";
 import {
   ExperimentApi,
   experimentWorkflowEvaluateParamsSchema,
@@ -52,7 +56,7 @@ export const experimentWorkflowEvaluationRest = defineRestRouter(ExperimentApi)
       { status: 422, description: "The body failed validation" },
     ],
   })
-  .withMiddleware(projectRestFacts)
+  .withMiddlewareContext(projectRequestContext)
   .handle(async ({ app, input, scope }, project) => {
     logger.info(
       { projectId: scope.id, workflowId: input.id },

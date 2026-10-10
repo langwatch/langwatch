@@ -154,7 +154,7 @@ fatter turns**, not a warmer cache.
   `rtk grep`) and passes through the ones it has no filter for. It is optional
   here and not on every machine, so check `command -v rtk` once and prefix from
   then on; unprefixed is correct when it is absent, and `rtk` on a machine
-  without it is `command not found` and a wasted turn. `haven install` offers
+  without it is `command not found` and a wasted turn. `haven self install` offers
   to install it.
 
 **Do not let one tool call outlive the prompt cache.** The cache TTL depends on

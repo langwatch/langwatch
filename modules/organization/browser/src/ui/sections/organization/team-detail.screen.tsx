@@ -23,6 +23,7 @@ import { useCallback, useEffect, useState } from "react";
 import { type SubmitHandler, useForm, useWatch } from "react-hook-form";
 import { useDebouncedCallback } from "use-debounce";
 
+import { applyHandledErrorToForm } from "../../../behavior/handled-error-form.tsx";
 import { api, type RouterOutputs } from "../../../behavior/organization-api.ts";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
 import { useOrganizationHost } from "../../../model/organization-host.ts";
@@ -113,13 +114,21 @@ export default function TeamDetailScreen() {
     if (trpcErrorCode(error) === "UNAUTHORIZED") {
       return (
         <VStack gap={4} align="start">
-          <PermissionAlert
-            permission="team:view"
-            message="You don't have permission to view this team. Please contact your team administrator for access."
-          />
+          <PermissionAlert permission="team:view" area="this team" />
         </VStack>
       );
     }
+  }
+
+  if (trpcErrorCode(team.error) === "NOT_FOUND") {
+    return (
+      <VStack gap={2} align="start">
+        <Heading as="h1">Team not found</Heading>
+        <Text color="fg.muted">
+          This team does not exist, or it was archived. Pick another from the Teams list.
+        </Text>
+      </VStack>
+    );
   }
 
   // Handle loading state
@@ -199,6 +208,8 @@ function EditTeam({ team }: { team: TeamWithProjectsAndMembers }) {
    * that silently did not happen.
    */
   function reportTeamSaveFailure(error: unknown): void {
+    // A refused name stays typed, with the reason under it, so it can be fixed in place.
+    if (applyHandledErrorToForm({ error, form })) return;
     restorePersistedTeamValues();
 
     const code = trpcErrorCode(error);

@@ -57,6 +57,19 @@ Feature: One event is read by id through a narrow seat beside the event store
       Then the statement names the tenant first and the whole stream key
       And it keeps rows with no occurred time and rows within two days either side of the id's time
 
+  Rule: The seat answers one aggregate's stream for identity's history panels (WEB-9103)
+
+    @unit
+    Scenario: One aggregate's stream is answered whole, whatever its age
+      Given an aggregate whose event was recorded a month ago
+      When the seat is asked for that tenant's aggregate stream
+      Then every event of the stream is answered, oldest first
+
+    @unit
+    Scenario: Another tenant's stream answers nothing
+      When another tenant, or an empty aggregate id, asks the seat for a stream
+      Then no event is answered
+
   Rule: A producer composes the seat beside its refusing store
 
     @integration

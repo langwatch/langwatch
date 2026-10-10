@@ -1559,7 +1559,9 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     authorization: Authorization;
     traceId: string;
   } & OccurredAtHint): Promise<SpanLangwatchSignalsRow[]> {
-    return this.readTraceSpans<SpanLangwatchSignalsRow[]>(
+    // Emptiness is judged on the rows ClickHouse returned, before the signal-less
+    // spans are dropped: a trace with no signals is not a stale hint.
+    const bySpan = await this.readTraceSpans<SpanLangwatchSignalsRow[]>(
       { authorization, traceId, occurredAtMs },
       (rows) => rows.length === 0,
       async (window) => {
@@ -1605,15 +1607,15 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
         const rows = signalsRowsSchema.parse(await result.json());
 
         const validBuckets = new Set<string>(LANGWATCH_SIGNAL_BUCKETS);
-        return rows
-          .filter((r) => Array.isArray(r.Signals) && r.Signals.length > 0)
-          .map((r) => ({
-            spanId: r.SpanId,
-            signals: r.Signals.filter((s): s is LangwatchSignalBucket => validBuckets.has(s)),
-          }))
-          .filter((r) => r.signals.length > 0);
+        return rows.map((r) => ({
+          spanId: r.SpanId,
+          signals: Array.isArray(r.Signals)
+            ? r.Signals.filter((s): s is LangwatchSignalBucket => validBuckets.has(s))
+            : [],
+        }));
       },
     );
+    return bySpan.filter((r) => r.signals.length > 0);
   }
 
   async listSpansPaginated({

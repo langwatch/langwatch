@@ -66,7 +66,8 @@ export function EvaluatorReplicateDialog({
 
   return (
     <Dialog.Root open={open} onOpenChange={({ open: isOpen }) => !isOpen && onClose()}>
-      <Dialog.Content bg="bg" onClick={(event) => event.stopPropagation()}>
+      <Dialog.Content onClick={(event) => event.stopPropagation()}>
+        <Dialog.CloseTrigger />
         <Dialog.Header>
           <Dialog.Title>Replicate Evaluator</Dialog.Title>
         </Dialog.Header>
@@ -116,11 +117,11 @@ export function EvaluatorReplicateDialog({
           </VStack>
         </Dialog.Body>
         <Dialog.Footer>
-          <Button variant="ghost" onClick={onClose}>
+          <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>
           <Button
-            colorPalette="blue"
+            colorPalette="orange"
             onClick={() => void replicate()}
             loading={copyEvaluator.isPending}
             disabled={selected.length === 0 || !chosen?.canCreate}

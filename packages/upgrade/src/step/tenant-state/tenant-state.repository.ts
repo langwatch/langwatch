@@ -10,10 +10,6 @@ import { Temporal } from "@langwatch/time";
 import { type LedgerTableNames, ledgerTables } from "../../ledger-tables.ts";
 import type { UpgradePostgres } from "../../ports.ts";
 
-/** Marks the SQL for the tenancy guard: the ledger describes the installation's upgrade. */
-const TENANCY =
-  "-- @tenancy: per-tenant step state belongs to the installation's upgrade ledger.\n";
-
 type StateRow = {
   status: string;
   report: unknown;
@@ -41,7 +37,7 @@ export class TenantStepStateRepository implements SystemMigrationStateRepository
   }): Promise<TenantMigrationRecord> {
     const table = await this.table();
     const { rows } = await this.postgres.query<StateRow>(
-      `${TENANCY}SELECT "status", "report", "held_reason",
+      `SELECT "status", "report", "held_reason",
         (extract(epoch FROM "held_since") * 1000)::bigint::text AS "held_since_ms"
        FROM ${table} WHERE "step_id" = $1 AND "tenant_id" = $2`,
       [migrationName, tenantId],
@@ -62,7 +58,7 @@ export class TenantStepStateRepository implements SystemMigrationStateRepository
   async hasFinalizedTenant({ migrationName }: { migrationName: string }): Promise<boolean> {
     const table = await this.table();
     const { rows } = await this.postgres.query<{ found: number }>(
-      `${TENANCY}SELECT 1 AS "found" FROM ${table}
+      `SELECT 1 AS "found" FROM ${table}
        WHERE "step_id" = $1 AND "status" = 'finalized' LIMIT 1`,
       [migrationName],
     );
@@ -73,7 +69,7 @@ export class TenantStepStateRepository implements SystemMigrationStateRepository
   async hasUnsettledTenant({ migrationName }: { migrationName: string }): Promise<boolean> {
     const table = await this.table();
     const { rows } = await this.postgres.query<{ found: number }>(
-      `${TENANCY}SELECT 1 AS "found" FROM ${table}
+      `SELECT 1 AS "found" FROM ${table}
        WHERE "step_id" = $1 AND ("status" = 'parked' OR "held_reason" IS NOT NULL) LIMIT 1`,
       [migrationName],
     );
@@ -91,7 +87,7 @@ export class TenantStepStateRepository implements SystemMigrationStateRepository
     const table = await this.table();
     const guard = unlessRolledBack ? `WHERE current."status" <> 'rolled_back'` : "";
     const { rows } = await this.postgres.query<{ step_id: string }>(
-      `${TENANCY}INSERT INTO ${table} AS current
+      `INSERT INTO ${table} AS current
          ("step_id", "tenant_id", "status", "report", "held_reason", "held_since", "updated_at")
        VALUES ($1, $2, $3, $4::jsonb, $5, to_timestamp($6::double precision / 1000), now())
        ON CONFLICT ("step_id", "tenant_id") DO UPDATE SET

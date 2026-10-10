@@ -13,7 +13,6 @@ import {
   Wrap,
 } from "../../primitives.ts";
 import { Select } from "../forms/select.tsx";
-import { SmallLabel } from "../forms/small-label.tsx";
 import { ProviderScopeChips } from "./provider-scope-chips.tsx";
 
 /**
@@ -581,7 +580,11 @@ export function ScopeChipPicker<T extends ScopeChipPickerScopeType = ScopeTriadT
 
   return (
     <VStack align="start" width="full" gap={1.5}>
-      {label && <SmallLabel>{label}</SmallLabel>}
+      {label && (
+        <Text fontSize="sm" fontWeight="medium">
+          {label}
+        </Text>
+      )}
       {(showQuickPicks || singleSelect) && quickPicks.length > 0 && (
         <QuickPickRow
           quickPicks={quickPicks}
@@ -920,7 +923,11 @@ function SingleScopeSelect({
 
   return (
     <VStack align="start" width="full" gap={1.5}>
-      {label && <SmallLabel>{label}</SmallLabel>}
+      {label && (
+        <Text fontSize="sm" fontWeight="medium">
+          {label}
+        </Text>
+      )}
       <Select.Root
         collection={collection}
         value={selected ? [entryKey(selected)] : []}

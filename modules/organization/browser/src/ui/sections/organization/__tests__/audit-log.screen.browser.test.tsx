@@ -62,6 +62,8 @@ function auditRow(overrides: Record<string, unknown> = {}) {
     targetId: null,
     before: null,
     after: null,
+    actorUserId: null,
+    actorUser: null,
     ...overrides,
   };
 }

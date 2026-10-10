@@ -89,6 +89,8 @@ function auditRow(overrides: Record<string, unknown> = {}) {
     targetId: "vk_abcdefghijklmnopqrstuvwxyz",
     before: null,
     after: null,
+    actorUserId: null,
+    actorUser: null,
     ...overrides,
   };
 }
@@ -131,9 +133,9 @@ describe("given an organization below the Enterprise plan", () => {
 });
 
 describe("given an Enterprise organization with a mixed audit history", () => {
-  describe("when the table renders", () => {
+  describe("when the feed renders", () => {
     /** @scenario Settings audit page lists gateway and platform events together */
-    it("shows a gateway row and a platform row with their own Source badges", () => {
+    it("marks the gateway entry as the gateway's and reads each action as a sentence", () => {
       state.auditLogs = [
         auditRow(),
         auditRow({
@@ -148,33 +150,94 @@ describe("given an Enterprise organization with a mixed audit history", () => {
       state.totalCount = 2;
       renderWithOrganizationHost(<AuditLogScreen />, planHost());
 
-      expect(screen.getByText("Gateway")).toBeInTheDocument();
-      expect(screen.getByText("Platform")).toBeInTheDocument();
-      expect(screen.getByText("gateway.virtual_key.created")).toBeInTheDocument();
-      expect(screen.getByText("organization.member.add")).toBeInTheDocument();
+      expect(screen.getAllByLabelText("AI Gateway")).toHaveLength(1);
+      expect(screen.queryByText("Platform")).not.toBeInTheDocument();
+      const [gateway, platform] = screen.getAllByTestId("audit-log-entry");
+      expect(gateway).toHaveTextContent(
+        "Alice created virtual key vk_abcdefghijklmnopqrstuvwxyz in Web App",
+      );
+      expect(within(gateway!).getByText("gateway.virtual_key.created")).toBeInTheDocument();
+      expect(platform).toHaveTextContent("Alice added member");
     });
 
-    /** @scenario Settings audit page lists gateway and platform events together */
-    it("shows the gateway row's target kind and a truncated id", () => {
-      state.auditLogs = [auditRow()];
+    /** @scenario Every entry says where it came from */
+    it("shows the address and the browser on every entry", () => {
+      state.auditLogs = [
+        auditRow({
+          userAgent:
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36",
+        }),
+      ];
       state.totalCount = 1;
       renderWithOrganizationHost(<AuditLogScreen />, planHost());
 
-      expect(screen.getByText("virtual_key")).toBeInTheDocument();
-      // Sixteen characters and an ellipsis. The full id is 29 long, so a cell
-      // that rendered it whole would fail here rather than merely look wide.
-      expect(screen.getByText(/^vk_abcdefghijklm/)).toBeInTheDocument();
-      expect(screen.queryByText(/vwxyz/)).not.toBeInTheDocument();
+      expect(screen.getByText("203.0.113.9")).toBeInTheDocument();
+      expect(screen.getByText("Chrome on macOS")).toBeInTheDocument();
     });
 
-    /** @scenario Settings audit page lists gateway and platform events together */
-    it("names the project a scoped row belongs to", () => {
-      state.auditLogs = [auditRow()];
+    /** @scenario A change reads inline as its fields, old to new */
+    it("summarises the change inline and opens the full diff on request", async () => {
+      state.auditLogs = [
+        auditRow({ before: { baseUrl: "api.openai.com" }, after: { baseUrl: "llmsim.local" } }),
+      ];
       state.totalCount = 1;
       renderWithOrganizationHost(<AuditLogScreen />, planHost());
 
-      const table = screen.getByRole("table");
-      expect(within(table).getByText("Web App")).toBeInTheDocument();
+      expect(screen.getByText("base url")).toBeInTheDocument();
+      expect(screen.getByText("api.openai.com")).toBeInTheDocument();
+      expect(screen.getByText("llmsim.local")).toBeInTheDocument();
+      expect(screen.queryByTestId("audit-log-detail")).not.toBeInTheDocument();
+
+      await userEvent.click(screen.getByRole("button", { name: "View diff" }));
+
+      const detail = screen.getByTestId("audit-log-detail");
+      expect(within(detail).getByText("Before")).toBeInTheDocument();
+      expect(within(detail).getByText("After")).toBeInTheDocument();
+      expect(within(detail).getByText("audit-1")).toBeInTheDocument();
+    });
+
+    /** @scenario A failed attempt reads as a failure */
+    it("carries the error on its own red line", () => {
+      state.auditLogs = [auditRow({ error: "FORBIDDEN: not allowed" })];
+      state.totalCount = 1;
+      renderWithOrganizationHost(<AuditLogScreen />, planHost());
+
+      expect(screen.getByText("Failed")).toBeInTheDocument();
+      expect(screen.getByTestId("audit-log-error")).toHaveTextContent("FORBIDDEN: not allowed");
+    });
+
+    /** @scenario A burst of identical events by one actor reads as one row */
+    it("folds three identical consecutive events into one entry marked ×3", async () => {
+      state.auditLogs = ["a", "b", "c"].map((id) => auditRow({ id }));
+      state.totalCount = 3;
+      renderWithOrganizationHost(<AuditLogScreen />, planHost());
+
+      expect(screen.getAllByTestId("audit-log-entry")).toHaveLength(1);
+      await userEvent.click(screen.getByRole("button", { name: "Show all 3 repeats" }));
+      expect(screen.getAllByTestId("audit-log-repeat")).toHaveLength(2);
+    });
+
+    /** @scenario An impersonated entry names the operator as well as the person */
+    it("reads the operator as the person", () => {
+      state.auditLogs = [
+        auditRow({
+          actorUserId: "op-1",
+          actorUser: { id: "op-1", name: "Admin", email: "admin@example.com" },
+        }),
+      ];
+      state.totalCount = 1;
+      renderWithOrganizationHost(<AuditLogScreen />, planHost());
+
+      expect(screen.getByTestId("audit-log-entry")).toHaveTextContent(/^.*Admin as Alice created/);
+    });
+
+    /** @scenario The feed reads by day */
+    it("heads the entries with their day", () => {
+      state.auditLogs = [auditRow({ createdAt: new Date() })];
+      state.totalCount = 1;
+      renderWithOrganizationHost(<AuditLogScreen />, planHost());
+
+      expect(screen.getByRole("region", { name: "Today" })).toBeInTheDocument();
     });
 
     /** @scenario A row written by a system actor says so rather than naming nobody */
@@ -204,6 +267,21 @@ describe("given an Enterprise organization with a mixed audit history", () => {
 
       expect(screen.getByText("No audit logs found")).toBeInTheDocument();
     });
+  });
+});
+
+describe("given a user search that names nobody in the organization", () => {
+  it("lists no entries instead of every entry", () => {
+    state.members = [{ userId: "u-1", user: { name: "Alice", email: "alice@example.com" } }];
+    state.auditLogs = [auditRow()];
+    state.totalCount = 1;
+
+    renderWithOrganizationHost(
+      <AuditLogScreen />,
+      planHost({ query: { userSearch: "nobody@none.test" } }),
+    );
+
+    expect(screen.getByText("No audit logs found")).toBeInTheDocument();
   });
 });
 

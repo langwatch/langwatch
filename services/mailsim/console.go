@@ -47,7 +47,7 @@ type inboxInfo struct {
 	SMTPAddr   string `json:"smtpAddr"`
 	BaseURL    string `json:"baseUrl"`
 	Persistent bool   `json:"persistent"`
-	// Address is the stack's own inbox address, as `haven mail address` prints
+	// Address is the stack's own inbox address, as `haven sim mail address` prints
 	// it; a standalone sink has none and answers "".
 	Address string `json:"address"`
 }

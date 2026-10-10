@@ -8,6 +8,7 @@ import {
 } from "@langwatch/dashboard-contract";
 import { describe, expect, it } from "vitest";
 
+import type { DashboardService } from "../dashboard.service.ts";
 import { SavedViewService } from "../saved-view.service.ts";
 
 type Call = { method: string } & Record<string, unknown>;
@@ -61,7 +62,26 @@ const seeded = (names: string[]) =>
   names.map((name, index) => ({ id: `view-${index}`, name, order: index, userId: null }));
 
 describe("SavedViewService.getAll", () => {
+  describe("given a caller that does not say whether the project takes writes", () => {
+    /** @scenario "A read that seeds defaults must be told whether the project takes writes" */
+    it("does not compile, for the views nor the first dashboard", () => {
+      const { service } = serviceWith({ count: 0, existing: [] });
+      const withoutTheFlag = [
+        // @ts-expect-error acceptsWrites is required, so omitting it is a type error
+        () => service.getAll({ projectId: "project-1" }),
+      ];
+      // @ts-expect-error acceptsWrites is required on the dashboard seed too
+      const firstDashboard: Parameters<DashboardService["getOrCreateFirst"]>[0] = {
+        projectId: "project-1",
+      };
+
+      expect(withoutTheFlag).toHaveLength(1);
+      expect(firstDashboard.projectId).toBe("project-1");
+    });
+  });
+
   describe("given a project that takes no writes (an aggregate)", () => {
+    /** @scenario "A read that seeds defaults must be told whether the project takes writes" */
     it("seeds nothing and returns what exists", async () => {
       const { service, calls } = serviceWith({ count: 0, existing: [] });
 

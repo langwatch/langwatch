@@ -137,7 +137,7 @@ func (f *fakeStore) AppendRunHistory(rec domain.RunRecord) error {
 }
 func (f *fakeStore) RunHistory() []domain.RunRecord { return f.runHistory }
 
-// fakeClaudeSettings records what `haven setup` asked to install.
+// fakeClaudeSettings records what `haven self setup` asked to install.
 type fakeClaudeSettings struct {
 	root    string
 	command string

@@ -9,13 +9,16 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { TraceCanonicalisationService } from "#features/derivation/services/trace-canonicalisation.service";
 
+import { ownProof } from "../../../../../__tests__/support/authorization-proofs.fixture.ts";
 import { traceSummaryRow } from "../../../../../repositories/clickhouse/__tests__/support/trace-summary-row.support.ts";
 import { blobStoreResolving } from "../../../../../services/__tests__/support/trace-blob-store.support.ts";
 import { TraceOffloadResolutionService } from "../../../../../services/trace-offload-resolution.service.ts";
 import { TraceIOExtractionService } from "../../../../derivation/services/trace-io-extraction.service.ts";
 import type { TraceBlobStoreService } from "../../../../media/services/trace-blob-store.service.ts";
 import type { ResolveTraceSpansFn } from "../../trace-legacy-read.repository.ts";
-import type * as traceLegacyReadRepositoryModule from "../trace-legacy-read.repository.ts";
+import { mappedLegacyRead } from "./support/legacy-trace-mapping.support.ts";
+
+const OWN_READ = ownProof({ projectId: "proj-1" });
 
 // ---------------------------------------------------------------------------
 // Hoisted mocks — mock only the CH SQL boundary
@@ -156,16 +159,12 @@ function setupGetTracesWithSpansMocks(traceId: string, spanId: string) {
 // ---------------------------------------------------------------------------
 
 describe("TraceLegacyReadClickHouseRepository — eventref resolution seam (ADR-022)", () => {
-  let TraceLegacyReadClickHouseRepository: typeof traceLegacyReadRepositoryModule.TraceLegacyReadClickHouseRepository;
   let blobStore: TraceBlobStoreService;
   let resolveTraceSpansFn: ResolveTraceSpansFn;
   let traceCanonicalisation: TraceCanonicalisationService;
 
   beforeEach(async () => {
     vi.clearAllMocks();
-
-    const mod = await import("../trace-legacy-read.repository.ts");
-    TraceLegacyReadClickHouseRepository = mod.TraceLegacyReadClickHouseRepository;
 
     blobStore = blobStoreResolving({ "langwatch.output": fullOutput });
     traceCanonicalisation = TraceCanonicalisationService.create();
@@ -193,7 +192,7 @@ describe("TraceLegacyReadClickHouseRepository — eventref resolution seam (ADR-
         it("strips the reserved eventref attr from the returned span", async () => {
           setupGetTracesWithSpansMocks("trace-1", "span-1");
 
-          const service = new TraceLegacyReadClickHouseRepository({
+          const service = mappedLegacyRead({
             resolveClickHouseClient: testResolveClickHouseClient,
             resolveTraceSpans: resolveTraceSpansFn,
             traceCanonicalisation,
@@ -201,6 +200,7 @@ describe("TraceLegacyReadClickHouseRepository — eventref resolution seam (ADR-
 
           // Per-call gate (#4888): resolution fires only when resolveBlobs:true.
           const traces = await service.findTracesWithSpans({
+            authorization: OWN_READ,
             projectId: "proj-1",
             traceIds: ["trace-1"],
             protections,

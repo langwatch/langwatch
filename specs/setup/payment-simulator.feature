@@ -162,7 +162,14 @@ Feature: paymentsim, a local stand-in for Stripe
     @unit
     Scenario: haven up says which Stripe billing talks to
       When `haven up` starts a stack
-      Then it prints "Stripe: paymentsim", or "Stripe: your key from .env" when a Stripe key is set
+      Then it prints "Stripe: paymentsim", "Stripe: your test key from .env" when a Stripe key is set, or "Stripe: custom base <url>" when STRIPE_API_BASE is set
+
+    @unit
+    Scenario: haven refuses a live Stripe key
+      Given STRIPE_SECRET_KEY in .env or the shell starts with sk_live_ or rk_live_
+      When `haven up` runs
+      Then it refuses to start the stack and names STRIPE_SECRET_KEY without printing its value
+      And it says to use a test key (sk_test_) or remove it to get paymentsim
 
     @unit
     Scenario: A dev build hosts paymentsim in the combined process

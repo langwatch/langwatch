@@ -1,4 +1,5 @@
 import { ListTable } from "@langwatch/design-system/list-table";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { Pagination } from "@langwatch/design-system/pagination";
 import { Skeleton, Table, Text, VStack } from "@langwatch/design-system/primitives";
 import { SquareTerminal } from "lucide-react";
@@ -27,7 +28,6 @@ import {
 import { SessionRow } from "../blocks/session-row.tsx";
 import { SessionsTableHeader } from "../blocks/sessions-table-header.tsx";
 import { SessionsToolbar } from "../blocks/sessions-toolbar.tsx";
-import { NoDataInfoBlock } from "../elements/no-data-info-block.tsx";
 import { PullRequestDetailDrawer } from "./pull-request-detail-drawer.tsx";
 
 /** Sessions table (last quarter); answers "on what" for spend. Replays in terminal. */

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 /** What one reconcile of an aggregate writes: members to attach, reads to revoke, the rest. */
-export type AggregateMembershipDecision = {
+type AggregateMembershipDecision = {
   attach: string[];
   revoke: string[];
   unchanged: string[];

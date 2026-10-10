@@ -367,6 +367,7 @@ describe("langyPlan", () => {
   });
 
   describe("given a turn with no in-progress step", () => {
+    /** @scenario "The checklist survives a reload" */
     it("reports currentIndex -1", () => {
       const message = {
         parts: [

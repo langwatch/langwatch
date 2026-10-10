@@ -1,7 +1,7 @@
 /**
- * The unsubscribe landing (public, no auth guard; ADR-031). Token passed as
- * prop for authorization; offers two unsubscribe scopes: this notification or
- * entire project. Spec: specs/automations/unsubscribe-landing.feature
+ * The unsubscribe landing (public, no auth guard; ADR-031). The link's
+ * `token` query key is the authorization; offers two unsubscribe scopes: this
+ * notification or entire project. Spec: specs/automations/unsubscribe-landing.feature
  */
 
 import { Link } from "@langwatch/browser-host/link";
@@ -11,11 +11,13 @@ import { useState } from "react";
 
 import { automationApi } from "../../behavior/automation-api.ts";
 import { useUnsubscribeTarget } from "../../behavior/use-automation-reads.ts";
+import { useAutomationHost } from "../../model/automation-host.ts";
 
 /** Which of the two promises in the footer link the recipient took. */
 export type UnsubscribeScope = "trigger" | "project";
 
-export default function UnsubscribeScreen({ token }: { token: string }) {
+export default function UnsubscribeScreen() {
+  const token = useAutomationHost().route().query.token ?? "";
   const [done, setDone] = useState<UnsubscribeScope | null>(null);
 
   const resolved = useUnsubscribeTarget({ token });

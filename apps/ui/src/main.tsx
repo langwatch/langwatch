@@ -9,7 +9,11 @@ import type {
 } from "@langwatch/browser-host/capabilities";
 import type { UiDrawerRegistry } from "@langwatch/browser-host/drawer";
 import { BrowserUiFeedback } from "@langwatch/browser-host/feedback";
-import { registerChunkReloadListener, signalUiMounted } from "@langwatch/browser-host/navigation";
+import {
+  registerChunkReloadListener,
+  reloadOnBundleSwap,
+  signalUiMounted,
+} from "@langwatch/browser-host/navigation";
 import { SessionVersionWatch, sessionVersionFetch } from "@langwatch/browser-host/session-version";
 import {
   createUiApplication,
@@ -242,6 +246,8 @@ class BrowserUiShell extends UiShell {
     // Before the first render, so a `?ff_` link opens straight onto the screen it names.
     applyFeatureFlagOverridesFromSearch(window.location.search);
     registerChunkReloadListener();
+    // Only a page a `haven up --ui=watch` stack served polls; every other returns at once.
+    reloadOnBundleSwap();
   }
 
   render(): ReactNode {

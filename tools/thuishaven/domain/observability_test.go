@@ -49,6 +49,9 @@ func TestObservabilityEnvEnablesBrowserTelemetryWithTheStack(t *testing.T) {
 	}
 
 	up := Stack{Slug: "portless", ObservabilityOTLPPort: 4318}
+	if got := valueOf(up.OverlayEnv(), "RUM_COLLECTOR_ENDPOINT"); got == "" {
+		t.Error("RUM_COLLECTOR_ENDPOINT must be set so the rum module does not warn about the deprecated OTEL fallback")
+	}
 	if got := valueOf(up.OverlayEnv(), "RUM_ENABLED"); got != "true" {
 		t.Errorf("RUM_ENABLED = %q, want true", got)
 	}

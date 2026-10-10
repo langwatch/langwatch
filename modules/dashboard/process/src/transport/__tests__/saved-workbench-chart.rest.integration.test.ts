@@ -13,7 +13,11 @@ import {
 } from "@langwatch/analytics-contract";
 import { VEGA_LITE_SCHEMA_URL } from "@langwatch/analytics-contract/visualization/validation";
 import { createLangWatchQLService } from "@langwatch/analytics-process/testing";
-import { bindRestMiddleware, createRestRuntime, canonicalErrorResponse } from "@langwatch/api/rest";
+import {
+  bindMiddlewareContext,
+  createRestRuntime,
+  canonicalErrorResponse,
+} from "@langwatch/api/rest";
 import { PermissionDeniedError } from "@langwatch/authorization";
 import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it, vi } from "vitest";
@@ -99,9 +103,9 @@ function mountKey({
   });
   const hono = runtime.mount(savedWorkbenchChartRest.router(), {
     app: () => app,
-    facts: [
-      bindRestMiddleware(langWatchQLCallerProtections, () => protections),
-      bindRestMiddleware(savedWorkbenchChartUrl, () => PLATFORM_URL),
+    middlewareContext: [
+      bindMiddlewareContext(langWatchQLCallerProtections, () => protections),
+      bindMiddlewareContext(savedWorkbenchChartUrl, () => PLATFORM_URL),
     ],
     onError: canonicalErrorResponse,
   });

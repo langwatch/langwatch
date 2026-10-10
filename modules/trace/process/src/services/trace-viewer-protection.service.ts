@@ -140,11 +140,56 @@ export class TraceViewerProtectionService {
     }
 
     const restricted = policy.customAttributes.filter((rule) => rule.disposition === "restrict");
-    const anonymous = input.publiclyShared || input.userId === undefined;
-    const groupIds = anonymous
-      ? []
-      : await this.groupIdsFor({ policy, projectId: input.projectId, userId: input.userId });
-    const categories = Object.fromEntries(
+    const categories = await this.categoriesFor({
+      policy,
+      projectId: input.projectId,
+      userId: input.userId,
+      anonymous: input.publiclyShared || input.userId === undefined,
+      isAdmin,
+      isMember,
+      isProjectOwner,
+    });
+
+    return {
+      canSeeCosts,
+      canSeeCapturedInput: categories?.input.canSee ?? false,
+      canSeeCapturedOutput: categories?.output.canSee ?? false,
+      capturedInputVisibleTo: categories?.input.restrictVisibleTo ?? null,
+      capturedOutputVisibleTo: categories?.output.restrictVisibleTo ?? null,
+      contentCategories: categories,
+      hiddenAttributes: restricted.map((rule) => ({
+        pattern: rule.pattern,
+        visibleTo: "members of this project",
+      })),
+      restrictedAttributes: restricted.map((rule) => ({
+        pattern: rule.pattern,
+        visibleTo: "members of this project",
+        canSee: false,
+      })),
+      visibilityCutoffMs,
+    };
+  }
+
+  private async categoriesFor({
+    policy,
+    projectId,
+    userId,
+    anonymous,
+    isAdmin,
+    isMember,
+    isProjectOwner,
+  }: {
+    policy: ResolvedDataPrivacy;
+    projectId: string;
+    userId: string | undefined;
+    anonymous: boolean;
+    isAdmin: boolean;
+    isMember: boolean;
+    isProjectOwner: boolean;
+  }): Promise<Protections["contentCategories"]> {
+    const groupIds = anonymous ? [] : await this.groupIdsFor({ policy, projectId, userId });
+
+    return Object.fromEntries(
       CONTENT_CATEGORIES.map((category) => {
         const resolved = policy.categories[category];
         return [
@@ -165,25 +210,6 @@ export class TraceViewerProtectionService {
         ];
       }),
     ) as Protections["contentCategories"];
-
-    return {
-      canSeeCosts,
-      canSeeCapturedInput: categories?.input.canSee ?? false,
-      canSeeCapturedOutput: categories?.output.canSee ?? false,
-      capturedInputVisibleTo: categories?.input.restrictVisibleTo ?? null,
-      capturedOutputVisibleTo: categories?.output.restrictVisibleTo ?? null,
-      contentCategories: categories,
-      hiddenAttributes: restricted.map((rule) => ({
-        pattern: rule.pattern,
-        visibleTo: "members of this project",
-      })),
-      restrictedAttributes: restricted.map((rule) => ({
-        pattern: rule.pattern,
-        visibleTo: "members of this project",
-        canSee: false,
-      })),
-      visibilityCutoffMs,
-    };
   }
 
   /** Whether the viewer owns the project; unknown ownership is not ownership. */

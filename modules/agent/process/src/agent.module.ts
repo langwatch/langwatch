@@ -1,9 +1,5 @@
 import type { AgentApi, AgentServerConfig } from "@langwatch/agent-contract";
-import {
-  bindRestHeader,
-  bindRestMiddleware,
-  projectCredentialOfRequest,
-} from "@langwatch/api/rest";
+import { projectCredentialOfRequest, projectRequestContextOf } from "@langwatch/api/rest";
 import { defineProcessModule, type PublishedProcessModule } from "@langwatch/process";
 import { defineMigrationStep } from "@langwatch/upgrade/step";
 
@@ -15,7 +11,7 @@ import { connectCallerOf } from "#rules/agent-connect-caller.rules";
 import { AgentHttpCredentialsBackfillService } from "#services/agent-http-credentials-backfill.service";
 import { AgentHttpSecretsService } from "#services/agent-http-secrets.service";
 import { AgentService } from "#services/agent.service";
-import { agentConnectCredentials, createAgentConnectRest } from "#transport/agent-connect.rest";
+import { createAgentConnectRest } from "#transport/agent-connect.rest";
 import { createAgentWebSocketProtocol } from "#transport/agent-connect.ws";
 import { agentLegacyRest } from "#transport/agent-legacy.rest";
 import { agentTraceparent, createAgentRest } from "#transport/agent.rest";
@@ -59,10 +55,11 @@ export const agentProcessModule: PublishedProcessModule<"agent", AgentApi, Agent
       }),
     ])
     // The connect caller is what the project door resolved; the rest are request headers.
-    .withTransportFacts(() => [
-      bindRestHeader(agentTraceparent, "traceparent"),
-      bindRestMiddleware(agentConnectCredentials, (context) => ({
-        caller: connectCallerOf(projectCredentialOfRequest(context.req.raw)),
-        instanceToken: context.req.header("x-agent-instance-token"),
-      })),
-    ]);
+    .provideMiddlewareContext({
+      projectRequestContext: projectRequestContextOf,
+      [agentTraceparent.name]: (request) => request.headers.get("traceparent"),
+      agentConnectCredentials: (request) => ({
+        caller: connectCallerOf(projectCredentialOfRequest(request)),
+        instanceToken: request.headers.get("x-agent-instance-token") ?? undefined,
+      }),
+    });

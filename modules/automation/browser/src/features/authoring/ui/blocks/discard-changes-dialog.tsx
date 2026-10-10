@@ -24,6 +24,7 @@ export function DiscardChangesDialog({
       size="sm"
     >
       <Dialog.Content>
+        <Dialog.CloseTrigger />
         <Dialog.Header>
           <Dialog.Title>Discard unsaved changes?</Dialog.Title>
         </Dialog.Header>
@@ -37,7 +38,7 @@ export function DiscardChangesDialog({
         </Dialog.Body>
         <Dialog.Footer>
           <HStack gap={2}>
-            <Button variant="ghost" size="sm" onClick={onKeepEditing}>
+            <Button variant="outline" size="sm" onClick={onKeepEditing}>
               Keep editing
             </Button>
             <Button colorPalette="red" size="sm" onClick={onDiscard}>

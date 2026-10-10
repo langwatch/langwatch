@@ -144,3 +144,16 @@ Feature: Model Provider service
     When the save is refused as a model_provider_invalid error
     Then the error carries the reason "endpoint_not_allowed"
     And the browser explains that the base URL cannot be used
+
+  @unit
+  Scenario: The model costs table filters by text, provider and custom rules
+    Given a list of model costs from several providers, some of them custom
+    When the search text, the provider or custom-only is set
+    Then only the rows whose model or regex contains the text, of that provider, or with a stored rule remain
+
+  @unit
+  Scenario: The model costs table sorts by model, input cost and output cost
+    Given a list of model costs where one has no input rate
+    When a sortable column header is activated once, twice and a third time
+    Then the rows order ascending, then descending, then return to the default order
+    And a row with no rate stays last in both directions

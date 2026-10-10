@@ -2,6 +2,7 @@ import type { Preview } from "@storybook/react-vite";
 
 import "./fonts.css";
 import { DesignSystemProvider } from "../src/provider/index.tsx";
+import { DocsPage } from "./docs-page.tsx";
 
 /**
  * Every story mounts the package's own provider and system, so a story shows
@@ -9,6 +10,7 @@ import { DesignSystemProvider } from "../src/provider/index.tsx";
  * "System" follows the viewer's operating system; the other two pin a mode.
  */
 const preview: Preview = {
+  tags: ["autodocs"],
   globalTypes: {
     colorMode: {
       description: "Design system color mode",
@@ -37,6 +39,31 @@ const preview: Preview = {
       },
     },
     layout: "padded",
+    docs: { page: DocsPage },
+    options: {
+      // The sidebar follows what a developer reaches for, not the folders.
+      storySort: {
+        method: "alphabetical",
+        order: [
+          "Start here",
+          ["Introduction", "Component gallery"],
+          "Foundations",
+          ["Tokens", "Colour", "Typography", "Gradients and brand surfaces", "Icons", "*"],
+          "Primitives",
+          "Inputs and forms",
+          "Data display",
+          "Feedback",
+          "Overlays",
+          "Navigation and layout",
+          "Chrome and app shell",
+          "Brand",
+          "Patterns",
+          ["Using them together", "*"],
+          "Consistency",
+          ["Scoreboard", "*"],
+        ],
+      },
+    },
   },
   decorators: [
     (Story, context) => {

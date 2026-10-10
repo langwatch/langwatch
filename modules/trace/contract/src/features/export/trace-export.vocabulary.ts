@@ -1,4 +1,5 @@
 import { sharedFiltersInputSchema } from "@langwatch/analytics-contract";
+import type { Authorization } from "@langwatch/authorization";
 import { z } from "zod";
 
 import type { TraceSharedFiltersInput } from "../../trace-legacy-read.types.ts";
@@ -63,6 +64,7 @@ export type ExportProgress = z.infer<typeof exportProgressSchema>;
 export type TraceExportDownloadInput = Readonly<{
   request: ExportRequest;
   userId: string;
+  authorization: Authorization;
 }>;
 
 /** A prepared export stream and the facts the HTTP door publishes before its body. */

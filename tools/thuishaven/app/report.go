@@ -155,6 +155,7 @@ func (o *Orchestrator) printStacks(r statusReport) {
 			ram = "  ~" + domain.HumanBytes(int64(treeRSS))
 		}
 		fmt.Printf("%-18s %-6s %s  (%s)%s\n", s.Slug, o.liveness(s), s.Branch, s.WorktreeDir, ram)
+		fmt.Printf("  refresh %s\n", s.Refresh.Name())
 		if s.Mode != "" {
 			fmt.Printf("  mode %s\n", s.EffectiveMode)
 		}
@@ -263,6 +264,8 @@ type stackStatus struct {
 	// metrics port, so a reader asking "is this stack actually running the
 	// whole application" had nowhere to look for it.
 	Lanes []laneStatus `json:"lanes"`
+	// Refresh shadows the record's to always name the mode: still, watch or hmr.
+	Refresh string `json:"refresh"`
 }
 
 // laneStatus is one supervised Node lane plus whether its port answers.
@@ -296,6 +299,7 @@ func (o *Orchestrator) stackStatuses(stacks []domain.Stack) []stackStatus {
 		}
 		out = append(out, stackStatus{
 			Stack:    s,
+			Refresh:  s.Refresh.Name(),
 			Live:     s.LauncherPID != 0 && o.sys.ProcessAlive(s.LauncherPID),
 			Services: svcs,
 			Lanes:    lanes,

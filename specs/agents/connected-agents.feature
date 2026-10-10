@@ -892,10 +892,10 @@ Feature: Connected agents
   Rule: Connected session protocols do not expose raw HTTP capabilities
 
     @unit
-    Scenario: A connected protocol forwards only its declared credential facts
+    Scenario: A connected protocol forwards only its declared middleware context
       Given a connected frame request with an additional secret header
       When the framework invokes the connected protocol
-      Then the App receives parsed frame input and the declared credential facts separately
+      Then the App receives parsed frame input and the declared middleware context separately
       And the additional header and raw request and response are absent
 
     @unit

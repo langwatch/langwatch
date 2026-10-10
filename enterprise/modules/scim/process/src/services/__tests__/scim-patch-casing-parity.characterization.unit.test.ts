@@ -161,8 +161,11 @@ describe("SCIM PATCH operation casing parity", () => {
     expect(repo.saveUserResource).toHaveBeenCalledWith(
       expect.objectContaining({ userId: "user-1", active: false }),
     );
-    // A leaver stays a member holding nothing (scim-connection-sync.feature).
-    expect(members.deleteMember).not.toHaveBeenCalled();
+    // A leaver's membership goes with their access (scim-connection-sync.feature).
+    expect(members.deleteMember).toHaveBeenCalledWith(
+      { organizationId: "org-1", userId: "user-1" },
+      null,
+    );
   });
 
   it("applies a capitalized Replace to group renaming", async () => {

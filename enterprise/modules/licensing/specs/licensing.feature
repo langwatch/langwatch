@@ -321,6 +321,46 @@ Feature: Enterprise licensing lifecycle
       And a managed-key-invalidated fact naming the other key and its organisation
 
     @unit
+    Scenario: Licensing records a managed key's licence as a fact gateway applies
+      Given a licence resolved to its managed key
+      When licensing records the licence that key serves
+      Then it records a managed-key-licence-set fact naming the key, its token's registry hash, the bound install and the term's end, never the token
+      And gateway rewrites that key's licence from the fact, the same values however often it arrives
+
+    @unit
+    Scenario: Licensing records a managed key's services as a fact gateway applies
+      Given a licence resolved to its managed key
+      When licensing records the platform services that key may serve
+      Then it records a managed-key-services-set fact naming the key and the whole service list
+      And gateway replaces that key's services from the fact, the same list however often it arrives
+
+    @unit
+    Scenario: Licensing records the install's hosted provider slot set and cleared as facts
+      Given an organization whose licence names managed models with the service switched on
+      When licensing decides the organization's gateway reaches LangWatch-hosted models, and later that it no longer does
+      Then it records a connect-upstream-set fact and then a connect-upstream-cleared fact, each naming only the organisation
+      And gateway pulls the slot from licensing on the set fact and drops it on the cleared fact, in that order
+
+    @unit
+    Scenario: The install's hosted provider slot falls back to the instance-wide licence
+      Given an organization that holds no licence of its own on a deployment licensed through LANGWATCH_LICENSE_KEY
+      When licensing serves the organization's connect upstream
+      Then the upstream carries the token derived from the instance-wide licence, the install's instance id and the Connect gateway endpoint
+
+    @unit
+    Scenario: Gateway keeps the install's hosted provider slot from licensing's upstream
+      Given licensing serves an upstream for the organization
+      When gateway handles licensing's connect-upstream-set fact
+      Then it reads the upstream from licensing and seals the token into its own slot
+
+    @unit
+    Scenario: Gateway leaves the hosted provider slot unset when licensing serves no upstream
+      Given licensing serves no upstream for the organization, or refuses the read
+      When gateway handles licensing's connect-upstream-set fact
+      Then the slot is left unset and the outcome is logged
+      And a refused read throws, so the delivery is retried with the slot untouched
+
+    @unit
     Scenario: Licensing records a licence's connect credential issued as a fact for gateway to provision
       Given a bound licence with no managed key
       When its token is resolved

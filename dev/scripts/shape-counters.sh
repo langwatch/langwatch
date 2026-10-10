@@ -12,7 +12,7 @@ rows=$(node -e 'console.log(String(require("./packages/architecture-enforcer/src
 # A family is absent while the process refuses to mount it, and the one reason
 # left is a fact nothing binds: `factBindings` refuses at mount, by name.
 declared=$(git ls-tree -r --name-only HEAD modules enterprise/modules | grep -cE "/transport/[^/]+\.rest\.ts$")
-absent=$(git grep -l "withMiddleware(" HEAD -- 'modules/*/server/src/transport/*.rest.ts' 'enterprise/modules/*/server/src/transport/*.rest.ts' | wc -l | tr -d " ")
+absent=$(git grep -l "withMiddlewareContext(" HEAD -- 'modules/*/server/src/transport/*.rest.ts' 'enterprise/modules/*/server/src/transport/*.rest.ts' | wc -l | tr -d " ")
 apiside=$(git ls-tree -r --name-only HEAD apps/api/src/features | grep -cE '\.(composition|composition\.types|mount)\.ts$')
 portsfiles=$(git ls-tree -r --name-only HEAD modules enterprise/modules | grep -E "/(ports|adapters)/[^/]+\.ts$" | grep -v __tests__ | wc -l | tr -d " ")
 portnames=$(LC_ALL=C git grep -hoP '\b[A-Z][A-Za-z0-9]*Ports?\b' HEAD -- 'modules/*.ts' 'enterprise/*.ts' 'packages/*.ts' 'apps/*.ts' | sort -u | wc -l | tr -d " ")

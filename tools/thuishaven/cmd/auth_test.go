@@ -99,3 +99,15 @@ func TestBrowserRequestNeedsALane(t *testing.T) {
 		t.Errorf("req = %v (%v)", req, err)
 	}
 }
+
+func TestBrowserSelectTakesATargetAndAnOption(t *testing.T) {
+	inv, _ := parse(browserSpec(), []string{"select", "#plan", "Team", "--lane", "a"})
+	req, err := browserRequest("select", inv)
+	if err != nil || req["ref"] != "#plan" || req["text"] != "Team" {
+		t.Errorf("req = %v (%v)", req, err)
+	}
+	inv, _ = parse(browserSpec(), []string{"select", "#plan", "--lane", "a"})
+	if _, err := browserRequest("select", inv); err == nil {
+		t.Error("select without an option was accepted")
+	}
+}

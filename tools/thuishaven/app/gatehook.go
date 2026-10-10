@@ -9,7 +9,7 @@ import (
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
 
-// Feature is an optional integration `haven setup` can install into this
+// Feature is an optional integration `haven self setup` can install into this
 // checkout. Optional is the operative word: these change how OTHER tools
 // behave, so haven offers them and does not assume them — `up` installs
 // nothing from this list.
@@ -20,7 +20,7 @@ type Feature struct {
 	Detail string
 }
 
-// Features is the list, in the order `haven setup` offers them.
+// Features is the list, in the order `haven self setup` offers them.
 var Features = []Feature{{
 	Name:    "gate-hook",
 	Summary: "queue heavy commands from Claude Code so parallel agents can't take the machine",
@@ -30,7 +30,7 @@ var Features = []Feature{{
 		"    instead of all landing at once. Hooks are read at session start, so new\n" +
 		"    Claude Code sessions pick it up. `haven up` now registers this automatically\n" +
 		"    for every worktree it starts, so running this by hand is only needed to\n" +
-		"    install it early or to turn it back on. `haven setup gate-hook --off` removes\n" +
+		"    install it early or to turn it back on. `haven self setup gate-hook --off` removes\n" +
 		"    it and stops `haven up` from reinstalling it here.",
 }, {
 	Name:    "codex-gate-hook",
@@ -127,7 +127,7 @@ func havenGateCommand(client string) (string, error) {
 // Best-effort and silent on the happy path: a write failure here must never
 // fail `up` itself, since the hook is a convenience a developer can always
 // install by hand. EnsureHook is itself already a no-op for a worktree opted
-// out with `haven setup gate-hook --off`, so this needs no opt-out check of
+// out with `haven self setup gate-hook --off`, so this needs no opt-out check of
 // its own.
 func (o *Orchestrator) EnsureGateHookForUp(worktreeDir string) {
 	if o.claude == nil || worktreeDir == "" {

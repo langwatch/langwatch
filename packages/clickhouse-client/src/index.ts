@@ -85,7 +85,6 @@ export type {
   ClickHouseStatementOperation,
   ClickHouseVendorClient,
   ClickHouseVendorClientOptions,
-  UnscopedStatementDeclaration,
 } from "./managed-client.ts";
 export type { RoutableStatementClient } from "./routingDriver.ts";
 export { routingDriver } from "./routingDriver.ts";
@@ -134,7 +133,11 @@ export {
   parseRoutingTable,
   UnknownTenantError,
 } from "./tenancy.ts";
-export type { TenantGuardOptions, TenantScopeViolation } from "./tenantGuard.ts";
+export type {
+  SkippedTenantCheck,
+  TenantGuardOptions,
+  TenantScopeViolation,
+} from "./tenantGuard.ts";
 export {
   StatementReporter,
   type StatementLogSink,
@@ -206,8 +209,9 @@ export type {
   ClickHouseClientResolver,
   ReadResource,
   StatementScopeViolation,
-  TenantScopeTimeColumn,
 } from "./authorized-reads.ts";
+export type { TenantScopeTimeColumn } from "@langwatch/clickhouse-markers";
+export { tenantScope, tenantSet } from "@langwatch/clickhouse-markers";
 export {
   AuthorizedClickHouse,
   expandFragment,
@@ -221,7 +225,5 @@ export {
   StatementScopeError,
   TenantReaderClientUnavailableError,
   TenantScopedReader,
-  tenantScope,
   tenantScopeKey,
-  tenantSet,
 } from "./authorized-reads.ts";

@@ -86,3 +86,9 @@ Feature: An upgrade tells the operator what it is doing and what to do next
     Given a worker on an empty ledger and an empty schema
     When its upgrade gate admits it
     Then it reports that this is a first install and that it runs "pnpm task upgrade" before taking jobs
+
+  @unit
+  Scenario: A worker that said it was behind says when the installation is current
+    Given a worker whose installation is behind its image
+    When the upgrade finishes and its gate admits it
+    Then the line after the upgrade's says the installation is current and the worker takes jobs

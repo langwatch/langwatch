@@ -130,6 +130,7 @@ describe("mergeContextChips", () => {
     });
 
     describe("when the user drops it again", () => {
+      /** @scenario "Removed context can be added back from the add control" */
       it("hides it, and it stays available to re-add", () => {
         const candidates = mergeContextChips([autoDerivedTrace, pickedTrace]);
         const chosen = new Set<string>();

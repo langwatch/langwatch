@@ -323,7 +323,7 @@ export function GroupDetailDialog({
       }}
       size="lg"
     >
-      <Dialog.Content bg="bg" maxHeight="90vh" overflowY="auto">
+      <Dialog.Content maxHeight="90vh" overflowY="auto">
         <Dialog.Header>
           <Dialog.Title>{group.name}</Dialog.Title>
         </Dialog.Header>
@@ -464,7 +464,7 @@ export function GroupDetailDialog({
               Cancel
             </Button>
             <Button
-              colorPalette="blue"
+              colorPalette="orange"
               disabled={!hasChanges}
               loading={isSaving}
               onClick={() => void handleSave()}

@@ -109,7 +109,7 @@ func (o *Orchestrator) restartServices(slug, name string) ([]string, error) {
 	for _, t := range targets {
 		pids := o.sys.PIDsOnPort(t.Port)
 		if len(pids) == 0 {
-			msgs = append(msgs, fmt.Sprintf("%-10s nothing on :%d, the supervisor will start it", t.Name, t.Port))
+			msgs = append(msgs, fmt.Sprintf("%-10s nothing on :%d, the launcher will start it", t.Name, t.Port))
 			continue
 		}
 		for _, pid := range pids {
@@ -120,7 +120,7 @@ func (o *Orchestrator) restartServices(slug, name string) ([]string, error) {
 			}
 			o.sys.TerminateGroup(pid)
 		}
-		msgs = append(msgs, fmt.Sprintf("%-10s bounced :%d, the supervisor brings it back", t.Name, t.Port))
+		msgs = append(msgs, fmt.Sprintf("%-10s bounced :%d, the launcher brings it back", t.Name, t.Port))
 	}
 	return msgs, nil
 }
@@ -175,7 +175,7 @@ func restartTargets(st domain.Stack, name string) []restartTarget {
 	inGo := map[string]bool{"gateway": !mono, "nlp": !mono}
 	inSims := map[string]bool{}
 	if !mono && goLaneHostsSimulators(st.WorktreeDir) {
-		for _, sim := range []string{domain.IdPService, domain.MailService, domain.StorageService, domain.VoiceService, domain.LLMService, domain.AnalyticsService, domain.OutboundService, domain.PaymentService, domain.TelemetryService} {
+		for _, sim := range []string{domain.IdPService, domain.MailService, domain.StorageService, domain.VoiceService, domain.LLMService, domain.AnalyticsService, domain.OutboundService, domain.PaymentService, domain.TelemetryService, domain.LambdaService} {
 			inSims[sim] = true
 		}
 	}
@@ -232,6 +232,12 @@ func restartableNames(st domain.Stack) []string {
 // detached up).
 func (o *Orchestrator) ResolveSlug(p UpParams) (string, error) { return o.resolveSlug(p) }
 
+// HasSelection reports whether the worktree has chosen its services yet.
+func (o *Orchestrator) HasSelection(worktreeDir string) bool {
+	_, found := o.store.ReadSelection(worktreeDir)
+	return found
+}
+
 // ResolveSelection loads the worktree's sticky service selection (lean default
 // when none exists), applies any ±deltas, and persists the result — so the
 // choice survives terminals, reboots, and detach. The file is also written on
@@ -277,19 +283,6 @@ func (o *Orchestrator) ResolveMode(worktreeDir string, sel domain.Selection, req
 		}
 	}
 	return sel, mode, nil
-}
-
-// ResolveHold applies `up --watch[=false]` to the sticky selection: a held
-// stack's Node host does not reload on a file change. Persists only a change.
-func (o *Orchestrator) ResolveHold(worktreeDir string, sel domain.Selection, held bool) (domain.Selection, error) {
-	if sel.Held == held {
-		return sel, nil
-	}
-	sel.Held = held
-	if err := o.store.WriteSelection(worktreeDir, sel); err != nil {
-		return sel, fmt.Errorf("saving the hold: %w", err)
-	}
-	return sel, nil
 }
 
 // restartObservability stops and re-ensures the shared LGTM stack, re-routing

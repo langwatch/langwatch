@@ -546,13 +546,6 @@ jobs:
           mkdir -p "$(dirname "$manifest")"
           cp "$current" "$manifest"
 
-      # Every declared REST fact must have a binding, or the process that
-      # mounts the declaring family refuses at boot. This static pass replaces
-      # discovering them one full boot at a time (2026-09-13: 29 accumulated
-      # unseen because nothing enumerated them).
-      - name: Refuse declared-but-unbound REST facts
-        run: node dev/scripts/find-unbound-rest-facts.mjs
-
       # Not --no-bail: one package's failure should not hide the rest, and a
       # migration in flight tends to break several at once. The job still fails.
       # One pass: the step above leaves no stale declaration to re-check against.
@@ -987,9 +980,6 @@ jobs:
         # ciphertext is not readable text cannot mock the cipher it asserts on.
         run: echo "CREDENTIALS_SECRET=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
 
-      - name: Setup database
-        run: pnpm prisma:migrate
-
       - name: Install Goose migration tool
         run: bash .github/scripts/install-goose.sh
 
@@ -997,6 +987,10 @@ jobs:
         env:
           CLICKHOUSE_PASSWORD: ci_password
         run: bash .github/scripts/start-clickhouse-with-storage-policy.sh
+
+      # `prisma:migrate` runs `task upgrade`, which needs ClickHouse up first.
+      - name: Setup database
+        run: pnpm prisma:migrate
 
       - name: Run ClickHouse migrations
         working-directory: apps/tasks

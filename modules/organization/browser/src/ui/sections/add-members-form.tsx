@@ -1,19 +1,12 @@
-import {
-  Button,
-  Field,
-  HStack,
-  Input,
-  Spinner,
-  Text,
-  VStack,
-} from "@langwatch/design-system/primitives";
+import { HorizontalFormControl } from "@langwatch/design-system/horizontal-form-control";
+import { Button, HStack, Spinner, Text, VStack } from "@langwatch/design-system/primitives";
 import { Mail } from "lucide-react";
+import { useEffect } from "react";
 import {
   type Control,
   Controller,
   type FieldErrors,
   type SubmitHandler,
-  type UseFormRegister,
   useForm,
   useWatch,
 } from "react-hook-form";
@@ -28,6 +21,7 @@ import {
 } from "../../model/add-members-form-model.ts";
 import type { MembersForm } from "../../model/member-invite-form.ts";
 import { OrganizationUserRole, TeamUserRole } from "../../model/prisma-types.ts";
+import { InviteEmailChips } from "../elements/invite-email-chips.tsx";
 import { OrganizationUserRoleField } from "../elements/organization-user-role-field.tsx";
 import { InviteTeamAssignments } from "./invite-team-assignments.tsx";
 
@@ -61,10 +55,10 @@ export function AddMembersForm({
 }: AddMembersFormProps) {
   const firstTeamId = teamOptions[0]?.value;
   const {
-    register,
     control,
     handleSubmit,
     setValue,
+    setFocus,
     formState: { errors },
   } = useForm<InviteFormValues>({
     defaultValues: {
@@ -74,6 +68,11 @@ export function AddMembersForm({
     },
   });
 
+  // Opened from the inline invite box: typing carries on here, not in the box behind.
+  useEffect(() => {
+    if (initialEmails) setFocus("emailsRaw");
+  }, [initialEmails, setFocus]);
+
   const selectedTeams = useWatch({ control, name: "teams" });
   const orgRole = useWatch({ control, name: "orgRole" });
   useTeamsFollowSeat({ orgRole, selectedTeams, setValue });
@@ -81,10 +80,10 @@ export function AddMembersForm({
   return (
     <form onSubmit={handleSubmit((values) => onSubmit({ invites: invitesFromForm(values) }))}>
       <VStack align="start" gap={4} width="100%">
-        <HStack gap={4} align="start" width="full">
-          <InviteEmailsField register={register} errors={errors} />
+        <VStack width="full" gap={0}>
+          <InviteEmailsField control={control} errors={errors} />
           <InviteSeatField control={control} />
-        </HStack>
+        </VStack>
         <InviteTeamAssignments
           control={control}
           setValue={setValue}
@@ -105,32 +104,45 @@ export function AddMembersForm({
 }
 
 function InviteEmailsField({
-  register,
+  control,
   errors,
 }: {
-  register: UseFormRegister<InviteFormValues>;
+  control: Control<InviteFormValues>;
   errors: FieldErrors<InviteFormValues>;
 }) {
   return (
-    <Field.Root flex="2" invalid={!!errors.emailsRaw}>
-      <Field.Label>Email addresses</Field.Label>
-      <Input
-        placeholder="alice@example.com, bob@example.com"
-        data-testid="members-invite-emails"
-        {...register("emailsRaw", {
-          required: "At least one email is required",
-          validate: validateInviteEmails,
-        })}
+    <HorizontalFormControl
+      label="Email addresses"
+      helper="Type or paste addresses; a comma, space or Enter adds each one"
+      invalid={!!errors.emailsRaw}
+      error={errors.emailsRaw}
+      inputWidth="60%"
+    >
+      <Controller
+        control={control}
+        name="emailsRaw"
+        rules={{ required: "At least one email is required", validate: validateInviteEmails }}
+        render={({ field }) => (
+          <InviteEmailChips
+            value={field.value}
+            onChange={field.onChange}
+            onBlur={field.onBlur}
+            inputRef={field.ref}
+            invalid={!!errors.emailsRaw}
+          />
+        )}
       />
-      <Field.ErrorText>{errors.emailsRaw?.message}</Field.ErrorText>
-    </Field.Root>
+    </HorizontalFormControl>
   );
 }
 
 function InviteSeatField({ control }: { control: Control<InviteFormValues> }) {
   return (
-    <Field.Root flex="1">
-      <Field.Label>Seat</Field.Label>
+    <HorizontalFormControl
+      label="Seat"
+      helper="What they can do across the organization"
+      inputWidth="60%"
+    >
       <Controller
         control={control}
         name="orgRole"
@@ -144,7 +156,7 @@ function InviteSeatField({ control }: { control: Control<InviteFormValues> }) {
           />
         )}
       />
-    </Field.Root>
+    </HorizontalFormControl>
   );
 }
 
@@ -160,7 +172,7 @@ function InviteFormActions({
   onCloseText: string;
 }) {
   return (
-    <HStack justify="end" width="100%" marginTop={4}>
+    <HStack justify="end" width="100%" marginTop={2}>
       <Button type="button" variant="outline" onClick={onClose} disabled={isLoading}>
         {onCloseText}
       </Button>

@@ -54,7 +54,9 @@ func (cell *run) restartWorkerMidUpgrade(ctx context.Context) {
 	defer cancel()
 	_ = worker.Wait(waitCtx)
 	cell.drills.killedAtMs, cell.drills.killedDone, cell.drills.killedTotal = int(time.Since(cell.origin).Milliseconds()), done, len(rows)
+	cell.procsMu.Lock()
 	cell.procs = slices.DeleteFunc(cell.procs, func(proc *Proc) bool { return proc == worker })
+	cell.procsMu.Unlock()
 	_ = os.Rename(cell.logPath("head-worker"), cell.logPath("head-worker-killed"))
 	if err := cell.startHeadWorker(); err != nil {
 		cell.drills.restartErr = err.Error()

@@ -8,11 +8,13 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { TraceExportRateLimitedError, type Protections } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
+import { ownProof } from "../../../../__tests__/support/authorization-proofs.fixture.ts";
 import type { TraceViewerProtectionService } from "../../../../services/trace-viewer-protection.service.ts";
 import type { TraceExportBounds, TraceExportSlot } from "../trace-export-bounds.service.ts";
 import { TraceExportDownloadService } from "../trace-export-download.service.ts";
 import type { TraceExportService } from "../trace-export.service.ts";
 
+const authorization = ownProof({ projectId: "project-1" });
 const protections = { canSeeCapturedInput: true, canSeeCapturedOutput: true } as Protections;
 const request = {
   projectId: "project-1",
@@ -78,7 +80,9 @@ describe("TraceExportDownloadService", () => {
     });
     const built = buildService({ bounds });
 
-    await expect(built.service.download({ request, userId: "user-1" })).rejects.toMatchObject({
+    await expect(
+      built.service.download({ request, userId: "user-1", authorization }),
+    ).rejects.toMatchObject({
       code: "trace_export_rate_limited",
     });
     expect(built.resolve).not.toHaveBeenCalled();
@@ -89,15 +93,17 @@ describe("TraceExportDownloadService", () => {
   it("resolves the caller's own protections and reads every trace through them", async () => {
     const { bounds } = boundsFake();
     const built = buildService({ bounds });
-    const download = await built.service.download({ request, userId: "user-1" });
+    const download = await built.service.download({ request, userId: "user-1", authorization });
 
     for await (const chunk of download.stream) void chunk;
 
     expect(built.resolve).toHaveBeenCalledWith(
       expect.objectContaining({ projectId: "project-1", userId: "user-1" }),
     );
-    expect(built.getTotalCount).toHaveBeenCalledWith({ request, protections });
-    expect(built.exportTraces).toHaveBeenCalledWith(expect.objectContaining({ protections }));
+    expect(built.getTotalCount).toHaveBeenCalledWith({ request, protections, authorization });
+    expect(built.exportTraces).toHaveBeenCalledWith(
+      expect.objectContaining({ protections, authorization }),
+    );
   });
 
   it("releases the claimed slot when sizing fails", async () => {
@@ -109,7 +115,9 @@ describe("TraceExportDownloadService", () => {
       },
     });
 
-    await expect(built.service.download({ request, userId: "user-1" })).rejects.toMatchObject({
+    await expect(
+      built.service.download({ request, userId: "user-1", authorization }),
+    ).rejects.toMatchObject({
       code: "export_failed",
     });
     expect(slot.released).toBe(1);
@@ -130,7 +138,7 @@ describe("TraceExportDownloadService", () => {
         yield { chunk: "row-2\\n", progress: { exported: 2, total: 2 } };
       },
     });
-    const download = await built.service.download({ request, userId: "user-1" });
+    const download = await built.service.download({ request, userId: "user-1", authorization });
 
     expect(slot.released).toBe(0);
     open();
@@ -164,7 +172,7 @@ describe("TraceExportDownloadService", () => {
         await new Promise<void>(() => {});
       },
     });
-    const download = await built.service.download({ request, userId: "user-1" });
+    const download = await built.service.download({ request, userId: "user-1", authorization });
     await download.cancel();
 
     expect(slot.released).toBe(1);

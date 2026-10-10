@@ -215,12 +215,4 @@ export class LangWatchQLProductionProvisioningService {
 
     return { rowsToInsert, blankKeyProjectIds };
   }
-
-  /**
-   * The sanctioned opt-out `guardProjectId` accepts on a raw PostgreSQL statement that
-   * intentionally has no tenancy predicate.
-   */
-  withTenancyOptOut(statement: string): string {
-    return `-- @tenancy: provisions LangWatchQL catalog objects shared across every tenant, not scoped to one\n${statement}`;
-  }
 }

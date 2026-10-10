@@ -6,6 +6,7 @@
 package havenrun
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"os/exec"
@@ -127,7 +128,7 @@ func Env(inherit []string, slug string, options EnvOptions) []string {
 		env = append(env, entry)
 	}
 	// LANGWATCH_DEV_WATCH=0: a measured stack never restarts on checkout edits
-	// (tools/dev-runtime holds); `haven reload` or `haven up -f` applies them.
+	// (tools/dev-runtime holds); `haven reload` or `haven up --force` applies them.
 	// LANGWATCH_DEV_ONE_PROCESS=0: diff stacks run the split ui/api/worker processes.
 	env = append(env, "LANGWATCH_SLUG="+slug, "LANGWATCH_DEV_WATCH=0", "LANGWATCH_DEV_ONE_PROCESS=0")
 	return append(env, options.Extra...)
@@ -142,13 +143,13 @@ func UpArgs(deltas ...string) []string {
 }
 
 // StatusArgs asks for the machine-readable one-shot report.
-func StatusArgs() []string { return []string{"status", "--agent", "--json"} }
+func StatusArgs() []string { return []string{"status", "--agent", "--json", "stacks"} }
 
 // DestroyArgs stops one stack and drops the databases haven made for it. The
 // slug is the whole safety story: nothing is derived from a directory, so a
 // caller can only destroy what it named.
 func DestroyArgs(slug string) []string {
-	return []string{"destroy", slug, "--agent", "--yes"}
+	return []string{"down", "--destroy", "--stack", slug, "--agent", "--yes"}
 }
 
 // LogArgs reads one stack's named lane log, for a boot that never became
@@ -220,6 +221,22 @@ func ParseStatus(output []byte) (Status, error) {
 		return Status{}, fmt.Errorf("haven status --json: %w", err)
 	}
 	return report, nil
+}
+
+// ParseEnv decodes a `haven env --json` overlay: the stack's variables plus
+// haven's own "v" and "stack" keys, which are not strings and are dropped.
+func ParseEnv(output []byte) (map[string]string, error) {
+	var report map[string]any
+	if err := json.NewDecoder(bytes.NewReader(output)).Decode(&report); err != nil {
+		return nil, fmt.Errorf("haven env --json: %w", err)
+	}
+	overlay := make(map[string]string, len(report))
+	for name, value := range report {
+		if text, ok := value.(string); ok {
+			overlay[name] = text
+		}
+	}
+	return overlay, nil
 }
 
 // StackReady finds the named, live stack whose every required lane is

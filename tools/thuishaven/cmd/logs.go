@@ -22,7 +22,7 @@ import (
 
 // The `haven logs` command: every service's captured output, from any
 // terminal, whether the stack runs attached, detached, or already stopped.
-// Filtering is a plain argument (`haven logs nlp`), following is -t, time
+// Filtering is a plain argument (`haven logs nlp`), following is -f, time
 // windows are --since, severity is --level, another stack is --stack. The
 // supervisor writes the per-service files this reads (adapters/procsupervisor
 // logsink.go); the launcher's terminal view and these files carry the same
@@ -65,7 +65,7 @@ func apiLaneFile(available map[string]bool) string {
 // goLaneSimulators are the simulators a go.work checkout's sims lane hosts
 // (cmd/service/combined_dev.go), or its go lane on an older haven. They have
 // no capture of their own, so `haven logs idp` reads that lane's lines.
-var goLaneSimulators = []string{"idp", "mail", "storage", "voice", "llm", "analytics", "outbound", "payment", "telemetry"}
+var goLaneSimulators = []string{"idp", "mail", "storage", "voice", "llm", "analytics", "outbound", "payment", "telemetry", "lambda"}
 
 // logSource is one selected view: a capture file, the CLI name its lines are
 // labeled with, and — for one application of a shared lane — the application a
@@ -101,7 +101,7 @@ var logServiceColors = map[string]string{
 	// The single Node lane of a monolith checkout, in the ui lane's color:
 	// it is the same half of the stack, in one process instead of two.
 	"app":           "34",
-	"design-system": "96", "mail-room": "95", "idp": "92", "mail": "94", "storage": "36", "voice": "93", "llm": "35", "analytics": "33", "outbound": "90", "payment": "32", "telemetry": "91",
+	"design-system": "96", "mail-room": "95", "idp": "92", "mail": "94", "storage": "36", "voice": "93", "llm": "35", "analytics": "33", "outbound": "90", "payment": "32", "telemetry": "91", "lambda": "93",
 	// Earlier lane names. A log file written before the local topology changed
 	// still reads in its own color rather than falling to plain text.
 	"backend": "32", "workers": "32", "gateway": "33", "nlp": "36",
@@ -111,7 +111,7 @@ func runLogsCmd(ctx context.Context, d deps, inv invocation) error {
 	// The observability stack is a container, not a supervised child — its logs
 	// come from docker, but through the same one command.
 	if len(inv.args) == 1 && inv.args[0] == "obs" {
-		return d.orch.ObservabilityLogs(ctx, inv.has("--tail"))
+		return d.orch.ObservabilityLogs(ctx, inv.has("--follow"))
 	}
 
 	if inv.has("--loki") || inv.has("--trace") {
@@ -152,6 +152,8 @@ func runLogsCmd(ctx context.Context, d deps, inv invocation) error {
 	}
 
 	lines, offsets, elided := readLogTails(dir, services)
+	// A launcher line is captured for both backend halves at one instant: show it once.
+	lines = slices.CompactFunc(lines, func(a, b logLine) bool { return a.ts.Equal(b.ts) && a.text == b.text })
 	lines = filterLogLines(lines, since, level)
 	lines = grepLogLines(lines, inv.value("--grep"))
 	if since.IsZero() && len(lines) > logsTailLines {
@@ -167,7 +169,7 @@ func runLogsCmd(ctx context.Context, d deps, inv invocation) error {
 	for _, l := range lines {
 		printLogLine(l, mode, d.isAgent)
 	}
-	if !inv.has("--tail") {
+	if !inv.has("--follow") {
 		if len(lines) == 0 {
 			fmt.Println("(no matching log lines yet)")
 		}
@@ -205,6 +207,17 @@ func selectLogServices(dir string, args []string) ([]logSource, error) {
 	}
 	var out []logSource
 	for _, a := range args {
+		if a == app.AppLane && !availableSet[a] {
+			// The one-process lane is captured per application: `app` reads all three.
+			for _, name := range []string{"ui", "api", "worker"} {
+				if src, ok := resolveLogSource(name, availableSet); ok {
+					out = append(out, src)
+				}
+			}
+			if len(out) > 0 {
+				continue
+			}
+		}
 		src, ok := resolveLogSource(a, availableSet)
 		if !ok {
 			return nil, fmt.Errorf("no captured logs for %q — this stack has: %s (plus obs)", a, strings.Join(logSelectableNames(available), ", "))
@@ -217,7 +230,8 @@ func selectLogServices(dir string, args []string) ([]logSource, error) {
 // resolveLogSource reads one CLI name as a view: an application of the backend
 // lane, or a capture file of its own.
 func resolveLogSource(name string, available map[string]bool) (logSource, bool) {
-	if file := apiLaneFile(available); file != "" && slices.Contains(apiLaneApps, name) {
+	// A worker capture of its own means the lane is split at capture (procsupervisor).
+	if file := apiLaneFile(available); file != "" && slices.Contains(apiLaneApps, name) && !available["worker"] {
 		return logSource{file: file, label: name, app: name}, true
 	}
 	// A one-process stack (LANGWATCH_DEV_ONE_PROCESS) writes ui, api and worker
@@ -250,6 +264,8 @@ func logSelectableNames(available []string) []string {
 		}
 		out = append(out, fileToCLIService(s))
 	}
+	slices.Sort(out)
+	out = slices.Compact(out)
 	if slices.Contains(available, app.GoLane) || slices.Contains(available, app.SimsLane) {
 		for _, sim := range goLaneSimulators {
 			if !slices.Contains(out, sim) {
@@ -569,7 +585,7 @@ func formatLogLine(l logLine, mode renderMode, plain bool) string {
 	case renderRaw:
 		return l.text
 	case renderJSON:
-		return logfmt.RenderJSON(l.text, opts)
+		return typedLogEvent(logfmt.RenderJSON(l.text, opts))
 	case renderHuman:
 	}
 	return logfmt.Render(l.text, opts)
@@ -672,7 +688,10 @@ func printLokiLines(out readOutput, lines []sources.LogLine, level string) error
 			continue
 		}
 		if asJSON {
-			if err := enc.Encode(l); err != nil {
+			if err := enc.Encode(struct {
+				Type string `json:"type"`
+				sources.LogLine
+			}{"log", l}); err != nil {
 				return err
 			}
 			continue
@@ -683,4 +702,16 @@ func printLokiLines(out readOutput, lines []sources.LogLine, level string) error
 		fmt.Fprintln(w, "grafana:", out.link)
 	}
 	return nil
+}
+
+// typedLogEvent stamps the NDJSON stream's discriminator onto one rendered
+// line: every event a stream emits says what it is.
+func typedLogEvent(line string) string {
+	switch {
+	case line == "{}":
+		return `{"type":"log"}`
+	case strings.HasPrefix(line, "{"):
+		return `{"type":"log",` + line[1:]
+	}
+	return line
 }

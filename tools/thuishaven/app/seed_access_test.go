@@ -8,7 +8,7 @@ import (
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
 
-// @scenario "haven seed returns the logins and the credentials haven made up"
+// @scenario "haven db seed returns the logins and the credentials haven made up"
 func TestSeedAccessMasksUnlessRevealed(t *testing.T) {
 	o := seedOrchestrator(t, &fakeSupervisor{}, seedStack())
 	p := UpParams{ExplicitSlug: "feat-x"}

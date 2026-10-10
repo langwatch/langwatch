@@ -1,4 +1,5 @@
 import type { OpsMigrationOverview } from "@langwatch/ops-contract";
+import { skipTenantCheck } from "@langwatch/prisma-client";
 import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
 import { SystemMigrationRecordNotFoundError } from "@langwatch/system-migrations";
 import type { TenantMigrationRecord, TenantMigrationStatus } from "@langwatch/system-migrations";
@@ -87,7 +88,10 @@ export class PrismaSystemMigrationStateRepository implements SystemMigrationStat
     // SQL, because a write parked on the pin's row lock must re-check the
     // guard against the row the pin committed; `updateMany` does not.
     const updated = await this.prisma.$executeRaw`
-      -- @tenancy: keyed by (migrationName, tenantId); the tenant is the key itself.
+      ${skipTenantCheck({
+        // Keyed by (migrationName, tenantId); the tenant is the key itself.
+        SKIP_TENANT_CHECK: true,
+      })}
       UPDATE "SystemMigrationTenantState"
          SET "status" = ${record.status},
              "report" = ${reportJson}::jsonb,
@@ -177,14 +181,17 @@ export class PrismaSystemMigrationStateRepository implements SystemMigrationStat
     migrationName,
     statuses,
     limit,
+    offset = 0,
   }: {
-    migrationName: string;
+    migrationName?: string | undefined;
     statuses: TenantMigrationStatus[];
     limit: number;
+    offset?: number;
   }): Promise<OpsMigrationOverview["attention"]> {
     const rows = await this.prisma.systemMigrationTenantState.findMany({
-      where: { migrationName, status: { in: statuses } },
-      orderBy: { updatedAt: "desc" },
+      where: { ...(migrationName ? { migrationName } : {}), status: { in: statuses } },
+      orderBy: [{ updatedAt: "desc" }, { migrationName: "asc" }, { tenantId: "asc" }],
+      skip: offset,
       take: limit,
     });
     return rows.map((row) => ({

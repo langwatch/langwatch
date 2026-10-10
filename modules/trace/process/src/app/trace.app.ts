@@ -91,7 +91,6 @@ import {
   type TraceListPage,
   type NormalizedSpan,
   type RecordSpanCommandData,
-  type TraceContentReadService,
   type TraceViewerService,
   type TraceApi,
   type OtlpTracesInput,
@@ -264,10 +263,11 @@ import {
   TraceIngressCommand,
   type CodingAgentIngestFilter,
 } from "../features/ingestion/services/trace-ingestion.service.ts";
-import {
-  TraceLegacyReadClickHouseRepository,
-  type ClickHouseTraceLegacyReadOptions,
-} from "../features/legacy/repositories/clickhouse/trace-legacy-read.repository.ts";
+import type {
+  ResolveTraceSpansBatchFn,
+  ResolveTraceSpansFn,
+  TraceLegacyReadRepository,
+} from "../features/legacy/repositories/trace-legacy-read.repository.ts";
 import {
   type GenerateFilterConditionsResult,
   translateLegacyFilters,
@@ -281,6 +281,7 @@ import {
   traceLegacySearchBodySchema,
 } from "../features/legacy/rules/trace-legacy-search-body.rules.ts";
 import { LegacyFilterMatchingService } from "../features/legacy/services/legacy-filter-matching.service.ts";
+import { LegacyTraceMappingService } from "../features/legacy/services/legacy-trace-mapping.service.ts";
 import {
   AmbiguousTraceIdPrefixError,
   TraceLegacyReadService,
@@ -311,7 +312,7 @@ import { TraceQueryEvaluationService } from "../features/query/services/trace-qu
 import { TraceQueryFieldsService } from "../features/query/services/trace-query-fields.service.ts";
 import { TraceQueryTranslationService } from "../features/query/services/trace-query-translation.service.ts";
 import { TraceSearchRouterService } from "../features/query/services/trace-search-router.service.ts";
-import { TraceContentReadService as ConcreteTraceContentReadService } from "../features/read/services/trace-content-read.service.ts";
+import { TraceContentReadService } from "../features/read/services/trace-content-read.service.ts";
 import { TraceListService } from "../features/read/services/trace-list-read.service.ts";
 import { TraceLogRecordIOService } from "../features/read/services/trace-log-record-io.service.ts";
 import { LogRecordStorageService } from "../features/read/services/trace-log-record-read.service.ts";
@@ -422,7 +423,7 @@ import {
   redactV2Content,
   toConversationContextTurn,
 } from "../rules/trace-read-mappers.rules.ts";
-import { gateSessionCost } from "../rules/trace-view-gates.rules.ts";
+import { gateEvaluations, gateSessionCost } from "../rules/trace-view-gates.rules.ts";
 import { TraceTenantUpdateStreamService } from "../services/trace-tenant-update-stream.service.ts";
 import type {
   TraceLegacyReads,
@@ -849,8 +850,13 @@ type TraceReaderCompositionOptions = {
   publicBaseUrl?: string;
 };
 
-/** What a composition root gives the legacy trace read: the store, and the policies over it. */
-type TraceLegacyReadCompositionOptions = Omit<ClickHouseTraceLegacyReadOptions, "retentionDays"> & {
+/** What a composition root gives the legacy trace read: the store, and its mapping's inputs. */
+type TraceLegacyReadCompositionOptions = {
+  /** The registry's legacy read store (§3.3). */
+  repository: TraceLegacyReadRepository;
+  traceCanonicalisation: TraceCanonicalisationService;
+  resolveTraceSpans?: ResolveTraceSpansFn | undefined;
+  resolveTraceSpansBatch?: ResolveTraceSpansBatchFn | undefined;
   /** Restores offloaded spans from the blob store (ADR-022) where no resolver is supplied. */
   blobResolutionDeps?: BlobResolutionDeps | undefined;
   /** The tenant's retention policy; absent, the span read floors at the platform default. */
@@ -869,6 +875,7 @@ type TraceTreeCompositionOptions = {
   eventDerivation?: TraceEventDerivation;
   payloads: TracePayloadReaderRepository;
   fullIo: TraceFullIo;
+  authorize: FoldReadAuthorizer;
 };
 
 /** Trace implements its public API and the collector's internal transport seam. */
@@ -1023,14 +1030,11 @@ export class TraceModule implements TraceApi, CollectorApp {
     });
     const read = TraceLegacyReadService.create({
       traceCanonicalisation: options.canonicalisation,
-      traceRead: TraceModule.composeLegacyRead({
+      traceRead: options.repositories.legacyRead,
+      mapping: TraceModule.composeLegacyRead({
+        repository: options.repositories.legacyRead,
         traceCanonicalisation: options.canonicalisation,
-        ...(resolve ? { resolveClickHouseClient: resolve } : {}),
         retentionResolver: options.dataRetention,
-        annotations: {
-          rows: options.repositories.annotations,
-          scores: options.repositories.annotationScores,
-        },
         blobResolutionDeps,
       }),
       editOverlay,
@@ -1045,6 +1049,11 @@ export class TraceModule implements TraceApi, CollectorApp {
       discoverUpdates: options.tenantBroadcast,
     });
     const protections = TraceViewerProtectionService.create(options.protections);
+    // Own-only: the records and viewer reads carry no door proof (ruling TRACE-PROOF-SHARE).
+    const ownReadAuthorizer = foldReadAuthorizer({
+      authz: options.protections.authz,
+      codePath: FOLD_READ_CODE_PATH,
+    });
     // Every role reads the summary off the trace_summaries row the worker's fold writes, as main's
     // traceSummaryStore did; a test may hand in its own store.
     const summaryStore =
@@ -1076,6 +1085,10 @@ export class TraceModule implements TraceApi, CollectorApp {
                 publiclyShared: false,
               });
               const trace = await read.findById({
+                authorization: await ownReadAuthorizer({
+                  projectId,
+                  purpose: { kind: "operator", entry: "TraceRecords.getById" },
+                }),
                 projectId,
                 traceId,
                 protections: { ...resolved, canSeeCosts: true },
@@ -1096,6 +1109,10 @@ export class TraceModule implements TraceApi, CollectorApp {
           }),
           payloads: options.repositories.eventPayloads,
           fullIo: TraceReadFullIoService.create(ioExtractionService),
+          authorize: foldReadAuthorizer({
+            authz: options.protections.authz,
+            codePath: FOLD_READ_CODE_PATH,
+          }),
         });
 
     return {
@@ -1133,6 +1150,7 @@ export class TraceModule implements TraceApi, CollectorApp {
       viewer: TraceViewerReadService.create({
         read,
         protections,
+        authorize: ownReadAuthorizer,
       }),
       annotationCommands: {
         add: async (input) => {
@@ -1187,24 +1205,22 @@ export class TraceModule implements TraceApi, CollectorApp {
     };
   }
 
-  /** The legacy trace read over ClickHouse, with its offload resolution and retention floor. */
-  static composeLegacyRead(
-    options: TraceLegacyReadCompositionOptions,
-  ): TraceLegacyReadClickHouseRepository {
-    const { blobResolutionDeps, retentionResolver, ...read } = options;
+  /** The legacy trace read's mapping, with its offload resolution and retention floor. */
+  static composeLegacyRead(options: TraceLegacyReadCompositionOptions): LegacyTraceMappingService {
+    const { blobResolutionDeps, retentionResolver, ...mapping } = options;
 
-    return TraceLegacyReadClickHouseRepository.create({
-      ...read,
+    return LegacyTraceMappingService.create({
+      ...mapping,
       ...(retentionResolver
         ? { retentionDays: TraceRetentionFloorService.create(retentionResolver) }
         : {}),
       resolveTraceSpans:
-        read.resolveTraceSpans ??
+        mapping.resolveTraceSpans ??
         (blobResolutionDeps
           ? TraceOffloadResolutionService.create().resolverFor(blobResolutionDeps)
           : undefined),
       resolveTraceSpansBatch:
-        read.resolveTraceSpansBatch ??
+        mapping.resolveTraceSpansBatch ??
         (blobResolutionDeps
           ? TraceOffloadResolutionBatchService.create().resolverFor(blobResolutionDeps)
           : undefined),
@@ -1241,6 +1257,7 @@ export class TraceModule implements TraceApi, CollectorApp {
         options.payloads,
         options.fullIo,
       ),
+      authorize: options.authorize,
     });
   }
 
@@ -1377,7 +1394,7 @@ export class TraceModule implements TraceApi, CollectorApp {
           recordDecision: () => {},
         })
       : null;
-    this.#contentReader = ConcreteTraceContentReadService.create(dependencies.traces.read);
+    this.#contentReader = TraceContentReadService.create(dependencies.traces.read);
     this.#scenarioEventMedia = TraceScenarioEventMediaService.create(dependencies.storedObjects);
     this.#legacyFilterMatching = LegacyFilterMatchingService.create({
       preconditionTraceData: PreconditionTraceDataService.create(),
@@ -1389,7 +1406,21 @@ export class TraceModule implements TraceApi, CollectorApp {
     this.#exportDownload =
       dependencies.protections && dependencies.exportBounds && dependencies.presence
         ? TraceExportDownloadService.create({
-            exports: TraceExportService.create({ traceService: dependencies.traces.read }),
+            exports: TraceExportService.create({
+              traceService: dependencies.traces.read,
+              compileFilter: ({ request }) =>
+                this.compileExplorerTraceFilter({
+                  query: request.query ?? "",
+                  tenantId: request.projectId,
+                  timeRange: { from: request.startDate, to: request.endDate },
+                }),
+              authorizeOwnRead: ({ projectId }) =>
+                this.#authorizeOwnRead({
+                  projectId,
+                  codePath: "api/routers/export",
+                  route: "TraceApi.downloadTraceExport",
+                }),
+            }),
             protections: dependencies.protections,
             bounds: dependencies.exportBounds,
             presence: dependencies.presence,
@@ -1602,6 +1633,10 @@ export class TraceModule implements TraceApi, CollectorApp {
 
     return this.#contentReader.listTraces({
       ...input,
+      authorization: await this.#authorizeContentRead({
+        projectId: input.query.projectId,
+        route: "TraceApi.listTraces",
+      }),
       query: {
         ...input.query,
         ...(pageSize === undefined ? {} : { pageSize }),
@@ -1637,8 +1672,14 @@ export class TraceModule implements TraceApi, CollectorApp {
       query: { ...input.query, ...(pageSize === undefined ? {} : { pageSize }) },
     });
   }
-  findTrace(input: TraceFindTraceInput): Promise<Trace | undefined> {
-    return this.#contentReader.findTrace(input);
+  async findTrace(input: TraceFindTraceInput): Promise<Trace | undefined> {
+    return this.#contentReader.findTrace({
+      ...input,
+      authorization: await this.#authorizeContentRead({
+        projectId: input.projectId,
+        route: "TraceApi.findTrace",
+      }),
+    });
   }
   async getTraceForViewer(input: {
     projectId: string;
@@ -2033,29 +2074,66 @@ export class TraceModule implements TraceApi, CollectorApp {
   async readTracesWithSpans(input: TraceReadTracesWithSpansInput): Promise<Trace[]> {
     await this.#readBounds.assertIdsWithinBound(input.projectId, input.traceIds);
 
-    return this.#contentReader.readTracesWithSpans(input);
+    return this.#contentReader.readTracesWithSpans({
+      ...input,
+      authorization: await this.#authorizeContentRead({
+        projectId: input.projectId,
+        route: "TraceApi.readTracesWithSpans",
+      }),
+    });
   }
 
   async readTracesWithSpansPreview(input: TraceReadTracesWithSpansPreviewInput): Promise<Trace[]> {
     await this.#readBounds.assertIdsWithinBound(input.projectId, input.traceIds);
 
-    return this.#contentReader.readTracesWithSpansPreview(input);
+    return this.#contentReader.readTracesWithSpansPreview({
+      ...input,
+      authorization: await this.#authorizeContentRead({
+        projectId: input.projectId,
+        route: "TraceApi.readTracesWithSpansPreview",
+      }),
+    });
   }
-  readOrderedSpansForTrace(input: TraceReadOrderedSpansInput): Promise<Span[]> {
-    return this.#contentReader.readOrderedSpansForTrace(input);
+  async readOrderedSpansForTrace(input: TraceReadOrderedSpansInput): Promise<Span[]> {
+    return this.#contentReader.readOrderedSpansForTrace({
+      ...input,
+      authorization: await this.#authorizeContentRead({
+        projectId: input.projectId,
+        route: "TraceApi.readOrderedSpansForTrace",
+      }),
+    });
   }
-  readThreadTraces(input: TraceReadThreadTracesInput): Promise<Trace[]> {
-    return this.#contentReader.readThreadTraces(input);
+  async readThreadTraces(input: TraceReadThreadTracesInput): Promise<Trace[]> {
+    return this.#contentReader.readThreadTraces({
+      ...input,
+      authorization: await this.#authorizeContentRead({
+        projectId: input.projectId,
+        route: "TraceApi.readThreadTraces",
+      }),
+    });
   }
   async readThreadsTraces(input: TraceReadThreadsTracesInput): Promise<Trace[]> {
     await this.#readBounds.assertIdsWithinBound(input.projectId, input.threadIds);
 
-    return this.#contentReader.readThreadsTraces(input);
+    return this.#contentReader.readThreadsTraces({
+      ...input,
+      authorization: await this.#authorizeContentRead({
+        projectId: input.projectId,
+        route: "TraceApi.readThreadsTraces",
+      }),
+    });
   }
   async readSampleTraces(input: TraceReadSampleTracesInput): Promise<Trace[]> {
     const pageSize = await this.#readBounds.clampPageSize(input.query.projectId, input.pageSize);
 
-    return this.#contentReader.readSampleTraces({ ...input, pageSize });
+    return this.#contentReader.readSampleTraces({
+      ...input,
+      pageSize,
+      authorization: await this.#authorizeContentRead({
+        projectId: input.query.projectId,
+        route: "TraceApi.readSampleTraces",
+      }),
+    });
   }
   readForViewer(input: TraceViewerReadInput): Promise<Trace[]> {
     if (!this.#dependencies.viewer) throw new Error("Trace viewer service is unavailable");
@@ -2382,9 +2460,10 @@ export class TraceModule implements TraceApi, CollectorApp {
         }),
       );
       return {
-        [input.traceId]: (byTrace[input.traceId] ?? []).map((evaluation) =>
-          gateEvaluationContent({ evaluation, protections }),
-        ),
+        [input.traceId]: gateEvaluations({
+          evaluations: byTrace[input.traceId] ?? [],
+          protections,
+        }),
       };
     }
     await this.#readBounds.assertIdsWithinBound(input.projectId, input.traceIds);
@@ -3416,6 +3495,17 @@ export class TraceModule implements TraceApi, CollectorApp {
     }
     if (!trace) throw new TraceNotFoundError(input.traceId);
     return trace;
+  }
+
+  /** The own-only proof the content reads' store reads go through (ruling TRACE-PROOF-SHARE). */
+  #authorizeContentRead({
+    projectId,
+    route,
+  }: {
+    projectId: string;
+    route: string;
+  }): Promise<Authorization> {
+    return this.#authorizeOwnRead({ projectId, codePath: "api/routers/traces", route });
   }
 
   /** The own-only proof for a read the door minted none for (ruling TRACE-PROOF-SHARE). */

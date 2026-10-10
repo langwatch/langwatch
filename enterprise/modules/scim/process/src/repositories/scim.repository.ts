@@ -188,6 +188,7 @@ export abstract class ScimRepository {
     organizationId: string;
     userId: string;
   }): Promise<string[]>;
+  /** A SCIM-pushed group by id; a group made in LangWatch is not found. */
   abstract findGroup(input: {
     organizationId: string;
     id: string;

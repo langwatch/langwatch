@@ -1,4 +1,4 @@
-import { bindRestHeader, canonicalErrorResponse } from "@langwatch/api/rest";
+import { bindMiddlewareContext, canonicalErrorResponse } from "@langwatch/api/rest";
 import { scenarioRestResponseWithPlatformUrlSchema } from "@langwatch/scenario-contract";
 import { describe, expect, it } from "vitest";
 
@@ -13,11 +13,16 @@ async function buildScenarioFamily(
   runtimeOptions?: Parameters<typeof createScenarioRestTestRuntime>[0],
 ) {
   const { app } = await createScenarioRestTestApp();
-  const { runtime, projectFacts } = createScenarioRestTestRuntime(runtimeOptions);
+  const { runtime, projectContext } = createScenarioRestTestRuntime(runtimeOptions);
   const mounted = runtime.mount(createScenarioRest().router(), {
     app: () => app,
     onError: canonicalErrorResponse,
-    facts: [projectFacts, bindRestHeader(scenarioRestSurface, "x-langwatch-surface")],
+    middlewareContext: [
+      projectContext,
+      bindMiddlewareContext(scenarioRestSurface, (request) =>
+        request.headers.get("x-langwatch-surface"),
+      ),
+    ],
   });
 
   return {

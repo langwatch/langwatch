@@ -145,6 +145,16 @@ describe("writing under an aggregate project", () => {
     ).not.toThrow();
   });
 
+  it("refuses an exempt permission on the aggregate when the route declared it", () => {
+    expect(() =>
+      refuseWriteUnderAggregate({
+        permissions: ["project:update"],
+        scope: aggregate,
+        refusedOnAggregate: true,
+      }),
+    ).toThrow(readOnly);
+  });
+
   it("leaves the same write open on a member project", () => {
     expect(() =>
       refuseWriteUnderAggregate({

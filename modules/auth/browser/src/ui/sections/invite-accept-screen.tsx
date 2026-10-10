@@ -3,7 +3,7 @@ import { Text } from "@langwatch/design-system/primitives";
 import { useRouter } from "../../behavior/use-route.ts";
 import { usePublishFrontDoorStage } from "../../model/ground-stage.ts";
 import { AuthCard } from "../elements/auth-card.tsx";
-import { SecondaryActionLink } from "../elements/secondary-action-link.tsx";
+import { FrontDoorLinkButton } from "../elements/front-door-link-button.tsx";
 import { FrontDoorShell } from "./front-door-shell.tsx";
 import { InviteLanding } from "./invite-landing.tsx";
 
@@ -33,11 +33,17 @@ function IncompleteInviteLink() {
     <AuthCard
       title="This invitation link is incomplete"
       intro="Some email clients cut long links in half. Open the one in your inbox again, or ask whoever invited you for a fresh link."
+      actions={
+        <FrontDoorLinkButton
+          href="/auth/signin"
+          label="Go to sign in"
+          testId="invite-go-to-sign-in"
+        />
+      }
     >
       <Text fontSize="13.5px" lineHeight="1.65" color="fg.muted" data-testid="invite-incomplete">
         Nothing has been accepted, and nothing expires while you sort it out.
       </Text>
-      <SecondaryActionLink href="/auth/signin" label="Go to sign in" />
     </AuthCard>
   );
 }

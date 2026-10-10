@@ -4,12 +4,8 @@ import { defineConfig } from "@langwatch/design-system/system";
 
 /** The brand ramp, as the marketing site cuts it. */
 const brand = {
-  /** Lifted for dark grounds, where the solid orange reads as a light source. */
-  300: "#ffb380",
   400: "#ff8a3d",
   500: "#f56b1a",
-  /** Deepened for white grounds, where white text has to survive on it. */
-  600: "#c2510a",
   700: "#a83e05",
 } as const;
 
@@ -33,13 +29,11 @@ export const frontDoorThemeConfig = defineConfig({
           /** The ground the whole viewport stands on: the site's paper, or
            *  the site's dark band — never the app's panel grey. */
           ground: mode("#ffffff", ink[950]),
-          /** The primary action, on BOTH grounds. It was an ink pill on paper
-           *  and orange on ink, which meant the two themes disagreed about
-           *  what the most important thing on the screen looks like. */
-          action: mode(brand[600], orange(0.92)),
-          actionHover: mode(brand[700], brand[400]),
+          /** The primary action: the product's own primary button, so door and app agree. */
+          action: { value: "{colors.orange.solid}" },
+          actionHover: { value: "{colors.orange.hover}" },
           /** Text that sits on the action colour. */
-          onAction: mode("#ffffff", "#ffffff"),
+          onAction: { value: "{colors.orange.contrast}" },
           /** Text on a tinted surface: readable where the tint alone is not. */
           ink: mode(brand[700], brand[400]),
           /** The tint itself. */
@@ -57,11 +51,12 @@ export const frontDoorThemeConfig = defineConfig({
            * that reads as an action on white disappears into a dark field.
            */
           detail: mode(brand[500], orange300(0.75)),
-          focusRing: mode(orange(0.22), orange300(0.22)),
+          /** The product's focus ring, so a focused field reads the same here as in the app. */
+          focusRing: { value: "{colors.accent.focusRing}" },
           glow: mode(orange(0.28), orange300(0.22)),
-          /** Fields: a translucent pane over the card's glass. */
-          fieldBg: mode(white(0.62), white(0.06)),
-          fieldBorder: mode("rgba(20, 20, 23, 0.14)", white(0.14)),
+          /** Fields: solid on paper so typed text stays crisp, a faint pane on ink. */
+          fieldBg: mode("#ffffff", white(0.05)),
+          fieldBorder: mode("rgba(20, 20, 23, 0.16)", white(0.14)),
           /** A near-solid floor for a card that is one sentence with nothing to operate. */
           cardBgSolid: mode(white(0.85), "rgba(12, 12, 15, 0.88)"),
         },

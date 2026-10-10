@@ -4,7 +4,10 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { Delayed } from "./delayed.tsx";
 
 const meta = {
-  title: "Primitives/Delayed",
+  title: "Feedback/Delayed",
+  parameters: {
+    usage: { use: "Holding back a spinner or skeleton a moment, so fast loads never flash." },
+  },
   component: Delayed,
   tags: ["autodocs"],
   args: {

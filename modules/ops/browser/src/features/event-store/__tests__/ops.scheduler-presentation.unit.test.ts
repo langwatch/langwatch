@@ -7,6 +7,7 @@ import {
   deriveLoopHealth,
   deriveStatus,
   isSlotStale,
+  targetNoun,
   latenessMs,
   needsAttention,
   type SchedulerJobLike,
@@ -339,5 +340,12 @@ describe("canRunNow", () => {
       expect(canRunNow({ projectName: "Acme", status: "scheduled" })).toBe(true);
       expect(canRunNow({ projectName: "Acme", status: "overdue" })).toBe(true);
     });
+  });
+});
+
+describe("targetNoun", () => {
+  /** @scenario Pause and Resume name a report schedule in human words */
+  it("words the internal reportTrigger as a report schedule", () => {
+    expect(targetNoun({ targetType: "reportTrigger" })).toBe("report schedule");
   });
 });

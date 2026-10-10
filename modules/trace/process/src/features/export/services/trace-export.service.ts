@@ -1,3 +1,4 @@
+import type { Authorization } from "@langwatch/authorization";
 import { createLogger } from "@langwatch/observability";
 /**
  * TraceExportService — the download half of the trace read. It orchestrates batch fetching and CSV
@@ -12,7 +13,8 @@ import type {
   ExportRequest,
 } from "@langwatch/trace-contract";
 
-import { enrichTracesWithEvaluations } from "../../../rules/trace-evaluation-enrichment.rules.ts";
+import { enrichTracesWithEvaluations } from "../../../rules/trace-evaluation-mapping.rules.ts";
+import type { TraceFilterWhere } from "../../../rules/trace-filter-hidden-origins.rules.ts";
 // The PORT rather than the concrete legacy service: the export reads one
 // method, and typing it at the port lets a process hand over whatever it
 // composed its legacy read as.
@@ -29,6 +31,8 @@ import {
 
 const BATCH_SIZE = 100;
 
+type ExportFilter = TraceFilterWhere | undefined;
+
 const logger = createLogger("langwatch:export");
 
 /**
@@ -36,16 +40,40 @@ const logger = createLogger("langwatch:export");
  * `for await (const { chunk, progress } of service.exportTraces(request))` to stream chunks to the
  * response while updating progress.
  */
+type OwnReadAuthorizer = (input: { projectId: string }) => Promise<Authorization>;
+
 export class TraceExportService {
   private readonly traceService: TraceLegacyRead;
+  private readonly compileFilter: (input: { request: ExportRequest }) => ExportFilter;
+  private readonly authorizeOwnRead: OwnReadAuthorizer;
 
-  private constructor({ traceService }: { traceService: TraceLegacyRead }) {
+  private constructor({
+    traceService,
+    compileFilter,
+    authorizeOwnRead,
+  }: {
+    traceService: TraceLegacyRead;
+    compileFilter: (input: { request: ExportRequest }) => ExportFilter;
+    authorizeOwnRead: OwnReadAuthorizer;
+  }) {
     this.traceService = traceService;
+    this.compileFilter = compileFilter;
+    this.authorizeOwnRead = authorizeOwnRead;
   }
 
   /** Creates the process-owned export facade over the composed trace reader. */
-  static create({ traceService }: { traceService: TraceLegacyRead }): TraceExportService {
-    return new TraceExportService({ traceService });
+  static create({
+    traceService,
+    compileFilter,
+    authorizeOwnRead,
+  }: {
+    traceService: TraceLegacyRead;
+    /** The Explorer's compiled filter for the request's query. */
+    compileFilter: (input: { request: ExportRequest }) => ExportFilter;
+    /** Mints the own-only proof the span and evaluation reads go through (TRACE-PROOF-SHARE). */
+    authorizeOwnRead: OwnReadAuthorizer;
+  }): TraceExportService {
+    return new TraceExportService({ traceService, compileFilter, authorizeOwnRead });
   }
 
   /**
@@ -55,9 +83,11 @@ export class TraceExportService {
   async getTotalCount({
     request,
     protections,
+    authorization,
   }: {
     request: ExportRequest;
     protections: Protections;
+    authorization: Authorization;
   }): Promise<number> {
     const result = await this.traceService.getAllTracesForProject(
       {
@@ -65,7 +95,6 @@ export class TraceExportService {
         startDate: request.startDate,
         endDate: request.endDate,
         filters: request.filters,
-        query: request.query,
         traceIds: request.traceIds,
         pageSize: 1,
       },
@@ -74,6 +103,9 @@ export class TraceExportService {
         downloadMode: false,
         includeSpans: false,
         scrollId: null,
+        filterWhere: this.compileFilter({ request }),
+        authorization,
+        ownRead: await this.authorizeOwnRead({ projectId: request.projectId }),
       },
     );
 
@@ -88,9 +120,11 @@ export class TraceExportService {
   async *exportTraces({
     request,
     protections,
+    authorization,
   }: {
     request: ExportRequest;
     protections: Protections;
+    authorization: Authorization;
   }): AsyncGenerator<{ chunk: string; progress: ExportProgress }> {
     logger.info(
       { projectId: request.projectId, mode: request.mode, format: request.format },
@@ -108,7 +142,7 @@ export class TraceExportService {
     let shouldFetch = true;
 
     while (shouldFetch) {
-      const result = await this.fetchBatch({ request, protections, scrollId });
+      const result = await this.fetchBatch({ request, protections, authorization, scrollId });
       const traces: Trace[] = result.groups.flat();
       if (isFirstBatch) {
         total = result.totalHits;
@@ -159,10 +193,12 @@ export class TraceExportService {
   private async fetchBatch({
     request,
     protections,
+    authorization,
     scrollId,
   }: {
     request: ExportRequest;
     protections: Protections;
+    authorization: Authorization;
     scrollId: string | undefined;
   }) {
     return this.traceService.getAllTracesForProject(
@@ -171,7 +207,6 @@ export class TraceExportService {
         startDate: request.startDate,
         endDate: request.endDate,
         filters: request.filters,
-        query: request.query,
         traceIds: request.traceIds,
         pageSize: BATCH_SIZE,
         scrollId,
@@ -182,6 +217,9 @@ export class TraceExportService {
         includeSpans: request.mode === "full",
         resolveBlobs: true,
         scrollId: scrollId ?? null,
+        filterWhere: this.compileFilter({ request }),
+        authorization,
+        ownRead: await this.authorizeOwnRead({ projectId: request.projectId }),
       },
     );
   }

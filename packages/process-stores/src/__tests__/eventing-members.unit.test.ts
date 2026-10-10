@@ -1,7 +1,11 @@
 /**
  * @vitest-environment node
  */
-import { ClickHouseQueryClient, type InsertRequest } from "@langwatch/clickhouse-client";
+import {
+  ClickHouseQueryClient,
+  type InsertRequest,
+  TenantGuard,
+} from "@langwatch/clickhouse-client";
 import { createTenantId } from "@langwatch/eventing";
 import { PrismaClient } from "@langwatch/prisma-client/generated";
 import { describe, expect, it } from "vitest";
@@ -18,6 +22,7 @@ const classifyAsTheWorkerDoes = ({ AggregateType }: { AggregateType: string }) =
 function consumingEventingOver({ inserts }: { inserts: InsertRequest[] }) {
   const refuse = () => Promise.reject(new Error("only inserts run here"));
   const clickhouse = new ClickHouseQueryClient({
+    tenantGuard: new TenantGuard(),
     driver: {
       execute: refuse,
       command: refuse,

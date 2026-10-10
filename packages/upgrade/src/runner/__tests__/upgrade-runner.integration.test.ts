@@ -12,6 +12,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createLedgerTables } from "../../ledger-tables.ts";
 import { UpgradeLedgerRepository } from "../../ledger.repository.ts";
 import type { ManifestStep, ReleaseManifest } from "../../manifest/manifest.ts";
+import type { UpgradeClickHouse } from "../../ports.ts";
 import { defineMigrationStep, type MigrationStep } from "../../step/migration-step.ts";
 import type { UpgradeReadHint } from "../run-hint.ts";
 import type { UpgradeRunPhase } from "../run-phases.ts";
@@ -299,7 +300,10 @@ describe.skipIf(!DB_URL)("the upgrade runner", () => {
   });
 
   describe("when _prisma_migrations holds a failed migration", () => {
-    /** @scenario "A failed Prisma migration is named with the resolve command before anything is applied" */
+    /**
+     * @scenario "A failed Prisma migration is named with the resolve command before anything is applied"
+     * @scenario "A failed Prisma migration the upgrade may not re-run stops with its repair command"
+     */
     it("exits 1 naming the migration and the resolve command, before the applier runs", async () => {
       await scratch.postgres.query(
         `INSERT INTO "_prisma_migrations" ("migration_name", "logs") VALUES ('20261001000000_broken', 'boom')`,
@@ -970,6 +974,39 @@ describe.skipIf(!DB_URL)("the upgrade runner", () => {
       expect(order).toEqual([]);
       expect(await statusOf(ARCHIVE_DROP)).toBe("failed");
       expect(await rowsIn("LegacyKey")).toBe(2);
+    });
+  });
+  describe("when an earlier seed failed after recording its run", () => {
+    /** @scenario "A seed cut after its run row is seeded again, never read as a fresh install" */
+    it("seeds again from the tools' records and marks no data step not-needed", async () => {
+      for (const name of ["20261001000000_base", "20261002000000_add"]) {
+        await scratch.postgres.query(
+          `INSERT INTO "_prisma_migrations" ("migration_name", "finished_at") VALUES ($1, now())`,
+          [name],
+        );
+      }
+      const unreachable: UpgradeClickHouse = {
+        queryRows: async () => {
+          throw new Error("Code: 210. Connection refused");
+        },
+      };
+      const gooseAt: UpgradeClickHouse = {
+        queryRows: async (sql) =>
+          JSON.parse(
+            sql.includes("system.tables")
+              ? `[{"present":1}]`
+              : `[{"version_id":1,"is_applied":1},{"version_id":2,"is_applied":1}]`,
+          ),
+      };
+      const applier = fakeApplier({ release: "3.22.0" });
+      await run(runnerFor({ release: "3.22.0", applier, clickhouse: unreachable })).catch(
+        () => null,
+      );
+      const outcome = await run(runnerFor({ release: "3.22.0", applier, clickhouse: gooseAt }));
+      expect(outcome.code).toBe("done");
+      expect(await statusOf("dataset:copy-keys")).not.toBe("not-needed");
+      const base = (await ledger().findSteps()).find((s) => s.id === "prisma:20261001000000_base");
+      expect(base).toMatchObject({ status: "done", inferred: true });
     });
   });
 });

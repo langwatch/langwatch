@@ -23,10 +23,10 @@ Feature: One module binds the door every API request passes
 
     @unit
     Scenario: The bound door is the one every host answers through
-      Given auth binds the API door among its transport facts
+      Given auth binds the API door among its middleware bindings
       When the process opens its hosts
       Then the process opens exactly the door auth bound
-      And the door binding is mounted on no REST family or tRPC namespace as a fact
+      And the door binding is mounted on no REST family or tRPC namespace as middleware context
 
   Rule: Authorization fails closed
 

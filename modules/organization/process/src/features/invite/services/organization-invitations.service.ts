@@ -73,7 +73,12 @@ export interface OrganizationInvitations {
   create(input: OrganizationInvitationsCreateInput): Promise<OrganizationInvitesCreated>;
   findPendingForAddresses(
     input: Readonly<{ addresses: readonly string[] }>,
-  ): Promise<{ inviteCode: string; organizationName: string; role: OrganizationUserRole }[]>;
+  ): Promise<{
+      inviteCode: string;
+      organizationName: string;
+      inviterName: string | null;
+      role: OrganizationUserRole;
+    }[]>;
   revoke(input: Readonly<{ organizationId: string; inviteId: string }>): Promise<void>;
   /**
    * Throttled per INVITATION, because the thing protected is the recipient's
@@ -195,7 +200,12 @@ export class OrganizationInvitationsService implements OrganizationInvitations {
   async findPendingForAddresses({
     addresses,
   }: Readonly<{ addresses: readonly string[] }>): Promise<
-    { inviteCode: string; organizationName: string; role: OrganizationUserRole }[]
+    {
+      inviteCode: string;
+      organizationName: string;
+      inviterName: string | null;
+      role: OrganizationUserRole;
+    }[]
   > {
     const normalized = [
       ...new Set(addresses.map((address) => address.trim().toLowerCase())),

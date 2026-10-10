@@ -373,16 +373,12 @@ function startClaimHeartbeat({
 }): ClaimHeartbeat {
   const timer = setInterval(() => {
     Promise.resolve(
-      receipts.$executeRaw`
-        -- @tenancy: a receipt is addressed by its own id, resolved from the
-        -- (scopeId, key) pair the caller holds.
-        UPDATE "IdempotencyReceipt"
-           SET "heartbeatAt" = ${toDate(nowInstant())}
-         WHERE "id" = ${receiptId}
-           AND "claimId" = ${claimId}
-      `,
+      receipts.idempotencyReceipt.updateMany({
+        where: { id: receiptId, claimId },
+        data: { heartbeatAt: toDate(nowInstant()) },
+      }),
     )
-      .then((count) => {
+      .then(({ count }) => {
         if (count > 0) return;
 
         // The claim is somebody else's now. Warn once and stop, rather than
@@ -428,14 +424,10 @@ export async function finalizeClaim({
   serializedBody: string;
 }): Promise<void> {
   // Ciphertext; see `readStoredBody` for why.
-  const count = await receipts.$executeRaw`
-    -- @tenancy: addressed by receipt id, fenced on the claim this request holds.
-    UPDATE "IdempotencyReceipt"
-       SET "responseStatus" = ${status},
-           "responseBody" = ${cipher.encrypt(serializedBody)}
-     WHERE "id" = ${receiptId}
-       AND "claimId" = ${claimId}
-  `;
+  const { count } = await receipts.idempotencyReceipt.updateMany({
+    where: { id: receiptId, claimId },
+    data: { responseStatus: status, responseBody: cipher.encrypt(serializedBody) },
+  });
 
   if (count === 0) {
     idempotencyLogger.error(
@@ -584,17 +576,14 @@ export async function takeOverClaim({
 }): Promise<ExistingVerdict> {
   const claimId = randomUUID();
 
-  const count = await receipts.$executeRaw`
-    -- @tenancy: a receipt is addressed by its own id, resolved from the
-    -- (scopeId, key) pair the caller holds.
-    UPDATE "IdempotencyReceipt"
-       SET "claimId" = ${claimId},
-           "heartbeatAt" = ${toDate(now)},
-           "expiresAt" = ${toDate(now.add({ milliseconds: RECEIPT_TTL_MS }))}
-     WHERE "id" = ${existing.id}
-       AND "claimId" = ${existing.claimId}
-       AND "responseStatus" IS NULL
-  `;
+  const { count } = await receipts.idempotencyReceipt.updateMany({
+    where: { id: existing.id, claimId: existing.claimId, responseStatus: null },
+    data: {
+      claimId,
+      heartbeatAt: toDate(now),
+      expiresAt: toDate(now.add({ milliseconds: RECEIPT_TTL_MS })),
+    },
+  });
 
   if (count === 0) return { kind: "retry" };
 

@@ -118,6 +118,18 @@ describe("SsoBreakGlassService", () => {
       await expect(service.hasLiveBinding({ organizationId: ORGANIZATION })).resolves.toBe(true);
     });
 
+    /** @scenario "Granting a holder who already has a live way back in renews it" */
+    it("supersedes the holder's earlier grant instead of adding a second", async () => {
+      const service = serviceFor();
+
+      const first = await grant(service);
+      const second = await grant(service);
+
+      expect(second.renewedFromBindingId).toBe(first.bindingId);
+      const live = await service.live({ organizationId: ORGANIZATION });
+      expect(live.map((binding) => binding.bindingId)).toEqual([second.bindingId]);
+    });
+
     /** @scenario "A way back in is never open-ended" */
     it("refuses an expiry in the past or beyond the window, and writes nothing", async () => {
       const service = serviceFor();

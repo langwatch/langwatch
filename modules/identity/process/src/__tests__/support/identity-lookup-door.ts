@@ -1,5 +1,5 @@
 import {
-  bindTrpcFact,
+  bindTrpcMiddlewareContext,
   createTrpcRuntime,
   TrpcRootDefinition,
   type TrpcRuntimeMembers,
@@ -8,7 +8,10 @@ import type { IdentityLookupApi } from "@langwatch/identity-contract";
 import type { OpsOperator } from "@langwatch/ops-contract";
 import { testAuthorizeDefaults } from "@langwatch/test-harness/trpc-members";
 
-import { identityLookupTrpcTransport, operatorFact } from "../../transport/identity-lookup.trpc.ts";
+import {
+  identityLookupTrpcTransport,
+  operatorContext,
+} from "../../transport/identity-lookup.trpc.ts";
 
 type Context = { actor: { type: "user"; id: string } | null; operator: OpsOperator | null };
 
@@ -48,7 +51,7 @@ export function identityLookupDoor({
   };
   const runtime = createTrpcRuntime<Context>({ root, procedure: root.procedure, members });
   const router = runtime.mount(identityLookupTrpcTransport, () => app, {
-    facts: [bindTrpcFact(operatorFact, (ctx: Context) => ctx.operator)],
+    middlewareContext: [bindTrpcMiddlewareContext(operatorContext, (ctx: Context) => ctx.operator)],
   });
 
   return {

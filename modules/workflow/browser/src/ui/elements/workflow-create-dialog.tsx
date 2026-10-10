@@ -185,7 +185,7 @@ export function WorkflowCreateDialog({
       trapFocus={false}
       preventScroll={false}
     >
-      <Dialog.Content bg="bg" paddingX={0}>
+      <Dialog.Content paddingX={0}>
         {renderContentBoundary(
           <>
             <Dialog.Header>

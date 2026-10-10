@@ -4,6 +4,7 @@ import {
   AuthorizedClickHouse,
   ClickHouseQueryClient,
   type QueryDriver,
+  TenantGuard,
 } from "@langwatch/clickhouse-client";
 
 export function authorizedClickHouseFor(client: ClickHouseClient): AuthorizedClickHouse {
@@ -33,6 +34,6 @@ export function authorizedClickHouseFor(client: ClickHouseClient): AuthorizedCli
       });
     },
   };
-  const queryClient = new ClickHouseQueryClient({ driver });
+  const queryClient = new ClickHouseQueryClient({ tenantGuard: new TenantGuard(), driver });
   return new AuthorizedClickHouse({ resolveClient: async () => queryClient });
 }

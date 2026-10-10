@@ -10,7 +10,7 @@ import {
   OrganizationMissingCredentialsError,
 } from "@langwatch/api";
 import {
-  bindRestMiddleware,
+  bindMiddlewareContext,
   createCanonicalFamilyErrorHandler,
   createRestRuntime,
   MANAGEMENT_API_VERSION,
@@ -22,7 +22,7 @@ import { Temporal, type Instant } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
 import {
-  organizationKeyFacts,
+  organizationKeyContext,
   organizationManagementRest,
 } from "../organization-management.rest.ts";
 
@@ -46,6 +46,7 @@ function mount(app: Partial<OrganizationApi>) {
     };
   };
   const runtime = createRestRuntime({
+    audit: { record: async () => {} },
     authorization: restTestAuthorization(),
     identity: {
       identify: ({ request }) => admit(request),
@@ -57,7 +58,9 @@ function mount(app: Partial<OrganizationApi>) {
   const hono = runtime.mount(organizationManagementRest.router(), {
     app: () => createApiFixture<OrganizationApi>(app),
     onError,
-    facts: [bindRestMiddleware(organizationKeyFacts, () => ({ apiKeyId: "key-1" }))],
+    middlewareContext: [
+      bindMiddlewareContext(organizationKeyContext, () => ({ apiKeyId: "key-1" })),
+    ],
   });
 
   return (

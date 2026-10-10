@@ -1,8 +1,5 @@
 import type { UpgradePostgres } from "../../ports.ts";
 
-/** Marks the SQL for the tenancy guard: an archive copies a whole retired table, every tenant. */
-const TENANCY = "-- @tenancy: a retired table is archived whole, before its contract drops it.\n";
-
 /** A table's row count, or null when the table does not exist. */
 export type ArchiveCounts = { source: number | null; archive: number | null };
 
@@ -26,7 +23,7 @@ export class ContractArchiveRepository {
     const count = (name: string, present: boolean) =>
       present ? `(SELECT count(*) FROM ${quoted(name)})::text` : "NULL";
     const { rows } = await this.postgres.query<{ source: string | null; archive: string | null }>(
-      `${TENANCY}SELECT ${count(source, exists.source)} AS "source", ${count(archive, exists.archive)} AS "archive"`,
+      `SELECT ${count(source, exists.source)} AS "source", ${count(archive, exists.archive)} AS "archive"`,
     );
     const asNumber = (value: string | null | undefined) => (value == null ? null : Number(value));
     return { source: asNumber(rows[0]?.source), archive: asNumber(rows[0]?.archive) };
@@ -35,7 +32,7 @@ export class ContractArchiveRepository {
   /** Rebuilds the archive from the live source in one implicit transaction; the source stays. */
   async copy({ source, archive }: { source: string; archive: string }): Promise<void> {
     await this.postgres.query(
-      `${TENANCY}DROP TABLE IF EXISTS ${quoted(archive)}; CREATE TABLE ${quoted(archive)} AS TABLE ${quoted(source)};`,
+      `DROP TABLE IF EXISTS ${quoted(archive)}; CREATE TABLE ${quoted(archive)} AS TABLE ${quoted(source)};`,
     );
   }
 }

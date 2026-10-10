@@ -9,7 +9,7 @@ const llmTwoModels = `{"calls":[
 {"id":"2","path":"/v1/chat/completions","dialect":"openai","model":"gpt-5-mini","mode":"markov","status":200},
 {"id":"1","path":"/v1/messages","dialect":"anthropic","model":"claude-error-429","mode":"markov","status":429,"error":"rate limited"}]}`
 
-// @scenario "haven llm calls filters by model and failure"
+// @scenario "haven sim llm list filters by model and failure"
 func TestLLMCallsFiltersByModelAndFailure(t *testing.T) {
 	api, _ := stubSim(t, map[string]string{
 		"GET /_sim/api/calls": llmTwoModels,

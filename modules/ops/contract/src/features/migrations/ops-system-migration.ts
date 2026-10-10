@@ -76,6 +76,12 @@ const tenantMigrationRecordSchema = z.object({
   report: z.unknown(),
 }) satisfies z.ZodType<TenantMigrationRecord>;
 
+/** One tenant's row with when it last moved, as the attention list and `listTenants` read it. */
+export const opsMigrationTenantRowSchema = z.object({
+  ...tenantMigrationRecordSchema.shape,
+  updatedAt: z.date(),
+});
+
 /** One enrollment row as the ops page lists it. */
 export const opsMigrationEnrollmentRecordSchema = z.object({
   organizationId: z.string(),
@@ -142,7 +148,7 @@ export const opsMigrationOverviewSchema = z.object({
    * for a migration that admits every organization automatically.
    */
   enrollment: z.object({ enrolledCount: z.number(), notEnrolledCount: z.number() }).nullable(),
-  attention: z.array(z.object({ ...tenantMigrationRecordSchema.shape, updatedAt: z.date() })),
+  attention: z.array(opsMigrationTenantRowSchema),
 });
 export type OpsMigrationOverview = z.infer<typeof opsMigrationOverviewSchema>;
 

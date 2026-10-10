@@ -12,7 +12,7 @@ export type GatewayClickHouseClient = {
     format: "JSONEachRow";
     clickhouse_settings?: Record<string, string | number | boolean | undefined>;
     /** Set when the statement genuinely spans tenants; see the tenant-scope guard. */
-    unscoped?: { reason: string };
+    SKIP_TENANT_CHECK?: true;
     /** One organisation's projects a `TenantId IN (...)` read binds, exactly. */
     tenantIds?: readonly string[];
     /** Abandons the read, retries included, once it aborts. */
@@ -59,7 +59,7 @@ export class ClickHouseGatewaySession implements GatewayClickHouseClient {
     query_params?: Record<string, unknown>;
     format: "JSONEachRow";
     clickhouse_settings?: Record<string, string | number | boolean | undefined>;
-    unscoped?: { reason: string };
+    SKIP_TENANT_CHECK?: true;
     tenantIds?: readonly string[];
     signal?: AbortSignal;
   }): Promise<{ json<T = unknown>(): Promise<T[]> }> {
@@ -69,7 +69,7 @@ export class ClickHouseGatewaySession implements GatewayClickHouseClient {
       sql: input.query,
       params: input.query_params,
       settings: input.clickhouse_settings as Record<string, string | number> | undefined,
-      ...(input.unscoped ? { unscoped: input.unscoped } : {}),
+      SKIP_TENANT_CHECK: input.SKIP_TENANT_CHECK,
       ...(input.tenantIds ? { tenantIds: input.tenantIds } : {}),
       ...(input.signal ? { signal: input.signal } : {}),
     });

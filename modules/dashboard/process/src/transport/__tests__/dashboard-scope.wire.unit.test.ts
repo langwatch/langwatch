@@ -5,7 +5,13 @@
  * Spec: dashboards-v2.feature AC171 to AC174 and AC189.
  */
 import { langWatchQLCallerProtections } from "@langwatch/analytics-contract";
-import { bindRestMiddleware, canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
+import {
+  bindMiddlewareContext,
+  canonicalErrorResponse,
+  createRestRuntime,
+  type RestMountOptions,
+  type RestTransportDeclaration,
+} from "@langwatch/api/rest";
 import type { TrpcProcedureFactory } from "@langwatch/api/trpc";
 import type { DashboardApi, DashboardScope } from "@langwatch/dashboard-contract";
 import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
@@ -103,15 +109,18 @@ function credentialDoors(app: DashboardApi, projectId: string) {
     authorization: restTestAuthorization(),
     identity: { authenticate: () => caller, identify: () => caller },
   });
-  const mount = (family: typeof dashboardRest, facts: unknown[] = []) =>
+  const mount = (
+    family: { router: () => RestTransportDeclaration<DashboardApi> },
+    middlewareContext: RestMountOptions<DashboardApi>["middlewareContext"] = [],
+  ) =>
     runtime.mount(family.router(), {
       app: () => app,
-      facts: facts as never,
+      middlewareContext,
       onError: canonicalErrorResponse,
     });
   const families = [
-    { under: "/analytics/dashboard-widgets", hono: mount(dashboardWidgetRest, WIDGET_FACTS) },
-    { under: "/analytics/charts", hono: mount(savedWorkbenchChartRest, CHART_FACTS) },
+    { under: "/analytics/dashboard-widgets", hono: mount(dashboardWidgetRest, WIDGET_CONTEXT) },
+    { under: "/analytics/charts", hono: mount(savedWorkbenchChartRest, CHART_CONTEXT) },
     { under: "/api/dashboards", hono: mount(dashboardRest) },
     { under: "/api/graphs", hono: mount(graphRest) },
   ];
@@ -131,13 +140,13 @@ function credentialDoors(app: DashboardApi, projectId: string) {
   };
 }
 
-const WIDGET_FACTS = [
-  bindRestMiddleware(dashboardWidgetUrl, () => PLATFORM_URL),
-  bindRestMiddleware(dashboardWidgetCallerSource, () => ({ kind: "api" as const })),
+const WIDGET_CONTEXT = [
+  bindMiddlewareContext(dashboardWidgetUrl, () => PLATFORM_URL),
+  bindMiddlewareContext(dashboardWidgetCallerSource, () => ({ kind: "api" as const })),
 ];
-const CHART_FACTS = [
-  bindRestMiddleware(langWatchQLCallerProtections, () => FULLY_PERMITTED),
-  bindRestMiddleware(savedWorkbenchChartUrl, () => PLATFORM_URL),
+const CHART_CONTEXT = [
+  bindMiddlewareContext(langWatchQLCallerProtections, () => FULLY_PERMITTED),
+  bindMiddlewareContext(savedWorkbenchChartUrl, () => PLATFORM_URL),
 ];
 
 /** The author's board in HOME, with a widget, a graph and a saved chart, at the scope asked for. */

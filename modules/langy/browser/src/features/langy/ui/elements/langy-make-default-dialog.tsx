@@ -46,11 +46,10 @@ export function LangyMakeDefaultDialog({
       initialFocusEl={() => declineRef.current}
     >
       {shown ? (
-        <Dialog.Content bg="bg" maxWidth="480px" errorScope="Langy default ask">
+        <Dialog.Content maxWidth="480px" errorScope="Langy default ask">
+          <Dialog.CloseTrigger />
           <Dialog.Header>
-            <Dialog.Title fontSize="md" fontWeight="500">
-              Set model as default?
-            </Dialog.Title>
+            <Dialog.Title>Set model as default?</Dialog.Title>
           </Dialog.Header>
           <Dialog.Body paddingTop={0}>
             <Text fontSize="sm" color="fg.muted" wordBreak="break-word">
@@ -69,7 +68,7 @@ export function LangyMakeDefaultDialog({
           <Dialog.Footer>
             <HStack width="full">
               <Spacer />
-              <Button ref={declineRef} variant="ghost" onClick={onDecline}>
+              <Button ref={declineRef} variant="outline" onClick={onDecline}>
                 Just this conversation
               </Button>
               <Button colorPalette="orange" onClick={onConfirm}>

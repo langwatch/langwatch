@@ -166,7 +166,7 @@ func parseDurationFlag(inv invocation, flag string) (time.Duration, error) {
 	return d, nil
 }
 
-// runTraces answers `haven traces [trace-id] [filters]` from this stack's own
+// runTraces answers `haven obs traces [trace-id] [filters]` from this stack's own
 // Tempo, filtered to its worktree.
 func runTraces(ctx context.Context, d deps, inv invocation) error {
 	filter, err := traceFilterFrom(inv)

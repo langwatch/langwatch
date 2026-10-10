@@ -1,6 +1,7 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { fromDate } from "@langwatch/time";
+import { EmailAlreadyRegisteredError } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { PrismaUserRepository, type UserDatabase } from "../prisma.user.repository.ts";
@@ -241,6 +242,16 @@ describe("PrismaUserRepository credential creation", () => {
         repositoryOver(database).create({ name: "Ada", email: "ada@example.com" }),
       ).rejects.toThrow("outbox unavailable");
       expect(state.committed).toBe(false);
+    });
+
+    /** @scenario "A mint that loses a race for its address answers that the address is taken" */
+    it("reads the store's unique-email refusal as the address being taken", async () => {
+      const { database, userCreate } = makeDatabase();
+      userCreate.mockRejectedValueOnce(Object.assign(new Error("unique"), { code: "P2002" }));
+
+      await expect(
+        repositoryOver(database).create({ name: "Ada", email: "ada@example.com" }),
+      ).rejects.toBeInstanceOf(EmailAlreadyRegisteredError);
     });
   });
 

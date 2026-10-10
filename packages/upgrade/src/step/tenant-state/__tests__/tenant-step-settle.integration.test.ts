@@ -4,6 +4,8 @@
  * Requires LANGWATCH_TEST_DATABASE_URL; the test gets its own Postgres schema.
  */
 
+import { SystemMigrationRunnerService } from "@langwatch/system-migrations";
+import { Temporal } from "@langwatch/time";
 import { Pool } from "pg";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
@@ -66,8 +68,16 @@ describe.skipIf(!DB_URL)("TenantStepSettleService over Postgres", () => {
       report: null,
     });
     const service = TenantStepSettleService.create({ state, ledger });
+    const runner = new SystemMigrationRunnerService({
+      now: () => Temporal.Now.instant(),
+      state,
+      lease: { acquire: async () => false, renew: async () => false, release: async () => {} },
+      tenants: { findTenantIdsAfter: async ({ cursor }) => (cursor ? [] : ["org-1"]) },
+      cohort: () => true,
+      migrations: [],
+    });
 
-    await service.settle({ ids: [PENDING, FAILED] });
+    await service.settle({ buckets: [{ ids: [PENDING, FAILED], runner }] });
     expect(await statusOf({ id: PENDING })).toBe("done");
     expect(await statusOf({ id: FAILED })).toBe("failed");
 
@@ -78,7 +88,7 @@ describe.skipIf(!DB_URL)("TenantStepSettleService over Postgres", () => {
       report: null,
       heldReason: "proof",
     });
-    await service.settle({ ids: [PENDING] });
+    await service.settle({ buckets: [{ ids: [PENDING], runner }] });
     expect(await statusOf({ id: PENDING })).toBe("pending");
   });
 });

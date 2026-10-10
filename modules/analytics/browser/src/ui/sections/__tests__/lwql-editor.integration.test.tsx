@@ -13,17 +13,20 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { SCHEMA } from "../../../model/lwql-language/__tests__/lwql-fixture.fixture.ts";
 
-type Suggestions = { suggestions: { label: string }[] };
+type Suggestion = { label: string; kind: string; detail?: string };
+type Suggestions = { suggestions: Suggestion[] };
 type Provider = { provideCompletionItems: (model: FakeModel, position: unknown) => Suggestions };
 type Marker = { message: string; startLineNumber: number; startColumn: number };
 
 type Recorded = {
+  controlledValue: string | undefined;
   provider: Provider | undefined;
   markers: unknown[];
   mounted: FakeModel | undefined;
 };
 
 const recorded = vi.hoisted((): Recorded => ({
+  controlledValue: undefined,
   provider: undefined,
   markers: [],
   mounted: undefined,
@@ -64,7 +67,8 @@ function fakeMonaco() {
 
 vi.mock("@monaco-editor/react", () => ({
   default: (props: {
-    value: string;
+    value?: string;
+    defaultValue: string;
     beforeMount: (monaco: unknown) => void;
     onMount: (editor: unknown, monaco: unknown) => void;
     options: { readOnly?: boolean };
@@ -74,11 +78,18 @@ vi.mock("@monaco-editor/react", () => ({
       if (!element || mountedOnce.current) return;
       mountedOnce.current = true;
       const monaco = fakeMonaco();
-      const model = new FakeModel(props.value);
+      recorded.controlledValue = props.value;
+      const model = new FakeModel(props.defaultValue);
       props.beforeMount(monaco);
       recorded.mounted = model;
       props.onMount(
-        { getModel: () => model, createDecorationsCollection: () => ({ set: vi.fn() }) },
+        {
+          getModel: () => model,
+          createDecorationsCollection: () => ({ set: vi.fn() }),
+          hasTextFocus: () => true,
+          getValue: model.getValue,
+          setValue: vi.fn(),
+        },
         monaco,
       );
     };
@@ -86,7 +97,7 @@ vi.mock("@monaco-editor/react", () => ({
       <textarea
         ref={attach}
         data-testid="lwql-input"
-        defaultValue={props.value}
+        defaultValue={props.defaultValue}
         readOnly={props.options.readOnly}
       />
     );
@@ -118,10 +129,14 @@ function mount({
   );
 }
 
-function completionLabels(): string[] {
+function completions(): Suggestion[] {
   const { provider, mounted } = recorded;
   if (!provider || !mounted) throw new Error("the editor has not mounted yet");
-  return provider.provideCompletionItems(mounted, {}).suggestions.map((s) => s.label);
+  return provider.provideCompletionItems(mounted, {}).suggestions;
+}
+
+function completionLabels(): string[] {
+  return completions().map((s) => s.label);
 }
 
 describe("LwqlEditor", () => {
@@ -137,7 +152,42 @@ describe("LwqlEditor", () => {
         mount({ schema: SCHEMA, value: "SELECT 1 FROM " });
         await screen.findByTestId("lwql-input");
         await waitFor(() =>
-          expect(completionLabels()).toEqual(["analytics.traces", "analytics.spans"]),
+          expect(completionLabels()).toEqual(["traces", "spans"]),
+        );
+      });
+    });
+  });
+
+  describe("given an editor the member is typing in", () => {
+    describe("when the host re-renders with the text it last saw", () => {
+      /** @scenario "Typing ahead of the host keeps the text, the cursor and the completion list" */
+      it("seeds the editor once and never hands it a controlled value to replay", async () => {
+        mount({ schema: SCHEMA, value: "SELECT * FROM tr" });
+        await screen.findByTestId("lwql-input");
+        expect(recorded.mounted?.getValue()).toBe("SELECT * FROM tr");
+        expect(recorded.controlledValue).toBeUndefined();
+      });
+    });
+  });
+
+  describe("given an editor given a schema and a statement reading a dataset", () => {
+    describe("when the member asks for completion in the WHERE clause", () => {
+      /** @scenario "The editor offers typed columns and functions alongside keywords" */
+      it("offers the dataset's columns with their type, the functions and the keywords", async () => {
+        mount({ schema: SCHEMA, value: "SELECT * FROM analytics.traces WHERE Dur" });
+        await screen.findByTestId("lwql-input");
+        await waitFor(() =>
+          expect(completions()).toEqual(
+            expect.arrayContaining([
+              expect.objectContaining({
+                label: "DurationMs",
+                kind: "Field",
+                detail: "UInt64 (ms)",
+              }),
+              expect.objectContaining({ label: "count", kind: "Function" }),
+              expect.objectContaining({ label: "WHERE", kind: "Keyword" }),
+            ]),
+          ),
         );
       });
     });

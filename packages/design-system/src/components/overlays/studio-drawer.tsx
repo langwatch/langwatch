@@ -3,6 +3,7 @@ import * as React from "react";
 
 import { StudioIsolatedErrorBoundary } from "../states/studio-error-boundary.tsx";
 import { CloseButton } from "./close-button.tsx";
+import { useDrawerEndInset } from "./drawer.tsx";
 
 /**
  * Context to provide a margin-top offset to all Drawer.Content descendants.
@@ -48,12 +49,8 @@ export const DrawerContent = React.forwardRef<HTMLDivElement, DrawerContentProps
     const marginTopProp =
       rest.marginTop ?? (contextMarginTop ? `${contextMarginTop}px` : undefined);
 
-    // THE LANGY CHOREOGRAPHY DID NOT TRAVEL: `@langwatch/langy-browser` is
-    // ungoverned and needs a stylesheet this package won't adopt globally.
-    // Without it a drawer opened in the studio slides under a docked panel
-    // rather than beside it.
-    // Spec: specs/langy/langy-panel-layout.feature.
-    const langyYieldMarginEnd = undefined;
+    const endInset = useDrawerEndInset();
+    const langyYieldMarginEnd = endInset > 0 ? `${endInset}px` : undefined;
     const langyStaggerEnter = undefined;
 
     // Crash inside the drawer body should NOT close the drawer. Wrap the

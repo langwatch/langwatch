@@ -471,11 +471,25 @@ export function retryAfterOf(error: unknown): string | undefined {
   return String(Math.ceil(waitMs / 1000));
 }
 
-/** The one mapping of a store failure every boundary answers handled: busy pool, schema behind. */
-export function promoteStoreFailure<T>(raised: T): T | HandledError {
+/** Whether this process's upgrade gate admitted it: the ledger is current for its image. */
+let ledgerCurrent = false;
+
+/** Process-global, so only the upgrade gate of the process that owns it calls it (STUCK-STATES). */
+export function setLedgerCurrent({ current }: { current: boolean }): void {
+  ledgerCurrent = current;
+}
+
+/**
+ * The one mapping of a store failure every boundary answers: busy pool, schema behind. Schema
+ * behind is `upgrade_in_progress` only before the gate admits; after, the ledger and the schema
+ * disagree, an unhandled 500 whose log names the table or column (STUCK-STATES).
+ */
+export function promoteStoreFailure<T>(raised: T): T | Error {
   if (isDatabaseBusy(raised)) return new DatabaseBusyError();
-  if (isSchemaBehind(raised)) return new UpgradeInProgressError();
-  return raised;
+  if (!isSchemaBehind(raised)) return raised;
+  if (!ledgerCurrent) return new UpgradeInProgressError();
+  const detail = raised instanceof Error ? raised.message : String(raised);
+  return new Error(`schema and ledger disagree: ${detail}`, { cause: raised });
 }
 
 // ---------------------------------------------------------------------------

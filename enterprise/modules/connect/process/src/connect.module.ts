@@ -13,6 +13,6 @@ export const connectProcessModule: PublishedProcessModule<"connect", ConnectApi,
     .withEventing(connectContractBudgetEventing)
     // The Go data plane signs hosted calls with the gateway's own secret, so the
     // family answers behind the gateway's door rather than a rebuilt one.
-    .withTransportFacts(({ dependencies }) => [
+    .provideMiddlewareBindings(({ dependencies }) => [
       bindRestCredential("internal_secret", () => dependencies.gateway.internalDoor()),
     ]);

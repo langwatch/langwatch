@@ -174,13 +174,14 @@ export default function OrganizationHostMount({ children }: { children?: ReactNo
   const uiScope = useUiScope();
   const activeScope = uiScope.activeScope();
   const { openDrawer, closeDrawer } = useDrawer();
+  const sessionActor = session.currentUser();
   const graph = useOrganizationGraph({
     organizationId: activeScope.organizationId ?? void 0,
     projectId: activeScope.projectId ?? void 0,
+    signedIn: !!sessionActor,
   });
   const facts = useUiOrganizationFacts();
   const flags = useUiFlags();
-  const sessionActor = session.currentUser();
   const reading = route.reading();
   const lentCards = useLentAll(AuthenticationOverviewCardToken);
   const overviewCards = useMemo(

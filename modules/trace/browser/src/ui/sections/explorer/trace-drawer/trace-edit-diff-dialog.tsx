@@ -63,7 +63,7 @@ export function TraceEditDiffDialog({ open, onClose, patch }: TraceEditDiffDialo
       size="xl"
       placement="center"
     >
-      <Dialog.Content bg="bg" maxHeight="85vh" display="flex" flexDirection="column">
+      <Dialog.Content maxHeight="85vh" display="flex" flexDirection="column">
         <Dialog.Header borderBottomWidth="1px" borderColor="border">
           <HStack gap={3} align="center">
             <Dialog.Title>

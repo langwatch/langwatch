@@ -8,6 +8,7 @@ import (
 	"io"
 	"iter"
 	"maps"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -32,6 +33,9 @@ type RunConfig struct {
 	Backoff    time.Duration // the first retry's wait; 1 s
 	Now        func() time.Time
 	Drain      bool // wait for the worker backlog to empty after the last ack
+	// Backlog, when set, scopes the drain to the seed's own tenants; without it the drain waits on
+	// the whole stack's worker backlog.
+	Backlog func(ctx context.Context, tenants []string, now time.Time) (SeedBacklog, error)
 }
 
 // Result counts what this session sent, how long sending took from the first ack, and the drain.
@@ -40,6 +44,8 @@ type Result struct {
 	IdentityRefused                           int // refused identity actions: what was asked for does not all exist
 	Refusals                                  map[string]int
 	Sent, Drained                             time.Duration
+	Deferred                                  int // the seed's jobs deferred past DrainHorizon when the drain ended
+	SkippedCells                              int // cells of projects an earlier run made and filled
 }
 
 // StallError is exit 4: sending stayed paused for StallAfter (design §5.4).
@@ -58,10 +64,17 @@ func Run(ctx context.Context, cfg RunConfig) (Result, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	r := &run{cfg: cfg, guard: NewGuard(cfg.Log), cancel: cancel, result: Result{Refusals: map[string]int{}}}
-	go r.watch(ctx)
+	watching, stopWatching := context.WithCancel(ctx)
+	defer stopWatching()
+	go r.watch(watching)
+	identity := true
 	for step := range cfg.Plan.Steps() {
 		if r.done(step.Seq) {
 			continue
+		}
+		if identity && step.Cell != nil {
+			identity = false
+			r.wg.Wait() // every org, member and grant lands before telemetry floods the worker
 		}
 		sending := r.actionsOf(step)
 		if r.acquire(ctx) != nil {
@@ -71,16 +84,24 @@ func Run(ctx context.Context, cfg RunConfig) (Result, error) {
 		go r.apply(ctx, step, sending)
 	}
 	r.wg.Wait()
+	stopWatching() // the guard paces sending; the drain reads on its own
 	if !r.firstAck.IsZero() {
 		r.result.Sent = cfg.Now().Sub(r.firstAck)
 	}
 	if err := r.finish(); err != nil {
 		return r.result, err
 	}
-	if cfg.Drain {
-		r.result.Drained = r.drain(ctx)
+	if !cfg.Drain {
+		return r.result, nil
 	}
-	return r.result, nil
+	if cfg.Backlog == nil {
+		r.result.Drained = r.drain(ctx)
+		return r.result, nil
+	}
+	started := cfg.Now()
+	err := r.drainSeed(ctx)
+	r.result.Drained = cfg.Now().Sub(started)
+	return r.result, err
 }
 
 func (cfg RunConfig) withDefaults() RunConfig {
@@ -177,7 +198,11 @@ func (r *run) done(seq int64) bool {
 func (r *run) apply(ctx context.Context, step Step, sending sending) {
 	actions, refused := sending.actions, sending.refused
 	defer r.wg.Done()
-	refs := map[string]string{}
+	if step.Cell != nil && r.existing(step.Cell.Project) {
+		r.skip(step)
+		return
+	}
+	refs, existing := map[string]string{}, false
 	for action, err := range r.sendable(step, actions) {
 		var reply Reply
 		if err == nil {
@@ -194,8 +219,30 @@ func (r *run) apply(ctx context.Context, step Step, sending sending) {
 			refused = reply.Code
 		}
 		maps.Copy(refs, reply.Refs)
+		existing = reply.Existing
+	}
+	if existing && step.Action != nil && step.Action.Kind == KindProjectCreate {
+		r.mu.Lock()
+		r.cfg.Checkpoint.Existing = append(r.cfg.Checkpoint.Existing, step.Action.Ref)
+		r.mu.Unlock()
 	}
 	r.ack(step, refs, refused)
+}
+
+// skip acks a cell of a project an earlier run made, counting it apart from what was sent.
+func (r *run) skip(step Step) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.inFlight--
+	r.result.SkippedCells++
+	r.cfg.Checkpoint.Ack(step.Seq, "skipped:existing_project", nil)
+}
+
+// existing says the project was found already made by an earlier run, which sent its telemetry.
+func (r *run) existing(project string) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return slices.Contains(r.cfg.Checkpoint.Existing, project)
 }
 
 func (r *run) ack(step Step, refs map[string]string, refused string) {
@@ -223,6 +270,9 @@ func (r *run) ack(step Step, refs map[string]string, refused string) {
 		r.result.MetricPoints += step.Cell.MetricPoints
 	} else {
 		r.result.Actions++
+	}
+	if refused != "" && step.Action != nil {
+		return // left unacked: a resume sends it again, and natural keys keep that idempotent
 	}
 	r.cfg.Checkpoint.Ack(step.Seq, counter, refs)
 	if r.cfg.Path != "" {
@@ -360,6 +410,64 @@ func (r *run) drain(ctx context.Context) time.Duration {
 	}
 	return r.cfg.Now().Sub(started)
 }
+
+// drainSeed waits, at most StallAfter, until two reads in a row find none of the seed's tenants'
+// jobs due or running; a group the worker blocked, or a drain that never settles, is an error.
+func (r *run) drainSeed(ctx context.Context) error {
+	tenants := r.seedTenants()
+	started, said, settled := r.cfg.Now(), r.cfg.Now(), 0
+	var backlog SeedBacklog
+	for settled < 2 {
+		if r.cfg.Now().Sub(started) >= StallAfter {
+			return fmt.Errorf("the worker did not land the seed's data in %s: %s", StallAfter, backlog)
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(drainTick):
+		}
+		read, err := r.cfg.Backlog(ctx, tenants, r.cfg.Now())
+		if err != nil {
+			_, _ = fmt.Fprintf(r.cfg.Log, "seedgen drain: backlog unread: %v\n", err)
+			settled = 0
+			continue
+		}
+		said = r.sayProgress(said, backlog, read)
+		backlog = read
+		if settled++; !backlog.Settled() {
+			settled = 0
+		}
+	}
+	r.result.Deferred = backlog.Deferred
+	if backlog.Blocked > 0 {
+		return fmt.Errorf("the worker blocked %d of the seed's job groups: its data has not all landed (see /ops)", backlog.Blocked)
+	}
+	return nil
+}
+
+// seedTenants are the org and project ids the run minted or bound: the drain's scope.
+func (r *run) seedTenants() []string {
+	var tenants []string
+	for ref, id := range r.cfg.Checkpoint.Refs {
+		if strings.HasPrefix(ref, "$org:") || strings.HasPrefix(ref, "$project:") {
+			tenants = append(tenants, id)
+		}
+	}
+	return tenants
+}
+
+// sayProgress logs a changed backlog at most every ten seconds and answers when it last said one.
+func (r *run) sayProgress(said time.Time, was, read SeedBacklog) time.Time {
+	now := r.cfg.Now()
+	if read == was || now.Sub(said) < 10*time.Second {
+		return said
+	}
+	_, _ = fmt.Fprintf(r.cfg.Log, "seedgen drain: %s\n", read)
+	return now
+}
+
+// drainTick is how often the drain reads the seed's backlog.
+const drainTick = 500 * time.Millisecond
 
 // BindInto binds every org and project ref the checkpoint has not minted to one existing org and
 // project (--into): the plan then sends telemetry only.

@@ -142,6 +142,9 @@
       "path": "packages/clickhouse-client/tsconfig.json"
     },
     {
+      "path": "packages/clickhouse-markers/tsconfig.json"
+    },
+    {
       "path": "packages/clickhouse-migrations/tsconfig.json"
     },
     {
@@ -463,6 +466,9 @@
       "path": "packages/ksuid/tsconfig.json"
     },
     {
+      "path": "apps/lambdasim-web/tsconfig.json"
+    },
+    {
       "path": "modules/langy/browser/tsconfig.json"
     },
     {
@@ -589,10 +595,10 @@
       "path": "apps/outboundsim-web/tsconfig.json"
     },
     {
-      "path": "apps/paymentsim-web/tsconfig.json"
+      "path": "packages/oxlint-rules/tsconfig.json"
     },
     {
-      "path": "packages/oxlint-rules/tsconfig.json"
+      "path": "apps/paymentsim-web/tsconfig.json"
     },
     {
       "path": "packages/plans/tsconfig.json"

@@ -3153,6 +3153,15 @@
           "documentation": "user | invite-accepted, on a withdrawal."
         },
         {
+          "name": "connectionId",
+          "columnName": "connectionId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "The SSO connection a single sign-on arrival was admitted through; null otherwise."
+        },
+        {
           "name": "occurredAt",
           "columnName": "occurredAt",
           "type": "DateTime",
@@ -13678,161 +13687,6 @@
           "kind": "scalar",
           "isList": false,
           "isOptional": false,
-          "documentation": ""
-        },
-        {
-          "name": "updatedAt",
-          "columnName": "updatedAt",
-          "type": "DateTime",
-          "kind": "scalar",
-          "isList": false,
-          "isOptional": false,
-          "documentation": ""
-        }
-      ]
-    },
-    {
-      "name": "DataPrivacyProjectScope",
-      "tableName": "DataPrivacyProjectScope",
-      "documentation": "",
-      "primaryKey": [
-        "projectId"
-      ],
-      "fields": [
-        {
-          "name": "projectId",
-          "columnName": "projectId",
-          "type": "String",
-          "kind": "scalar",
-          "isList": false,
-          "isOptional": false,
-          "documentation": ""
-        },
-        {
-          "name": "organizationId",
-          "columnName": "organizationId",
-          "type": "String",
-          "kind": "scalar",
-          "isList": false,
-          "isOptional": false,
-          "documentation": ""
-        },
-        {
-          "name": "teamId",
-          "columnName": "teamId",
-          "type": "String",
-          "kind": "scalar",
-          "isList": false,
-          "isOptional": true,
-          "documentation": ""
-        },
-        {
-          "name": "isPersonal",
-          "columnName": "isPersonal",
-          "type": "Boolean",
-          "kind": "scalar",
-          "isList": false,
-          "isOptional": true,
-          "documentation": ""
-        },
-        {
-          "name": "departmentId",
-          "columnName": "departmentId",
-          "type": "String",
-          "kind": "scalar",
-          "isList": false,
-          "isOptional": true,
-          "documentation": ""
-        },
-        {
-          "name": "teamRecordedAt",
-          "columnName": "teamRecordedAt",
-          "type": "DateTime",
-          "kind": "scalar",
-          "isList": false,
-          "isOptional": true,
-          "documentation": ""
-        },
-        {
-          "name": "departmentRecordedAt",
-          "columnName": "departmentRecordedAt",
-          "type": "DateTime",
-          "kind": "scalar",
-          "isList": false,
-          "isOptional": true,
-          "documentation": ""
-        },
-        {
-          "name": "archivedAt",
-          "columnName": "archivedAt",
-          "type": "DateTime",
-          "kind": "scalar",
-          "isList": false,
-          "isOptional": true,
-          "documentation": ""
-        },
-        {
-          "name": "updatedAt",
-          "columnName": "updatedAt",
-          "type": "DateTime",
-          "kind": "scalar",
-          "isList": false,
-          "isOptional": false,
-          "documentation": ""
-        }
-      ]
-    },
-    {
-      "name": "DataRetentionProjectScope",
-      "tableName": "DataRetentionProjectScope",
-      "documentation": "",
-      "primaryKey": [
-        "projectId"
-      ],
-      "fields": [
-        {
-          "name": "projectId",
-          "columnName": "projectId",
-          "type": "String",
-          "kind": "scalar",
-          "isList": false,
-          "isOptional": false,
-          "documentation": ""
-        },
-        {
-          "name": "organizationId",
-          "columnName": "organizationId",
-          "type": "String",
-          "kind": "scalar",
-          "isList": false,
-          "isOptional": false,
-          "documentation": ""
-        },
-        {
-          "name": "teamId",
-          "columnName": "teamId",
-          "type": "String",
-          "kind": "scalar",
-          "isList": false,
-          "isOptional": true,
-          "documentation": ""
-        },
-        {
-          "name": "teamRecordedAt",
-          "columnName": "teamRecordedAt",
-          "type": "DateTime",
-          "kind": "scalar",
-          "isList": false,
-          "isOptional": true,
-          "documentation": ""
-        },
-        {
-          "name": "archivedAt",
-          "columnName": "archivedAt",
-          "type": "DateTime",
-          "kind": "scalar",
-          "isList": false,
-          "isOptional": true,
           "documentation": ""
         },
         {

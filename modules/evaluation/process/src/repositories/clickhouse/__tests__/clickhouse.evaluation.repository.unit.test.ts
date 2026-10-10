@@ -132,8 +132,8 @@ function harness(rows: Record<string, unknown>[][] = []): {
 function readerQuery(
   answer: (input: { sql: string; params: Record<string, unknown> }) => Record<string, unknown>[],
 ) {
-  return vi.fn(async (input: { sql: string; params: Record<string, unknown> }) => ({
-    rows: answer(input),
+  return vi.fn(async (input: { sql: string; params?: Record<string, unknown> }) => ({
+    rows: answer({ sql: input.sql, params: input.params ?? {} }),
   }));
 }
 

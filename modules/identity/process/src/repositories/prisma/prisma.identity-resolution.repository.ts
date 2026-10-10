@@ -3,6 +3,7 @@ import {
   LIVE_IDENTIFIER_STATES,
 } from "@langwatch/identity-contract";
 import { createLogger } from "@langwatch/observability";
+import { skipTenantCheck } from "@langwatch/prisma-client";
 import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
 
 import { IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME } from "../../rules/identity-migration-names.rules.ts";
@@ -81,6 +82,11 @@ export class PrismaIdentityResolutionRepository implements IdentityResolver {
   /** `ORDER BY` fixes which row answers, so a resolution never picks differently between reads. */
   private async resolve(match: Prisma.Sql): Promise<ResolutionRow> {
     const rows = await this.database.$queryRaw<ResolutionRow[]>`
+      ${skipTenantCheck({
+        // Sign-in resolves an identifier by its own value before any tenant is known; the join
+        // reads only that user's backfill state row.
+        SKIP_TENANT_CHECK: true,
+      })}
       SELECT i."id" AS "identifierId", i."userId" AS "userId",
              i."providerId" AS "providerId", s."status" AS "status"
       FROM "Identifier" i

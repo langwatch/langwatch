@@ -19,6 +19,7 @@ const { state } = vi.hoisted(() => ({
     hasPassword: true,
     changeRejectsWith: void 0 as unknown,
     identifiers: [] as Record<string, unknown>[],
+    governedBySso: false,
   },
 }));
 
@@ -41,6 +42,9 @@ vi.mock("../../../behavior/personal-workspace-api.ts", () => {
       identity: { myIdentifiers: { invalidate: vi.fn() } },
     }),
     identity: {
+      mySignInGovernance: {
+        useQuery: () => ({ data: { governedBySso: state.governedBySso } }),
+      },
       myIdentifiers: {
         useQuery: () => ({ data: state.identifiers, isPending: false, error: null }),
       },
@@ -77,6 +81,7 @@ beforeEach(() => {
   state.hasPassword = true;
   state.changeRejectsWith = void 0;
   state.identifiers = [];
+  state.governedBySso = false;
   calls.unlinkAccount.mockReset();
   calls.changePassword.mockReset();
   calls.setPassword.mockReset();
@@ -386,5 +391,20 @@ describe("given a self-hosted deployment behind an enterprise provider", () => {
     renderSection();
 
     expect(screen.queryByTestId("password-section")).toBeNull();
+  });
+});
+
+describe("given an account whose organization's single sign-on governs sign-in", () => {
+  /** @scenario "A person whose organization's single sign-on governs sign-in is not offered a password" */
+  it("offers no password and says single sign-on handles sign-in", async () => {
+    state.hasPassword = false;
+    state.governedBySso = true;
+    renderSection();
+
+    expect(await screen.findByTestId("password-sso-governed")).toHaveTextContent(
+      "Your organization's single sign-on handles sign-in for this account.",
+    );
+    expect(screen.queryByTestId("password-action")).toBeNull();
+    expect(screen.getByTestId("password-empty")).not.toHaveTextContent("second way in");
   });
 });

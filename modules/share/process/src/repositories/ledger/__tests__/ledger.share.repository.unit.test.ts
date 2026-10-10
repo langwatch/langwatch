@@ -1,5 +1,5 @@
 import type { AuthzApi } from "@langwatch/authz-contract";
-import type { ShareLink } from "@langwatch/share-contract";
+import { shareLinkSchema, type ShareLink } from "@langwatch/share-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
@@ -223,6 +223,22 @@ describe("LedgerShareRepository", () => {
             principal: { type: "project", id: PROJECT_ID },
           }),
         );
+      });
+
+      /** @scenario "A cut-over organization's new share link answers the link alone" */
+      it("answers the link without the project context its read-back carries", async () => {
+        const { repository, head } = buildRepository({ onEngine: true });
+        vi.mocked(head.findById).mockResolvedValue({
+          ...shareRow(),
+          project: {
+            traceSharingEnabled: true,
+            team: { organizationId: ORGANIZATION_ID, organization: { traceSharingEnabled: true } },
+          },
+        });
+
+        const link = await repository.create(createParams);
+
+        expect(shareLinkSchema.safeParse(link).success).toBe(true);
       });
 
       it("refuses to invent a row when the projection has not landed one", async () => {

@@ -3,7 +3,11 @@
  * Python and TypeScript SDKs still call. Same operations, permissions, doors and bodies; kept out
  * of the published document, as main kept it.
  */
-import { defineRestRouter, MANAGEMENT_API_VERSION, projectRestFacts } from "@langwatch/api/rest";
+import {
+  defineRestRouter,
+  MANAGEMENT_API_VERSION,
+  projectRequestContext,
+} from "@langwatch/api/rest";
 import {
   abortExperimentRunRequestSchema,
   abortExperimentRunResponseSchema,
@@ -51,7 +55,7 @@ export const experimentV3LegacyRest = defineRestRouter(ExperimentV3RestApi)
   .withPermission("evaluations:create")
   .withResponse("negotiated", {})
   .withDocs(HIDDEN)
-  .withMiddleware(projectRestFacts, experimentWorkbenchCredential)
+  .withMiddlewareContext(projectRequestContext, experimentWorkbenchCredential)
   .handle(async ({ app, input, raw, response, scope }, project, credential) =>
     negotiatedRunAnswer(
       response,
@@ -108,7 +112,7 @@ export const experimentV3LegacyRest = defineRestRouter(ExperimentV3RestApi)
   .withPermission("experiments:update")
   .withOutput(saveWorkbenchStateResponseSchema)
   .withDocs(HIDDEN)
-  .withMiddleware(projectRestFacts, experimentWorkbenchCredential)
+  .withMiddlewareContext(projectRequestContext, experimentWorkbenchCredential)
   .handle(({ app, input: { evaluationSlug, ...body }, scope }, _project, credential) =>
     app.saveWorkbenchStateBySlug(
       { ...body, projectId: scope.id, slug: evaluationSlug },
@@ -135,7 +139,7 @@ export const experimentV3LegacyRest = defineRestRouter(ExperimentV3RestApi)
   .withInput(restoreWorkbenchVersionBodySchema)
   .withOutput(restoreWorkbenchVersionResponseSchema)
   .withDocs(HIDDEN)
-  .withMiddleware(projectRestFacts, experimentWorkbenchCredential)
+  .withMiddlewareContext(projectRequestContext, experimentWorkbenchCredential)
   .handle(async ({ app, input, scope }, _project, credential) => ({
     version: (
       await app.restoreWorkbenchVersionBySlug(

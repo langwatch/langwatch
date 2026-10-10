@@ -3,7 +3,7 @@
  * translated there once: a memory-limit error reaches the panel as the handled
  * `query_memory_exceeded` with its copy, not as an unknown 500.
  */
-import { ClickHouseQueryClient, type QueryDriver } from "@langwatch/clickhouse-client";
+import { ClickHouseQueryClient, type QueryDriver, TenantGuard } from "@langwatch/clickhouse-client";
 import { describe, expect, it } from "vitest";
 
 import { ClickHouseAnalyticsSessionsRepository } from "../clickhouse.analytics-sessions.repository.ts";
@@ -21,7 +21,7 @@ function memoryLimitExceeded(): Error {
 
 function repositoryOver(driver: QueryDriver) {
   const sessions = ClickHouseAnalyticsSessionsRepository.create(
-    new ClickHouseQueryClient({ driver }),
+    new ClickHouseQueryClient({ tenantGuard: new TenantGuard(), driver }),
   );
   return ClickHouseAnalyticsRepository.create({
     resolveClient: (tenantId) => sessions.resolve(tenantId),

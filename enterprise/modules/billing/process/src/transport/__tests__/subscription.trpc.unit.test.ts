@@ -3,14 +3,14 @@
  * The `subscription.*` surface: the eight names the billing page calls, the
  * permission each is behind, and the two-step every checkout is.
  */
-import { bindTrpcFact, createTrpcRuntime } from "@langwatch/api/trpc";
+import { bindTrpcMiddlewareContext, createTrpcRuntime } from "@langwatch/api/trpc";
 import { UserEmailRequiredError } from "@langwatch/enterprise-billing-contract";
 import { trpcTestMembers } from "@langwatch/test-harness/trpc-members";
 import { initTRPC } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
-  billingCallerEmailFact,
+  billingCallerEmailContext,
   subscriptionTrpcTransport,
   type BillingSubscriptionApi,
 } from "../subscription.trpc.ts";
@@ -49,7 +49,9 @@ function routerFor(permits: (permission: string) => boolean = () => true) {
     members: trpcTestMembers<BillingTrpcTestContext>({ permits }),
   }).mount(subscriptionTrpcTransport, () => billing, {
     // The address is the PROCESS's to resolve, off the session it authenticated.
-    facts: [bindTrpcFact(billingCallerEmailFact, (ctx) => ctx.email ?? null)],
+    middlewareContext: [
+      bindTrpcMiddlewareContext(billingCallerEmailContext, (ctx) => ctx.email ?? null),
+    ],
   });
 }
 

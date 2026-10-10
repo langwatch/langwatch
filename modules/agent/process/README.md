@@ -6,7 +6,7 @@ The server half of [agent](../README.md). Agents a project builds and runs: thei
 
 ## Installation
 
-`defineProcessModule("agent").withRepositories(agentRepositories).withApi(AgentModule).withTransports(…, …, …, agentLegacyRest, agentTrpcTransport).withEventing(agentLifecycleEventing).withEventing(agentWorkflowFieldsEventing).withMigrations(…).withTransportFacts(…)`, `src/agent.module.ts:25`.
+`defineProcessModule("agent").withRepositories(agentRepositories).withApi(AgentModule).withTransports(…, …, …, agentLegacyRest, agentTrpcTransport).withEventing(agentLifecycleEventing).withEventing(agentWorkflowFieldsEventing).withMigrations(…).provideMiddlewareBindings(…)`, `src/agent.module.ts:25`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 

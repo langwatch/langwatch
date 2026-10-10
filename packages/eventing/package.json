@@ -44,7 +44,7 @@
     "@opentelemetry/api": "catalog:",
     "ioredis": "catalog:",
     "langwatch": "workspace:*",
-    "nanoid": "^6.0.0",
+    "nanoid": "catalog:",
     "prom-client": "catalog:",
     "zod": "catalog:"
   },

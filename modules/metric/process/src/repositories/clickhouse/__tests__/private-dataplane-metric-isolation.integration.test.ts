@@ -21,6 +21,7 @@ import {
   routingDriver,
   type ClickHouseClientCreationInput,
   type TenantDirectory,
+  TenantGuard,
 } from "@langwatch/clickhouse-client";
 import {
   migrateTestClickHouseOnce,
@@ -80,7 +81,10 @@ function routedMember({ sharedUrl, privateUrl }: { sharedUrl: string; privateUrl
     router: createTenantRouter({ table, directory }),
     clientFactory: new VendorFactory(),
   });
-  const clickhouse = new ClickHouseQueryClient({ driver: routingDriver(connection) });
+  const clickhouse = new ClickHouseQueryClient({
+    tenantGuard: new TenantGuard(),
+    driver: routingDriver(connection),
+  });
   const metrics = ClickHouseMetricDataPointAppendRepository.create({
     resolveClient: ClickHouseMetricDataPointAppendRepository.resolverOver(clickhouse),
     defaultRetentionDays: 30,

@@ -9,7 +9,13 @@ import { mapTraceListPayload } from "../map-trace-list-payload.ts";
  */
 const row = (fields: Partial<TraceListItem>): TraceListItem => fields as TraceListItem;
 
-type RowEvaluation = TraceEvalResult;
+/** A wire evaluation: what a cell renders plus the fields the mapper drops. */
+type RowEvaluation = TraceEvalResult & {
+  evaluationId: string;
+  evaluatorType: string;
+  traceId: string;
+  isGuardrail: boolean;
+};
 
 describe("mapTraceListPayload", () => {
   describe("when the payload is undefined", () => {
@@ -43,20 +49,19 @@ describe("mapTraceListPayload", () => {
         passed: true,
         label: "safe",
       };
+      const wireEvaluation: RowEvaluation = {
+        ...toxicity,
+        evaluationId: "ev1",
+        evaluatorType: "langevals/toxicity",
+        traceId: "t1",
+        isGuardrail: false,
+      };
       const rows = mapTraceListPayload({
         items: [
           row({
             traceId: "t1",
             projectId: "member-a",
-            evaluations: [
-              {
-                ...toxicity,
-                evaluationId: "ev1",
-                evaluatorType: "langevals/toxicity",
-                traceId: "t1",
-                isGuardrail: false,
-              } satisfies RowEvaluation,
-            ],
+            evaluations: [wireEvaluation],
           }),
           row({ traceId: "t1", projectId: "member-b", evaluations: [] }),
         ],

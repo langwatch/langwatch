@@ -235,6 +235,39 @@ describe("AnomalyWebhookDestinationMigrationService", () => {
       });
     });
 
+    /** @scenario "A background step stops its compare-and-swap retries when its run is aborted" */
+    it("stops retrying a rule edited on every write once aborted, saving no page and archiving nothing", async () => {
+      const controller = new AbortController();
+      let writes = 0;
+      const { store, archived, migration, destinationsOf } = await harness({
+        beforeWrite: async () => {
+          writes += 1;
+          if (writes > 20) throw new Error("the compare-and-swap retried past the abort");
+          if (writes === 3) controller.abort();
+          const index = store.anomalyRules.findIndex((rule) => rule.organizationId === "org_a");
+          const rule = store.anomalyRules[index]!;
+          store.anomalyRules[index] = {
+            ...rule,
+            updatedAt: toDate(fromDate(rule.updatedAt).add({ milliseconds: 1 })),
+          };
+        },
+      });
+      const saves: { afterOrganizationId: string }[] = [];
+
+      const report = await migration.migrate({
+        signal: controller.signal,
+        onPage: async (page) => void saves.push(page),
+      });
+
+      expect(writes).toBe(3);
+      expect(report.afterOrganizationId).toBeNull();
+      expect(saves).toEqual([]);
+      expect(archived).toEqual([]);
+      expect(await destinationsOf("org_a")).toMatchObject({
+        destinations: [{ type: "webhook", url: "https://a.example.test/hook" }, {}],
+      });
+    });
+
     /** @scenario "A release rolled back after the destination migration still delivers each rule's alerts" */
     it("old reader still finds the inline form", async () => {
       const { migration, destinationsOf } = await harness();

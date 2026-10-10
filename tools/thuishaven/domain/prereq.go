@@ -10,7 +10,7 @@ import (
 // toolchain, the brew formulae behind the managed Postgres and Redis, a
 // container runtime. `haven up` discovers a missing one the hard way — as a
 // failure, one at a time, at the moment it first needs it. This file is the
-// catalogue so `haven install` can ask all of those questions at once, before
+// catalogue so `haven self install` can ask all of those questions at once, before
 // anything is running.
 //
 // Everything here is pure: what the prerequisites are, how to tell whether one
@@ -135,7 +135,7 @@ type Prereq struct {
 	// because "missing" implies haven could fix it.
 	DarwinOnly bool
 	// UnlistedOnDarwin keeps an entry off the macOS report and picker; it is
-	// installed there only when named (`haven install runtime=colima`).
+	// installed there only when named (`haven self install runtime=colima`).
 	UnlistedOnDarwin bool
 }
 
@@ -382,7 +382,7 @@ var Prereqs = []Prereq{{
 }, {
 	Key:              "runtime",
 	Name:             "Container runtime",
-	Summary:          "optional on macOS: the container fallback, haven play and sandboxed langy — pick one",
+	Summary:          "optional on macOS: the container fallback, haven pr --throwaway and sandboxed langy — pick one",
 	Requirement:      PrereqOptional,
 	After:            []string{"brew"},
 	DarwinOnly:       true,
@@ -391,7 +391,7 @@ var Prereqs = []Prereq{{
 		"    supported answer rather than a refusal: on macOS ClickHouse and the\n" +
 		"    telemetry stack (traces included) run natively either way, and langy\n" +
 		"    on the host tier. A runtime buys you the container fallback\n" +
-		"    (HAVEN_CH_RUNTIME, LANGWATCH_HAVEN_OBS_TIER), `haven play` and\n" +
+		"    (HAVEN_CH_RUNTIME, LANGWATCH_HAVEN_OBS_TIER), `haven pr --throwaway` and\n" +
 		"    langy's sandboxed worker tier.\n" +
 		"    haven's own stack is built on colima: its ceiling is explicit and\n" +
 		"    per-profile, and it needs no license. Docker Desktop works too.",
@@ -495,7 +495,7 @@ func (s PrereqState) String() string {
 	}
 }
 
-// Actionable reports whether this state is one `haven install` can do
+// Actionable reports whether this state is one `haven self install` can do
 // something about — which is the same question as "should the picker offer
 // it". A skipped entry is deliberately not actionable: that is what the
 // developer asked for, and naming it explicitly is how they take it back.
@@ -615,7 +615,7 @@ func OrderPrereqs(chosen []Chosen) []Chosen {
 }
 
 // LookupPrereq finds a catalogue entry by key, for the positional form
-// (`haven install clickhouse-client`).
+// (`haven self install clickhouse-client`).
 func LookupPrereq(key string) (Prereq, bool) {
 	for _, p := range Prereqs {
 		if p.Key == key {

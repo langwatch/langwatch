@@ -143,6 +143,13 @@ export const liveHome = ({ now, surfaces }: { now: number; surfaces?: Surface[] 
     canResetDatabases: true,
   },
   belowFloor: "",
+  seed: {
+    canSeed: true,
+    sizes: ["tiny", "small", "medium", "large"],
+    personas: ["all", "startup", "enterprise", "gateway", "agent-eval"],
+    status: "seed: done in 42s (exit 0) [--size tiny --persona all]",
+    log: [],
+  },
 });
 
 export const stoppedHome = ({ now }: { now: number }): StackHome => {
@@ -170,6 +177,7 @@ export const stoppedHome = ({ now }: { now: number }): StackHome => {
       canResetDatabases: true,
     },
     belowFloor: "",
+    seed: { canSeed: false, sizes: ["tiny"], personas: ["all"], status: "", log: [] },
   };
 };
 
@@ -246,7 +254,7 @@ export const hub = ({ now }: { now: number }): Hub => {
 
 const LOG_TEXTS: [string, string, string][] = [
   ["api", "info", 'msg="GET /api/health" status=200 duration_ms=3'],
-  ["app", "info", "vite ready in 812 ms"],
+  ["ui", "info", "vite ready in 812 ms"],
   ["worker", "debug", 'msg="drained queue" queue=evaluations jobs=0'],
   ["api", "warn", 'msg="slow query" elapsed_ms=1840 table=traces'],
   ["worker", "info", 'msg="projection caught up" projection=trace-summary'],
@@ -254,7 +262,7 @@ const LOG_TEXTS: [string, string, string][] = [
   ["gateway", "info", 'msg="provider warmed" provider=openai'],
   ["api", "info", 'msg="<script>alert(1)</script> echoed in a query string"'],
   ["worker", "fatal", 'msg="lost the redis connection" attempts=5'],
-  ["app", "", "  ➜  Local:   http://localhost:5560/"],
+  ["ui", "", "  ➜  Local:   http://localhost:5560/"],
 ];
 
 export const logs = ({ now, lane = "" }: { now: number; lane?: string }): Logs => {
@@ -265,5 +273,5 @@ export const logs = ({ now, lane = "" }: { now: number; lane?: string }): Logs =
       lines.push({ at: ago({ now, seconds: (60 - index) * 7 }), service, level, text });
     }
   }
-  return { lines, services: ["api", "app", "gateway", "worker"], limit: 1000 };
+  return { lines, services: ["api", "gateway", "ui", "worker"], limit: 1000 };
 };

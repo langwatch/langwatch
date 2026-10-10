@@ -2,9 +2,9 @@ import { EventEmitter } from "node:events";
 
 import type { AgentApi } from "@langwatch/agent-contract";
 import {
-  bindRestMiddleware,
+  bindMiddlewareContext,
   createRestRuntime,
-  projectRestFacts,
+  projectRequestContext,
   UnauthorizedError,
 } from "@langwatch/api/rest";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
@@ -147,11 +147,11 @@ export function createScenarioRestTestRuntime(
     },
   });
 
-  const projectFacts = bindRestMiddleware(projectRestFacts, () => ({
+  const projectContext = bindMiddlewareContext(projectRequestContext, () => ({
     projectSlug: PROJECT_SLUG,
     viewerUserId: options.viewerUserId === undefined ? "user_scenario_rest" : options.viewerUserId,
     actorId: options.actorId ?? "user_scenario_rest",
   }));
 
-  return { runtime, projectFacts };
+  return { runtime, projectContext };
 }

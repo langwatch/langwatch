@@ -672,7 +672,7 @@ Notes: only the `BASE_HOST` fact is a real deployment config; the two `voice/*.c
 Config leaves:
 | field | env spelling | schema | default | source |
 | auth0WebhookSecret | AUTH0_SCIM_WEBHOOK_SECRET | z.string().optional() | — | contract — **secret-shaped (verifies an inbound webhook signature), declared as config** |
-| provenOffboarding | SCIM_V2_GRANTS | environmentBooleanSchema | false | contract |
+| provenOffboarding | SCIM_V2_GRANTS | environmentBooleanSchema | true | contract |
 
 Supplied by the deleted app config (`slices.scim`): `config.scim` — passthrough of both fields, no extra derivation (`config.scim = {...scimServerConfigDefinition}` at the top level).
 

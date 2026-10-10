@@ -12,6 +12,11 @@ import { z } from "zod";
 
 import {
   INVITE_ACCEPTED_EVENT_TYPE,
+  MEMBERS_INVITED_EVENT_TYPE,
+  ORGANIZATION_MEMBER_DEPARTMENT_CHANGED_EVENT_TYPE,
+  ORGANIZATION_MEMBER_DISABLED_EVENT_TYPE,
+  ORGANIZATION_MEMBER_ENABLED_EVENT_TYPE,
+  ORGANIZATION_MEMBER_REMOVED_EVENT_TYPE,
   ORGANIZATION_SIGNED_UP_EVENT_TYPE,
 } from "./organization-lifecycle.events.ts";
 import {
@@ -57,6 +62,19 @@ export type OrganizationApiCreateAndAssignInput = z.infer<
  */
 export const organizationFullyLoadedListSchema = z.array(z.unknown());
 
+/** Every fact that changes who is in the organization, their seat or their role. */
+const MEMBERSHIP_CHANGED = [
+  { event: MEMBERS_INVITED_EVENT_TYPE, scope: "organizationId" },
+  { event: INVITE_ACCEPTED_EVENT_TYPE, scope: "organizationId" },
+  { event: ORGANIZATION_MEMBER_DISABLED_EVENT_TYPE, scope: "organizationId" },
+  { event: ORGANIZATION_MEMBER_ENABLED_EVENT_TYPE, scope: "organizationId" },
+  { event: ORGANIZATION_MEMBER_REMOVED_EVENT_TYPE, scope: "organizationId" },
+  { event: ORGANIZATION_MEMBER_DEPARTMENT_CHANGED_EVENT_TYPE, scope: "organizationId" },
+  GRANT_ATTACHED_EVENT_TYPE,
+  GRANT_ROLE_CHANGED_EVENT_TYPE,
+  GRANT_REVOKED_EVENT_TYPE,
+];
+
 export const organizationTrpc = defineTrpcContract("organization")
   /** Sign-up: the caller's first organization and its first team. */
   .mutation("createAndAssign")
@@ -100,21 +118,21 @@ export const organizationTrpc = defineTrpcContract("organization")
   .withOutput(organizationWriteAckSchema)
 
   /** The member pickers' read: names always, addresses only for an administrator. */
-  .query("getOrganizationWithMembersAndTheirTeams")
+  .query("getOrganizationWithMembersAndTheirTeams", { invalidatedBy: MEMBERSHIP_CHANGED })
   .withInput(organizationApiWithMembersInputSchema)
   .withOutput(organizationMemberDirectorySchema)
 
   /** The Directory's tab badges: counts only, so a closed tab loads no list. */
-  .query("getDirectoryCounts")
+  .query("getDirectoryCounts", { invalidatedBy: MEMBERSHIP_CHANGED })
   .withInput(organizationApiScopeSchema)
   .withOutput(organizationDirectoryCountsSchema)
 
-  .query("getMemberById")
+  .query("getMemberById", { invalidatedBy: MEMBERSHIP_CHANGED })
   .withInput(organizationApiMemberScopeSchema)
   .withOutput(organizationMemberRecordSchema)
 
   /** The members invitations brought; the browser joins identity's admissions to it. */
-  .query("getInvitedMemberIds")
+  .query("getInvitedMemberIds", { invalidatedBy: MEMBERSHIP_CHANGED })
   .withInput(organizationApiScopeSchema)
   .withOutput(organizationInvitedMemberIdsSchema)
 
@@ -122,7 +140,7 @@ export const organizationTrpc = defineTrpcContract("organization")
   .withInput(organizationApiUpdateTeamMemberRoleInputSchema)
   .withOutput(organizationWriteAckSchema)
 
-  .query("getAllOrganizationMembers")
+  .query("getAllOrganizationMembers", { invalidatedBy: MEMBERSHIP_CHANGED })
   .withInput(organizationApiScopeSchema)
   .withOutput(organizationUserRowsSchema)
 

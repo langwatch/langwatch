@@ -13,7 +13,7 @@ import (
 	"github.com/langwatch/langwatch/tools/thuishaven/cmd/viewer/sources"
 )
 
-const analyticsUsage = "usage: haven analytics <status|records [--provider] [--kind] [--event|--name] [--id]|record <id>|clear|wait --event <name> [--timeout]> [--json]"
+const analyticsUsage = "usage: haven sim analytics <status|list [--provider] [--kind] [--event|--name] [--id]|record <id>|clear|wait --event <name> [--timeout]|fault <0|4xx|5xx|off>> [--json]"
 
 // analyticsPollEvery is how often `wait` re-reads the records.
 const analyticsPollEvery = 250 * time.Millisecond
@@ -41,7 +41,7 @@ type analyticsStatus struct {
 	} `json:"activity"`
 }
 
-// runAnalytics is `haven analytics <status|records|clear|wait>`.
+// runAnalytics is `haven sim analytics <status|list|clear|wait>`.
 func runAnalytics(ctx context.Context, d deps, inv invocation) error {
 	if len(inv.args) == 0 {
 		return errors.New(analyticsUsage)
@@ -79,8 +79,10 @@ func analyticsCommand(ctx context.Context, api sources.SimAPI, inv invocation, a
 		return simDone(asJSON, "cleared", "records cleared")
 	case "wait":
 		return analyticsWait(ctx, api, inv, asJSON)
+	case "set":
+		return simSetForcedError(api, "analytics", inv, asJSON)
 	}
-	return fmt.Errorf("unknown `haven analytics` subcommand %q; %s", inv.args[0], analyticsUsage)
+	return fmt.Errorf("unknown `haven sim analytics` subcommand %q; %s", inv.args[0], analyticsUsage)
 }
 
 func printAnalyticsStatus(v analyticsStatus) {
@@ -95,7 +97,7 @@ func printAnalyticsStatus(v analyticsStatus) {
 // analyticsOneRecord picks a record out of the list, properties and raw call
 // included: the sim has no per-record endpoint.
 func analyticsOneRecord(api sources.SimAPI, inv invocation, asJSON bool) error {
-	if err := needArgs(inv, 2, "haven analytics record <id>"); err != nil {
+	if err := needArgs(inv, 2, "haven sim analytics record <id>"); err != nil {
 		return err
 	}
 	var all struct {
@@ -124,7 +126,7 @@ func analyticsOneRecord(api sources.SimAPI, inv invocation, asJSON bool) error {
 		fmt.Printf("raw: %s\n", r.Raw)
 		return nil
 	}
-	return fmt.Errorf("no analytics record %q; list them with `haven analytics records`", inv.args[1])
+	return fmt.Errorf("no analytics record %q; list them with `haven sim analytics list`", inv.args[1])
 }
 
 func printAnalyticsRecords(v struct{ Records []analyticsRecord }) {
@@ -139,7 +141,7 @@ func printAnalyticsRecords(v struct{ Records []analyticsRecord }) {
 // analyticsWait polls until a record matches the filter; no match in --timeout is an error.
 func analyticsWait(ctx context.Context, api sources.SimAPI, inv invocation, asJSON bool) error {
 	if !inv.has("--event") && !inv.has("--name") && !inv.has("--kind") && !inv.has("--provider") && !inv.has("--id") {
-		return errors.New("usage: haven analytics wait --event <name> [--provider] [--kind] [--id] [--timeout 30s]")
+		return errors.New("usage: haven sim analytics wait --event <name> [--provider] [--kind] [--id] [--timeout 30s]")
 	}
 	timeout := mailWaitDefaultTimeout
 	if raw := inv.value("--timeout"); raw != "" {

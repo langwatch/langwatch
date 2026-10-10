@@ -103,10 +103,9 @@ export async function discoverAffectedAggregates({
       ORDER BY TenantId
     `,
     params,
-    unscoped: {
-      reason:
-        "Replay discovery: a replay is asked for one tenant or for every tenant, and the tenant predicate is present only in the first case.",
-    },
+    // Replay discovery: a replay is asked for one tenant or for every tenant, and the tenant
+    // predicate is present only in the first case.
+    SKIP_TENANT_CHECK: true,
   });
 
   return rows;
@@ -136,10 +135,9 @@ export async function discoverTenants({
       ORDER BY TenantId
     `,
     params: { eventTypes: [...eventTypes], sinceMs },
-    unscoped: {
-      reason:
-        "Replay tenant listing: a replay lists the tenants holding a lane's events before it discovers each tenant's aggregates under that tenant.",
-    },
+    // Replay tenant listing: a replay lists the tenants holding a lane's events before it discovers
+    // each tenant's aggregates under that tenant.
+    SKIP_TENANT_CHECK: true,
   });
   return rows.map((row) => row.tenantId);
 }
@@ -178,10 +176,9 @@ export async function countEventsForAggregates({
         )
     `,
     params,
-    unscoped: {
-      reason:
-        "Replay discovery: a replay is asked for one tenant or for every tenant, and the tenant predicate is present only in the first case.",
-    },
+    // Replay discovery: a replay is asked for one tenant or for every tenant, and the tenant
+    // predicate is present only in the first case.
+    SKIP_TENANT_CHECK: true,
   });
 
   return parseInt(rows[0]?.totalEvents ?? "0", 10);
@@ -570,7 +567,8 @@ export class EventingClickHouseReplayEventSource implements ReplayEventSource {
         tenantId,
         sql: "OPTIMIZE TABLE {table:Identifier}",
         params: { table },
-        unscoped: { reason: "Replay's post-rebuild OPTIMIZE TABLE names a table, not a tenant." },
+        // Replay's post-rebuild OPTIMIZE TABLE names a table, not a tenant.
+        SKIP_TENANT_CHECK: true,
       });
     }
   }

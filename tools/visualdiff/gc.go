@@ -252,7 +252,7 @@ func CollectGarbage(ctx context.Context, request GCRequest) error {
 		problems = append(problems, request.collectRun(ctx, stale)...)
 	}
 	for _, slug := range plan.OrphanSlugs {
-		fmt.Fprintf(request.Out, "gc: orphan stack %s: haven destroy\n", slug)
+		fmt.Fprintf(request.Out, "gc: orphan stack %s: haven down --destroy\n", slug)
 		problems = append(problems, request.destroy(ctx, slug)...)
 	}
 	if err := request.Run(ctx, commandSpec{name: "git", args: []string{"worktree", "prune"}, dir: request.Root}, request.Out); err != nil {
@@ -324,7 +324,7 @@ func (request GCRequest) destroy(ctx context.Context, slug string) []string {
 	spec := commandSpec{name: havenrun.Command, args: havenrun.DestroyArgs(slug), dir: request.Root, env: havenEnv(request.Environ(), slug)}
 	if err := request.Run(ctx, spec, &out); err != nil && !strings.Contains(strings.ToLower(out.String()), "no such") &&
 		!strings.Contains(strings.ToLower(out.String()), "not found") {
-		return []string{fmt.Sprintf("haven destroy %s: %v", slug, err)}
+		return []string{fmt.Sprintf("haven down --destroy --stack %s: %v", slug, err)}
 	}
 	return nil
 }

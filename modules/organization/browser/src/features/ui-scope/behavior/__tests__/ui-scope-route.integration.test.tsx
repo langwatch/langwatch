@@ -128,8 +128,16 @@ describe("given an address the router matched", () => {
 });
 
 describe("given a visitor with no session opening an invitation link", () => {
+  /** @scenario "The invite landing renders for a visitor with no session" */
   it("renders the landing instead of sending the visitor to sign in", () => {
     expect(isUiPublicRoute("/invite/accept")).toBe(true);
+  });
+});
+
+describe("given a recipient with no session opening an unsubscribe link", () => {
+  /** @scenario "A signed-out recipient reaches the page, not the sign-in screen" */
+  it("renders the landing instead of sending the recipient to sign in", () => {
+    expect(isUiPublicRoute("/unsubscribe")).toBe(true);
   });
 });
 

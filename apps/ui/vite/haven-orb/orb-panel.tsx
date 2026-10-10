@@ -328,7 +328,10 @@ function PreviewBody({ image, capturing }: { image?: string; capturing: boolean 
 }
 
 const SENT_LINE = {
-  sent: { color: "fg.success", text: "Sent. An agent reads it with haven feedback list --open." },
+  sent: {
+    color: "fg.success",
+    text: "Sent. An agent reads it with haven orb feedback list --open.",
+  },
   refused: { color: "fg.error", text: "Haven did not take it. Your note is kept; try again." },
 };
 

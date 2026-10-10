@@ -1,11 +1,11 @@
 import { useUiDeployment } from "@langwatch/browser-host/capabilities";
+import { SnippetPreview } from "@langwatch/design-system/code-preview";
 import { API_KEY_PLACEHOLDER } from "@langwatch/design-system/personal-access-token-banner";
 import { Separator, Text, VStack } from "@langwatch/design-system/primitives";
 import type React from "react";
 import { useState } from "react";
 
 import { useActiveProject } from "../active-project-context.tsx";
-import { CodePreview } from "./code-preview.tsx";
 import { parseSnippet } from "./codegen/snippets.ts";
 
 export function OpenTelemetrySetup(): React.ReactElement {
@@ -72,7 +72,7 @@ service:
           environment variables. This approach works with any OpenTelemetry SDK or library that
           supports OTLP HTTP export.
         </Text>
-        <CodePreview
+        <SnippetPreview
           code={envVarsCode}
           filename=".env"
           codeLanguage="bash"
@@ -97,7 +97,7 @@ service:
           and forward them to LangWatch. This is useful for complex deployments or when you need
           additional processing.
         </Text>
-        <CodePreview
+        <SnippetPreview
           code={collectorCode}
           filename="collector-config.yaml"
           languageIconUrl="/images/external-icons/otel.svg"

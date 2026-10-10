@@ -49,7 +49,7 @@ export interface MetricClickHouseClient {
     format?: DataFormat;
     clickhouse_settings?: ClickHouseSettings;
     /** Set when the statement genuinely spans tenants; see the tenant-scope guard. */
-    unscoped?: { reason: string };
+    SKIP_TENANT_CHECK?: true;
   }): Promise<{ json<T = unknown>(): Promise<T[]> }>;
 }
 
@@ -77,7 +77,7 @@ function metricClickHouseResolver(
           tenantId,
           sql: params.query,
           ...(params.query_params ? { params: params.query_params } : {}),
-          ...(params.unscoped ? { unscoped: params.unscoped } : {}),
+          SKIP_TENANT_CHECK: params.SKIP_TENANT_CHECK,
         });
         return { json: async <T = unknown>() => result.rows as T[] };
       },

@@ -148,8 +148,59 @@ describe("ProjectOperationsService", () => {
         expect.objectContaining({ id: "project_123", organizationId: "org-1" }),
       );
       expect(sharingDisabled).toEqual([
-        { projectId: "project_123", organizationId: "org-1", disabledByUserId: MEMBER.id },
+        {
+          projectId: "project_123",
+          organizationId: "org-1",
+          disabledByUserId: MEMBER.id,
+          revokeExistingLinks: true,
+        },
       ]);
+    });
+  });
+
+  describe("when trace sharing is switched off through the seam", () => {
+    /** @scenario "Turning sharing off and keeping the links paused leaves them in place" */
+    it("records the fact with the keep-paused choice and writes only the switch", async () => {
+      const update = vi.fn(async () => characterizationProject(false));
+      const sharingDisabled: TraceSharingDisabled[] = [];
+      const operations = characterizationOperations({
+        projects: { findWithTeam: async () => characterizationProject(true), update },
+        sharingDisabled,
+      });
+
+      await operations.setTraceSharing({
+        projectId: "project_123",
+        enabled: false,
+        revokeExistingLinks: false,
+        by: MEMBER,
+      });
+
+      expect(update).toHaveBeenCalledWith(
+        expect.objectContaining({ data: { traceSharingEnabled: false } }),
+      );
+      expect(sharingDisabled).toEqual([
+        expect.objectContaining({ projectId: "project_123", revokeExistingLinks: false }),
+      ]);
+    });
+
+    it("records no fact when switching sharing back on", async () => {
+      const sharingDisabled: TraceSharingDisabled[] = [];
+      const operations = characterizationOperations({
+        projects: {
+          findWithTeam: async () => characterizationProject(false),
+          update: async () => characterizationProject(true),
+        },
+        sharingDisabled,
+      });
+
+      await operations.setTraceSharing({
+        projectId: "project_123",
+        enabled: true,
+        revokeExistingLinks: true,
+        by: MEMBER,
+      });
+
+      expect(sharingDisabled).toEqual([]);
     });
   });
 

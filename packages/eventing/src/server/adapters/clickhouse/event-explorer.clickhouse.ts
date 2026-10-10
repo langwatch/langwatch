@@ -82,10 +82,9 @@ export class EventingClickHouseEventExplorer {
         ORDER BY AggregateType, TenantId
       `,
       params: queryParams,
-      unscoped: {
-        reason:
-          "Operator event explorer: the tenant filter is optional because an operator searches across tenants to find the aggregate to replay.",
-      },
+      // Operator event explorer: the tenant filter is optional because an operator searches across
+      // tenants to find the aggregate to replay.
+      SKIP_TENANT_CHECK: true,
     });
 
     return rows.map((row) => ({
@@ -161,10 +160,9 @@ export class EventingClickHouseEventExplorer {
         LIMIT 50
       `,
       params: queryParams,
-      unscoped: {
-        reason:
-          "Operator event explorer: the tenant filter is optional because an operator searches across tenants to find the aggregate to replay.",
-      },
+      // Operator event explorer: the tenant filter is optional because an operator searches across
+      // tenants to find the aggregate to replay.
+      SKIP_TENANT_CHECK: true,
     });
 
     return rows.map((row) => ({

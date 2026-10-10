@@ -137,7 +137,7 @@ func TestCheckPrereqsNeedsEveryBinaryOfACandidate(t *testing.T) {
 }
 
 // macOS needs no container runtime (HAVEN-NO-COLIMA-MAC), so the report and
-// picker leave it off there; `haven install runtime=colima` still installs it.
+// picker leave it off there; `haven self install runtime=colima` still installs it.
 func TestCheckPrereqsLeavesTheRuntimeOffTheMacReport(t *testing.T) {
 	o := installOrchestrator(&fakeTools{}, &fakeStore{}, &fakeProxy{})
 	for _, st := range o.CheckPrereqs(context.Background()) {
@@ -490,7 +490,7 @@ func reportEntry(t *testing.T, report []domain.PrereqStatus, key string) domain.
 	return domain.PrereqStatus{}
 }
 
-// @scenario "A small macOS accept queue is reported and haven install sets it"
+// @scenario "A small macOS accept queue is reported and haven self install sets it"
 func TestSomaxconnBelowTheFloorIsMissingWithTheSysctlFix(t *testing.T) {
 	cases := []struct {
 		value       string

@@ -6,7 +6,7 @@ import (
 )
 
 // Limit is one machine-wide resource cap the operator may set, by its short
-// kebab name, from `haven limits` or the hub. Env is the knob every reader
+// kebab name, from `haven machine limits` or the hub. Env is the knob every reader
 // already resolves it through, so a limit needs no reader of its own.
 type Limit struct {
 	Name      string
@@ -27,7 +27,7 @@ type LimitMachine struct {
 func (m LimitMachine) ramMB() int  { return int(m.TotalRAMBytes >> 20) }
 func (m LimitMachine) ramGiB() int { return int(m.TotalRAMBytes >> 30) }
 
-// The kebab names `haven limits` and the hub address each limit by.
+// The kebab names `haven machine limits` and the hub address each limit by.
 const (
 	LimitClickHouseMemory = "clickhouse-memory-mb"
 	LimitObservability    = "observability-memory-mb"
@@ -40,7 +40,7 @@ const (
 	LimitInstantEvalMockJudge = "instant-eval-mock-judge"
 )
 
-// Limits is the catalog, in the order `haven limits` prints it.
+// Limits is the catalog, in the order `haven machine limits` prints it.
 var Limits = []Limit{
 	{
 		// Native tier: max_server_memory_usage soft cap. Container tier: cgroup limit.
@@ -122,7 +122,7 @@ type LimitValue struct {
 	Applies   string `json:"applies"`
 }
 
-// LimitsReport is `haven limits --json` and GET /api/limits.
+// LimitsReport is `haven machine limits --json` and GET /api/limits.
 type LimitsReport struct {
 	TotalRAMBytes uint64       `json:"totalRamBytes"`
 	CPUs          int          `json:"cpus"`

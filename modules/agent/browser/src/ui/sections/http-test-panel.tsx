@@ -23,6 +23,7 @@ import { useCallback, useMemo, useState } from "react";
 import { TestMessagesBuilder } from "../blocks/http-test-messages-builder.tsx";
 import { HttpTestRequestPreview } from "../blocks/http-test-request-preview.tsx";
 import { HttpTestResponseDisplay } from "../blocks/http-test-response-display.tsx";
+import { HttpJsonPathText } from "../elements/http-json-path-text.tsx";
 
 const DEFAULT_THREAD_ID = "test-thread-123";
 const DEFAULT_MESSAGES: TestMessage[] = [{ role: "user", content: "Hello" }];
@@ -37,6 +38,13 @@ export type HttpTestPanelProps = {
   outputPath?: string;
   bodyTemplate?: string;
   explainError?: HttpTestErrorExplanation;
+  /** Fired with each test result, so the output path field can check itself against it. */
+  onResult?: (result: HttpTestResult) => void;
+  /** Moves focus to the field that sets `outputPath`. */
+  onEditOutputPath?: () => void;
+  /** The shape the path is checked against, when one is known. */
+  shape?: unknown;
+  shapeIsSample?: boolean;
 };
 
 const escapeRegExp = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -59,6 +67,10 @@ export function HttpTestPanel({
   outputPath,
   bodyTemplate,
   explainError,
+  onResult,
+  onEditOutputPath,
+  shape,
+  shapeIsSample = false,
 }: HttpTestPanelProps) {
   const {
     threadId,
@@ -71,7 +83,7 @@ export function HttpTestPanel({
     bodyValidation,
     headerValidation,
     handleTest,
-  } = useHttpTestPanel({ onTest, bodyTemplate, headers });
+  } = useHttpTestPanel({ onTest, bodyTemplate, headers, onResult });
 
   return (
     <VStack align="stretch" gap={4} width="full">
@@ -134,7 +146,21 @@ export function HttpTestPanel({
       {outputPath && (
         <Box fontSize="sm" color="fg.muted">
           <Text>
-            Output will be extracted using JSONPath: <Code fontSize="sm">{outputPath}</Code>
+            Output is extracted using JSONPath <HttpJsonPathText path={outputPath} shape={shape} anyIndex={shapeIsSample} />
+            {onEditOutputPath && (
+              <>
+                {". "}
+                <Button
+                  variant="plain"
+                  size="xs"
+                  colorPalette="blue"
+                  onClick={onEditOutputPath}
+                  data-testid="edit-output-path"
+                >
+                  Change the path
+                </Button>
+              </>
+            )}
           </Text>
         </Box>
       )}
@@ -151,7 +177,7 @@ export function HttpTestPanel({
         </Button>
       </HStack>
 
-      {result && <HttpTestResponseDisplay result={result} explainError={explainError} />}
+      {result && <HttpTestResponseDisplay result={result} explainError={explainError} outputPath={outputPath} />}
     </VStack>
   );
 }
@@ -176,7 +202,7 @@ function validateHeaders(headers: HttpTestPanelProps["headers"]) {
   return { valid: errors.length === 0, errors };
 }
 
-function useHttpTestPanel({ onTest, bodyTemplate, headers }: HttpTestPanelProps) {
+function useHttpTestPanel({ onTest, bodyTemplate, headers, onResult }: HttpTestPanelProps) {
   const [threadId, setThreadId] = useState(DEFAULT_THREAD_ID);
   const [messages, setMessages] = useState<TestMessage[]>(DEFAULT_MESSAGES);
   const [isLoading, setIsLoading] = useState(false);
@@ -197,6 +223,7 @@ function useHttpTestPanel({ onTest, bodyTemplate, headers }: HttpTestPanelProps)
     try {
       const response = await onTest({ threadId, messages });
       setResult(response);
+      onResult?.(response);
     } catch (error) {
       setResult({
         success: false,
@@ -205,7 +232,7 @@ function useHttpTestPanel({ onTest, bodyTemplate, headers }: HttpTestPanelProps)
     } finally {
       setIsLoading(false);
     }
-  }, [messages, onTest, threadId]);
+  }, [messages, onResult, onTest, threadId]);
 
   return {
     threadId,

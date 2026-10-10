@@ -13,7 +13,7 @@ import { EventingTraceEventPayloadRepository } from "../eventing.trace-event-pay
 type SeatRead = Parameters<EventReadSeat["getEvent"]>[0];
 
 /** A seat answering one event's data, or not found, and keeping every read it was asked. */
-class RecordingSeat implements EventReadSeat {
+class RecordingSeat implements Pick<EventReadSeat, "getEvent"> {
   readonly reads: SeatRead[] = [];
 
   constructor(private readonly data: unknown) {}

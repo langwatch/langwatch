@@ -264,7 +264,7 @@ export default function GroupsScreen() {
           if (!e.open) setGroupToDelete(null);
         }}
       >
-        <Dialog.Content bg="bg" maxWidth="440px">
+        <Dialog.Content maxWidth="440px">
           <Dialog.Header>
             <Dialog.Title>Delete group</Dialog.Title>
           </Dialog.Header>

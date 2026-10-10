@@ -393,15 +393,15 @@ const ConversationSkeleton: React.FC<{ conversationId: string }> = ({ conversati
         paddingX={4}
         paddingY={2.5}
         borderBottomWidth="1px"
-        borderColor="border.muted"
-        bg="bg.subtle"
+        borderColor={{ base: "gray.200", _dark: "border.muted" }}
+        bg="bg.surface"
         flexShrink={0}
       >
         <Text
           textStyle="2xs"
           color="fg.muted"
           textTransform="uppercase"
-          letterSpacing="0.06em"
+          letterSpacing="wider"
           fontWeight="semibold"
         >
           Conversation
@@ -474,6 +474,9 @@ const ConversationSkeleton: React.FC<{ conversationId: string }> = ({ conversati
 
 const CONVERSATION_MODES: Mode[] = ["thread", "bubbles", "markdown"];
 
+/** A host with chrome over the thread's end (the queue's bar) widens this by that much. */
+const SCROLL_END_PADDING = "calc(var(--chakra-spacing-4) + var(--lw-scroll-clearance-bottom, 0px))";
+
 const ConversationHeader: React.FC<{
   conversationId: string | null;
   currentTraceId: string;
@@ -499,15 +502,15 @@ const ConversationHeader: React.FC<{
       paddingX={4}
       paddingY={2.5}
       borderBottomWidth="1px"
-      borderColor="border.muted"
-      bg="bg.subtle"
+      borderColor={{ base: "gray.200", _dark: "border.muted" }}
+      bg="bg.surface"
       flexShrink={0}
     >
       <Text
         textStyle="2xs"
         color="fg.muted"
         textTransform="uppercase"
-        letterSpacing="0.06em"
+        letterSpacing="wider"
         fontWeight="semibold"
       >
         Conversation
@@ -611,7 +614,8 @@ const PlainTurnsView: React.FC<TurnsViewProps & { systemPrompt: string | null }>
       flex={1}
       overflow="auto"
       paddingX={5}
-      paddingY={4}
+      paddingTop={4}
+      paddingBottom={SCROLL_END_PADDING}
     >
       <VStack
         align="stretch"
@@ -839,7 +843,14 @@ const VirtualizedTurnsView: React.FC<TurnsViewProps & { systemPrompt: string | n
   const underReview = turnUnderReview({ parsedTurns, focusTraceId });
 
   return (
-    <Box ref={attachScroller} flex={1} overflow="auto" paddingX={5} paddingY={4}>
+    <Box
+      ref={attachScroller}
+      flex={1}
+      overflow="auto"
+      paddingX={5}
+      paddingTop={4}
+      paddingBottom={SCROLL_END_PADDING}
+    >
       <Box
         width="full"
         maxWidth={columnMaxWidth({ layout, isRailActive, railLayout })}
@@ -932,7 +943,14 @@ const MarkdownConversationView: React.FC<{
           {copied ? "Copied" : "Copy"}
         </Button>
       </HStack>
-      <Box ref={scrollRef} flex={1} minHeight={0} overflow="auto" bg="bg.panel">
+      <Box
+        ref={scrollRef}
+        flex={1}
+        minHeight={0}
+        overflow="auto"
+        bg="bg.panel"
+        paddingBottom="var(--lw-scroll-clearance-bottom, 0px)"
+      >
         <Box height={`${virtualizer.getTotalSize()}px`} width="full" position="relative">
           {virtualizer.getVirtualItems().map((row) => {
             const chunk = chunks[row.index]!;

@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -145,7 +146,7 @@ func TestReadSelectionMigratesTheOldDeveloperToolNames(t *testing.T) {
 			if err := s.WriteSelection(dir, sel); err != nil {
 				t.Fatalf("WriteSelection: %v", err)
 			}
-			b, err := os.ReadFile(filepath.Join(dir, ".haven.json"))
+			b, err := os.ReadFile(selectionPath(dir))
 			if err != nil {
 				t.Fatalf("read back: %v", err)
 			}
@@ -201,7 +202,7 @@ func TestWriteSelectionStatesEveryService(t *testing.T) {
 				t.Fatalf("WriteSelection: %v", err)
 			}
 
-			b, err := os.ReadFile(filepath.Join(dir, ".haven.json"))
+			b, err := os.ReadFile(selectionPath(dir))
 			if err != nil {
 				t.Fatalf("read back: %v", err)
 			}
@@ -308,7 +309,7 @@ func TestReapEventsPersistBoundedNewestLast(t *testing.T) {
 	}
 }
 
-// @scenario "haven slot explain shows each holder and waiter with class, age and effective priority"
+// @scenario "haven machine slot explain shows each holder and waiter with class, age and effective priority"
 func TestWaiterSnapshotsListsLiveRegistrations(t *testing.T) {
 	s := New(t.TempDir())
 
@@ -345,7 +346,7 @@ func TestWaiterSnapshotsListsLiveRegistrations(t *testing.T) {
 	}
 }
 
-// @scenario "haven slot explain shows each holder and waiter with class, age and effective priority"
+// @scenario "haven machine slot explain shows each holder and waiter with class, age and effective priority"
 func TestWaiterSnapshotsDropsDeadAndExpiredEntries(t *testing.T) {
 	s := New(t.TempDir())
 	dir := s.waitersDir("checks")
@@ -433,5 +434,28 @@ func TestReadSelectionIgnoresTheOptInEraPaymentKey(t *testing.T) {
 	writeSelectionJSON(t, dir, `{"services":{"paymentsim":false}}`)
 	if sel, _ := s.ReadSelection(dir); sel.Payment {
 		t.Error(`a stated "paymentsim": false (haven up -payment) was ignored`)
+	}
+}
+
+// @scenario "The stack mode is not sticky"
+// A file an older haven wrote with a saved mode reads as still, and the next write drops the keys.
+func TestSelectionIgnoresAndDropsTheRetiredModes(t *testing.T) {
+	s, dir := New(t.TempDir()), t.TempDir()
+	writeSelectionJSON(t, dir, `{"held":true,"watch":true,"watch-ui":true,"bundled-ui":true,"dev-ui":true,"services":{}}`)
+	got, ok := s.ReadSelection(dir)
+	if !ok || !got.IsStill() || !got.IsBuiltUI() {
+		t.Fatalf("a saved mode should read as still, got %+v ok=%v", got, ok)
+	}
+	if err := s.WriteSelection(dir, got); err != nil {
+		t.Fatalf("WriteSelection: %v", err)
+	}
+	b, err := os.ReadFile(selectionPath(dir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, key := range []string{"held", `"watch"`, "watch-ui", "bundled-ui", "dev-ui"} {
+		if strings.Contains(string(b), key) {
+			t.Errorf("the next write kept %s:\n%s", key, b)
+		}
 	}
 }

@@ -1,4 +1,4 @@
-import { bindRestMiddleware, projectCredentialOfRequest } from "@langwatch/api/rest";
+import { projectCredentialOfRequest } from "@langwatch/api/rest";
 import { defineProcessModule, type PublishedProcessModule } from "@langwatch/process";
 import type { PromptApi, PromptServerConfig } from "@langwatch/prompt-contract";
 import { defineMigrationStep } from "@langwatch/upgrade/step";
@@ -9,7 +9,7 @@ import { promptRepositories } from "./repositories/prompt-repositories.registry.
 import { PromptTagBackfillService } from "./services/prompt-tag-backfill.service.ts";
 import { promptExecuteRest } from "./transport/prompt-execute.rest.ts";
 import { promptTagTrpcTransport } from "./transport/prompt-tag.trpc.ts";
-import { promptRest, promptRestFacts } from "./transport/prompt.rest.ts";
+import { promptRest } from "./transport/prompt.rest.ts";
 import { promptTrpcTransport } from "./transport/prompt.trpc.ts";
 
 /** Prompt library server — tRPC, REST, and the browser-only playground stream. */
@@ -37,16 +37,16 @@ export const promptProcessModule: PublishedProcessModule<"prompt", PromptApi, Pr
         }),
       ];
     })
-    // Both facts come off the credential the request already carries: the
+    // Both contexts come off the credential the request already carries: the
     // organization the project belongs to, and the deep link back into the
     // library, which the app builds from its own configured `publicBaseUrl`.
-    .withTransportFacts(({ app }) => [
-      bindRestMiddleware(promptRestFacts, (context) => {
-        const { project } = projectCredentialOfRequest(context.req.raw);
+    .provideMiddlewareContext({
+      promptRestContext: (request, { app }) => {
+        const { project } = projectCredentialOfRequest(request);
 
         return {
           organizationId: project.organizationId,
           promptsUrl: app.promptsPlatformUrl({ projectSlug: project.slug }),
         };
-      }),
-    ]);
+      },
+    });

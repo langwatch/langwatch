@@ -126,7 +126,7 @@
     "@langwatch/webhook-process": "workspace:*",
     "@langwatch/workflow-process": "workspace:*",
     "hono": "catalog:",
-    "nanoid": "^6.0.0",
+    "nanoid": "catalog:",
     "prisma": "catalog:",
     "zod": "catalog:"
   },

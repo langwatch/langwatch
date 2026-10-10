@@ -10,7 +10,7 @@ import (
 	"github.com/langwatch/langwatch/tools/thuishaven/app"
 )
 
-// seedValueFlags are the seedgen flags `haven seed` passes through, in the order it passes them.
+// seedValueFlags are the seedgen flags `haven db seed` passes through, in the order it passes them.
 var seedValueFlags = []string{"--size", "--spans", "--days", "--persona", "--private", "--seed", "--anchor", "--shape", "--into", "--age", "--conversations", "--turns"}
 
 func seedSpec() commandSpec {
@@ -26,7 +26,7 @@ func seedSpec() commandSpec {
 		{long: "--conversations", takesValue: true, value: "<n>", summary: "long conversations per project (default 1)"},
 		{long: "--turns", takesValue: true, value: "<n>", summary: "turns in each conversation, one trace each (default 15)"},
 		{long: "--shape", takesValue: true, value: "saas|sh-licensed|sh-free", summary: "deployment shape"},
-		{long: "--org", takesValue: true, value: "name=..,plan=free,users=N[,persona=..]", summary: "create this org instead of the tier's (repeatable)"},
+		{long: "--org", takesValue: true, value: "name=..,plan=free|licence,users=N[,persona=..][,owner=EMAIL][,admin=no]", summary: "create this org instead of the tier's (repeatable)"},
 		{long: "--into", takesValue: true, value: "<org-id>/<project-id>", summary: "send telemetry only, into an existing project"},
 		{long: "--live", summary: "stream a gentle live load into the last seed's orgs"},
 		{long: "--dry-run", summary: "print the plan's counts, rows, bytes and duration; write nothing"},
@@ -43,11 +43,11 @@ func seedSpec() commandSpec {
 	}
 }
 
-// runSeed is `haven seed [status]`. Exit 2 means refused before writing, 4 stalled, 1 a check failed.
+// runSeed is `haven db seed [status]`. Exit 2 means refused before writing, 4 stalled, 1 a check failed.
 func runSeed(ctx context.Context, d deps, inv invocation) error {
 	if len(inv.args) > 0 {
 		if inv.args[0] != "status" {
-			return fmt.Errorf("haven seed: unknown subcommand %q — status", inv.args[0])
+			return fmt.Errorf("haven db seed: unknown subcommand %q — status", inv.args[0])
 		}
 		return d.orch.SeedStatus(d.params)
 	}

@@ -269,6 +269,35 @@ function ReleasesTable({
   );
 }
 
+/** What this image still ships but retires, what replaces each and when it goes (ruling D8). */
+function DeprecationsTable({ deprecations }: { deprecations: UpgradeStatusView["deprecations"] }) {
+  return (
+    <ListTable data-testid="upgrade-deprecations">
+      <Table.Header>
+        <Table.Row>
+          <Table.ColumnHeader>Deprecated</Table.ColumnHeader>
+          <Table.ColumnHeader>Replaced by</Table.ColumnHeader>
+          <Table.ColumnHeader>Removed in</Table.ColumnHeader>
+        </Table.Row>
+      </Table.Header>
+      <Table.Body>
+        {deprecations.map((entry) => (
+          <Table.Row key={entry.id}>
+            <Table.Cell>
+              <Text fontWeight="medium">{entry.what}</Text>
+              <Text textStyle="xs" color="fg.muted">
+                {entry.notice}
+              </Text>
+            </Table.Cell>
+            <Table.Cell>{entry.successor ?? "Nothing"}</Table.Cell>
+            <Table.Cell whiteSpace="nowrap">{entry.removedIn ?? "A future release"}</Table.Cell>
+          </Table.Row>
+        ))}
+      </Table.Body>
+    </ListTable>
+  );
+}
+
 function RunsTable({
   runs,
   onOpenRun,
@@ -562,6 +591,11 @@ export function UpgradesOverview({
       <OverviewBlock title="Recent runs">
         <RunsTable runs={runs} onOpenRun={onOpenRun} />
       </OverviewBlock>
+      {status.deprecations.length > 0 && (
+        <OverviewBlock title="Deprecated">
+          <DeprecationsTable deprecations={status.deprecations} />
+        </OverviewBlock>
+      )}
     </Stack>
   );
 }

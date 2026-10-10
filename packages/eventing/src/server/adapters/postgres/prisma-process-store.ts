@@ -1,4 +1,5 @@
 import { generate } from "@langwatch/ksuid";
+import { skipTenantCheck } from "@langwatch/prisma-client";
 import {
   type PrismaClient,
   Prisma,
@@ -244,7 +245,10 @@ export class PrismaProcessStore implements ProcessStore {
     // Revision remains an explicit compare-and-swap below; the lock also
     // closes the absent-row race for the first write.
     await tx.$queryRaw`
-          -- @tenancy: advisory-lock helper, key is process-ref-bounded
+          ${skipTenantCheck({
+            // Advisory-lock helper, key is process-ref-bounded.
+            SKIP_TENANT_CHECK: true,
+          })}
           WITH process_lock AS MATERIALIZED (
             SELECT pg_advisory_xact_lock(
               hashtextextended(${refLockKey(write.ref)}, 0)
@@ -558,7 +562,10 @@ export class PrismaProcessStore implements ProcessStore {
     // pool ran out — "Unable to start a transaction in the given time" on
     // every claim, which stalls every pipeline the outbox feeds.
     const rows = await this.#prisma.$queryRaw<ProcessManagerOutbox[]>(Prisma.sql`
-        -- @tenancy: outbox claim is cross-project worker infrastructure by design
+        ${skipTenantCheck({
+          // Outbox claim is cross-project worker infrastructure by design.
+          SKIP_TENANT_CHECK: true,
+        })}
         WITH candidates AS (
           SELECT "id"
           FROM "ProcessManagerOutbox"
@@ -709,6 +716,11 @@ export class PrismaProcessStore implements ProcessStore {
     // both handle, so row locks here would only add writes.
     const rows = await this.#prisma.$queryRaw<ProcessManagerInstance[]>(
       Prisma.sql`
+        ${skipTenantCheck({
+          // The due-wake scan is cross-project worker infrastructure: it finds every process
+          // instance whose wake time has passed, in any project.
+          SKIP_TENANT_CHECK: true,
+        })}
         SELECT *
         FROM "ProcessManagerInstance"
         WHERE "nextWakeAt" <= ${asDate(params.now)}
@@ -765,21 +777,22 @@ export class PrismaProcessStore implements ProcessStore {
   async deleteDispatchedBefore(params: { processName: string; before: number }): Promise<number> {
     // Cross-tenant retention sweep: this prunes dispatched outbox rows for a process name
     // across every project, so it has no `projectId` predicate and the multitenancy guard would
-    // otherwise throw on every scheduled
-    // prune tick. Opt out via the guard's sanctioned `-- @tenancy:` marker
+    // otherwise throw on every scheduled prune tick, so it skips the tenant check.
     const affected = await this.#prisma.$executeRaw`
       DELETE FROM "ProcessManagerOutbox"
       WHERE "processName" = ${params.processName}
         AND "status" = 'dispatched'::"ProcessManagerOutboxStatus"
         AND "dispatchedAt" < ${asDate(params.before)}
-      -- @tenancy: process-manager outbox retention cross-tenant sweep (system-owned maintenance)
+      ${skipTenantCheck({
+        // Process-manager outbox retention cross-tenant sweep (system-owned maintenance)
+        SKIP_TENANT_CHECK: true,
+      })}
     `;
     return affected;
   }
 
   // The three batched sweeps below share one shape: pick at most `limit` ids with a bounded
-  // SELECT, then delete exactly those.
-  // the multitenancy guard's sanctioned `-- @tenancy:` marker, the same opt-out
+  // SELECT, then delete exactly those; each skips the tenant check.
 
   async deleteDispatchedOutboxBatch(params: { before: number; limit: number }): Promise<number> {
     if (params.limit <= 0) return 0;
@@ -791,7 +804,10 @@ export class PrismaProcessStore implements ProcessStore {
           AND "dispatchedAt" < ${asDate(params.before)}
         LIMIT ${params.limit}
       )
-      -- @tenancy: process-manager retention sweep, dispatched outbox (system-owned maintenance)
+      ${skipTenantCheck({
+        // Process-manager retention sweep, dispatched outbox (system-owned maintenance)
+        SKIP_TENANT_CHECK: true,
+      })}
     `;
   }
 
@@ -808,7 +824,10 @@ export class PrismaProcessStore implements ProcessStore {
           AND "updatedAt" < ${asDate(params.before)}
         LIMIT ${params.limit}
       )
-      -- @tenancy: process-manager retention sweep, discarded outbox (system-owned maintenance)
+      ${skipTenantCheck({
+        // Process-manager retention sweep, discarded outbox (system-owned maintenance)
+        SKIP_TENANT_CHECK: true,
+      })}
     `;
   }
 
@@ -821,7 +840,10 @@ export class PrismaProcessStore implements ProcessStore {
         WHERE "consumedAt" < ${asDate(params.before)}
         LIMIT ${params.limit}
       )
-      -- @tenancy: process-manager retention sweep, consumed inbox (system-owned maintenance)
+      ${skipTenantCheck({
+        // Process-manager retention sweep, consumed inbox (system-owned maintenance)
+        SKIP_TENANT_CHECK: true,
+      })}
     `;
   }
 }

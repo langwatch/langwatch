@@ -26,12 +26,6 @@ export interface HandledErrorAlertProps {
    * the description. Inline alerts have the room; toasts do not.
    */
   showAllTips?: boolean;
-  /**
-   * A surface that paints its own ground — the signed-out front door's glass —
-   * hooks its treatment on here. The alert keeps its own structure and colour;
-   * only the pane it sits on changes.
-   */
-  className?: string;
 }
 
 export function HandledErrorAlert({
@@ -39,7 +33,6 @@ export function HandledErrorAlert({
   title,
   fallbackTitle,
   showAllTips = true,
-  className,
 }: HandledErrorAlertProps) {
   if (error === null || error === void 0) return null;
 
@@ -54,12 +47,13 @@ export function HandledErrorAlert({
   const traceId = readErrorTraceId(error);
 
   return (
-    <Alert.Root status="error" role="alert" className={className} justifyContent="center">
-      <Alert.Indicator>
+    // The design system's compact status alert, read left to right: mark, title, sentence.
+    <Alert.Root status="error" role="alert" size="sm" alignItems="flex-start">
+      <Alert.Indicator marginTop="1px">
         <AlertCircle aria-hidden="true" />
       </Alert.Indicator>
-      <Alert.Content alignItems="center" textAlign="center" minWidth={0}>
-        <Alert.Title>{headline}</Alert.Title>
+      <Alert.Content textAlign="start" minWidth={0} gap={0.5}>
+        <Alert.Title fontWeight={600}>{headline}</Alert.Title>
         <Alert.Description>{description}</Alert.Description>
 
         {showAllTips && tips.length > 0 && (

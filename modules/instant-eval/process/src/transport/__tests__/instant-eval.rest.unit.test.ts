@@ -1,5 +1,5 @@
 import {
-  bindRestMiddleware,
+  bindMiddlewareContext,
   canonicalErrorResponse,
   createRestRuntime,
   ForbiddenError,
@@ -94,8 +94,10 @@ function mount(api: Partial<InstantEvalApi>, holds: (permission: string) => bool
     app: () => stub,
     credential: "project",
     onError: canonicalErrorResponse,
-    facts: [
-      bindRestMiddleware(instantEvalRestCredential, () => ({ kind: "legacyProjectKey" as const })),
+    middlewareContext: [
+      bindMiddlewareContext(instantEvalRestCredential, () => ({
+        kind: "legacyProjectKey" as const,
+      })),
     ],
   });
 

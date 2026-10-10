@@ -31,7 +31,7 @@ let repo: ClickHouseMetricDataPointAppendRepository;
 function metricClient(client: ClickHouseClient): MetricClickHouseClient {
   return {
     insert: async (params) => client.insert(params),
-    query: async ({ unscoped: _unscoped, ...params }) => {
+    query: async ({ SKIP_TENANT_CHECK: _skip, ...params }) => {
       const resultSet = await client.query(params);
       return {
         json: async <T>(): Promise<T[]> => {

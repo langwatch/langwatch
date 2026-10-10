@@ -48,7 +48,7 @@ export function InstantEvalConfirmDialog({
       onOpenChange={({ open }) => !open && onClose()}
       size="sm"
     >
-      <Dialog.Content bg="bg">
+      <Dialog.Content>
         <Dialog.CloseTrigger />
         <Dialog.Header>
           <Dialog.Title>Judge each result?</Dialog.Title>
@@ -119,7 +119,7 @@ export function InstantEvalConfirmDialog({
           )}
         </Dialog.Body>
         <Dialog.Footer>
-          <Button variant="ghost" size="sm" onClick={onSearchWords}>
+          <Button variant="outline" size="sm" onClick={onSearchWords}>
             Search the words instead
           </Button>
           <Button colorPalette="orange" size="sm" onClick={onRun} loading={isStarting}>

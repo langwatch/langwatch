@@ -93,16 +93,11 @@ export function HistorySection({
   );
 }
 
-/**
- * One thing that happened, on a rail: a dot per event and a hairline joining
- * them, which is what turns a list of sentences into a sequence. Decoration
- * over the order the rows already have, so it is hidden from a reader who is
- * being read to.
- */
+/** One event on a rail: a dot per event and a hairline joining them, hidden from screen readers. */
 function HistoryRow({ entry, last }: { entry: HistoryDayEntry; last: boolean }) {
   return (
     <HStack gap={3} align="stretch" data-testid="connection-history-entry">
-      <VStack gap={0} width="7px" flexShrink={0} paddingTop="7px" aria-hidden="true">
+      <VStack gap={0} width="7px" flexShrink={0} paddingTop="6.5px" aria-hidden="true">
         <Box
           width="7px"
           height="7px"
@@ -112,21 +107,21 @@ function HistoryRow({ entry, last }: { entry: HistoryDayEntry; last: boolean }) 
         />
         {!last && <Box flex={1} width="1px" background="border.muted" />}
       </VStack>
-      <HStack gap={3} align="start" paddingBottom={last ? 0 : 2.5} minWidth={0} flex={1}>
+      <HStack gap={3} align="baseline" paddingBottom={last ? 0 : 2.5} minWidth={0} flex={1}>
         <Text
           fontSize="11.5px"
           color="fg.muted"
           flexShrink={0}
           whiteSpace="nowrap"
           fontVariantNumeric="tabular-nums"
-          lineHeight="1.5"
+          lineHeight="20px"
         >
           {toDate(Temporal.Instant.fromEpochMilliseconds(entry.occurredAtMs)).toLocaleTimeString(
             undefined,
             TIME_FORMAT,
           )}
         </Text>
-        <Text fontSize="13px" lineHeight="1.5" minWidth={0}>
+        <Text fontSize="13px" lineHeight="20px" minWidth={0}>
           {entry.summary}
         </Text>
         {/* Named rather than hidden: the weaker evidence an earlier

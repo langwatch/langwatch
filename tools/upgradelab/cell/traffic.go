@@ -57,6 +57,10 @@ func SeededID(seed int64, kind string, n int) string {
 	return hex.EncodeToString(sum[:16])
 }
 
+// RunSeed salts seed with the run's start, so a cell started from a snapshot never replays the ids
+// produce wrote; it is fixed for the whole run, so every id stays reproducible and readable back.
+func RunSeed(seed int64, origin time.Time) int64 { return seed ^ origin.UnixNano() }
+
 // Mix is the traffic of a cell: four ingest doors, then the API and tRPC calls a user makes.
 func Mix(rate time.Duration) []Kind {
 	return []Kind{

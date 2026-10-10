@@ -6,7 +6,7 @@ The server half of [instant-eval](../README.md). Instant evaluations: the opt-in
 
 ## Installation
 
-`defineProcessModule("instant-eval").withRepositories(instantEvalRepositories).withChannels(instantEvalChannels).withApi(InstantEvalModule).withTransports(instantEvalRest, instantEvalTrpcTransport).withTransportFacts(…).withEventing(instantEvalEventing).withMigrations(…)`, `src/instant-eval.module.ts:23`.
+`defineProcessModule("instant-eval").withRepositories(instantEvalRepositories).withChannels(instantEvalChannels).withApi(InstantEvalModule).withTransports(instantEvalRest, instantEvalTrpcTransport).provideMiddlewareBindings(…).withEventing(instantEvalEventing).withMigrations(…)`, `src/instant-eval.module.ts:23`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 

@@ -22,7 +22,7 @@ const REQUESTED_AT = 1_700_000_000_000;
 const RESOLVED_AT = REQUESTED_AT + 60_000;
 const EXPIRES_AT = REQUESTED_AT + 14 * 24 * 60 * 60 * 1000;
 
-const requested: JoinRequestFact = {
+const requested = {
   type: JOIN_REQUESTED_EVENT_TYPE,
   occurredAt: REQUESTED_AT,
   data: {
@@ -34,9 +34,10 @@ const requested: JoinRequestFact = {
     expiresAtMs: EXPIRES_AT,
     notifyAdmins: true,
     origin: "web",
+    connectionId: null,
     actor: { type: "user", id: "user_sam" },
   },
-};
+} satisfies JoinRequestFact;
 
 const pending = (): JoinRequestAggregateState =>
   reduceJoinRequest({

@@ -30,6 +30,7 @@ import {
   traceHeaderSchema,
   traceResourceInfoSchema,
 } from "./trace-view.contract.ts";
+import { TRACE_NAME_CHANGED_EVENT_TYPE } from "./trace.constants.ts";
 import {
   spanTreeDeltaTransportInputSchema,
   spanTreeTransportInputSchema,
@@ -431,7 +432,8 @@ export const tracesTrpc = defineTrpcContract("traces")
   .withInput(routeSearchInputSchema)
   .withOutput(routeSearchResultSchema)
 
-  .query("header")
+  // Trace events are appended under the project, so a rename hints there.
+  .query("header", { invalidatedBy: [TRACE_NAME_CHANGED_EVENT_TYPE] })
   .withInput(
     z.object({
       projectId: z.string(),

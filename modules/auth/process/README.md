@@ -6,7 +6,7 @@ The server half of [auth](../README.md). Signing in and staying signed in: the b
 
 ## Installation
 
-`defineProcessModule("auth").withRepositories(authRepositories).withChannels(authChannels).withApi(AuthModule).withTransports(authTrpcTransport, signInSecurityTrpcTransport, authCliDeviceFlowRest, authRest).withEventing(authEventing).withEventing(authLifecycleEventing).withTasks(…).withTransportFacts(…)`, `src/auth.module.ts:24`.
+`defineProcessModule("auth").withRepositories(authRepositories).withChannels(authChannels).withApi(AuthModule).withTransports(authTrpcTransport, signInSecurityTrpcTransport, authCliDeviceFlowRest, authRest).withEventing(authEventing).withEventing(authLifecycleEventing).withTasks(…).provideMiddlewareBindings(…)`, `src/auth.module.ts:24`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -677,7 +677,7 @@ interface Input {
   email: string;
   addressProof: string;
 }
-type Output = z.infer<typeof signUpEnrollmentSchema>; // ../contract/src/front-door.responses.ts:87
+type Output = z.infer<typeof signUpEnrollmentSchema>; // ../contract/src/front-door.responses.ts:73
 
 // auth.route
 // Input: frontDoorRouteInputSchema, ../contract/src/front-door.schemas.ts:14
@@ -708,7 +708,7 @@ type Output =
 interface Input {
   inviteCode: string;
 }
-// Output: inviteLandingSchema, ../contract/src/front-door.responses.ts:49
+// Output: inviteLandingSchema, ../../organization/contract/src/organization.responses.ts:92
 interface Output {
   organizationName: string;
   inviterName: string | null;
@@ -725,7 +725,7 @@ interface Output {
 // auth.myAddressConfirmation
 // Input: inline, ../contract/src/auth.trpc.ts:68
 type Input = unknown;
-// Output: addressConfirmationSchema, ../contract/src/front-door.responses.ts:62
+// Output: addressConfirmationSchema, ../contract/src/front-door.responses.ts:48
 interface Output {
   email: string | null;
   confirmed: boolean;
@@ -746,7 +746,7 @@ interface Output {
 // auth.priorSession
 // Input: inline, ../contract/src/auth.trpc.ts:77
 type Input = unknown;
-// Output: priorSessionSchema, ../contract/src/front-door.responses.ts:72
+// Output: priorSessionSchema, ../contract/src/front-door.responses.ts:58
 type Output =
   | {
       kind: "expired";
@@ -909,7 +909,7 @@ Run by the tasks process, before serve.
 
 | Kind   | Leaf                          | Environment variable                      | Declared at                                          |
 | ------ | ----------------------------- | ----------------------------------------- | ---------------------------------------------------- |
-| secret | `session`                     | `NEXTAUTH_SECRET`                         | `src/app/auth.app.ts:276`                            |
+| secret | `session`                     | `NEXTAUTH_SECRET`                         | `src/app/auth.app.ts:274`                            |
 | secret | `googleClientSecret`          | `GOOGLE_CLIENT_SECRET`                    | `../../../packages/secrets/src/shared-secrets.ts:52` |
 | secret | `githubClientSecret`          | `GITHUB_CLIENT_SECRET`                    | `../../../packages/secrets/src/shared-secrets.ts:53` |
 | secret | `gitlabClientSecret`          | `GITLAB_CLIENT_SECRET`                    | `../../../packages/secrets/src/shared-secrets.ts:54` |
@@ -919,8 +919,8 @@ Run by the tasks process, before serve.
 | secret | `cognitoClientSecret`         | `COGNITO_CLIENT_SECRET`                   | `../../../packages/secrets/src/shared-secrets.ts:58` |
 | secret | `oneLoginClientSecret`        | `ONELOGIN_CLIENT_SECRET`                  | `../../../packages/secrets/src/shared-secrets.ts:59` |
 | secret | `oidcClientSecret`            | `OIDC_CLIENT_SECRET`                      | `../../../packages/secrets/src/shared-secrets.ts:60` |
-| secret | `auth0ManagementSecret`       | `AUTH0_MGMT_CLIENT_SECRET`                | `src/app/auth.app.ts:279`                            |
-| secret | `internalSlackSignupsWebhook` | `SLACK_CHANNEL_SIGNUPS`                   | `src/app/auth.app.ts:281`                            |
+| secret | `auth0ManagementSecret`       | `AUTH0_MGMT_CLIENT_SECRET`                | `src/app/auth.app.ts:277`                            |
+| secret | `internalSlackSignupsWebhook` | `SLACK_CHANNEL_SIGNUPS`                   | `src/app/auth.app.ts:279`                            |
 | config | `sessionUrl`                  | `NEXTAUTH_URL`                            | `../contract/src/auth.config.ts:20`                  |
 | config | `mfaEnrollmentOpen`           | `MFA_ENROLLMENT_OPEN`                     | `../contract/src/auth.config.ts:22`                  |
 | config | `passkeysEnabled`             | `PASSKEYS_ENABLED`                        | `../contract/src/auth.config.ts:23`                  |

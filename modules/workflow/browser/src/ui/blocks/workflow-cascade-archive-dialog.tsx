@@ -112,12 +112,10 @@ export function WorkflowCascadeArchiveDialog({
       placement="center"
       initialFocusEl={() => inputRef.current}
     >
-      <Dialog.Content bg="bg" maxWidth="500px" onClick={(e) => e.stopPropagation()}>
+      <Dialog.Content maxWidth="500px" onClick={(e) => e.stopPropagation()}>
         <Dialog.CloseTrigger />
         <Dialog.Header>
-          <Dialog.Title fontSize="md" fontWeight="500">
-            Delete {ENTITY_TYPE_LABEL[entityType]}?
-          </Dialog.Title>
+          <Dialog.Title>Delete {ENTITY_TYPE_LABEL[entityType]}?</Dialog.Title>
         </Dialog.Header>
         <Dialog.Body>
           {isLoadingRelated ? (

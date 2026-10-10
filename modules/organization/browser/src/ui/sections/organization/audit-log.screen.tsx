@@ -15,7 +15,6 @@ import {
   Input,
   NativeSelect,
   Spacer,
-  Table,
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
@@ -25,7 +24,7 @@ import type { EnrichedAuditLog as StoredEnrichedAuditLog } from "@langwatch/orga
 /** An audit row as the browser receives it: its instant is an ISO string. */
 type EnrichedAuditLog = WireOf<StoredEnrichedAuditLog>;
 import { neutralizeFormula, neutralizeRows } from "@langwatch/csv";
-import { formatDistanceToNow, nowInstant, readableDate } from "@langwatch/time";
+import { nowInstant, toDate } from "@langwatch/time";
 import { ArrowLeft, Download, ScrollText, Search } from "lucide-react";
 import Parse from "papaparse";
 import { useMemo, useState } from "react";
@@ -40,6 +39,7 @@ import {
 import {
   auditBackLink,
   matchMemberId,
+  searchMatchesNobody,
   readAuditPaging,
   readAuditTarget,
   withAuditFilter,
@@ -47,6 +47,7 @@ import {
   withAuditPageSize,
   withoutAuditTarget,
 } from "../../../model/audit-log-filters.ts";
+import { auditFeedDays, groupAuditRuns } from "../../../model/audit-log-rows.ts";
 import {
   auditPeriodLabel,
   auditPeriodQuery,
@@ -54,6 +55,7 @@ import {
 } from "../../../model/audit-period.ts";
 import { disambiguateLabels } from "../../../model/disambiguate-labels.ts";
 import { useOrganizationHost } from "../../../model/organization-host.ts";
+import { AuditLogEntry } from "../../../ui/blocks/audit-log-entry.tsx";
 import { AuditPaginationFooter } from "../../../ui/elements/audit-pagination-footer.tsx";
 import { AuditPeriodPicker } from "../../../ui/elements/audit-period-picker.tsx";
 import { Link } from "../../../ui/elements/organization-link.tsx";
@@ -65,10 +67,10 @@ function auditLogsView({
 }: {
   isLoading: boolean;
   rowCount: number;
-}): "loading" | "empty" | "table" {
+}): "loading" | "empty" | "feed" {
   if (isLoading) return "loading";
   if (rowCount === 0) return "empty";
-  return "table";
+  return "feed";
 }
 
 export default function AuditLogScreen() {
@@ -97,6 +99,7 @@ export default function AuditLogScreen() {
     { enabled: !!organizationId },
   );
   const searchUserId = matchMemberId(members.data?.members ?? [], userSearch);
+  const matchesNobody = searchMatchesNobody(members.data?.members, userSearch);
 
   const filters: AuditLogFilters = {
     organizationId,
@@ -111,7 +114,7 @@ export default function AuditLogScreen() {
 
   const auditLogs = organizationApi.organization.getAuditLogs.useQuery(
     { ...filters, pageOffset, pageSize },
-    { enabled: !!organizationId && isEnterprise },
+    { enabled: !!organizationId && isEnterprise && !matchesNobody },
   );
 
   const utils = organizationApi.useUtils();
@@ -141,12 +144,16 @@ export default function AuditLogScreen() {
     );
   }
 
-  const rows: EnrichedAuditLog[] = auditLogs.data?.auditLogs ?? [];
-  const totalHits = auditLogs.data?.totalCount ?? 0;
+  const feed = matchesNobody ? undefined : auditLogs.data;
+  const rows: EnrichedAuditLog[] = feed?.auditLogs ?? [];
+  const totalHits = feed?.totalCount ?? 0;
   const backLink = auditBackLink({ target, projectSlug: scope.projectSlug });
   const projects = (organization?.teams ?? []).flatMap((team) =>
     team.projects.map((project) => ({ id: project.id, label: project.name, teamName: team.name })),
   );
+
+  const projectLabel = (projectId: string) =>
+    projects.find((project) => project.id === projectId)?.label ?? projectId;
 
   const logsView = auditLogsView({ isLoading: auditLogs.isLoading, rowCount: rows.length });
 
@@ -219,13 +226,16 @@ export default function AuditLogScreen() {
         <PageLayout.Heading>Audit Log</PageLayout.Heading>
         <Spacer />
         {host.projectSwitcher()}
-        <PageLayout.HeaderButton onClick={() => void downloadCsv()} disabled={isExporting}>
+        <PageLayout.HeaderButton
+          onClick={() => void downloadCsv()}
+          disabled={isExporting || matchesNobody}
+        >
           <Download />
           Export CSV
         </PageLayout.HeaderButton>
       </PageLayout.Header>
 
-      <VStack gap={6} width="full" align="start" paddingTop={4}>
+      <VStack gap={4} width="full" align="start" paddingTop={4}>
         <VStack align="start" gap={1} width="full">
           {backLink && (
             <Link href={backLink.href} color="fg.muted" fontSize="sm">
@@ -234,7 +244,7 @@ export default function AuditLogScreen() {
               </HStack>
             </Link>
           )}
-          <Text color="fg.muted">
+          <Text color="fg.muted" fontSize="sm">
             Every change made in this organization: who made it, what changed and when. Filter by
             project, user, action or date range.
           </Text>
@@ -252,67 +262,45 @@ export default function AuditLogScreen() {
           )}
         </VStack>
 
-        <HStack gap={4} width="full" flexWrap="wrap" align="end">
-          <VStack align="start" gap={1} flex="1" minWidth="200px" maxWidth="300px">
-            <Text fontSize="sm" fontWeight="medium" color="fg.muted">
-              Search by User
-            </Text>
-            <InputGroup startElement={<Search size={16} />} width="full">
-              <Input
-                placeholder="Search by name or email..."
-                aria-label="Search by User"
-                value={userSearch}
-                onChange={(event) => handleUserSearchChange(event.target.value)}
-                width="full"
-              />
-            </InputGroup>
-          </VStack>
-
-          <VStack align="start" gap={1} flex="1" minWidth="200px" maxWidth="300px">
-            <Text fontSize="sm" fontWeight="medium" color="fg.muted">
-              Filter by Action
-            </Text>
+        <HStack gap={2} width="full" flexWrap="wrap">
+          <InputGroup startElement={<Search size={14} />} width="240px">
             <Input
-              placeholder="Filter by action type..."
-              aria-label="Filter by Action"
-              value={actionFilter}
-              onChange={(event) => handleActionFilterChange(event.target.value)}
-              width="full"
+              size="sm"
+              placeholder="Search by name or email..."
+              aria-label="Search by User"
+              value={userSearch}
+              onChange={(event) => handleUserSearchChange(event.target.value)}
             />
-          </VStack>
-
-          <VStack align="start" gap={1} flex="1" minWidth="150px" maxWidth="200px">
-            <Text fontSize="sm" fontWeight="medium" color="fg.muted">
-              Project
-            </Text>
-            <NativeSelect.Root size="sm" width="full">
-              <NativeSelect.Field
-                aria-label="Project"
-                value={selectedProjectId ?? "all"}
-                onChange={(event) =>
-                  handleProjectChange(event.target.value === "all" ? null : event.target.value)
-                }
-              >
-                <option value="all">All Projects</option>
-                {disambiguateLabels(projects, (project) => project.teamName).map((project) => (
-                  <option key={project.id} value={project.id}>
-                    {project.displayLabel}
-                  </option>
-                ))}
-              </NativeSelect.Field>
-              <NativeSelect.Indicator />
-            </NativeSelect.Root>
-          </VStack>
-
-          <VStack align="start" gap={1} flex="1" minWidth="200px" maxWidth="300px">
-            <Text fontSize="sm" fontWeight="medium" color="fg.muted">
-              Select Date
-            </Text>
-            <AuditPeriodPicker
-              label={auditPeriodLabel(period, mode, now)}
-              onPick={(presetKey) => host.setQuery(auditPeriodQuery(query, presetKey))}
-            />
-          </VStack>
+          </InputGroup>
+          <Input
+            size="sm"
+            width="200px"
+            placeholder="Filter by action..."
+            aria-label="Filter by Action"
+            value={actionFilter}
+            onChange={(event) => handleActionFilterChange(event.target.value)}
+          />
+          <NativeSelect.Root size="sm" width="200px">
+            <NativeSelect.Field
+              aria-label="Project"
+              value={selectedProjectId ?? "all"}
+              onChange={(event) =>
+                handleProjectChange(event.target.value === "all" ? null : event.target.value)
+              }
+            >
+              <option value="all">All Projects</option>
+              {disambiguateLabels(projects, (project) => project.teamName).map((project) => (
+                <option key={project.id} value={project.id}>
+                  {project.displayLabel}
+                </option>
+              ))}
+            </NativeSelect.Field>
+            <NativeSelect.Indicator />
+          </NativeSelect.Root>
+          <AuditPeriodPicker
+            label={auditPeriodLabel(period, mode, now)}
+            onPick={(presetKey) => host.setQuery(auditPeriodQuery(query, presetKey))}
+          />
         </HStack>
 
         {logsView === "loading" && <SettingsRowsSkeleton rows={8} />}
@@ -325,35 +313,32 @@ export default function AuditLogScreen() {
             />
           </Box>
         )}
-        {logsView === "table" && (
+        {logsView === "feed" && (
           <>
-            <Box
-              width="full"
-              overflowX="auto"
-              borderWidth="1px"
-              borderColor="border"
-              borderRadius="lg"
-            >
-              <Table.Root variant="line" width="full">
-                <Table.Header>
-                  <Table.Row>
-                    <Table.ColumnHeader>Timestamp</Table.ColumnHeader>
-                    <Table.ColumnHeader>Source</Table.ColumnHeader>
-                    <Table.ColumnHeader>User</Table.ColumnHeader>
-                    <Table.ColumnHeader>Action</Table.ColumnHeader>
-                    <Table.ColumnHeader>Target</Table.ColumnHeader>
-                    <Table.ColumnHeader>Project</Table.ColumnHeader>
-                    <Table.ColumnHeader>IP Address</Table.ColumnHeader>
-                    <Table.ColumnHeader>Error</Table.ColumnHeader>
-                  </Table.Row>
-                </Table.Header>
-                <Table.Body>
-                  {rows.map((log) => (
-                    <AuditLogRow key={log.id} log={log} projects={projects} />
+            <VStack width="full" align="stretch" gap={0} data-testid="audit-log-feed">
+              {auditFeedDays({ runs: groupAuditRuns(rows), now: toDate(now) }).map((day) => (
+                <Box key={day.label} as="section" aria-label={day.label}>
+                  <Text
+                    fontSize="xs"
+                    fontWeight="semibold"
+                    color="fg.muted"
+                    textTransform="uppercase"
+                    letterSpacing="wider"
+                    paddingX={3}
+                    paddingTop={3}
+                    paddingBottom={1}
+                    borderBottomWidth="1px"
+                    borderColor="border.muted"
+                    marginBottom={1}
+                  >
+                    {day.label}
+                  </Text>
+                  {day.runs.map((run) => (
+                    <AuditLogEntry key={run.id} run={run} projectLabel={projectLabel} />
                   ))}
-                </Table.Body>
-              </Table.Root>
-            </Box>
+                </Box>
+              ))}
+            </VStack>
 
             {totalHits > 0 && (
               <AuditPaginationFooter
@@ -369,105 +354,5 @@ export default function AuditLogScreen() {
         )}
       </VStack>
     </>
-  );
-}
-
-function AuditLogRow({
-  log,
-  projects,
-}: {
-  log: EnrichedAuditLog;
-  projects: { id: string; label: string }[];
-}) {
-  return (
-    <Table.Row>
-      <Table.Cell>
-        <VStack align="start" gap={0}>
-          <Text fontSize="sm">{readableDate(log.createdAt).toLocaleString()}</Text>
-          <Text fontSize="xs" color="fg.muted">
-            {formatDistanceToNow(readableDate(log.createdAt), { addSuffix: true })}
-          </Text>
-        </VStack>
-      </Table.Cell>
-      <Table.Cell>
-        <Badge
-          size="sm"
-          variant="subtle"
-          colorPalette={log.source === "gateway" ? "purple" : "gray"}
-        >
-          {log.source === "gateway" ? "Gateway" : "Platform"}
-        </Badge>
-      </Table.Cell>
-      <Table.Cell>
-        {log.user ? (
-          <VStack align="start" gap={0}>
-            <Text fontSize="sm" fontWeight="medium">
-              {log.user.name ?? "Unknown"}
-            </Text>
-            <Text fontSize="xs" color="fg.muted">
-              {log.user.email}
-            </Text>
-          </VStack>
-        ) : (
-          <Text fontSize="sm" color="fg.subtle">
-            {log.userId ? "User not found" : "System"}
-          </Text>
-        )}
-      </Table.Cell>
-      <Table.Cell>
-        <Text fontSize="sm" fontFamily="mono">
-          {log.action}
-        </Text>
-      </Table.Cell>
-      <Table.Cell>
-        {log.targetKind && log.targetId ? (
-          <VStack align="start" gap={0}>
-            <Text fontSize="xs" color="fg.muted">
-              {log.targetKind}
-            </Text>
-            <Text fontSize="xs" fontFamily="mono">
-              {log.targetId.slice(0, 16)}…
-            </Text>
-          </VStack>
-        ) : (
-          <Text fontSize="sm" color="fg.subtle">
-            —
-          </Text>
-        )}
-      </Table.Cell>
-      <Table.Cell>
-        {log.projectId ? (
-          <Text fontSize="sm">
-            {projects.find((project) => project.id === log.projectId)?.label ?? log.projectId}
-          </Text>
-        ) : (
-          <Text fontSize="sm" color="fg.subtle">
-            —
-          </Text>
-        )}
-      </Table.Cell>
-      <Table.Cell>
-        {log.ipAddress ? (
-          <Text fontSize="sm" fontFamily="mono">
-            {log.ipAddress}
-          </Text>
-        ) : (
-          <Text fontSize="sm" color="fg.subtle">
-            —
-          </Text>
-        )}
-      </Table.Cell>
-      <Table.Cell>
-        {log.error ? (
-          <Text fontSize="sm" color="fg.error">
-            {log.error}
-          </Text>
-        ) : (
-          <Text fontSize="sm" color="fg.subtle">
-            —
-          </Text>
-        )}
-      </Table.Cell>
-    </Table.Row>
   );
 }

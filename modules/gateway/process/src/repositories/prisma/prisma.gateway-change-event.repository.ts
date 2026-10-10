@@ -3,6 +3,7 @@
  * via GET /api/internal/gateway/changes?since=<revision>. Any mutation to a
  * gateway-visible artifact (VK, budget, ModelProvider) must append here.
  */
+import { skipTenantCheck } from "@langwatch/prisma-client";
 import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
 import { z } from "zod";
 
@@ -14,7 +15,7 @@ import type {
 import type { GatewayPersistenceTransaction } from "../gateway-transaction.repository.ts";
 
 /** The client slice the revision feed needs. */
-type GatewayChangeEventDatabase = Pick<PrismaClient, "gatewayChangeEvent">;
+type GatewayChangeEventDatabase = Pick<PrismaClient, "gatewayChangeEvent" | "$transaction">;
 
 export class PrismaGatewayChangeEventsRepository implements GatewayChangeEventsRepository {
   static create(database: GatewayChangeEventDatabase): PrismaGatewayChangeEventsRepository {
@@ -27,7 +28,18 @@ export class PrismaGatewayChangeEventsRepository implements GatewayChangeEventsR
     input: AppendGatewayChangeEventInput,
     transaction?: GatewayPersistenceTransaction,
   ): Promise<{ revision: bigint }> {
-    const client = transaction ? (transaction as Prisma.TransactionClient) : this.prisma;
+    if (!transaction) {
+      return this.prisma.$transaction((tx) => this.append(input, tx));
+    }
+    const client = transaction as Prisma.TransactionClient;
+    // One appender per organization until commit: a later revision committing first
+    // would let the feed's cursor pass an earlier one (a revoke) before it is visible.
+    await client.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`gateway-change-feed:${input.organizationId}`}, 0)) ${skipTenantCheck(
+      {
+        // A lock, not a read; its key is itself one organization's.
+        SKIP_TENANT_CHECK: true,
+      },
+    )}`;
     const event = await client.gatewayChangeEvent.create({
       data: {
         organizationId: input.organizationId,

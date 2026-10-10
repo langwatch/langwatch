@@ -20,6 +20,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "dev": "vite --config preview/vite.config.ts",
+    "build:studio": "vite build --config preview/vite.config.ts",
     "typecheck": "tsc -b tsconfig.json preview/tsconfig.json",
     "test": "vitest run"
   },
@@ -49,5 +50,23 @@
   },
   "langwatch": {
     "group": "libraries"
+  },
+  "nx": {
+    "targets": {
+      "build:studio": {
+        "cache": true,
+        "dependsOn": [
+          "^build"
+        ],
+        "inputs": [
+          "production",
+          "^production",
+          "jsBuild"
+        ],
+        "outputs": [
+          "{projectRoot}/preview/dist"
+        ]
+      }
+    }
   }
 }

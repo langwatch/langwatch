@@ -688,6 +688,7 @@ function LoadedSourceDetail({
             onClose={() => setIsEditing(false)}
             onSubmit={(input) => updateMutation.mutate(input)}
             isPending={updateMutation.isPending}
+            refusal={updateMutation.error}
           />
 
           <SourceActivityPanels

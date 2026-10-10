@@ -21,9 +21,9 @@ vi.mock("@langwatch/browser-host/capabilities", async (importOriginal) => ({
   useUiDeployment: () => ({ isSaaS: true, isDevelopment: false, appBaseUrl: "" }),
 }));
 
-// Both snippets render through CodePreview; its text is what a reader copies.
-vi.mock("../../../onboarding/observability/code-preview.tsx", () => ({
-  CodePreview: ({ code, filename }: { code: string; filename: string }) => (
+// Both snippets render through SnippetPreview; its text is what a reader copies.
+vi.mock("@langwatch/design-system/code-preview", () => ({
+  SnippetPreview: ({ code, filename }: { code: string; filename: string }) => (
     <div data-testid={filename}>{code}</div>
   ),
 }));

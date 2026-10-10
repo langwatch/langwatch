@@ -9,11 +9,13 @@ const (
 	KindRetentionSet  = "retention.set"
 	KindProjectCreate = "project.create"
 	KindMemberAdd     = "member.add"
+	// KindLicenseIssue signs an Enterprise licence with the stack's dev key and stores it on the org.
+	KindLicenseIssue = "license.issue"
 )
 
 // Kinds lists every action kind the plan emits; coverage.json may name only these.
 var Kinds = []string{KindUserCreate, KindOrgCreate, KindRetentionSet, KindProjectCreate, KindMemberAdd,
-	KindTraceOTLP, KindLogOTLP, KindMetricOTLP}
+	KindLicenseIssue, KindTraceOTLP, KindLogOTLP, KindMetricOTLP}
 
 // Step is one item of the plan stream: an action for the runner, or a telemetry cell the chunker
 // turns into trace, log and metric chunks with ids "<run>/<seq>.<chunk>".

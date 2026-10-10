@@ -4,9 +4,9 @@
  * @see specs/auth/signup-does-not-strand-an-account.feature
  */
 import {
-  bindTrpcFact,
-  browserSessionFact,
-  callerAddressFact,
+  bindTrpcMiddlewareContext,
+  browserSessionContext,
+  callerAddressContext,
   createTrpcRuntime,
 } from "@langwatch/api/trpc";
 import {
@@ -19,7 +19,7 @@ import { EmailAlreadyRegisteredError } from "@langwatch/user-contract";
 import { initTRPC } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { authRequestHeadersFact, authTrpcTransport, callerEmailFact } from "../auth.trpc.ts";
+import { authRequestHeadersContext, authTrpcTransport, callerEmailContext } from "../auth.trpc.ts";
 import { authTrpcTestMembers, type AuthTrpcTestContext } from "./auth.trpc.harness.ts";
 
 const CHALLENGE = "c".repeat(43);
@@ -115,11 +115,11 @@ const router = createTrpcRuntime<AuthTrpcTestContext>({
   anonymousProcedure: trpc.procedure,
   members: authTrpcTestMembers(),
 }).mount(authTrpcTransport, () => door, {
-  facts: [
-    bindTrpcFact(callerAddressFact, (ctx) => ctx.address ?? null),
-    bindTrpcFact(callerEmailFact, (ctx) => ctx.email ?? null),
-    bindTrpcFact(authRequestHeadersFact, (ctx) => ctx.headers ?? null),
-    bindTrpcFact(browserSessionFact, (ctx) => ctx.sessionId ?? null),
+  middlewareContext: [
+    bindTrpcMiddlewareContext(callerAddressContext, (ctx) => ctx.address ?? null),
+    bindTrpcMiddlewareContext(callerEmailContext, (ctx) => ctx.email ?? null),
+    bindTrpcMiddlewareContext(authRequestHeadersContext, (ctx) => ctx.headers ?? null),
+    bindTrpcMiddlewareContext(browserSessionContext, (ctx) => ctx.sessionId ?? null),
   ],
 });
 

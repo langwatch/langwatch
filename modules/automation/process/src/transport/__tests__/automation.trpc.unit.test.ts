@@ -4,13 +4,13 @@
  * browser calls, the kind each one is, the permission it is answered behind,
  * and the caller each write is attributed to.
  */
-import { bindTrpcFact, createTrpcRuntime } from "@langwatch/api/trpc";
+import { bindTrpcMiddlewareContext, createTrpcRuntime } from "@langwatch/api/trpc";
 import type { AutomationApi } from "@langwatch/automation-contract";
 import { trpcTestMembers } from "@langwatch/test-harness/trpc-members";
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 
-import { automationCallerEmailFact, automationTrpcTransport } from "../automation.trpc.ts";
+import { automationCallerEmailContext, automationTrpcTransport } from "../automation.trpc.ts";
 import type { AutomationTrpcTestContext } from "./automation.trpc.harness.ts";
 
 function mount(
@@ -22,7 +22,9 @@ function mount(
     procedure: trpc.procedure,
     members: trpcTestMembers<AutomationTrpcTestContext>({ permits: options.permits }),
   }).mount(automationTrpcTransport, () => options.app as AutomationApi, {
-    facts: [bindTrpcFact(automationCallerEmailFact, (ctx) => ctx.email ?? null)],
+    middlewareContext: [
+      bindTrpcMiddlewareContext(automationCallerEmailContext, (ctx) => ctx.email ?? null),
+    ],
   });
 
   return {

@@ -96,7 +96,7 @@ func (t *ErrorsTab) fold(line sources.LogLine) {
 // unstructured one is read the way the log filter reads it.
 func failed(line sources.LogLine, rec logfmt.Record, structured bool) bool {
 	if structured {
-		return rec.Level == logfmt.LevelError || rec.Level == logfmt.LevelFatal
+		return logfmt.Failed(rec)
 	}
 	return levelRank[logfmt.Level(line.Level)] >= levelRank[logfmt.LevelError]
 }

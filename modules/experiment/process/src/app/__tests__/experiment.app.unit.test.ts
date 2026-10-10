@@ -81,6 +81,7 @@ const apiKeyToken = ({
     organizationId: "organization-1",
     isPersonal: false,
     ownerUserId: null,
+    kind: "application",
   },
 });
 

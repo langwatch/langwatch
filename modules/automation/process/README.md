@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 Callable automation capability shared by transports and process peers.
 
-Peers call these through the token, declared at `../contract/src/automation.api.ts:70`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/automation.api.ts:72`; nothing else in this package is public.
 
 #### `getAllForProject`
 
@@ -376,6 +376,14 @@ The authoring drawer's test-fire button, throttled and self-addressed.
 sendTestFire(input: AutomationApiTestFireInput, author: AutomationTestFireAuthor): Promise<TestFireResult>;
 ```
 
+#### `previewTriggerEmail`
+
+Renders the email an authoring draft would send, without delivering it.
+
+```typescript
+previewTriggerEmail(input: AutomationApiPreviewEmailInput): Promise<AutomationEmailPreview>;
+```
+
 #### `findUnsubscribeView`
 
 ```typescript
@@ -645,7 +653,7 @@ interface Response {
 
 ### `automation`
 
-Contract `../contract/src/automation.trpc.ts:41`, router `src/transport/automation.trpc.ts:18`.
+Contract `../contract/src/automation.trpc.ts:43`, router `src/transport/automation.trpc.ts:18`.
 
 | Procedure                         | Kind     | Gate                         | Input                                          | Output                           |
 | --------------------------------- | -------- | ---------------------------- | ---------------------------------------------- | -------------------------------- |
@@ -667,6 +675,7 @@ Contract `../contract/src/automation.trpc.ts:41`, router `src/transport/automati
 | `automation.listSlackChannels`    | mutation | Permission `triggers:update` | `automationApiListSlackChannelsInputSchema`    | `slackChannelListingSchema`      |
 | `automation.updateTriggerFilters` | mutation | Permission `triggers:update` | `automationApiUpdateTriggerFiltersInputSchema` | `triggerSchema`                  |
 | `automation.testFireTemplate`     | mutation | Permission `triggers:update` | `automationApiTestFireInputSchema`             | `testFireResultSchema`           |
+| `automation.previewTriggerEmail`  | query    | Permission `triggers:update` | `automationApiPreviewEmailInputSchema`         | `automationEmailPreviewSchema`   |
 | `automation.upsert`               | mutation | Permission `triggers:update` | `automationApiUpsertInputSchema`               | `triggerSchema`                  |
 
 ```typescript
@@ -690,7 +699,7 @@ interface Output {
 interface Input {
   projectId: string;
 }
-// Output: automationListRowSchema.array() (inline, ../contract/src/automation.trpc.ts:52)
+// Output: automationListRowSchema.array() (inline, ../contract/src/automation.trpc.ts:54)
 
 // automation.getDailyCap
 type Input = z.infer<typeof automationApiProjectScopeSchema>; // ../contract/src/automation.trpc-schemas.ts:22
@@ -715,7 +724,7 @@ interface Output {
 
 // automation.getTriggerStats
 type Input = z.infer<typeof automationApiProjectScopeSchema>; // ../contract/src/automation.trpc-schemas.ts:22
-// Output: inline, ../contract/src/automation.trpc.ts:69
+// Output: inline, ../contract/src/automation.trpc.ts:71
 type Output = {
   triggerId: string;
   lastFiredAt: unknown | null;
@@ -730,7 +739,7 @@ interface Input {
   triggerId: string;
   limit?: number;
 }
-// Output: inline, ../contract/src/automation.trpc.ts:73
+// Output: inline, ../contract/src/automation.trpc.ts:75
 type Output = {
   id: string;
   triggerId: string;
@@ -746,10 +755,10 @@ interface Input {
   triggerId: string;
   limit?: number;
 }
-// Output: webhookDeliveryRowSchema.array() (inline, ../contract/src/automation.trpc.ts:78)
+// Output: webhookDeliveryRowSchema.array() (inline, ../contract/src/automation.trpc.ts:80)
 
 // automation.getFireHistory
-// Input: automationApiFireHistoryTrpcInputSchema, ../contract/src/automation.trpc-schemas.ts:292
+// Input: automationApiFireHistoryTrpcInputSchema, ../contract/src/automation.trpc-schemas.ts:312
 interface Input {
   projectId: string;
   triggerId: string;
@@ -759,11 +768,11 @@ interface Input {
     id: string;
   } | null;
 }
-type Output = z.infer<typeof triggerFirePageSchema>; // ../contract/src/automation.trpc-schemas.ts:276
+type Output = z.infer<typeof triggerFirePageSchema>; // ../contract/src/automation.trpc-schemas.ts:296
 
 // automation.getLatestEvaluation
 type Input = z.infer<typeof automationApiTriggerScopeSchema>; // ../contract/src/automation.trpc-schemas.ts:26
-// Output: inline, ../contract/src/automation.trpc.ts:88
+// Output: inline, ../contract/src/automation.trpc.ts:90
 type Output = {
   triggerId: string;
   projectId: string;
@@ -778,7 +787,7 @@ type Output = {
 
 // automation.getNextFiring
 type Input = z.infer<typeof automationApiTriggerScopeSchema>; // ../contract/src/automation.trpc-schemas.ts:26
-type Output = z.infer<typeof nextFiringSchema>; // ../contract/src/automation.trpc-schemas.ts:318
+type Output = z.infer<typeof nextFiringSchema>; // ../contract/src/automation.trpc-schemas.ts:338
 
 // automation.getRecentActivity
 // Input: automationApiRecentActivityInputSchema, ../contract/src/automation.trpc-schemas.ts:140
@@ -786,7 +795,7 @@ interface Input {
   projectId: string;
   limit?: number;
 }
-// Output: inline, ../contract/src/automation.trpc.ts:97
+// Output: inline, ../contract/src/automation.trpc.ts:99
 type Output = {
   id: string;
   triggerId: string;
@@ -797,7 +806,7 @@ type Output = {
 
 // automation.getReportSchedules
 type Input = z.infer<typeof automationApiProjectScopeSchema>; // ../contract/src/automation.trpc-schemas.ts:22
-// Output: inline, ../contract/src/automation.trpc.ts:105
+// Output: inline, ../contract/src/automation.trpc.ts:107
 type Output = {
   triggerId: string;
   nextRunAt: unknown | null;
@@ -816,7 +825,7 @@ type Output = z.infer<typeof triggerSchema>; // ../contract/src/trigger.ts:55
 
 // automation.getTriggerById
 type Input = z.infer<typeof automationApiTriggerScopeSchema>; // ../contract/src/automation.trpc-schemas.ts:26
-// Output: triggerSchema.nullable() (inline, ../contract/src/automation.trpc.ts:113)
+// Output: triggerSchema.nullable() (inline, ../contract/src/automation.trpc.ts:115)
 
 // automation.listSlackChannels
 // Input: automationApiListSlackChannelsInputSchema, ../contract/src/automation.trpc-schemas.ts:156
@@ -859,8 +868,19 @@ interface Output {
   httpStatus?: number;
 }
 
+// automation.previewTriggerEmail
+type Input = z.infer<typeof automationApiPreviewEmailInputSchema>; // ../contract/src/automation.trpc-schemas.ts:246
+// Output: automationEmailPreviewSchema, ../contract/src/automation.trpc-schemas.ts:255
+interface Output {
+  subject: string;
+  html: string;
+  usedDefault: boolean;
+  missingVariables: string[];
+  errors: string[];
+}
+
 // automation.upsert
-type Input = z.infer<typeof automationApiUpsertInputSchema>; // ../contract/src/automation.trpc-schemas.ts:244
+type Input = z.infer<typeof automationApiUpsertInputSchema>; // ../contract/src/automation.trpc-schemas.ts:264
 type Output = z.infer<typeof triggerSchema>; // ../contract/src/trigger.ts:55
 ```
 
@@ -968,12 +988,14 @@ Run by the tasks process, before serve.
 
 | Kind   | Leaf                        | Environment variable                   | Declared at                               |
 | ------ | --------------------------- | -------------------------------------- | ----------------------------------------- |
-| secret | `unsubscribe`               | `NEXTAUTH_SECRET`                      | `src/app/automation.app.ts:406`           |
-| config | `emailHourlyCap`            | `TRIGGER_EMAIL_HOURLY_CAP`             | `../contract/src/automation.config.ts:11` |
-| config | `tenantDailyCap`            | `TRIGGER_EMAIL_TENANT_DAILY_CAP`       | `../contract/src/automation.config.ts:12` |
-| config | `persistDailyCapFree`       | `TRIGGER_PERSIST_DAILY_CAP_FREE`       | `../contract/src/automation.config.ts:13` |
-| config | `persistDailyCapPaid`       | `TRIGGER_PERSIST_DAILY_CAP_PAID`       | `../contract/src/automation.config.ts:14` |
-| config | `persistDailyCapEnterprise` | `TRIGGER_PERSIST_DAILY_CAP_ENTERPRISE` | `../contract/src/automation.config.ts:15` |
-| config | `publicBaseUrl`             | `BASE_HOST`                            | `../contract/src/automation.config.ts:20` |
+| secret | `unsubscribe`               | `NEXTAUTH_SECRET`                      | `src/app/automation.app.ts:408`           |
+| config | `emailHourlyCap`            | `TRIGGER_EMAIL_HOURLY_CAP`             | `../contract/src/automation.config.ts:17` |
+| config | `tenantDailyCap`            | `TRIGGER_EMAIL_TENANT_DAILY_CAP`       | `../contract/src/automation.config.ts:18` |
+| config | `persistDailyCapFree`       | `TRIGGER_PERSIST_DAILY_CAP_FREE`       | `../contract/src/automation.config.ts:19` |
+| config | `persistDailyCapPaid`       | `TRIGGER_PERSIST_DAILY_CAP_PAID`       | `../contract/src/automation.config.ts:20` |
+| config | `persistDailyCapEnterprise` | `TRIGGER_PERSIST_DAILY_CAP_ENTERPRISE` | `../contract/src/automation.config.ts:21` |
+| config | `publicBaseUrl`             | `BASE_HOST`                            | `../contract/src/automation.config.ts:26` |
+| config | `slackApiBase`              | `SLACK_API_BASE`                       | `../contract/src/automation.config.ts:28` |
+| config | `slackWebhookBase`          | `SLACK_WEBHOOK_BASE`                   | `../contract/src/automation.config.ts:29` |
 
 <!-- readme:generated:end -->

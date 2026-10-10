@@ -1,4 +1,5 @@
 import type { ServingRosterEntry } from "@langwatch/upgrade";
+import type { Deprecation } from "@langwatch/upgrade/manifest";
 import {
   createUpgradeReader,
   describeStepStatus,
@@ -23,15 +24,20 @@ export class MemoryUpgradeLedgerRepository implements UpgradeLedgerRepository {
   /** The steps a retry reopened, read back as pending. */
   private readonly reopened = new Set<string>();
 
-  private constructor(private readonly reader: UpgradeReader) {}
+  private constructor(
+    private readonly reader: UpgradeReader,
+    private readonly deprecations: Deprecation[],
+  ) {}
 
   /** A test may hand a reader of its own, so a page reads a ledger with releases and runs. */
   static create({
     steps = [],
     reader,
+    deprecations = [],
   }: {
     steps?: UpgradeImage["steps"];
     reader?: UpgradeReader;
+    deprecations?: Deprecation[];
   } = {}): MemoryUpgradeLedgerRepository {
     return new MemoryUpgradeLedgerRepository(
       reader ??
@@ -40,11 +46,16 @@ export class MemoryUpgradeLedgerRepository implements UpgradeLedgerRepository {
           image: { release: "unreleased", steps },
           floor: null,
         }),
+      deprecations,
     );
   }
 
   findStatus(): Promise<UpgradeStatus> {
     return this.reader.status();
+  }
+
+  findDeprecations(): Deprecation[] {
+    return this.deprecations;
   }
 
   findSteps(filter?: ListStepsFilter): Promise<UpgradeStepPage> {

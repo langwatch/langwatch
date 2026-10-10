@@ -8,6 +8,7 @@ import { Button, HStack, Text, VStack } from "@langwatch/design-system/primitive
 import { Fingerprint, ShieldCheck } from "lucide-react";
 
 import { useSecureAccountNudge } from "../../behavior/use-secure-account-nudge.ts";
+import { SSO_HANDLES_SIGN_IN } from "../../model/last-way-in.ts";
 
 export default function SecureAccountNudge() {
   const nudge = useSecureAccountNudge();
@@ -38,6 +39,11 @@ export default function SecureAccountNudge() {
         </Dialog.Header>
         <Dialog.Body>
           <NudgeCopy offersPasskey={offer.passkey} offersTwoStep={offer.twoStep} />
+          {nudge.ssoGoverned && (
+            <Text fontSize="sm" color="fg.muted" marginTop={3} data-testid="nudge-sso-governed">
+              {SSO_HANDLES_SIGN_IN}
+            </Text>
+          )}
         </Dialog.Body>
         <Dialog.Footer>
           <HStack gap={3} justify="end" width="full">

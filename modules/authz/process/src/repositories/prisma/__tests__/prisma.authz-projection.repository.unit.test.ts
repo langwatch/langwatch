@@ -262,6 +262,22 @@ describe("PrismaAuthzProjectionRepository", () => {
       expect(sql).toContain("FOR UPDATE");
       expect(executeRaw.mock.calls[0]).toContain("membership_1");
     });
+
+    /** The raw-query tenancy guard refuses a statement naming no tenant column. */
+    it("marks a skipping attach's identity lock as tenancy-addressed", async () => {
+      const { repository, executeRaw } = build();
+
+      await repository.append({
+        kind: "grant.upsert",
+        row: grantRow(),
+        onDuplicate: "skip",
+      } as GrantProjectionWrite);
+
+      const sql = sqlFrom(executeRaw);
+      expect(sql).toContain("pg_advisory_xact_lock");
+      const [, marker] = executeRaw.mock.calls[0] ?? [];
+      expect(marker instanceof Prisma.Sql && marker.sql).toContain("SKIP_TENANT_CHECK");
+    });
   });
 
   describe("given a write that states one field", () => {

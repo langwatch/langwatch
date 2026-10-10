@@ -275,7 +275,8 @@ function RunRowData({
           open={isCancelAllDialogOpen}
           onOpenChange={({ open }) => setIsCancelAllDialogOpen(open)}
         >
-          <Dialog.Content bg="bg" maxWidth="sm">
+          <Dialog.Content maxWidth="sm">
+            <Dialog.CloseTrigger />
             <Dialog.Header>
               <Dialog.Title>Cancel remaining jobs?</Dialog.Title>
             </Dialog.Header>

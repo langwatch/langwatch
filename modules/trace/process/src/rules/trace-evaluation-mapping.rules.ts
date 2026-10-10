@@ -1,6 +1,6 @@
 import type { TraceEvaluationData as TraceEvaluation } from "@langwatch/evaluation-contract";
 import { Temporal } from "@langwatch/time";
-import type { Evaluation } from "@langwatch/trace-contract";
+import type { Evaluation, Trace } from "@langwatch/trace-contract";
 
 /**
  * The object a stored JSON column holds, or null when the column was empty.
@@ -146,4 +146,36 @@ export function mapTraceEvaluationsToLegacyEvaluations(
   }
 
   return output;
+}
+
+/**
+ * Merges evaluations from traceChecks into trace objects: TraceService
+ * returns them separately, so this attaches each to its trace's
+ * `evaluations` array for serialization.
+ */
+export function enrichTracesWithEvaluations({
+  traces,
+  traceChecks,
+}: {
+  traces: Trace[];
+  traceChecks: Record<string, Evaluation[]>;
+}): Trace[] {
+  return traces.map((trace) => {
+    const existingEvals = trace.evaluations ?? [];
+    const externalEvals = traceChecks[trace.trace_id] ?? [];
+
+    // Merge, deduplicating by evaluation_id
+    const seen: Record<string, true> = Object.create(null);
+    const merged: Evaluation[] = [];
+    for (const evaluation of [...existingEvals, ...externalEvals]) {
+      if (seen[evaluation.evaluation_id] === true) continue;
+      seen[evaluation.evaluation_id] = true;
+      merged.push(evaluation);
+    }
+
+    return {
+      ...trace,
+      evaluations: merged,
+    };
+  });
 }

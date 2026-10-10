@@ -1,12 +1,12 @@
 /**
  * The `/api/api-keys` family on a runtime that stands in for the process: one
- * organization door, the credential fact a mount binds, and the canonical
+ * organization door, the credential context a mount binds, and the canonical
  * error envelope the host answers with.
  */
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { RestAuditRow, RestIdentity } from "@langwatch/api/hosting";
 import {
-  bindRestMiddleware,
+  bindMiddlewareContext,
   canonicalErrorResponse,
   createRestRuntime,
   ForbiddenError,
@@ -104,15 +104,15 @@ export function mountApiKeyRest(
   const hono = runtime.mount(apiKeyRest.router(), {
     app: () => apiKeys,
     onError: canonicalErrorResponse,
-    facts: [
-      bindRestMiddleware(apiKeyRestCredential, (c) => ({
+    middlewareContext: [
+      bindMiddlewareContext(apiKeyRestCredential, (request) => ({
         apiKeyId: API_KEY_ID,
-        userId: callerOf(c.req.raw) ?? null,
+        userId: callerOf(request) ?? null,
       })),
-      bindRestMiddleware(apiKeyIngestionCaller, (c) => {
-        const userId = callerOf(c.req.raw);
+      bindMiddlewareContext(apiKeyIngestionCaller, (request) => {
+        const userId = callerOf(request);
         const principal: PrincipalRef =
-          presentedOf(c.req.raw) === AS_SESSION && userId
+          presentedOf(request) === AS_SESSION && userId
             ? { type: "user", id: userId }
             : { type: "apiKey", id: API_KEY_ID };
         return { principal, organizationId: ORGANIZATION_ID };

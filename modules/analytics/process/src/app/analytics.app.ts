@@ -928,7 +928,7 @@ export class AnalyticsModule
 
   /**
    * The same restricted tenant identity, for a CREDENTIAL rather than a member. Stops at
-   * the project because an API key's protections are already resolved as a transport fact
+   * the project because an API key's protections are already resolved as middleware context
    * by `resolveApiKeyProtections` — resolving them again here could only disagree.
    */
   async resolveApiKeyRunCaller(input: Readonly<{ projectId: string }>): Promise<LangWatchQLCaller> {

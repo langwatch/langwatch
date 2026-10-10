@@ -1,3 +1,4 @@
+import { skipTenantCheck } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 import { findBlockingRegistrationSlots } from "../../rules/sso-connection-registration.rules.ts";
@@ -31,7 +32,10 @@ export class PrismaSsoConnectionRegistrationRepository extends SsoConnectionRegi
   async claim(candidate: SsoConnectionRegistrationSlot): Promise<SsoConnectionRegistrationSlot> {
     return this.prisma.$transaction(async (tx) => {
       await tx.$executeRaw`
-        -- @tenancy: organization-scoped advisory lock keyed by the bound organization id
+        ${skipTenantCheck({
+          // Organization-scoped advisory lock keyed by the bound organization id.
+          SKIP_TENANT_CHECK: true,
+        })}
         SELECT pg_advisory_xact_lock(hashtextextended(${candidate.organizationId}, 1397968719))
       `;
       const rows = await tx.ssoConnectionRegistrationSlot.findMany({
@@ -81,7 +85,10 @@ export class PrismaSsoConnectionRegistrationRepository extends SsoConnectionRegi
   }): Promise<void> {
     await this.prisma.$transaction(async (tx) => {
       await tx.$executeRaw`
-        -- @tenancy: organization-scoped advisory lock keyed by the bound organization id
+        ${skipTenantCheck({
+          // Organization-scoped advisory lock keyed by the bound organization id.
+          SKIP_TENANT_CHECK: true,
+        })}
         SELECT pg_advisory_xact_lock(hashtextextended(${organizationId}, 1397968719))
       `;
       const claimed = await tx.ssoConnectionRegistrationSlot.findMany({

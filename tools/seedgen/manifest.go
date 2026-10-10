@@ -42,3 +42,7 @@ func writeJSON(path string, value any) error {
 	}
 	return os.Rename(temporary, path)
 }
+
+// FailureFile is the file in the run directory holding why the last run failed, one line; a run
+// that succeeds leaves none.
+const FailureFile = "failure.txt"

@@ -60,6 +60,9 @@ export const BACKGROUND_STEP_RETRY: BackgroundStepRetry = {
   maxBackoffMs: 15 * 60_000,
 };
 
+/** A swept run past this aborts, keeps its checkpoint and is pending again (ARCHITECTURE.md §7). */
+export const BACKGROUND_STEP_DEADLINE_MS = 15 * 60_000;
+
 /** How often the worker looks for a background step to run. */
 export const BACKGROUND_SWEEP_EVERY_MS = 30_000;
 
@@ -80,6 +83,7 @@ export interface BackgroundStepsOptions {
   leaseTtlMs?: number;
   renewEveryMs?: number;
   retry?: BackgroundStepRetry;
+  deadlineMs?: number;
   /** A monotonic clock in milliseconds, for the retry backoff. */
   now?: () => number;
 }
@@ -155,21 +159,25 @@ export class BackgroundStepsService {
     const gone =
       !step.needsOldWritersGone || (await this.options.oldWritersGoneFor({ stepId: step.id }));
     if (!gone) return "waiting";
-    return this.runLeased({ step, resumeFrom: row.report ?? null, signal });
+    const deadlineMs = this.options.deadlineMs ?? BACKGROUND_STEP_DEADLINE_MS;
+    return this.runLeased({ step, resumeFrom: row.report ?? null, signal, deadlineMs });
   }
 
   /**
    * Runs one step under its lease, renewed on a timer; a refused renewal aborts the run. A run
    * that ends aborted is never recorded done or failed: its checkpoint stays for the next attempt.
+   * Past `deadlineMs` the run is no longer awaited, so a step that ignores its signal cannot stall.
    */
   private async runLeased({
     step,
     resumeFrom,
     signal,
+    deadlineMs,
   }: {
     step: MigrationStep;
     resumeFrom: MigrationStepReport | null;
     signal: AbortSignal;
+    deadlineMs?: number;
   }): Promise<StepOutcome> {
     const { ledger, identity, log } = this.options;
     const ttlMs = this.options.leaseTtlMs ?? BACKGROUND_STEP_LEASE_TTL_MS;
@@ -178,32 +186,35 @@ export class BackgroundStepsService {
     if (!lease) return "held";
     const module = moduleOf(step.id);
     const runId = `background:${identity.owner}`;
-    const held = this.holdLease({ name, ttlMs, signal, step: step.id });
+    const held = this.holdLease({ name, ttlMs, signal, step: step.id, deadlineMs });
     try {
       // Another worker may have finished it between the read and the lease.
       const current = (await ledger.findSteps()).find((row) => row.id === step.id);
       if (!current || !RUNNABLE.has(current.status)) return "held";
       await ledger.markRunning({ id: step.id, runId });
       log("info", "background step started", { step: step.id, module, resumed: !!resumeFrom });
-      const report = await step.run({
+      const run = step.run({
         checkpoint: {
           resumeFrom,
           save: async ({ report: saved }) => {
             if (held.lost())
               throw new Error(`the lease of ${step.id} was lost; checkpoint refused`);
+            if (held.expired())
+              throw new Error(`${step.id} passed its deadline; checkpoint refused`);
             await ledger.saveReport({ id: step.id, report: saved });
           },
         },
         dryRun: false,
         signal: held.signal,
       });
-      if (held.signal.aborted) return await this.suspend({ step, runId, lost: held.lost() });
+      const report = await Promise.race([run, held.deadline]);
+      if (held.signal.aborted) return await this.suspend({ step, runId, held });
       await ledger.setStatus({ ids: [step.id], status: "done", runId, report });
       this.failures.delete(step.id);
       log("info", "background step done", { step: step.id, module });
       return "done";
     } catch (error) {
-      if (held.signal.aborted) return await this.suspend({ step, runId, lost: held.lost() });
+      if (held.signal.aborted) return await this.suspend({ step, runId, held });
       return await this.recordFailure({ step, runId, error });
     } finally {
       held.stop();
@@ -211,17 +222,19 @@ export class BackgroundStepsService {
     }
   }
 
-  /** The lease's renewal timer and the step's own signal, aborted by the sweep or a lost lease. */
+  /** Renews the lease on a timer; the sweep, a lost lease or the deadline abort the run. */
   private holdLease({
     name,
     ttlMs,
     signal,
     step,
+    deadlineMs,
   }: {
     name: string;
     ttlMs: number;
     signal: AbortSignal;
     step: string;
+    deadlineMs?: number;
   }) {
     const { ledger, identity, log } = this.options;
     const controller = new AbortController();
@@ -247,31 +260,58 @@ export class BackgroundStepsService {
       this.options.renewEveryMs ?? BACKGROUND_STEP_RENEW_EVERY_MS,
     );
     timer.unref?.();
+    let expired = false;
+    let expire: (reason: Error) => void = () => undefined;
+    const deadline = new Promise<never>((_, reject) => (expire = reject));
+    const deadlineTimer =
+      deadlineMs === undefined
+        ? undefined
+        : setTimeout(() => {
+            expired = true;
+            const reason = new Error(
+              `the run passed its ${Math.round(deadlineMs / 60_000)}-minute deadline; it resumes from its checkpoint`,
+            );
+            log("warn", "background step passed its deadline; stopping the step", {
+              step,
+              deadlineMs,
+            });
+            controller.abort(reason);
+            expire(reason);
+          }, deadlineMs);
+    deadlineTimer?.unref?.();
     return {
       signal: controller.signal,
+      deadline,
       lost: () => lost,
+      expired: () => expired,
       stop: () => {
         clearInterval(timer);
+        clearTimeout(deadlineTimer);
         signal.removeEventListener("abort", onStop);
       },
     };
   }
 
-  /** A stopped run returns its step to pending; a lost lease leaves the row to the new holder. */
+  /** A stopped run returns its step to pending, naming an expiry; a lost lease leaves the row. */
   private async suspend({
     step,
     runId,
-    lost,
+    held,
   }: {
     step: MigrationStep;
     runId: string;
-    lost: boolean;
+    held: { signal: AbortSignal; lost: () => boolean; expired: () => boolean };
   }): Promise<"held"> {
-    if (!lost) await this.options.ledger.setStatus({ ids: [step.id], status: "pending", runId });
+    const lost = held.lost();
+    const lastError = held.expired() ? messageOf(held.signal.reason) : null;
+    if (!lost) {
+      await this.options.ledger.setStatus({ ids: [step.id], status: "pending", runId, lastError });
+    }
     this.options.log("info", "background step stopped; it resumes from its checkpoint", {
       step: step.id,
       module: moduleOf(step.id),
       leaseLost: lost,
+      expired: held.expired(),
     });
     return "held";
   }

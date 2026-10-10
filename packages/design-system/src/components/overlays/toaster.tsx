@@ -42,26 +42,37 @@ export const toaster: Omit<CreateToasterReturn, "create"> & {
     }),
 };
 
+/** The icon carries the status hue: light on the tinted glass, a tint on the dark panel. */
 const STATUS = {
-  error: { fg: "red.fg", filled: true },
-  warning: { fg: "yellow.fg", filled: true },
-  success: { fg: "green.fg", filled: true },
-  info: { fg: "fg.muted", filled: false },
-  loading: { fg: "fg.muted", filled: false },
+  error: { fg: { _light: "red.300", _dark: "red.fg" } },
+  warning: { fg: { _light: "orange.300", _dark: "orange.fg" } },
+  success: { fg: { _light: "green.300", _dark: "green.fg" } },
+  info: { fg: { _light: "blue.300", _dark: "fg.muted" } },
+  loading: { fg: "fg.muted" },
 } as const;
 
 type ToastStatus = keyof typeof STATUS;
 const statusOf = (type: string | undefined): ToastStatus =>
   type && type in STATUS ? (type as ToastStatus) : "info";
-const onPanelOnly = (status: ToastStatus, color: string) =>
-  STATUS[status].filled ? { _light: "inherit", _dark: color } : color;
 
-/** Secondary actions wear the toast's own foreground, quieter than its title, in both modes. */
+/** The action is a small pill on the title line in the toast's own foreground, in both modes. */
 export const toastActionStyle = {
   color: "inherit",
-  opacity: 0.8,
-  "&:hover": { opacity: 1 },
-  "--toast-trigger-bg": "transparent",
+  opacity: 0.92,
+  height: "5",
+  paddingInline: "2.5",
+  borderRadius: "full",
+  borderWidth: "1px",
+  borderColor: "var(--toast-border-color, var(--chakra-colors-border-muted))",
+  bg: "var(--toast-trigger-bg)",
+  fontSize: "12px",
+  fontWeight: "560",
+  lineHeight: "1",
+  "&:hover": {
+    opacity: 1,
+    bg: "color-mix(in srgb, var(--toast-trigger-bg), currentColor 12%)",
+  },
+  "&:focus-visible": { outline: "2px solid currentColor", outlineOffset: "1px" },
 } as const;
 
 function StatusGlyph({ status }: { status: ToastStatus }) {
@@ -75,32 +86,23 @@ function StatusGlyph({ status }: { status: ToastStatus }) {
 
 function StatusIcon({ status }: { status: ToastStatus }) {
   return (
-    <Box
-      color={onPanelOnly(status, STATUS[status].fg)}
-      display="flex"
-      alignItems="center"
-      height="5"
-      flexShrink={0}
-    >
+    <Box color={STATUS[status].fg} display="flex" alignItems="center" height="5" flexShrink={0}>
       <StatusGlyph status={status} />
     </Box>
   );
 }
 
-/** A toast's lifetime drawn as a bar that drains, holding whenever its timer does. */
+/** A toast's lifetime on its bottom rim: it drains along the curve and pauses with the timer. */
 function LifetimeBar({ lifetime }: { lifetime: number }) {
   return (
     <Box
       data-toast-lifetime=""
       aria-hidden
       position="absolute"
-      insetInline="3.5"
-      bottom="1"
-      height="2px"
-      borderRadius="full"
-      bg="currentColor"
-      opacity={0.3}
-      transformOrigin="left"
+      inset="-1px"
+      borderRadius="inherit"
+      borderBottom="2px solid currentColor"
+      opacity={0.9}
       pointerEvents="none"
       css={{
         "--toast-lifetime": `${lifetime}ms`,
@@ -186,18 +188,12 @@ export function Toaster({
                 {toast.title && <Toast.Title>{toast.title}</Toast.Title>}
                 {toast.description && <Toast.Description>{toast.description}</Toast.Description>}
                 {renderMeta?.(toast.meta)}
-                {toast.action && (
-                  <Toast.ActionTrigger
-                    marginTop="2"
-                    alignSelf="flex-start"
-                    fontSize="12px"
-                    fontWeight="560"
-                    css={toastActionStyle}
-                  >
-                    {toast.action.label}
-                  </Toast.ActionTrigger>
-                )}
               </Stack>
+              {toast.action && (
+                <Toast.ActionTrigger alignSelf="flex-start" flexShrink={0} css={toastActionStyle}>
+                  {toast.action.label}
+                </Toast.ActionTrigger>
+              )}
               <Toast.CloseTrigger
                 position="static"
                 alignSelf="flex-start"

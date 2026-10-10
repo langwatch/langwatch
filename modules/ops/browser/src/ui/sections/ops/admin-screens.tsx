@@ -3,6 +3,10 @@
  * Cloud admin is LangWatch's own tooling: off SaaS it answers as an unknown page.
  */
 
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
+import { SearchX } from "lucide-react";
+import type { ReactNode } from "react";
+
 import BugReportsView from "../../../features/admin/ui/sections/bug-reports-view.tsx";
 import IdentityLookupView from "../../../features/admin/ui/sections/identity-lookup-view.tsx";
 import LicensesView from "../../../features/admin/ui/sections/licenses-view.tsx";
@@ -12,7 +16,7 @@ import SelfHostedInstancesView from "../../../features/admin/ui/sections/self-ho
 import SsoConnectionsView from "../../../features/admin/ui/sections/sso-connections-view.tsx";
 import SubscriptionsView from "../../../features/admin/ui/sections/subscriptions-view.tsx";
 import UsersView from "../../../features/admin/ui/sections/users-view.tsx";
-import { CloudOnly } from "./cloud-only.tsx";
+import { useOpsHost } from "../../../model/ops-host.ts";
 
 export {
   IdentityLookupView as IdentityLookupScreen,
@@ -21,6 +25,27 @@ export {
   SsoConnectionsView as SsoConnectionsScreen,
   UsersView as UsersScreen,
 };
+
+/** Renders its children only where ops's cloud-ops capability is on; elsewhere an unknown page. */
+export function CloudOnly({ children }: { children: ReactNode }) {
+  return <ShownOnly when={useOpsHost().cloudOps()}>{children}</ShownOnly>;
+}
+
+/** Renders its children where Feature Flags is offered; elsewhere an unknown page. */
+export function FeatureFlagsOnly({ children }: { children: ReactNode }) {
+  return <ShownOnly when={useOpsHost().offersFeatureFlags()}>{children}</ShownOnly>;
+}
+
+function ShownOnly({ when, children }: { when: boolean; children: ReactNode }) {
+  if (when) return <>{children}</>;
+  return (
+    <NoDataInfoBlock
+      title="Page not found"
+      description="There is nothing at this address."
+      icon={<SearchX />}
+    />
+  );
+}
 
 export function CloudSubscriptionsScreen() {
   return (

@@ -1,5 +1,5 @@
 import {
-  bindRestMiddleware,
+  bindMiddlewareContext,
   createRestRuntime,
   canonicalErrorResponse,
   principalOfCredential,
@@ -36,6 +36,7 @@ function keyCredential(apiKeyId: string): RestResolvedProjectCredential {
       organizationId: "org_1",
       isPersonal: false,
       ownerUserId: null,
+      kind: "application",
     },
   };
 }
@@ -58,8 +59,10 @@ function mount(
     app: () => createApiFixture<WorkflowApi>({ runSynchronous }, "WorkflowApi"),
     credential: "project",
     onError: canonicalErrorResponse,
-    facts: [
-      bindRestMiddleware(workflowRunCallerKey, () => (caller ? keyRowOf(caller.credential) : null)),
+    middlewareContext: [
+      bindMiddlewareContext(workflowRunCallerKey, () =>
+        caller ? keyRowOf(caller.credential) : null,
+      ),
     ],
   });
 }

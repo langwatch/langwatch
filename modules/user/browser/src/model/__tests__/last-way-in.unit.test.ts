@@ -35,6 +35,20 @@ describe("given how many ways in an account holds", () => {
     });
   });
 
+  describe("when an organization's SSO connection is the only one", () => {
+    it("names single sign-on, never the connection id, and offers no passkey or password", () => {
+      const warning = lastWayInWarningFor({
+        passkeys: 0,
+        hasPassword: false,
+        linked: [{ provider: "ssoc_0003TdmygUVipom1qhj9TfyNq5bVo", providerAccountId: "sub-1" }],
+      });
+
+      expect(warning?.id).toBe("only-linked");
+      expect(warning?.message).toContain("single sign-on");
+      expect(warning?.message).not.toMatch(/ssoc|passkey|password/i);
+    });
+  });
+
   describe("when there are two ways in, or none", () => {
     it("says nothing", () => {
       expect(lastWayInWarningFor({ passkeys: 1, hasPassword: true, linked: [] })).toBeNull();

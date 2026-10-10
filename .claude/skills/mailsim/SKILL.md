@@ -1,6 +1,6 @@
 ---
 name: mailsim
-description: "Catch, read and assert on the emails the LangWatch stack sends, using mailsim, haven's local mail sink. Use when someone says 'did the email send', 'where is the verification mail', 'invite link', 'wait for the email', 'mailsim', 'the mail sink', 'haven mail', 'test the reset email', or needs to load-test SMTP."
+description: "Catch, read and assert on the emails the LangWatch stack sends, using mailsim, haven's local mail sink. Use when someone says 'haven mail', 'did the email send', 'where is the verification mail', 'invite link', 'wait for the email', 'mailsim', 'the mail sink', 'haven sim mail', 'test the reset email', or needs to load-test SMTP."
 user-invocable: true
 ---
 
@@ -16,6 +16,7 @@ nothing, whatever the recipient domain. Code: `services/mailsim`, console
 - URL: `https://mail.<slug>.langwatch.localhost` (console); `haven status` shows the
   loopback HTTP port (`MAILSIM_HTTP_ADDR`) and the SMTP port (`MAILSIM_SMTP_ADDR`).
 - The app's own mail is routed at it (`SMTP_HOST=127.0.0.1`) unless `.env` names a provider.
+- No mail provider at all (even one `.env` names): `haven up --no-mail --force` blanks every mail setting for that run; `haven up --force` restores it. It restarts the stack.
 - Standalone: `make service svc=mailsim` (HTTP :5580, SMTP :5581).
 
 ## Inspect and assert (HTTP)
@@ -27,6 +28,7 @@ GET    /api/messages/wait?to=&subject=&after=<id>&timeout=30s
                                              long poll; 200 message, 204 on timeout
 DELETE /api/messages   |   DELETE /api/messages/{id}
 GET    /api/inbox                            stack, own address, SMTP address, persistence
+GET|PUT /_sim/api/settings                   {"forcedError": 0|4xx|5xx}: SMTP MAIL FROM refused with that code
 ```
 
 Test pattern: trigger the action, then `curl ".../api/messages/wait?to=a@x.test&subject=verify&timeout=20s"`
@@ -47,9 +49,10 @@ and read `links[0]`. Use `after=<newest id>` to ignore older mail.
 
 ## From a terminal or agent
 
-`--json` on every read (default in agent mode); non-zero exit on failure, including a `wait` timeout.
+`--json` on every read (default in agent mode); non-zero exit on failure; a `wait` timeout exits 66.
 
 ```
-haven mail address | inbox | list [--to] [--subject] | get <id> [--html] | links <id>
-haven mail wait [--to] [--subject] [--after <id>] [--timeout 30s] | delete <id> | clear
+haven sim mail address | status | list [--to] [--subject] | get <id> [--html] | links <id>
+haven sim mail fault --error <0|4xx|5xx>         # SMTP sends refused with that reply code (4xx retry, 5xx permanent); 0 clears it
+haven sim mail wait [--to] [--subject] [--after <id>] [--timeout 30s] | delete <id> | clear
 ```

@@ -6,6 +6,7 @@
  */
 import type { UiFailureNotice } from "@langwatch/browser-host/capabilities";
 import { setUiFeedbackHost } from "@langwatch/browser-host/toaster";
+import { resolveErrorCopy } from "@langwatch/error-views";
 import {
   QueryClient,
   QueryClientProvider,
@@ -17,7 +18,6 @@ import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { resolveErrorCopy } from "../../../../behavior/errors/logic/resolve-error-copy.ts";
 import { useExplorerStore } from "../../../../behavior/explorer.store.ts";
 import { useLensSync } from "../use-lens-sync.ts";
 

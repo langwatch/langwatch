@@ -6,29 +6,29 @@
 import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
 import { checkupTrpc, OpsApi } from "@langwatch/ops-contract";
 
-import { opsOperatorFact } from "#transport/ops-operator.trpc";
+import { opsOperatorContext } from "#transport/ops-operator.trpc";
 
 export const checkupTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof checkupTrpc> =
   defineTrpcRouter(OpsApi, checkupTrpc)
     .procedure("status")
-    .withFacts(opsOperatorFact)
+    .withMiddlewareContext(opsOperatorContext)
     .withPermission("organization:view")
     .handle(({ app, input }, operator) => app.getCheckup({ ...input, operator }))
 
     .procedure("run")
-    .withFacts(opsOperatorFact)
+    .withMiddlewareContext(opsOperatorContext)
     .withPermission("organization:manage")
     .handle(({ app, input, actor }, operator) =>
       app.runCheckup({ ...input, operator, requestedBy: actor.id }),
     )
 
     .procedure("usageReport")
-    .withFacts(opsOperatorFact)
+    .withMiddlewareContext(opsOperatorContext)
     .withPermission("organization:view")
     .handle(({ app, input }, operator) => app.getUsageReport({ ...input, operator }))
 
     .procedure("setUsageReportSwitches")
-    .withFacts(opsOperatorFact)
+    .withMiddlewareContext(opsOperatorContext)
     .withPermission("organization:manage")
     .handle(({ app, input }, operator) => app.setUsageReportSwitches({ ...input, operator }))
     .build();

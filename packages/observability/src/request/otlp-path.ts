@@ -51,3 +51,28 @@ export function canonicalOtlpPath(pathname: string): string | null {
 
   return `${CANONICAL_OTLP_BASE_PATH}/${suffix[1]}`;
 }
+
+/** Carries the path a corrected OTLP request was sent to. */
+export const OTLP_CORRECTED_PATH_HEADER = "x-langwatch-otlp-corrected-path";
+
+/** A per-process secret prefixes the marker, so a receiver tells our rewrite from a forgery. */
+const CORRECTION_SECRET = crypto.randomUUID();
+
+export function stampCorrectedPath({
+  headers,
+  originalPath,
+}: {
+  headers: Headers;
+  originalPath: string;
+}): void {
+  headers.set(OTLP_CORRECTED_PATH_HEADER, `${CORRECTION_SECRET} ${originalPath}`);
+}
+
+/** The path the exporter actually used, or null if this was not our rewrite. */
+export function readCorrectedPath(value: string | undefined): string | null {
+  if (!value) return null;
+  const separator = value.indexOf(" ");
+  if (separator === -1) return null;
+  if (value.slice(0, separator) !== CORRECTION_SECRET) return null;
+  return value.slice(separator + 1) || null;
+}

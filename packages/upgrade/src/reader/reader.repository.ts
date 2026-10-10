@@ -85,6 +85,7 @@ const runFactSchema = z.object({
   release: nullable(z.string()),
   floor: nullable(z.string()),
   started_at: z.date(),
+  plan: jsonObject,
 });
 export type LedgerRunFact = z.infer<typeof runFactSchema>;
 
@@ -275,12 +276,13 @@ export class UpgradeReaderRepository {
     return row === undefined ? null : runRowSchema.parse(row);
   }
 
-  /** The newest run that succeeded and recorded a release: where the installation stands. */
+  /** The newest succeeded run that recorded a release, or an upgrade by an unreleased image. */
   async findLatestSucceededRun({ tables }: { tables: LedgerTables }): Promise<LedgerRunRow | null> {
     if (!tables.run) return null;
     const rows = await this.queryRows({
       text: (t) => `SELECT to_jsonb(run) - 'plan' - 'report' AS "row" FROM ${t.run} run
-              WHERE run."outcome" = 'succeeded' AND run."release" IS NOT NULL
+              WHERE run."outcome" = 'succeeded'
+                AND (run."release" IS NOT NULL OR run."kind" = 'upgrade')
               ORDER BY run."started_at" DESC, run."id" DESC LIMIT 1`,
     });
     const row = rows[0];
@@ -340,7 +342,8 @@ export class UpgradeReaderRepository {
     if (!tables.run) return [];
     const { rows } = await this.query<object>(
       (t) => `SELECT run."kind", run."outcome", run."release",
-          to_jsonb(run) ->> 'floor' AS "floor", run."started_at" FROM ${t.run} run`,
+          to_jsonb(run) ->> 'floor' AS "floor", to_jsonb(run) -> 'plan' AS "plan",
+          run."started_at" FROM ${t.run} run`,
     );
     return rows.map((row) => runFactSchema.parse(row));
   }

@@ -101,7 +101,7 @@ func TestPriorityClaimMarkerNeverEntersADurationEstimate(t *testing.T) {
 	}
 }
 
-/** @scenario "haven slot explain shows each holder and waiter with class, age and effective priority" */
+/** @scenario "haven machine slot explain shows each holder and waiter with class, age and effective priority" */
 func TestLastPriorityClaimFindsTheNewestMatchingAgent(t *testing.T) {
 	now := time.Now()
 	history := []RunRecord{

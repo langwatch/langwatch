@@ -75,6 +75,7 @@ function makeService(rows: OperatorReportSchedule[]) {
         organizationId: "organization",
         isPersonal: false,
         ownerUserId: null,
+        kind: "application",
       })),
   });
   const audit = new RecordingAudit();

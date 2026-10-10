@@ -66,6 +66,7 @@ export class NurturingModule implements NurturingApi {
         deliver: (input) => delivery.deliver(input),
         projectCreated: (data) => milestones.projectCreated(data),
         guidedTurnFailed: (data) => delivery.deliverGuidedTurnFailed(data),
+        usageReportReceived: (input) => delivery.deliverUsageReport(input),
         evaluationCompleted: (input) => milestones.evaluationCompleted(input),
         simulationRunFinished: (input) => milestones.simulationRunFinished(input),
       }),

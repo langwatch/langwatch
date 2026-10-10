@@ -1,11 +1,9 @@
-import type { AuthzApi } from "@langwatch/authz-contract";
 import {
   type LicenseData,
   type LicensingServerConfig,
   CONNECT_DEFAULT_GATEWAY_ENDPOINT,
   CONNECT_DEFAULT_LICENSE_ENDPOINT,
 } from "@langwatch/enterprise-licensing-contract";
-import type { GatewayApi } from "@langwatch/gateway-contract";
 import { planQuantities } from "@langwatch/plans";
 import { ResourceScope, type ServerRole } from "@langwatch/process";
 import { ScopedSecrets } from "@langwatch/secrets";
@@ -14,7 +12,6 @@ import { ScopedSecrets } from "@langwatch/secrets";
  * Test license fixtures - pre-generated static constants.
  * License generation logic stays in lw-saas only.
  */
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 
 import { LicensingModule } from "../app/licensing.app.ts";
 import type { LicensingRepositories } from "../repositories/licensing.repositories.ts";
@@ -247,12 +244,9 @@ export class RecordingLicenseRetention implements LicenseRetention {
   }
 }
 
-type LicensingPeers = Parameters<typeof LicensingModule.create>[0]["dependencies"];
-
 /** What a suite changes about the app it boots; everything else is memory and silence. */
 export type TestLicensingAppOptions = Readonly<{
   repositories?: Partial<LicensingRepositories>;
-  dependencies?: Partial<LicensingPeers>;
   config?: Partial<LicensingServerConfig>;
   /** The value each declared secret resolves to, by its key; unnamed keys are unset. */
   secrets?: Readonly<Record<string, string | undefined>>;
@@ -269,11 +263,7 @@ export function createTestLicensingApp(
 ): Promise<LicensingModule> {
   const secrets = options.secrets ?? {};
   return LicensingModule.create({
-    dependencies: {
-      scopes: createApiFixture<AuthzApi>(),
-      gateway: createApiFixture<GatewayApi>(),
-      ...options.dependencies,
-    },
+    dependencies: {},
     repositories: {
       ...MemoryLicensingRepositories.create(),
       organizationLicenses: MemoryOrganizationLicenseRepository.create(

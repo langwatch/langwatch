@@ -42,6 +42,7 @@ const FULL_VIEW: Protections = { canSeeCapturedInput: true, canSeeCapturedOutput
 function pageRow(overrides: Partial<PageRow> = {}): PageRow {
   return {
     conversationId: "session-a",
+    projectId: PROJECT_ID,
     traceCount: 3,
     totalCost: 1.25,
     totalTokens: 4200,

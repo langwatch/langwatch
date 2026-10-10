@@ -1,5 +1,6 @@
 import { Lent } from "@langwatch/browser-host/lent";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
+import { InlineCode } from "@langwatch/design-system/inline-code";
 import { Menu } from "@langwatch/design-system/menu";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
@@ -9,6 +10,7 @@ import {
   Box,
   Button,
   Card,
+  HStack,
   Spacer,
   Table,
   Text,
@@ -54,11 +56,17 @@ function statusBadge(endpoint: EndpointView) {
   );
 }
 
-function eventsSummary(enabledEvents: string[]) {
-  if (enabledEvents.includes("*")) return "all events";
-  const shown = enabledEvents.slice(0, 2).join(", ");
+function EventsSummary({ enabledEvents }: { enabledEvents: string[] }) {
+  if (enabledEvents.includes("*")) return <>all events</>;
   const rest = enabledEvents.length - 2;
-  return rest > 0 ? `${shown} +${rest}` : shown;
+  return (
+    <HStack gap="1" flexWrap="wrap">
+      {enabledEvents.slice(0, 2).map((event) => (
+        <InlineCode key={event}>{event}</InlineCode>
+      ))}
+      {rest > 0 && <Text as="span">+{rest}</Text>}
+    </HStack>
+  );
 }
 
 /** Which endpoint each drawer and confirmation is showing, if any. */
@@ -290,8 +298,8 @@ function WebhookRow(props: EndpointActionProps) {
     <Table.Row>
       <WebhookDestinationCell endpoint={endpoint} />
       <Table.Cell>
-        <Text fontSize="sm" color="fg.muted">
-          {eventsSummary(endpoint.enabledEvents)}
+        <Text as="div" fontSize="sm" color="fg.muted">
+          <EventsSummary enabledEvents={endpoint.enabledEvents} />
         </Text>
       </Table.Cell>
       <Table.Cell>{statusBadge(endpoint)}</Table.Cell>

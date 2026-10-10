@@ -1,4 +1,6 @@
 import { formatCost, formatTokens } from "@langwatch/design-system/display-formatters";
+import { FormattedDate } from "@langwatch/design-system/formatted-date";
+import { FormattedNumber } from "@langwatch/design-system/formatted-number";
 import { ListTable } from "@langwatch/design-system/list-table";
 import { chakra, HStack, Spinner, Table, Text } from "@langwatch/design-system/primitives";
 import { readableDate } from "@langwatch/time";
@@ -118,21 +120,31 @@ const SessionRow: React.FC<{
       </HStack>
     </Table.Cell>
     <Table.Cell fontSize="sm" whiteSpace="nowrap">
-      {formatShortDate({ timestampMs: session.startedAtMs })}{" "}
-      {readableDate(session.startedAtMs).toLocaleTimeString(undefined, {
-        hour: "2-digit",
-        minute: "2-digit",
-      })}
+      <FormattedDate value={session.startedAtMs}>
+        {formatShortDate({ timestampMs: session.startedAtMs })}{" "}
+        {readableDate(session.startedAtMs).toLocaleTimeString(undefined, {
+          hour: "2-digit",
+          minute: "2-digit",
+        })}
+      </FormattedDate>
     </Table.Cell>
     <ContributorName contributor={session} />
     <Table.Cell fontSize="sm" color="fg.muted">
       {session.agent ? <AgentLabel agent={session.agent} /> : MISSING_VALUE}
     </Table.Cell>
     <Table.Cell textAlign="end" fontSize="sm">
-      {formatTokens(session.totalTokens)}
+      <FormattedNumber value={session.totalTokens} unit="tokens">
+        {formatTokens(session.totalTokens)}
+      </FormattedNumber>
     </Table.Cell>
     <Table.Cell textAlign="end" fontSize="sm">
-      {session.costUsd === null ? MISSING_VALUE : formatCost(session.costUsd)}
+      {session.costUsd === null ? (
+        MISSING_VALUE
+      ) : (
+        <FormattedNumber value={session.costUsd} currency="USD">
+          {formatCost(session.costUsd)}
+        </FormattedNumber>
+      )}
     </Table.Cell>
   </Table.Row>
 );

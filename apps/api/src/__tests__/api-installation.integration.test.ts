@@ -194,7 +194,6 @@ describe("the api process installation", () => {
           project: closed,
           organization: closed,
           api_key: closed,
-          scim_token: closed,
           instance_admin: closed,
           browser: closed,
         },
@@ -267,7 +266,6 @@ describe("the api process installation", () => {
           project: closed,
           organization: closed,
           api_key: closed,
-          scim_token: closed,
           instance_admin: closed,
           browser: { ...closed, identifyOptional: ({ request }) => signedIn(request) },
         },
@@ -328,7 +326,6 @@ describe("the api process installation", () => {
           project: closed,
           organization: closed,
           api_key: closed,
-          scim_token: closed,
           instance_admin: closed,
           browser: closed,
         },
@@ -378,38 +375,46 @@ describe("the api process installation", () => {
 
   /** @scenario "The api process serves every OTLP signal at its own module's door" */
   it("answers every OTLP signal from its owner's door, canonically and under an alias", async () => {
-    const { runtime } = await bootApi();
+    const closed = {
+      authenticate: () => {
+        throw new Error("the OTLP doors resolve their key themselves.");
+      },
+    };
+    const host = RestHost.create({
+      authz: restTestAuthorization().forRequest(),
+      identities: {
+        project: closed,
+        organization: closed,
+        api_key: closed,
+        instance_admin: closed,
+        browser: closed,
+      },
+      bearers: () => closed,
+      audit: { record: async () => {} },
+    });
+    const families = new Map<string, string>();
+    const mountNothing = { mount: () => {} };
+    // The booted process mounts each OTLP family with the doors its module bound.
+    const otlpOnly: Pick<RestHost, "mount"> = {
+      mount: (declaration, app, options) => {
+        if (!OTLP_FAMILIES.has(declaration.namespace)) return;
+        families.set(declaration.namespace, declaration.api.name);
+        host.mount(declaration, app, options);
+      },
+    };
+    const { runtime } = await bootApi({
+      surface: () => ({
+        hosts: {
+          rest: otlpOnly,
+          trpc: mountNothing,
+          websocket: mountNothing,
+          rawhttp: mountNothing,
+        },
+        serve: () => void 0,
+      }),
+    });
 
     try {
-      const closed = {
-        authenticate: () => {
-          throw new Error("the OTLP doors resolve their key themselves.");
-        },
-      };
-      const host = RestHost.create({
-        authz: restTestAuthorization().forRequest(),
-        identities: {
-          project: closed,
-          organization: closed,
-          api_key: closed,
-          scim_token: closed,
-          instance_admin: closed,
-          browser: closed,
-        },
-        bearers: () => closed,
-        audit: { record: async () => {} },
-      });
-      const families = new Map<string, string>();
-      for (const module of processModules) {
-        const token = module.apiContract;
-        if (!(token instanceof ModuleApiToken)) continue;
-        for (const transport of module.transports ?? []) {
-          const namespace = transport.namespace ?? "";
-          if (transport.protocol !== "rest" || !OTLP_FAMILIES.has(namespace)) continue;
-          families.set(namespace, module.name);
-          host.mount(transport.router(), () => runtime.service(token));
-        }
-      }
       const post = (path: string, body: object) =>
         host.app.fetch(
           new Request(`http://api.test${path}`, {

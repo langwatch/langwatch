@@ -23,11 +23,13 @@ import {
   createErrorHandler,
   OrganizationPermissionError,
   PayloadTooLargeError,
+  ProjectInvalidCredentialsError,
 } from "../../errors.ts";
+import type { RestCaller } from "../../hosting/api-door.ts";
 import { getRoutePolicy } from "../../route-registry.ts";
-import { defineRestRouter, projectRestFacts } from "../declaration.ts";
+import { defineRestRouter, projectRequestContext } from "../declaration.ts";
 import { documentedResponses, securityForCredentialClass } from "../openapi.ts";
-import { bindRestHeader, bindRestMiddleware, defineRestMiddleware } from "../request.ts";
+import { bindMiddlewareContext, defineMiddlewareContext } from "../request.ts";
 import { declined } from "../response.ts";
 import { createRestRuntime, type RestDeprecationLog } from "../runtime.ts";
 
@@ -349,7 +351,7 @@ describe("the document a declared route publishes", () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// The facts a mount binds, and what the handler is handed beside its input.
+// The middleware context a mount binds, and what the handler is handed beside its input.
 // ─────────────────────────────────────────────────────────────────────────────
 
 interface ReportApi {
@@ -357,7 +359,7 @@ interface ReportApi {
 }
 
 const ReportApi = moduleApi<ReportApi>()("ops");
-const surface = defineRestMiddleware("surface", z.string().nullable());
+const surface = defineMiddlewareContext("surface", z.string().nullable());
 
 const reports = defineRestRouter(ReportApi)
   .withNamespace("reports")
@@ -366,7 +368,7 @@ const reports = defineRestRouter(ReportApi)
   .withParams(z.object({ id: z.string() }))
   .withPermission("annotations:view")
   .withOutput(z.object({ id: z.string(), platformUrl: z.string(), surface: z.string() }))
-  .withMiddleware(projectRestFacts, surface)
+  .withMiddlewareContext(projectRequestContext, surface)
   .handle(async ({ app, input }, project, header) => {
     const report = await app.read({ id: input.id });
 
@@ -390,21 +392,21 @@ function reportsApp(): Hono {
     app: () => ({ read: async ({ id }: { id: string }) => ({ id }) }),
     credential: "project",
     onError: createErrorHandler(),
-    facts: [
-      bindRestMiddleware(projectRestFacts, () => ({
+    middlewareContext: [
+      bindMiddlewareContext(projectRequestContext, () => ({
         projectSlug: "acme",
         viewerUserId: null,
         actorId: "user-1",
       })),
-      bindRestHeader(surface, "x-langwatch-surface"),
+      bindMiddlewareContext(surface, (request) => request.headers.get("x-langwatch-surface")),
     ],
   });
 }
 
-describe("a route whose declaration names the facts it needs", () => {
-  describe("given the mount bound each of them once", () => {
-    /** @scenario "A route's declared facts are bound once at the mount and reach every handler" */
-    it("hands the handler each parsed fact, in declaration order, beside its input", async () => {
+describe("a route whose declaration names the middleware context it needs", () => {
+  describe("given its module provided each of them", () => {
+    /** @scenario "A route's declared middleware context is provided by its module and reaches every handler" */
+    it("hands the handler each parsed context, in declaration order, beside its input", async () => {
       const response = await reportsApp().request(`/api/reports/${VERSION}/report-1`, {
         headers: { "x-langwatch-surface": "cli" },
       });
@@ -418,8 +420,8 @@ describe("a route whose declaration names the facts it needs", () => {
       });
     });
 
-    /** @scenario "A route's declared facts are bound once at the mount and reach every handler" */
-    it("resolves the facts at every address the route answers at", async () => {
+    /** @scenario "A route's declared middleware context is provided by its module and reaches every handler" */
+    it("resolves the context at every address the route answers at", async () => {
       for (const path of [
         "/api/reports/report-1",
         "/api/reports/latest/report-1",
@@ -684,8 +686,8 @@ interface RoleApi {
 }
 
 const RoleApi = moduleApi<RoleApi>()("role");
-const roleRestFacts = defineRestMiddleware(
-  "roleRestFacts",
+const roleRestContext = defineMiddlewareContext(
+  "roleRestContext",
   z.object({ organizationId: z.string() }),
 );
 
@@ -704,16 +706,16 @@ const roles = defineRestRouter(RoleApi)
     z.object({
       tier: z.literal("organization"),
       scopeId: z.string(),
-      factOrganizationId: z.string(),
+      contextOrganizationId: z.string(),
       roles: z.array(z.string()),
     }),
   )
   .withDocs({ summary: "List the organization's roles", tags: ["Roles"] })
-  .withMiddleware(roleRestFacts)
+  .withMiddlewareContext(roleRestContext)
   .handle(async ({ app, scope }, organization) => ({
     tier: scope.tier,
     scopeId: scope.id,
-    factOrganizationId: organization.organizationId,
+    contextOrganizationId: organization.organizationId,
     roles: (await app.listRoles({ organizationId: scope.id })).map((role) => role.id),
   }))
 
@@ -761,7 +763,9 @@ function rolesApp(
   const app = runtime.mount(roles.router(), {
     app: () => roleApplication,
     onError: createErrorHandler(),
-    facts: [bindRestMiddleware(roleRestFacts, () => ({ organizationId: ORGANIZATION_ID }))],
+    middlewareContext: [
+      bindMiddlewareContext(roleRestContext, () => ({ organizationId: ORGANIZATION_ID })),
+    ],
   });
 
   return { app, authenticate };
@@ -770,7 +774,7 @@ function rolesApp(
 describe("a family whose declaration names the organization door", () => {
   describe("given a caller the door resolved an organization for", () => {
     /** @scenario "A handler on an organization door receives the organization scope" */
-    it("hands the handler the organization scope, and the fact the mount bound", async () => {
+    it("hands the handler the organization scope, and the context the mount bound", async () => {
       const response = await rolesApp().app.request(`/api/roles/${VERSION}`);
 
       expect(response.status).toBe(200);
@@ -778,7 +782,7 @@ describe("a family whose declaration names the organization door", () => {
       await expect(response.json()).resolves.toEqual({
         tier: "organization",
         scopeId: ORGANIZATION_ID,
-        factOrganizationId: ORGANIZATION_ID,
+        contextOrganizationId: ORGANIZATION_ID,
         roles: [`role-in-${ORGANIZATION_ID}`],
       });
     });
@@ -2617,6 +2621,77 @@ describe("a route the family's credential reaches optionally", () => {
     expect(() => bugReportsApp({ optional: false })).toThrow(
       /supplied no identity.identifyOptional/,
     );
+  });
+});
+
+// The same intake, answering a key its door refuses as no key at all (W02, Alex 2026-10-10).
+const anonymousBugReports = defineRestRouter(BugReportApi)
+  .withNamespace("bug-reports")
+  .withVersion(VERSION)
+  .withAddressing("v1-only")
+  .post("/", "submitBugReport")
+  .withInput(z.object({ title: z.string() }))
+  .withAccess(optionalCredential({ reason: KEY_ONLY_ENRICHES, refused: "anonymous" }))
+  .withOutput(z.object({ id: z.string(), filedUnder: z.string() }))
+  .withStatus(201)
+  .withDocs({ summary: "File an issue report" })
+  .handle(async ({ app, input, scope }) => {
+    const report = await app.submit({ title: input.title, projectId: scope?.id ?? null });
+
+    return { id: report.id, filedUnder: scope?.id ?? "none" };
+  })
+  .build();
+
+function anonymousBugReportsApp(identify: () => RestCaller): Hono {
+  const runtime = createRestRuntime({
+    authorization: authorizationPort,
+    identity: {
+      authenticate: () => {
+        throw new Error("An optional-credential route asks no permission of its credential.");
+      },
+      identify,
+    },
+  });
+
+  return runtime.mount(anonymousBugReports.router(), {
+    app: () => ({ submit: async () => ({ id: "report-1" }) }),
+    onError: createErrorHandler(),
+  });
+}
+
+describe("a route that answers a refused credential as none", () => {
+  /** @scenario "A route answers a credential its door refuses as no credential" */
+  it("files under the project the door verified", async () => {
+    const response = await fileReport(
+      anonymousBugReportsApp(() => ({ actor: null, scope: { tier: "project", id: "project-7" } })),
+    );
+
+    expect(response.status).toBe(201);
+    await expect(response.json()).resolves.toEqual({ id: "report-1", filedUnder: "project-7" });
+  });
+
+  /** @scenario "A route answers a credential its door refuses as no credential" */
+  it("answers a missing or bad credential unattributed, never 401", async () => {
+    const response = await fileReport(
+      anonymousBugReportsApp(() => {
+        throw new ProjectInvalidCredentialsError();
+      }),
+    );
+
+    expect(response.status).toBe(201);
+    await expect(response.json()).resolves.toEqual({ id: "report-1", filedUnder: "none" });
+  });
+
+  /** @scenario "A route answers a credential its door refuses as no credential" */
+  it("answers unattributed when the door fails for a reason that is not a refusal", async () => {
+    const response = await fileReport(
+      anonymousBugReportsApp(() => {
+        throw new Error("the key store is down");
+      }),
+    );
+
+    expect(response.status).toBe(201);
+    await expect(response.json()).resolves.toEqual({ id: "report-1", filedUnder: "none" });
   });
 });
 

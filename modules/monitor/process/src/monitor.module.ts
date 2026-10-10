@@ -1,3 +1,4 @@
+import { projectRequestContextOf } from "@langwatch/api/rest";
 import type { MonitorApi, MonitorServerConfig } from "@langwatch/monitor-contract";
 import { defineProcessModule, type PublishedProcessModule } from "@langwatch/process";
 
@@ -15,4 +16,5 @@ export const monitorProcessModule: PublishedProcessModule<
   .withRepositories(monitorRepositories)
   .withApi(MonitorModule)
   .withTransports(createMonitorsRest(), monitorTrpcTransport)
+  .provideMiddlewareContext({ projectRequestContext: projectRequestContextOf })
   .withEventing(monitorEvaluatorCleanupEventing);

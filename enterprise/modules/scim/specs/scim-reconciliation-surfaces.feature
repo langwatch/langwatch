@@ -240,3 +240,19 @@ Feature: The SCIM reconciliation surfaces - directory sync you can read
     And an older grant was recently revoked
     When the administrator reads recent directory changes
     Then the recent removal is included in chronological order
+
+  # ── Member provenance ───────────────────────────────────────────────────
+
+  @unit
+  Scenario: The members a directory created are named with its provider
+    Given "acme-okta"'s directory has claimed "sam" and "ana"
+    And "lee" joined "acme" some other way
+    When an administrator asks which of "sam", "lee" and "ana" a directory created
+    Then the answer names "sam" and "ana" with the provider "okta"
+    And "lee" is not in the answer
+
+  @unit
+  Scenario: Another organization's directory never explains a member
+    Given another organization's directory has claimed "sam"
+    When an administrator of "acme" asks which of its members a directory created
+    Then the answer is empty

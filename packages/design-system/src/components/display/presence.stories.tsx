@@ -33,7 +33,13 @@ const peers: PresencePeer[] = [
 ];
 
 const meta = {
-  title: "Components/Presence",
+  title: "Data display/Presence",
+  parameters: {
+    usage: {
+      use: "Who else is looking at the same thing right now.",
+      avoid: "The author or owner of a record: use Avatar.",
+    },
+  },
   component: PresenceAvatarStack,
   tags: ["autodocs"],
   args: { peers },

@@ -87,6 +87,7 @@ function mount({ failKeys = 0 }: { failKeys?: number } = {}) {
   apis.ready();
 
   const runtime = createRestRuntime({
+    audit: { record: async () => {} },
     authorization: restTestAuthorization(),
     identity: {
       identify: ({ request }) => {

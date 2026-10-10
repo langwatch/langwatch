@@ -24,7 +24,7 @@ import {
 import { isDeclaredMigrationStep, isMigrationStep } from "../step/migration-step.ts";
 import { type FirstInstallUpgrade, spawnFirstInstallUpgrade } from "./first-install-upgrade.ts";
 import { IMAGE_CODE_STEPS_FILE, readImageCodeSteps } from "./image-code-steps.ts";
-import { imageGateSteps, readImageTree } from "./image-tree.ts";
+import { imageGateSteps, imageRelease, readImageTree } from "./image-tree.ts";
 import {
   type ServingRole,
   type ServingVerdict,
@@ -159,7 +159,7 @@ export function upgradeGateOver({
                 gate,
                 firstInstall,
                 warn,
-                findFailedSteps,
+                findFailedSteps: findBlockingFailures,
                 findLeaseHolder,
                 wait,
               })
@@ -285,7 +285,7 @@ function sayRun({ verdict, warn }: { verdict: ServingVerdict; warn: ServingGateW
   const why =
     verdict.outcome === "first-install"
       ? "first install: the ledger and the schema are empty"
-      : `behind this image: blocking steps not done: ${"outstanding" in verdict ? verdict.outstanding.join(", ") : ""}`;
+      : `behind this image: steps not done: ${"outstanding" in verdict ? verdict.outstanding.join(", ") : ""}`;
   warn(
     `${why}, so this worker runs \`${UPGRADE_COMMAND}\` before it takes jobs; its lines follow`,
     {
@@ -296,10 +296,33 @@ function sayRun({ verdict, warn }: { verdict: ServingVerdict; warn: ServingGateW
   );
 }
 
+/** Whether the worker stops asking; one that said it was behind also says it caught up. */
+function settled({
+  verdict,
+  wasBehind,
+  warn,
+}: {
+  verdict: ServingVerdict;
+  wasBehind: boolean;
+  warn: ServingGateWarn;
+}): boolean {
+  if (verdict.outcome === "first-install" || verdict.outcome === "behind") return false;
+  if (wasBehind && verdict.admitted) {
+    warn(
+      `\`${UPGRADE_COMMAND}\` finished: the installation is current, so this worker takes jobs`,
+      {
+        phase: "current",
+        next: "nothing to do",
+      },
+    );
+  }
+  return true;
+}
+
 /**
  * The worker runs `upgrade` while its installation is behind (UPGRADE-IN-WORKER): it waits while
- * another runner holds the lease and, after a failed run, for a Retry that returns the step to
- * `pending`; a restart is an operator act, so a new worker runs once more (UIW-3).
+ * another runner holds the lease, after a failed step for a Retry that returns it to `pending`,
+ * and after a failure with no failed step retries on a backoff (STUCK-STATES).
  */
 export async function admitAfterFirstInstall({
   gate,
@@ -321,9 +344,12 @@ export async function admitAfterFirstInstall({
   let mayRunPastFailure = true;
   let ranClean = false;
   let lastWait = "";
+  let retries = 0;
+  let wasBehind = false;
   for (;;) {
     const verdict = await gate.admit();
-    if (verdict.outcome !== "first-install" && verdict.outcome !== "behind") return verdict;
+    if (settled({ verdict, wasBehind, warn })) return verdict;
+    wasBehind = true;
     const reason = await waitReason({ findLeaseHolder, findFailedSteps, mayRunPastFailure });
     if (reason) {
       const next = "nothing to do: this worker asks again every 10 s";
@@ -337,14 +363,64 @@ export async function admitAfterFirstInstall({
     // An exit 0 that left the ledger behind runs again only after the re-ask interval.
     if (ranClean) await wait(reAskMs);
     sayRun({ verdict, warn });
-    const { exitCode } = await firstInstall();
+    const { exitCode, logTail } = await firstInstall();
     ranClean = exitCode === 0;
-    if (ranClean) continue;
+    if (ranClean) {
+      retries = 0;
+      continue;
+    }
     // After any run a failed step waits for a Retry; a lease loser's exit is not a failure.
     mayRunPastFailure = false;
-    if (exitCode !== EXIT_CODES.lease_not_acquired) warnFailedRun({ verdict, exitCode, warn });
-    await wait(reAskMs);
+    retries = await waitAfterFailedRun({
+      run: { verdict, exitCode, logTail },
+      retries,
+      findFailedSteps,
+      warn,
+      wait,
+      reAskMs,
+    });
   }
+}
+
+/** The longest a worker waits between runs that fail with no failed step (STUCK-STATES). */
+export const UPGRADE_RETRY_MAX_MS = 5 * 60_000;
+
+/** Waits after a failed run; answers the count of back-to-back failures with no failed step. */
+async function waitAfterFailedRun({
+  run: { verdict, exitCode, logTail },
+  retries,
+  findFailedSteps,
+  warn,
+  wait,
+  reAskMs,
+}: {
+  run: { verdict: ServingVerdict; exitCode: number; logTail: readonly string[] };
+  retries: number;
+  findFailedSteps: () => Promise<UpgradeFailedRun["failedSteps"]>;
+  warn: ServingGateWarn;
+  wait: (ms: number) => Promise<unknown>;
+  reAskMs: number;
+}): Promise<number> {
+  const failed =
+    exitCode === EXIT_CODES.lease_not_acquired ? [] : await findFailedSteps().catch(() => []);
+  if (exitCode === EXIT_CODES.lease_not_acquired || failed.length > 0) {
+    if (failed.length > 0) warnFailedRun({ verdict, exitCode, warn });
+    await wait(reAskMs);
+    return 0;
+  }
+  const retryInMs = Math.min(reAskMs * 2 ** retries, UPGRADE_RETRY_MAX_MS);
+  const cause = logTail.at(-1) ?? "it printed nothing";
+  warn(
+    `\`${UPGRADE_COMMAND}\` exited ${exitCode} with no failed step to retry (last line: ${cause}); this worker retries it in ${retryInMs / 1000} s`,
+    {
+      phase: verdict.outcome,
+      waitingOn: "the retry backoff",
+      retryInMs,
+      next: "nothing to do if the cause passes; otherwise fix what the run's lines name",
+    },
+  );
+  await wait(retryInMs);
+  return retries + 1;
 }
 
 function warnFailedRun({
@@ -440,7 +516,7 @@ export async function servingUpgradeGate({
   warn?: ServingGateWarn;
 }): Promise<UpgradeGate> {
   const tree = servingImageTree();
-  const release = loadReleases().manifests.at(-1)?.release ?? null;
+  const release = imageRelease({ manifests: loadReleases().manifests, tree });
   return secrets.into(storesOwner.secrets.database, (database) =>
     secrets.into(storesOwner.secrets.clickhouse, (clickhouse) =>
       secrets.into(storesOwner.secrets.clickhouseRoutes, (routes) =>

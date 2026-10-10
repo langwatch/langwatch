@@ -1,5 +1,5 @@
 import { AuthorizedClickHouse } from "@langwatch/clickhouse-client";
-import { clickHouseClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
+import { clickHouseQueryClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
 import { describe, expect, it, vi } from "vitest";
 
 import { TraceModule } from "#app/trace.app";
@@ -10,10 +10,7 @@ import { TraceSummaryReaderRepository } from "#repositories/trace-summary-reader
 import type { TraceFullIo } from "../features/read/services/trace-read-full-io.service.ts";
 // From the port that defines them: an in-package test does not need the
 // package's public surface, and `index.ts` publishes what CONSUMERS import.
-import type {
-  TraceClickHouseClient,
-  TraceClickHouseResolver,
-} from "../repositories/clickhouse/clickhouse.trace-member-client.repository.ts";
+import type { TraceClickHouseResolver } from "../repositories/clickhouse/clickhouse.trace-member-client.repository.ts";
 import { ClickHouseTraceSpanRepository } from "../repositories/clickhouse/trace-span.repository.ts";
 import { aggregateProof, ownProof } from "./support/authorization-proofs.fixture.ts";
 import { TestModelProviderService } from "./support/model-provider.service.fake.ts";
@@ -96,7 +93,7 @@ function fencedClickHouse(
   calls: FencedCall[],
   rowsFor: (callIndex: number) => unknown[],
 ): AuthorizedClickHouse {
-  const client = clickHouseClientDouble({
+  const client = clickHouseQueryClientDouble({
     query: vi.fn(
       async ({
         sql,
@@ -123,10 +120,7 @@ function fencedTree(
   calls: FencedCall[],
   rowsFor: (callIndex: number) => unknown[],
 ): ClickHouseTraceSpanRepository {
-  return ClickHouseTraceSpanRepository.create({
-    resolveClient: refusingResolver,
-    clickhouse: fencedClickHouse(calls, rowsFor),
-  });
+  return ClickHouseTraceSpanRepository.create({ clickhouse: fencedClickHouse(calls, rowsFor) });
 }
 
 describe("TraceModule.composeTree", () => {
@@ -223,32 +217,22 @@ describe("TraceModule.composeTree", () => {
 
 describe("ClickHouseTraceSpanRepository evaluation reads", () => {
   it("preserves the fields Evaluation consumes from canonical stored spans", async () => {
-    const calls: string[] = [];
-    const repository = ClickHouseTraceSpanRepository.create({
-      clickhouse: fencedClickHouse([], () => []),
-      resolveClient: async (): Promise<TraceClickHouseClient> => ({
-        query: async ({ query }: { query: string }) => {
-          calls.push(query);
-          const rows: unknown[] = [
-            {
-              SpanType: "rag",
-              Model: "",
-              Contexts: JSON.stringify([
-                { content: "plain context" },
-                { content: { title: "structured context" } },
-              ]),
-            },
-            { SpanType: "", Model: "model-1", Contexts: "" },
-          ];
-
-          return { json: async () => rows };
-        },
-      }),
-    });
+    const calls: FencedCall[] = [];
+    const repository = fencedTree(calls, () => [
+      {
+        SpanType: "rag",
+        Model: "",
+        Contexts: JSON.stringify([
+          { content: "plain context" },
+          { content: { title: "structured context" } },
+        ]),
+      },
+      { SpanType: "", Model: "model-1", Contexts: "" },
+    ]);
 
     await expect(
       repository.findEvaluationSpans({
-        tenantId: "project_1",
+        authorization,
         traceId: "trace_1",
       }),
     ).resolves.toEqual([
@@ -260,35 +244,24 @@ describe("ClickHouseTraceSpanRepository evaluation reads", () => {
       { type: "span", model: "model-1", ragContextTexts: [] },
     ]);
     expect(calls).toHaveLength(1);
-    expect(calls[0]).toContain("FROM stored_spans");
-    expect(calls[0]).not.toContain("trace_analytics");
+    expect(calls[0]?.tenantId).toBe("project_1");
+    expect(calls[0]?.sql).toContain("FROM stored_spans");
+    expect(calls[0]?.sql).not.toContain("trace_analytics");
+    expect(calls[0]?.sql).not.toContain("{tenantId:String}");
   });
 
   it("keeps legacy event metric mapping and newest-event ordering", async () => {
-    const calls: string[] = [];
-    const repository = ClickHouseTraceSpanRepository.create({
-      clickhouse: fencedClickHouse([], () => []),
-      resolveClient: async (): Promise<TraceClickHouseClient> => ({
-        query: async ({ query }: { query: string }) => {
-          calls.push(query);
-          const rows: unknown[] = [
-            {
-              EventType: "thumbs_up_down",
-              Attributes: {
-                "event.metrics.vote": "1",
-                note: "useful",
-              },
-            },
-          ];
-
-          return { json: async () => rows };
-        },
-      }),
-    });
+    const calls: FencedCall[] = [];
+    const repository = fencedTree(calls, () => [
+      {
+        EventType: "thumbs_up_down",
+        Attributes: { "event.metrics.vote": "1", note: "useful" },
+      },
+    ]);
 
     await expect(
       repository.findEvaluationEvents({
-        tenantId: "project_1",
+        authorization,
         traceId: "trace_1",
       }),
     ).resolves.toEqual([
@@ -299,9 +272,11 @@ describe("ClickHouseTraceSpanRepository evaluation reads", () => {
       },
     ]);
     expect(calls).toHaveLength(1);
-    expect(calls[0]).toContain("Events.Timestamp");
-    expect(calls[0]).toContain("ORDER BY event_timestamp DESC");
-    expect(calls[0]).not.toContain("elasticsearch");
+    expect(calls[0]?.tenantId).toBe("project_1");
+    expect(calls[0]?.sql).toContain("Events.Timestamp");
+    expect(calls[0]?.sql).toContain("ORDER BY event_timestamp DESC");
+    expect(calls[0]?.sql).not.toContain("elasticsearch");
+    expect(calls[0]?.sql).not.toContain("{tenantId:String}");
   });
 });
 

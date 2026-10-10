@@ -133,6 +133,23 @@ export function query(): string {
       expect(workspace.messages()).toEqual(["analytics reads trace_summaries, owned by trace."]);
     });
 
+    /** @scenario "A table name reached through a file constant is still access" */
+    it("reads a constant handed to a read helper as `table:`", () => {
+      const workspace = fixture();
+      workspace.write(
+        "modules/trace/process/src/repositories/clickhouse/trace-summary.repository.ts",
+        writer("trace_summaries"),
+      );
+      workspace.write(
+        "modules/analytics/process/src/repositories/clickhouse/summary.mapper.ts",
+        `const TABLE_NAME = "trace_summaries" as const;
+export const subquery = () => latestVersionSubquery({ table: TABLE_NAME, alias: "t" });
+`,
+      );
+
+      expect(workspace.messages()).toEqual(["analytics reads trace_summaries, owned by trace."]);
+    });
+
     /** @scenario "A table name imported from a sibling file is still access" */
     it("resolves a table named by a constant imported from a relative file", () => {
       const workspace = fixture();

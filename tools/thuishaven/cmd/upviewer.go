@@ -58,7 +58,7 @@ func runUpViewer(ctx context.Context, target viewerTarget, preferred string) err
 }
 
 // runPlayViewer is the same view over a play sandbox, with the opposite quit
-// contract in its banner: quitting `haven play` destroys the sandbox, it never
+// contract in its banner: quitting `haven pr --throwaway` destroys the sandbox, it never
 // detaches.
 func runPlayViewer(ctx context.Context, target viewerTarget) error {
 	m := newViewerModel(target.slug, target.logPath, target.logDir)
@@ -1040,7 +1040,7 @@ func (m *viewerModel) bodyRows(budget int) []string {
 // modeAndStatus is the banner's command name and the stack's state beside it.
 func (m *viewerModel) modeAndStatus() (string, string) {
 	if m.destroyOnQuit {
-		return "haven play", "\x1b[33m● Ephemeral sandbox" + sgrReset
+		return "haven pr --throwaway", "\x1b[33m● Ephemeral sandbox" + sgrReset
 	}
 	switch {
 	case !m.snap.Found:

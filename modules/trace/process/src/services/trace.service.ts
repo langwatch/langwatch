@@ -1,4 +1,5 @@
 import type { Authorization } from "@langwatch/authorization";
+import type { FoldReadAuthorizer } from "@langwatch/eventing";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { nowInstant } from "@langwatch/time";
 import {
@@ -64,6 +65,8 @@ type TraceComposition = {
   records: TraceRecordRepository;
   eventDerivation: TraceEventDerivation;
   fullRecords: TraceFullRecordRepository;
+  /** Mints the own-only proof for the reads whose `*Api` names a tenant, not a proof. */
+  authorize: FoldReadAuthorizer;
 };
 
 const DEFAULT_INGEST_WAIT_MS = 30_000;
@@ -117,15 +120,27 @@ export class TraceService {
   }
 
   async getEvaluationSpans(input: EvaluationTraceReadInput): Promise<EvaluationTraceSpan[]> {
-    const parsed = evaluationTraceReadInputSchema.parse(input);
+    const { tenantId, ...read } = evaluationTraceReadInputSchema.parse(input);
 
-    return this.composition.repository.findEvaluationSpans(parsed);
+    return this.composition.repository.findEvaluationSpans({
+      ...read,
+      authorization: await this.ownProof({
+        projectId: tenantId,
+        entry: "TraceService.getEvaluationSpans",
+      }),
+    });
   }
 
   async getEvaluationEvents(input: EvaluationTraceReadInput): Promise<EvaluationTraceEvent[]> {
-    const parsed = evaluationTraceReadInputSchema.parse(input);
+    const { tenantId, ...read } = evaluationTraceReadInputSchema.parse(input);
 
-    return this.composition.repository.findEvaluationEvents(parsed);
+    return this.composition.repository.findEvaluationEvents({
+      ...read,
+      authorization: await this.ownProof({
+        projectId: tenantId,
+        entry: "TraceService.getEvaluationEvents",
+      }),
+    });
   }
 
   async getSpanTreePage({
@@ -209,7 +224,10 @@ export class TraceService {
 
     try {
       const sample = await this.composition.repository.findIngestLag({
-        tenantId: parsed.projectId,
+        authorization: await this.ownProof({
+          projectId: parsed.projectId,
+          entry: "TraceService.resolveIngestWaitTimeout",
+        }),
       });
       if (!sample || sample.sampleCount < MIN_INGEST_SAMPLE_COUNT) {
         return DEFAULT_INGEST_WAIT_MS;
@@ -235,6 +253,16 @@ export class TraceService {
       tenantId: parsed.projectId,
       traceId: parsed.traceId,
     });
+  }
+
+  private ownProof({
+    projectId,
+    entry,
+  }: {
+    projectId: string;
+    entry: string;
+  }): Promise<Authorization> {
+    return this.composition.authorize({ projectId, purpose: { kind: "operator", entry } });
   }
 
   private price({ costInput, cost, ...node }: TraceSpanSummaryRecord): SpanTreeNode {

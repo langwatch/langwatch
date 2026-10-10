@@ -1,6 +1,7 @@
 /** Toggle and banner for governance sample data panels. */
 
-import { Button, Flex, Icon, Text } from "@langwatch/design-system/primitives";
+import { Banner } from "@langwatch/design-system/banner";
+import { Button, Icon } from "@langwatch/design-system/primitives";
 import { Compass, Sparkles, Tent } from "lucide-react";
 import type React from "react";
 import type { ReactNode } from "react";
@@ -35,34 +36,16 @@ export const SampleDataToggle: React.FC<{
 };
 
 /**
- * Banner shown when samples are active; an `output` (role status) honesty affordance
- * claiming that nothing on screen is real.
+ * Banner shown when samples are active: a status claiming that nothing on screen is real.
+ * The default wording stands on its own whether or not the panels carry their own badges.
  */
 export const SampleDataBanner: React.FC<{ children?: ReactNode }> = ({ children }) => (
-  <Flex
-    as="output"
-    align="center"
-    gap={2}
-    paddingX={3.5}
-    paddingY={2.5}
-    background="orange.subtle"
-    borderWidth="1px"
-    borderColor="orange.muted"
-    borderRadius="md"
-    color="orange.fg"
-    flexShrink={0}
-  >
-    <Icon boxSize={4}>
-      <Sparkles />
-    </Icon>
-    <Text textStyle="sm" fontWeight={600}>
-      {/* The default no longer points at the per-panel badges. A page whose
-          panels are ALL invented drops those badges, because this banner has
-          already said it once and sixteen repetitions of it say nothing more
-          — which left the old copy naming marks the reader could not see.
-          This wording stands on its own and stays true either way. */}
-      {children ??
-        "Viewing sample data. Nothing here is real. Turn samples off to see your organization’s data."}
-    </Text>
-  </Flex>
+  <Banner
+    status="warning"
+    icon={<Sparkles size={16} aria-hidden="true" />}
+    title={
+      children ??
+      "Viewing sample data. Nothing here is real. Turn samples off to see your organization’s data."
+    }
+  />
 );

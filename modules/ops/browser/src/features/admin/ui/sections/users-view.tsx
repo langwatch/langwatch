@@ -312,7 +312,7 @@ export function ImpersonateDialog({
         <Dialog.Footer>
           <HStack width="full">
             <Spacer />
-            <Button variant="ghost" onClick={onClose} disabled={loading}>
+            <Button variant="outline" onClick={onClose} disabled={loading}>
               Cancel
             </Button>
             <Button onClick={submit} loading={loading} colorPalette="orange">

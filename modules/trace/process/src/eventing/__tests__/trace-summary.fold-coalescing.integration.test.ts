@@ -1,3 +1,4 @@
+import { type Authorization, projectIdsReadBy } from "@langwatch/authorization";
 import {
   createTenantId,
   FoldProjectionExecutor,
@@ -40,12 +41,13 @@ class MemoryProjection extends TraceSummaryProjectionRepository {
   }
 
   async findByTraceId(input: {
-    tenantId: string;
+    authorization: Authorization;
     traceId: string;
   }): Promise<TraceSummaryData | null> {
+    const readable = projectIdsReadBy(input.authorization);
     const last = [...this.written]
       .reverse()
-      .find((entry) => entry.tenantId === input.tenantId && entry.data.traceId === input.traceId);
+      .find((entry) => readable.includes(entry.tenantId) && entry.data.traceId === input.traceId);
     return last?.data ?? null;
   }
 }

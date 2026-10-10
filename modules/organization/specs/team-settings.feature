@@ -32,3 +32,34 @@ Feature: The team settings page reads as main's does
     Given a team the reader may edit, with one admin member
     When a new name is typed into the name field and Enter is pressed
     Then the team is saved with the new name and its members unchanged, with no save button
+
+  @integration
+  Scenario: An archived team's address says the team was not found
+    Given a team that has been archived
+    When its settings address is opened
+    Then the page says the team was not found, with no loading skeleton
+
+  @unit
+  Scenario: A team name is unique within its organization
+    Given an organization with a live team called "Platform"
+    When a team is created, or another team is renamed, to " platform "
+    Then it is refused with status 409 and the code "team_name_taken"
+    And the message reads "A team called platform already exists"
+
+  @unit
+  Scenario: A team keeps its own name when it is saved again
+    Given an organization with a live team called "Platform"
+    When that team is renamed to "PLATFORM"
+    Then the rename is accepted
+
+  @integration
+  Scenario: The create-team drawer shows a taken name under the name field
+    Given the server refuses a new team with "team_name_taken"
+    When Create is pressed
+    Then the name field shows "A team called Platform already exists"
+
+  @integration
+  Scenario: The team settings page shows a taken name under the name field
+    Given the server refuses a rename with "team_name_taken"
+    When the new name is saved
+    Then the name field shows "A team called Taken already exists"

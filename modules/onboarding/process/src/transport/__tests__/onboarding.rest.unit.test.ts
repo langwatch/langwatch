@@ -2,7 +2,11 @@
  * @vitest-environment node
  * @see specs/features/onboarding/guided-onboarding-variant.feature
  */
-import { bindRestMiddleware, createRestRuntime, canonicalErrorResponse } from "@langwatch/api/rest";
+import {
+  bindMiddlewareContext,
+  createRestRuntime,
+  canonicalErrorResponse,
+} from "@langwatch/api/rest";
 import {
   GuidedOnboardingPathUnknownError,
   type OnboardingApi,
@@ -36,7 +40,7 @@ function mount(options: { credential?: Credential; onboarding?: Partial<Onboardi
     app: () => app,
     credential: "project",
     onError: canonicalErrorResponse,
-    facts: [bindRestMiddleware(onboardingRestCredential, () => credential)],
+    middlewareContext: [bindMiddlewareContext(onboardingRestCredential, () => credential)],
   });
 
   const send = (method: string, path: string) =>

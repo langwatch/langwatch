@@ -18,6 +18,7 @@ func Command(ctx context.Context, args []string, stdout io.Writer) (int, error) 
 	if err != nil {
 		return 2, err
 	}
+	options.Stdout = stdout
 	if options.PostgresBase == "" || options.ClickHouseBase == "" {
 		if options.PostgresBase, options.ClickHouseBase, err = HavenServers(ctx); err != nil {
 			return 2, err
@@ -47,9 +48,22 @@ func (report *Report) ExitCode() int {
 
 func parse(args []string) (Options, error) {
 	var options Options
-	flags := flag.NewFlagSet("cell", flag.ContinueOnError)
-	flags.StringVar(&options.Deployment, "deployment", "cloud", "cloud | hybrid | self-hosted")
-	flags.StringVar(&options.Tier, "tier", "S", "volume tier: S (L and XL wait for lane L4)")
+	flags := cellFlags("cell", &options)
+	flags.StringVar(&options.FromSnapshot, "from-snapshot", "", "a produce entry directory or cache key: restore it instead of seeding")
+	ledger := flags.String("ledger", "", "comma-separated #8553 rows (UP-04, UD-7, ...) to claim at start and report at the end")
+	drills := flags.String("drills", "", "comma-separated drills on top of the profile: api-early (switch on /healthz), worker-restart, retry")
+	if err := flags.Parse(args); err != nil {
+		return options, err
+	}
+	return withDrills(options, *ledger, *drills)
+}
+
+// cellFlags are the flags cell and produce share.
+func cellFlags(name string, options *Options) *flag.FlagSet {
+	flags := flag.NewFlagSet(name, flag.ContinueOnError)
+	flags.StringVar(&options.Deployment, "deployment", "cloud", "cloud | cloud-sso | hybrid | self-hosted")
+	flags.StringVar(&options.Tier, "tier", "S", "volume tier: S or M (L and XL wait for lane L4)")
+	flags.BoolVar(&options.NoAdminEmails, "no-admin-emails", false, "self-hosted-free boots without ADMIN_EMAILS")
 	flags.StringVar(&options.Shape, "shape", "typical", "data shape: typical")
 	flags.Int64Var(&options.Seed, "seed", 1, "seed for every generated id and payload")
 	flags.StringVar(&options.FromDir, "from-dir", ".worktrees/upgradelab-main", "checkout of the release upgraded from (no .env)")
@@ -72,17 +86,16 @@ func parse(args []string) (Options, error) {
 	flags.BoolVar(&options.Shots, "shots", true, "screenshot each api phase and Ops > Upgrades (Playwright from head's apps/ui)")
 	flags.Float64Var(&options.MaxLoad, "max-load", 40, "refuse to start when the machine's 1-minute load average is above this (0: never refuse)")
 	flags.StringVar(&options.TestedBy, "tested-by", "", "who runs the cell, written to the ledger's Tested by: lane:<id> (model) or @handle")
-	ledger := flags.String("ledger", "", "comma-separated #8553 rows (UP-04, UD-7, ...) to claim at start and report at the end")
-	drills := flags.String("drills", "", "comma-separated drills on top of the profile: api-early (switch on /healthz), worker-restart, retry")
-	if err := flags.Parse(args); err != nil {
-		return options, err
-	}
-	for _, id := range strings.Split(*ledger, ",") {
+	return flags
+}
+
+func withDrills(options Options, ledger, drills string) (Options, error) {
+	for _, id := range strings.Split(ledger, ",") {
 		if id = strings.TrimSpace(id); id != "" {
 			options.Ledger = append(options.Ledger, id)
 		}
 	}
-	for _, drill := range strings.Split(*drills, ",") {
+	for _, drill := range strings.Split(drills, ",") {
 		switch drill {
 		case "":
 		case DrillAPIEarly:

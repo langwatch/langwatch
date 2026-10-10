@@ -15,7 +15,7 @@ func TestPreflightRefusesDiskAndClickHouseShortfalls(t *testing.T) {
 		t.Fatalf("want a disk shortfall, got %v", err)
 	}
 	err = Preflight(estimate, "large", Capacity{FreeDisk: 100 << 30, ClickHouseCap: 3 << 30})
-	if !errors.As(err, &refusal) || !strings.Contains(refusal.Raise, "haven limits set clickhouse-memory-mb 6144") {
+	if !errors.As(err, &refusal) || !strings.Contains(refusal.Raise, "haven machine limits set clickhouse-memory-mb 6144") {
 		t.Fatalf("want the ClickHouse floor and the haven limit that raises it, got %v", err)
 	}
 	if err := Preflight(estimate, "large", Capacity{FreeDisk: 100 << 30, ClickHouseCap: 8 << 30}); err != nil {

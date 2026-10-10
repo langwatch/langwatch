@@ -85,7 +85,7 @@ export function DashboardNameDialog({
           <HStack width="full">
             <Spacer />
             <Button
-              colorPalette="blue"
+              colorPalette="orange"
               data-testid="analytics-dashboard-create-confirm"
               onClick={handleConfirm}
               disabled={!dashboardName.trim()}

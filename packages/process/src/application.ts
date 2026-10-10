@@ -1,4 +1,4 @@
-import { type BoundTransportFacts, type TransportPeers } from "@langwatch/api";
+import { type BoundMiddlewareBindings, type TransportPeers } from "@langwatch/api";
 import { type EventUpcastReader, type FeatureEventing } from "@langwatch/eventing";
 import {
   type DependencyToken,
@@ -566,11 +566,11 @@ export class ApplicationBuilder<
       // its own app gets the same instance every other caller holds.
       if (role === "api") {
         // Now: all Apps exist, nothing serves yet. Only moment doors can be built.
-        const facts = [...installed].map(([feature, state]) => ({
+        const middlewareBindings = [...installed].map(([feature, state]) => ({
           feature,
-          facts: state.facts ?? [],
+          middlewareBindings: state.middlewareBindings ?? [],
         }));
-        const hosts = this.openDoors((token) => provided.get(token), facts);
+        const hosts = this.openDoors((token) => provided.get(token), middlewareBindings);
         if (
           hosts.rest !== void 0 ||
           hosts.trpc !== void 0 ||
@@ -616,14 +616,16 @@ export class ApplicationBuilder<
 
   /**
    * The doors this process opens, resolved once: named hosts come back as they are; a factory
-   * runs here over every installed App, by contract token, and every module's bound facts.
+   * runs here over every installed App, by contract token, and every module's middleware bindings.
    */
   private openDoors(
     resolve: (token: TokenIdentity) => unknown,
-    facts: readonly BoundTransportFacts[] = [],
+    middlewareBindings: readonly BoundMiddlewareBindings[] = [],
   ): FeatureTransportHosts<Rest, Trpc> {
     const source = this.state.hosts;
-    return typeof source === "function" ? source(transportPeersOf(resolve, facts)) : source;
+    return typeof source === "function"
+      ? source(transportPeersOf(resolve, middlewareBindings))
+      : source;
   }
 
   /** Store peer instances as-is; declare module API tokens. */
@@ -908,10 +910,10 @@ function declaredTransportsOf(
       feature: declaration.name,
       transports: declaration.transports,
       provided: () => state.provided,
-      // What the MODULE bound for the facts its own routes name, built by its
-      // install in this role. The process binds only its own doors' facts and
-      // never re-declares a route to supply a module's.
-      facts: state.facts ?? [],
+      // What the MODULE bound for its own routes, built by its install in this
+      // role. The process binds only its own doors' middleware context and never
+      // re-declares a route to supply a module's.
+      middlewareBindings: state.middlewareBindings ?? [],
     },
   ];
 }

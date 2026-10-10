@@ -3,7 +3,7 @@
  * The SSO connection log, read: newest first, scoped to the caller's tenant.
  * Corresponds to specs/identity/sso-connection-history.feature.
  */
-import { type OwnEventStore, createTenantId } from "@langwatch/eventing";
+import { createTenantId, type EventReadSeat } from "@langwatch/eventing";
 import {
   CONNECTION_ACTIVATED_EVENT_TYPE,
   CONNECTION_REGISTERED_EVENT_TYPE,
@@ -89,16 +89,19 @@ function repositoryOver(eventsByTenant: Record<string, SsoConnectionEvent[]>): {
   // A real store filters by BOTH the tenant and the aggregate id; so does
   // this one, or a connection id belonging to nobody in this tenant would
   // "find" another connection's events purely by sharing a bucket.
-  const read: OwnEventStore["read"] = async ({ tenantId, aggregateId, accepts }) => {
+  const findAggregateEvents: EventReadSeat["findAggregateEvents"] = async ({
+    tenantId,
+    aggregateType,
+    aggregateId,
+  }) => {
     requestedTenants.push(tenantId);
-    const events: readonly unknown[] = (eventsByTenant[tenantId] ?? []).filter(
-      (event) => event.aggregateId === aggregateId,
+    return (eventsByTenant[tenantId] ?? []).filter(
+      (event) => event.aggregateType === aggregateType && event.aggregateId === aggregateId,
     );
-    return events.filter(accepts);
   };
   return {
     repository: EventingSsoConnectionHistoryRepository.create({
-      eventStore: { read },
+      eventReadSeat: { findAggregateEvents },
     }),
     requestedTenants,
   };

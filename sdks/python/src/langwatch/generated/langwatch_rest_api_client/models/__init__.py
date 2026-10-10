@@ -8130,20 +8130,26 @@ from .span_input_output_type_1_value_item_content_type_0_type_1_item_type_4 impo
 from .span_input_output_type_1_value_item_content_type_0_type_1_item_type_5 import (
     SpanInputOutputType1ValueItemContentType0Type1ItemType5,
 )
-from .span_input_output_type_1_value_item_content_type_0_type_1_item_type_6_input_audio import (
-    SpanInputOutputType1ValueItemContentType0Type1ItemType6InputAudio,
+from .span_input_output_type_1_value_item_content_type_0_type_1_item_type_6 import (
+    SpanInputOutputType1ValueItemContentType0Type1ItemType6,
 )
-from .span_input_output_type_1_value_item_content_type_0_type_1_item_type_7_source import (
-    SpanInputOutputType1ValueItemContentType0Type1ItemType7Source,
+from .span_input_output_type_1_value_item_content_type_0_type_1_item_type_7 import (
+    SpanInputOutputType1ValueItemContentType0Type1ItemType7,
 )
-from .span_input_output_type_1_value_item_content_type_0_type_1_item_type_8 import (
-    SpanInputOutputType1ValueItemContentType0Type1ItemType8,
+from .span_input_output_type_1_value_item_content_type_0_type_1_item_type_8_input_audio import (
+    SpanInputOutputType1ValueItemContentType0Type1ItemType8InputAudio,
 )
-from .span_input_output_type_1_value_item_content_type_0_type_1_item_type_9 import (
-    SpanInputOutputType1ValueItemContentType0Type1ItemType9,
+from .span_input_output_type_1_value_item_content_type_0_type_1_item_type_9_source import (
+    SpanInputOutputType1ValueItemContentType0Type1ItemType9Source,
 )
-from .span_input_output_type_1_value_item_content_type_0_type_1_item_type_10_file import (
-    SpanInputOutputType1ValueItemContentType0Type1ItemType10File,
+from .span_input_output_type_1_value_item_content_type_0_type_1_item_type_10 import (
+    SpanInputOutputType1ValueItemContentType0Type1ItemType10,
+)
+from .span_input_output_type_1_value_item_content_type_0_type_1_item_type_11 import (
+    SpanInputOutputType1ValueItemContentType0Type1ItemType11,
+)
+from .span_input_output_type_1_value_item_content_type_0_type_1_item_type_12_file import (
+    SpanInputOutputType1ValueItemContentType0Type1ItemType12File,
 )
 from .span_input_output_type_1_value_item_function_call_type_0 import SpanInputOutputType1ValueItemFunctionCallType0
 from .span_input_output_type_1_value_item_parts_item_type_0 import SpanInputOutputType1ValueItemPartsItemType0
@@ -8154,16 +8160,18 @@ from .span_input_output_type_1_value_item_parts_item_type_2_image_url import (
 from .span_input_output_type_1_value_item_parts_item_type_3 import SpanInputOutputType1ValueItemPartsItemType3
 from .span_input_output_type_1_value_item_parts_item_type_4 import SpanInputOutputType1ValueItemPartsItemType4
 from .span_input_output_type_1_value_item_parts_item_type_5 import SpanInputOutputType1ValueItemPartsItemType5
-from .span_input_output_type_1_value_item_parts_item_type_6_input_audio import (
-    SpanInputOutputType1ValueItemPartsItemType6InputAudio,
+from .span_input_output_type_1_value_item_parts_item_type_6 import SpanInputOutputType1ValueItemPartsItemType6
+from .span_input_output_type_1_value_item_parts_item_type_7 import SpanInputOutputType1ValueItemPartsItemType7
+from .span_input_output_type_1_value_item_parts_item_type_8_input_audio import (
+    SpanInputOutputType1ValueItemPartsItemType8InputAudio,
 )
-from .span_input_output_type_1_value_item_parts_item_type_7_source import (
-    SpanInputOutputType1ValueItemPartsItemType7Source,
+from .span_input_output_type_1_value_item_parts_item_type_9_source import (
+    SpanInputOutputType1ValueItemPartsItemType9Source,
 )
-from .span_input_output_type_1_value_item_parts_item_type_8 import SpanInputOutputType1ValueItemPartsItemType8
-from .span_input_output_type_1_value_item_parts_item_type_9 import SpanInputOutputType1ValueItemPartsItemType9
-from .span_input_output_type_1_value_item_parts_item_type_10_file import (
-    SpanInputOutputType1ValueItemPartsItemType10File,
+from .span_input_output_type_1_value_item_parts_item_type_10 import SpanInputOutputType1ValueItemPartsItemType10
+from .span_input_output_type_1_value_item_parts_item_type_11 import SpanInputOutputType1ValueItemPartsItemType11
+from .span_input_output_type_1_value_item_parts_item_type_12_file import (
+    SpanInputOutputType1ValueItemPartsItemType12File,
 )
 from .span_input_output_type_1_value_item_tool_calls_type_0_item_function import (
     SpanInputOutputType1ValueItemToolCallsType0ItemFunction,
@@ -12749,27 +12757,31 @@ __all__ = (
     "SpanInputOutputType0",
     "SpanInputOutputType1ValueItemContentType0Type1ItemType0",
     "SpanInputOutputType1ValueItemContentType0Type1ItemType1",
-    "SpanInputOutputType1ValueItemContentType0Type1ItemType10File",
+    "SpanInputOutputType1ValueItemContentType0Type1ItemType10",
+    "SpanInputOutputType1ValueItemContentType0Type1ItemType11",
+    "SpanInputOutputType1ValueItemContentType0Type1ItemType12File",
     "SpanInputOutputType1ValueItemContentType0Type1ItemType2ImageUrl",
     "SpanInputOutputType1ValueItemContentType0Type1ItemType3",
     "SpanInputOutputType1ValueItemContentType0Type1ItemType4",
     "SpanInputOutputType1ValueItemContentType0Type1ItemType5",
-    "SpanInputOutputType1ValueItemContentType0Type1ItemType6InputAudio",
-    "SpanInputOutputType1ValueItemContentType0Type1ItemType7Source",
-    "SpanInputOutputType1ValueItemContentType0Type1ItemType8",
-    "SpanInputOutputType1ValueItemContentType0Type1ItemType9",
+    "SpanInputOutputType1ValueItemContentType0Type1ItemType6",
+    "SpanInputOutputType1ValueItemContentType0Type1ItemType7",
+    "SpanInputOutputType1ValueItemContentType0Type1ItemType8InputAudio",
+    "SpanInputOutputType1ValueItemContentType0Type1ItemType9Source",
     "SpanInputOutputType1ValueItemFunctionCallType0",
     "SpanInputOutputType1ValueItemPartsItemType0",
     "SpanInputOutputType1ValueItemPartsItemType1",
-    "SpanInputOutputType1ValueItemPartsItemType10File",
+    "SpanInputOutputType1ValueItemPartsItemType10",
+    "SpanInputOutputType1ValueItemPartsItemType11",
+    "SpanInputOutputType1ValueItemPartsItemType12File",
     "SpanInputOutputType1ValueItemPartsItemType2ImageUrl",
     "SpanInputOutputType1ValueItemPartsItemType3",
     "SpanInputOutputType1ValueItemPartsItemType4",
     "SpanInputOutputType1ValueItemPartsItemType5",
-    "SpanInputOutputType1ValueItemPartsItemType6InputAudio",
-    "SpanInputOutputType1ValueItemPartsItemType7Source",
-    "SpanInputOutputType1ValueItemPartsItemType8",
-    "SpanInputOutputType1ValueItemPartsItemType9",
+    "SpanInputOutputType1ValueItemPartsItemType6",
+    "SpanInputOutputType1ValueItemPartsItemType7",
+    "SpanInputOutputType1ValueItemPartsItemType8InputAudio",
+    "SpanInputOutputType1ValueItemPartsItemType9Source",
     "SpanInputOutputType1ValueItemToolCallsType0ItemFunction",
     "SpanInputOutputType2ValueCostType0",
     "SpanInputOutputType3ValueCostType0",

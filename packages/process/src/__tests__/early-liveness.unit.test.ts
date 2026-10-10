@@ -93,6 +93,52 @@ describe("a worker whose boot is held by a slow stage", () => {
   });
 });
 
+describe("a worker whose boot is refused after its liveness door opened", () => {
+  describe("when the same process boots again on the same port", () => {
+    it("binds the port the refused boot released", async () => {
+      let refuse = true;
+      class RefusedApp implements SlowApi {
+        static readonly contract = SlowApi;
+        static readonly dependencies = {};
+
+        static create(): Promise<RefusedApp> {
+          return refuse ? Promise.reject(new Error("refused")) : Promise.resolve(new RefusedApp());
+        }
+
+        ready(): boolean {
+          return true;
+        }
+      }
+      const refused = defineProcessModule("annotation").withApi(RefusedApp).build();
+      const port = await freePort();
+      const start = () =>
+        Preamble.create("refused-boot-test")
+          .withEnvironment({})
+          .withConfig(processConfig([refused], "worker"))
+          .withHealthPort(port)
+          .withProcessOwnership(false)
+          .withSecrets((_, secrets) => secrets.withEnv())
+          .start();
+      const first = await start();
+      await expect(
+        first.container("worker").boot({ classifyEventLogRetention: () => "traces" }),
+      ).rejects.toThrow("refused");
+
+      refuse = false;
+      const second = await start();
+      try {
+        const application = await second
+          .container("worker")
+          .boot({ classifyEventLogRetention: () => "traces" });
+        await second.run(application);
+        expect((await fetch(`http://127.0.0.1:${port}/healthz`)).status).toBe(200);
+      } finally {
+        await second.close();
+      }
+    });
+  });
+});
+
 describe("a server whose liveness door opened ahead of listen", () => {
   describe("when listen then starts the hosted components", () => {
     it("keeps the one door it opened rather than binding a second", async () => {

@@ -87,6 +87,7 @@ function summary(
 function mount(modelProviders: Partial<ModelProviderApi>) {
   const { app } = mountableModelProviderApp({ modelProviders });
   const hono = createRestRuntime({
+    audit: { record: async () => {} },
     authorization: restTestAuthorization(),
     identity: {
       authenticate: () => ({

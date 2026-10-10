@@ -4,7 +4,7 @@
 import Stripe from "stripe";
 import { describe, expect, it } from "vitest";
 
-import { HttpStripeWebhooksChannel } from "../http/http.stripe-webhooks.channel.ts";
+import { HttpStripeWebhooksChannel } from "../http/http.billing.channels.ts";
 import { MemoryStripeWebhooksChannel } from "../memory/memory.stripe-webhooks.channel.ts";
 import type { StripeWebhooksChannel } from "../stripe-webhooks.channel.ts";
 

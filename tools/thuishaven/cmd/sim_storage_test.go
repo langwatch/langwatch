@@ -31,7 +31,7 @@ func TestStorageClearScopesToTheNamedBucket(t *testing.T) {
 	}
 }
 
-// @scenario "haven storage presigns, seeds and reads the request log for agents"
+// @scenario "haven sim storage presigns, seeds and reads the request log for agents"
 func TestStoragePresignSeedAndRequestsCallTheirRoutes(t *testing.T) {
 	api, seen := stubSim(t, map[string]string{
 		"GET /_sim/api/presign":  `{"url":"http://s/b/k?X-Amz-Signature=x","method":"PUT","expiresAt":"2026-10-09T10:00:00Z"}`,

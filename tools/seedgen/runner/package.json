@@ -14,10 +14,12 @@
   "dependencies": {
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/data-retention-contract": "workspace:*",
+    "@langwatch/enterprise-licensing-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/log-contract": "workspace:*",
     "@langwatch/metric-contract": "workspace:*",
     "@langwatch/organization-contract": "workspace:*",
+    "@langwatch/plans": "workspace:*",
     "@langwatch/process": "workspace:*",
     "@langwatch/project-contract": "workspace:*",
     "@langwatch/task": "workspace:*",

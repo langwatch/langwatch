@@ -19,7 +19,7 @@ import { z } from "zod";
 import { type ConnectedBillingPeers, BillingModule } from "../app/billing.app.ts";
 import { createStripeUsageReporting } from "../billing.module.ts";
 import { composeHttpBillingStripe } from "../channels/http/http.billing-stripe.channels.ts";
-import { HttpStripeWebhooksChannel } from "../channels/http/http.stripe-webhooks.channel.ts";
+import { HttpStripeWebhooksChannel } from "../channels/http/http.billing.channels.ts";
 import { MemoryBillingWebhookHostChannel } from "../channels/memory/memory.billing-webhook-host.channel.ts";
 import { MemoryBillingOrganizationRepository } from "../repositories/memory/memory.billing-account-facts.repository.ts";
 import { MemoryBillingWebhookOrganizationRepository } from "../repositories/memory/memory.billing-webhook-organization.repository.ts";
@@ -205,7 +205,6 @@ describe.skipIf(!goPresent)(
           project: closed,
           organization: closed,
           api_key: closed,
-          scim_token: closed,
           instance_admin: closed,
           browser: closed,
         },

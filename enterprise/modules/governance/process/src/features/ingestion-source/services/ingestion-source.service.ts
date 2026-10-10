@@ -5,9 +5,11 @@ import {
   IngestionSourceCapReachedError,
   IngestionSourceNotFoundError,
   NON_ENTERPRISE_INGESTION_SOURCE_CAP,
+  OttlStatementsInvalidError,
   unsupportedValue,
   type CreatedGovernanceIngestionSource,
   type CreateGovernanceIngestionSourceCommand,
+  type GovernanceOttlGateway,
   type GovernanceIngestionSource,
   type UpdateGovernanceIngestionSourceCommand,
 } from "@langwatch/enterprise-governance-contract";
@@ -52,6 +54,7 @@ export class IngestionSourceService {
   private readonly now: () => number;
   private readonly validation: IngestionSourceValidationService;
   private readonly parserConfigs: IngestionSourceParserConfigService;
+  private readonly ottl: Pick<GovernanceOttlGateway, "validate">;
 
   private constructor({
     repository,
@@ -65,6 +68,7 @@ export class IngestionSourceService {
     now,
     validation,
     parserConfigs,
+    ottl,
   }: {
     repository: IngestionSourceRepository;
     projects: IngestionSourceProjects;
@@ -77,6 +81,7 @@ export class IngestionSourceService {
     now: () => number;
     validation: IngestionSourceValidationService;
     parserConfigs: IngestionSourceParserConfigService;
+    ottl: Pick<GovernanceOttlGateway, "validate">;
   }) {
     this.repository = repository;
     this.projects = projects;
@@ -89,6 +94,7 @@ export class IngestionSourceService {
     this.now = now;
     this.validation = validation;
     this.parserConfigs = parserConfigs;
+    this.ottl = ottl;
   }
 
   static create(options: {
@@ -100,6 +106,7 @@ export class IngestionSourceService {
     destinations: PullDestinationService;
     providerAccounts: ProviderAccountChannel;
     diagnostics: GovernanceDiagnosticsSink;
+    ottl: Pick<GovernanceOttlGateway, "validate">;
     now?: () => number;
   }): IngestionSourceService {
     return new IngestionSourceService({
@@ -112,6 +119,7 @@ export class IngestionSourceService {
       providerAccounts: options.providerAccounts,
       diagnostics: options.diagnostics,
       now: options.now ?? Date.now,
+      ottl: options.ottl,
       validation: IngestionSourceValidationService.create({ projects: options.projects }),
       parserConfigs: IngestionSourceParserConfigService.create({
         repository: options.repository,
@@ -201,6 +209,7 @@ export class IngestionSourceService {
       ...input.parserConfig,
     };
     this.destinations.assertAllowed(requestedParserConfig);
+    await this.assertOttlParses(requestedParserConfig);
     const { providerAccountId } = await this.parserConfigs.assertClaimsAreFree({
       organizationId: input.organizationId,
       sourceType: input.sourceType,
@@ -250,6 +259,7 @@ export class IngestionSourceService {
       this.validation.assertAdapterUnchanged(existing.parserConfig, incoming);
       cursorMustNotMove = this.validation.assertReportUnchangedOncePulled(existing, incoming);
       this.destinations.assertAllowed(incoming);
+      await this.assertOttlParses(incoming);
       this.parserConfigs.assertRepointAllowed({ existing, incoming });
       const { providerAccountId } = await this.parserConfigs.assertClaimsAreFree({
         organizationId: input.organizationId,
@@ -285,6 +295,17 @@ export class IngestionSourceService {
     }
 
     return source;
+  }
+
+  /** The gateway's parser is the gate; a deferred check saves, as the editor says it will. */
+  private async assertOttlParses(parserConfig: Record<string, unknown>): Promise<void> {
+    const raw = parserConfig.ottlStatements;
+    const statements = Array.isArray(raw) ? raw.filter((s) => typeof s === "string") : [];
+    if (statements.length === 0) return;
+    const result = await this.ottl.validate(statements);
+    if (result.status === "invalid") {
+      throw new OttlStatementsInvalidError({ statements, errors: result.errors });
+    }
   }
 
   /** The fields whose only rule is that they were supplied. */

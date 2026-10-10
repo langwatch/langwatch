@@ -18,7 +18,8 @@ import {
 } from "../../../../../repositories/clickhouse/__tests__/support/clickhouse-endpoint.support.ts";
 import { traceQueryTranslation } from "../../../../../services/__tests__/fixtures/trace-query-services.fixtures.ts";
 import { TraceCanonicalisationService } from "../../../../derivation/services/trace-canonicalisation.service.ts";
-import { TraceLegacyReadClickHouseRepository } from "../trace-legacy-read.repository.ts";
+import type { LegacyTraceMappingService } from "../../../services/legacy-trace-mapping.service.ts";
+import { mappedLegacyRead } from "./support/legacy-trace-mapping.support.ts";
 
 const clickHouseConfigured = testClickHouseConfigured();
 
@@ -32,7 +33,7 @@ const OK_REFUND_U1 = `${tenantId}-ok-refund-u1`;
 const FAILED_HELLO_U1 = `${tenantId}-failed-hello-u1`;
 
 let ch: ClickHouseClient;
-let repo: TraceLegacyReadClickHouseRepository;
+let repo: LegacyTraceMappingService;
 
 function summaryRow({
   traceId,
@@ -91,6 +92,7 @@ async function search({
     downloadMode: true,
     ...(filterWhere ? { filterWhere } : {}),
     authorization: ownProof({ projectId: tenantId }),
+    ownRead: ownProof({ projectId: tenantId }),
   });
   return results.groups
     .flat()
@@ -101,7 +103,7 @@ async function search({
 describe.skipIf(!clickHouseConfigured)("a trace search filter (integration)", () => {
   beforeAll(async () => {
     ch = await startMigratedTraceClickHouse();
-    repo = TraceLegacyReadClickHouseRepository.create({
+    repo = mappedLegacyRead({
       resolveClickHouseClient: async () => ch,
       traceCanonicalisation: TraceCanonicalisationService.create(),
       annotations: {

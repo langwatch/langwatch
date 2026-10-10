@@ -1,7 +1,6 @@
-import { ProjectMissingCredentialsError } from "@langwatch/api";
 import type { LogRequestCollectionResult } from "@langwatch/log-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import type { TraceApi } from "@langwatch/trace-contract";
+import type { OtlpIngestCredential, TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
 import { otlpLogAnswer } from "../../rules/otlp-log-answer.rules.ts";
@@ -21,27 +20,25 @@ const LOG_BATCH = {
   ],
 };
 
+/** The key the `otlp_ingest` door verified before the body reached the receiver. */
+const CREDENTIAL: OtlpIngestCredential = {
+  project: { id: "project-1", teamId: "team-1", organizationId: "organization-1" },
+  identity: {
+    apiKeyId: "key-1",
+    organizationId: "organization-1",
+    ingestSourceType: null,
+    ingestionTemplateId: null,
+  },
+};
+
 function receiver({
   collected = { outcome: "collected", acceptedLogRecords: 1, rejectedLogRecords: 0 },
-  keyless = false,
-}: { collected?: LogRequestCollectionResult; keyless?: boolean } = {}) {
+}: { collected?: LogRequestCollectionResult } = {}) {
   const calls: { markedUsed: string[]; collectedFor: string[] } = {
     markedUsed: [],
     collectedFor: [],
   };
   const traces = createApiFixture<TraceApi>({
-    otlpCredential: async () => {
-      if (keyless) throw new ProjectMissingCredentialsError();
-      return {
-        project: { id: "project-1", teamId: "team-1", organizationId: "organization-1" },
-        identity: {
-          apiKeyId: "key-1",
-          organizationId: "organization-1",
-          ingestSourceType: null,
-          ingestionTemplateId: null,
-        },
-      };
-    },
     otlpUsageLimit: async () => {},
     otlpMarkCredentialUsed: ({ apiKeyId }) => void calls.markedUsed.push(apiKeyId),
   });
@@ -57,10 +54,13 @@ function receiver({
   const post = async (path: string, body: string = JSON.stringify(LOG_BATCH)) =>
     otlpLogAnswer(
       await service.receive({
-        method: "POST",
-        path,
-        headers: { "content-type": "application/json", "x-auth-token": "sk-lw-test" },
-        body: new TextEncoder().encode(body),
+        request: {
+          method: "POST",
+          path,
+          headers: { "content-type": "application/json" },
+          body: new TextEncoder().encode(body),
+        },
+        credential: CREDENTIAL,
       }),
     );
   return { post, calls };
@@ -115,18 +115,6 @@ describe("OtlpLogReceiverService", () => {
     });
   });
 
-  describe("given no credential", () => {
-    it("refuses with the key directory's 401 and collects nothing", async () => {
-      const { post, calls } = receiver({ keyless: true });
-
-      const answer = await post("/api/otel/v1/traces/v1/logs");
-
-      expect(answer.status).toBe(401);
-      expect(Object.keys(answer.body)).toEqual(["message"]);
-      expect(calls.collectedFor).toEqual([]);
-    });
-  });
-
   describe("given a body that is not OTLP", () => {
     it("answers 400, reports no exception and leaves the key unmarked", async () => {
       const { post, calls } = receiver();
@@ -140,8 +128,8 @@ describe("OtlpLogReceiverService", () => {
   });
 
   describe("given a path outside the known exporter misconfigurations", () => {
-    it("answers 404 before touching the credential", async () => {
-      const { post, calls } = receiver({ keyless: true });
+    it("answers 404 and collects nothing", async () => {
+      const { post, calls } = receiver();
 
       await expect(post("/elsewhere/v1/logs")).resolves.toEqual({
         status: 404,

@@ -45,3 +45,9 @@ Feature: The auth-header-read lint rule
     Given an auth module transport that reads the X-Auth-Token header
     When the auth-header-read rule runs over it
     Then it reports nothing, as credential-reader-owner exempts the same owners
+
+  @unit
+  Scenario: A field test with `in` is not a header read
+    Given a module app testing `"authorization" in input`, where authorization is an authz proof field
+    When the auth-header-read rule runs over it
+    Then it reports nothing, while the same test against a headers object is still reported

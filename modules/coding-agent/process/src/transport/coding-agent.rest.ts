@@ -5,7 +5,7 @@
  */
 import {
   baseResponses,
-  defineRestMiddleware,
+  defineMiddlewareContext,
   defineRestRouter,
   MANAGEMENT_API_VERSION,
   resolvePersonalCaller,
@@ -28,7 +28,7 @@ import {
  * What the project door resolved: the workspace the personal-workspace guard is
  * applied to, and the credential itself, which reads with its own bindings.
  */
-export const codingAgentRestCaller = defineRestMiddleware(
+export const codingAgentRestCaller = defineMiddlewareContext(
   "codingAgentRestCaller",
   z.object({
     project: z.object({
@@ -96,7 +96,7 @@ export const codingAgentRollupRest = defineRestRouter(CodingAgentApi)
   .withQuery(pullRequestUsageQuerySchema)
   .withPermission("traces:view")
   .withOutput(pullRequestUsageResponseSchema)
-  .withMiddleware(codingAgentRestCaller)
+  .withMiddlewareContext(codingAgentRestCaller)
   .withDocs({
     summary: "Get pull request coding agent usage",
     description:

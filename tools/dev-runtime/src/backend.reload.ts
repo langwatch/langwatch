@@ -115,3 +115,33 @@ export function recycleReason({
   }
   return undefined;
 }
+
+/** How long after each consecutive failed boot the next one runs (Alex, 2026-10-10). */
+export const RETRY_DELAYS_MS = [2_000, 5_000, 15_000, 30_000] as const;
+
+/**
+ * A failed boot retries on its own: 2 s, 5 s, 15 s, then every 30 s. One timer at a time;
+ * `reset` (a change, or a boot that succeeded) starts the schedule over.
+ */
+export function createRetrySchedule({ retry }: { retry: () => void }): {
+  failed(): number;
+  reset(): void;
+} {
+  let attempt = 0;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  return {
+    failed() {
+      clearTimeout(timer);
+      const delay = RETRY_DELAYS_MS[Math.min(attempt, RETRY_DELAYS_MS.length - 1)] ?? 30_000;
+      attempt += 1;
+      timer = setTimeout(retry, delay);
+      timer.unref?.();
+      return delay;
+    },
+    reset() {
+      attempt = 0;
+      clearTimeout(timer);
+      timer = undefined;
+    },
+  };
+}

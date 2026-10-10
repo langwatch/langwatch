@@ -338,7 +338,9 @@ export class AuthzIdDecisionsService {
     const closed = await Promise.all(
       projectScopes.map(async ([projectId, scope]) => {
         const known = scope?.type === "project" ? scope.kind : undefined;
-        const kind = known ?? (await this.deps.collector.findScopeRef({ projectId }))?.kind;
+        const found =
+          known !== undefined ? null : await this.deps.collector.findScopeRef({ projectId });
+        const kind = known ?? (found?.type === "project" ? found.kind : undefined);
         return isClosedAggregate({ kind, organizationRole }) ? [projectId] : [];
       }),
     );

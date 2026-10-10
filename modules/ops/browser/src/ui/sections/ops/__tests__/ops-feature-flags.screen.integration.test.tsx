@@ -14,6 +14,7 @@ vi.mock("../../../../features/feature-flags/ui/sections/feature-flags-content.ts
 }));
 
 describe("given the Ops Feature Flags page", () => {
+  /** @scenario "Self-hosted installs do not offer the Feature Flags page" */
   it("answers as an unknown page without cloud ops", () => {
     renderWithOpsHost(<OpsFeatureFlagsScreen />, { host: fakeOpsHost({ cloudOps: false }) });
 

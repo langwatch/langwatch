@@ -55,7 +55,11 @@ describe.skipIf(!DB_URL)("api key revocation on Postgres", () => {
           },
         });
         const revokeWith = (cause: ApiKeyRevocationCause) => (tx: Prisma.TransactionClient) =>
-          PrismaApiKeyRepository.create({ prisma: tx }).revoke({ id: key.id, cause });
+          PrismaApiKeyRepository.create({ prisma: tx }).revoke({
+            id: key.id,
+            organizationId,
+            cause,
+          });
 
         const answers = await raceOnOneRow({
           prisma,

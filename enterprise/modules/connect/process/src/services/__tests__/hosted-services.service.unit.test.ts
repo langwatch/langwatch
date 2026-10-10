@@ -1,10 +1,10 @@
+import type { HostedCaller } from "@langwatch/enterprise-connect-contract";
 import {
   ConnectLicenseRequiredError,
   connectUsageAnswerSchema,
   ConnectServiceNotEntitledError,
   type ConnectService,
   type ContractTerms,
-  type HostedCaller,
   type LicensingApi,
 } from "@langwatch/enterprise-licensing-contract";
 import { ValidationError } from "@langwatch/handled-error";

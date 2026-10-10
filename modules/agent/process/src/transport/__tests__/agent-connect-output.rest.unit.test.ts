@@ -18,7 +18,7 @@ vi.mock("@langwatch/observability", async (importOriginal) => ({
 import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 
 import { createAgentConnectRest } from "../agent-connect.rest.ts";
-import { connectCredentialsFact, connectDoor } from "./agent-connect-door.fixture.ts";
+import { connectCredentialsContext, connectDoor } from "./agent-connect-door.fixture.ts";
 
 const CONTENT_MARKER = "content-marker";
 
@@ -34,7 +34,7 @@ function buildApi(connectFrames: AgentApi["connectFrames"]) {
     runtime.mount(createAgentConnectRest().router(), {
       app: () => app,
       onError: canonicalErrorResponse,
-      facts: [connectCredentialsFact],
+      middlewareContext: [connectCredentialsContext],
     }),
   );
   return hono;

@@ -6,6 +6,7 @@ import {
   cliKeyManagementPermissions,
   type CliKeyManagementPermission,
 } from "@langwatch/api-key-contract";
+import { InlineCode } from "@langwatch/design-system/inline-code";
 import {
   Box,
   Button,
@@ -522,8 +523,8 @@ function LookupStatus({ userCode, lookup }: { userCode: string; lookup: DeviceCo
   if (!userCode) {
     return (
       <StatusCard palette="orange" icon={CircleAlert} title="No code provided">
-        Run <code>langwatch login</code> in your terminal, it will print a link with your code
-        embedded.
+        Run <InlineCode>langwatch login</InlineCode> in your terminal, it will print a link with
+        your code embedded.
       </StatusCard>
     );
   }
@@ -540,7 +541,7 @@ function LookupStatus({ userCode, lookup }: { userCode: string; lookup: DeviceCo
   if (lookup.kind === "expired") {
     return (
       <StatusCard palette="orange" icon={Clock3} title="Code expired">
-        Restart <code>langwatch login</code> in your terminal to get a new code.
+        Restart <InlineCode>langwatch login</InlineCode> in your terminal to get a new code.
       </StatusCard>
     );
   }
@@ -764,7 +765,8 @@ function CliKeyScopesField({
       {!isLoading && selectedScopes.length === 0 && !hasAnyScopeToOffer && (
         <Text textStyle="xs" color="orange.fg" mt={2}>
           Your account holds no access in this organization, so there is nothing to give the CLI.
-          Ask an administrator to add you to a team, then run <code>langwatch login</code> again.
+          Ask an administrator to add you to a team, then run{" "}
+          <InlineCode>langwatch login</InlineCode> again.
         </Text>
       )}
     </Box>
@@ -838,8 +840,8 @@ function CliManagementRequest({ management }: { management: ManagementRequest })
     return (
       <StatusCard palette="red" icon={TriangleAlert} title="You have no management access here">
         The CLI asked for management access, and your account holds no management permission in this
-        organization. Deny this request and run <code>langwatch login --device</code> without{" "}
-        <code>--management</code>, or ask an organization admin.
+        organization. Deny this request and run <InlineCode>langwatch login --device</InlineCode>{" "}
+        without <InlineCode>--management</InlineCode>, or ask an organization admin.
       </StatusCard>
     );
   }
@@ -908,7 +910,7 @@ function ActionOutcome({ action }: { action: ActionState }) {
       <StatusCard palette="green" icon={CheckCircle2} title="API key approved">
         The API key for <strong>{action.projectName ?? "your project"}</strong> (
         {action.organizationName}) is on its way to your terminal, and the CLI will save it to your{" "}
-        <code>.env</code>. You can close this tab.
+        <InlineCode>.env</InlineCode>. You can close this tab.
       </StatusCard>
     );
   }

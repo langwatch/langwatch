@@ -1,9 +1,10 @@
 import {
-  defineRestMiddleware,
+  defineMiddlewareContext,
   defineRestRouter,
   MANAGEMENT_API_VERSION,
-  projectRestFacts,
+  projectRequestContext,
   resolver,
+  type RestDoorCredential,
   type RestTransportDeclaration,
 } from "@langwatch/api/rest";
 /**
@@ -37,7 +38,7 @@ const logger = createLogger("langwatch:api:scenarios");
  * header. Only "cli" is honoured; every other value, absent included, reads
  * as "api", so a caller cannot claim an in-process surface over the wire.
  */
-export const scenarioRestSurface = defineRestMiddleware(
+export const scenarioRestSurface = defineMiddlewareContext(
   "scenarioRestSurface",
   z.string().nullable(),
 );
@@ -104,7 +105,11 @@ const scenarioNotFoundResponse = {
 export function createScenarioRest(): Readonly<{
   protocol: "rest";
   namespace: string;
-  router: () => RestTransportDeclaration<ScenarioApi>;
+  router: () => RestTransportDeclaration<
+    ScenarioApi,
+    RestDoorCredential,
+    typeof projectRequestContext | typeof scenarioRestSurface
+  >;
 }> {
   /** Where a scenario opens: its editor drawer, in the interface the project reads. */
   const withPlatformUrl = async (input: {
@@ -131,7 +136,7 @@ export function createScenarioRest(): Readonly<{
       .withPermission("scenarios:view")
       .withOutput(z.array(scenarioRestResponseWithPlatformUrlSchema))
       .withDocs({ description: "Get all scenarios for a project" })
-      .withMiddleware(projectRestFacts)
+      .withMiddlewareContext(projectRequestContext)
       .handle(async ({ app, scope }, project) => {
         logger.info({ projectId: scope.id }, "Listing scenarios");
         const listed = await app.list({ projectId: scope.id });
@@ -156,7 +161,7 @@ export function createScenarioRest(): Readonly<{
         description: "Get a specific scenario by ID",
         responses: scenarioNotFoundResponse,
       })
-      .withMiddleware(projectRestFacts)
+      .withMiddlewareContext(projectRequestContext)
       .handle(async ({ app, input, scope }, project) => {
         logger.info({ projectId: scope.id, scenarioId: input.id }, "Getting scenario");
         const scenario = await app.getById({ id: input.id, projectId: scope.id });
@@ -178,7 +183,7 @@ export function createScenarioRest(): Readonly<{
       .withOutput(scenarioRestResponseWithPlatformUrlSchema)
       .withStatus(201)
       .withDocs({ description: "Create a new scenario" })
-      .withMiddleware(projectRestFacts, scenarioRestSurface)
+      .withMiddlewareContext(projectRequestContext, scenarioRestSurface)
       .handle(async ({ app, input: body, scope }, project, surface) => {
         logger.info({ projectId: scope.id }, "Creating scenario");
         const label = scenarioAuthorLabel(surface);
@@ -224,7 +229,7 @@ export function createScenarioRest(): Readonly<{
       .withPermission("scenarios:update")
       .withOutput(scenarioRestResponseWithPlatformUrlSchema)
       .withDocs({ description: "Update an existing scenario", responses: scenarioNotFoundResponse })
-      .withMiddleware(projectRestFacts, scenarioRestSurface)
+      .withMiddlewareContext(projectRequestContext, scenarioRestSurface)
       .handle(async ({ app, input, scope }, project, surface) => {
         const { id, ...body } = input;
         logger.info({ projectId: scope.id, scenarioId: id }, "Updating scenario");
@@ -254,7 +259,7 @@ export function createScenarioRest(): Readonly<{
       .withPermission("scenarios:update")
       .withOutput(scenarioRestResponseWithPlatformUrlSchema)
       .withDocs({ description: "Update an existing scenario", responses: scenarioNotFoundResponse })
-      .withMiddleware(projectRestFacts, scenarioRestSurface)
+      .withMiddlewareContext(projectRequestContext, scenarioRestSurface)
       .handle(async ({ app, input, scope }, project, surface) => {
         const { id, ...body } = input;
         logger.info({ projectId: scope.id, scenarioId: id }, "Updating scenario");

@@ -66,6 +66,7 @@ import { serviceDoesNotOpenAChannelRule } from "./rules/service-does-not-open-a-
 import { serviceLoadsItsOwnConfigRule } from "./rules/service-loads-its-own-config.rule.mjs";
 import { sharedSetupIsAHookRule } from "./rules/shared-setup-is-a-hook.rule.mjs";
 import { signatureMirrorRule } from "./rules/signature-mirror.rule.mjs";
+import { skipTenantCheckReasonRule } from "./rules/skip-tenant-check-reason.rule.mjs";
 import { sliceReaderIsAHookRule } from "./rules/slice-reader-is-a-hook.rule.mjs";
 import { standInCastRule } from "./rules/stand-in-cast.rule.mjs";
 import { storeContainmentRule } from "./rules/store-containment.rule.mjs";
@@ -94,6 +95,7 @@ const HOUSE_RULES = [
   transportDeclaresRule,
   clickhouseNoVersionOrderLimitRule,
   clickhouseTenantIdRule,
+  skipTenantCheckReasonRule,
   noFormWatchInChildRule,
   noTautologicalAssertionRule,
   requireFetchTimeoutRule,
@@ -181,6 +183,7 @@ export {
   transportDeclaresRule,
   clickhouseNoVersionOrderLimitRule,
   clickhouseTenantIdRule,
+  skipTenantCheckReasonRule,
   noFormWatchInChildRule,
   noTautologicalAssertionRule,
   requireFetchTimeoutRule,

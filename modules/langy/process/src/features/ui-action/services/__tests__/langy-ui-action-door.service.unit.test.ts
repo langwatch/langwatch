@@ -17,6 +17,7 @@ const PROJECT = {
   organizationId: "org-1",
   isPersonal: false,
   ownerUserId: null,
+  kind: "application",
 };
 const SCOPED_KEY: RestResolvedProjectCredential = {
   type: "apiKey",

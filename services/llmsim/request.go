@@ -291,7 +291,7 @@ func (s *Server) answer(h http.Header, req request) reply {
 	} else if strings.EqualFold(h.Get(HeaderMode), "langy") || strings.Contains(req.model, "langy-echo") {
 		rep = langy(req, r)
 	} else {
-		rep = s.markovReply(req, r)
+		rep = s.markovReply(req, r, toolsMode(h, req.model))
 	}
 	rep.ID = fmt.Sprintf("%016x", r.Uint64())
 	rep.In = req.promptTokens()
@@ -306,14 +306,20 @@ func (s *Server) answer(h http.Header, req request) reply {
 	return rep
 }
 
-func (s *Server) markovReply(req request, r *mrand.Rand) reply {
+// toolsMode makes an unforced (auto) tool choice always call a tool: the
+// model name holds "tools" or the call carries X-Llmsim-Tools: auto.
+func toolsMode(h http.Header, model string) bool {
+	return strings.EqualFold(h.Get(HeaderTools), "auto") || strings.Contains(model, "tools")
+}
+
+func (s *Server) markovReply(req request, r *mrand.Rand, alwaysCall bool) reply {
 	g := &schemaGen{r: r, chain: s.chain}
 	switch {
 	case req.schema != nil:
 		g.root = req.schema
 		b, _ := json.Marshal(g.value(req.schema, 0))
 		return reply{Mode: "json", Text: string(b), Finish: "stop"}
-	case len(req.tools) > 0 && (req.forced != "" || (len(req.last().results) == 0 && r.IntN(2) == 0)):
+	case len(req.tools) > 0 && (req.forced != "" || (len(req.last().results) == 0 && (alwaysCall || r.IntN(2) == 0))):
 		return toolReply(req, g)
 	case req.jsonObject:
 		text, _ := s.chain.text(r, 8, 0)
@@ -327,13 +333,22 @@ func (s *Server) markovReply(req request, r *mrand.Rand) reply {
 	return reply{Mode: "markov", Text: text, Finish: "stop"}
 }
 
-// toolReply calls the forced tool, or the first one offered, with arguments
-// drawn from its schema.
+// toolReply calls the named tool, else the longest offered name the last
+// user message mentions, else a seeded pick, with arguments from its schema.
 func toolReply(req request, g *schemaGen) reply {
-	t := req.tools[0]
+	t := req.tools[g.r.IntN(len(req.tools))]
+	user := ""
+	if i := lastUserTurn(req.turns); i >= 0 {
+		user = strings.ToLower(req.turns[i].text)
+	}
+	hint := ""
 	for _, offered := range req.tools {
 		if offered.name == req.forced {
 			t = offered
+			break
+		}
+		if len(offered.name) > len(hint) && strings.Contains(user, strings.ToLower(offered.name)) {
+			t, hint = offered, offered.name
 		}
 	}
 	args := "{}"

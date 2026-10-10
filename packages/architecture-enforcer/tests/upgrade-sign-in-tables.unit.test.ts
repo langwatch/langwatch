@@ -84,8 +84,10 @@ export class Repository { static readonly tables = prismaTables(${names}); }
 
   async fixRows() {
     // reads from nothing
-    return this.database.$executeRaw\`
-      -- @tenancy: fleet-wide
+    return this.database.$executeRaw\`\${skipTenantCheck({
+      // The fix rewrites rows of every tenant in one pass.
+      SKIP_TENANT_CHECK: true,
+    })}
       ${sql}
     \`;
   }

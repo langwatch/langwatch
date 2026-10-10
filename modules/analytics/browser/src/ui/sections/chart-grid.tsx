@@ -14,6 +14,7 @@ import {
   CHART_GRID_MARGIN_PX,
   CHART_GRID_MAX_ROW_SPAN,
   CHART_GRID_ROW_HEIGHT_PX,
+  reflowSingleColumnStack,
   type ChartGridPlacement,
 } from "../../model/chart-grid.ts";
 
@@ -116,7 +117,10 @@ export function ChartGrid({
     [onPlacementsCommit, placements],
   );
 
-  const layout = placements.map((placement) => ({ ...toLayoutItem(placement), minH: minRowSpan }));
+  const layout = reflowSingleColumnStack(placements).map((placement) => ({
+    ...toLayoutItem(placement),
+    minH: minRowSpan,
+  }));
 
   return (
     <Box ref={containerRef} width="100%" className="chart-grid">

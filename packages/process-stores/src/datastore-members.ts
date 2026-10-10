@@ -4,6 +4,7 @@
  * empty store as if healthy. Event sourcing builds in `eventing-members.ts`.
  */
 import type { Logger } from "@langwatch/observability";
+import { counter } from "@langwatch/observability/metrics";
 import {
   type OperatorReadMint,
   PrismaConfigService,
@@ -46,8 +47,17 @@ export function buildPrisma(options: {
     databaseUrl,
     log: options.config.logWarnings ? ["error", "warn"] : ["error"],
   });
+  const skipped = counter({
+    name: "postgres_tenant_check_skipped_total",
+    description: "Raw Postgres statements that set SKIP_TENANT_CHECK",
+  });
   const connection = PrismaConnectionService.create({
-    guard: PrismaTenancyGuardService.create(),
+    guard: PrismaTenancyGuardService.create({
+      onSkippedTenantCheck: ({ table }) => {
+        skipped.inc({ table });
+        options.logger.debug({ table }, "tenant check skipped");
+      },
+    }),
     logger: options.logger,
   }).connect(configuration);
 

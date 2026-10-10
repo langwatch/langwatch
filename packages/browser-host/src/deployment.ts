@@ -21,6 +21,7 @@ export type UiDeploymentSlices = Readonly<{
   authProvider?: string;
   passkeysEnabled: boolean;
   emailPasswordEnabled: boolean;
+  federatedProviders: readonly string[];
   signUpMode?: "open" | "invite_only";
   hasCloudOps: boolean;
   gatewayBaseUrl?: string;
@@ -37,6 +38,7 @@ export function deriveUiDeployment({
   authProvider,
   passkeysEnabled,
   emailPasswordEnabled,
+  federatedProviders,
   signUpMode,
   hasCloudOps,
   gatewayBaseUrl,
@@ -53,8 +55,21 @@ export function deriveUiDeployment({
     ...(authProvider ? { authProvider } : {}),
     passkeysEnabled,
     emailPasswordEnabled,
+    federatedProviders,
     ...(signUpMode ? { signUpMode } : {}),
     hasCloudOps,
     ...(gatewayBaseUrl ? { gatewayBaseUrl } : {}),
   };
+}
+
+/** Where the app runs: LangWatch's cloud, a customer's own install, or a developer's machine. */
+export type Hosting = "cloud" | "self-hosted" | "local";
+
+/** A development build is local whatever it claims to be; haven stacks run SaaS-shaped. */
+export function hostingOf({
+  isDevelopment,
+  isSaaS,
+}: Pick<UiDeployment, "isDevelopment" | "isSaaS">): Hosting {
+  if (isDevelopment) return "local";
+  return isSaaS ? "cloud" : "self-hosted";
 }

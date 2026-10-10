@@ -61,6 +61,24 @@ describe("given a user who already holds Member on a team", () => {
   });
 });
 
+describe("given an identical grant that lands while a skipping attach waits", () => {
+  /** @scenario "A skipping attach dropped by the fold answers the held grant as the duplicate" */
+  it("asks the fold to skip and answers the held grant as the duplicate", async () => {
+    const { writer, db, sent } = harness({ poll: { intervalMs: 1, timeoutMs: 100 } });
+    db.grant.findMany.mockResolvedValueOnce([]).mockResolvedValue([storedGrantRow()]);
+
+    const outcome = await writer.attachBindings({
+      organizationId: ORG_ID,
+      bindings: [again],
+      actor: ACTOR,
+      onDuplicate: "skip",
+    });
+
+    expect(sent[0]?.data).toMatchObject({ grant: { grantId: "rb_2", onDuplicate: "skip" } });
+    expect(outcome).toEqual({ attached: [], duplicates: ["rb_1"] });
+  });
+});
+
 describe("given a binding changed to a role a sibling already holds", () => {
   /** @scenario "Changing a binding to a role a sibling already holds is written" */
   it("sends the role change rather than refusing it", async () => {

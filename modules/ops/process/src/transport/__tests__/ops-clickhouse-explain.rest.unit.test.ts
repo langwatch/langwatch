@@ -23,7 +23,6 @@ function mountApp(configured: string | null = SECRET) {
       project: closed,
       organization: closed,
       api_key: closed,
-      scim_token: closed,
       instance_admin: closed,
       browser: closed,
     },
@@ -32,7 +31,7 @@ function mountApp(configured: string | null = SECRET) {
   });
 
   host.mount(opsClickHouseExplainRest.router(), () => app, {
-    facts: [bindRestCredential("internal_secret", () => app.operatorDoor)],
+    middlewareBindings: [bindRestCredential("internal_secret", () => app.operatorDoor)],
   });
 
   return host.app;

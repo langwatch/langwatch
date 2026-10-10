@@ -178,23 +178,27 @@ func TestDeveloperToolsAreNamedByTheirHostnameOnTheCLI(t *testing.T) {
 }
 
 // @scenario "The application frames the Storybook the stack routes to"
-func TestOverlayNamesTheStorybookPortOnlyWhenThereIsOne(t *testing.T) {
+func TestOverlayHandsTheUILaneTheBuiltStorybookAndNeverADevServer(t *testing.T) {
 	base := Stack{Slug: "happy-tiger", APIPort: 41001, Services: []Service{{Name: "app", Port: 44000}}}
+	const url = "https://design-system.happy-tiger.langwatch.localhost"
 
 	t.Run("given a worktree running the Storybook lane", func(t *testing.T) {
 		st := base
-		st.Services = append(st.Services, Service{Name: DesignSystemService, Port: 46006})
-		if got := valueOf(st.OverlayEnv(), "LANGWATCH_STORYBOOK_PORT"); got != "46006" {
-			t.Fatalf("LANGWATCH_STORYBOOK_PORT = %q, want the port haven allocated — "+
-				"otherwise the ui lane derives its own and starts a second Storybook", got)
+		st.Services = append(st.Services, Service{Name: DesignSystemService, Port: 46006, URL: url})
+		env := st.OverlayEnv()
+		if got := valueOf(env, "LANGWATCH_STORYBOOK_URL"); got != url {
+			t.Fatalf("LANGWATCH_STORYBOOK_URL = %q, want the routed Storybook haven serves", got)
+		}
+		if hasKey(env, "LANGWATCH_STORYBOOK_PORT") || hasKey(env, "LANGWATCH_SKIP_STORYBOOK") {
+			t.Fatal("the ui lane must frame haven's Storybook, not hold a port of its own")
 		}
 	})
 
 	t.Run("given a worktree that did not select it", func(t *testing.T) {
 		st := base
 		st.Services = append(st.Services, Service{Name: DesignSystemService})
-		if hasKey(st.OverlayEnv(), "LANGWATCH_STORYBOOK_PORT") {
-			t.Fatal("a port-less Storybook must name no port; the ui lane keeps its own start-on-first-visit behavior")
+		if got := valueOf(st.OverlayEnv(), "LANGWATCH_SKIP_STORYBOOK"); got != "1" {
+			t.Fatalf("LANGWATCH_SKIP_STORYBOOK = %q, want 1: no Storybook dev server under haven", got)
 		}
 	})
 }

@@ -55,7 +55,7 @@ export function SaveAsViewButton() {
       </Button>
 
       <Dialog.Root open={isOpen} onOpenChange={(e) => setIsOpen(e.open)} size="sm">
-        <Dialog.Content bg="bg">
+        <Dialog.Content>
           <Dialog.Header>
             <Dialog.Title>Save as view</Dialog.Title>
           </Dialog.Header>
@@ -74,7 +74,7 @@ export function SaveAsViewButton() {
               <ScopeSelector scope={scope} onScopeChange={setScope} />
               <HStack gap={2}>
                 <Button
-                  variant="ghost"
+                  variant="outline"
                   onClick={() => {
                     setIsOpen(false);
                     setViewName("");
@@ -82,7 +82,7 @@ export function SaveAsViewButton() {
                 >
                   Cancel
                 </Button>
-                <Button colorPalette="blue" onClick={handleConfirm} disabled={!viewName.trim()}>
+                <Button colorPalette="orange" onClick={handleConfirm} disabled={!viewName.trim()}>
                   Save
                 </Button>
               </HStack>

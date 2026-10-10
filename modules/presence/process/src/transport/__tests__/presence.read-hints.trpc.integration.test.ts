@@ -4,7 +4,7 @@
  * @see packages/api/specs/read-hints.feature
  */
 import {
-  bindTrpcFact,
+  bindTrpcMiddlewareContext,
   createTrpcRuntime,
   TrpcRootDefinition,
   type TrpcRuntimeMembers,
@@ -17,7 +17,7 @@ import {
   createPresenceTestApp,
   TestPresenceEmitters,
 } from "../../app/__tests__/presence.fixture.ts";
-import { presenceSessionPersonFact, presenceTrpcTransport } from "../presence.trpc.ts";
+import { presenceSessionPersonContext, presenceTrpcTransport } from "../presence.trpc.ts";
 
 type DoorContext = { actor: { id: string } | null };
 
@@ -89,7 +89,7 @@ async function mountedDoors() {
     procedure: root.procedure,
     members: members(),
   }).mount(presenceTrpcTransport, () => app, {
-    facts: [bindTrpcFact(presenceSessionPersonFact, () => null)],
+    middlewareContext: [bindTrpcMiddlewareContext(presenceSessionPersonContext, () => null)],
   });
 
   return { router, emitters };

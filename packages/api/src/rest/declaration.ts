@@ -60,7 +60,8 @@ import {
 } from "./key-credential.ts";
 import type { RestTransportDocs } from "./openapi.ts";
 import {
-  defineRestMiddleware,
+  defineMiddlewareContext,
+  type MiddlewareContext,
   type RawBodyValue,
   type RestCachePolicy,
   type RestMultipart,
@@ -75,7 +76,6 @@ import {
   type RestRawBodyForm,
   type RestRawResponse,
   type RestRawResult,
-  type RestTransportMiddleware,
 } from "./request.ts";
 import {
   defaultProducesFor,
@@ -163,17 +163,26 @@ type OutputSchema =
   | z.ZodDiscriminatedUnion<readonly z.ZodObject[]>;
 
 /**
- * What a project-scoped door knows about the caller beyond the request's own
- * input: the platform-URL slug, the person a personal view is filtered for,
- * and the actor an action is recorded against — named here so every family agrees.
+ * What a project-scoped door knows about the caller beyond the request's own input: the
+ * platform-URL slug, the person a personal view is filtered for, and the actor an action is
+ * recorded against. Each module whose routes name it provides it with `projectRequestContextOf`.
  */
-export const projectRestFacts = defineRestMiddleware(
-  "projectRestFacts",
+export const projectRequestContext = defineMiddlewareContext(
+  "projectRequestContext",
   z.object({
     projectSlug: z.string(),
     viewerUserId: z.string().nullable(),
     actorId: z.string(),
   }),
+);
+
+/**
+ * The browser session the browser door resolved, as `{ id }`, or null for a caller with none.
+ * Each module whose routes name it provides it with `browserSessionOfRequest`.
+ */
+export const browserSessionContext = defineMiddlewareContext(
+  "browserSession",
+  z.object({ id: z.string().min(1) }).nullable(),
 );
 
 /** What a superseded family or route answers with, and what replaces it. */
@@ -218,6 +227,8 @@ export type RestDoorCredential = Extract<
   | "instance_admin"
   | "session_key"
   | "cli_token"
+  | "otlp_ingest"
+  | "licence_token"
   | "browser"
 >;
 
@@ -236,6 +247,8 @@ export const DOOR_SCOPE_TIER = {
   instance_admin: null,
   session_key: "project",
   cli_token: "organization",
+  otlp_ingest: "project",
+  licence_token: "organization",
 } as const satisfies Record<RestDoorCredential, AuthzDeclaredScopeId["tier"] | null>;
 
 /** The scope a handler on `Door` is handed: the tier that door resolves. */
@@ -355,17 +368,22 @@ export type StoredHandlerArguments<Api> = Readonly<{
   request: Request;
 }>;
 type StoredHandler<Api> = {
-  invoke(args: StoredHandlerArguments<Api>, ...facts: unknown[]): unknown;
+  invoke(args: StoredHandlerArguments<Api>, ...context: unknown[]): unknown;
 }["invoke"];
 /**
  * A handler with its declaration's own types erased. The door, the raw form and
  * the parsed input each shape the arguments differently, so no one written
  * signature is comparable to all of them; `handle` is where they are enforced.
  */
-type ErasedHandler = (args: never, ...facts: never[]) => unknown;
-type MiddlewareFacts<Middleware extends readonly RestTransportMiddleware[]> = {
+type ErasedHandler = (args: never, ...context: never[]) => unknown;
+type MiddlewareContextValues<Middleware extends readonly MiddlewareContext[]> = {
   [Index in keyof Middleware]: z.output<Middleware[Index]["schema"]>;
 };
+/** The context a route asks its module for; `withHeaders` values bind themselves. */
+type ProvidedContexts<Middleware extends readonly MiddlewareContext[]> = Exclude<
+  Middleware[number],
+  { readonly source: "headers" }
+>;
 
 /** The methods a route may name, spelled the way HTTP spells them. */
 export type RestMethodName = Uppercase<HttpMethod>;
@@ -562,6 +580,8 @@ export type RestTransportRoute<Api> = Readonly<{
   readonly entitlement?: EntitlementGate;
   /** Present exactly when the route mints a credential: the permission its refusal names. */
   readonly mintsCredential?: AuthzPermission;
+  /** Present exactly when the route is refused on an aggregate though its permission is exempt. */
+  readonly refusedOnAggregate?: true;
   /** Present exactly when the route's create is replayable under a caller key. */
   readonly idempotency?: RestIdempotency;
   /** Present exactly when the route writes its own body instead of a schema's. */
@@ -575,7 +595,7 @@ export type RestTransportRoute<Api> = Readonly<{
   /** True for the one route of a path that answers whatever method arrives. */
   readonly anyMethod?: boolean;
   readonly status?: ContentfulStatusCode;
-  readonly middleware?: readonly RestTransportMiddleware[];
+  readonly middleware?: readonly MiddlewareContext[];
   readonly bodyLimit?: Readonly<{ maxBytes: number; onExceeded(): Error }>;
   readonly deprecated?: RestDeprecation;
   /** Present when the path sits in another module's namespace (R10). */
@@ -590,7 +610,11 @@ export type RestTransportRoute<Api> = Readonly<{
 }>;
 
 /** Inert REST transport metadata consumed by a process-owned mount adapter. */
-export type RestTransportDeclaration<Api> = Readonly<{
+export type RestTransportDeclaration<
+  Api,
+  Named extends RestDoorCredential = RestDoorCredential,
+  Needs extends MiddlewareContext = MiddlewareContext,
+> = Readonly<{
   readonly protocol: "rest";
   readonly api: FeatureApiWitness<Api>;
   /** The family's own path segment: `/api/<namespace>`. */
@@ -606,6 +630,10 @@ export type RestTransportDeclaration<Api> = Readonly<{
    * is handed. Declared, not mounted: the handler's own type follows it.
    */
   readonly credential: RestDoorCredential;
+  /** Type-only, never set: the doors its non-public routes name, which `.withDoors` keys match. */
+  readonly named?: Named;
+  /** Type-only, never set: the context its routes ask for, keyed by `.provideMiddlewareContext`. */
+  readonly needs?: Needs;
   /** Applies to every route the family declares, unless a route names its own. */
   readonly deprecated?: RestDeprecation;
   readonly routes: readonly RestTransportRoute<Api>[];
@@ -629,6 +657,7 @@ type RouteState = Readonly<{
   cache?: RestCachePolicy;
   entitlement?: EntitlementGate;
   mintsCredential?: AuthzPermission;
+  refusedOnAggregate?: true;
   idempotency?: RestIdempotency;
   rawResponse?: RestRawResponse;
   /** Present exactly when the route declared the kind of answer it gives. */
@@ -648,7 +677,7 @@ type RouteState = Readonly<{
   version?: DateVersion;
   docs?: RestTransportDocs;
   status?: ContentfulStatusCode;
-  middleware?: readonly RestTransportMiddleware[];
+  middleware?: readonly MiddlewareContext[];
   bodyLimit?: Readonly<{ maxBytes: number; onExceeded(): Error }>;
   deprecated?: RestDeprecation;
   sharedPath?: RestSharedPath;
@@ -714,11 +743,15 @@ type RouteShape = Readonly<{
   permission: boolean;
   /** Whether that permission mints the proof the handler is handed (ADR-166). */
   proof: boolean;
-  middleware: readonly RestTransportMiddleware[];
+  middleware: readonly MiddlewareContext[];
   access: RouteAccessKind;
   /** The family's door, which a route may narrow to its own. */
   family: RestDoorCredential;
   door: RestDoorCredential;
+  /** The doors the family's routes handled so far answer behind. */
+  named: RestDoorCredential;
+  /** The context the family's routes handled so far ask their module for. */
+  needs: MiddlewareContext;
   /** The family's session schema, and the one this route's own door declared. */
   familySession: RouteSession;
   session: RouteSession;
@@ -733,7 +766,14 @@ type With<S extends RouteShape, Changes extends Partial<RouteShape>> = Readonly<
 }>;
 
 class RouteBuilder<Api, S extends RouteShape> {
-  private readonly router: RestTransportRouter<Api, S["family"], S["strict"], S["familySession"]>;
+  private readonly router: RestTransportRouter<
+    Api,
+    S["family"],
+    S["strict"],
+    S["familySession"],
+    S["named"],
+    S["needs"]
+  >;
   private readonly method: S["method"];
   private readonly path: S["path"];
   private readonly operation: string;
@@ -746,7 +786,14 @@ class RouteBuilder<Api, S extends RouteShape> {
     operation,
     state = {},
   }: {
-    router: RestTransportRouter<Api, S["family"], S["strict"], S["familySession"]>;
+    router: RestTransportRouter<
+      Api,
+      S["family"],
+      S["strict"],
+      S["familySession"],
+      S["named"],
+      S["needs"]
+    >;
     method: S["method"];
     path: S["path"];
     operation: string;
@@ -1008,6 +1055,23 @@ class RouteBuilder<Api, S extends RouteShape> {
       path: this.path,
       operation: this.operation,
       state: { ...this.state, mintsCredential: permission },
+    });
+  }
+
+  /**
+   * The route writes under its project although its permission is exempt from the aggregate
+   * write guard, so the door refuses it on an aggregate (ADR-177 decision 8).
+   */
+  refusedOnAggregate(): RouteBuilder<Api, S> {
+    if (this.state.refusedOnAggregate)
+      throw new Error("REST route already declared refusedOnAggregate()");
+
+    return new RouteBuilder<Api, S>({
+      router: this.router,
+      method: this.method,
+      path: this.path,
+      operation: this.operation,
+      state: { ...this.state, refusedOnAggregate: true },
     });
   }
 
@@ -1400,9 +1464,16 @@ class RouteBuilder<Api, S extends RouteShape> {
         MultipartArguments<S["body"]> &
         RawResponseArguments<S["answer"]> &
         ResponseArguments<S["answer"]>,
-      ...facts: MiddlewareFacts<S["middleware"]>
+      ...context: MiddlewareContextValues<S["middleware"]>
     ) => TResult & OutputResultCheck<S["answer"], TResult>,
-  ): RestTransportRouter<Api, S["family"], S["strict"], S["familySession"]> {
+  ): RestTransportRouter<
+    Api,
+    S["family"],
+    S["strict"],
+    S["familySession"],
+    S["named"] | (S["access"] extends "public" ? never : S["door"]),
+    S["needs"] | ProvidedContexts<S["middleware"]>
+  > {
     assertRouteReady({
       method: this.method,
       path: this.path,
@@ -1485,16 +1556,13 @@ class RouteBuilder<Api, S extends RouteShape> {
   }
 
   withHeaders<Schema extends z.ZodObject>(schema: Schema) {
-    const headers: RestTransportMiddleware<Schema> = Object.freeze({
-      name: `headers:${this.operation}`,
-      schema,
-      source: "headers",
-    });
+    const headers: MiddlewareContext<`headers:${string}`, Schema> & { readonly source: "headers" } =
+      Object.freeze({ name: `headers:${this.operation}`, schema, source: "headers" });
 
-    return this.withMiddleware(headers);
+    return this.withMiddlewareContext(headers);
   }
 
-  withMiddleware<const Added extends readonly RestTransportMiddleware[]>(
+  withMiddlewareContext<const Added extends readonly MiddlewareContext[]>(
     ...middleware: Added
   ): RouteBuilder<Api, With<S, { middleware: [...S["middleware"], ...Added] }>> {
     return new RouteBuilder<Api, With<S, { middleware: [...S["middleware"], ...Added] }>>({
@@ -1647,6 +1715,7 @@ function doorParts(state: RouteState): Partial<RestTransportRoute<unknown>> {
   return {
     ...(state.entitlement ? { entitlement: state.entitlement } : {}),
     ...(state.mintsCredential ? { mintsCredential: state.mintsCredential } : {}),
+    ...(state.refusedOnAggregate ? { refusedOnAggregate: state.refusedOnAggregate } : {}),
     ...(state.credential ? { credential: state.credential } : {}),
     ...(state.key ? { key: state.key } : {}),
     ...(state.keyKinds ? { keyKinds: state.keyKinds } : {}),
@@ -1662,6 +1731,8 @@ type OpenRoute<
   Door extends RestDoorCredential,
   StrictJsonSchemas extends boolean,
   Session extends RouteSession,
+  Named extends RestDoorCredential,
+  Needs extends MiddlewareContext,
 > = RouteBuilder<
   Api,
   {
@@ -1681,6 +1752,8 @@ type OpenRoute<
     session: Session;
     key: false;
     strict: StrictJsonSchemas;
+    named: Named;
+    needs: Needs;
   }
 >;
 
@@ -1689,6 +1762,8 @@ class RestTransportRouter<
   Door extends RestDoorCredential = "project",
   StrictJsonSchemas extends boolean = false,
   Session extends RouteSession = Missing,
+  Named extends RestDoorCredential = never,
+  Needs extends MiddlewareContext = never,
 > {
   readonly routes: RestTransportRoute<Api>[] = [];
   private addressing: RestAddressing = "dated";
@@ -1761,7 +1836,7 @@ class RestTransportRouter<
   withAddressing(
     addressing: RestAddressing,
     options: RestAddressingOptions = {},
-  ): RestTransportRouter<Api, Door, StrictJsonSchemas, Session> {
+  ): RestTransportRouter<Api, Door, StrictJsonSchemas, Session, Named, Needs> {
     if (this.routes.length > 0) {
       throw new Error(`REST "${this.namespace}" must declare its addressing before its routes`);
     }
@@ -1779,7 +1854,7 @@ class RestTransportRouter<
   /** Marks every route of the family superseded by `successor`. */
   withDeprecated(
     deprecated: RestDeprecation,
-  ): RestTransportRouter<Api, Door, StrictJsonSchemas, Session> {
+  ): RestTransportRouter<Api, Door, StrictJsonSchemas, Session, Named, Needs> {
     this.deprecated = deprecated;
 
     return this;
@@ -1789,9 +1864,9 @@ class RestTransportRouter<
   build(): Readonly<{
     protocol: "rest";
     namespace: string;
-    router: () => RestTransportDeclaration<Api>;
+    router: () => RestTransportDeclaration<Api, Named, Needs>;
   }> {
-    const declaration: RestTransportDeclaration<Api> = {
+    const declaration: RestTransportDeclaration<Api, Named, Needs> = {
       protocol: "rest",
       api: this.api,
       namespace: this.namespace,
@@ -1810,7 +1885,7 @@ class RestTransportRouter<
   get<Path extends string>(
     path: Path,
     operation: string,
-  ): OpenRoute<Api, "get", Path, Door, StrictJsonSchemas, Session> {
+  ): OpenRoute<Api, "get", Path, Door, StrictJsonSchemas, Session, Named, Needs> {
     assertSupportedPath({
       path,
       addressing: this.addressing,
@@ -1824,7 +1899,7 @@ class RestTransportRouter<
   patch<Path extends string>(
     path: Path,
     operation: string,
-  ): OpenRoute<Api, "patch", Path, Door, StrictJsonSchemas, Session> {
+  ): OpenRoute<Api, "patch", Path, Door, StrictJsonSchemas, Session, Named, Needs> {
     assertSupportedPath({
       path,
       addressing: this.addressing,
@@ -1838,7 +1913,7 @@ class RestTransportRouter<
   post<Path extends string>(
     path: Path,
     operation: string,
-  ): OpenRoute<Api, "post", Path, Door, StrictJsonSchemas, Session> {
+  ): OpenRoute<Api, "post", Path, Door, StrictJsonSchemas, Session, Named, Needs> {
     assertSupportedPath({
       path,
       addressing: this.addressing,
@@ -1852,7 +1927,7 @@ class RestTransportRouter<
   put<Path extends string>(
     path: Path,
     operation: string,
-  ): OpenRoute<Api, "put", Path, Door, StrictJsonSchemas, Session> {
+  ): OpenRoute<Api, "put", Path, Door, StrictJsonSchemas, Session, Named, Needs> {
     assertSupportedPath({
       path,
       addressing: this.addressing,
@@ -1866,7 +1941,7 @@ class RestTransportRouter<
   delete<Path extends string>(
     path: Path,
     operation: string,
-  ): OpenRoute<Api, "delete", Path, Door, StrictJsonSchemas, Session> {
+  ): OpenRoute<Api, "delete", Path, Door, StrictJsonSchemas, Session, Named, Needs> {
     assertSupportedPath({
       path,
       addressing: this.addressing,
@@ -2447,7 +2522,7 @@ function assertPermissionTarget({
     input?: SourceSchema;
     rawBody?: RestRawBody;
     permissionTarget?: RestPermissionTarget;
-    middleware?: readonly RestTransportMiddleware[];
+    middleware?: readonly MiddlewareContext[];
   }>;
 }): void {
   const target = state.permissionTarget!;
@@ -2455,10 +2530,10 @@ function assertPermissionTarget({
 
   if (target.at === "header") {
     const declared = state.middleware?.some(
-      (fact) =>
-        fact.source === "headers" &&
-        fact.schema instanceof z.ZodObject &&
-        sourceKeys(fact.schema).includes(target.header),
+      (middleware) =>
+        middleware.source === "headers" &&
+        middleware.schema instanceof z.ZodObject &&
+        sourceKeys(middleware.schema).includes(target.header),
     );
 
     if (!declared)

@@ -1,11 +1,10 @@
 /**
- * `POST /api/demo/hotel_bot` - the scripted demo agent behind the sample project. LangWatch
- * staff only (ruling 2026-10-05): the browser door asks `ops:manage` at the platform tier and
- * hides the route from everyone else; the X-Auth-Token is the project key the traces post with.
+ * `POST /api/demo/hotel_bot` - the scripted demo agent behind the sample project. The
+ * project-scoped API-key door verifies the caller, so the traces land in that project
+ * (Alex 2026-10-10 W02-HOTEL-BOT).
  */
 import { defineRestRouter, MANAGEMENT_API_VERSION } from "@langwatch/api/rest";
 import {
-  hotelBotHeadersSchema,
   hotelBotReplySchema,
   hotelBotRequestSchema,
   SampleAgentsApi,
@@ -18,11 +17,15 @@ export const hotelBotRest = defineRestRouter(SampleAgentsApi)
 
   .post("/api/demo/hotel_bot", "runHotelBot")
   .withInput(hotelBotRequestSchema)
-  .withCredential("browser")
-  .withPermission("ops:manage", { at: "platform", refusal: "hidden" })
-  .withHeaders(hotelBotHeadersSchema)
+  .withCredential("project", { key: true })
+  .withPermission("traces:create")
   .withOutput(hotelBotReplySchema)
   .withDocs({ hide: true })
-  // oxlint-disable-next-line langwatch/auth-header-read -- posts the demo project key onward
-  .handle(({ app }, headers) => app.runHotelBot({ authToken: headers["x-auth-token"] }))
+  .handle(({ app, scope, key }) =>
+    app.runHotelBot({
+      projectId: scope.id,
+      startedByApiKeyId: key.apiKeyId,
+      startedByUserId: key.ownerUserId,
+    }),
+  )
   .build();

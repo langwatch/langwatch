@@ -669,9 +669,6 @@ test_size_overlays() {
 # "no untriaged workloads" check below — that is deliberate.
 HARDENED_WORKLOADS=(
   "templates/app/deployment.yaml"
-  # The pre-upgrade migration Job runs the app image with the app's own
-  # security contexts and never calls the Kubernetes API.
-  "templates/app/migrate-pre-roll-job.yaml"
   "templates/workers/deployment.yaml"
   "templates/langwatch_nlp/deployment.yaml"
   "templates/langevals/deployment.yaml"
@@ -709,6 +706,10 @@ HARDENED_WORKLOADS_GATED=(
   "charts/clickhouse/templates/keeper-statefulset.yaml"
   "charts/clickhouse/templates/backup-cronjobs.yaml"
   "templates/cronjobs/cronjobs.yaml"
+  # The pre-roll migration Job runs the app image with the app's own security
+  # contexts and never calls the Kubernetes API. It renders only with
+  # serializeUpgrades active.
+  "templates/app/migrate-pre-roll-job.yaml"
 )
 
 CH_FULL_FLAGS=(--set autogen.enabled=true
@@ -855,6 +856,9 @@ test_pod_security() {
   for tpl in "${HARDENED_WORKLOADS_GATED[@]}"; do
     case "$tpl" in
       templates/cronjobs/*) assert_workload_hardened "$tpl" "${CRONJOB_FLAGS[@]}" ;;
+      templates/app/migrate-pre-roll-job.yaml)
+        assert_workload_hardened "$tpl" --set autogen.enabled=true \
+          --set app.storedObjects.localFilesystem.serializeUpgrades=true ;;
       *)                    assert_workload_hardened "$tpl" "${CH_FULL_FLAGS[@]}" ;;
     esac
   done

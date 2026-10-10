@@ -3,7 +3,7 @@ import {
   PrismaProcessPurge,
   PrismaProcessStore,
 } from "@langwatch/eventing/server";
-import { prismaRepositories } from "@langwatch/prisma-client";
+import { prismaRepositories, skipTenantCheck } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { UpgradeRunnerRepository } from "@langwatch/upgrade/runner";
 import { TenantStepStateRepository } from "@langwatch/upgrade/step/tenant-state";
@@ -38,7 +38,10 @@ class PrismaPostgresHealthRepository extends PostgresHealthRepository {
 
   async findServerVersion(): Promise<string> {
     const rows = await this.prisma.$queryRaw<{ server_version: string }[]>`
-      -- @tenancy: asks the server its version, which belongs to no tenant.
+      ${skipTenantCheck({
+        // Asks the server its version, which belongs to no tenant.
+        SKIP_TENANT_CHECK: true,
+      })}
       SHOW server_version`;
     return rows[0]?.server_version ?? "unknown version";
   }
@@ -69,9 +72,8 @@ type NotPostgres =
   | "events"
   | "storageFootprint";
 
-/** Marks the tenant step table's SQL for the tenancy guard, as the ledger repository does. */
-const LEDGER_TENANCY =
-  "-- @tenancy: the upgrade ledger describes the installation, not a tenant.\n";
+// The upgrade ledger and its tenant step table describe the installation, not a tenant.
+const LEDGER_TENANCY = `${skipTenantCheck({ SKIP_TENANT_CHECK: true }).sql}\n`;
 
 /**
  * The claimed rows, eventing's own process store, the migration pass's Postgres reads, and the

@@ -1,4 +1,4 @@
-import { bindTrpcFact, createTrpcRuntime } from "@langwatch/api/trpc";
+import { bindTrpcMiddlewareContext, createTrpcRuntime } from "@langwatch/api/trpc";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 /**
  * @vitest-environment node
@@ -11,7 +11,10 @@ import { trpcTestMembers } from "@langwatch/test-harness/trpc-members";
 import { initTRPC } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { organizationSessionPersonFact, organizationTrpcTransport } from "../organization.trpc.ts";
+import {
+  organizationSessionPersonContext,
+  organizationTrpcTransport,
+} from "../organization.trpc.ts";
 
 type TestContext = {
   actor: { id: string };
@@ -31,7 +34,9 @@ const router = createTrpcRuntime<TestContext>({
   procedure: trpc.procedure,
   members,
 }).mount(organizationTrpcTransport, () => app, {
-  facts: [bindTrpcFact(organizationSessionPersonFact, (ctx) => ctx.person)],
+  middlewareContext: [
+    bindTrpcMiddlewareContext(organizationSessionPersonContext, (ctx) => ctx.person),
+  ],
 });
 const caller = router.createCaller({
   actor: { id: "user_ana" },
@@ -103,7 +108,7 @@ describe("organization.update over who saved it", () => {
 describe("organization's session-person fact", () => {
   /** @scenario "The signed-in person fact may carry an image organization does not read" */
   it("reads the name and the email and leaves an image out", () => {
-    const person = organizationSessionPersonFact.schema.parse({
+    const person = organizationSessionPersonContext.schema.parse({
       name: "Ana",
       email: "ana@acme.com",
       image: "https://example.com/ana.png",

@@ -30,6 +30,7 @@ import {
   type TraceDestinationInput,
   type TraceDestinationProject,
   type TraceSharingConfig,
+  type SetTraceSharingInput,
   type UpdateProjectInput,
   type UpdateProjectMetadataInput,
   type ProjectUsageCount,
@@ -581,6 +582,10 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
     by: Readonly<{ id: string }>,
   ): Promise<Project> {
     return this.#operations.updateSettings(input, by);
+  }
+
+  setTraceSharing(input: SetTraceSharingInput): Promise<void> {
+    return this.#operations.setTraceSharing(input);
   }
 
   archive(input: Readonly<{ projectId: string }>): Promise<{ alreadyArchived: boolean }> {

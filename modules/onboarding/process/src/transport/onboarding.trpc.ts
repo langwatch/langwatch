@@ -3,7 +3,11 @@
  * is the caller's own organization state, authorized at the exact tenant; the
  * sign-up pair runs before the caller belongs to any organization.
  */
-import { defineTrpcFact, defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
+import {
+  defineMiddlewareContext,
+  defineTrpcRouter,
+  type TrpcRouterDeclaration,
+} from "@langwatch/api/trpc";
 import { OnboardingApi, onboardingTrpc } from "@langwatch/onboarding-contract";
 import { z } from "zod";
 
@@ -11,7 +15,7 @@ const AUTHORIZED_BY_THE_APP =
   "guided-onboarding state is the organization's own; the app authorizes the exact organizationId before any read or write";
 
 /** The signed-in person, bound by the process under this name for every namespace. */
-const sessionPersonFact = defineTrpcFact(
+const sessionPersonContext = defineMiddlewareContext(
   "organizationSessionPerson",
   z.object({ name: z.string().nullable(), email: z.string().nullable() }).nullable(),
 );
@@ -63,7 +67,7 @@ export const onboardingTrpcTransport: TrpcRouterDeclaration<OnboardingApi, typeo
     .handle(async ({ app, input, actor }) => app.attachConversation({ ...input, userId: actor.id }))
 
     .procedure("initializeOrganization")
-    .withFacts(sessionPersonFact)
+    .withMiddlewareContext(sessionPersonContext)
     .noPermission(BEFORE_MEMBERSHIP)
     .handle(({ app, input, actor }, person) =>
       app.initializeOrganization(input, {

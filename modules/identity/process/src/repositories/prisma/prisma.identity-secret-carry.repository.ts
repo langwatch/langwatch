@@ -1,3 +1,4 @@
+import { skipTenantCheck } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { fromDate, type Instant, toDate } from "@langwatch/time";
 
@@ -104,7 +105,10 @@ export class PrismaIdentitySecretCarryRepository implements IdentitySecretCarryR
     limit: number;
   }): Promise<string[]> {
     const rows = await this.prisma.$queryRaw<{ userId: string }[]>`
-      -- @tenancy: the heal pass enumerates its cohort across users; each is a tenant.
+      ${skipTenantCheck({
+        // The heal pass enumerates its cohort across users; each is a tenant.
+        SKIP_TENANT_CHECK: true,
+      })}
       SELECT DISTINCT a."userId"
       FROM "Account" a
       LEFT JOIN "AccountCredential" c ON c."id" = a."id"

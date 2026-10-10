@@ -219,3 +219,14 @@ export interface DataPrivacyScopeFacts {
   isPersonal: boolean;
 }
 export type DataPrivacyRow = z.infer<typeof dataPrivacyRowSchema>;
+
+/**
+ * Folded policies one request has already resolved, keyed by its sorted project ids
+ * (ADR-144 decision 9). Lives on the request context and dies with it, so it needs no
+ * invalidation: a member's rule change reaches the next request.
+ */
+export type PrivacyPolicyRequestMemo = Map<string, Promise<ResolvedDataPrivacy>>;
+
+export function newPrivacyPolicyRequestMemo(): PrivacyPolicyRequestMemo {
+  return new Map();
+}

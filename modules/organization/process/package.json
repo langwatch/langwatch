@@ -60,7 +60,7 @@
     "@trpc/server": "catalog:",
     "hono": "catalog:",
     "hono-openapi": "catalog:",
-    "nanoid": "^6.0.0",
+    "nanoid": "catalog:",
     "slugify": "catalog:",
     "zod": "catalog:"
   },

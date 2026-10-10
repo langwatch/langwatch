@@ -134,6 +134,7 @@ export abstract class OrganizationInviteRepository {
   abstract findOldestPendingInviteForAddress(input: { address: string }): Promise<{
     inviteCode: string;
     organizationName: string;
+    inviterName: string | null;
     role: OrganizationUserRole;
   } | null>;
   /**

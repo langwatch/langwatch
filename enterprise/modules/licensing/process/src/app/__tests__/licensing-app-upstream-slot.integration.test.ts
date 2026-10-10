@@ -1,17 +1,17 @@
-import type { AuthzApi } from "@langwatch/authz-contract";
-import type { GatewayApi } from "@langwatch/gateway-contract";
+import type { EventingCommands } from "@langwatch/eventing";
 import { ResourceScope } from "@langwatch/process";
 import type { RateLimiter } from "@langwatch/process-stores";
 import { ScopedSecrets } from "@langwatch/secrets";
 /**
  * @vitest-environment node
  * @see specs/self-hosting/connected-services/managed-models-provider.feature
- * The production composition writes the install's hosted provider slot through the gateway peer.
+ * The production composition records the install's hosted provider slot as a licensing fact.
  */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { afterAll, describe, expect, it } from "vitest";
 
 import { TEST_LICENSING_CONFIG, VALID_LICENSE_KEY } from "../../__tests__/testing.ts";
+import type { LicensingCustomerPipeline } from "../../eventing/licensing-customer.pipeline.ts";
 import { LiveLicensingRepositories } from "../../repositories/live/live.licensing.repositories.ts";
 import {
   createLicensingTestConnection,
@@ -32,20 +32,13 @@ describe.skipIf(!TEST_DATABASE_URL)("the install's hosted provider slot in produ
   });
 
   describe("given a licensed organization and Connect switched off", () => {
-    it("clears the organization's slot through the gateway on every license sync", async () => {
+    it("records the organization's slot cleared on every license sync", async () => {
       const organization = await prisma.organization.create({
         data: { name: "Acme", slug: `${RUN}-acme`, license: VALID_LICENSE_KEY },
       });
       const cleared: string[] = [];
       const app = await LicensingModule.create({
-        dependencies: {
-          scopes: createApiFixture<AuthzApi>(),
-          gateway: createApiFixture<GatewayApi>({
-            clearConnectUpstreamInternal: async ({ organizationId }) => {
-              cleared.push(organizationId);
-            },
-          }),
-        },
+        dependencies: {},
         repositories: LiveLicensingRepositories.create({
           prisma,
           encryption: createApiFixture<IssuedLicenseCipher>(),
@@ -55,6 +48,17 @@ describe.skipIf(!TEST_DATABASE_URL)("the install's hosted provider slot in produ
         resources: new ResourceScope(),
         secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
       });
+
+      type Senders = EventingCommands<LicensingCustomerPipeline>;
+      app.connectCustomerCommands(
+        createApiFixture<Senders>({
+          recordConnectUpstreamCleared: createApiFixture<Senders["recordConnectUpstreamCleared"]>({
+            send: async ({ organizationId }) => {
+              cleared.push(organizationId);
+            },
+          }),
+        }),
+      );
 
       await app.syncLicenses();
 

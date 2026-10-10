@@ -152,9 +152,9 @@ func ResolvePosture(f PostureFacts) (ContainerPosture, PostureSource, error) {
 func PostureUnavailable(p ContainerPosture, f PostureFacts) error {
 	switch {
 	case p == PostureColima && !f.ColimaInstalled:
-		return fmt.Errorf("container posture is colima, but colima and the docker CLI are not both installed — `haven install runtime=colima`, or choose another with %s", PostureEnvVar)
+		return fmt.Errorf("container posture is colima, but colima and the docker CLI are not both installed — `haven self install runtime=colima`, or choose another with %s", PostureEnvVar)
 	case p == PostureDocker && !f.DockerInstalled:
-		return fmt.Errorf("container posture is docker, but the docker CLI is not installed — `haven install runtime=docker-desktop`, or choose another with %s", PostureEnvVar)
+		return fmt.Errorf("container posture is docker, but the docker CLI is not installed — `haven self install runtime=docker-desktop`, or choose another with %s", PostureEnvVar)
 	}
 	return nil
 }

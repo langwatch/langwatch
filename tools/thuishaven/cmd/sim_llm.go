@@ -15,7 +15,7 @@ import (
 	"github.com/langwatch/langwatch/tools/thuishaven/cmd/viewer/sources"
 )
 
-// The per-simulator nouns (`haven llm|analytics|storage|voice`) are thin
+// The per-simulator nouns (`haven sim llm|analytics|storage|voice`) are thin
 // clients over each sim's own console API. simAPI and the helpers below are
 // shared by all of them; the mail noun predates them and has its own client.
 
@@ -84,7 +84,7 @@ func needArgs(inv invocation, n int, usage string) error {
 	return nil
 }
 
-const llmUsage = "usage: haven llm <info|calls [--model <text>] [--failed]|call <id>|clear|set [--error <status>] [--seed <value>]> [--json]"
+const llmUsage = "usage: haven sim llm <status|list [--model <text>] [--failed]|get <id>|clear|fault <status|off>|config [--seed <value>]> [--json]"
 
 type llmCall struct {
 	ID           string    `json:"id"`
@@ -107,7 +107,7 @@ type llmSettings struct {
 	Seed        string `json:"seed"`
 }
 
-// runLLM is `haven llm <info|calls|call|clear|set>`.
+// runLLM is `haven sim llm <status|list|get|clear|fault|config>`.
 func runLLM(_ context.Context, d deps, inv invocation) error {
 	if len(inv.args) == 0 {
 		return errors.New(llmUsage)
@@ -133,7 +133,7 @@ func llmCommand(api sources.SimAPI, inv invocation, asJSON bool) error {
 	case "calls":
 		return llmCalls(api, inv, asJSON)
 	case "call":
-		if err := needArgs(inv, 2, "haven llm call <id>"); err != nil {
+		if err := needArgs(inv, 2, "haven sim llm get <id>"); err != nil {
 			return err
 		}
 		raw, err := api.GetRaw("/_sim/api/calls/"+url.PathEscape(inv.args[1]), nil)
@@ -149,7 +149,7 @@ func llmCommand(api sources.SimAPI, inv invocation, asJSON bool) error {
 	case "set":
 		return llmSet(api, inv, asJSON)
 	}
-	return fmt.Errorf("unknown `haven llm` subcommand %q; %s", inv.args[0], llmUsage)
+	return fmt.Errorf("unknown `haven sim llm` subcommand %q; %s", inv.args[0], llmUsage)
 }
 
 // llmCalls lists recent calls, keeping only those whose model contains --model
@@ -206,7 +206,7 @@ func printLlmCalls(calls []llmCall) {
 // so the current ones are read first.
 func llmSet(api sources.SimAPI, inv invocation, asJSON bool) error {
 	if !inv.has("--error") && !inv.has("--seed") {
-		return errors.New("usage: haven llm set [--error <0|4xx|5xx>] [--seed <value>]")
+		return errors.New("usage: haven sim llm fault <0|4xx|5xx|off> | config --seed <value>")
 	}
 	var next llmSettings
 	if err := api.Get("/_sim/api/settings", nil, &next); err != nil {

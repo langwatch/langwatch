@@ -1,9 +1,10 @@
 import { type AuthzApi, AuthzScopeNotFoundError } from "@langwatch/authz-contract";
-import type { HostedCaller } from "@langwatch/enterprise-licensing-contract";
+import {
+  CONTRACT_BUDGET_EXTERNAL_ID,
+  type HostedCaller,
+} from "@langwatch/enterprise-connect-contract";
 import type { GatewayApi, GatewayBudgetWithSeats } from "@langwatch/gateway-contract";
 import type { Instant } from "@langwatch/time";
-
-import { CONTRACT_BUDGET_EXTERNAL_ID } from "./contract-budget-store.service.ts";
 
 type UsageGateway = Pick<
   GatewayApi,

@@ -4,7 +4,7 @@
  * Eventing's event-log rewrite, driven by data-retention, over seeded rows in a scratch database.
  */
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
-import { ClickHouseQueryClient, type QueryDriver } from "@langwatch/clickhouse-client";
+import { ClickHouseQueryClient, type QueryDriver, TenantGuard } from "@langwatch/clickhouse-client";
 import { retentionCategories, type RetentionCategory } from "@langwatch/data-retention-contract";
 import {
   classifyEventLogRowRetention,
@@ -54,7 +54,7 @@ function queryClient(client: ClickHouseClient): ClickHouseQueryClient {
       });
     },
   };
-  return new ClickHouseQueryClient({ driver });
+  return new ClickHouseQueryClient({ tenantGuard: new TenantGuard(), driver });
 }
 
 async function retentionByRow(): Promise<

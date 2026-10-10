@@ -5,10 +5,10 @@
  */
 import { ProjectInvalidCredentialsError, ProjectMissingCredentialsError } from "@langwatch/api";
 import {
-  bindRestMiddleware,
+  bindMiddlewareContext,
   canonicalErrorResponse,
   createRestRuntime,
-  projectRestFacts,
+  projectRequestContext,
   restRouteDocumentation,
 } from "@langwatch/api/rest";
 import type { Experiment, ExperimentApi } from "@langwatch/experiment-contract";
@@ -97,8 +97,8 @@ function mountInit({
   const hono = runtime.mount(experimentInitRest.router(), {
     app: () => app,
     onError: canonicalErrorResponse,
-    facts: [
-      bindRestMiddleware(projectRestFacts, () => ({
+    middlewareContext: [
+      bindMiddlewareContext(projectRequestContext, () => ({
         projectSlug: PROJECT_SLUG,
         viewerUserId: null,
         actorId: "key-1",

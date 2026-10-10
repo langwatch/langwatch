@@ -3,10 +3,10 @@ package cmd
 import (
 	"bufio"
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"os"
+	"slices"
 	"strings"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/app"
@@ -18,9 +18,9 @@ import (
 // drop and asks, `--yes` replaces the prompt for scripts, and agent mode
 // never destroys without it.
 func runDB(ctx context.Context, d deps, inv invocation) error {
-	usage := "usage: haven db reset [preset] [--yes] | haven db seed [preset] | haven db url [postgres|clickhouse|redis] | haven db prune [--dry-run|--yes]\n  presets: " + strings.Join(app.SeedPresetNames(), ", ")
+	usage := "usage: haven db reset [preset] [--yes] | haven db seed [preset | seed flags] | haven db url [postgres|clickhouse|redis] | haven db prune [--dry-run|--yes] | haven db status | haven db logins\n  presets: " + strings.Join(app.SeedPresetNames(), ", ")
 	if len(inv.args) == 0 {
-		return errors.New(usage)
+		return usageErr("%s", usage)
 	}
 	switch inv.args[0] {
 	case "reset":
@@ -48,6 +48,13 @@ func runDB(ctx context.Context, d deps, inv invocation) error {
 	case "seed":
 		if inv.has("--yes") {
 			return fmt.Errorf("db seed is non-destructive (an idempotent upsert, nothing dropped) — no confirmation to give")
+		}
+		if usesSeedgen(inv) {
+			if len(inv.args) > 1 {
+				return usageErr("haven db seed takes a preset or seed flags, not both")
+			}
+			inv.args = nil
+			return runSeed(ctx, d, inv)
 		}
 		if err := guardSeedEnv(d); err != nil {
 			return err
@@ -86,7 +93,7 @@ func runDB(ctx context.Context, d deps, inv invocation) error {
 		}
 		return d.orch.DBURL(ctx, d.params, engine)
 	default:
-		return fmt.Errorf("unknown `haven db` subcommand %q — %s", inv.args[0], usage)
+		return usageErr("unknown `haven db` subcommand %q — %s", inv.args[0], usage)
 	}
 }
 
@@ -119,11 +126,11 @@ func confirmDBReset(c dbResetConfirm) (bool, error) {
 		}
 		return true, nil
 	case c.isAgent && shared:
-		return false, fmt.Errorf(
+		return false, usageErr(
 			"db reset would drop %q, the shared database every worktree without its own falls back to, not just this stack's — pass --yes to confirm",
 			c.db)
 	case c.isAgent:
-		return false, fmt.Errorf(
+		return false, usageErr(
 			"db reset drops and recreates database %q on the managed ClickHouse and Postgres and flushes this stack's Redis db — pass --yes to confirm", c.db)
 	}
 
@@ -159,6 +166,17 @@ func askDBReset(c dbResetConfirm, shared bool) string {
 	// answer. Only a read that produced nothing answered nothing.
 	answer, _ := bufio.NewReader(c.in).ReadString('\n')
 	return strings.TrimSpace(answer)
+}
+
+// usesSeedgen reports whether `db seed` was given the seed generator's flags
+// (what `haven db seed` took) rather than a preset.
+func usesSeedgen(inv invocation) bool {
+	for _, f := range append(slices.Clone(seedValueFlags), "--org", "--live", "--dry-run", "--json", "--reveal") {
+		if inv.has(f) {
+			return true
+		}
+	}
+	return false
 }
 
 // dbPresetArg is the optional positional preset after reset/seed.

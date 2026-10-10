@@ -17,7 +17,7 @@ import { LayoutTemplate, Plus } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { useAnalyticsHost } from "../../../../model/analytics-host.ts";
-import { opensElsewhere } from "../../../../ui/elements/analytics-menu-link.tsx";
+import { opensElsewhere } from "../../../../ui/elements/analytics-link.tsx";
 import type { CuratedBoard } from "../../model/curated-boards.ts";
 import { TemplateCard } from "./template-card.tsx";
 

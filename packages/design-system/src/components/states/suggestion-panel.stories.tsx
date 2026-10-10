@@ -4,7 +4,13 @@ import { Box, Text } from "../../primitives.ts";
 import { SuggestionPanel } from "./suggestion-panel.tsx";
 
 const meta = {
-  title: "Components/Suggestion panel",
+  title: "Feedback/Suggestion panel",
+  parameters: {
+    usage: {
+      use: "The panel suggestions sit in under an input, with key hints in its foot.",
+      avoid: "A list of actions: use Menu.",
+    },
+  },
   component: SuggestionPanel,
   tags: ["autodocs"],
   decorators: [

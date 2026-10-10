@@ -12,7 +12,6 @@ import {
   IdentityCapabilityUnavailableError,
   identityConfig,
   type IdentityEmailResolution,
-  IDENTITY_PIPELINE_NAME,
   JOIN_REQUEST_PIPELINE_NAME,
   SSO_CONNECTION_PIPELINE_NAME,
   type IdentityLookupAnswer,
@@ -89,6 +88,7 @@ import { MfaGuardsService } from "../features/mfa/services/mfa-guards.service.ts
 import { OrganizationMfaNotifierService } from "../features/mfa/services/organization-mfa-notifier.service.ts";
 import { OrganizationMfaService } from "../features/mfa/services/organization-mfa.service.ts";
 import { TwoStepAccountService } from "../features/mfa/services/two-step-account.service.ts";
+import { SignInGovernanceService } from "../features/signin/services/sign-in-governance.service.ts";
 import { SignUpIdentifierService } from "../features/signin/services/sign-up-identifier.service.ts";
 import { SignInAccountLookupService } from "../features/signin/services/signin-account-lookup.service.ts";
 import { SignInRouterService } from "../features/signin/services/signin-router.service.ts";
@@ -131,7 +131,6 @@ import {
   composeSsoConnectionGraph,
   type SsoConnectionPipeline,
 } from "../features/sso-connection/eventing/sso-connection.pipeline.ts";
-import { EventingSsoConnectionHistoryRepository } from "../features/sso-connection/repositories/eventing/eventing.sso-connection-history.repository.ts";
 import { newSsoBreakGlassBindingId } from "../features/sso-connection/rules/sso-connection-id.rules.ts";
 import { OrganizationSsoConnectionsService } from "../features/sso-connection/services/organization-sso-connections.service.ts";
 import { SsoConnectionAdminService } from "../features/sso-connection/services/sso-connection-admin.service.ts";
@@ -152,7 +151,6 @@ import { SsoDomainCeremonyService } from "../features/sso-domain/services/sso-do
 import { SsoDomainOwnershipBackfillService } from "../features/sso-domain/services/sso-domain-ownership-backfill.service.ts";
 import { SsoDomainReproofService } from "../features/sso-domain/services/sso-domain-reproof.service.ts";
 import { SsoDomainOwnershipMigrationService } from "../features/sso-domain/services/system-migration-sso-domain-ownership.service.ts";
-import { EventingIdentityHistoryRepository } from "../repositories/eventing/eventing.identity-history.repository.ts";
 import type { IdentityRateLimitRepository } from "../repositories/identity-rate-limit.repository.ts";
 import type { IdentityRepositories } from "../repositories/identity.repositories.ts";
 import { LocalDoorBreakGlassBindingRepository } from "../repositories/local/local.door-break-glass-binding.repository.ts";
@@ -240,6 +238,7 @@ type IdentityAppParts = {
   twoStepAccounts: TwoStepAccountService;
   organizationMfa: OrganizationMfaService;
   signInRouter: SignInRouterService;
+  signInGovernance: SignInGovernanceService;
   pipelines: IdentityPipelineBuilders;
 };
 
@@ -467,10 +466,8 @@ export class IdentityModule
     });
     const identityEventing = ConnectedIdentityEventing.create();
     const eventStores = IdentityEventStores.create();
-    // Read through user_identity's own store: the lookup, the link proposals and the pipeline.
-    const identityHistory = EventingIdentityHistoryRepository.create({
-      eventStore: eventStores.of({ pipeline: IDENTITY_PIPELINE_NAME }),
-    });
+    // The lookup, the link proposals and the pipeline read one log through the read seat.
+    const identityHistory = setup.repositories.identityHistory;
     const ledger = IdentityLedgerStore.create({
       projectionStore: setup.repositories.identityProjection,
       heads: setup.repositories.heads,
@@ -595,12 +592,8 @@ export class IdentityModule
     });
     const ssoConnectionGuards = ssoConnectionGraph.guards;
     const ssoConnections: SsoConnectionService | null = ssoConnectionGraph.connections;
-    // Answered only once sso_connection is built here (see ssoConnectionHistory()): an absent
-    // log refuses by name rather than reading as a connection nothing ever happened to.
     const ssoConnectionHistory = SsoConnectionHistoryService.create({
-      history: EventingSsoConnectionHistoryRepository.create({
-        eventStore: eventStores.of({ pipeline: SSO_CONNECTION_PIPELINE_NAME }),
-      }),
+      history: setup.repositories.ssoConnectionHistory,
     });
     const ssoAdmin = ssoConnections
       ? SsoConnectionAdminService.create({
@@ -801,6 +794,10 @@ export class IdentityModule
           }),
         })
       : null;
+    const accountAddress = async ({ userId }: { userId: string }) => {
+      const user = await setup.dependencies.users.findById({ id: userId });
+      return user?.email ? { email: user.email, confirmed: user.emailVerified } : null;
+    };
     const signInRouter = SignInRouterService.create({
       legacy: legacyDomainRouting,
       domains: connectionDomainRouting,
@@ -826,6 +823,18 @@ export class IdentityModule
       beforeAccountDelete: (account) => bridge.beforeAccountDelete(account),
     };
 
+    const accountIdentifiers = AccountIdentifiersService.create({
+      heads: setup.repositories.heads,
+      identity,
+      ceremony: verification,
+      mail: setup.channels.addressConfirmationMail,
+      rateLimiter: setup.repositories.rateLimits,
+      sessions: setup.channels.authReads,
+      accountAddress,
+      hasMailDelivery: async () =>
+        (await setup.dependencies.notifications.getMailDelivery()).provider !== undefined,
+    });
+
     return new IdentityModule({
       emails,
       ceremonies: hookCeremonies,
@@ -839,20 +848,7 @@ export class IdentityModule
         heads: setup.repositories.heads,
         identifiers: CryptoIdentifierIdentityService.create(),
       }),
-      accountIdentifiers: AccountIdentifiersService.create({
-        heads: setup.repositories.heads,
-        identity,
-        ceremony: verification,
-        mail: setup.channels.addressConfirmationMail,
-        rateLimiter: setup.repositories.rateLimits,
-        sessions: setup.channels.authReads,
-        accountAddress: async ({ userId }) => {
-          const user = await setup.dependencies.users.findById({ id: userId });
-          return user?.email ? { email: user.email, confirmed: user.emailVerified } : null;
-        },
-        hasMailDelivery: async () =>
-          (await setup.dependencies.notifications.getMailDelivery()).provider !== undefined,
-      }),
+      accountIdentifiers,
       microsoftAccountRekey: MicrosoftAccountRekeyService.create({
         accounts: setup.repositories.accountRekey,
       }),
@@ -937,6 +933,11 @@ export class IdentityModule
           ),
       }),
       signInRouter,
+      signInGovernance: SignInGovernanceService.create({
+        identifiers: accountIdentifiers,
+        accountAddress,
+        router: signInRouter,
+      }),
       pipelines: {
         eventing: identityEventing,
         stores: eventStores,
@@ -1046,6 +1047,11 @@ export class IdentityModule
     profile: Readonly<Record<string, unknown>>;
   }): Promise<void> {
     return this.#parts.microsoftAccountRekey.moveOnSignIn(input);
+  }
+
+  /** Whether an organization's single sign-on governs this person's own sign-in. */
+  isSignInGovernedBySso(input: { userId: string }): Promise<boolean> {
+    return this.#parts.signInGovernance.isGovernedBySso(input);
   }
 
   routeSignIn(

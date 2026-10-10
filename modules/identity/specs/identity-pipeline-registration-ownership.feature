@@ -34,16 +34,22 @@ Feature: Identity's four pipelines are declared, and connected by the process
   @unit
   Scenario: Identity appends and reads its own aggregates through each pipeline's own event store
     Given the process builds identity's pipelines over their own event stores
-    When a join-request command states a fact, or a person's identity history is read
+    When a join-request command states a fact
     Then the fact is appended through the join-request pipeline's store in the organization's tenant
-    And the history is read through the identity pipeline's store in the person's own tenant, MFA facts included
     And a pipeline built only to be listed hands its store to nobody
 
   @unit
   Scenario: A ledger or history whose pipeline this process never built refuses by name
-    Given this process never built identity's join-request or identity pipeline
-    When a join-request command commits, or a person's identity history is read
+    Given this process never built identity's join-request pipeline
+    When a join-request command commits
     Then it is refused naming the pipeline, and no command is staged
+
+  @unit
+  Scenario: Identity's history is read through eventing's read seat on a process that only produces
+    Given the api process, whose event store refuses every read
+    When a person's identity history or an SSO connection's history is read
+    Then one aggregate's stream is read through eventing's read seat in its own tenant, MFA facts included
+    And where the process has no event log the read refuses by name rather than reading as empty
 
   @unit
   Scenario: An SSO connection command commits on a process that only produces commands

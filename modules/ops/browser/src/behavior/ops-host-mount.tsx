@@ -10,6 +10,7 @@ import {
   useUiScope,
   type UiFeedback,
 } from "@langwatch/browser-host/capabilities";
+import { hostingOf } from "@langwatch/browser-host/deployment";
 import { useMemo, type ReactNode } from "react";
 import { useLocation } from "react-router";
 
@@ -32,6 +33,7 @@ class CapabilityOpsHost extends OpsHostApi {
       hasPermission: (permission: string) => boolean;
       sharedInstall: boolean;
       cloudOps: boolean;
+      offersFeatureFlags: boolean;
       projectId: string | undefined;
       route: OpsRouteReading;
       asPath: string;
@@ -60,6 +62,10 @@ class CapabilityOpsHost extends OpsHostApi {
 
   cloudOps(): boolean {
     return this.deps.cloudOps;
+  }
+
+  offersFeatureFlags(): boolean {
+    return this.deps.offersFeatureFlags;
   }
 
   /** The project the operator is standing in, from the shell's active scope. */
@@ -110,7 +116,9 @@ class CapabilityOpsHost extends OpsHostApi {
  */
 export default function OpsHostMount({ children }: { children?: ReactNode }) {
   const { session, navigation, route, feedback } = useUiHostServices();
-  const { isSaaS, hasCloudOps } = useUiDeployment();
+  const deployment = useUiDeployment();
+  const { isSaaS, hasCloudOps } = deployment;
+  const hosting = hostingOf(deployment);
   const { projectId } = useUiScope().activeScope();
   const location = useLocation();
   const reading = route.reading();
@@ -122,6 +130,7 @@ export default function OpsHostMount({ children }: { children?: ReactNode }) {
         hasPermission: (permission) => session.hasPermission(permission),
         sharedInstall: isSaaS,
         cloudOps: hasCloudOps,
+        offersFeatureFlags: hasCloudOps || hosting === "local",
         projectId: projectId ?? void 0,
         route: { params: reading.params, query: reading.query },
         asPath,
@@ -129,7 +138,18 @@ export default function OpsHostMount({ children }: { children?: ReactNode }) {
         navigate: (to) => navigation.navigate(to),
         feedback,
       }),
-    [session, isSaaS, hasCloudOps, projectId, reading, asPath, route, navigation, feedback],
+    [
+      session,
+      isSaaS,
+      hasCloudOps,
+      hosting,
+      projectId,
+      reading,
+      asPath,
+      route,
+      navigation,
+      feedback,
+    ],
   );
 
   return <OpsHostProvider value={host}>{children}</OpsHostProvider>;

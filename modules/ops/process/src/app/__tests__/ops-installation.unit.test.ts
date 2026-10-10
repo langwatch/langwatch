@@ -35,6 +35,7 @@ import { memoryStores } from "@langwatch/process-stores";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
 import type { ScenarioApi } from "@langwatch/scenario-contract";
+import type { ShareApi } from "@langwatch/share-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 import type { StoredObjectApi } from "@langwatch/stored-object-contract";
 import type { SystemMigration } from "@langwatch/system-migrations";
@@ -104,6 +105,7 @@ function process(
       authz,
       "data-retention": createApiFixture<DataRetentionApi>(),
       project: createApiFixture<ProjectApi>({ searchByQuery: async () => [] }),
+      share: createApiFixture<ShareApi>(),
       "audit-log": createApiFixture<AuditLogApi>({
         record: async () => ({ id: "audit", occurredAt: 0 }),
       }),

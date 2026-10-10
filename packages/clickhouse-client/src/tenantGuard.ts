@@ -840,17 +840,17 @@ export class TenantScopeError extends Error {
 export function describeTenantScopeViolation(violation: TenantScopeViolation): string {
   switch (violation.kind) {
     case "missing-predicate":
-      return "Statement has no `TenantId = {param:String}` predicate. No other id in this schema is unique across tenants, so this would read another tenant's rows. Add the predicate, or declare `unscoped: { reason }` if the statement genuinely spans tenants.";
+      return "Statement has no `TenantId = {param:String}` predicate. No other id in this schema is unique across tenants, so this would read another tenant's rows. Add the predicate, or set `SKIP_TENANT_CHECK: true`, with a comment giving the reason, if the statement genuinely spans tenants.";
     case "literal-predicate":
       return "Statement inlines the tenant as a literal instead of binding a parameter. Bind it, so it can be checked against the caller's tenant and cannot be built by concatenation.";
     case "weakening-disjunction":
-      return "Statement has an `OR` that can disjoin the tenant predicate away, which would return every tenant's rows. Bracket the disjunction so it cannot weaken the tenant scoping, or declare `unscoped: { reason }` if the statement genuinely spans tenants.";
+      return "Statement has an `OR` that can disjoin the tenant predicate away, which would return every tenant's rows. Bracket the disjunction so it cannot weaken the tenant scoping, or set `SKIP_TENANT_CHECK: true`, with a comment giving the reason, if the statement genuinely spans tenants.";
     case "negated-predicate":
-      return "Statement negates the tenant predicate with `NOT`, which would return every other tenant's rows. Remove the negation, or declare `unscoped: { reason }` if the statement genuinely spans tenants.";
+      return "Statement negates the tenant predicate with `NOT`, which would return every other tenant's rows. Remove the negation, or set `SKIP_TENANT_CHECK: true`, with a comment giving the reason, if the statement genuinely spans tenants.";
     case "predicate-not-and-term":
-      return "Statement's tenant predicate is not a plain `AND` term of its clause (a comparison, a function, `IS`, `?:` or a `BETWEEN` around it), so it could be cancelled and return every other tenant's rows. Keep it a plain `AND` term, or declare `unscoped: { reason }` if the statement genuinely spans tenants.";
+      return "Statement's tenant predicate is not a plain `AND` term of its clause (a comparison, a function, `IS`, `?:` or a `BETWEEN` around it), so it could be cancelled and return every other tenant's rows. Keep it a plain `AND` term, or set `SKIP_TENANT_CHECK: true`, with a comment giving the reason, if the statement genuinely spans tenants.";
     case "unbound-read":
-      return "Statement reads a table that no tenant predicate of its own scope binds (a `UNION` arm, a subquery, a joined table, or a predicate outside `WHERE`, `PREWHERE`, `HAVING` or an inner or left join's `ON`), which would return other tenants' rows. Bind every read with a plain `AND` term, qualified for a joined table, or declare `unscoped: { reason }` if the statement genuinely spans tenants.";
+      return "Statement reads a table that no tenant predicate of its own scope binds (a `UNION` arm, a subquery, a joined table, or a predicate outside `WHERE`, `PREWHERE`, `HAVING` or an inner or left join's `ON`), which would return other tenants' rows. Bind every read with a plain `AND` term, qualified for a joined table, or set `SKIP_TENANT_CHECK: true`, with a comment giving the reason, if the statement genuinely spans tenants.";
     case "missing-param":
       return `Statement binds tenant parameter "${violation.param}" but no such parameter was supplied.`;
     case "param-mismatch":
@@ -866,9 +866,19 @@ export function describeTenantScopeViolation(violation: TenantScopeViolation): s
   }
 }
 
+/** The first table a statement names, for the skip counter's label. */
+const STATEMENT_TABLE = /\b(?:FROM|INTO|TABLE|UPDATE)\s+`?([\w.]+)`?/i;
+
+/** What a skipped check reports: which kind of call, the table it touched, and its tenant. */
+export interface SkippedTenantCheck {
+  operation: "statement" | "insert";
+  table: string;
+  tenantId: string;
+}
+
 export interface TenantGuardOptions {
-  /** Called for each declared-unscoped statement, so they can be audited. */
-  onUnscoped?: ((request: QueryRequest) => void) | undefined;
+  /** Called for each statement or batch that set `SKIP_TENANT_CHECK`, so they can be counted. */
+  onUnscoped?: ((skipped: SkippedTenantCheck) => void) | undefined;
 }
 
 /**
@@ -877,25 +887,27 @@ export interface TenantGuardOptions {
  * or a retry budget is spent on a statement that must not run.
  */
 export class TenantGuard {
-  private readonly onUnscoped: ((request: QueryRequest) => void) | undefined;
+  private readonly onUnscoped: ((skipped: SkippedTenantCheck) => void) | undefined;
 
   constructor({ onUnscoped }: TenantGuardOptions = {}) {
     this.onUnscoped = onUnscoped;
   }
 
   /**
-   * Throws {@link TenantScopeError} unless the statement is tenant-scoped or declares a written
-   * reason for not being. Returns nothing on success rather than the request: it is a check,
+   * Throws {@link TenantScopeError} unless the statement is tenant-scoped or sets
+   * `SKIP_TENANT_CHECK`. Returns nothing on success rather than the request: it is a check,
    * and a caller that had to remember to use a returned value could forget to.
    */
   assert(request: QueryRequest): void {
-    if (request.unscoped !== undefined) {
-      // Guarded because `onUnscoped` is host code - an audit log, a counter - and this branch
-      // is the one where the guard has already decided to allow. An exception from it would
-      // propagate out of `assert` and refuse a statement the guard just approved, which is a
-      // reporting hook deciding policy. Observability must not change what it observes; see
-      // ./resilience.ts.
-      quietly(() => this.onUnscoped?.(request));
+    if (request.SKIP_TENANT_CHECK === true) {
+      // `quietly`: a throwing counter must not refuse what the guard allowed (./resilience.ts).
+      quietly(() =>
+        this.onUnscoped?.({
+          operation: "statement",
+          table: request.table ?? STATEMENT_TABLE.exec(request.sql)?.[1] ?? "unknown",
+          tenantId: request.tenantId,
+        }),
+      );
       return;
     }
 
@@ -916,6 +928,16 @@ export class TenantGuard {
    * no predicate. Every row is checked, not just the first, to catch a mixed batch.
    */
   assertInsert(request: InsertRequest): void {
+    if (request.SKIP_TENANT_CHECK === true) {
+      quietly(() =>
+        this.onUnscoped?.({
+          operation: "insert",
+          table: request.table,
+          tenantId: request.tenantId,
+        }),
+      );
+      return;
+    }
     const violation = checkInsertTenantScope(request);
     if (violation !== null) {
       throw new TenantScopeError(violation, request.tenantId);

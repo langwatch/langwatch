@@ -1,5 +1,5 @@
 import { AuthorizedClickHouse } from "@langwatch/clickhouse-client";
-import { clickHouseClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
+import { clickHouseQueryClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
 // Unit tests for SQL `listAll` emits. List pages in two stages: inner picks
 // page traces (keys only), outer reads payload. Dedup is full-window aggregate.
 // Assertions on emitted SQL; companion integration test proves semantics
@@ -21,7 +21,7 @@ function occurrences({ haystack, needle }: { haystack: string; needle: string })
 
 function makeRepo() {
   const queries: string[] = [];
-  const client = clickHouseClientDouble({
+  const client = clickHouseQueryClientDouble({
     query: vi.fn(async ({ sql }: { sql: string }) => {
       queries.push(sql);
       return { rows: [] };

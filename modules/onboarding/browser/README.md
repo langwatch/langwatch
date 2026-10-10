@@ -10,12 +10,12 @@ Installed by ui, from the app's generated module list (`pnpm generate:modules`).
 
 ## Screens
 
-| Page key                          | URL                             | Within | Label | Permission     | Flags |
-| --------------------------------- | ------------------------------- | ------ | ----- | -------------- | ----- |
-| `pages/onboarding`                | `/onboarding`                   | –      | –     | –              | –     |
-| `pages/onboarding/welcome`        | `/onboarding/welcome`           | –      | –     | –              | –     |
-| `pages/onboarding/product/index`  | `/onboarding/product`           | –      | –     | –              | –     |
-| `pages/onboarding/[team]/project` | `/onboarding/:team/project`     | –      | –     | –              | –     |
+| Page key                          | URL                         | Within | Label | Permission | Flags |
+| --------------------------------- | --------------------------- | ------ | ----- | ---------- | ----- |
+| `pages/onboarding`                | `/onboarding`               | –      | –     | –          | –     |
+| `pages/onboarding/welcome`        | `/onboarding/welcome`       | –      | –     | –          | –     |
+| `pages/onboarding/product/index`  | `/onboarding/product`       | –      | –     | –          | –     |
+| `pages/onboarding/[team]/project` | `/onboarding/:team/project` | –      | –     | –          | –     |
 
 A URL marked (route table) is joined from `apps/ui/src/shell/ui-route-table.ts`; the screen declares no `path`.
 

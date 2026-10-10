@@ -25,7 +25,13 @@ const AUTH0_STRATEGY_NAMES: Readonly<Record<string, string>> = {
   github: "GitHub",
 };
 
+/** An organization's SSO connection signs in under its own id (`ssoc_…`), never a vendor name. */
+export function isSsoConnectionProvider(provider: string): boolean {
+  return provider.startsWith("ssoc_");
+}
+
 export function providerDisplayName(provider: string, providerAccountId: string): string {
+  if (isSsoConnectionProvider(provider)) return "Single sign-on";
   if (provider !== "auth0") return titleCase(provider);
   const [strategy] = providerAccountId.split("|");
   // An account id with no strategy in it names nothing, and the platform

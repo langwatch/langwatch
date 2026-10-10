@@ -19,7 +19,8 @@ const TYPES = [
 ];
 
 const meta = {
-  title: "Primitives/Column type icon",
+  title: "Data display/Column type icon",
+  parameters: { usage: { use: "The type of a dataset column, as an icon." } },
   component: ColumnTypeIcon,
   tags: ["autodocs"],
   args: { type: "string", size: 12 },

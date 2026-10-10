@@ -180,11 +180,6 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
   // SCIM's peer fold of identity's SSO connection facts, one row per connection carrying its
   // `organizationId`; written by the row id, read by organization.
   ScimSsoConnectionView: {},
-  // Data retention's peer fold of project's lifecycle facts, one row per project carrying its
-  // `organizationId`; written and read by the project, listed by organization or its team.
-  DataRetentionProjectScope: {
-    extraBound: ({ clause }) => typeof clauseField(clause, "projectId") === "string",
-  },
   // Trace's fold of governance's coding-assistant billing fact, one row per
   // (organizationId, sourceType); every read and write names its organization.
   TraceIngestSourceBilling: {},
@@ -203,7 +198,7 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
   },
   ApiKey: {
     // lookupId is the globally-unique public token half. The api-key module declares its
-    // fleet-wide sweeps as `@tenancy` SQL in its own repository; no hatch here.
+    // fleet-wide sweeps as raw SQL that skips the tenant check; no hatch here.
     extraBound: ({ clause }) => typeof clauseField(clause, "lookupId") === "string",
   },
   RoutingPolicy: {},

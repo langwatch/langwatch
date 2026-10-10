@@ -121,7 +121,13 @@ export type EnrichedAuditLog = {
   before: unknown;
   /** Gateway-side diff (after state). Only set when source="gateway". */
   after: unknown;
+  /** Who really acted when that is not `userId` (an operator impersonating). */
+  actorUserId: string | null;
+  actorUser: { id: string; name: string | null; email: string | null } | null;
 };
+
+/** What the tRPC door writes into an impersonated audit row's metadata. */
+export const auditImpersonationMetadataSchema = z.object({ impersonatorId: z.string().min(1) });
 
 /**
  * How colleagues on a matching domain get into an organization; identity's join ledger

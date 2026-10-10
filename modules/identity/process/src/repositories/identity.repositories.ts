@@ -17,6 +17,7 @@ import type { SsoBreakGlassRepository } from "../features/sso-arrival/repositori
 import type { SsoMigrationEvidenceRepository } from "../features/sso-arrival/repositories/sso-migration-evidence.repository.ts";
 import type { SsoConnectionFoldState } from "../features/sso-connection/eventing/sso-connection-state.projection.ts";
 import type { SsoConnectionAdminRepository } from "../features/sso-connection/repositories/sso-connection-admin.repository.ts";
+import type { SsoConnectionHistoryRepository } from "../features/sso-connection/repositories/sso-connection-history.repository.ts";
 import type { SsoConnectionRegistrationRepository } from "../features/sso-connection/repositories/sso-connection-registration.repository.ts";
 import type { SsoConnectionRoutingRepository } from "../features/sso-connection/repositories/sso-connection-routing.repository.ts";
 import type {
@@ -34,6 +35,7 @@ import type { IdentityAccountRekeyRepository } from "./identity-account-rekey.re
 import type { IdentityBackfillRepository } from "./identity-backfill.repository.ts";
 import type { IdentityConnectionIssuersRepository } from "./identity-connection-issuers.repository.ts";
 import type { IdentityHeadsRepository } from "./identity-heads.repository.ts";
+import type { IdentityHistoryRepository } from "./identity-history.repository.ts";
 import type { IdentityLatchRepository } from "./identity-latch.repository.ts";
 import type { IdentityLookupRepository } from "./identity-lookup.repository.ts";
 import type { IdentityMigrationRepository } from "./identity-migration.repository.ts";
@@ -109,4 +111,8 @@ export interface IdentityRepositories {
   readonly identityLookup: IdentityLookupRepository;
   /** Identity's throttles: join requests, confirmation mails and the lookup's attempt budget. */
   readonly rateLimits: IdentityRateLimitRepository;
+  /** A person's identity log and the link proposals folded from it (WEB-9103). */
+  readonly identityHistory: IdentityHistoryRepository;
+  /** A connection's log, read as its history panel (WEB-9103). */
+  readonly ssoConnectionHistory: SsoConnectionHistoryRepository;
 }

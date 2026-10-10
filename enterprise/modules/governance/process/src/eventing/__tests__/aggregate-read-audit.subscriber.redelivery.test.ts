@@ -10,7 +10,7 @@ import {
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { PROJECT_KIND } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 
 import type { GovernanceOcsfEventWriter } from "../../repositories/governance.repositories.ts";
 import { DefaultGovernanceAdminWorkspaceViewAuditService } from "../../services/admin-workspace-view-audit.service.ts";
@@ -54,13 +54,13 @@ const projects = new Map([
 
 let nowMs: number;
 let auditLog: MemoryAuditLog;
-let ocsf: { insertEvent: ReturnType<typeof vi.fn> };
+let ocsf: { insertEvent: Mock<GovernanceOcsfEventWriter["insertEvent"]> };
 let service: DefaultGovernanceAdminWorkspaceViewAuditService;
 
 beforeEach(() => {
   nowMs = 1_700_000_000_000;
   auditLog = new MemoryAuditLog(() => nowMs);
-  ocsf = { insertEvent: vi.fn(async () => undefined) };
+  ocsf = { insertEvent: vi.fn<GovernanceOcsfEventWriter["insertEvent"]>(async () => undefined) };
   service = DefaultGovernanceAdminWorkspaceViewAuditService.create({
     auditLog,
     teams: createApiFixture<OrganizationApi>({}, "OrganizationApi"),

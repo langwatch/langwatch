@@ -99,6 +99,19 @@ describe("auth server configuration", () => {
     });
   });
 
+  describe("given the federated providers the Connect buttons offer", () => {
+    const providers = async (environment: Record<string, string>) =>
+      (await authBrowserConfig.project(read(environment), void 0)).federatedProviders;
+
+    /** @scenario "The browser is told which providers the deployment offers" */
+    it("lists the named provider then each social one, and none in email mode", async () => {
+      await expect(
+        providers({ AUTH_PROVIDER: "auth0", GOOGLE_CLIENT_ID: "g", GITHUB_CLIENT_ID: "h" }),
+      ).resolves.toEqual(["auth0", "google", "github"]);
+      await expect(providers({ GOOGLE_CLIENT_ID: "g" })).resolves.toEqual([]);
+    });
+  });
+
   describe("given the installation's sign-up mode", () => {
     const signUpMode = async (environment: Record<string, string>) =>
       (await authBrowserConfig.project(read(environment), void 0)).signUpMode;

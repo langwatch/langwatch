@@ -78,9 +78,10 @@ export function createUpgradeGate({
   return {
     async admit() {
       const [steps, runs] = await Promise.all([ledger.findSteps(), ledger.findRuns()]);
+      const unregistered = unregisteredFor({ role: gatedRole, image, steps });
       const verdict = assertCurrent({
         ledger: { steps },
-        image: { release, blockingSteps },
+        image: { release, blockingSteps: [...blockingSteps, ...unregistered] },
         floor: ledgerFloor({ runs }),
       });
       if (verdict.outcome === "behind") {
@@ -107,6 +108,21 @@ export function createUpgradeGate({
     },
     serving: () => admitted,
   };
+}
+
+/** Only an upgrade run registers a declared step, so the worker runs one for any not there yet. */
+function unregisteredFor({
+  role,
+  image,
+  steps,
+}: {
+  role: ServingRole;
+  image: ServingGateImage;
+  steps: readonly Pick<UpgradeStep, "id">[];
+}): string[] {
+  if (role !== "worker") return [];
+  const recorded = new Set(steps.map(({ id }) => id));
+  return image.declaredSteps.filter((id) => !recorded.has(id));
 }
 
 /** A reopen never refuses a start: the failure is reported; the next admitted process retries. */

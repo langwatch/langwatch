@@ -8,7 +8,6 @@ import {
   canonicalConflictResponses,
   defineRestRouter,
   MANAGEMENT_API_VERSION,
-  type RestTransportDeclaration,
 } from "@langwatch/api/rest";
 import {
   InstantEvalApi,
@@ -58,15 +57,7 @@ const RUN_NOT_FOUND = {
   description: "This project holds no run with that id (instant_eval_not_found)",
 };
 
-/**
- * The type is written out rather than inferred so the declaration emit stays
- * portable.
- */
-export const instantEvalRest: Readonly<{
-  protocol: "rest";
-  namespace: string;
-  router: () => RestTransportDeclaration<InstantEvalApi>;
-}> = defineRestRouter(InstantEvalApi)
+export const instantEvalRest = defineRestRouter(InstantEvalApi)
   .withNamespace("instant-evals")
   .withVersion(MANAGEMENT_API_VERSION)
   .withAddressing("v1-only")
@@ -74,7 +65,7 @@ export const instantEvalRest: Readonly<{
   .post("/", "createInstantEvalRun")
   .withPermission("analytics:manage")
   .withInput(instantEvalRunInputSchema)
-  .withMiddleware(instantEvalRestCredential)
+  .withMiddlewareContext(instantEvalRestCredential)
   .withOutput(instantEvalRunSchema)
   .withStatus(202)
   .withDocs({
@@ -92,7 +83,7 @@ export const instantEvalRest: Readonly<{
   .post("/estimate", "estimateInstantEvalRun")
   .withPermission("analytics:manage")
   .withInput(instantEvalRunInputSchema)
-  .withMiddleware(instantEvalRestCredential)
+  .withMiddlewareContext(instantEvalRestCredential)
   .withOutput(instantEvalEstimateSchema)
   .withDocs({
     summary: "Estimate a run",
@@ -184,7 +175,7 @@ export const instantEvalRest: Readonly<{
   .withPermission("analytics:view")
   .withParams(instantEvalIdParamsSchema)
   .withQuery(instantEvalSampleQuerySchema)
-  .withMiddleware(instantEvalRestCredential)
+  .withMiddlewareContext(instantEvalRestCredential)
   .withOutput(instantEvalSampleSchema)
   .withDocs({
     summary: "Sample a run",

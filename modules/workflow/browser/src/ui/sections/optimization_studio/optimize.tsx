@@ -438,7 +438,7 @@ export function OptimizeModalContent({
 
   if (!versions.data) {
     return (
-      <Dialog.Content bg="bg" borderTop="5px solid" borderColor="green.400">
+      <Dialog.Content borderTop="5px solid" borderColor="green.400">
         <Dialog.Header fontWeight={600}>Optimize Workflow</Dialog.Header>
         <Dialog.CloseTrigger />
         <Dialog.Body>
@@ -463,7 +463,6 @@ export function OptimizeModalContent({
   return (
     <FormProvider {...form}>
       <Dialog.Content
-        bg="bg"
         as="form"
         onSubmit={form.handleSubmit(onSubmit)}
         borderTop="5px solid"

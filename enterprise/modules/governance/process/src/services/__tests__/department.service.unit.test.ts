@@ -23,10 +23,16 @@ async function harness(options: { targetExists?: boolean } = {}) {
     assignMemberDepartment: async ({ userId }) => (writes.push(`user:${userId}`), exists),
     assignTeamDepartment: async ({ teamId }) => (writes.push(`team:${teamId}`), exists),
     findMembersWithDepartments: async () => [
-      { userId: "user-2", departmentId: null, user: { name: null, email: "zed@acme.com" } },
+      {
+        userId: "user-2",
+        departmentId: null,
+        disabledAt: null,
+        user: { name: null, email: "zed@acme.com" },
+      },
       {
         userId: "user-1",
         departmentId: department.id,
+        disabledAt: null,
         user: { name: "Ada", email: "ada@acme.com" },
       },
     ],

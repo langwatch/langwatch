@@ -3,6 +3,7 @@ import { setFlowCallbacks, useDrawer } from "@langwatch/browser-host/drawer";
 import { Link } from "@langwatch/browser-host/link";
 import { CodePreview } from "@langwatch/design-system/code-preview";
 import { HorizontalFormControl } from "@langwatch/design-system/horizontal-form-control";
+import { InlineCode } from "@langwatch/design-system/inline-code";
 import { langwatchEndpoint } from "@langwatch/design-system/langwatch-endpoint-env";
 import { Box, Button, NativeSelect, Text, VStack } from "@langwatch/design-system/primitives";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
@@ -344,7 +345,8 @@ EOF
                   </Box>
 
                   <Text fontSize="sm" color="gray.600">
-                    Set the <code>LANGWATCH_API_KEY</code> environment variable with your API key.{" "}
+                    Set the <InlineCode>LANGWATCH_API_KEY</InlineCode> environment variable with
+                    your API key.{" "}
                     <Link
                       href={apiKeyLink}
                       color="blue.500"

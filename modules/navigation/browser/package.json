@@ -47,8 +47,7 @@
     "react-error-boundary": "catalog:",
     "react-icons": "catalog:",
     "usehooks-ts": "catalog:",
-    "zod": "catalog:",
-    "zustand": "^5.0.2"
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@chakra-ui/react": "catalog:",

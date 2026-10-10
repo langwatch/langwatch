@@ -4,14 +4,14 @@
  * procedures: names the migration, stamps the operator, and delegates to
  * the runner. Spec: specs/migration/authz-grants-rollout.feature.
  */
-import { bindTrpcFact, createTrpcRuntime } from "@langwatch/api/trpc";
+import { bindTrpcMiddlewareContext, createTrpcRuntime } from "@langwatch/api/trpc";
 import { HandledError } from "@langwatch/handled-error";
 import type { OpsOperator } from "@langwatch/ops-contract";
 import { initTRPC } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { opsTrpcMembers } from "../../transport/__tests__/ops.trpc.harness.ts";
-import { opsOperatorFact } from "../../transport/ops-operator.trpc.ts";
+import { opsOperatorContext } from "../../transport/ops-operator.trpc.ts";
 import { opsUpgradeTrpcTransport } from "../../transport/ops-upgrade.trpc.ts";
 import type { OpsSystemMigrationRunner } from "../ops.app.ts";
 import { createOpsTestApp, OPS_STAFF_ADDRESS, platformOperatorAuthz } from "./ops.fixture.ts";
@@ -27,6 +27,7 @@ const service = {
   withdraw: vi.fn<OpsSystemMigrationRunner["withdraw"]>(),
   getEnrollments: vi.fn<OpsSystemMigrationRunner["getEnrollments"]>(),
   getOverview: vi.fn<OpsSystemMigrationRunner["getOverview"]>(),
+  listTenants: vi.fn<OpsSystemMigrationRunner["listTenants"]>(),
   startPass: vi.fn<OpsSystemMigrationRunner["startPass"]>(),
   executePass: vi.fn<OpsSystemMigrationRunner["executePass"]>(),
   rollBack: vi.fn<OpsSystemMigrationRunner["rollBack"]>(),
@@ -77,7 +78,9 @@ function callerFor(operator: OpsOperator) {
       asked: (permission) => demandedPermissions.set(current, permission),
     }),
   }).mount(opsUpgradeTrpcTransport, () => app, {
-    facts: [bindTrpcFact(opsOperatorFact, (ctx: MigrationTestContext) => ctx.operator)],
+    middlewareContext: [
+      bindTrpcMiddlewareContext(opsOperatorContext, (ctx: MigrationTestContext) => ctx.operator),
+    ],
   });
 
   // The name the grain is recorded under: tRPC hands the door no path.
