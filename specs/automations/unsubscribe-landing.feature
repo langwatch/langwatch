@@ -69,3 +69,12 @@ Feature: The unsubscribe landing page
       When the recipient is looking at the page
       Then they see that it is still working
       And they are not told the link is invalid
+
+  Rule: The page needs no session
+
+    @integration
+    Scenario: A signed-out recipient reaches the page, not the sign-in screen
+      Given the recipient is not signed in to LangWatch
+      When they open the unsubscribe link
+      Then the unsubscribe page renders
+      And they are not sent to the sign-in screen

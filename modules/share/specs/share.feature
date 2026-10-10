@@ -244,6 +244,12 @@ Feature: Share a trace behind a secret, scoped, expiring link
       When a visitor presents the link
       Then the link grants nothing
 
+    @unit
+    Scenario: A cut-over organization's new share link answers the link alone
+      Given an organization served by the authorization engine
+      When a member creates a share link for a trace
+      Then the answer is the link as the share contract declares it, with no project context
+
   Rule: Legacy links keep working; the legacy UI no longer offers sharing
 
     @integration @unimplemented
