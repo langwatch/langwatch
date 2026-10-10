@@ -235,6 +235,7 @@ export const automationApiTestFireInputSchema = z.object({
   report: z
     .object({
       sourceKind: z.enum(["traceQuery", "customGraph", "dashboard"]),
+      scheduleLabel: z.string().optional(),
     })
     .nullable()
     .default(null),

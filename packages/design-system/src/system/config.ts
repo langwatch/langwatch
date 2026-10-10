@@ -35,15 +35,22 @@ const toastPanel = {
   "--toast-border-color": "colors.border.muted",
 } as const;
 
-/** A light-mode toast's status fill: deep hue under the text, lifting to a white sheen. */
-const toastMesh = (hue: "red" | "orange" | "green" | "blue") => ({
-  bg: `${hue}.700`,
-  backgroundImage: [
-    "radial-gradient(70% 140% at 100% 0%, rgba(255, 255, 255, 0.32) 0%, transparent 60%)",
-    `radial-gradient(80% 160% at 85% 100%, var(--chakra-colors-${hue}-500) 0%, transparent 70%)`,
-    `linear-gradient(110deg, var(--chakra-colors-${hue}-700) 0%, var(--chakra-colors-${hue}-600) 100%)`,
-  ].join(", "),
-});
+/** A light-mode toast's fill: its hue deep under the text, glowing bright towards the top right. */
+const toastMesh = (hue: "red" | "orange" | "green" | "blue") => {
+  const c = (n: number, alpha = "100%") =>
+    `color-mix(in srgb, var(--chakra-colors-${hue}-${n}) ${alpha}, transparent)`;
+  const mid = `color-mix(in srgb, var(--chakra-colors-${hue}-700) 50%, var(--chakra-colors-${hue}-600))`;
+  return {
+    bg: `${hue}.700`,
+    backgroundImage: [
+      "linear-gradient(180deg, rgba(255, 255, 255, 0.18) 0%, transparent 55%)",
+      `radial-gradient(55% 140% at 100% 0%, ${c(400, "85%")} 0%, transparent 62%)`,
+      `radial-gradient(60% 150% at 85% 125%, ${c(500, "80%")} 0%, transparent 65%)`,
+      `linear-gradient(105deg, ${c(700)} 0%, ${mid} 50%, ${c(600)} 100%)`,
+    ].join(", "),
+    boxShadow: `inset 0 0 0 1px rgba(255, 255, 255, 0.16), 0 10px 28px -10px ${c(500, "70%")}`,
+  };
+};
 
 export const designSystemConfig = defineConfig({
   globalCss: {
