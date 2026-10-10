@@ -95,6 +95,13 @@ function formatMmSs(totalSeconds: number): string {
 type TalkRefs = {
   session: { current: VoiceCallSession | null };
   startedAt: { current: number };
+  // Frozen when the call ends, before the save runs. The server derives the
+  // cut-at-limit marker from endedAt - startedAt (#8028), so a save that is
+  // retried or delayed (slow name entry, a failed first save) must reuse the
+  // moment the call actually ended, not `Date.now()` at each attempt — else a
+  // below-limit call could cross the limit while disconnected and persist as
+  // cut (#8214). 0 until the call ends, when callSpanOf falls back to now.
+  endedAt: { current: number };
   conversationId: { current: string | undefined };
   // The signed session token from mint, carried back verbatim to finish.
   sessionToken: { current: string | undefined };
@@ -116,6 +123,7 @@ function createTalkRefs(agentRowId: string | undefined): TalkRefs {
   return {
     session: { current: null },
     startedAt: { current: 0 },
+    endedAt: { current: 0 },
     conversationId: { current: undefined },
     sessionToken: { current: undefined },
     maxSeconds: { current: PRE_MINT_MAX_SECONDS_PLACEHOLDER },
@@ -199,17 +207,29 @@ function applyFinishSuccess({
   });
 }
 
+/**
+ * The call's span as finish posts it. Whether the limit ended the call is the
+ * server's finding from this span (#8028); the panel keeps its own flag only
+ * for what it shows. endedAt is the frozen end time from when the call ended;
+ * `Date.now()` only as a fallback for a finish that never went through
+ * runEndCall (#8214).
+ */
+function callSpanOf(refs: TalkRefs): { startedAt: number; endedAt: number } {
+  return {
+    startedAt: refs.startedAt.current || Date.now(),
+    endedAt: refs.endedAt.current || Date.now(),
+  };
+}
+
 async function runFinish({
   props,
   refs,
   dispatch,
-  isCutAtLimit,
   nameOverride,
 }: {
   props: TalkToItPanelProps;
   refs: TalkRefs;
   dispatch: (event: TalkEvent) => void;
-  isCutAtLimit: boolean;
   nameOverride?: string;
 }): Promise<void> {
   // Read off the ref, not a closed-over `state` param: a provider-initiated
@@ -223,9 +243,7 @@ async function runFinish({
     name: nameOverride ?? props.name,
     conversationId: refs.conversationId.current,
     transcript,
-    startedAt: refs.startedAt.current || Date.now(),
-    endedAt: Date.now(),
-    isCutAtLimit,
+    ...callSpanOf(refs),
     ...(props.scenarioId ? { scenarioId: props.scenarioId } : {}),
   };
   let res: Response;
@@ -264,17 +282,22 @@ async function runEndCall({
 }: {
   refs: TalkRefs;
   dispatch: (event: TalkEvent) => void;
-  finish: (args: { isCutAtLimit: boolean }) => Promise<void>;
+  finish: () => Promise<void>;
   isCutAtLimit: boolean;
 }): Promise<void> {
   stopTick(refs);
+  // Freeze the end time at the moment the call ends, before the (async) hangup
+  // and any save retry: the run's cut-at-limit marker is derived from this
+  // span server-side (#8028), so it must be when the call ended, not when a
+  // later save attempt happened to run (#8214).
+  refs.endedAt.current = Date.now();
   dispatch(isCutAtLimit ? { type: "LIMIT_REACHED" } : { type: "HANG_UP" });
   try {
     await refs.session.current?.hangUp();
   } catch {
     // The socket may already be closed; the finish still runs.
   }
-  await finish({ isCutAtLimit });
+  await finish();
 }
 
 /**
@@ -490,13 +513,8 @@ function useTalkToItCall(props: TalkToItPanelProps) {
   refs.stateRef.current = state;
 
   const finish = useCallback(
-    ({
-      isCutAtLimit,
-      nameOverride,
-    }: {
-      isCutAtLimit: boolean;
-      nameOverride?: string;
-    }) => runFinish({ props, refs, dispatch, isCutAtLimit, nameOverride }),
+    ({ nameOverride }: { nameOverride?: string } = {}) =>
+      runFinish({ props, refs, dispatch, nameOverride }),
     [props, refs],
   );
   const endCall = useCallback(
@@ -517,9 +535,9 @@ function useTalkToItCall(props: TalkToItPanelProps) {
     });
   }, [props, refs, endCall]);
   const saveWithName = useCallback(
-    ({ isCutAtLimit, name }: { isCutAtLimit: boolean; name: string }) => {
+    ({ name }: { name: string }) => {
       dispatch({ type: "HANG_UP" }); // back to saving
-      void finish({ isCutAtLimit, nameOverride: name });
+      void finish({ nameOverride: name });
     },
     [finish],
   );
@@ -657,7 +675,7 @@ function NeedsNameView({
   state: Extract<TalkState, { kind: "needsName" }>;
   pendingName: string;
   setPendingName: (value: string) => void;
-  onSave: (args: { isCutAtLimit: boolean; name: string }) => void;
+  onSave: (args: { name: string }) => void;
 }) {
   return (
     <VStack align="stretch" gap={2} data-testid="talk-needs-name">
@@ -671,9 +689,7 @@ function NeedsNameView({
       <Button
         colorPalette="blue"
         disabled={pendingName.trim().length === 0}
-        onClick={() =>
-          onSave({ isCutAtLimit: state.isCutAtLimit, name: pendingName.trim() })
-        }
+        onClick={() => onSave({ name: pendingName.trim() })}
         data-testid="talk-name-save"
       >
         Save

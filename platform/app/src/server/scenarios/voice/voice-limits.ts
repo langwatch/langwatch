@@ -55,6 +55,26 @@ export function voiceCallMaxSeconds(
   return Math.min(parsed, VOICE_CALL_MAX_SECONDS_CEILING);
 }
 
+/**
+ * Whether a call that ran for `durationMs` reached the call limit.
+ *
+ * The limit is applied in whole seconds: the countdown that ends a browser
+ * call fires once `floor(elapsed / 1000) >= maxCallSeconds`, so a call the
+ * limit ended spans at least `maxCallSeconds * 1000` milliseconds by the time
+ * it is hung up, and one a person ended early does not. That makes the span a
+ * finding the server can make for itself, where a flag in the finish body was
+ * only ever the browser's claim (#8028).
+ */
+export function callReachedLimit({
+  durationMs,
+  maxCallSeconds,
+}: {
+  durationMs: number;
+  maxCallSeconds: number;
+}): boolean {
+  return durationMs >= maxCallSeconds * 1000;
+}
+
 export function voiceRunsMaxConcurrent(
   env: NodeJS.ProcessEnv = process.env,
 ): number {
