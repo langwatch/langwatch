@@ -634,11 +634,15 @@ func (cell *run) switchToHead(ctx context.Context) error {
 		}
 		cell.mark("switched")
 	}
+	apiStarted := time.Now()
 	if err := cell.startHeadAPI(); err != nil {
 		return err
 	}
 	cell.mark("headApiStarted")
-	if err := sleep(ctx, cell.options.WorkerDelay); err != nil {
+	if err := cell.switchEarly(ctx); err != nil {
+		return err
+	}
+	if err := sleep(ctx, cell.options.WorkerDelay-time.Since(apiStarted)); err != nil {
 		return err
 	}
 	cell.proc("from-worker").Stop(20 * time.Second)
@@ -663,11 +667,34 @@ func (cell *run) rollOver(ctx context.Context) error {
 	if err != nil || cell.headDied() {
 		return errors.Join(err, cell.deathNote())
 	}
+	if cell.marks["switched"] == 0 {
+		if err := cell.balancer.Switch(cell.headURL()); err != nil {
+			return err
+		}
+		cell.mark("switched")
+	}
+	cell.stopFrom()
+	return nil
+}
+
+// switchEarly (D1, UD-7): the balancer sends every call to head's api once it listens, a full worker
+// delay before any head worker runs; the old release keeps running until the worker starts.
+func (cell *run) switchEarly(ctx context.Context) error {
+	if !cell.drill(DrillAPIEarly) || cell.profile.StopStart {
+		return nil
+	}
+	err := waitFor(ctx, cell.options.WorkerDelay, func() bool {
+		cell.reviveAPI()
+		status, _, err := get(ctx, httpClient, cell.headURL()+"/healthz")
+		return err == nil && status/100 == 2
+	})
+	if err != nil {
+		return fmt.Errorf("head's api did not listen within the worker delay: %w", err)
+	}
 	if err := cell.balancer.Switch(cell.headURL()); err != nil {
 		return err
 	}
 	cell.mark("switched")
-	cell.stopFrom()
 	return nil
 }
 
