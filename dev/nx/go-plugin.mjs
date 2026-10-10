@@ -32,7 +32,7 @@ const goModule = (root) => ({
   tags: ["go"],
   targets: {
     "test:go": { executor: "nx:run-commands", options: { cwd: root, command: "go test ./..." } },
-    "lint:go": { command: `make --no-print-directory go-lint GO_LINT_MODULES=${root}` },
+    "lint:go": { command: `make --no-print-directory go-lint-slot GO_LINT_MODULES=${root}` },
     ...(root === "tools" ? { herrgen: { command: "go run ./cmd/herrgen" } } : {}),
   },
 });

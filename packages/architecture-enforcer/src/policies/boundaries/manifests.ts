@@ -13,7 +13,7 @@ function exportKeys(exportsValue: unknown): string[] {
   return Object.keys(exportsValue as Record<string, unknown>);
 }
 
-type WorkspaceCatalogs = {
+export type WorkspaceCatalogs = {
   readonly catalog: Readonly<Record<string, string>>;
   readonly catalogs: Readonly<Record<string, Readonly<Record<string, string>>>>;
 };
@@ -92,7 +92,7 @@ function parseWorkspaceCatalogs(text: string): WorkspaceCatalogs {
 
 const workspaceCatalogsByRoot = new Map<string, WorkspaceCatalogs>();
 
-function readWorkspaceCatalogs(root: string): WorkspaceCatalogs {
+export function readWorkspaceCatalogs(root: string): WorkspaceCatalogs {
   const cached = workspaceCatalogsByRoot.get(root);
   if (cached) return cached;
 

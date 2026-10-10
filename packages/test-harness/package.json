@@ -80,7 +80,7 @@
     "nanoid": "catalog:",
     "picomatch": "^4.0.4",
     "pino": "catalog:",
-    "stripe": "^15.12.0",
+    "stripe": "catalog:",
     "typescript": "catalog:"
   },
   "devDependencies": {

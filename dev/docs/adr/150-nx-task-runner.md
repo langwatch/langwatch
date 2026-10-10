@@ -167,10 +167,11 @@ checkout are Nx targets with honest inputs and outputs:
   copies files from outside its package (the evaluator catalogue, the trace
   schemas, the skills, the OpenAPI document, the redaction sources), so its
   entry in `targetDefaults` names each of them and treats
-  `src/internal/generated` as output, not input. `ensure-built` no longer calls Nx (amended 2026-10-09): every predev paid
-  the graph and hash cost, 5 to 45 s with the daemon off. It hashes each
-  package's content plus the outside inputs this entry names (a test holds the
-  two lists together) and runs only the stale package's own build script.
+  `src/internal/generated` as output, not input. `ensure-built` calls Nx only on a stale stamp (amended 2026-10-09, 2026-10-10):
+  every predev used to pay the graph and hash cost, 5 to 45 s with the daemon off.
+  It hashes each package's content plus the outside inputs this entry names (a
+  test holds the two lists together); a fresh stamp never calls Nx, a stale one
+  runs `nx run <pkg>:build`, so another checkout's cached build can satisfy it.
 
 `generate:modules`, the two Langy generators and the evaluator-catalogue copy
 stay uncached: each costs less than an Nx task's own start-up, and

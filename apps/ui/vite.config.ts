@@ -104,6 +104,9 @@ dotenv.config({ path: rootEnvPath, quiet: true });
 // Set by `haven up --ui=bundled`: Vite serves incrementally rebuilt bundles from memory.
 const IS_BUNDLED = process.env.LANGWATCH_UI_BUNDLED === "1";
 
+// Set by the cached `build:local` target haven serves: gzip size reporting is pure cost there.
+const IS_LOCAL_BUILD = process.env.LANGWATCH_UI_LOCAL_BUILD === "1";
+
 const FRONTEND_PORT = parseInt(process.env.LANGWATCH_APP_PORT ?? process.env.PORT ?? "5560");
 const API_PORT = FRONTEND_PORT + 1000;
 
@@ -283,6 +286,7 @@ export default defineConfig(async ({ command }): Promise<UserConfig> => {
     build: {
       outDir: "dist/client",
       sourcemap: true,
+      reportCompressedSize: !IS_LOCAL_BUILD,
       rollupOptions: {
         // Vite 8.3's bundled client lacks the `requestLazy` rolldown 1.2.9 emits for lazy imports.
         ...BUNDLED_ROLLDOWN,

@@ -50,5 +50,23 @@
   },
   "langwatch": {
     "group": "libraries"
+  },
+  "nx": {
+    "targets": {
+      "build:studio": {
+        "cache": true,
+        "dependsOn": [
+          "^build"
+        ],
+        "inputs": [
+          "production",
+          "^production",
+          "jsBuild"
+        ],
+        "outputs": [
+          "{projectRoot}/preview/dist"
+        ]
+      }
+    }
   }
 }
