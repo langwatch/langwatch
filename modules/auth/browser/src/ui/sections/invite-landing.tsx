@@ -10,13 +10,12 @@ import { useSignInRouting } from "../../behavior/use-sign-in-routing.ts";
 import { acceptInviteResultSchema } from "../../model/invite-messages.ts";
 import { readHandledError } from "../../model/read-handled-error.ts";
 import { AuthCard } from "../elements/auth-card.tsx";
+import { FrontDoorLinkButton } from "../elements/front-door-link-button.tsx";
 import {
-  FRONT_DOOR_ACTION_GEOMETRY,
   FRONT_DOOR_PRIMARY_STYLE,
   FrontDoorPrimaryButton,
 } from "../elements/front-door-primary-button.tsx";
 import { HandledErrorAlert } from "../elements/handled-error-alert.tsx";
-import { SecondaryActionLink } from "../elements/secondary-action-link.tsx";
 import { PasskeyCeremonyPanel, passkeyCeremonyTitle } from "./passkey-ceremony-panel.tsx";
 import { SignInMethodPicker } from "./sign-in-method-picker.tsx";
 
@@ -77,9 +76,11 @@ function InviteDeadEnd({ error, inviteCode }: { error: unknown; inviteCode: stri
   }
 
   return (
-    <AuthCard title="Invitation">
+    <AuthCard
+      title="Invitation"
+      actions={<FrontDoorLinkButton href="/auth/signin" label="Go to sign in" />}
+    >
       <Text data-testid="invite-dead-end">This invitation is no longer available.</Text>
-      <SecondaryActionLink href="/auth/signin" label="Go to sign in" />
     </AuthCard>
   );
 }
@@ -102,7 +103,7 @@ function ExpiredInvite({ error, inviteCode }: { error: unknown; inviteCode: stri
               We let the organization know. You will get a fresh invitation by email once somebody
               there sends it.
             </Text>
-            <SecondaryActionLink href="/auth/signin" label="Go to sign in" />
+            <FrontDoorLinkButton href="/auth/signin" label="Go to sign in" />
           </>
         ) : (
           <>
@@ -192,22 +193,15 @@ function SignedOutInvite({
           onFederatedMethodChosen={(method) => void signIn(method.id, { callbackUrl })}
           renderLocalMethod={() => (
             <VStack width="full" align="stretch" gap={3}>
-              <Button asChild {...FRONT_DOOR_PRIMARY_STYLE}>
-                <Link href={`/auth/signin?callbackUrl=${encodeURIComponent(callbackUrl)}`}>
-                  Sign in
-                </Link>
-              </Button>
-              <Button
-                asChild
-                variant="outline"
-                {...FRONT_DOOR_ACTION_GEOMETRY}
-                borderColor="frontDoor.fieldBorder"
-                _hover={{ backgroundColor: "frontDoor.fieldBg", borderColor: "fg.subtle" }}
-              >
-                <Link href={`/auth/signup?callbackUrl=${encodeURIComponent(callbackUrl)}`}>
-                  Create an account
-                </Link>
-              </Button>
+              <FrontDoorLinkButton
+                href={`/auth/signin?callbackUrl=${encodeURIComponent(callbackUrl)}`}
+                label="Sign in"
+              />
+              <FrontDoorLinkButton
+                href={`/auth/signup?callbackUrl=${encodeURIComponent(callbackUrl)}`}
+                label="Create an account"
+                tone="secondary"
+              />
             </VStack>
           )}
         />
