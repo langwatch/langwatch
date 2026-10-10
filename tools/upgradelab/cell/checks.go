@@ -582,13 +582,16 @@ func (cell *run) traceMeterPart(ctx context.Context) Verdict {
 			return Verdict{Name: part.Name, Result: "inconclusive", Detail: errText(err1) + " " + errText(err2)}
 		}
 		for tenant, count := range summaries {
+			if cell.agedOnly(tenant) {
+				continue
+			}
 			traces += count
 			if meter[tenant] != count {
 				mismatched = append(mismatched, fmt.Sprintf("%s %q meter %d, traces %d", label, tenant, meter[tenant], count))
 			}
 		}
 		for tenant, count := range meter {
-			if _, ok := summaries[tenant]; !ok {
+			if _, ok := summaries[tenant]; !ok && !cell.agedOnly(tenant) {
 				mismatched = append(mismatched, fmt.Sprintf("%s %q meter %d, traces 0", label, tenant, count))
 			}
 		}

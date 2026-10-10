@@ -52,6 +52,10 @@ func TestRetentionJudgesEachSliceAgainstMainsOwnTTL(t *testing.T) {
 	if got := judgeRetention(empty); got.Result != "inconclusive" {
 		t.Errorf("a slice empty at the cut proves nothing: %s", got.Result)
 	}
+	expired := append(kept, sliceCount{Org: "org-rule", Kind: "logs", Slice: 61, Retention: 35, Seeded: 25})
+	if got := judgeRetention(expired); got.Result != "pass" || !strings.Contains(got.Detail, "before the cut: [org-rule logs 61d]") {
+		t.Errorf("a slice main's TTL emptied before the cut proves no upgrade loss: %s %s", got.Result, got.Detail)
+	}
 	if expectAfter(25, 0) != "25" || !strings.HasPrefix(expectAfter(25, 10), "15 to 25") {
 		t.Errorf("expectations: %q %q", expectAfter(25, 0), expectAfter(25, 10))
 	}

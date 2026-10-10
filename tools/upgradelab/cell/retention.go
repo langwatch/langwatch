@@ -71,6 +71,7 @@ type sliceCount struct {
 	Kind      string `json:"kind"`
 	Table     string `json:"table"`
 	Slice     int    `json:"sliceDays"`
+	Retention int    `json:"retentionDays"` // the org's effective traces retention as main resolved it
 	Seeded    int    `json:"seeded"`
 	AtCut     int    `json:"atCut"`
 	Expirable int    `json:"expirable"` // stamped by main to expire by the end of the cell (one day of slack)
@@ -87,6 +88,11 @@ type retentionState struct {
 }
 
 func (cell *run) overlay(name string) bool { return slices.Contains(cell.options.Overlays, name) }
+
+// agedOnly is a retention overlay project: it holds only clones dated before the month the meter seeds (I5).
+func (cell *run) agedOnly(tenant string) bool {
+	return slices.ContainsFunc(cell.retention.orgs, func(org retentionOrg) bool { return org.ProjectID == tenant })
+}
 
 // retentionRules makes the overlay's organizations as the seed account, each on a paid plan (main refuses rules on
 // free), sets the rules through main's dataRetention.setForScope and reads back the retention main resolves.
@@ -308,7 +314,7 @@ func (cell *run) retentionAtCut(ctx context.Context) error {
 		for _, org := range cell.retention.orgs {
 			for _, age := range agedSlices {
 				measured := counts[table.Table][agedKey{org.ProjectID, age}]
-				cell.retention.counts = append(cell.retention.counts, sliceCount{Org: org.Label, Kind: table.Kind, Table: table.Table, Slice: age,
+				cell.retention.counts = append(cell.retention.counts, sliceCount{Org: org.Label, Kind: table.Kind, Table: table.Table, Slice: age, Retention: org.EffectiveDays,
 					Seeded: cell.retention.seeded[table.Table], AtCut: measured[0], Expirable: measured[1], Expect: expectAfter(measured[0], measured[1]), After: -1})
 			}
 		}
@@ -352,24 +358,50 @@ func (cell *run) retentionVerdict(ctx context.Context) []Verdict {
 	}
 	data, _ := json.MarshalIndent(map[string]any{"orgs": cell.retention.orgs, "slices": cell.retention.counts}, "", "  ")
 	_ = os.WriteFile(filepath.Join(cell.options.RunDir, "retention.json"), data, 0o600)
-	return []Verdict{judgeRetention(cell.retention.counts)}
+	return []Verdict{judgeRetention(cell.retention.counts), cell.agedReadVerdict(ctx)}
+}
+
+// agedReadVerdict (R2): per organization, the oldest aged trace still stored reads back through head's tRPC.
+func (cell *run) agedReadVerdict(ctx context.Context) Verdict {
+	cell.seeder.PlainWire = true // the reads go to head
+	var read, failed []string
+	for _, org := range cell.retention.orgs {
+		query := fmt.Sprintf("SELECT TraceId, dateDiff('day', OccurredAt, now()) FROM trace_summaries FINAL WHERE TenantId = %s AND dateDiff('day', OccurredAt, now()) >= 20 ORDER BY OccurredAt ASC LIMIT 1 FORMAT TSV", sqlQuote(org.ProjectID))
+		out, err := clickhouseQuery(ctx, cell.stores.queryURL(""), query)
+		trace, age, _ := strings.Cut(strings.TrimSpace(out), "\t")
+		if err != nil || trace == "" {
+			failed = append(failed, fmt.Sprintf("%s: no aged trace to read (%s)", org.Label, errText(err)))
+			continue
+		}
+		var got struct {
+			TraceID string `json:"trace_id"`
+		}
+		if err := cell.seeder.Call(ctx, false, "traces.getById", map[string]any{"projectId": org.ProjectID, "traceId": trace}, &got); err != nil {
+			failed = append(failed, fmt.Sprintf("%s %sd %s: %.200s", org.Label, age, trace, err.Error()))
+			continue
+		}
+		read = append(read, fmt.Sprintf("%s %sd %s", org.Label, age, trace))
+	}
+	return verdict("R2", len(failed) == 0 && len(read) > 0, fmt.Sprintf("read through head's traces.getById: %v; failed: %v", read, failed))
 }
 
 // judgeRetention fails any slice that lost more than main's TTL may take, and is inconclusive when a slice
-// held nothing at the cut (the seed project had no such rows to clone, so nothing was proved).
+// held nothing at the cut, unless main's own TTL emptied a slice older than the org's retention before it.
 func judgeRetention(counts []sliceCount) Verdict {
-	var lost, empty, lines []string
+	var lost, empty, expired, lines []string
 	for _, each := range counts {
 		name := fmt.Sprintf("%s %s %dd", each.Org, each.Kind, each.Slice)
 		lines = append(lines, fmt.Sprintf("%s %d->%d", name, each.AtCut, each.After))
 		switch {
+		case each.AtCut == 0 && each.Seeded > 0 && each.Retention > 0 && each.Slice > each.Retention:
+			expired = append(expired, name)
 		case each.AtCut == 0:
 			empty = append(empty, name)
 		case each.After < each.AtCut-each.Expirable:
 			lost = append(lost, fmt.Sprintf("%s %d->%d (TTL may take %d)", name, each.AtCut, each.After, each.Expirable))
 		}
 	}
-	detail := fmt.Sprintf("lost: %v; empty at the cut: %v; per slice at the cut -> after: %s", lost, empty, strings.Join(lines, ", "))
+	detail := fmt.Sprintf("lost: %v; empty at the cut: %v; expired by main's TTL before the cut: %v; per slice at the cut -> after: %s", lost, empty, expired, strings.Join(lines, ", "))
 	if len(lost) == 0 && len(empty) > 0 {
 		return Verdict{ID: "R1", Name: invariantNames["R1"], Result: "inconclusive", Detail: detail}
 	}
