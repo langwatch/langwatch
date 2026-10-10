@@ -143,6 +143,9 @@ const bodyCss = ({
   wrap: boolean;
   guttered: boolean;
 }) => ({
+  ...(compact ? COMPACT_BODY : {}),
+  ...(guttered ? GUTTERED : {}),
+  ...(wrap ? wrappedBody({ guttered }) : {}),
   "& pre": {
     margin: 0,
     padding: "12px 16px",
@@ -150,10 +153,10 @@ const bodyCss = ({
     overflowX: "auto",
     tabSize: 4,
     background: "transparent !important",
+    ...(compact ? COMPACT_BODY["& pre"] : {}),
+    ...(guttered ? GUTTERED["& pre"] : {}),
+    ...(wrap ? wrappedBody({ guttered })["& pre"] : {}),
   },
-  ...(compact ? COMPACT_BODY : {}),
-  ...(guttered ? GUTTERED : {}),
-  ...(wrap ? wrappedBody({ guttered }) : {}),
 });
 
 /** One house window for every code sample: title bar, copy button, Shiki body. */
