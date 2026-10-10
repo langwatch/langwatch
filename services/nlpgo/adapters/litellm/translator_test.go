@@ -517,7 +517,7 @@ func TestInlineCredentials_RequiresProvider(t *testing.T) {
 }
 
 // @scenario "A Gemini or Vertex provider with a base URL reaches that host instead of Google's"
-func TestFromLiteLLMParams_GeminiAndVertexCarryTheBaseURL(t *testing.T) {
+func TestFromLiteLLMParams_GeminiVertexAndBedrockCarryTheBaseURL(t *testing.T) {
 	gemini, err := FromLiteLLMParams("gemini", map[string]any{"api_key": "k", "api_base": "http://127.0.0.1:21651"})
 	if err != nil || gemini.Gemini["api_base"] != "http://127.0.0.1:21651" {
 		t.Fatalf("gemini api_base lost: %v %v", gemini.Gemini, err)
@@ -525,5 +525,9 @@ func TestFromLiteLLMParams_GeminiAndVertexCarryTheBaseURL(t *testing.T) {
 	vertex, err := FromLiteLLMParams("vertex_ai", map[string]any{"vertex_project": "p", "vertex_location": "l", "api_base": "http://127.0.0.1:21651"})
 	if err != nil || vertex.VertexAI["api_base"] != "http://127.0.0.1:21651" {
 		t.Fatalf("vertex api_base lost: %v %v", vertex.VertexAI, err)
+	}
+	bedrock, err := FromLiteLLMParams("bedrock", map[string]any{"aws_region_name": "us-east-1", "api_base": "http://127.0.0.1:21651"})
+	if err != nil || bedrock.Bedrock["api_base"] != "http://127.0.0.1:21651" {
+		t.Fatalf("bedrock api_base lost: %v %v", bedrock.Bedrock, err)
 	}
 }

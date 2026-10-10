@@ -337,7 +337,7 @@ func (r *BifrostRouter) Dispatch(ctx context.Context, req *domain.Request, cred 
 	// public runtime host (see bedrockConverseEndpoint); any other Bedrock
 	// request without a runtime endpoint stays on bifrost.
 	if req.Type == domain.RequestTypeChat {
-		if endpoint, err := bedrockConverseEndpoint(cred, model); err != nil {
+		if endpoint, err := bedrockConverseEndpoint(cred, model, r.endpointPolicy); err != nil {
 			return nil, err
 		} else if endpoint != "" {
 			return r.dispatchBedrockVPCE(ctx, req, provider, model, cred, endpoint)
@@ -727,7 +727,7 @@ func (r *BifrostRouter) DispatchStream(ctx context.Context, req *domain.Request,
 	// with its own VPCE handling. OpenAI models on Bedrock stream through the
 	// same lane over the public runtime host.
 	if req.Type == domain.RequestTypeChat {
-		if endpoint, err := bedrockConverseEndpoint(cred, model); err != nil {
+		if endpoint, err := bedrockConverseEndpoint(cred, model, r.endpointPolicy); err != nil {
 			return nil, err
 		} else if endpoint != "" {
 			return r.dispatchBedrockVPCEStream(ctx, req, provider, model, cred, endpoint)

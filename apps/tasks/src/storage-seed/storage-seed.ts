@@ -75,9 +75,9 @@ const LLMSIM_VERTEX_SERVICE_ACCOUNT = JSON.stringify({
 });
 
 /**
- * Gemini and Vertex rows aimed at llmsim when haven routes there (HAVEN_SEED_LLMSIM_BASE_URL).
+ * Gemini, Vertex and Bedrock rows at llmsim when haven routes there (HAVEN_SEED_LLMSIM_BASE_URL).
  * `base_url` is the generic key the gateway wire reads for any provider; a real key in the
- * environment wins, so a developer's own Gemini or Vertex account is never redirected.
+ * environment wins, so a developer's own Gemini, Vertex or AWS account is never redirected.
  */
 export function llmsimProviderKeys({
   provider,
@@ -96,6 +96,14 @@ export function llmsimProviderKeys({
       GOOGLE_APPLICATION_CREDENTIALS: LLMSIM_VERTEX_SERVICE_ACCOUNT,
       VERTEXAI_PROJECT: "llmsim",
       VERTEXAI_LOCATION: "us-central1",
+      base_url: base,
+    };
+  }
+  if (provider === "bedrock" && !environment.AWS_ACCESS_KEY_ID) {
+    return {
+      AWS_ACCESS_KEY_ID: "llmsim",
+      AWS_SECRET_ACCESS_KEY: "llmsim",
+      AWS_REGION_NAME: "us-east-1",
       base_url: base,
     };
   }

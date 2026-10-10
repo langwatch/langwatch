@@ -128,6 +128,13 @@ Feature: Custom (OpenAI-compatible) provider routing to customer endpoints
     Then the generateContent call reaches that host, on the Gemini models path or the Vertex publishers path
     And a credential without a base_url keeps Google's endpoints
 
+  @unit
+  Scenario: A Bedrock provider whose runtime host is on the customer-endpoint allowlist reaches that host
+    Given a Bedrock credential whose runtime endpoint or base_url names a host on ALLOWED_PROXY_HOSTS
+    When a chat completion is dispatched through the gateway
+    Then the Converse call is signed for and sent to that host
+    But a runtime host that is neither amazonaws.com nor on the allowlist is still refused
+
   Scenario: An endpoint that fell out of recent use still works when dispatched to again
     Given an "anthropic" model provider with a base URL that has not been used recently
     And many other Anthropic-compatible endpoints have served traffic since

@@ -313,3 +313,18 @@ func TestCredentialFromHeaders_VertexBaseURL(t *testing.T) {
 		t.Errorf("api_base should reach the gateway as base_url: %v", cred.Extra)
 	}
 }
+
+// @scenario "A Bedrock provider whose runtime host is on the customer-endpoint allowlist reaches that host"
+func TestCredentialFromHeaders_BedrockBaseURL(t *testing.T) {
+	hdr := encodeCreds(t, inlineCreds{
+		Provider: "bedrock",
+		Bedrock:  map[string]string{"aws_access_key_id": "k", "aws_secret_access_key": "s", "aws_region_name": "us-east-1", "api_base": "http://127.0.0.1:21651"},
+	})
+	cred, err := credentialFromHeaders(map[string]string{headerInlineCredentials: hdr})
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+	if cred.Extra["base_url"] != "http://127.0.0.1:21651" {
+		t.Errorf("api_base should reach the gateway as base_url: %v", cred.Extra)
+	}
+}

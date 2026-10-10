@@ -97,6 +97,7 @@ Feature: llmsim, a local LLM provider stand-in run by haven
     When the stack is seeded
     Then the organization gets a Gemini row and a Vertex row whose base_url is llmsim's address
     And a model call on either, through the gateway or the playground, reaches llmsim
+    And a Bedrock row likewise, unless the .env names AWS access keys
     But a Gemini key or Vertex service account the .env names is seeded as it is, with no base_url
 
   Scenario: Langy mode echoes a plain message

@@ -25,8 +25,8 @@ gets the same answer, at no cost. Code: `services/llmsim`, console `apps/llmsim-
 - Overlay sets `OPENAI_BASE_URL`, `ANTHROPIC_BASE_URL` and dummy keys, so the seeded
   providers, playground, evaluators, scenarios and Langy reach it. A base URL `.env`
   names wins. Standalone: `make service svc=llmsim` (:5595).
-- The seed also adds Gemini and Vertex rows whose `base_url` is llmsim (`HAVEN_SEED_LLMSIM_BASE_URL`),
-  unless `.env` names a real Gemini key or Vertex service account.
+- The seed also adds Gemini, Vertex and Bedrock rows whose `base_url` is llmsim (`HAVEN_SEED_LLMSIM_BASE_URL`),
+  unless `.env` names a real Gemini key, Vertex service account or AWS keys.
 
 ## Steer a call
 

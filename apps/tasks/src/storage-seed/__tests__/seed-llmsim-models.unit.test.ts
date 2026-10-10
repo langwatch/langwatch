@@ -40,6 +40,20 @@ describe("given haven routes models at llmsim", () => {
   });
 
   /** @scenario "haven seeds Gemini and Vertex providers at llmsim" */
+  it("seeds a Bedrock row whose base_url is llmsim unless real AWS keys are named", () => {
+    expect(llmsimProviderKeys({ provider: "bedrock", environment })).toMatchObject({
+      base_url: "http://127.0.0.1:21651",
+      AWS_REGION_NAME: expect.any(String),
+    });
+    expect(
+      llmsimProviderKeys({
+        provider: "bedrock",
+        environment: { ...environment, AWS_ACCESS_KEY_ID: "AKIAREAL" },
+      }),
+    ).toBeUndefined();
+  });
+
+  /** @scenario "haven seeds Gemini and Vertex providers at llmsim" */
   it("leaves a developer's own Gemini or Vertex account and every other provider alone", () => {
     expect(
       llmsimProviderKeys({

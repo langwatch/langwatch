@@ -285,6 +285,9 @@ func bedrockCred(m map[string]string) domain.Credential {
 	if v := m["aws_bedrock_runtime_endpoint"]; v != "" {
 		extra["bedrock_runtime_endpoint"] = v
 	}
+	if v := m["api_base"]; v != "" {
+		extra["base_url"] = v // a stand-in runtime host such as llmsim; the gateway checks its allowlist
+	}
 	return domain.Credential{
 		ID:         inlineCredentialID(domain.ProviderBedrock),
 		ProviderID: domain.ProviderBedrock,

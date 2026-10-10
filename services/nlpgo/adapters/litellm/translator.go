@@ -74,7 +74,7 @@ func FromLiteLLMParams(provider string, params map[string]any) (InlineCredential
 			Bedrock: pickStrings(params,
 				"aws_access_key_id", "aws_secret_access_key",
 				"aws_session_token", "aws_region_name",
-				"aws_bedrock_runtime_endpoint",
+				"aws_bedrock_runtime_endpoint", "api_base",
 			),
 		}, nil
 	case "vertex_ai", "vertex":
