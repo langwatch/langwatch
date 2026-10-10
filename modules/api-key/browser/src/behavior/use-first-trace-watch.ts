@@ -1,7 +1,8 @@
 // Post-approval first-trace watch: hooks hold state and act on pure policy (first-trace-policy.ts).
-// Waits for the first-trace read hint, then redirects.
+// Waits for the project's first trace on trace's live stream, then redirects.
 // Spec: specs/ai-governance/cli-onboarding/post-login-first-trace-redirect.feature
 
+import { traceClient } from "@langwatch/trace-client";
 import { useEffect, useState } from "react";
 
 import { useApiKeyHost } from "../model/api-key-host.ts";
@@ -52,10 +53,15 @@ export function useFirstTraceWatch({
 
   const hasFirstMessage = apiKeyApi.project.getHasFirstMessage.useQuery(
     { projectId: personalProject?.id ?? "" },
+    { enabled: polling.enabled, refetchOnWindowFocus: false },
+  );
+
+  // While waiting, any event on trace's stream re-reads the flag, as the Trace Explorer does.
+  traceClient.traces.onTraceUpdate.useSubscription(
+    { projectId: personalProject?.id ?? "" },
     {
-      enabled: polling.enabled,
-      // needs a read hint: first trace received for the project
-      refetchOnWindowFocus: false,
+      enabled: polling.enabled && hasSeenNeverSynced,
+      onData: () => void hasFirstMessage.refetch(),
     },
   );
 

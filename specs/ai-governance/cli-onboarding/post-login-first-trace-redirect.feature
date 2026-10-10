@@ -73,7 +73,7 @@ Feature: Post-login first-trace watch on the CLI authorize page
     Then the watch's read has no refetch interval
     And it does not refetch when the window regains focus
 
-  @bdd @cli-onboarding @first-trace @integration @unimplemented
+  @bdd @cli-onboarding @first-trace @integration
   Scenario: The watch updates when the project's first trace is received
     Given the watch confirmed the project has never synced a trace
     When the project's first trace is received

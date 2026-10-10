@@ -5800,6 +5800,9 @@ importers:
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
+      '@langwatch/trace-client':
+        specifier: workspace:*
+        version: link:../../trace/client
       lucide-react:
         specifier: 'catalog:'
         version: 1.22.0(react@19.2.8)
@@ -15529,6 +15532,9 @@ importers:
 
   modules/trace/client:
     dependencies:
+      '@langwatch/api':
+        specifier: workspace:*
+        version: link:../../../packages/api
       '@langwatch/module':
         specifier: workspace:*
         version: link:../../../packages/module
