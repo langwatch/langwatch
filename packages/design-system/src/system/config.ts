@@ -35,6 +35,16 @@ const toastPanel = {
   "--toast-border-color": "colors.border.muted",
 } as const;
 
+/** A light-mode toast's status fill: deep hue under the text, lifting to a white sheen. */
+const toastMesh = (hue: "red" | "orange" | "green" | "blue") => ({
+  bg: `${hue}.700`,
+  backgroundImage: [
+    "radial-gradient(70% 140% at 100% 0%, rgba(255, 255, 255, 0.32) 0%, transparent 60%)",
+    `radial-gradient(80% 160% at 85% 100%, var(--chakra-colors-${hue}-500) 0%, transparent 70%)`,
+    `linear-gradient(110deg, var(--chakra-colors-${hue}-700) 0%, var(--chakra-colors-${hue}-600) 100%)`,
+  ].join(", "),
+});
+
 export const designSystemConfig = defineConfig({
   globalCss: {
     body: {
@@ -1295,15 +1305,19 @@ export const designSystemConfig = defineConfig({
               animation: "toast-sink 220ms cubic-bezier(0.4, 0, 1, 1) both",
             },
             _motionReduce: { transition: "none", animation: "none" },
-            // Light mode: a vibrant status fill with deep same-hue ink (AA: 4.9-11.6:1);
-            // white on these fills fails contrast. Loading stays neutral.
+            // Light mode: a mesh of the status hue (deep at the text edge, a white
+            // sheen top-right) with white text; the left half stays >= 600 for contrast.
             _light: {
               "&:is([data-type=error], [data-type=warning], [data-type=success], [data-type=info])":
-                { borderColor: "transparent", "--toast-trigger-bg": "rgba(255, 255, 255, 0.35)" },
-              "&[data-type=error]": { bg: "red.500", color: "red.950" },
-              "&[data-type=warning]": { bg: "orange.400", color: "orange.950" },
-              "&[data-type=success]": { bg: "green.500", color: "green.950" },
-              "&[data-type=info]": { bg: "blue.400", color: "blue.950" },
+                {
+                  borderColor: "transparent",
+                  color: "white",
+                  "--toast-trigger-bg": "rgba(255, 255, 255, 0.18)",
+                },
+              "&[data-type=error]": toastMesh("red"),
+              "&[data-type=warning]": toastMesh("orange"),
+              "&[data-type=success]": toastMesh("green"),
+              "&[data-type=info]": toastMesh("blue"),
             },
             _dark: {
               ...toastPanel,
