@@ -205,6 +205,12 @@ function ShellContentRow({
             _dark={{
               borderColor: "border.muted",
             }}
+            // Clip composited sticky glass to the card, including its scrolled corners.
+            clipPath={
+              langyDockInset > 0
+                ? "inset(0 round var(--chakra-radii-xl) var(--chakra-radii-xl) 0 0)"
+                : "inset(0 round var(--chakra-radii-xl) 0 0 0)"
+            }
             overflow="auto"
             display="flex"
             minHeight={`calc(100vh - ${APP_HEADER_HEIGHT}px)`}

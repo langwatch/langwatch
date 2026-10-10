@@ -98,11 +98,11 @@ function Header({
       ref={mergeRefs(headerRef, ref)}
       data-page-header
       data-scrolled={scrolled ? "true" : "false"}
-      height="shellHeader"
+      height="auto"
       minHeight="shellHeader"
       flexShrink={0}
       paddingX={6}
-      paddingY={1.5}
+      paddingY={3}
       alignItems="center"
       width="full"
       borderBottomWidth={withBorder ? "1px" : 0}
