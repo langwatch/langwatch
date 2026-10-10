@@ -1,142 +1,111 @@
 /**
- * The card, the header line and the row separators every results table is drawn with.
+ * The column layout, the empty line and the truncation note every results table shares,
+ * over the design system's ListTable.
  * @see specs/features/agent-testing/results-tabs.feature
  */
 
-import { Box, chakra, Text } from "@langwatch/design-system/primitives";
+import { ListTable } from "@langwatch/design-system/list-table";
+import { Table, Text } from "@langwatch/design-system/primitives";
 import type { ReactNode } from "react";
 
-/** The card every results table sits in. */
-export function ResultsTableCard({ children, testId }: { children: ReactNode; testId?: string }) {
-  return (
-    <Box
-      borderWidth="1px"
-      borderColor="border"
-      borderRadius="xl"
-      background="bg.panel"
-      overflow="hidden"
-      boxShadow="0 1px 2px color-mix(in srgb, var(--chakra-colors-bg-scrim) 4%, transparent)"
-      data-testid={testId}
-    >
-      {children}
-    </Box>
-  );
-}
+/**
+ * One column of a results table. A column without a width shares the free width; a width
+ * holds the cell padding as well as the content. `action` is the pinned row-menu column.
+ */
+export type ResultsColumn = {
+  key: string;
+  text: string;
+  width?: string;
+  align?: "end";
+  action?: boolean;
+};
 
-/** The uppercase header line of a table, laid out on the given columns. */
-export function ResultsTableHead({
+/** The table, laid out by its columns so a long name truncates rather than widening it. */
+export function ResultsTable({
   columns,
-  headings,
-}: {
-  columns: string;
-  /** One entry per column. An empty string draws a column with no heading. */
-  headings: { key: string; text: string; align?: "right" }[];
-}) {
-  return (
-    <Box
-      display="grid"
-      gridTemplateColumns={columns}
-      columnGap={3}
-      alignItems="center"
-      paddingX={4}
-      paddingY={2}
-      background="bg.muted/50"
-      borderBottomWidth="1px"
-      borderBottomColor="border"
-      textStyle="micro"
-      fontWeight="semibold"
-      textTransform="uppercase"
-      letterSpacing="0.025em"
-      color="fg.muted"
-    >
-      {headings.map((heading) => (
-        <Text key={heading.key} as="span" textAlign={heading.align}>
-          {heading.text}
-        </Text>
-      ))}
-    </Box>
-  );
-}
-
-/** The rows of a table, hairlined between one another. */
-export function ResultsTableBody({ children }: { children: ReactNode }) {
-  return (
-    <chakra.div
-      css={{
-        "& > * + *": {
-          borderTopWidth: "1px",
-          borderTopColor: "var(--chakra-colors-border-muted)",
-        },
-      }}
-    >
-      {children}
-    </chakra.div>
-  );
-}
-
-/** One row: the grid, the padding and the hover every table shares. */
-export function ResultsTableRow({
-  columns,
-  onClick,
+  minWidth,
   testId,
-  paddingY = "10px",
   children,
 }: {
-  columns: string;
-  onClick?: () => void;
+  columns: ResultsColumn[];
+  /** The width under which the table scrolls sideways rather than squeezing its columns. */
+  minWidth?: string;
   testId?: string;
-  paddingY?: string;
   children: ReactNode;
 }) {
   return (
-    <Box
-      display="grid"
-      gridTemplateColumns={columns}
-      columnGap={3}
-      alignItems="center"
-      paddingX={4}
-      paddingY={paddingY}
-      cursor={onClick ? "pointer" : undefined}
-      _hover={onClick ? { background: "bg.muted/40" } : undefined}
-      onClick={onClick}
+    <ListTable
+      tableLayout="fixed"
+      minWidth={minWidth}
+      containerProps={{ overflowX: "auto" }}
       data-testid={testId}
     >
+      <Table.ColumnGroup>
+        {columns.map((column) => (
+          <Table.Column key={column.key} width={column.width} data-column={column.key} />
+        ))}
+      </Table.ColumnGroup>
       {children}
-    </Box>
+    </ListTable>
+  );
+}
+
+/** The header line: one heading per column, the row-menu column named for screen readers. */
+export function ResultsTableHead({
+  columns,
+  testId,
+}: {
+  columns: ResultsColumn[];
+  testId?: string;
+}) {
+  return (
+    <Table.Header data-testid={testId}>
+      <Table.Row>
+        {columns.map((column) =>
+          column.action ? (
+            <ListTable.ActionHeader key={column.key} />
+          ) : (
+            <Table.ColumnHeader key={column.key} textAlign={column.align}>
+              {column.text}
+            </Table.ColumnHeader>
+          ),
+        )}
+      </Table.Row>
+    </Table.Header>
   );
 }
 
 /** What a table says when the filters leave it nothing. */
-export function ResultsTableEmptyLine({ text }: { text: string }) {
+export function ResultsTableEmptyLine({ text, columns }: { text: string; columns: number }) {
   return (
-    <Text
-      textStyle="bodySm"
-      color="fg.muted"
-      textAlign="center"
-      paddingX={4}
-      paddingY={10}
-      data-testid="results-table-empty"
-    >
-      {text}
-    </Text>
+    <ListTable.SpanRow columns={columns}>
+      <Text
+        textStyle="bodySm"
+        color="fg.muted"
+        textAlign="center"
+        paddingX={4}
+        paddingY={10}
+        data-testid="results-table-empty"
+      >
+        {text}
+      </Text>
+    </ListTable.SpanRow>
   );
 }
 
-/**
- * The line under a table that has more rows than it drew.
- */
-export function ResultsTableTruncationLine({ text }: { text: string }) {
+/** The line under a table that has more rows than it drew. */
+export function ResultsTableTruncationLine({ text, columns }: { text: string; columns: number }) {
   return (
-    <Text
-      textStyle="micro"
-      color="fg.muted"
-      borderTopWidth="1px"
-      borderTopColor="border"
-      paddingX={4}
-      paddingY={2}
-      data-testid="results-table-truncation"
-    >
-      {text}
-    </Text>
+    <ListTable.SpanRow columns={columns}>
+      <Text
+        textStyle="micro"
+        color="fg.muted"
+        paddingX={4}
+        paddingY={2}
+        data-testid="results-table-truncation"
+      >
+        {text}
+      </Text>
+    </ListTable.SpanRow>
   );
 }

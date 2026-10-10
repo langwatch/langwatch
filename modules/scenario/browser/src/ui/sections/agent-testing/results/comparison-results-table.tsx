@@ -4,7 +4,8 @@
  * @see specs/features/agent-testing/comparison-mode.feature
  */
 
-import { Box, Text } from "@langwatch/design-system/primitives";
+import { ListTable } from "@langwatch/design-system/list-table";
+import { Box, Table } from "@langwatch/design-system/primitives";
 import type { ScenarioRunData } from "@langwatch/scenario-contract";
 
 import { TargetLegend } from "../../../elements/agent-testing/shared/target-dot.tsx";
@@ -48,8 +49,6 @@ function TargetColumnHeader({
       flexDirection="column"
       alignItems="flex-start"
       gap={1.5}
-      textTransform="none"
-      letterSpacing="normal"
       data-testid={`comparison-column-${target.key}`}
     >
       <TargetLegend color={target.color} label={target.label} textStyle="caption" isWrapped />
@@ -60,70 +59,64 @@ function TargetColumnHeader({
 
 /** The line above the matrix: "Scenario", then one header per target. */
 function MatrixHeader({
-  columns,
   targets,
   scenarioRuns,
 }: {
-  columns: string;
   targets: BatchTarget[];
   scenarioRuns: ScenarioRunData[];
 }) {
   return (
-    <Box
-      display="grid"
-      gridTemplateColumns={columns}
-      columnGap={3}
-      alignItems="flex-start"
-      paddingX={4}
-      paddingY={2.5}
-      background="bg.muted/50"
-      borderBottomWidth="1px"
-      borderBottomColor="border"
-      textStyle="micro"
-      fontWeight="semibold"
-      textTransform="uppercase"
-      letterSpacing="0.025em"
-      color="fg.muted"
-    >
-      <Text as="span" paddingTop="2px">
-        Scenario
-      </Text>
-      {targets.map((target) => (
-        <TargetColumnHeader key={target.key} target={target} scenarioRuns={scenarioRuns} />
-      ))}
-    </Box>
+    <Table.Header>
+      <Table.Row
+        // A target header carries a summary and wraps its label, so it outgrows the band.
+        css={{
+          "&& > th": {
+            verticalAlign: "top",
+            height: "auto",
+            paddingY: "2.5",
+            whiteSpace: "normal",
+          },
+        }}
+      >
+        <Table.ColumnHeader>
+          <Box paddingTop="2px">Scenario</Box>
+        </Table.ColumnHeader>
+        {targets.map((target) => (
+          <Table.ColumnHeader key={target.key}>
+            <TargetColumnHeader target={target} scenarioRuns={scenarioRuns} />
+          </Table.ColumnHeader>
+        ))}
+      </Table.Row>
+    </Table.Header>
   );
 }
 
 export function ComparisonResultsTable(props: ComparisonResultsTableProps) {
   const { scenarioRuns, targets } = props;
   const scenarios = scenariosOf(scenarioRuns);
-  const { template: columns, minWidth } = comparisonColumns(targets);
+  const { scenarioWidth, targetWidth, minWidth } = comparisonColumns(targets);
 
   return (
-    <Box
-      borderWidth="1px"
-      borderColor="border"
-      borderRadius="xl"
-      overflowX="auto"
+    <ListTable
+      tableLayout="fixed"
+      minWidth={minWidth}
+      containerProps={{ overflowX: "auto" }}
       data-testid="comparison-results-table"
     >
-      <Box minWidth={minWidth}>
-        <MatrixHeader columns={columns} targets={targets} scenarioRuns={scenarioRuns} />
+      <Table.ColumnGroup>
+        <Table.Column width={scenarioWidth} data-column="scenario" />
+        {targets.map((target) => (
+          <Table.Column key={target.key} width={targetWidth} data-column={target.key} />
+        ))}
+      </Table.ColumnGroup>
 
-        <Box
-          css={{
-            "& > * + *": {
-              borderTopWidth: "1px",
-              borderTopColor: "var(--chakra-colors-border-muted)",
-            },
-          }}
-        >
-          {scenarios.map((scenario) => (
-            <MatrixRow key={scenario.scenarioId} scenario={scenario} columns={columns} {...props} />
-          ))}
-        </Box>
-      </Box>
-    </Box>
+      <MatrixHeader targets={targets} scenarioRuns={scenarioRuns} />
+
+      <Table.Body>
+        {scenarios.map((scenario) => (
+          <MatrixRow key={scenario.scenarioId} scenario={scenario} {...props} />
+        ))}
+      </Table.Body>
+    </ListTable>
   );
 }

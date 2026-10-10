@@ -4,7 +4,15 @@
  * @see specs/features/agent-testing/comparison-mode.feature
  */
 
-import { Box, Button, chakra, HStack, Spinner, Text } from "@langwatch/design-system/primitives";
+import {
+  Box,
+  Button,
+  chakra,
+  HStack,
+  Spinner,
+  Table,
+  Text,
+} from "@langwatch/design-system/primitives";
 import { isTerminalStatus } from "@langwatch/scenario-contract";
 import type { ScenarioRunData } from "@langwatch/scenario-contract";
 import { Square } from "lucide-react";
@@ -159,39 +167,36 @@ function MatrixCell({
 /** One scenario across every target. */
 export function MatrixRow({
   scenario,
-  columns,
   targets,
   scenarioRuns,
   ...handlers
 }: RunLineHandlers & {
   scenario: ScenarioLine;
-  columns: string;
   targets: BatchTarget[];
   scenarioRuns: ScenarioRunData[];
 }) {
   return (
-    <Box
-      display="grid"
-      gridTemplateColumns={columns}
-      columnGap={3}
-      alignItems="start"
-      paddingX={4}
-      paddingY="10px"
+    <Table.Row
+      _hover={{ bg: "transparent" }}
+      css={{ "& > td": { verticalAlign: "top" } }}
       data-testid={`comparison-row-${scenario.scenarioId}`}
     >
-      <Text textStyle="bodySm" fontWeight="medium" color="fg" paddingTop="5px" truncate>
-        {scenario.name}
-      </Text>
+      <Table.Cell>
+        <Text textStyle="bodySm" fontWeight="medium" color="fg" paddingTop="5px" truncate>
+          {scenario.name}
+        </Text>
+      </Table.Cell>
 
       {targets.map((target) => (
-        <MatrixCell
-          key={target.key}
-          scenario={scenario}
-          target={target}
-          scenarioRuns={scenarioRuns}
-          {...handlers}
-        />
+        <Table.Cell key={target.key}>
+          <MatrixCell
+            scenario={scenario}
+            target={target}
+            scenarioRuns={scenarioRuns}
+            {...handlers}
+          />
+        </Table.Cell>
       ))}
-    </Box>
+    </Table.Row>
   );
 }
