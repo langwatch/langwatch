@@ -55,9 +55,9 @@ describe("given a settings page", () => {
 
   describe("when it is the authentication family", () => {
     it.each(["/settings/authentication", "/settings/authentication/provider"])(
-      "leaves %s unmeasured, so its section rail fills the card",
+      "frames %s at the settings measure, its pages being header tabs now",
       (pathname) => {
-        expect(measureAt({ pathname })).toBe("");
+        expect(measureAt({ pathname })).toBe("960px");
       },
     );
   });

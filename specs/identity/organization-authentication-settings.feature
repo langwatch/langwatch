@@ -228,11 +228,12 @@ Feature: Organization authentication settings
       And the page explains that single sign-on is not required
       And activating or removing a connection does not change the saved policies
 
-  Rule: the Authentication pages share one rail
+  Rule: the Authentication pages share one row of header tabs
 
     @integration
-    Scenario: The Authentication pages share main's rail
+    Scenario: The Authentication pages share one row of header tabs
       Given an administrator on any of Overview, Identity provider or Connectors
       When the page renders
-      Then a rail lists Overview, Identity provider and Connectors in that order
-      And the page the reader is on is marked as the current entry
+      Then the header is titled Authentication
+      And its tabs list Overview, Identity provider and Connectors in that order
+      And the page the reader is on is marked as the current tab

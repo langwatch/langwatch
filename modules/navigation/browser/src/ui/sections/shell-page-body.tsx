@@ -89,14 +89,12 @@ const PAGE_INSET = "var(--chakra-spacing-6)";
 const SETTINGS_MEASURE = "960px";
 
 /**
- * Settings, gateway, instance and Cloud admin pages read at the settings measure, under the title;
- * authentication's section rail takes the full width, as main's fullBleed did.
+ * Settings, gateway, instance and Cloud admin pages read at the settings measure, under the title.
  * Ops tools other than instance and Cloud admin draw their own frame and get none here.
  */
 function PageMeasure({ pathname, children }: { pathname: string; children: ReactNode }) {
   const isMeasured =
-    (isPathUnder({ pathname, base: "/settings" }) &&
-      !isPathUnder({ pathname, base: "/settings/authentication" })) ||
+    isPathUnder({ pathname, base: "/settings" }) ||
     isPathUnder({ pathname, base: "/gateway" }) ||
     MEASURED_OPS_PAGES.some((item) => isPathUnder({ pathname, base: item.href }));
   if (!isMeasured) return <>{children}</>;
