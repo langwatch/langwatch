@@ -69,14 +69,38 @@ export function wallClockFrame({ speed }: { speed: number }): number {
   return (Date.now() % 3_600_000) * speed;
 }
 
-/** Starts the mesh or the warp in `element` and returns the stop; throws without WebGL. */
-export function mountAmbientShader({
+/**
+ * The warp's noise texture, loaded and at least 1024px, as the React wrapper hands it over
+ * (its processUniforms and setMinImageSize, Paper Shaders, PolyForm Shield 1.0.0). Mounted
+ * before it loads, the warp samples an empty or tiny texture and its edges turn hard.
+ */
+async function loadedNoiseTexture(): Promise<HTMLImageElement | undefined> {
+  const image = getShaderNoiseTexture();
+  if (!image) return undefined;
+  if (!image.complete || image.naturalWidth === 0) {
+    await new Promise<void>((resolve) => {
+      image.addEventListener("load", () => resolve(), { once: true });
+      image.addEventListener("error", () => resolve(), { once: true });
+    });
+  }
+  const { naturalWidth: width, naturalHeight: height } = image;
+  if (width > 0 && height > 0 && width < 1024 && height < 1024) {
+    const aspect = width / height;
+    image.width = Math.round(aspect > 1 ? 1024 * aspect : 1024);
+    image.height = Math.round(aspect > 1 ? 1024 : 1024 / aspect);
+  }
+  return image;
+}
+
+/** Starts the mesh or the warp in `element` and resolves to the stop; rejects without WebGL. */
+export async function mountAmbientShader({
   element,
   mode,
 }: {
   element: HTMLElement;
   mode: "light" | "dark";
-}): () => void {
+}): Promise<() => void> {
+  const noiseTexture = mode === "dark" ? await loadedNoiseTexture() : undefined;
   const mount =
     mode === "dark"
       ? new ShaderMount(
@@ -92,7 +116,7 @@ export function mountAmbientShader({
             u_swirlIterations: WARP_AT_REST.swirlIterations,
             u_shapeScale: WARP_AT_REST.shapeScale,
             u_shape: WarpPatterns.edge,
-            u_noiseTexture: getShaderNoiseTexture(),
+            u_noiseTexture: noiseTexture,
             ...sizing(defaultPatternSizing, WARP_AT_REST),
           },
           undefined,

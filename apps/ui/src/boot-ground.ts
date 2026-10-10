@@ -5,18 +5,20 @@
  */
 import { mountAmbientShader } from "@langwatch/design-system/ambient-ground-shader";
 
-function start(): void {
+async function start(): Promise<void> {
   const element = document.getElementById("lw-boot-shader");
   if (!element || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
   const mode = document.documentElement.classList.contains("dark") ? "dark" : "light";
   let stop: () => void;
   try {
-    stop = mountAmbientShader({ element, mode });
+    stop = await mountAmbientShader({ element, mode });
   } catch {
     return;
   }
+  // The splash may have left while the texture loaded.
+  if (!element.isConnected) return stop();
   element.dataset.live = "true";
   document.addEventListener("lw-boot:done", () => stop(), { once: true });
 }
 
-start();
+void start();
