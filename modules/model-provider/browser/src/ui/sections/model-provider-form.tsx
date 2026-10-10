@@ -546,13 +546,11 @@ function ProviderModelArea({
 function SaveProviderButton({
   canResolveTarget,
   isBusy,
-  isDirty,
   label,
   onSave,
 }: {
   canResolveTarget: boolean;
   isBusy: boolean;
-  isDirty: boolean;
   label: string;
   onSave: () => void;
 }) {
@@ -562,7 +560,7 @@ function SaveProviderButton({
         size="sm"
         colorPalette="orange"
         loading={isBusy}
-        disabled={!canResolveTarget || !isDirty}
+        disabled={!canResolveTarget}
         data-testid="model-provider-save"
         onClick={onSave}
       >
@@ -743,8 +741,6 @@ export const EditModelProviderForm = ({
     setAdvancedAccordionValue([]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gatewayMenuEnabled, providerId]);
-
-  const isAdvancedDirty = JSON.stringify(advancedDraft) !== JSON.stringify(initialAdvancedDraft);
 
   // Controlled accordion state: collapsed by default, but expands
   // automatically when the user clicks Save with malformed JSON so the
@@ -1033,7 +1029,6 @@ export const EditModelProviderForm = ({
 
         <SaveProviderButton
           canResolveTarget={!cannotResolveTarget}
-          isDirty={state.isDirty || isAdvancedDirty}
           isBusy={isBusy}
           label={saveLabel}
           onSave={handleSave}
