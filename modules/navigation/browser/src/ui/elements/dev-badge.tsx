@@ -11,8 +11,8 @@ const LABEL_MAX_WIDTH = "220px";
 export function DevBadge({ label }: { label?: string }) {
   const pill = (
     <Text
-      fontSize="11px"
-      fontWeight="bold"
+      textStyle="micro"
+      fontWeight="semibold"
       color="fg"
       backgroundColor="bg.raised"
       border="1px solid"

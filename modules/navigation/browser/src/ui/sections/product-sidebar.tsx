@@ -80,7 +80,7 @@ function QuickSearchMenuItem({ showLabel }: { showLabel: boolean }) {
         rightElement={
           <Kbd
             variant="outline"
-            fontSize="10px"
+            textStyle="micro"
             fontWeight="normal"
             background="bg.muted"
             {...QUIET_SIDEBAR_CHIP}
@@ -185,7 +185,6 @@ function DetourMenuBody({
           id={group.id}
           label={group.label}
           showExpanded={showExpanded}
-          isSentenceCase
         >
           {group.items.map((item) => (
             <SideMenuLink

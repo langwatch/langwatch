@@ -120,9 +120,7 @@ function MobileTopBar({
         ) : (
           <HStack gap={2} paddingX={1} flexShrink={0}>
             <SettingsIcon size={14} color="var(--chakra-colors-fg-muted)" />
-            <Text fontSize="13px" fontWeight="medium">
-              Settings
-            </Text>
+            <Text textStyle="label">Settings</Text>
           </HStack>
         )}
         {showsOwnScope ? (

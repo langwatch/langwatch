@@ -108,9 +108,7 @@ function ProductCluster({
         // way out is the sidebar's back entry. The switcher pill's inset keeps the icon in place.
         <HStack gap={2} paddingX={2.5} height="28px">
           <DetourIcon size={14} color="var(--chakra-colors-fg-muted)" />
-          <Text fontSize="13px" fontWeight="medium">
-            {isAdmin ? "Admin" : "Settings"}
-          </Text>
+          <Text textStyle="label">{isAdmin ? "Admin" : "Settings"}</Text>
         </HStack>
       )}
     </HStack>

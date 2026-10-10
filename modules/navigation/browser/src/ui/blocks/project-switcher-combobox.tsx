@@ -103,7 +103,7 @@ function ProjectComboboxTrigger({
           aria-label="Switch project"
           data-testid="navigation-project-switcher"
           data-tour="project-switcher"
-          fontSize="13px"
+          textStyle="bodySm"
           fontWeight="normal"
           paddingX={2}
           height="32px"

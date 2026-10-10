@@ -107,7 +107,7 @@ export function CommandBarLangyMode({
               outline="none"
               boxShadow="none"
               background="transparent"
-              fontSize="15px"
+              fontSize="md"
               lineHeight="1.5"
               flex={1}
               minWidth={0}
@@ -124,13 +124,7 @@ export function CommandBarLangyMode({
               }}
             />
 
-            <Text
-              flexShrink={0}
-              fontSize="11px"
-              fontWeight="semibold"
-              color="fg.muted"
-              letterSpacing="0.02em"
-            >
+            <Text flexShrink={0} textStyle="micro" fontWeight="semibold" color="fg.muted">
               Langy
             </Text>
           </HStack>
@@ -145,7 +139,7 @@ export function CommandBarLangyMode({
         borderTop="1px solid"
         borderColor="border.subtle"
         color="fg.muted"
-        fontSize="12px"
+        textStyle="caption"
       >
         <Text>Ask about the project in plain language</Text>
         <HStack gap={3} flexShrink={0}>
@@ -175,7 +169,7 @@ function KeyHint({ children }: { children: React.ReactNode }) {
       alignItems="center"
       justifyContent="center"
       fontFamily="mono"
-      fontSize="10px"
+      textStyle="micro"
       lineHeight="1"
       borderWidth="1px"
       borderColor="border.subtle"

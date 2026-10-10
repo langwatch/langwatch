@@ -12,8 +12,6 @@ type SidebarSectionProps = {
   defaultExpanded?: boolean;
   /** The `data-tour` target the guided tour spotlights: the label and the items together. */
   tourId?: string;
-  /** Sentence-case group label (Settings, Admin) rather than the product sidebar's caps. */
-  isSentenceCase?: boolean;
 };
 
 /** The design system's sidebar section, open or closed as this person last left it. */
@@ -24,14 +22,13 @@ export const SidebarSection = ({
   showExpanded,
   defaultExpanded = true,
   tourId,
-  isSentenceCase = false,
 }: SidebarSectionProps) => {
   const { isExpanded, toggleSection } = useSidebarSectionState({ id, defaultExpanded });
 
   return (
     <SidebarSectionView
       label={label}
-      heading={<SideMenuSectionLabel label={label} isSentenceCase={isSentenceCase} />}
+      heading={<SideMenuSectionLabel label={label} />}
       isExpanded={isExpanded}
       onToggle={toggleSection}
       showExpanded={showExpanded}

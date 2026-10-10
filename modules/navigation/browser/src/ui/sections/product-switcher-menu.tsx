@@ -16,7 +16,7 @@ import {
 /** The trigger reads as a raised pill on the top bar's gray. */
 const productPillStyle = {
   variant: "ghost",
-  fontSize: "13px",
+  textStyle: "bodySm",
   fontWeight: "medium",
   paddingX: 2.5,
   height: "28px",
@@ -79,16 +79,14 @@ export function ProductSwitcherMenu({ activeProductId }: { activeProductId: Prod
                 <VStack align="start" gap={0.5} width="full">
                   <HStack gap={2} width="full">
                     <Icon size={13} color="var(--chakra-colors-fg-muted)" />
-                    <Text fontSize="13px" fontWeight="medium">
-                      {product.label}
-                    </Text>
+                    <Text textStyle="label">{product.label}</Text>
                     {isActive && (
                       <Box marginLeft="auto" display="flex">
                         <Check size={13} aria-label="Current product" />
                       </Box>
                     )}
                   </HStack>
-                  <Text fontSize="11px" lineHeight="short" color="fg.muted" paddingLeft="21px">
+                  <Text textStyle="micro" color="fg.muted" paddingLeft="21px">
                     {product.pitch}
                   </Text>
                 </VStack>
@@ -108,9 +106,7 @@ export function ProductSwitcherMenu({ activeProductId }: { activeProductId: Prod
               >
                 <HStack gap={2} width="full">
                   <ServerCog size={13} color="var(--chakra-colors-fg-muted)" />
-                  <Text fontSize="13px" fontWeight="medium">
-                    Admin
-                  </Text>
+                  <Text textStyle="label">Admin</Text>
                 </HStack>
               </Menu.Item>
             </>

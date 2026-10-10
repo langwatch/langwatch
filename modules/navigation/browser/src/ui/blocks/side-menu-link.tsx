@@ -126,7 +126,7 @@ export const SideMenuItem = ({
       {showLabel && (
         <>
           <Text
-            fontSize={density.fontSize}
+            textStyle={density.textStyle}
             // Active reads stronger than hover by weight and ink, not by a second fill.
             fontWeight={isActive ? "medium" : "normal"}
             color={isActive ? "fg" : "nav.fg"}

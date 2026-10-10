@@ -35,10 +35,10 @@ function MeScopeChip() {
     <>
       <ScopeDivider />
       <HStack gap={2} paddingX={1.5} minWidth={0}>
-        <Text fontSize="13px" whiteSpace="nowrap">
+        <Text textStyle="bodySm" whiteSpace="nowrap">
           {name}
         </Text>
-        <Badge variant="outline" fontSize="10px" color="fg.muted" borderRadius="md">
+        <Badge variant="outline" textStyle="micro" color="fg.muted" borderRadius="md">
           Personal
         </Badge>
       </HStack>
@@ -126,7 +126,7 @@ function ProjectMenu({
           aria-label="Switch project"
           data-testid="navigation-project-switcher"
           data-tour="project-switcher"
-          fontSize="13px"
+          textStyle="bodySm"
           fontWeight="normal"
           paddingX={2}
           height="32px"
@@ -154,7 +154,7 @@ function ProjectMenu({
                 <Menu.Item
                   key={candidate.projectId}
                   value={candidate.projectId}
-                  fontSize="13px"
+                  textStyle="bodySm"
                   asChild
                 >
                   <NavigationLink href={candidate.href} _hover={{ textDecoration: "none" }}>
@@ -178,7 +178,7 @@ function ProjectMenu({
                 <Menu.Item
                   value={`new-project-${team.teamId}`}
                   data-testid="navigation-project-new"
-                  fontSize="13px"
+                  textStyle="bodySm"
                   onClick={() => onCreateProjectForTeam({ teamId: team.teamId, orgId: team.orgId })}
                 >
                   <Plus size={13} /> New Project
