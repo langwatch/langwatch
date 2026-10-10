@@ -1,0 +1,81 @@
+name: codebase-health
+
+# Nightly codebase health: type-check cost per program, root typecheck time and
+# peak RSS, longest reference chain, emitted .d.ts size and architecture
+# findings per policy, compared with the previous successful run's health.json.
+# A jump opens (or comments on) the issue labelled codebase-health.
+#
+# Spec: specs/tooling/codebase-health.feature
+
+on:
+  schedule:
+    - cron: "13 1 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+  actions: read
+
+concurrency:
+  group: codebase-health
+  cancel-in-progress: false
+
+jobs:
+  health:
+    name: measure and compare
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      GH_TOKEN: ${{ github.token }}
+      SKIP_ENV_VALIDATION: "true"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+
+      - uses: ./.github/actions/setup-pnpm-node
+        with:
+          install: all
+
+      - uses: ./.github/actions/prepare-generated-files
+
+      # The Nx cache would replay the typecheck and measure nothing.
+      - name: Root typecheck, timed
+        run: /usr/bin/time -v -o typecheck-time.txt pnpm typecheck --skip-nx-cache
+
+      - name: Type-check cost per program
+        run: node dev/scripts/ts-program-metrics.mjs --out=ts-program-metrics.jsonl
+
+      # Exit 1 means findings, which are what this step counts.
+      - name: Architecture findings
+        run: pnpm lint:architecture > architecture.txt 2>&1 || test $? -eq 1
+
+      - name: Previous run's health.json
+        run: |
+          run_id=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow codebase-health.yml --status success --limit 1 --json databaseId --jq '.[0].databaseId // empty')
+          if [ -n "$run_id" ]; then
+            gh run download "$run_id" --repo "$GITHUB_REPOSITORY" --name codebase-health --dir previous || echo "no artifact on run $run_id"
+          else
+            echo "no previous successful run"
+          fi
+
+      - name: Compare and report
+        run: >-
+          node dev/scripts/codebase-health.mjs
+          --metrics=ts-program-metrics.jsonl
+          --architecture=architecture.txt
+          --time=typecheck-time.txt
+          --previous=previous/health.json
+          --out=health.json
+          --commit="$GITHUB_SHA"
+          --publish
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: codebase-health
+          path: |
+            health.json
+            ts-program-metrics.jsonl
+            architecture.txt
+          retention-days: 30
+          if-no-files-found: warn
