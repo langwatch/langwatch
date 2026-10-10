@@ -505,7 +505,6 @@ export const APP_ERROR_CODES = [
   "membership_disabled",
   "migration_enrolled_automatically",
   "migration_enrollment_already_exists",
-  "migration_enrollment_cloud_only",
   "migration_enrollment_not_found",
   "migration_not_available_on_installation",
   "migration_pass_already_running",

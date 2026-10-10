@@ -24,6 +24,7 @@ const LONG_STEP = [
   },
 ];
 let isSaaS = false;
+let ENROLLMENTS: Record<string, unknown>[] = [];
 
 vi.mock("../../../behavior/ops-api.ts", () => ({
   api: {
@@ -33,7 +34,7 @@ vi.mock("../../../behavior/ops-api.ts", () => ({
         listSystemMigrations: { useQuery: () => ({ data: MIGRATIONS, isLoading: false }) },
         listTenants: { useInfiniteQuery: () => ({ data: { pages: [] }, isLoading: false }) },
         listMigrationEnrollments: {
-          useQuery: () => ({ data: { isSaaS, enrollments: [] } }),
+          useQuery: () => ({ data: { isSaaS, enrollments: ENROLLMENTS } }),
         },
         runSystemMigrationPass: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
         enrollMigrationTenant: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
@@ -55,11 +56,24 @@ vi.mock("../../../behavior/ops-feedback.ts", () => ({
 }));
 vi.mock("../../../behavior/ops-session.ts", () => ({
   useOpsPermission: () => ({ scope: { kind: "platform" } }),
+  useIsSharedInstall: () => isSaaS,
 }));
 
 import { UpgradeTenantMigrations } from "../ui/sections/upgrade-tenant-migrations.tsx";
 
-afterEach(cleanup);
+const ENROLLED = {
+  organizationId: "org-1",
+  organizationName: "Enrolled org",
+  migrationName: "ops:manual",
+  enrolledByLabel: "Operator",
+  enrolledByUserId: "user-1",
+  createdAt: 0,
+};
+
+afterEach(() => {
+  cleanup();
+  ENROLLMENTS = [];
+});
 
 function renderTab() {
   render(
@@ -121,17 +135,37 @@ describe("UpgradeTenantMigrations", () => {
   });
 
   describe("given a self-hosted installation with a step not enrolled automatically", () => {
-    /** @scenario "Every organization action shows on cloud and self-hosted alike" */
-    it("offers enrol, enrol a cohort, run for an organization and roll back, with Enrolled", () => {
+    /** @scenario "A self-hosted installation offers no enrolment on the Organizations tab" */
+    it("offers run for an organization and roll back, and no enrolment", () => {
       MIGRATIONS = [{ ...LONG_STEP[0], name: "ops:manual", enrolledAutomatically: false }];
+      ENROLLMENTS = [ENROLLED];
       isSaaS = false;
+      renderTab();
+
+      const row = screen.getByTestId("upgrade-tenant-migration-ops:manual");
+      for (const name of [/Run for organization/, /Roll back/]) {
+        expect(within(row).getByRole("button", { name })).toBeTruthy();
+      }
+      for (const name of [/^Enroll…/, /Enroll cohort/, /Withdraw/]) {
+        expect(screen.queryByRole("button", { name })).toBeNull();
+      }
+      expect(screen.getByRole("button", { name: /Run a pass now/ })).toBeTruthy();
+    });
+  });
+
+  describe("given the cloud installation with a step not enrolled automatically", () => {
+    /** @scenario "Cloud offers enrolment beside every organization action" */
+    it("offers enrol, enrol a cohort, run for an organization, roll back and withdraw", () => {
+      MIGRATIONS = [{ ...LONG_STEP[0], name: "ops:manual", enrolledAutomatically: false }];
+      ENROLLMENTS = [ENROLLED];
+      isSaaS = true;
       renderTab();
 
       const row = screen.getByTestId("upgrade-tenant-migration-ops:manual");
       for (const name of [/^Enroll…/, /Enroll cohort/, /Run for organization/, /Roll back/]) {
         expect(within(row).getByRole("button", { name })).toBeTruthy();
       }
-      expect(screen.getByRole("columnheader", { name: "Enrolled" })).toBeTruthy();
+      expect(screen.getByRole("button", { name: /Withdraw/ })).toBeTruthy();
     });
   });
 });

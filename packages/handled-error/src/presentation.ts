@@ -1928,11 +1928,6 @@ const presentations = {
         : "It is already enrolled for that migration, so the next pass will process it. Nothing to do.";
     },
   },
-  migration_enrollment_cloud_only: {
-    title: "Enrollment does not apply to this installation",
-    describe: () =>
-      "Self-hosted installations run released migrations automatically for every organization, so there is nothing to enroll or withdraw.",
-  },
   migration_enrollment_not_found: {
     title: "This organization is not enrolled",
     describe: (error) => {

@@ -627,7 +627,9 @@ Feature: Running system migrations across organizations
   # ═══ Self-hosted installations ════════════════════════════════════════
   # Cloud decides WHO by the migration's cohort; self-hosted decides WHETHER
   # by the migration declaring itself released for self-hosting. Two axes,
-  # two declarations, and self-hosted never reads the cohort one.
+  # two declarations, and self-hosted never reads the cohort one. Enrolment is
+  # therefore cloud only: the self-hosted console offers no enrol, cohort or
+  # withdraw (modules/ops/specs/upgrades.feature).
 
   @unit
   Scenario: Enrollment does not apply to self-hosted installations

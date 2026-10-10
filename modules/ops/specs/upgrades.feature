@@ -105,12 +105,21 @@ Feature: Ops shows an installation's release upgrades, read-only
     Then its Enrolled count reads All and no empty enrolment list is shown
     And the held organization is listed as needing attention
 
+  # Enrolment is cloud only (ADR-173 section 7, UPGRADE-UI-2)
   @integration
-  Scenario: Every organization action shows on cloud and self-hosted alike
+  Scenario: A self-hosted installation offers no enrolment on the Organizations tab
     Given a self-hosted installation with a step that is not enrolled automatically
     When an operator holding ops:manage opens the Organizations tab
+    Then the step offers run for an organization and roll back
+    And it offers no enrol, enrol a cohort or withdraw
+    And the Run a pass now button is shown
+
+  @integration
+  Scenario: Cloud offers enrolment beside every organization action
+    Given the cloud installation with a step that is not enrolled automatically and one enrolled organization
+    When an operator holding ops:manage opens the Organizations tab
     Then the step offers enrol, enrol a cohort, run for an organization and roll back
-    And the Enrolled column is shown
+    And the enrolled organization offers withdraw
 
   @integration
   Scenario: The Organizations tab lists every organization's state, filtered by step and state
@@ -329,6 +338,27 @@ Feature: Ops shows an installation's release upgrades, read-only
     Then both operator steps show under "Action needed" with their status
     And only the failed one offers Retry
 
+  # Action needed on Home, never a Done button (ADR-173 section 7, UPGRADE-UI-2)
+  @integration
+  Scenario: Home shows Action needed for updates while an operator step is unfinished
+    Given an operator step of the running version that is not finished
+    When someone holding ops:view opens Home
+    Then an "Action needed for updates" bar shows in the slot pending join requests use
+    And it links to Ops, Upgrades
+    And nothing offers to mark the step done
+
+  @integration
+  Scenario: Home shows no update bar when nothing needs doing
+    Given every operator step of the running version is finished, or the read is pending or failed
+    When someone holding ops:view opens Home
+    Then no update bar is drawn and no error flashes
+
+  @integration
+  Scenario: Home shows no update bar to someone without ops:view
+    Given an operator step of the running version that is not finished
+    When someone without ops:view opens Home
+    Then no update bar is drawn and the steps are not read
+
   # The status read behind the overview (ADR-173 section 7, UPGRADE-UI-2)
   @unit
   Scenario: The status names a release build by its release
@@ -363,6 +393,8 @@ Feature: Ops shows an installation's release upgrades, read-only
     Then the latest release 3.22.0 is kept for the status to read
     And a later reply naming none forgets it
 
+  # The console offers enrolment only on cloud; the server needs no refusal, as a self-hosted
+  # pass admits every organization whatever the rows say.
   @unit
   Scenario: Enrolment acts on a self-hosted installation as it does on cloud
     Given a self-hosted installation and a step that is not enrolled automatically
