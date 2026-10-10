@@ -288,6 +288,44 @@ func TestJSONSchemaOutput(t *testing.T) {
 	}
 }
 
+// @scenario "A json_object response follows the fields its prompt names"
+func TestJSONObjectFollowsPrompt(t *testing.T) {
+	srv := newTestServer(t)
+	system := "Respond with a JSON object.\\n\\n1. **name**: a short name\\n2. **situation**: a context\\n3. **criteria**: 3-6 success criteria"
+	body := `{"model":"m","response_format":{"type":"json_object"},"messages":[{"role":"system","content":"` + system + `"},{"role":"user","content":"An angry customer."}]}`
+	var got struct {
+		Name      string   `json:"name"`
+		Situation string   `json:"situation"`
+		Criteria  []string `json:"criteria"`
+	}
+	first := text(chat(t, srv, body, nil))
+	if err := json.Unmarshal([]byte(first), &got); err != nil {
+		t.Fatalf("%q: %v", first, err)
+	}
+	if got.Name == "" || got.Situation == "" || len(got.Criteria) < 3 {
+		t.Fatalf("fields missing: %s", first)
+	}
+	if second := text(chat(t, srv, body, nil)); second != first {
+		t.Fatalf("same request, different JSON: %s vs %s", first, second)
+	}
+	plain := `{"model":"m","response_format":{"type":"json_object"},"messages":[{"role":"user","content":"Say something."}]}`
+	var answer struct {
+		Answer string `json:"answer"`
+	}
+	if err := json.Unmarshal([]byte(text(chat(t, srv, plain, nil))), &answer); err != nil || answer.Answer == "" {
+		t.Fatalf("a prompt naming no fields lost the answer shape: %v", err)
+	}
+	sys, _ := json.Marshal(`JSON schema:
+{"type":"object","required":["score"],"properties":{"score":{"type":"integer","minimum":5,"maximum":9}}}`)
+	embedded := `{"model":"m","response_format":{"type":"json_object"},"messages":[{"role":"system","content":` + string(sys) + `},{"role":"user","content":"Rate."}]}`
+	var scored struct {
+		Score int `json:"score"`
+	}
+	if err := json.Unmarshal([]byte(text(chat(t, srv, embedded, nil))), &scored); err != nil || scored.Score < 5 || scored.Score > 9 {
+		t.Fatalf("embedded schema not honored: %+v %v", scored, err)
+	}
+}
+
 // @scenario "Embeddings come back at the requested dimension"
 func TestEmbeddings(t *testing.T) {
 	srv := newTestServer(t)

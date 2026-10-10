@@ -41,7 +41,10 @@ an OpenAI provider with a base URL into chat completions before it leaves.
   `format` (date-time, date, email, uri, uuid), numbers within
   `minimum`/`maximum`, a seeded `enum`/`const` pick, arrays of `minItems` to
   `maxItems`, required keys always, optional keys half the time, `$ref`/`$defs`
-  resolved. `json_object` gets `{"answer": "..."}`.
+  resolved. `json_object` follows the fields its prompt names (an embedded
+  `JSON schema:` block, else the `**bold**` fields of numbered instructions; a field
+  whose line asks for a count range or a list is an array) and otherwise gets
+  `{"answer": "..."}`.
 - **Tools**: a forced tool (`tool_choice` required, a named function, or
   Anthropic `any`/`tool`) is always called; otherwise, when tools are offered
   and the last message is not a tool result, half of all prompts call a tool.

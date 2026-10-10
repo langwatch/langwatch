@@ -57,6 +57,12 @@ Feature: llmsim, a local LLM provider stand-in run by haven
     Then the answer is JSON with every required key, formats, bounds, enums, consts and $ref types honoured
     And the same request gives the same JSON while a different prompt gives different JSON
 
+  Scenario: A json_object response follows the fields its prompt names
+    When a chat completion asks for a json_object response format and the prompt lists **bold** field names or embeds a JSON schema
+    Then the answer is a JSON object with those fields, a list for a field whose line asks for a count range or a list
+    And the same request gives the same JSON
+    And a json_object request whose prompt names no fields still answers {"answer": ...}
+
   Scenario: Embeddings come back at the requested dimension
     When a client asks for embeddings of two inputs at 64 dimensions
     Then it gets two 64-dimension vectors, each a function of its input alone
