@@ -443,7 +443,7 @@ function ActionsMenu({ id, model }: { id?: string; model: string }) {
         {id && (
           <Menu.Item
             value="delete"
-            color="red.600"
+            color="red.fg"
             onClick={(event) => {
               event.stopPropagation();
               deleteLLMModelCost.mutate(

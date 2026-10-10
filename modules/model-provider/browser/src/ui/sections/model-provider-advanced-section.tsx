@@ -216,7 +216,7 @@ export function ModelProviderAdvancedSection({
                   onChange={(e) => setField("skipPermissionsModels")(e.target.value)}
                 />
                 {skipPermissionsError ? (
-                  <Text fontSize="xs" color="red.500">
+                  <Text fontSize="xs" color="red.fg">
                     {skipPermissionsError}
                   </Text>
                 ) : (
@@ -227,7 +227,7 @@ export function ModelProviderAdvancedSection({
             {showGatewayFields &&
               (!modelProviderId ? (
                 <Box width="full" paddingY={2}>
-                  <Text fontSize="xs" color="gray.500">
+                  <Text fontSize="xs" color="fg.subtle">
                     Save the provider first to configure rate limits and routing hints.
                   </Text>
                 </Box>
@@ -296,7 +296,7 @@ export function ModelProviderAdvancedSection({
                       onChange={(e) => setField("providerConfigJson")(e.target.value)}
                     />
                     {jsonError ? (
-                      <Text fontSize="xs" color="red.500">
+                      <Text fontSize="xs" color="red.fg">
                         {jsonError}
                       </Text>
                     ) : (
@@ -314,7 +314,7 @@ export function ModelProviderAdvancedSection({
                       <Text>Last checked: {formatDate(initial.lastHealthCheckAt)}</Text>
                       <Text>Circuit opened: {formatDate(initial.circuitOpenedAt)}</Text>
                       {initial.disabledAt && (
-                        <Text color="red.500">Disabled at: {formatDate(initial.disabledAt)}</Text>
+                        <Text color="red.fg">Disabled at: {formatDate(initial.disabledAt)}</Text>
                       )}
                     </VStack>
                   </Box>
