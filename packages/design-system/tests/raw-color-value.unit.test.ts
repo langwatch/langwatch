@@ -44,18 +44,6 @@ describe("getRawColorValue", () => {
     expect(getRawColorValue("gray.400")).toBe("#9CA3AF");
   });
 
-  it("returns Primer gray in dark mode and the existing gray in light mode", () => {
-    const lightGray = getRawColorValue("gray.400");
-    document.documentElement.classList.add("dark");
-    try {
-      expect(getRawColorValue("gray.400")).toBe("#9198a1");
-      expect(getRawColorValue("gray.850")).toBe("#151b23");
-    } finally {
-      document.documentElement.classList.remove("dark");
-    }
-    expect(getRawColorValue("gray.400")).toBe(lightGray);
-  });
-
   it("throws for a token the stylesheet does not define instead of guessing", () => {
     expect(() => getRawColorValue("blue.fg")).toThrow(
       "Colour variable --chakra-colors-blue-fg is not defined",

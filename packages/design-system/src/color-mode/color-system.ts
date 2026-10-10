@@ -14,23 +14,16 @@ export const colorSystem = {
     100: { value: "#f1f5f9" },
     50: { value: "#f8fafc" },
   },
-  // Primer dark gray scale; semantic gray steps select this backing scale in dark mode.
+  // Used on _dark sides only; near-neutral with the smallest indigo tint.
   zinc: {
-    50: { value: "#f0f6fc" },
-    100: { value: "#e6edf3" },
-    150: { value: "#d8dee4" },
-    200: { value: "#c9d1d9" },
-    300: { value: "#b1bac4" },
-    400: { value: "#9198a1" },
-    450: { value: "#838c97" },
-    500: { value: "#6e7681" },
-    600: { value: "#484f58" },
-    700: { value: "#3d444d" },
-    750: { value: "#2f3742" },
-    800: { value: "#212830" },
-    850: { value: "#151b23" },
-    900: { value: "#0d1117" },
-    950: { value: "#010409" },
+    500: { value: "#565664" },
+    600: { value: "#3a3a44" },
+    700: { value: "#282832" },
+    750: { value: "#20202a" },
+    800: { value: "#1a1a24" },
+    850: { value: "#15151e" },
+    900: { value: "#10101a" },
+    950: { value: "#080812" },
   },
   red: {
     50: { value: "#FFF5F5" },
@@ -140,22 +133,4 @@ export const colorSystem = {
     800: { value: "#702459" },
     900: { value: "#521B41" },
   },
-};
-// Keep the light gray scale unchanged while Chakra roles use Primer gray in dark mode.
-export const grayScale = {
-  ...Object.fromEntries(
-    Object.entries(colorSystem.gray).map(([step, token]) => [
-      step,
-      {
-        value: {
-          _light: token.value,
-          _dark:
-            Object.entries(colorSystem.zinc).find(([darkStep]) => darkStep === step)?.[1].value ??
-            colorSystem.zinc[50].value,
-        },
-      },
-    ]),
-  ),
-  850: { value: { _light: colorSystem.gray[800].value, _dark: colorSystem.zinc[850].value } },
-  750: { value: { _light: colorSystem.gray[700].value, _dark: colorSystem.zinc[750].value } },
 };

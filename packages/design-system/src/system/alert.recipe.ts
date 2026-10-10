@@ -35,7 +35,7 @@ const MESH = {
   toast: { base: [7, 12], spot: [3, 4], rim: [26, 36] },
   outline: { base: [1, 3], spot: [1, 2], rim: [32, 42] },
   subtle: { base: [12, 18], spot: [4, 5], rim: [30, 40] },
-  surface: { base: [18, 25], spot: [5, 6], rim: [38, 48] },
+  surface: { base: [18, 22], spot: [5, 6], rim: [38, 48] },
 } as const;
 
 export type MeshLevel = keyof typeof MESH;
