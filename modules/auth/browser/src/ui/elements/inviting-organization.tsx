@@ -1,6 +1,6 @@
 import { Avatar } from "@langwatch/design-system/avatar";
 import { HStack, Text, VStack } from "@langwatch/design-system/primitives";
-import { getColorForString } from "@langwatch/design-system/rotating-colors";
+import { getColorPaletteForString } from "@langwatch/design-system/rotating-colors";
 
 import { SHAPE } from "../../model/front-door-theme.ts";
 
@@ -27,8 +27,8 @@ export function InvitingOrganization({
       <Avatar.Root
         size="md"
         shape="rounded"
-        color="white"
-        background={getColorForString("colors", organizationName).color}
+        color={`${getColorPaletteForString(organizationName)}.fg`}
+        background={`${getColorPaletteForString(organizationName)}.subtle`}
         flexShrink={0}
       >
         <Avatar.Fallback name={organizationName} />
