@@ -518,6 +518,25 @@ export function getTraceColumnDef(
   return traceColumnDefsByString[id];
 }
 
+/**
+ * The member project a row was listed from (ADR-144). Kept out of
+ * `traceColumnDefs` on purpose: it means something only on an aggregate
+ * project, so no lens or column picker offers it, and `useTraceLensColumns`
+ * puts it first on an aggregate's table and nowhere else.
+ */
+export const MEMBER_PROJECT_COLUMN_ID = "project";
+
+export const memberProjectColumnDef = traceCol.accessor(
+  (row) => row.projectId ?? "",
+  {
+    id: MEMBER_PROJECT_COLUMN_ID,
+    header: "Project",
+    size: 180,
+    minSize: 120,
+    enableSorting: false,
+  },
+) as ColumnDef<TraceListItem, unknown>;
+
 export function buildConversationColumns(
   ids: string[],
 ): Array<ColumnDef<ConversationGroup, any>> {

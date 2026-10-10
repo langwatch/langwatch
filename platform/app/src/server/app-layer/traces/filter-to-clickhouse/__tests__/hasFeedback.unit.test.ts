@@ -56,7 +56,7 @@ describe("has:feedback", () => {
 
   describe("when compiled to ClickHouse", () => {
     it("looks for the thumbs_up_down event name", () => {
-      const compiled = translateFilterToClickHouse("has:feedback", "t1", {
+      const compiled = translateFilterToClickHouse("has:feedback", {
         from: 0,
         to: 1,
       });

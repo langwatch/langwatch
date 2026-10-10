@@ -76,6 +76,35 @@ export function showErrorToast({
 }
 
 /**
+ * Mutation options for a write the screen already shows as done: once the
+ * write settles, `reload` reads the server's copy back, and a refusal is
+ * toasted under `fallbackTitle` first. On success the reload picks up the
+ * saved row; on a refusal it puts back what the server kept, so a refused
+ * edit does not stick on screen.
+ *
+ * ```ts
+ * api.savedViews.rename.useMutation(
+ *   reloadingWriteOptions({ fallbackTitle: "Couldn't rename the view", reload }),
+ * );
+ * ```
+ */
+export function reloadingWriteOptions({
+  fallbackTitle,
+  reload,
+}: {
+  fallbackTitle: string;
+  reload: () => void;
+}): { onSuccess: () => void; onError: (error: unknown) => void } {
+  return {
+    onSuccess: reload,
+    onError: (error) => {
+      showErrorToast({ error, fallbackTitle });
+      reload();
+    },
+  };
+}
+
+/**
  * The toast's single body line: the registry's description, plus the one
  * remaining server tip that adds something to it.
  *

@@ -203,6 +203,7 @@ import {
   PrismaSessionFactors,
 } from "./organization-mfa-adapters";
 import { PriorSessionService } from "./prior-session.service";
+import { ProvenAddressesService } from "./proven-addresses.service";
 import { pinnedFetch, systemHostResolver } from "./public-egress";
 import { PrismaCredentialAccountRepository } from "./repositories/credential-account.prisma.repository";
 import { PrismaIdentityAccountsRepository } from "./repositories/identity-accounts.prisma.repository";
@@ -342,6 +343,21 @@ const identityEmailService = new IdentityEmailService(identityHeads, isLatched);
 
 export function identityEmail(): IdentityEmailService {
   return identityEmailService;
+}
+
+/**
+ * The addresses a person has proven, identifiers first and the verified
+ * legacy column behind them: one rule for the join door and the invitation
+ * lookup, composed once over the same two reads.
+ */
+const provenAddressesService = new ProvenAddressesService({
+  verifiedEmailsOf: (args) => identityEmailService.verifiedEmailsOf(args),
+  findVerifiedLegacyEmail: (args) =>
+    identityUsers.findVerifiedLegacyEmail(args),
+});
+
+export function provenAddresses(): ProvenAddressesService {
+  return provenAddressesService;
 }
 
 /**
@@ -611,6 +627,15 @@ export async function addressRoutesToConnection({
  * its refusal carries the place to go instead — so the two ask once, here,
  * and cannot come to different conclusions about whose address this is.
  *
+ * The answer carries the METHOD beside the connection, because the two are
+ * not always the same string. A self-serve connection is dialled by its own
+ * id. A grandfathered connection is routed through the broker: the router
+ * names the connection but the method it dials is `auth0`, because the
+ * deployment holds no credentials of its own for it and the engine registers
+ * nothing under its id (`@ee/sso/legacy-sso-dial`). A caller that wants to
+ * SEND somebody to the connection needs to know which of the two it is; a
+ * caller that only wants to know whose address this is does not.
+ *
  * Left to throw for the reason stated above: on a deployment that mandates
  * single sign-on for this address, failing open would hand out the very door
  * the connection exists to close.
@@ -619,13 +644,13 @@ export async function connectionGoverningAddress({
   email,
 }: {
   email: string;
-}): Promise<{ connectionId: string } | null> {
+}): Promise<{ connectionId: string; methodId: string } | null> {
   const decision = await signInRouter().route({ identifier: email });
   if (decision.outcome !== "redirect_to_connection") return null;
-  const connectionId =
-    decision.methodSet.find((method) => method.connectionId !== null)
-      ?.connectionId ?? null;
-  return connectionId === null ? null : { connectionId };
+  const method =
+    decision.methodSet.find((method) => method.connectionId !== null) ?? null;
+  if (method === null || method.connectionId === null) return null;
+  return { connectionId: method.connectionId, methodId: method.id };
 }
 
 let credentialSessionGuard: CredentialSessionGuard | undefined;
@@ -1384,7 +1409,8 @@ export function signUpVerification(): SignUpVerificationService {
       sendVerificationLink: ({ email, verificationUrl }) =>
         sendSignUpVerificationEmail({ email, verificationUrl }),
     },
-    buildVerificationUrl: ({ token }) => buildSignUpVerificationUrl(token),
+    buildVerificationUrl: ({ token, callbackUrl }) =>
+      buildSignUpVerificationUrl({ token, callbackUrl }),
   });
 }
 

@@ -14,8 +14,12 @@ import {
   enableInstantEvals,
   instantEvalOptInOffer,
   instantEvalSwitchOffered,
+  selfHostedInstantEvalOffer,
   switchInstantEvalsOn,
 } from "../opt-in";
+
+/** A Prisma no path under test reaches: every row read here is injected. */
+const NO_PRISMA = {} as PrismaClient;
 
 describe("given a self-serve organization on the hosted service", () => {
   describe("when the switch path asks whether the organization is offered it", () => {
@@ -36,6 +40,7 @@ describe("given a self-serve organization on the hosted service", () => {
     it("offers the switch", async () => {
       await expect(
         instantEvalOptInOffer({
+          prisma: NO_PRISMA,
           organizationId: "organization",
           maySwitch: async () => true,
           isSaas: () => true,
@@ -50,6 +55,7 @@ describe("given a self-serve organization on the hosted service", () => {
     it("offers a word with an organization admin", async () => {
       await expect(
         instantEvalOptInOffer({
+          prisma: NO_PRISMA,
           organizationId: "organization",
           maySwitch: async () => false,
           isSaas: () => true,
@@ -67,6 +73,7 @@ describe("given an enterprise organization on the hosted service", () => {
       const maySwitch = vi.fn(async () => false);
       await expect(
         instantEvalOptInOffer({
+          prisma: NO_PRISMA,
           organizationId: "organization",
           maySwitch,
           isSaas: () => true,
@@ -80,19 +87,93 @@ describe("given an enterprise organization on the hosted service", () => {
 
 describe("given a self-hosted install", () => {
   describe("when the popover asks what to offer", () => {
-    /** @scenario "A self-hosted install is offered a word with us" */
-    it("offers a word with us without reading the plan", async () => {
+    /** @scenario "A self-hosted install is told why from its judge and its license, and the plan is not read" */
+    it("answers from the install's own reason, without reading the plan or the member", async () => {
       const planTypeOf = vi.fn(async () => "PRO");
+      const maySwitch = vi.fn(async () => true);
       await expect(
         instantEvalOptInOffer({
+          prisma: NO_PRISMA,
           organizationId: "organization",
-          maySwitch: async () => true,
+          maySwitch,
           isSaas: () => false,
           planTypeOf,
+          selfHostedOfferOf: async () => "not_in_license",
         }),
-      ).resolves.toBe("contact_us");
+      ).resolves.toBe("not_in_license");
       expect(planTypeOf).not.toHaveBeenCalled();
+      expect(maySwitch).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe("given a self-hosted install that is not released", () => {
+  const licensed = { isEntitled: true, isSwitchedOn: true };
+  const unlicensed = { isEntitled: false, isSwitchedOn: false };
+
+  /** @scenario "A self-hosted install is told why from its judge and its license, and the plan is not read" */
+  it.each([
+    {
+      reason:
+        "judges through LangWatch on a license without Instant Evals, or no license",
+      route: "connect",
+      license: unlicensed,
+      offer: "not_in_license",
+    },
+    {
+      reason: "holds a license naming them that an admin switched off",
+      route: "connect",
+      license: { isEntitled: true, isSwitchedOn: false },
+      offer: "switched_off",
+    },
+    {
+      reason: "holds a license naming them but no credential to present",
+      route: "connect",
+      license: licensed,
+      offer: "not_connected",
+    },
+    {
+      reason: "has Connect switched off",
+      route: "disconnected",
+      license: licensed,
+      offer: "not_connected",
+    },
+    {
+      reason: "judges with its own key",
+      route: "own_key",
+      license: licensed,
+      offer: "ask_operator",
+    },
+    {
+      reason: "has judging turned off",
+      route: "off",
+      license: licensed,
+      offer: "ask_operator",
+    },
+  ] as const)("is told so when it $reason", async ({
+    route,
+    license,
+    offer,
+  }) => {
+    await expect(
+      selfHostedInstantEvalOffer({
+        prisma: NO_PRISMA,
+        organizationId: "organization",
+        judgeRoute: () => route,
+        licenseOf: async () => license,
+      }),
+    ).resolves.toBe(offer);
+  });
+
+  it("never reads the license of an install that does not judge through LangWatch", async () => {
+    const licenseOf = vi.fn(async () => licensed);
+    await selfHostedInstantEvalOffer({
+      prisma: NO_PRISMA,
+      organizationId: "organization",
+      judgeRoute: () => "own_key",
+      licenseOf,
+    });
+    expect(licenseOf).not.toHaveBeenCalled();
   });
 });
 
@@ -113,7 +194,37 @@ describe("given an organization that is offered a word with us", () => {
           isSaas: () => true,
           planTypeOf: async () => "ENTERPRISE",
         }),
-      ).rejects.toBeInstanceOf(InstantEvalOptInNotOfferedError);
+      ).rejects.toMatchObject({
+        name: "InstantEvalOptInNotOfferedError",
+        meta: { deployment: "enterprise" },
+      });
+      expect(updateMany).not.toHaveBeenCalled();
+    });
+
+    it("names the license, or the operator of an install with its own judge key, on a self-hosted install", async () => {
+      const updateMany = vi.fn(async () => ({ count: 1 }));
+      const prisma = {
+        organization: { updateMany },
+      } as unknown as PrismaClient;
+
+      const refused = switchInstantEvalsOn({
+        prisma,
+        organizationId: "organization",
+        userId: "member",
+        isSaas: () => false,
+      });
+      await expect(refused).rejects.toBeInstanceOf(
+        InstantEvalOptInNotOfferedError,
+      );
+      await expect(refused).rejects.toMatchObject({
+        meta: { deployment: "self_hosted" },
+        message: expect.stringContaining("from its license"),
+      });
+      await expect(refused).rejects.toMatchObject({
+        message: expect.stringContaining(
+          "from whoever runs it when it has its own judge key",
+        ),
+      });
       expect(updateMany).not.toHaveBeenCalled();
     });
   });

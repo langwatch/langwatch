@@ -1098,7 +1098,7 @@ export class PublicApiTriggerService {
     const query = filterQuery?.trim() ?? "";
     if (query === "") return null;
     try {
-      translateFilterToClickHouse(query, projectId, { from: 0, to: 0 });
+      translateFilterToClickHouse(query, { from: 0, to: 0 });
     } catch (error) {
       // The translator's account can name internal columns, so it goes to
       // the log; the caller gets the fixed customer-safe refusal.

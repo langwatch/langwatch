@@ -116,7 +116,9 @@ describe("createResilientClickHouseClient()", () => {
 
   describe("when a read exhausts its retries", () => {
     it("calls maxRetries+1 times then throws the final error", async () => {
-      const transientError = new Error("MEMORY_LIMIT_EXCEEDED");
+      const transientError = new Error(
+        "Code: 202. DB::Exception: Too many simultaneous queries. Maximum: 100.",
+      );
       const mock = makeMockClient({
         query: vi.fn().mockRejectedValue(transientError),
       });
@@ -369,7 +371,9 @@ describe("createResilientClickHouseClient()", () => {
 
   describe("when logging throws during a read retry", () => {
     it("still retries and succeeds", async () => {
-      const transientError = new Error("MEMORY_LIMIT_EXCEEDED");
+      const transientError = new Error(
+        "Code: 202. DB::Exception: Too many simultaneous queries. Maximum: 100.",
+      );
       const queryResult = { data: [] };
       const mock = makeMockClient({
         query: vi
@@ -478,28 +482,45 @@ describe("createResilientClickHouseClient()", () => {
 });
 
 describe("query error translation after retries are exhausted", () => {
-  it("throws QueryMemoryExceededError for a 241 driver error, preserving the raw error in reasons", async () => {
-    const raw = new Error(
-      "Code: 241. DB::Exception: Memory limit (for query) exceeded. (MEMORY_LIMIT_EXCEEDED)",
-    );
-    const mock = makeMockClient({
-      query: vi.fn().mockRejectedValue(raw),
-    });
-    const client = createResilientClickHouseClient({
-      client: mock,
-      maxRetries: 1,
-      baseDelayMs: 1,
-    });
+  describe("when a read hits MEMORY_LIMIT_EXCEEDED", () => {
+    const memoryErrors = [
+      {
+        label: "its own query limit",
+        message:
+          "Code: 241. DB::Exception: Query memory limit exceeded: would use 2.01 GiB (attempt to allocate chunk of 4.00 MiB), maximum: 1.86 GiB: While executing CreatingSetsTransform. (MEMORY_LIMIT_EXCEEDED)",
+      },
+      {
+        label: "the user or server total",
+        message:
+          "Code: 241. DB::Exception: User memory limit exceeded: would use 9.31 GiB, maximum: 9.31 GiB. OvercommitTracker decision: Query was selected to stop by OvercommitTracker. (MEMORY_LIMIT_EXCEEDED)",
+      },
+    ] as const;
 
-    const { QueryMemoryExceededError } = await import(
-      "~/server/app-layer/traces/errors"
-    );
-    const rejection = await client.query({ query: "SELECT 1" }).catch((e) => e);
+    for (const { label, message } of memoryErrors) {
+      /** @scenario A query over the memory limit is not retried in place */
+      it(`throws QueryMemoryExceededError on the first attempt for ${label}, preserving the raw error in reasons`, async () => {
+        const raw = new Error(message);
+        const mock = makeMockClient({
+          query: vi.fn().mockRejectedValue(raw),
+        });
+        const client = createResilientClickHouseClient({
+          client: mock,
+          maxRetries: 3,
+          baseDelayMs: 1,
+        });
 
-    expect(rejection).toBeInstanceOf(QueryMemoryExceededError);
-    expect(rejection.reasons).toEqual([raw]);
-    // Retries happened first — translation only fires after exhaustion.
-    expect(mock.query).toHaveBeenCalledTimes(2);
+        const { QueryMemoryExceededError } = await import(
+          "~/server/app-layer/traces/errors"
+        );
+        const rejection = await client
+          .query({ query: "SELECT 1" })
+          .catch((e) => e);
+
+        expect(rejection).toBeInstanceOf(QueryMemoryExceededError);
+        expect(rejection.reasons).toEqual([raw]);
+        expect(mock.query).toHaveBeenCalledTimes(1);
+      });
+    }
   });
 
   it("rethrows unmapped driver errors unchanged", async () => {

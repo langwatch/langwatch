@@ -20,6 +20,8 @@ langwatch instrument claude --project acme-app
 
 This mints an ingest key for this device, scoped to the project, and pins the tool to the project. LangWatch creates one key per device and never replaces another device's key, so any number of machines can report to one project at the same time. You need a login and the `traces:create` permission on the project.
 
+A member on a [Developer seat](/platform/members-and-teams#developers) holds no permission on any shared project, so the pin is refused and the device keeps its current connection. Ask an administrator to move you to a Member seat and add you to the team that owns the project.
+
 The wrapper takes the same flag and then starts the agent:
 
 ```bash

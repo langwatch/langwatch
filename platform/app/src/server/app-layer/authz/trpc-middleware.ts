@@ -18,6 +18,8 @@
  * machine-readable half of the declaration: the sweep test walks the router
  * and refuses any procedure whose chain carries none.
  */
+
+import type { Authorization } from "@langwatch/actor";
 import {
   type AuthzDenialReason,
   type AuthzPermission,
@@ -34,16 +36,24 @@ import {
 import { createLogger } from "@langwatch/observability";
 import { TRPCError } from "@trpc/server";
 import type { OrganizationUserRole } from "~/generated/prisma/client";
+import { captureException, toError } from "~/utils/posthogErrorCapture";
 import type { Session } from "../../auth";
 import { prisma } from "../../db";
 import { type App, getApp } from "../app";
+import { PROOF_BEARING_PERMISSIONS } from "../clients/clickhouse/authorized-reads";
 import { organizationMfa } from "../identity/runtime";
 import { deploymentOffersTwoStepVerification } from "../identity/signin-method-policy";
+import type { ProjectKindReader } from "../permissions/aggregate-admin-gate";
 import {
   DeveloperSeatRestrictedError,
   LiteMemberRestrictedError,
   MembershipDisabledError,
 } from "../permissions/errors";
+import { isAggregateProjectKind } from "../projects/project-kinds";
+import {
+  assertProjectAcceptsWrites,
+  writesUnderProject,
+} from "../projects/project-write-guard";
 import {
   permissionDecisionRecord,
   principalOfSession,
@@ -68,6 +78,8 @@ type MiddlewareParams = {
     app?: App;
     permissionChecked: boolean;
     organizationRole?: OrganizationUserRole | null;
+    /** The proof minted for a proof-bearing permission; see `trpc.ts`. */
+    authorization?: Authorization;
     /**
      * The two-step verification gate's per-request memo (D06). A tRPC batch
      * shares one context, so this is what makes one person cost one query
@@ -80,10 +92,131 @@ type MiddlewareParams = {
     mfaGate?: Partial<
       Pick<MfaGateDeps, "offered" | "scopes" | "organizationMfa">
     >;
+    /** How a project's kind is read (ADR-144); the App's cached reader
+     *  unless a test hands one in. */
+    projectKinds?: ProjectKindReader;
   };
   input: ScopeInput;
+  /** The procedure path tRPC hands every middleware; the proof's purpose. */
+  path?: string;
+  /** The procedure type tRPC hands every middleware. */
+  type?: "query" | "mutation" | "subscription";
   next: () => any;
 };
+
+/**
+ * ADR-144 block B: mint the proof for a route that reads a proof-bearing
+ * store. Runs after the permission and the second factor, so the proof is
+ * only ever minted for a request that was admitted. The door evaluates the
+ * same grants the check did, through the same engine, so a disagreement is
+ * a defect and surfaces as a refusal rather than a wider read.
+ */
+async function mintRouteAuthorization({
+  ctx,
+  session,
+  path,
+  permission,
+  scope,
+}: {
+  ctx: MiddlewareParams["ctx"];
+  session: Session;
+  path: string | undefined;
+  permission: AuthzPermission;
+  scope: { tier: string; id: string };
+}): Promise<void> {
+  if (scope.tier !== "project" || !PROOF_BEARING_PERMISSIONS.has(permission)) {
+    return;
+  }
+  const { actor, subject } = principalOfSession({ session });
+  ctx.authorization = await appOf(ctx).authorization.authorize({
+    actor:
+      actor.userId === subject.userId
+        ? { type: "user", id: subject.userId }
+        : { type: "user", id: subject.userId, impersonatorId: actor.userId },
+    principal: { type: "user", id: subject.userId },
+    permission,
+    scope: { projectId: scope.id },
+    purpose: { kind: "route", route: path ?? "unknown" },
+  });
+}
+
+/**
+ * ADR-144 decision 8: nothing is written under an aggregate's tenant. Every
+ * mutation declared under a write permission on a project-tier resource is
+ * refused on an aggregate here, after the permission (so a caller with no
+ * business on the project is refused for that reason first) and before the
+ * handler (so no route has to remember to ask). Queries and the permissions
+ * that manage the project itself are untouched.
+ */
+async function refuseWriteUnderAggregate({
+  ctx,
+  type,
+  permissions,
+  scope,
+  organizationRole,
+}: {
+  ctx: MiddlewareParams["ctx"];
+  type: MiddlewareParams["type"];
+  /**
+   * The permissions the mutation is declared under. Under `.permissionAny`
+   * any one admits the caller, so the mutation writes if any of them does.
+   */
+  permissions: readonly AuthzPermission[];
+  scope: { tier: string; id: string };
+  organizationRole: OrganizationUserRole | null;
+}): Promise<void> {
+  if (type !== "mutation" || scope.tier !== "project") return;
+  if (!permissions.some(writesUnderProject)) return;
+  // Only an organisation admin is ever admitted to an aggregate: the
+  // decision above already refused anyone else on one (decision 5), so a
+  // permitted non-admin is on some other kind of project and costs no read.
+  if (organizationRole !== "ADMIN") return;
+  await assertProjectAcceptsWrites({
+    kinds: projectKindsOf(ctx),
+    projectId: scope.id,
+  });
+}
+
+/**
+ * ADR-144 decision 9: a read of an aggregate project is audited where its
+ * proof is minted, so a deep link, a prefetch or a direct call is audited
+ * as surely as a rendered page. Only a proof that reads shared grants on an
+ * aggregate qualifies; a plain project's proof never reaches the kind read.
+ * The row is deduplicated per actor and aggregate in process and in the
+ * database, so the cost is one cached kind read per request.
+ *
+ * Never fails the read: an audit failure is logged and reported, and the
+ * next read in the window retries it.
+ */
+async function auditAggregateRead({
+  ctx,
+  session,
+  scope,
+}: {
+  ctx: MiddlewareParams["ctx"];
+  session: Session;
+  scope: { tier: string; id: string };
+}): Promise<void> {
+  const authorization = ctx.authorization;
+  if (scope.tier !== "project") return;
+  if (!authorization?.grants.some((grant) => grant.kind === "shared")) return;
+  const projectId = scope.id;
+  try {
+    const kind = await projectKindsOf(ctx).kindOf(projectId);
+    if (!isAggregateProjectKind(kind)) return;
+    await appOf(ctx).aggregateReadAudit.recordAggregateRead({
+      actorUserId: session.user.id,
+      organizationId: authorization.scope.organizationId,
+      aggregateProjectId: projectId,
+    });
+  } catch (error) {
+    logger.warn(
+      { error, projectId },
+      "could not audit an aggregate read; the read goes on",
+    );
+    captureException(toError(error));
+  }
+}
 
 /**
  * The gate's dependencies for this request: the flag, the scope lookup, the
@@ -99,6 +232,10 @@ const mfaGateDepsFor = (ctx: MiddlewareParams["ctx"]): MfaGateDeps => {
     cache: ctx.mfaGateCache,
   };
 };
+
+/** The kind reader this request asks: the injected one, or the App's. */
+const projectKindsOf = (ctx: MiddlewareParams["ctx"]): ProjectKindReader =>
+  ctx.projectKinds ?? appOf(ctx).projectKinds;
 
 /**
  * The App this request decides through: the one its context factory injected,
@@ -129,13 +266,14 @@ export const checkDeclaredPermission = ({
 }): DeclaredMiddleware =>
   declareAuthzMiddleware(
     { kind: "permission", permission, via, nondisclosure },
-    async ({ ctx, input, next }: MiddlewareParams) => {
+    async ({ ctx, input, path, type, next }: MiddlewareParams) => {
       // `publicProcedure` exposes `.permission()` too, so a session is not a
       // given. Answering "unauthenticated" before any id is looked at keeps
       // an anonymous caller from learning anything about the scope.
       if (!ctx.session?.user) {
         throw new TRPCError({ code: "UNAUTHORIZED" });
       }
+      const session = ctx.session;
 
       const scope = requireDeclaredScope({ permission, input, via });
       const { permitted, organizationRole, denialReason } = await appOf(
@@ -182,11 +320,28 @@ export const checkDeclaredPermission = ({
         scope,
       });
 
+      await refuseWriteUnderAggregate({
+        ctx,
+        type,
+        permissions: [permission],
+        scope,
+        organizationRole,
+      });
+
       // Legacy parity: the organization tier never carried a role onto the
       // context, so only the project/team resolutions (non-null role) do.
       if (organizationRole !== null) {
         ctx.organizationRole = organizationRole;
       }
+
+      await mintRouteAuthorization({
+        ctx,
+        session,
+        path,
+        permission,
+        scope,
+      });
+      await auditAggregateRead({ ctx, session, scope });
 
       ctx.permissionChecked = true;
       return next();
@@ -205,7 +360,7 @@ export const checkDeclaredPermissionAny = (
 ): DeclaredMiddleware =>
   declareAuthzMiddleware(
     { kind: "permission-any", permissions },
-    async ({ ctx, input, next }: MiddlewareParams) => {
+    async ({ ctx, input, type, next }: MiddlewareParams) => {
       if (!ctx.session?.user) {
         throw new TRPCError({ code: "UNAUTHORIZED" });
       }
@@ -262,6 +417,17 @@ export const checkDeclaredPermissionAny = (
         userId: ctx.session.user.id,
         sessionId: ctx.session.sessionId,
         scope,
+      });
+
+      // The same door as the single-permission seam: no mutation declared
+      // this way today writes, and one added later is refused on an
+      // aggregate without having to remember to ask.
+      await refuseWriteUnderAggregate({
+        ctx,
+        type,
+        permissions,
+        scope,
+        organizationRole,
       });
 
       ctx.organizationRole = organizationRole;

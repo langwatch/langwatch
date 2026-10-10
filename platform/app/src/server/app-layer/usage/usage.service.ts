@@ -1,6 +1,7 @@
 import { createLogger } from "@langwatch/observability";
 import { UNLIMITED_MESSAGES } from "../../../../ee/billing/planLimits";
 import type { PlanInfo } from "../../../../ee/licensing/planInfo";
+import { LimitExceededError } from "../../license-enforcement/errors";
 import type { OrganizationRepository } from "../../repositories/organization.repository";
 import type { EventUsageService } from "../../traces/event-usage.service";
 import type { TraceUsageService } from "../../traces/trace-usage.service";
@@ -12,6 +13,7 @@ import {
 import { TtlCache } from "../../utils/ttlCache";
 import { OrganizationNotFoundForTeamError } from "../organizations/errors";
 import type { OrganizationService } from "../organizations/organization.service";
+import type { SimulationRunService } from "../simulations/simulation-run.service";
 import type { PlanResolver } from "../subscription/plan-provider";
 import { buildLimitMessage } from "./limit-message";
 
@@ -47,6 +49,7 @@ export type UsageLimitResult =
 export class UsageService {
   private readonly countCache: TtlCache<number>;
   private readonly decisionCache: TtlCache<MeterDecision>;
+  private readonly scenarioSetCache: TtlCache<string[]>;
 
   constructor(
     private readonly organizationService: OrganizationService,
@@ -54,6 +57,10 @@ export class UsageService {
     private readonly eventUsageService: EventUsageService,
     private readonly planResolver: PlanResolver,
     private readonly organizationRepository: OrganizationRepository | null,
+    private readonly simulationRunService: Pick<
+      SimulationRunService,
+      "getDistinctExternalSetIds"
+    >,
   ) {
     this.countCache = new TtlCache<number>(
       CACHE_TTL_MS,
@@ -63,6 +70,85 @@ export class UsageService {
       CACHE_TTL_MS,
       "ttlcache:usage:decision:",
     );
+    this.scenarioSetCache = new TtlCache<string[]>(
+      CACHE_TTL_MS,
+      "ttlcache:usage:scenarioSets:",
+    );
+  }
+
+  /**
+   * Refuses a run that would start a new simulation (scenario set) past the
+   * plan's cap. Sets the organization already ran are always allowed, so an
+   * organization above the cap keeps running what it has; only a new set is
+   * refused. Plans without a cap (paid cloud, self-hosted) never count.
+   *
+   * @throws LimitExceededError with limitType `scenarioSets`
+   */
+  async checkScenarioSetLimit({
+    organizationId,
+    scenarioSetId,
+  }: {
+    organizationId: string;
+    scenarioSetId: string;
+  }): Promise<void> {
+    const plan = await this.planResolver(organizationId);
+    const max = plan.maxScenarioSets;
+    if (max === undefined || plan.overrideAddingLimitations) return;
+
+    let knownSetIds: string[];
+    try {
+      knownSetIds = await this.getKnownScenarioSetIds(organizationId);
+    } catch (error) {
+      // An unknown count must not block runs, so the cap is skipped for this
+      // event rather than refusing it.
+      logger.warn(
+        { error, organizationId, plan: plan.name },
+        "checkScenarioSetLimit: scenario set usage is unavailable, allowing the run",
+      );
+      return;
+    }
+    if (knownSetIds.includes(scenarioSetId)) return;
+
+    if (knownSetIds.length >= max) {
+      throw new LimitExceededError("scenarioSets", knownSetIds.length, max);
+    }
+
+    // Remember the new set right away: run events reach ClickHouse
+    // asynchronously, so a fresh read would not see it yet and a burst of
+    // new sets could slip past the cap.
+    await this.scenarioSetCache.set(organizationId, [
+      ...knownSetIds,
+      scenarioSetId,
+    ]);
+  }
+
+  /** Number of distinct simulations (scenario sets) the organization ran. */
+  async countScenarioSets(organizationId: string): Promise<number> {
+    return (await this.getKnownScenarioSetIds(organizationId)).length;
+  }
+
+  /**
+   * The organization's external scenario set ids. Read from the cache when
+   * present, since the cache also holds sets admitted moments ago that
+   * ClickHouse may not return yet.
+   */
+  private async getKnownScenarioSetIds(
+    organizationId: string,
+  ): Promise<string[]> {
+    const cached = await this.scenarioSetCache.get(organizationId);
+    if (cached) return cached;
+
+    const projectIds =
+      await this.organizationService.getProjectIds(organizationId);
+    const known = projectIds.length
+      ? [
+          ...(await this.simulationRunService.getDistinctExternalSetIds({
+            projectIds,
+          })),
+        ]
+      : [];
+    await this.scenarioSetCache.set(organizationId, known);
+    return known;
   }
 
   async checkLimit({ teamId }: { teamId: string }): Promise<UsageLimitResult> {

@@ -83,6 +83,8 @@ export function createCodingAgentSpanFactsDispatchSubscriber(deps: {
   contributeSpanFacts: (data: ContributeSpanFactsCommandData) => Promise<void>;
   getNormalizedSpanById: (params: {
     tenantId: string;
+    /** The reference event the read is made for; the proof names it. */
+    eventId: string;
     traceId: string;
     spanId: string;
     /** Required: the store read has no unbounded fallback to widen into. */
@@ -384,6 +386,7 @@ async function resolveClaimCheck(
   deps: {
     getNormalizedSpanById: (params: {
       tenantId: string;
+      eventId: string;
       traceId: string;
       spanId: string;
       occurredAtMs: number;
@@ -392,6 +395,7 @@ async function resolveClaimCheck(
 ): Promise<ContributeSpanFactsCommandData> {
   const span = await deps.getNormalizedSpanById({
     tenantId: ref.tenantId,
+    eventId: ref.id,
     traceId: ref.data.traceId,
     spanId: ref.data.spanId,
     // Center the store's partition window on the span's OWN start (the stored

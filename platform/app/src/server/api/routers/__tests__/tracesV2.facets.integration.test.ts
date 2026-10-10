@@ -14,6 +14,7 @@ import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
+import { AuthorizedClickHouse } from "~/server/app-layer/clients/clickhouse/authorized-reads";
 import { EvaluationRunService } from "~/server/app-layer/evaluations/evaluation-run.service";
 import { NullEvaluationRunRepository } from "~/server/app-layer/evaluations/repositories/evaluation-run.repository";
 import { createTestApp } from "~/server/app-layer/presets";
@@ -135,7 +136,9 @@ beforeAll(async () => {
     traces: {
       ...defaults.traces,
       list: new TraceListService(
-        new TraceListClickHouseRepository(async () => ch),
+        new TraceListClickHouseRepository(
+          new AuthorizedClickHouse({ resolveClient: async () => ch }),
+        ),
         new EvaluationRunService(new NullEvaluationRunRepository()),
         new TopicService(new NullTopicRepository()),
       ),
