@@ -4,7 +4,7 @@
  * read, and each press landing on the command it names.
  */
 
-import { cleanup, fireEvent, screen, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 type Call = { name: string; input: unknown };
@@ -21,10 +21,30 @@ const { state } = vi.hoisted(() => ({
     grants: [] as unknown[],
     candidates: [] as unknown[],
     polls: [] as ({ enabled?: boolean } | undefined)[],
+    /** Bumped when a read catches up, so the mounted screen re-renders as React Query would. */
+    version: 0,
+    listeners: new Set<() => void>(),
   },
 }));
 
-vi.mock("../../../behavior/sso-api.ts", () => {
+/** A read catching up: the mounted screen hears it, as it would from the query cache. */
+function publishView(view: unknown) {
+  state.view = view;
+  state.version += 1;
+  for (const listener of state.listeners) listener();
+}
+
+vi.mock("../../../behavior/sso-api.ts", async () => {
+  const { useSyncExternalStore } = await vi.importActual<{
+    useSyncExternalStore: (
+      subscribe: (listener: () => void) => () => void,
+      read: () => number,
+    ) => number;
+  }>("react");
+  const subscribe = (listener: () => void) => {
+    state.listeners.add(listener);
+    return () => state.listeners.delete(listener);
+  };
   const mutation = (name: string) => ({
     useMutation: () => ({
       isPending: false,
@@ -58,6 +78,7 @@ vi.mock("../../../behavior/sso-api.ts", () => {
       ssoSetup: {
         getSetup: {
           useQuery: (_input: unknown, options?: { enabled?: boolean }) => {
+            useSyncExternalStore(subscribe, () => state.version);
             state.polls.push(options);
             return {
               data: state.view,
@@ -493,7 +514,7 @@ describe("the single sign-on setup page", () => {
         activated: false,
       };
       state.view = setupView({ goLive: ready });
-      const { rerenderWithSsoHost } = renderWithSsoHost(<SsoSetupScreen />);
+      renderWithSsoHost(<SsoSetupScreen />);
 
       fireEvent.click(screen.getByTestId("connection-go-live-activate"));
 
@@ -501,11 +522,14 @@ describe("the single sign-on setup page", () => {
       expect(screen.getByTestId("connection-go-live-activate")).toHaveProperty("disabled", true);
       expect(state.polls.at(-1)).toEqual({ enabled: true });
 
-      state.view = setupView({
-        connection: connectionView({ state: "ACTIVE" }),
-        goLive: { ...ready, activated: true },
+      act(() => {
+        publishView(
+          setupView({
+            connection: connectionView({ state: "ACTIVE" }),
+            goLive: { ...ready, activated: true },
+          }),
+        );
       });
-      rerenderWithSsoHost(<SsoSetupScreen />);
 
       expect(state.polls.at(-1)).toEqual({ enabled: false });
       expect(screen.queryByText(/Activation accepted/)).toBeNull();
