@@ -3,9 +3,8 @@
  * agents. Unauthenticated on purpose: the reporter may be struggling
  * because setup failed, so filing must never require a working login.
  */
-import { publicRoute } from "@langwatch/api/access";
+import { optionalCredential } from "@langwatch/api/access";
 import {
-  defineRestMiddleware,
   defineRestRouter,
   MANAGEMENT_API_VERSION,
   type RestProtocolRefusal,
@@ -15,7 +14,6 @@ import {
   OpsApi,
   submitBugReportSchema,
 } from "@langwatch/ops-contract";
-import { z } from "zod";
 
 import { bugReportRefusal } from "#rules/ops-intake-refusal.rules";
 
@@ -25,15 +23,6 @@ import { bugReportRefusal } from "#rules/ops-intake-refusal.rules";
  * the better error than a 413.
  */
 const MAX_BODY_BYTES = 12 * 1024 * 1024;
-
-/**
- * The project credential a report MAY carry, as this process reads one off a
- * request. Null where the caller presented none.
- */
-export const bugReportCredential = defineRestMiddleware(
-  "bugReportCredential",
-  z.object({ token: z.string(), projectId: z.string().nullable() }).nullable(),
-);
 
 /** Every body this route writes, in the sentences released builds already read. */
 const INTAKE_ANSWERS =
@@ -62,14 +51,15 @@ export const opsBugReportRest = defineRestRouter(OpsApi)
     summary: "File an issue report from a coding agent",
     description: INTAKE_ANSWERS,
   })
+  // The project door verifies a presented key; a missing or bad one files unlinked (main).
   .withAccess(
-    publicRoute({
+    optionalCredential({
       reason:
         "the reporter may be struggling precisely because setup failed, so filing a report " +
         "must never require a working login; a project credential only enriches the report",
+      refused: "anonymous",
     }),
   )
-  .withMiddleware(bugReportCredential)
   .withHeaders(bugReportIntakeHeadersSchema)
   .withBodyLimit({ maxBytes: MAX_BODY_BYTES })
   .withResponse("protocol", {
@@ -77,11 +67,11 @@ export const opsBugReportRest = defineRestRouter(OpsApi)
     because: INTAKE_ANSWERS,
     refusal: intakeRefusal,
   })
-  .handle(async ({ app, input, response }, credential, headers) => {
+  .handle(async ({ app, input, response, scope }, headers) => {
     const answer = await app.receiveBugReport({
       report: input,
       forwardedFor: headers["x-forwarded-for"] ?? null,
-      credential,
+      linkedProjectId: scope?.id ?? null,
     });
 
     return response.write({

@@ -574,14 +574,14 @@ export interface OpsApi {
   submitBugReport(input: {
     report: SubmitBugReport;
     callerKey: string;
-    apiToken?: string | undefined;
-    projectIdHint?: string | null;
+    /** The project the intake door verified the reporter's key for; null files unlinked. */
+    linkedProjectId?: string | null;
   }): Promise<{ id: string }>;
   /** One report as the intake door received it, answered in the bodies released builds read. */
   receiveBugReport(input: {
     report: SubmitBugReport;
     forwardedFor: string | null;
-    credential: Readonly<{ token: string; projectId: string | null }> | null;
+    linkedProjectId: string | null;
   }): Promise<OpsDoorAnswer>;
   findDashboardData(): DashboardData | null;
   badgeCounts(): OpsApiGetBadgeCountsOutput;

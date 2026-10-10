@@ -1855,6 +1855,9 @@ office deactivates only through user, so it keeps no picked date (Alex, 2026-10-
 - `publicRoute`/raw results only for genuinely non-JSON protocols
   (OAuth device flow, MCP streams, webhook raw bodies) and the documented
   `*-legacy.rest.ts` family, each carrying a one-line reason.
+- `optionalCredential({ reason, refused: "anonymous" })` answers a credential the door refuses as none: the
+  door's `identify` runs, a refusal hands no actor and no scope, any other failure still fails the request
+  (the bug-report intake, Alex 2026-10-10 W02-BUG-INTAKE).
 - A branch living in a handler moves into the module as an `*Api` operation carrying that logic
   unchanged; such a one-to-one move is approved in advance. An operation that adds behaviour or a new
   shape is still asked for (Alex, 2026-09-24). `ScenarioApi.launchRun` is such a port, one-to-one with

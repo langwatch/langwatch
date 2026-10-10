@@ -472,7 +472,14 @@ function assertPortsBound<Api>({
 
     assertDoorQuestions({ address, route, door, credential });
 
-    if (route.access?.kind === "optional" && !door.identifyOptional) {
+    if (anonymousOnRefusal(route) && !door.identify) {
+      throw new Error(
+        `REST ${address} answers a refused credential as none, and this runtime ` +
+          "supplied no identity.identify",
+      );
+    }
+
+    if (route.access?.kind === "optional" && !anonymousOnRefusal(route) && !door.identifyOptional) {
       throw new Error(
         `REST ${address} answers with or without the family's credential, and this runtime ` +
           "supplied no identity.identifyOptional",
@@ -2101,6 +2108,8 @@ async function callerOf({
     return requireIdentify(door)({ request, ...(rawBody === void 0 ? {} : { rawBody }) });
   }
 
+  if (anonymousOnRefusal(route)) return anonymousCallerOf({ door, request });
+
   if (kind === "optional") return requireIdentifyOptional(door)({ request });
 
   if (kind === "authenticated" || kind === "deferred" || planFirst(route))
@@ -2113,6 +2122,30 @@ async function callerOf({
     ...(route.permissionReach ? { reach: route.permissionReach } : {}),
     ...(route.keyKinds ? { keyKinds: route.keyKinds } : {}),
   });
+}
+
+/** Whether the route answers a credential its door refuses as no credential at all. */
+function anonymousOnRefusal(route: RestTransportRoute<unknown>): boolean {
+  return route.access?.kind === "optional" && route.access.refused === "anonymous";
+}
+
+/**
+ * The caller the door verifies, or nobody: a missing or refused credential is answered as
+ * none, so the route still serves. A failure that is not a refusal still fails the request.
+ */
+async function anonymousCallerOf({
+  door,
+  request,
+}: {
+  door: RestIdentity;
+  request: Request;
+}): Promise<RestCaller | null> {
+  try {
+    return await requireIdentify(door)({ request });
+  } catch (error) {
+    if (HandledError.isHandled(error)) return null;
+    throw error;
+  }
 }
 
 /**

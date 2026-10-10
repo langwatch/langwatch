@@ -3,8 +3,6 @@
  * The report intake's per-caller allowance, over the memory twins.
  * @see modules/ops/specs/bug-report-intake-limit.feature
  */
-import type { ApiKeyApi } from "@langwatch/api-key-contract";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { MemoryBugReportRateLimitRepository } from "../../repositories/memory/memory.bug-report-rate-limit.repository.ts";
@@ -28,7 +26,7 @@ function intake(): {
     service.submit({
       input: { source: "cli", kind: "summary", title: "The CLI could not reach the API" },
       callerKey,
-      apiKeys: createApiFixture<ApiKeyApi>(),
+      linkedProjectId: null,
     });
   return { reports, submit };
 }

@@ -23,7 +23,9 @@ import {
   createErrorHandler,
   OrganizationPermissionError,
   PayloadTooLargeError,
+  ProjectInvalidCredentialsError,
 } from "../../errors.ts";
+import type { RestCaller } from "../../hosting/api-door.ts";
 import { getRoutePolicy } from "../../route-registry.ts";
 import { defineRestRouter, projectRestFacts } from "../declaration.ts";
 import { documentedResponses, securityForCredentialClass } from "../openapi.ts";
@@ -2617,6 +2619,76 @@ describe("a route the family's credential reaches optionally", () => {
     expect(() => bugReportsApp({ optional: false })).toThrow(
       /supplied no identity.identifyOptional/,
     );
+  });
+});
+
+// The same intake, answering a key its door refuses as no key at all (W02, Alex 2026-10-10).
+const anonymousBugReports = defineRestRouter(BugReportApi)
+  .withNamespace("bug-reports")
+  .withVersion(VERSION)
+  .withAddressing("v1-only")
+  .post("/", "submitBugReport")
+  .withInput(z.object({ title: z.string() }))
+  .withAccess(optionalCredential({ reason: KEY_ONLY_ENRICHES, refused: "anonymous" }))
+  .withOutput(z.object({ id: z.string(), filedUnder: z.string() }))
+  .withStatus(201)
+  .withDocs({ summary: "File an issue report" })
+  .handle(async ({ app, input, scope }) => {
+    const report = await app.submit({ title: input.title, projectId: scope?.id ?? null });
+
+    return { id: report.id, filedUnder: scope?.id ?? "none" };
+  })
+  .build();
+
+function anonymousBugReportsApp(identify: () => RestCaller): Hono {
+  const runtime = createRestRuntime({
+    authorization: authorizationPort,
+    identity: {
+      authenticate: () => {
+        throw new Error("An optional-credential route asks no permission of its credential.");
+      },
+      identify,
+    },
+  });
+
+  return runtime.mount(anonymousBugReports.router(), {
+    app: () => ({ submit: async () => ({ id: "report-1" }) }),
+    onError: createErrorHandler(),
+  });
+}
+
+describe("a route that answers a refused credential as none", () => {
+  /** @scenario "A route answers a credential its door refuses as no credential" */
+  it("files under the project the door verified", async () => {
+    const response = await fileReport(
+      anonymousBugReportsApp(() => ({ actor: null, scope: { tier: "project", id: "project-7" } })),
+    );
+
+    expect(response.status).toBe(201);
+    await expect(response.json()).resolves.toEqual({ id: "report-1", filedUnder: "project-7" });
+  });
+
+  /** @scenario "A route answers a credential its door refuses as no credential" */
+  it("answers a missing or bad credential unattributed, never 401", async () => {
+    const response = await fileReport(
+      anonymousBugReportsApp(() => {
+        throw new ProjectInvalidCredentialsError();
+      }),
+    );
+
+    expect(response.status).toBe(201);
+    await expect(response.json()).resolves.toEqual({ id: "report-1", filedUnder: "none" });
+  });
+
+  /** @scenario "A route answers a credential its door refuses as no credential" */
+  it("still fails the request when the door fails for a reason that is not a refusal", async () => {
+    const response = await fileReport(
+      anonymousBugReportsApp(() => {
+        throw new Error("the key store is down");
+      }),
+    );
+
+    expect(response.status).toBe(500);
   });
 });
 

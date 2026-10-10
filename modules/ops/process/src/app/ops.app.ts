@@ -1815,15 +1815,12 @@ export class OpsModule implements OpsApi {
   submitBugReport(input: {
     report: SubmitBugReport;
     callerKey: string;
-    apiToken?: string | undefined;
-    projectIdHint?: string | null;
+    linkedProjectId?: string | null;
   }): Promise<{ id: string }> {
     return this.#dependencies.intake.submit({
       input: input.report,
       callerKey: input.callerKey,
-      apiToken: input.apiToken,
-      projectIdHint: input.projectIdHint,
-      apiKeys: this.#dependencies.apiKeys,
+      linkedProjectId: input.linkedProjectId ?? null,
     });
   }
 
@@ -1831,14 +1828,13 @@ export class OpsModule implements OpsApi {
   async receiveBugReport(input: {
     report: SubmitBugReport;
     forwardedFor: string | null;
-    credential: Readonly<{ token: string; projectId: string | null }> | null;
+    linkedProjectId: string | null;
   }): Promise<OpsDoorAnswer> {
     try {
       const { id } = await this.submitBugReport({
         report: input.report,
         callerKey: toCallerKey(input.forwardedFor),
-        apiToken: input.credential?.token,
-        projectIdHint: input.credential?.projectId ?? null,
+        linkedProjectId: input.linkedProjectId,
       });
 
       return { status: 201, body: { id } };

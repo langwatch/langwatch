@@ -289,6 +289,14 @@ Feature: Transport declaration split
     And a mount that cannot open the door for an absent credential is refused, naming the route
 
   @integration
+  Scenario: A route answers a credential its door refuses as no credential
+    Given a route declared to take the family's credential optionally, answering a refused one as none
+    When a caller presents a credential the door verifies
+    Then the handler is handed the scope the door resolved
+    And a caller presenting a missing or bad credential is answered with no actor and no scope, never a 401
+    And a door failing for a reason that is not a refusal still fails the request
+
+  @integration
   Scenario: A route whose resource names its own owner resolves the scope in its handler
     Given a route declared to defer its scope, with the written reason the handler resolves it
     When a caller the door authenticates reaches it

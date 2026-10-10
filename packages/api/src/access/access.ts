@@ -416,15 +416,26 @@ export function anyAuthenticated({ reason }: { reason: string }): AuthenticatedR
  * one is resolved as ever, one presenting none is handed a null actor and a
  * null scope. `reason` is why the answer is safe to give either way.
  */
-export type OptionalCredentialAccess = Readonly<{ kind: "optional"; reason: string }>;
+export type OptionalCredentialAccess = Readonly<{
+  kind: "optional";
+  reason: string;
+  /** `"anonymous"`: a credential the door refuses is answered as none (W02, Alex 2026-10-10). */
+  refused?: "anonymous";
+}>;
 
 /** Declares one route answerable with or without the family's credential. */
-export function optionalCredential({ reason }: { reason: string }): OptionalCredentialAccess {
+export function optionalCredential({
+  reason,
+  refused,
+}: {
+  reason: string;
+  refused?: "anonymous";
+}): OptionalCredentialAccess {
   if (reason.trim() === "") {
     throw new Error("optionalCredential needs a written reason for answering without a credential");
   }
 
-  return Object.freeze({ kind: "optional", reason });
+  return Object.freeze({ kind: "optional", reason, ...(refused ? { refused } : {}) });
 }
 
 /**

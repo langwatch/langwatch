@@ -1,4 +1,4 @@
-import { bindRestCredential, bindRestMiddleware } from "@langwatch/api/rest";
+import { bindRestCredential } from "@langwatch/api/rest";
 import type { OpsApi, OpsServerConfig } from "@langwatch/ops-contract";
 import { defineProcessModule, type PublishedProcessModule } from "@langwatch/process";
 import { type CodeStepId, defineMigrationStep } from "@langwatch/upgrade/step";
@@ -22,7 +22,7 @@ import { SystemMigrationsPassTask } from "#tasks/system-migrations-pass.task";
 import { adminRest } from "#transport/admin.rest";
 import { checkupRest } from "#transport/checkup.rest";
 import { checkupTrpcTransport } from "#transport/checkup.trpc";
-import { bugReportCredential, opsBugReportRest } from "#transport/ops-bug-report.rest";
+import { opsBugReportRest } from "#transport/ops-bug-report.rest";
 import { opsBugReportTrpcTransport } from "#transport/ops-bug-report.trpc";
 import { opsClickHouseExplainRest } from "#transport/ops-clickhouse-explain.rest";
 import { opsUpgradeTrpcTransport } from "#transport/ops-upgrade.trpc";
@@ -48,20 +48,11 @@ export const opsProcessModule: PublishedProcessModule<"ops", OpsApi, OpsServerCo
       checkupTrpcTransport,
       checkupRest,
     )
-    // The intake is public - the reporter may be struggling because setup
-    // failed - so the credential only enriches a report, at the same
-    // precedence the project door reads a token at (Basic, Bearer,
-    // X-Auth-Token). Unverified: a bad token still files the report. The
-    // EXPLAIN door compares the operator secret before the body is read.
+    // The EXPLAIN door compares the operator secret before the body is read.
     .withTransportFacts(({ app }) => {
       if (!(app instanceof OpsModule))
         throw new TypeError("Ops transport requires its constructed application");
-      return [
-        bindRestMiddleware(bugReportCredential, (context) =>
-          extractRequestCredential(context.req.raw),
-        ),
-        bindRestCredential("internal_secret", () => app.operatorDoor),
-      ];
+      return [bindRestCredential("internal_secret", () => app.operatorDoor)];
     })
     .withEventing(usageReportEventing)
     .withEventing(anomalyDetectionEventing)
@@ -120,39 +111,3 @@ export const opsProcessModule: PublishedProcessModule<"ops", OpsApi, OpsServerCo
         },
       }),
     ]);
-
-/** One request's presented project credential, unverified, or none at all. */
-function extractRequestCredential(
-  request: Request,
-): { token: string; projectId: string | null } | null {
-  /* oxlint-disable langwatch/auth-header-read -- the project key a bug report may carry */
-  const authorization = request.headers.get("authorization");
-  const xAuthToken = request.headers.get("x-auth-token");
-  const xProjectId = request.headers.get("x-project-id");
-  /* oxlint-enable langwatch/auth-header-read */
-
-  if (authorization?.toLowerCase().startsWith("basic ")) {
-    const parsed = parseBasicCredential(authorization.slice(6));
-    if (parsed) return parsed;
-  }
-
-  if (authorization?.toLowerCase().startsWith("bearer ")) {
-    const token = authorization.slice(7).trim();
-    if (token) return { token, projectId: xProjectId };
-  }
-
-  return xAuthToken ? { token: xAuthToken, projectId: xProjectId } : null;
-}
-
-/** `user:pass` read as `{ projectId, token }`, or null when it does not parse. */
-function parseBasicCredential(value: string): { token: string; projectId: string | null } | null {
-  try {
-    const decoded = Buffer.from(value, "base64").toString("utf-8");
-    const separator = decoded.indexOf(":");
-    if (separator < 1 || separator === decoded.length - 1) return null;
-
-    return { projectId: decoded.slice(0, separator), token: decoded.slice(separator + 1) };
-  } catch {
-    return null;
-  }
-}
