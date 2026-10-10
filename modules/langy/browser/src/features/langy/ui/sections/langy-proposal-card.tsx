@@ -213,7 +213,7 @@ function ProposalDecision({
         borderRadius="md"
         borderWidth={0}
         background={destructive ? "var(--chakra-colors-red-solid)" : "transparent"}
-        color="white"
+        color={destructive ? "red.contrast" : "fg"}
         fontSize="sm"
         fontWeight={500}
         cursor={isApplying ? "default" : "pointer"}

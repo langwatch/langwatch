@@ -145,17 +145,18 @@ export function LangyDevDrawer({
           // alpha over a blur of the page behind. Top/bottom/right borders are
           // GONE — the panel's silhouette already draws those edges — leaving
           // the left hairline as the drawer's one line of its own.
-          background="bg.surface/85"
+          background="bg.card/85"
           backdropFilter="blur(8px)"
           borderWidth={0}
           borderLeftWidth="1px"
           borderStyle="solid"
           borderColor="border"
-          boxShadow="0 12px 28px rgba(20,20,23,0.12), 0 32px 64px rgba(20,20,23,0.10)"
+          boxShadow="0 12px 28px color-mix(in srgb, var(--chakra-colors-bg-scrim) 12%, transparent), 0 32px 64px color-mix(in srgb, var(--chakra-colors-bg-scrim) 10%, transparent)"
           _dark={{
-            background: "bg.surface/88",
+            background: "bg.card/88",
             backdropFilter: "blur(16px) saturate(1.1)",
-            boxShadow: "0 12px 28px rgba(0,0,0,0.5)",
+            boxShadow:
+              "0 12px 28px color-mix(in srgb, var(--chakra-colors-bg-scrim) 50%, transparent)",
           }}
           as="aside"
           aria-label="Langy developer inspector"
