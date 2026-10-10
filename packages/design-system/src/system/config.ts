@@ -120,8 +120,8 @@ export const designSystemConfig = defineConfig({
     keyframes: {
       // A toast's remaining lifetime, drained left to right; see toaster.tsx.
       "toast-drain": {
-        from: { transform: "scaleX(1)" },
-        to: { transform: "scaleX(0)" },
+        from: { clipPath: "inset(0 0 0 0)" },
+        to: { clipPath: "inset(0 100% 0 0)" },
       },
       // A toast card rising into the stack and sinking out of it. It runs on
       // `transform`, so it composes with the stack's own translate and scale.
