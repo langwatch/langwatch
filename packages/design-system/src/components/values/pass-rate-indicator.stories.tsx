@@ -6,7 +6,13 @@ import { PassRateCircle, PassRateDisplay } from "./pass-rate-indicator.tsx";
 const RATES = [0, 25, 50, 75, 100];
 
 const meta = {
-  title: "Components/Pass rate indicator",
+  title: "Data display/Pass rate indicator",
+  parameters: {
+    usage: {
+      use: "The share of evaluations or checks that passed.",
+      avoid: "Usage against a limit: use Meter bar.",
+    },
+  },
   component: PassRateDisplay,
   tags: ["autodocs"],
   args: { passRate: 82 },

@@ -1,5 +1,5 @@
 import { showErrorToast } from "@langwatch/browser-host/errors";
-import { Button, HStack, Text } from "@langwatch/design-system/primitives";
+import { Banner, BannerAction } from "@langwatch/design-system/banner";
 import { useState } from "react";
 
 /** Who last wrote the newer version, named by the actor the server reported. */
@@ -24,40 +24,33 @@ export function WorkbenchStaleBanner({
   const who = WHO_UPDATED_IT[actorLabel ?? ""] ?? "This evaluation was updated somewhere else";
 
   return (
-    <HStack
+    <Banner
+      status="warning"
+      placement="top"
       data-testid="workbench-stale-banner"
-      paddingX={6}
-      paddingY={2}
-      background="orange.subtle"
-      borderBottomWidth="1px"
-      borderColor="orange.muted"
-      gap={3}
-      flexShrink={0}
+      action={
+        <BannerAction
+          loading={isReloading}
+          onClick={() => {
+            setIsReloading(true);
+            void onReload()
+              .catch((error) => {
+                // The user pressed Reload, so a failure has to reach them. Their
+                // unsaved edits are still here and the banner stays up, so the
+                // button is worth pressing again.
+                showErrorToast({
+                  error,
+                  fallbackTitle: "Couldn't reload this evaluation",
+                });
+              })
+              .finally(() => setIsReloading(false));
+          }}
+        >
+          Reload
+        </BannerAction>
+      }
     >
-      <Text fontSize="sm" color="fg">
-        {who}. Reloading shows the latest version and discards your unsaved edits.
-      </Text>
-      <Button
-        size="xs"
-        colorPalette="orange"
-        loading={isReloading}
-        onClick={() => {
-          setIsReloading(true);
-          void onReload()
-            .catch((error) => {
-              // The user pressed Reload, so a failure has to reach them. Their
-              // unsaved edits are still here and the banner stays up, so the
-              // button is worth pressing again.
-              showErrorToast({
-                error,
-                fallbackTitle: "Couldn't reload this evaluation",
-              });
-            })
-            .finally(() => setIsReloading(false));
-        }}
-      >
-        Reload
-      </Button>
-    </HStack>
+      {who}. Reloading shows the latest version and discards your unsaved edits.
+    </Banner>
   );
 }

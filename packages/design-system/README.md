@@ -24,13 +24,16 @@ System, Light and Dark. The accessibility addon runs on every story.
 1. One file per component in `src/components/`, named in kebab case.
 2. Add its named subpath to `exports` in `package.json` — consumers import
    `@langwatch/design-system/<name>`, never a deep path.
-3. Write `src/components/<name>.stories.tsx` beside it. A directory of
-   components (`icons/`, `messages/`) takes one story named after the
-   directory.
+3. Write `<name>.stories.tsx` beside it, titled into a sidebar section (below)
+   and with `parameters.usage` saying when to use it and what to use instead.
+   A directory of components (`icons/`, `messages/`) takes one story named
+   after the directory.
 4. Add or extend a scenario in `specs/design-system/` and bind it to a test.
 
-`specs/design-system/component-catalogue.feature` is enforced: a component with
-no story, or a story that will not render in both colour modes, fails
+`specs/design-system/component-catalogue.feature` and
+`specs/storybook-showcase.feature` are enforced: a published entry point with no
+story, a story outside the sidebar sections, a component page with no usage, or
+a story that will not render in both colour modes fails
 `pnpm --filter @langwatch/design-system test`.
 
 ## What a story owes
@@ -58,9 +61,16 @@ variable), or `getRawColorValue` / `useColorRawValue` for a literal in the curre
 - Copy follows `dev/docs/best_practices/copywriting.md`: no abbreviations, no
   internals.
 
-## Catalogue taxonomy
+## The workshop's sidebar
 
-**Foundations** are tokens and non-component rules (colour, the logo, icons,
-overlay depth). **Primitives** are small accessible building blocks.
-**Components** are named reusable controls with a stable API. **Patterns** are
-app-independent compositions this package already owns.
+Filed by what a developer reaches for, in the order of `.storybook/preview.tsx`:
+Start here (introduction, component gallery), Foundations (tokens, colour,
+typography, gradients, icons), Primitives, Inputs and forms, Data display,
+Feedback, Overlays, Navigation and layout, Chrome and app shell, Brand, Patterns
+(whole screens) and Consistency (do and don't, the scoreboard). Stories sit
+beside what they document: a component, the tokens in `src/system`, or the
+workshop's own pages in `src/workshop`.
+
+Every docs page shows how many files import the component, counted from the
+import sites when Storybook starts or builds (`.storybook/adoption.ts`;
+`node .storybook/adoption.ts` prints the whole inventory).

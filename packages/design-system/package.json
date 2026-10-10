@@ -454,6 +454,10 @@
     "./workflow-card": {
       "types": "./dist/components/layout/workflow-card.d.ts",
       "default": "./src/components/layout/workflow-card.tsx"
+    },
+    "./app-shell": {
+      "types": "./dist/components/layout/app-shell.d.ts",
+      "default": "./src/components/layout/app-shell.tsx"
     }
   },
   "scripts": {
@@ -511,5 +515,25 @@
   },
   "langwatch": {
     "group": "browser"
+  },
+  "nx": {
+    "targets": {
+      "build:storybook": {
+        "cache": true,
+        "dependsOn": [
+          "^build"
+        ],
+        "inputs": [
+          "production",
+          "^production",
+          "jsBuild",
+          "{projectRoot}/.storybook/**/*",
+          "{workspaceRoot}/apps/ui/public/**/*"
+        ],
+        "outputs": [
+          "{projectRoot}/storybook-static"
+        ]
+      }
+    }
   }
 }

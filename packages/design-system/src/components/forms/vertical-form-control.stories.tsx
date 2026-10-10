@@ -4,7 +4,13 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { VerticalFormControl } from "./vertical-form-control.tsx";
 
 const meta = {
-  title: "Components/Vertical form control",
+  title: "Inputs and forms/Vertical form control",
+  parameters: {
+    usage: {
+      use: "Forms in drawers, dialogs and narrow columns: the label above the control.",
+      avoid: "Wide settings pages: use Horizontal form control.",
+    },
+  },
   component: VerticalFormControl,
   tags: ["autodocs"],
   args: {

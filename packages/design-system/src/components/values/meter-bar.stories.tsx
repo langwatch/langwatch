@@ -4,7 +4,14 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { MeterBar } from "./meter-bar.tsx";
 
 const meta = {
-  title: "Components/Meter bar",
+  title: "Data display/Meter bar",
+  parameters: {
+    usage: {
+      use: "How much of a limit is used, as a filled track.",
+      avoid:
+        "A share that passed: use Pass rate indicator. A running job: Progress from primitives.",
+    },
+  },
   component: MeterBar,
   tags: ["autodocs"],
   args: {

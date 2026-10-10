@@ -9,7 +9,13 @@ function Crashing(): never {
 }
 
 const meta = {
-  title: "Patterns/Studio dialog",
+  title: "Overlays/Studio dialog",
+  parameters: {
+    usage: {
+      use: "A dialog over the studio canvas, on its glass surface.",
+      avoid: "Outside the studio: use Dialog.",
+    },
+  },
   component: Dialog.Root,
   tags: ["autodocs"],
   args: { open: true, children: null },

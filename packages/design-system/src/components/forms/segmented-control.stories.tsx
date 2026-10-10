@@ -4,7 +4,14 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { SegmentedControl } from "./segmented-control.tsx";
 
 const meta = {
-  title: "Components/Segmented control",
+  title: "Inputs and forms/Segmented control",
+  parameters: {
+    usage: {
+      use: "Switching between two to four views or modes of the same content.",
+      avoid:
+        "A choice that is saved with a form: use Radio. Moving between pages: use the Section navigation frame.",
+    },
+  },
   component: SegmentedControl,
   tags: ["autodocs"],
   args: {

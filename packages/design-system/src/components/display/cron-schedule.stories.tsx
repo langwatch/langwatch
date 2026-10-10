@@ -4,7 +4,13 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { CronSchedule } from "./cron-schedule.tsx";
 
 const meta = {
-  title: "Primitives/CronSchedule",
+  title: "Data display/Cron schedule",
+  parameters: {
+    usage: {
+      use: "A cron expression, said as a sentence with its timezone.",
+      avoid: "Never a raw cron string on its own.",
+    },
+  },
   component: CronSchedule,
   tags: ["autodocs"],
   args: { cron: "*/15 * * * *", timezone: "Europe/Amsterdam" },

@@ -5,7 +5,8 @@ import { BarChart3, MessageSquare } from "lucide-react";
 import { AskChip } from "./ask-chip.tsx";
 
 const meta = {
-  title: "Components/Ask chip",
+  title: "Brand/Ask chip",
+  parameters: { usage: { use: "A chip that routes a question to Langy." } },
   component: AskChip,
   tags: ["autodocs"],
   args: {

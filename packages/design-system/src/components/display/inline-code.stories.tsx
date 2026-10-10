@@ -4,7 +4,13 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { InlineCode } from "./inline-code.tsx";
 
 const meta = {
-  title: "Primitives/InlineCode",
+  title: "Data display/Inline code",
+  parameters: {
+    usage: {
+      use: "A key, path, command or identifier inside a sentence.",
+      avoid: "Several lines: use Code preview.",
+    },
+  },
   component: InlineCode,
   tags: ["autodocs"],
   args: { children: "gateway.virtual_key.created" },

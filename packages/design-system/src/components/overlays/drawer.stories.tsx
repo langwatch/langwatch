@@ -6,7 +6,13 @@ import { NoDataInfoBlock } from "../states/no-data-info-block.tsx";
 import { Drawer } from "./drawer.tsx";
 
 const meta = {
-  title: "Components/Drawer",
+  title: "Overlays/Drawer",
+  parameters: {
+    usage: {
+      use: "Details, editing a record and multi-step forms beside the page. Drawers are routed singletons.",
+      avoid: "A quick yes or no: use Dialog. Never a drawer inside a drawer: navigate instead.",
+    },
+  },
   component: Drawer.Root,
   tags: ["autodocs"],
   args: { open: true, size: "md", children: null },

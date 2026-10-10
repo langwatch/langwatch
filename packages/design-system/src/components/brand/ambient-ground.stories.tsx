@@ -4,10 +4,16 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { AmbientGround } from "./ambient-ground.tsx";
 
 const meta = {
-  title: "Patterns/Ambient ground",
+  title: "Brand/Ambient ground",
   component: AmbientGround,
   tags: ["autodocs"],
-  parameters: { layout: "fullscreen" },
+  parameters: {
+    usage: {
+      use: "The live mesh behind a branded page.",
+      avoid: "Product pages keep the plain ground.",
+    },
+    layout: "fullscreen",
+  },
   decorators: [
     (Story) => (
       <Box position="relative" height="100vh" overflow="hidden">

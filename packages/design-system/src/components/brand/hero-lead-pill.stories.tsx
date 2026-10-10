@@ -10,7 +10,10 @@ const glyphs = [
 ];
 
 const meta = {
-  title: "Components/Hero lead pill",
+  title: "Brand/Hero lead pill",
+  parameters: {
+    usage: { use: "The lead menu pill on an empty page that invites the first step." },
+  },
   component: HeroLeadPill,
   tags: ["autodocs"],
   args: {

@@ -4,7 +4,13 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { Pagination } from "./pagination.tsx";
 
 const meta = {
-  title: "Components/Pagination",
+  title: "Data display/Pagination",
+  parameters: {
+    usage: {
+      use: "Under a List table whose rows come in pages, cursor-only sources included.",
+      avoid: "A list that loads as it scrolls needs no pager.",
+    },
+  },
   component: Pagination,
   tags: ["autodocs"],
   args: {

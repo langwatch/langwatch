@@ -160,6 +160,11 @@ const meta = {
   component: ColourFoundations,
   tags: ["autodocs"],
   parameters: {
+    usage: {
+      use: "Pick a semantic token for every colour: fg, bg, border, a status, a palette role or a chart series.",
+      avoid:
+        "Never a hex value, rgb(), a palette scale step or bare white or black outside this package.",
+    },
     controls: { disable: true },
   },
 } satisfies Meta<typeof ColourFoundations>;

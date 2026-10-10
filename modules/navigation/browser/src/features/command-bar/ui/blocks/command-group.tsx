@@ -1,4 +1,4 @@
-import { Text, VStack } from "@langwatch/design-system/primitives";
+import { CommandBarGroup } from "@langwatch/design-system/app-shell";
 
 import { getItemKey, type ListItem } from "../../model/command-icon-info.ts";
 import { CommandItem } from "../elements/command-item.tsx";
@@ -26,17 +26,7 @@ export function CommandGroup({
   if (items.length === 0) return null;
 
   return (
-    <VStack align="stretch" gap={0}>
-      <Text
-        fontSize="12px"
-        fontWeight="normal"
-        color="fg.muted"
-        px={{ base: 4, md: 5 }}
-        paddingTop={3.5}
-        paddingBottom={1.5}
-      >
-        {label}
-      </Text>
+    <CommandBarGroup label={label}>
       {items.map((item, i) => (
         <CommandItem
           key={getItemKey(item)}
@@ -47,6 +37,6 @@ export function CommandGroup({
           onMouseEnter={onMouseEnter}
         />
       ))}
-    </VStack>
+    </CommandBarGroup>
   );
 }

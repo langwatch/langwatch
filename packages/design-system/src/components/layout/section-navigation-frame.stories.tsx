@@ -54,11 +54,17 @@ const paragraphs = (count: number) => (
 );
 
 const meta = {
-  title: "Components/Section navigation frame",
+  title: "Chrome and app shell/Section navigation frame",
   component: SectionNavigationFrame,
   tags: ["autodocs"],
   decorators: [InShellCard],
-  parameters: { layout: "fullscreen" },
+  parameters: {
+    usage: {
+      use: "A rail of sections beside a page, shared by pages of different modules (ARCHITECTURE.md, ruled 2026-09-28).",
+      avoid: "Two to four views of the same content: use Segmented control.",
+    },
+    layout: "fullscreen",
+  },
   args: {
     label: "Automations",
     header: header("Reports"),

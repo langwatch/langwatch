@@ -1,11 +1,23 @@
-import { Badge } from "@chakra-ui/react";
+import { Badge, HStack } from "@chakra-ui/react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { Users } from "lucide-react";
 
-import { StatTile, StatTileFigure, StatTileGrid, StatTileSkeleton } from "./stat-tile.tsx";
+import {
+  CompactStat,
+  StatTile,
+  StatTileFigure,
+  StatTileGrid,
+  StatTileSkeleton,
+} from "./stat-tile.tsx";
 
 const meta = {
-  title: "Components/Stat tile",
+  title: "Data display/Stat tile",
+  parameters: {
+    usage: {
+      use: "One headline fact about a page's subject: a figure, an optional meter and a hint, in a StatTileGrid.",
+      avoid: "A value over time: a chart. A fact inside a settings card: the card's rows.",
+    },
+  },
   component: StatTile,
   tags: ["autodocs"],
   args: {
@@ -59,4 +71,20 @@ export const Grid: Story = {
 
 export const Loading: Story = {
   render: () => <StatTileSkeleton columns={3} />,
+};
+
+/** `CompactStat`: a dense strip of operator figures, one linked to its drill-down. */
+export const CompactStrip: Story = {
+  render: () => (
+    <HStack gap={2}>
+      <CompactStat label="Queued" value="1,284" sublabel="jobs" />
+      <CompactStat label="Failed" value="12" warning hint="In the last hour" />
+      <CompactStat
+        label="Dead letters"
+        value="3"
+        href="#dead-letters"
+        renderLink={(content, href) => <a href={href}>{content}</a>}
+      />
+    </HStack>
+  ),
 };

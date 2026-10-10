@@ -1,5 +1,6 @@
 import type { PersonalTokenMint } from "@langwatch/api-key-client";
 import { useUiDeployment } from "@langwatch/browser-host/capabilities";
+import { SnippetPreview } from "@langwatch/design-system/code-preview";
 import {
   API_KEY_PLACEHOLDER,
   PersonalAccessTokenBanner,
@@ -10,7 +11,6 @@ import { useEffect, useRef, useState } from "react";
 import { selfHostedEndpoint } from "../../../../model/explorer/onboarding/self-hosted-endpoint.ts";
 import { CLOUD_ENDPOINT } from "../../../../model/onboarding/shared/build-mcp-config.ts";
 import { showErrorToast } from "../../errors/index.ts";
-import { CodePreview } from "../../onboarding/observability/code-preview.tsx";
 
 interface ApiKeyIntegrationInfoCardProps {
   projectId: string;
@@ -118,7 +118,7 @@ export function ApiKeyIntegrationInfoCard({ projectId, minting }: ApiKeyIntegrat
         scopeNote={minting.scopeNote}
         createLabel="Create a key"
       />
-      <CodePreview
+      <SnippetPreview
         code={code}
         filename=".env"
         codeLanguage="bash"

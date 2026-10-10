@@ -4,7 +4,13 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { Banner, BannerAction } from "./banner.tsx";
 
 const meta = {
-  title: "Components/Banner",
+  title: "Feedback/Banner",
+  parameters: {
+    usage: {
+      use: "A notice heading a page or panel: a missing configuration, a limit reached. New notices use it.",
+      avoid: "Inside a form: Alert. Something that just happened: Toaster.",
+    },
+  },
   component: Banner,
   tags: ["autodocs"],
   args: {

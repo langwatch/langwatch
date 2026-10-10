@@ -31,7 +31,7 @@ export function StatStrip({ data }: { data: DashboardData }) {
         label="Blocked"
         value={formatCount(totalBlocked)}
         sublabel={`${formatCount(data.totalGroups)} groups`}
-        color={totalBlocked > 0 ? "red.500" : undefined}
+        color={totalBlocked > 0 ? "fg.error" : undefined}
       />
       <LinkedStat
         label="Parked"
@@ -40,7 +40,7 @@ export function StatStrip({ data }: { data: DashboardData }) {
         // limit doing its job, and an unexplained orange six-figure number
         // reads as an outage to whoever is on call.
         sublabel={totalParked > 0 ? "at capacity limit" : "none at limit"}
-        color={totalParked > 0 ? "orange.500" : undefined}
+        color={totalParked > 0 ? "fg.warning" : undefined}
       />
       <LatencyStats data={data} />
       <DeadLetterStat
@@ -73,7 +73,7 @@ function ThroughputStats({ data }: { data: DashboardData }) {
         label="Failed/s"
         value={formatRate(data.failedPerSec)}
         sublabel={data.totalFailed > 0 ? `${formatCount(data.totalFailed)} total` : undefined}
-        color={data.failedPerSec > 0 ? "red.500" : undefined}
+        color={data.failedPerSec > 0 ? "fg.error" : undefined}
       />
     </>
   );
@@ -136,7 +136,7 @@ function DeadLetterStat({
           ? `${formatCount(queueDead)} queue · ${formatCount(outboxDead)} outbox`
           : undefined
       }
-      color={total > 0 ? "red.500" : undefined}
+      color={total > 0 ? "fg.error" : undefined}
     />
   );
 }

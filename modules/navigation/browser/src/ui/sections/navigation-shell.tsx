@@ -4,6 +4,7 @@
  */
 
 import { UiPageForbidden } from "@langwatch/browser/page-fallbacks";
+import { ICON_RAIL_WIDTH } from "@langwatch/design-system/app-shell";
 import { Box, HStack } from "@langwatch/design-system/primitives";
 import { useEffect, useRef, type ReactNode } from "react";
 
@@ -16,7 +17,7 @@ import { useProjectAddressRedirect } from "../../behavior/use-project-address-re
 import { APP_HEADER_HEIGHT } from "../../model/menu-widths.ts";
 import { useNavigationHost } from "../../model/navigation-host.ts";
 import { LANGY_DOCK_TRANSITION, shellContentMaxWidth } from "../../model/shell-layout.ts";
-import { ICON_RAIL_WIDTH, IconRail } from "./icon-rail.tsx";
+import { ProductIconRail } from "./icon-rail.tsx";
 import { MobileShell } from "./mobile-shell.tsx";
 import { ProductSidebar } from "./product-sidebar.tsx";
 import { ShellPageBody } from "./shell-page-body.tsx";
@@ -89,7 +90,7 @@ export function NavigationShell({
       <ShellTitle pageTitle={pageTitle} state={state} />
 
       {isIconRail && (
-        <IconRail
+        <ProductIconRail
           activeProductId={state.activeProductId}
           isSettingsActive={state.isSettingsRoute}
         />

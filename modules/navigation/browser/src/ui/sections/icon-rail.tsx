@@ -1,8 +1,7 @@
 /** Icon-rail product column (moved from platform/app; uses NavigationLink). */
 
+import { IconRail, IconRailTile } from "@langwatch/design-system/app-shell";
 import { LogoIcon } from "@langwatch/design-system/logo-icon";
-import { Box, Text, VStack } from "@langwatch/design-system/primitives";
-import type { LucideIcon } from "lucide-react";
 import { Settings as SettingsIcon } from "lucide-react";
 
 import { useLlmOpsProjectSlug } from "../../behavior/use-llm-ops-project-slug.ts";
@@ -11,65 +10,10 @@ import { useNavigationHost } from "../../model/navigation-host.ts";
 import { PRODUCTS, type ProductDefinition, type ProductId } from "../../model/products.ts";
 import { NavigationLink } from "../elements/navigation-link.tsx";
 
-export const ICON_RAIL_WIDTH = "64px";
-
 const LOGO_HEIGHT = 30;
 
-function RailTile({
-  icon: Icon,
-  label,
-  title,
-  isActive,
-  onOpen,
-}: {
-  icon: LucideIcon;
-  label: string;
-  title: string;
-  isActive: boolean;
-  onOpen: () => void;
-}) {
-  return (
-    <Box
-      as="button"
-      position="relative"
-      width="54px"
-      paddingY={2}
-      borderRadius="xl"
-      cursor="pointer"
-      backgroundColor={isActive ? "bg.panel" : "transparent"}
-      boxShadow={isActive ? "0 1px 3px rgba(26, 26, 46, 0.09)" : undefined}
-      color={isActive ? "fg" : "gray.400"}
-      transition="all 0.15s ease-in-out"
-      _hover={isActive ? undefined : { backgroundColor: "bg.panel/50", color: "fg.muted" }}
-      aria-label={label}
-      aria-current={isActive ? "page" : undefined}
-      title={title}
-      onClick={onOpen}
-    >
-      {isActive && (
-        <Box
-          position="absolute"
-          left="-7px"
-          top="50%"
-          transform="translateY(-50%)"
-          width="3px"
-          height="24px"
-          borderRightRadius="full"
-          background="fg/70"
-        />
-      )}
-      <VStack gap={1}>
-        <Icon size={19} strokeWidth={isActive ? 2.1 : 1.9} />
-        <Text fontSize="8.5px" fontWeight="semibold" lineHeight="1" letterSpacing="tight">
-          {label}
-        </Text>
-      </VStack>
-    </Box>
-  );
-}
-
 /** Icon-rail: product tiles with Settings at bottom. Tile click opens product. */
-export function IconRail({
+export function ProductIconRail({
   activeProductId,
   isSettingsActive,
 }: {
@@ -92,33 +36,25 @@ export function IconRail({
   };
 
   return (
-    <VStack
-      as="nav"
-      aria-label="Products"
-      data-tour="product-switcher"
-      width={ICON_RAIL_WIDTH}
-      minWidth={ICON_RAIL_WIDTH}
-      minHeight="100vh"
-      backgroundColor="bg.rail"
-      borderRightWidth="1px"
-      borderRightStyle="solid"
-      borderRightColor="border"
-      paddingY={3}
-      gap={1}
-      alignItems="center"
+    <IconRail
+      tourId="product-switcher"
+      home={
+        <NavigationLink href="/" aria-label="LangWatch" display="flex" alignItems="center">
+          <LogoIcon height={LOGO_HEIGHT} forceColorMode="light" />
+        </NavigationLink>
+      }
+      footer={
+        <IconRailTile
+          icon={SettingsIcon}
+          label="Settings"
+          title="Settings"
+          isActive={isSettingsActive}
+          onOpen={() => host.navigate("/settings")}
+        />
+      }
     >
-      <NavigationLink
-        href="/"
-        aria-label="LangWatch"
-        display="flex"
-        alignItems="center"
-        marginBottom={2}
-      >
-        <LogoIcon height={LOGO_HEIGHT} forceColorMode="light" />
-      </NavigationLink>
-
       {options.map((product) => (
-        <RailTile
+        <IconRailTile
           key={product.id}
           icon={product.icon}
           label={product.label}
@@ -127,16 +63,6 @@ export function IconRail({
           onOpen={() => openProduct(product)}
         />
       ))}
-
-      <Box marginTop="auto" paddingBottom={1}>
-        <RailTile
-          icon={SettingsIcon}
-          label="Settings"
-          title="Settings"
-          isActive={isSettingsActive}
-          onOpen={() => host.navigate("/settings")}
-        />
-      </Box>
-    </VStack>
+    </IconRail>
   );
 }

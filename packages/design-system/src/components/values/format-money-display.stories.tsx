@@ -4,7 +4,13 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { FormatMoney } from "./format-money-display.tsx";
 
 const meta = {
-  title: "Components/Format money",
+  title: "Data display/Format money",
+  parameters: {
+    usage: {
+      use: "A money amount with its currency, formatted the one way.",
+      avoid: "A plain number: use Formatted number.",
+    },
+  },
   component: FormatMoney,
   tags: ["autodocs"],
   args: {

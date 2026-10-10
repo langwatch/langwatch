@@ -1,7 +1,7 @@
+import { SnippetPreview } from "@langwatch/design-system/code-preview";
 import type React from "react";
 
 import type { FrameworkKey, PlatformKey } from "../../../model/observability/types.ts";
-import { CodePreview } from "./code-preview.tsx";
 import { useCodegen } from "./codegen/index.ts";
 
 export function FrameworkIntegrationCode({
@@ -24,7 +24,7 @@ export function FrameworkIntegrationCode({
   const { code, filename, codeLanguage, highlightLines } = codegenResult;
 
   return (
-    <CodePreview
+    <SnippetPreview
       code={code}
       filename={filename}
       codeLanguage={codeLanguage}

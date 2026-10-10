@@ -3,7 +3,8 @@
  * a large figure, an optional meter against a limit, an optional hint. Tiles
  * sit in a `StatTileGrid`. Presentational only: no fetching, no module words.
  */
-import { Card, HStack, SimpleGrid, Skeleton, Text, VStack } from "@chakra-ui/react";
+import { Card, HStack, SimpleGrid, Skeleton, Stat, Text, VStack } from "@chakra-ui/react";
+import { ArrowUpRight } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { MeterBar } from "./meter-bar.tsx";
@@ -127,4 +128,72 @@ export function StatTileSkeleton({
       ))}
     </SimpleGrid>
   );
+}
+
+export interface CompactStatProps {
+  label: string;
+  /** The figure; `children` take its place when one stat reads several figures. */
+  value?: string;
+  sublabel?: string;
+  /** A semantic colour token for the figure. */
+  color?: string;
+  /** Marks the figure past its threshold, and says so in `data-warning`. */
+  warning?: boolean;
+  /** Hover explanation of what the figure is measured over. */
+  hint?: string;
+  href?: string;
+  /** Wraps the stat in the host's in-app link; required with `href`, so a click never reloads. */
+  renderLink?: (content: ReactNode, href: string) => ReactNode;
+  testId?: string;
+  children?: ReactNode;
+}
+
+/**
+ * A dense dashboard figure on a strip of many: a label, one value or several, an optional
+ * drill-down. A page's headline facts take `StatTile` instead.
+ */
+export function CompactStat({
+  label,
+  value,
+  sublabel,
+  color,
+  warning,
+  hint,
+  href,
+  renderLink,
+  testId,
+  children,
+}: CompactStatProps) {
+  const linked = href !== undefined && renderLink !== undefined;
+  const content = (
+    <Stat.Root
+      cursor={linked ? "pointer" : undefined}
+      _hover={linked ? { bg: "bg.subtle" } : undefined}
+      borderRadius="md"
+      flexShrink={0}
+      padding={2}
+      transition="background 0.1s"
+      data-testid={testId}
+      title={hint}
+      data-warning={warning === undefined ? undefined : String(warning)}
+    >
+      <Stat.Label whiteSpace="nowrap">
+        <HStack gap={1}>
+          <Text>{label}</Text>
+          {linked ? <ArrowUpRight size={10} /> : null}
+        </HStack>
+      </Stat.Label>
+      {children ?? (
+        <Stat.ValueText color={color} whiteSpace="nowrap">
+          {value}
+        </Stat.ValueText>
+      )}
+      {sublabel ? (
+        <Text textStyle="xs" color="fg.muted" fontWeight="normal" whiteSpace="nowrap">
+          {sublabel}
+        </Text>
+      ) : null}
+    </Stat.Root>
+  );
+  return linked ? renderLink(content, href) : content;
 }
