@@ -151,7 +151,7 @@ export function GraphCardHeader({
       marginBottom={4}
       cursor={isDragging ? "grabbing" : "grab"}
     >
-      <BarChart2 color="orange" />
+      <BarChart2 color="var(--chakra-colors-orange-fg)" />
       {isDashboardWidget && onRename ? (
         <EditableWidgetName
           name={displayName}
