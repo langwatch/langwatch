@@ -98,6 +98,7 @@ import {
   trpcFailureTraceIds,
   type TrpcFailureTraceIds,
 } from "./audit.ts";
+import { refuseOutdatedClient } from "./client-outdated.ts";
 import { trpcThrottle, type TrpcThrottle } from "./throttle.ts";
 
 const logger = createLogger("langwatch:trpc");
@@ -1232,6 +1233,7 @@ export function createTrpcRuntime<
     // The parser FIRST, then the check: a check installed ahead of `.input()`
     // reads `undefined` and silently authorizes nothing.
     const checked = doorOf({ anonymous, procedure, anonymousProcedure, request })
+      .use(refuseOutdatedClient)
       .input(request.member.input)
       .use(trace)
       .use(requestLog(members, { anonymous }))

@@ -653,6 +653,12 @@ const presentations = {
     title: "Too much running at once",
     describe: () => "We paused this one to keep the rest responsive. Try again.",
   },
+  client_outdated: {
+    // fault: customer. A tab left open across an upgrade still speaks the
+    // earlier release's wire format; reloading fetches this one.
+    title: "This page is out of date: reload to continue",
+    describe: () => "LangWatch was updated while this page was open. Reload to pick up the update.",
+  },
   broadcaster_not_active: {
     title: "Live updates disconnected",
     describe: () => "Refresh the page to reconnect.",
@@ -1684,6 +1690,10 @@ const presentations = {
   license_expired: {
     title: "Your license has expired",
     describe: () => "Renew it to carry on, or talk to your account team.",
+  },
+  license_expiry_in_past: {
+    title: "That end date has already passed",
+    describe: () => "A license can only end on a future date. Pick a later one and try again.",
   },
   license_signing_key_not_pem: {
     title: "That doesn't look like a private key",

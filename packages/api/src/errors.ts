@@ -495,6 +495,20 @@ export class UpgradeInProgressError extends HandledError {
   }
 }
 
+/** A tab still running the release before plain JSON; its page must reload onto this one. */
+export class ClientOutdatedError extends HandledError {
+  declare readonly code: "client_outdated";
+
+  constructor() {
+    super("client_outdated", "This page is from an earlier release; reload it.", {
+      httpStatus: 400,
+      fault: "customer",
+    });
+
+    this.name = "ClientOutdatedError";
+  }
+}
+
 /** A handled refusal's `meta.retryAfterMs` as `Retry-After` seconds; none without a wait. */
 export function retryAfterOf(error: unknown): string | undefined {
   const waitMs = HandledError.isHandled(error) ? error.meta.retryAfterMs : undefined;
