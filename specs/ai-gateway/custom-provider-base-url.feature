@@ -121,6 +121,13 @@ Feature: Custom (OpenAI-compatible) provider routing to customer endpoints
     Then the dispatch does not fail credential validation
     And the upstream request carries no x-api-key header
 
+  @unit
+  Scenario: A Gemini or Vertex provider with a base URL reaches that host instead of Google's
+    Given a Gemini credential, or a Vertex credential with a project and location, whose base_url names another host
+    When a chat completion is dispatched through the gateway
+    Then the generateContent call reaches that host, on the Gemini models path or the Vertex publishers path
+    And a credential without a base_url keeps Google's endpoints
+
   Scenario: An endpoint that fell out of recent use still works when dispatched to again
     Given an "anthropic" model provider with a base URL that has not been used recently
     And many other Anthropic-compatible endpoints have served traffic since

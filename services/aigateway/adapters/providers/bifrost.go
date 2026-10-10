@@ -1600,6 +1600,12 @@ func mapProvider(cred domain.Credential) bfschemas.ModelProvider {
 	case domain.ProviderBedrock:
 		return bfschemas.Bedrock
 	case domain.ProviderVertex:
+		// A base-URL override (a local stand-in such as llmsim) leaves the
+		// stock Vertex provider, which pins its Google host, for the derived
+		// Gemini-type provider that speaks the same publishers path.
+		if credBaseURL(cred) != "" && credentialIsAgentPlatform(cred) {
+			return geminiCompatProviderKey(cred)
+		}
 		return bfschemas.Vertex
 	case domain.ProviderGemini:
 		// A credential carrying a project and region is an Agent Platform
@@ -1608,7 +1614,7 @@ func mapProvider(cred domain.Credential) bfschemas.ModelProvider {
 		// project and location, because the stock Gemini provider is
 		// pinned to generativelanguage.googleapis.com, where such a key
 		// is refused by its own restrictions.
-		if credentialIsAgentPlatform(cred) {
+		if credentialIsAgentPlatform(cred) || credBaseURL(cred) != "" {
 			return geminiCompatProviderKey(cred)
 		}
 		return bfschemas.Gemini
@@ -1872,16 +1878,35 @@ const geminiCompatPrefix = "gemini-url-"
 // location. See specs/model-providers/google-agent-platform.feature.
 func geminiAgentPlatformEndpointForCred(cred domain.Credential) (anthropicCompatEndpoint, bfschemas.ModelProvider) {
 	endpoint := anthropicCompatEndpoint{
-		baseURL: fmt.Sprintf(
-			"https://aiplatform.googleapis.com/v1/projects/%s/locations/%s/publishers/google",
-			url.PathEscape(cred.Extra["project_id"]),
-			url.PathEscape(cred.Extra["region"]),
-		),
-		keyless:  false,
+		baseURL:  geminiCompatBaseURL(cred),
+		keyless:  cred.ProviderID == domain.ProviderVertex && strings.TrimSpace(cred.APIKey) == "",
 		baseType: bfschemas.Gemini,
 	}
 	sum := sha256.Sum256([]byte(fmt.Sprintf("%s|keyless=%t", endpoint.baseURL, endpoint.keyless)))
 	return endpoint, bfschemas.ModelProvider(geminiCompatPrefix + hex.EncodeToString(sum[:8]))
+}
+
+// geminiCompatBaseURL is the derived Gemini provider's base: the Agent Platform
+// publishers path for a project and location, else the Gemini API root. A
+// base-URL override replaces Google's host, as it does for Anthropic.
+func geminiCompatBaseURL(cred domain.Credential) string {
+	host := strings.TrimRight(credBaseURL(cred), "/")
+	if !credentialIsAgentPlatform(cred) {
+		if strings.HasSuffix(host, "/v1beta") || strings.HasSuffix(host, "/v1") {
+			return host
+		}
+		return host + "/v1beta"
+	}
+	if host == "" {
+		host = "https://aiplatform.googleapis.com"
+	}
+	host = strings.TrimSuffix(strings.TrimSuffix(host, "/v1beta"), "/v1")
+	return fmt.Sprintf(
+		"%s/v1/projects/%s/locations/%s/publishers/google",
+		host,
+		url.PathEscape(cred.Extra["project_id"]),
+		url.PathEscape(cred.Extra["region"]),
+	)
 }
 
 // geminiCompatProviderKey derives the provider key for a Gemini credential
@@ -1931,7 +1956,7 @@ func credentialIsAgentPlatform(cred domain.Credential) bool {
 // registry stores both kinds of derived endpoint, and the credential's
 // provider says which one this is.
 func compatEndpointForCred(cred domain.Credential) (anthropicCompatEndpoint, bfschemas.ModelProvider) {
-	if cred.ProviderID == domain.ProviderGemini {
+	if cred.ProviderID == domain.ProviderGemini || cred.ProviderID == domain.ProviderVertex {
 		return geminiAgentPlatformEndpointForCred(cred)
 	}
 	return anthropicCompatEndpointForCred(cred)
