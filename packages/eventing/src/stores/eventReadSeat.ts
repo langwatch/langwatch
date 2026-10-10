@@ -27,7 +27,7 @@ export interface AggregateEventsReadInput {
 
 /**
  * Reads beside a store that may refuse every read (Q209, 2026-10-06): one event by id, and one
- * aggregate's stream for identity's history panels only (WEB-9103, 2026-10-10).
+ * aggregate's stream for identity's history panels and SCIM's sync activity (WEB-9103, 2026-10-10).
  * Spec: packages/eventing/specs/event-read-seat.feature.
  */
 export interface EventReadSeat<EventType extends Event = Event> {

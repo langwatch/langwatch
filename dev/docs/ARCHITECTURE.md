@@ -2008,7 +2008,7 @@ acyclic; event causation may loop (a request and its completion) and idempotency
 seat-raised event and sends its own invoicing command; `LicensingApi.findSeatChanges` and the minute
 poll go (Alex, 2026-09-29).
 A module reading its own event-sourced state writes optimistically or tolerates eventual consistency
-with a pending answer, never a reverse read; identity's history and proposals are read through the
+with a pending answer, never a reverse read; identity's history and proposals and SCIM's sync activity are read through the
 eventing member's surface (Alex, 2026-09-29).
 Enterprise `nurturing` shows the subscriber rule (Alex, 2026-09-29): nurturing's own subscribers listen to
 each owner's events, which carry ids and the non-personal, point-in-time facts; no owner knows nurturing and
