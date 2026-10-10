@@ -37,6 +37,8 @@ export interface LangWatchQLExecuteRequest {
    * would ignore the one the surface chose.
    */
   readonly granularitySeconds?: LangWatchQLAcceptedGranularityStep;
+  /** Trace origins the surface leaves out of every view the statement reads, as a board does. */
+  readonly excludeOrigins?: readonly string[];
 }
 
 /** How a submission reaches the server. */

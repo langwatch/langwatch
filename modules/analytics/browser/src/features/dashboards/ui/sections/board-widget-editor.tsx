@@ -12,7 +12,7 @@ import { DashboardWidgetEditDrawer } from "../../../dashboard-widget/ui/sections
 import { SandboxedChartFrame } from "../../../dashboard-widget/ui/sections/sandboxed-chart-frame.tsx";
 import { useBoardWidgetEditor } from "../../behavior/use-board-widget-editor.ts";
 import type { WidgetAsk } from "../../langy/model/board-langy.ts";
-import type { BoardPeriod } from "../../model/board-period.ts";
+import type { BoardQueryContext } from "../../model/board-period.ts";
 import type { BoardWidget } from "../../model/board-widgets.ts";
 import { widgetApiSnippet, widgetCreatePrompt, widgetMcpSnippet } from "../../model/widget-api.ts";
 import { WidgetApiPanel } from "../blocks/widget-api-panel.tsx";
@@ -46,7 +46,7 @@ export function BoardWidgetEditor({
   projectId: string;
   projectSlug: string;
   dashboardId: string;
-  period: BoardPeriod;
+  period: BoardQueryContext;
   isSaving: boolean;
   /** Langy's suggestions for this widget; absent when Langy is not available. */
   asks?: readonly WidgetAsk[];

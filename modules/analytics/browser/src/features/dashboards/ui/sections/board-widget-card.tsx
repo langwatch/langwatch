@@ -15,7 +15,7 @@ import { DashboardWidgetFrameOverWindow } from "../../../dashboard-widget/ui/sec
 import { useWidgetClipboard } from "../../behavior/use-widget-clipboard.ts";
 import { useWidgetCsvExport } from "../../behavior/use-widget-csv-export.ts";
 import type { WidgetSetup } from "../../langy/model/board-langy.ts";
-import type { BoardPeriod } from "../../model/board-period.ts";
+import type { BoardQueryContext } from "../../model/board-period.ts";
 import type { BoardWidget } from "../../model/board-widgets.ts";
 import { WIDGET_EDIT_PERMISSION } from "../../model/dashboards-access.ts";
 import { AskLangyButton } from "../blocks/ask-langy-button.tsx";
@@ -51,7 +51,7 @@ export function BoardWidgetCard({
   dashboardId: string;
   /** The board's name, which an exported file is named for. */
   boardName: string;
-  period: BoardPeriod;
+  period: BoardQueryContext;
   isWriting: boolean;
   langy?: WidgetCardLangy;
   /**
@@ -69,7 +69,7 @@ export function BoardWidgetCard({
   // A widget the reader may not see offers nothing that reads its data: no Langy, alert or report.
   const langyOnData = face === "no_access" ? undefined : langy;
   const canEditCode = face !== "no_access" || host.hasPermission(WIDGET_EDIT_PERMISSION);
-  const { periodStart, periodEnd, granularitySeconds } = period;
+  const { periodStart, periodEnd, granularitySeconds, excludeOrigins } = period;
   const timeWindow = useMemo(
     () => ({ start: periodStart, end: periodEnd }),
     [periodStart, periodEnd],
@@ -124,6 +124,7 @@ export function BoardWidgetCard({
         maxHeight={widgetBodyHeightPx(widget.placement.rowSpan)}
         timeWindow={timeWindow}
         granularitySeconds={granularitySeconds}
+        excludeOrigins={excludeOrigins}
         onFaceChange={setFace}
         onExportChange={csvExport.onExportChange}
         {...(langy ? { onAskLangyToSetUp: langy.setUpMissing } : {})}

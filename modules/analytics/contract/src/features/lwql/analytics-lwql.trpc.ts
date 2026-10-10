@@ -27,6 +27,15 @@ export const lwqlRunRequestSchema = z.object({
   ...lwqlStatementSchema.shape,
 });
 
+/**
+ * One statement run for a surface that leaves trace origins out, as a Dashboards board leaves
+ * out Langy's turns. Only this door takes it: the REST query runs what it is sent.
+ */
+export const lwqlQueryRequestSchema = z.object({
+  ...lwqlRunRequestSchema.shape,
+  excludeOrigins: z.array(z.string().min(1).max(64)).max(20).readonly().optional(),
+});
+
 /** One refusal, positioned where the parser or the policy found it. */
 export const lwqlViolationSchema: z.ZodType<LangWatchQLViolation> = z
   .object({
@@ -70,6 +79,6 @@ export const analyticsLwqlTrpc = defineTrpcContract("analytics.lwql")
   .withOutput(lwqlValidationResultSchema)
 
   .mutation("query")
-  .withInput(lwqlRunRequestSchema)
+  .withInput(lwqlQueryRequestSchema)
   .withOutput(langWatchQLQueryResultSchema)
   .build();

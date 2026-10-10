@@ -29,6 +29,7 @@ import type {
   LangWatchQLResultLimits,
 } from "../repositories/langwatch-ql-executor.repository.ts";
 import { langWatchQLPassSql } from "../rules/langwatch-ql-pass-sql.rules.ts";
+import { scopeLangWatchQLToOrigins } from "../rules/langwatch-ql-query-scope.rules.ts";
 import { DEFAULT_LWQL_RESULT_LIMITS } from "../rules/langwatch-ql-result-limits.rules.ts";
 import {
   langWatchQLExecutionParameters,
@@ -320,6 +321,7 @@ export class LangWatchQLService {
     timeWindow,
     granularitySeconds,
     onBudgetOverflow,
+    excludeOrigins = [],
     isInstantEvalsEnabled,
     signal,
   }: LangWatchQLProjectSetExecuteInput & LangWatchQLEvalGate): Promise<LangWatchQLQueryResult> {
@@ -358,6 +360,9 @@ export class LangWatchQLService {
     const tenantCapability = lwqlCapability.tenantCapabilitySet({
       secrets: projects.map((project) => project.lwqlKey),
     });
+    // Only a statement that follows the window reads within it; one with its own range, such
+    // as month to date, would lose Langy traces older than the window from the origin lookup.
+    const followedWindow = validation.followsTimeWindow ? timeWindow : void 0;
     const result = await this.executeValidated({
       executor,
       projects,
@@ -366,6 +371,8 @@ export class LangWatchQLService {
       validation,
       granularity,
       tenantCapability,
+      excludeOrigins,
+      ...(followedWindow ? { timeWindow: followedWindow } : {}),
       ...(signal ? { signal } : {}),
     });
     // After the main query, never beside it: a refused or failed query costs no second read.
@@ -375,7 +382,8 @@ export class LangWatchQLService {
       validation,
       database: this.deps.database,
       views: this.views,
-      timeWindow: validation.followsTimeWindow ? timeWindow : void 0,
+      excludeOrigins,
+      timeWindow: followedWindow,
       granularitySeconds: granularity.followsGranularity ? granularity.granularitySeconds : void 0,
     });
 
@@ -406,6 +414,8 @@ export class LangWatchQLService {
     validation,
     granularity,
     tenantCapability,
+    excludeOrigins,
+    timeWindow,
     signal,
   }: {
     readonly executor: LangWatchQLExecutorRepository;
@@ -415,6 +425,10 @@ export class LangWatchQLService {
     readonly validation: ValidatedLangWatchQL;
     readonly granularity: LangWatchQLGranularityResolution;
     readonly tenantCapability: string;
+    /** The origins the surface leaves out of every view the statement reads. */
+    readonly excludeOrigins: readonly string[];
+    /** The window the statement follows, which bounds the origin lookup; absent, none does. */
+    readonly timeWindow?: LangWatchQLTimeWindow;
     readonly signal?: AbortSignal;
   }): Promise<LangWatchQLQueryResult> {
     // The resolved record plus the step this run was bucketed at, when the
@@ -423,9 +437,15 @@ export class LangWatchQLService {
     const executionParameters = langWatchQLExecutionParameters({ validation, granularity });
 
     const execution = await executor.execute({
-      // The submitted statement with one edit and no other: a default `LIMIT` when the caller
-      // named none, so an unbounded query is capped rather than streamed.
-      sql: langWatchQLRowLimitedSql({ sql, validation, maxRows: this.limits.maxRows }),
+      // The submitted statement with a default `LIMIT` when the caller named none, so an
+      // unbounded query is capped rather than streamed, and the origins the surface left out.
+      sql: scopeLangWatchQLToOrigins({
+        sql: langWatchQLRowLimitedSql({ sql, validation, maxRows: this.limits.maxRows }),
+        excludeOrigins,
+        database: this.deps.database,
+        views: this.views,
+        ...(timeWindow ? { timeWindow } : {}),
+      }),
       // The resolved record, not the caller's: it is the one carrying the
       // window this surface injected AND the step this run was bucketed at.
       // `validation.boundParameters` is the wrong half — it predates the
@@ -473,6 +493,7 @@ export class LangWatchQLService {
         diagnostics: diagnostics.map((diagnostic) => diagnostic.code),
         followsTimeWindow: validation.followsTimeWindow,
         followsGranularity: granularity.followsGranularity,
+        excludeOrigins,
       },
       "LangWatchQL executed",
     );

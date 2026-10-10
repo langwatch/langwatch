@@ -25,13 +25,18 @@ vi.mock("../../dashboard-widget/ui/sections/sandboxed-chart-frame.tsx", () => ({
 
 import { StubAnalyticsHost } from "../../../testing.tsx";
 import type { SandboxedChartFrameProps } from "../../dashboard-widget/ui/sections/sandboxed-chart-frame.tsx";
-import type { BoardPeriod } from "../model/board-period.ts";
+import type { BoardQueryContext } from "../model/board-period.ts";
 import type { BoardWidget } from "../model/board-widgets.ts";
 import { BoardWidgetCard, type WidgetCardLangy } from "../ui/sections/board-widget-card.tsx";
 import { CuratedWidgetCard } from "../ui/sections/curated-widget-card.tsx";
 import { renderDashboards } from "./render-dashboards.test-helpers.tsx";
 
-const PERIOD: BoardPeriod = { periodStart: 1_000, periodEnd: 2_000, granularitySeconds: 3600 };
+const PERIOD: BoardQueryContext = {
+  periodStart: 1_000,
+  periodEnd: 2_000,
+  granularitySeconds: 3600,
+  excludeOrigins: ["langy"],
+};
 const DEFINITION = {
   version: 1 as const,
   code: "export default function Widget() { return null; }",
@@ -239,6 +244,7 @@ describe("given a From LangWatch board's widget whose query reads cost", () => {
             rowSpan={4}
             timeWindow={{ start: 1_000, end: 2_000 }}
             granularitySeconds={3600}
+            excludeOrigins={PERIOD.excludeOrigins}
             onAskLangy={vi.fn()}
           />
         ),
