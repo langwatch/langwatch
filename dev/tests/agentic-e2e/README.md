@@ -192,7 +192,7 @@ Tests are **self-contained** - they create their own test user automatically. No
 
 The `auth.setup.ts` handles this:
 
-1. Registers a test user via the `/api/trpc/user.register` API
+1. Registers a test user via the `/api/trpc/auth.register` API
 2. Signs in through the UI
 3. Completes onboarding if shown
 4. Saves session state to `.auth/user.json`

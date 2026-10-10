@@ -98,7 +98,7 @@ defineRestRouter(AnnotationApi).withNamespace("annotations").withVersion("2026-0
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
-});
+}, 60_000); // four cold tsc programs in one test
 
 /** @scenario "Registering a route without an access policy is a type error" */
 it("refuses a route registered with no access decision, because it has no handler to call", () => {
