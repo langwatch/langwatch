@@ -15,8 +15,8 @@ import { Drawer } from "@langwatch/design-system/drawer";
 import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import {
+  Alert,
   Badge,
-  Box,
   Button,
   Code,
   Collapsible,
@@ -4691,19 +4691,16 @@ function WebhookEndpointPanel({
 /** The one-shot warning, and how long the old secret keeps working. */
 function SecretGraceNotice() {
   return (
-    <Box
-      borderWidth="1px"
-      borderColor="amber.300"
-      backgroundColor="orange.subtle"
-      padding={3}
-      borderRadius="sm"
-    >
-      <Text fontSize="xs" color="amber.900">
-        <strong>Important:</strong> the secret above will not be shown again. We retained the prior
-        secret&apos;s hash for a 24h grace window if you&apos;re rotating, so you have time to roll
-        the new value through every upstream client.
-      </Text>
-    </Box>
+    <Alert.Root status="warning" size="sm">
+      <Alert.Indicator />
+      <Alert.Content>
+        <Alert.Description>
+          <strong>Important:</strong> the secret above will not be shown again. We retained the
+          prior secret&apos;s hash for a 24h grace window if you&apos;re rotating, so you have time
+          to roll the new value through every upstream client.
+        </Alert.Description>
+      </Alert.Content>
+    </Alert.Root>
   );
 }
 
