@@ -88,11 +88,15 @@ describe("production main colour parity", () => {
     );
   });
 
+  it("puts light fields on white, as main's were, and dark ones on main's input ground", () => {
+    expect(resolve("bg.control", "_light")).toBe(resolve("bg.surface", "_light"));
+    expect(resolve("bg.control", "_dark")).toBe(resolve("bg.input", "_dark"));
+  });
+
   it.each([
     ["bg.overlay", "bg.panel"],
     ["bg.raised", "bg.panel"],
     ["bg.nested", "bg.muted"],
-    ["bg.control", "bg.input"],
     ["bg.hover", "bg.softHover"],
     ["bg.selected", "nav.bgActive"],
     ["bg.stripe", "bg.subtle"],

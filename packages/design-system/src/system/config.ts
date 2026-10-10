@@ -550,7 +550,8 @@ export const designSystemConfig = defineConfig({
           overlay: { value: "{colors.bg.panel}" },
           nested: { value: "{colors.bg.muted}" },
           raised: { value: "{colors.bg.panel}" },
-          control: { value: "{colors.bg.input}" },
+          // Light fields are white on the grey page, as main's were; grey read as disabled.
+          control: { value: { _light: "{colors.bg.surface}", _dark: "{colors.bg.input}" } },
           hover: { value: "{colors.bg.softHover}" },
           selected: { value: "{colors.nav.bgActive}" },
           stripe: { value: "{colors.bg.subtle}" },
