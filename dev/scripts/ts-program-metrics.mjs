@@ -32,8 +32,11 @@ const readConfig = (file) =>
       .replace(/(^|[^:"])\/\/.*$/gm, "$1")
       .replace(/,(\s*[}\]])/g, "$1"),
   );
-const configOf = (path) =>
-  existsSync(path) && statSync(path).isDirectory() ? join(path, "tsconfig.json") : path;
+const configOf = (path) => {
+  if (!existsSync(path)) return path;
+  const directory = statSync(path).isDirectory();
+  return directory ? join(path, "tsconfig.json") : path;
+};
 
 /** Every config reachable from the root solution that compiles files (containers skipped). */
 function programs() {
@@ -80,25 +83,28 @@ function selfTimes(traceFile) {
     if (!byThread.has(event.tid)) byThread.set(event.tid, []);
     byThread.get(event.tid).push({ ...event, child: 0 });
   }
-  const byName = {};
-  const byFile = {};
-  for (const events of byThread.values()) {
-    events.sort((a, b) => a.ts - b.ts || (b.dur ?? 0) - (a.dur ?? 0));
-    const stack = [];
-    for (const event of events) {
-      while (stack.length > 0 && stack.at(-1).ts + (stack.at(-1).dur ?? 0) <= event.ts) stack.pop();
-      if (stack.length > 0) stack.at(-1).child += event.dur ?? 0;
-      stack.push(event);
-    }
-    for (const event of events) {
-      const ms = ((event.dur ?? 0) - event.child) / 1000;
-      byName[event.name] = (byName[event.name] ?? 0) + ms;
-      const path = event.args?.path;
-      if (typeof path === "string")
-        byFile[relative(root, path)] = (byFile[relative(root, path)] ?? 0) + ms;
-    }
+  const totals = { byName: {}, byFile: {} };
+  for (const events of byThread.values()) addThreadSelfTimes({ events, totals });
+  return totals;
+}
+
+/** One thread's events, nested by time: each parent's `child` collects its children's durations. */
+function addThreadSelfTimes({ events, totals }) {
+  const ordered = events.toSorted((a, b) => a.ts - b.ts || (b.dur ?? 0) - (a.dur ?? 0));
+  const stack = [];
+  for (const event of ordered) {
+    while (stack.length > 0 && stack.at(-1).ts + (stack.at(-1).dur ?? 0) <= event.ts) stack.pop();
+    if (stack.length > 0) stack.at(-1).child += event.dur ?? 0;
+    stack.push(event);
   }
-  return { byName, byFile };
+  for (const event of ordered) {
+    const ms = ((event.dur ?? 0) - event.child) / 1000;
+    totals.byName[event.name] = (totals.byName[event.name] ?? 0) + ms;
+    const path = event.args?.path;
+    if (typeof path !== "string") continue;
+    const file = relative(root, path);
+    totals.byFile[file] = (totals.byFile[file] ?? 0) + ms;
+  }
 }
 
 /** Our own generics (outside node_modules) by number of instantiated types. */
@@ -118,7 +124,7 @@ function ownGenerics(typesFile) {
 
 const top = (record, count) =>
   Object.entries(record)
-    .sort((a, b) => b[1] - a[1])
+    .toSorted((a, b) => b[1] - a[1])
     .slice(0, count)
     .map(([key, value]) => [key, Math.round(value)]);
 
