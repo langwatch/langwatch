@@ -230,10 +230,13 @@ export function clickHouseRunOptions({
   url,
   settings,
   upTo,
+  signal,
 }: {
   url: string;
   settings: Pick<GooseOptions, "clusterName" | "childEnvironment" | "waitSeconds"> | undefined;
   upTo: number | undefined;
+  /** The upgrade lease's signal: losing the lease kills goose. */
+  signal: AbortSignal | undefined;
 }): GooseOptions {
   return {
     connectionUrl: url,
@@ -241,6 +244,7 @@ export function clickHouseRunOptions({
     childEnvironment: settings?.childEnvironment,
     waitSeconds: settings?.waitSeconds,
     verbose: true,
+    signal,
     ...(upTo === undefined ? {} : { upTo }),
   };
 }
@@ -248,9 +252,11 @@ export function clickHouseRunOptions({
 async function migrateClickHouse({
   input,
   upTo,
+  signal,
 }: {
   input: TaskInput;
   upTo?: number;
+  signal: AbortSignal;
 }): Promise<SchemaTargetReport[]> {
   const { config, targets } = clickhouseTargets(input);
   const settings = config.settings;
@@ -258,7 +264,7 @@ async function migrateClickHouse({
   for (const target of targets) {
     let error: string | null = null;
     try {
-      await runMigrations(clickHouseRunOptions({ url: target.url, settings, upTo }));
+      await runMigrations(clickHouseRunOptions({ url: target.url, settings, upTo, signal }));
     } catch (failure) {
       error = String(failure instanceof Error ? failure.message : failure)
         .split(target.url)
@@ -313,7 +319,7 @@ function oneReleaseApplier({ input }: { input: TaskInput }): UpgradeSchemaApplie
       await realignRewrittenChecksums({ input });
       applied = [
         await deployPrisma({ input, lockTimeoutMs, signal }),
-        ...(await migrateClickHouse({ input })),
+        ...(await migrateClickHouse({ input, signal })),
       ];
       return applied;
     },
@@ -510,7 +516,7 @@ function stepSchemaTo({ input }: { input: TaskInput }): StepSchemaTo {
   return async ({ release, prismaFolders, gooseUpTo, lockTimeoutMs, signal }) => {
     const postgres = await stepPrisma({ input, release, prismaFolders, lockTimeoutMs, signal });
     if (!postgres.reports.every((report) => report.ok) || gooseUpTo === null) return postgres;
-    const clickhouse = await migrateClickHouse({ input, upTo: gooseUpTo });
+    const clickhouse = await migrateClickHouse({ input, upTo: gooseUpTo, signal });
     return { ...postgres, reports: [...postgres.reports, ...clickhouse] };
   };
 }
