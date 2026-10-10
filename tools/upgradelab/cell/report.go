@@ -106,6 +106,7 @@ var invariantNames = map[string]string{
 	"H2":  "the upgrade applied every ClickHouse target and the ledger shows each",
 	"I0":  "the api serves everything from boot while the upgrade runs: no holding page",
 	"B1":  "no browser console error and no failed request during the walk",
+	"I7":  "every stored event parses under head's schemas and upcasts",
 	"I5":  "read models are filled: trace meter equals the trace count, open suite runs counted, scope rows for every project",
 	"I2":  "ledger current: every step done or not-needed (operator steps aside)",
 	"I2b": "nothing reopened after ready",
@@ -133,7 +134,7 @@ var invariantNames = map[string]string{
 // scenarioIDs maps each check to the soak scenarios it judges (plan section 8.3, "Judged by").
 var scenarioIDs = map[string][]string{
 	"N1": {"S1"}, "N6": {"S1"}, "N7": {"S1"}, "N5": {"S2"}, "N2": {"S3"}, "D1": {"S3"}, "N3": {"S4"}, "N4": {"S5"},
-	"I0": {"S6"}, "I2": {"S7", "F1"}, "I2b": {"S7"}, "I4": {"S8"}, "I6": {"S9"}, "I5": {"S10"}, "I9": {"S11"}, "B1": {"S11"},
+	"I0": {"S6"}, "I2": {"S7", "F1"}, "I2b": {"S7"}, "I4": {"S8"}, "I6": {"S9"}, "I5": {"S10"}, "I7": {"S14"}, "I9": {"S11"}, "B1": {"S11"},
 	"O1": {"S12"}, "I8": {"S13", "F2"}, "D3": {"U3"},
 	"H1": {"H1"}, "H2": {"H2"}, "H3": {"H3"}, "H4": {"H4"}, "H5": {"H5"},
 }

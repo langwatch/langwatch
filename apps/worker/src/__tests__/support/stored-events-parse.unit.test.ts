@@ -49,7 +49,7 @@ function row({
     AggregateId: "aggregate-1",
     EventId: id,
     EventTimestamp: 1_700_000_000_000,
-    EventOccurredAt: null,
+    EventOccurredAt: 0,
     EventType: type,
     EventVersion: "2026-01-01",
     EventPayload: payload,

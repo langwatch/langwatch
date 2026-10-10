@@ -4,6 +4,7 @@
  * @see packages/eventing/specs/stored-event-parse.feature
  */
 import { recordToEvent, type SealedPipelineDefinition } from "@langwatch/eventing";
+import { mapEventLogRows } from "@langwatch/eventing/server";
 
 /** One (AggregateType, EventType, EventVersion) group of a target's log and its stored count. */
 export interface StoredEventGroup {
@@ -20,7 +21,7 @@ export interface StoredEventRow {
   AggregateId: string;
   EventId: string;
   EventTimestamp: number;
-  EventOccurredAt: number | null;
+  EventOccurredAt: number;
   EventType: string;
   EventVersion: string;
   EventPayload: unknown;
@@ -65,6 +66,18 @@ export function parserFromDefinitions(definitions: readonly SealedPipelineDefini
   };
 }
 
+/** A row rebuilt by the worker's own ClickHouse mapping, payload normalisation included. */
+function readAsWorker(row: StoredEventRow): unknown {
+  const [record] = mapEventLogRows({
+    rows: [row],
+    tenantId: row.TenantId,
+    aggregateType: row.AggregateType,
+    aggregateId: row.AggregateId,
+  });
+  if (!record) throw new Error(`event ${row.EventId} did not map`);
+  return recordToEvent(record, row.AggregateId);
+}
+
 function issuesOf(error: unknown): string[] {
   if (typeof error !== "object" || error === null || !("issues" in error)) return [];
   if (!Array.isArray(error.issues)) return [];
@@ -97,7 +110,7 @@ export async function findRefusedGroups({
         sampled += 1;
         try {
           if (!parse) throw new Error("undeclared");
-          parse(recordToEvent(row, row.AggregateId));
+          parse(readAsWorker(row));
         } catch (error) {
           refused += 1;
           example ??= { id: row.EventId, issues: parse ? issuesOf(error) : [] };

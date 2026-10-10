@@ -3,6 +3,7 @@ package cell
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"fmt"
 	"maps"
 	"net/http"
@@ -43,7 +44,7 @@ func (cell *run) checks(ctx context.Context) error {
 		cell.apiEarlyVerdict(), cell.crashVerdict(), droppedVerdict(cell.report.Traffic), ingestVerdict(cell.report.Traffic), unansweredVerdict(cell.allCalls()), lostVerdict(cell.report.Traffic), cell.queueVerdict(), cell.opsVerdict(final))
 	cell.report.Verdicts = append(cell.report.Verdicts, cell.hybridVerdicts(ctx)...)
 	cell.report.Verdicts = append(cell.report.Verdicts, cell.drillVerdicts(final)...)
-	cell.report.Verdicts = append(cell.report.Verdicts, cell.readModelVerdict(ctx), cell.browserVerdict())
+	cell.report.Verdicts = append(cell.report.Verdicts, cell.readModelVerdict(ctx), cell.browserVerdict(), cell.storedEventsVerdict(ctx))
 	for index := range cell.report.Verdicts {
 		cell.report.Verdicts[index].Scenarios = scenarioIDs[cell.report.Verdicts[index].ID]
 	}
@@ -600,4 +601,55 @@ func (cell *run) scopePart(ctx context.Context) Verdict {
 		}
 	}
 	return Verdict{Name: "privacy and retention", Result: map[bool]string{true: "pass", false: "fail"}[len(gaps) == 0], Detail: fmt.Sprintf("projects without a scope row: %v", gaps)}
+}
+
+// storedEventsVerdict (I7): head's worker parses every stored event on every ClickHouse target under
+// its schemas and upcasts (apps/worker/src/__tests__/stored-events-parse.integration.test.ts).
+func (cell *run) storedEventsVerdict(ctx context.Context) Verdict {
+	var urls []string
+	for _, label := range append([]string{""}, cell.stores.Private...) {
+		urls = append(urls, cell.stores.ClickHouseURL(label))
+	}
+	reportPath := filepath.Join(cell.options.RunDir, "stored-events.json")
+	_ = os.Remove(reportPath)
+	command := exec.CommandContext(ctx, "pnpm", "--filter", "@langwatch/worker", "test:integration", "src/__tests__/stored-events-parse.integration.test.ts") // #nosec G204 -- fixed argv.
+	command.Dir = cell.options.HeadDir
+	command.Env = cell.envWith(map[string]string{
+		"STORED_EVENTS_CLICKHOUSE_URLS": strings.Join(urls, ","),
+		"STORED_EVENTS_REPORT":          reportPath,
+		"VITEST_MAX_WORKERS":            "2",
+	})
+	out, runErr := command.CombinedOutput()
+	_ = os.WriteFile(cell.logPath("stored-events"), out, 0o600)
+	report, readErr := os.ReadFile(reportPath) // #nosec G304 -- the cell's own run directory.
+	if readErr != nil {
+		report = nil
+	}
+	return storedEventsJudgement(report, runErr)
+}
+
+// storedEventsJudgement reads the parse report: zero refused groups pass, any fail by name, and a
+// run that wrote no readable report is inconclusive.
+func storedEventsJudgement(report []byte, runErr error) Verdict {
+	const name = "every stored event parses under head's schemas and upcasts"
+	var parsed struct {
+		Targets int `json:"targets"`
+		Refused []struct {
+			Target, AggregateType, EventType, EventVersion, Reason, ExampleEventID string
+			Refused, Sampled, Stored                                               int
+		} `json:"refused"`
+	}
+	if report == nil || json.Unmarshal(report, &parsed) != nil {
+		return Verdict{ID: "I7", Name: name, Result: "inconclusive", Detail: "no parse report (see stored-events.log): " + errText(runErr)}
+	}
+	var groups []string
+	for _, each := range parsed.Refused {
+		groups = append(groups, fmt.Sprintf("%s %s/%s@%s %s %d/%d (stored %d, e.g. %s)", each.Target, each.AggregateType, each.EventType, each.EventVersion, each.Reason, each.Refused, each.Sampled, each.Stored, each.ExampleEventID))
+	}
+	result := verdict("I7", len(groups) == 0, fmt.Sprintf("%d targets; refused groups: %v", parsed.Targets, groups))
+	if len(groups) == 0 && runErr != nil {
+		result = Verdict{ID: "I7", Result: "inconclusive", Detail: "report has no refusal but the run failed (see stored-events.log): " + errText(runErr)}
+	}
+	result.Name = name
+	return result
 }

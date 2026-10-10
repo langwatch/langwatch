@@ -6,6 +6,7 @@
  */
 import { writeFileSync } from "node:fs";
 
+import { EVENT_LOG_SELECT_COLUMNS } from "@langwatch/eventing/server";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -74,11 +75,11 @@ function httpSource(raw: string): StoredEventSource {
     },
     async *readGroup({ group, limit }) {
       const body = await post(
-        `SELECT TenantId, AggregateType, AggregateId, EventId, EventTimestamp, EventOccurredAt,
-                EventType, EventVersion, EventPayload, ProcessingTraceparent, IdempotencyKey
+        `SELECT TenantId, AggregateType, AggregateId, ${EVENT_LOG_SELECT_COLUMNS}
          FROM event_log
          WHERE AggregateType = {aggregateType:String} AND EventType = {eventType:String}
            AND EventVersion = {eventVersion:String}
+         ORDER BY cityHash64(EventId)
          LIMIT {limit:UInt32}`,
         {
           aggregateType: group.aggregateType,
