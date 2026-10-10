@@ -206,7 +206,7 @@ export function SectionNavigationRail({
           data-testid="section-navigation-title"
           display={{ base: "none", md: "flex" }}
           alignItems="center"
-          height="48px"
+          height="shellHeader"
           flexShrink={0}
           paddingX={2}
           fontSize="md"

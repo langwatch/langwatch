@@ -16,17 +16,17 @@ const COMPACT_HEADER = {
 /** Zero-specificity defaults, so a row's or a cell's own padding wins. */
 const COMPACT_CELLS = { "& :where(tbody td)": { paddingY: "2", paddingX: "3" } } as const;
 
-/** List table with rounded border, tall header, and grid borders. Compose with Table parts. */
+/** Rounded list table with optional column rules. Compose with Table parts. */
 export function ListTable({
   children,
   containerProps,
-  columnRules = true,
+  columnRules = false,
   density = "default",
   ...props
 }: ComponentProps<typeof Table.Root> & {
   /** `compact`: a short, opaque, sentence-case header and tighter cells, for dense logs. */
   density?: "default" | "compact";
-  /** False for a dense log whose rows read across: row rules only, no line between cells. */
+  /** Opt in to column dividers; ordinary lists use row rules only. */
   columnRules?: boolean;
   /**
    * Overrides on the bordered container, for a page that needs the card itself
@@ -45,6 +45,7 @@ export function ListTable({
       {...containerProps}
     >
       <Table.Root
+        borderRadius="inherit"
         variant="line"
         css={{
           // Taller header row with comfortable breathing room.

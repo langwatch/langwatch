@@ -94,6 +94,7 @@ export const designSystemConfig = defineConfig({
       "toast-fade": { from: { opacity: 1 }, to: { opacity: 0 } },
     },
     tokens: {
+      sizes: { shellHeader: { value: "48px" } },
       fonts: {
         heading: {
           value: interFontFamily,
@@ -1033,7 +1034,14 @@ export const designSystemConfig = defineConfig({
         slots: ["root", "row", "cell", "columnHeader", "header", "body"],
         base: {
           // The container owns the ground, including rounded corners.
-          root: { background: "transparent" },
+          root: {
+            background: "transparent",
+            borderRadius: "md",
+            // Clip rounded cells without introducing a scroll ancestor for sticky headers.
+            overflow: "clip",
+            borderCollapse: "separate",
+            borderSpacing: 0,
+          },
           row: {
             bg: "transparent",
             _hover: { bg: "bg.hover" },
