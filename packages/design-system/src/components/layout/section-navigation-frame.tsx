@@ -294,6 +294,7 @@ export function SectionNavigationFrame({
   return (
     <Stack
       data-section-frame
+      background="bg.surface"
       overflow="hidden"
       data-testid="section-navigation-layout"
       direction={{ base: "column", md: "row" }}

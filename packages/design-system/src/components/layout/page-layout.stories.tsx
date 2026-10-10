@@ -136,3 +136,44 @@ export const HeaderStates: Story = {
     </HStack>
   ),
 };
+
+/** Scroll either panel: the reserved hairline fades in without moving the title. */
+export const ScrollingGlass: Story = {
+  render: () => (
+    <HStack align="start" gap={6} wrap="wrap">
+      {(["light", "dark"] as const).map((mode) => (
+        <Box
+          key={mode}
+          className={mode}
+          bg="bg.surface"
+          color="fg"
+          width="480px"
+          height="320px"
+          overflowY="auto"
+          borderWidth="1px"
+          borderColor="border.card"
+          borderRadius="lg"
+        >
+          <PageLayout.Header>
+            <PageLayout.Heading>Integrations</PageLayout.Heading>
+          </PageLayout.Header>
+          <Stack padding={6} gap={4}>
+            {Array.from({ length: 12 }, (_, index) => (
+              <Box
+                key={index}
+                bg="bg.card"
+                borderWidth="1px"
+                borderColor="border.card"
+                borderRadius="lg"
+                padding={4}
+              >
+                <Text>Connection {index + 1}</Text>
+                <Text color="fg.muted">Content scrolls underneath the title.</Text>
+              </Box>
+            ))}
+          </Stack>
+        </Box>
+      ))}
+    </HStack>
+  ),
+};

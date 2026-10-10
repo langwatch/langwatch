@@ -77,6 +77,16 @@ control ground. Prefer removing a call-site background override to adding one.
 The sticky page title is the intentional glass exception: it samples the same
 content ground, with the reduced-graphics switch restoring opacity.
 
+### Sticky page titles
+
+`PageLayout.Header` stays at the top of its scrolling content panel. Its
+65% `bg.surface` glass and 16px backdrop blur reveal content passing underneath;
+`--lw-panel-alpha` and `--lw-backdrop-blur` make it opaque when reduced graphics
+is enabled. A reserved 1px hairline starts transparent and fades to `border.card`
+after scrolling, without changing layout. Reduced motion disables the fade.
+Section-navigation headers use the same behavior and surface as ordinary page
+headers. `withBorder={false}` explicitly opts out of the scroll hairline.
+
 ### Surface ladder
 
 The dark material is blue ink: OKLCH hue **250°**, with chroma tapering from

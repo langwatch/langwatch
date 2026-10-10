@@ -12,9 +12,19 @@ import {
   Container as ChakraContainer,
   Heading as ChakraHeading,
   HStack,
+  mergeRefs,
   Text,
 } from "@chakra-ui/react";
-import { createContext, useContext, type PropsWithChildren, type ReactNode } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  type PropsWithChildren,
+  type ReactNode,
+  type Ref,
+} from "react";
 
 // Container component
 interface ContainerProps extends ChakraContainerProps {
@@ -44,6 +54,7 @@ function Container({ children, sidebarWidth = 200, ...props }: PropsWithChildren
 
 // Header component
 interface HeaderProps extends ChakraStackProps {
+  ref?: Ref<HTMLDivElement>;
   withBorder?: boolean;
   actions?: ReactNode;
 }
@@ -52,24 +63,58 @@ function Header({
   children,
   withBorder = true,
   actions,
+  ref,
   ...props
 }: PropsWithChildren<HeaderProps>) {
+  const headerRef = useRef<HTMLDivElement>(null);
+  const [scrolled, setScrolled] = useState(false);
+
+  useEffect(() => {
+    const header = headerRef.current;
+    if (!header) return;
+    const update = () => {
+      let hasScroll = window.scrollY > 0;
+      for (let parent = header.parentElement; parent; parent = parent.parentElement) {
+        hasScroll ||= parent.scrollTop > 0;
+      }
+      setScrolled(hasScroll);
+    };
+    // Capture handles nested page scrollers, including a section header's
+    // horizontal wrapper, without treating an unrelated drawer as this page.
+    const onScroll = (event: Event) => {
+      if (
+        event.target === document ||
+        (event.target instanceof Element && event.target.contains(header))
+      )
+        update();
+    };
+    update();
+    document.addEventListener("scroll", onScroll, { capture: true, passive: true });
+    return () => document.removeEventListener("scroll", onScroll, true);
+  }, []);
+
   return (
     <HStack
+      ref={mergeRefs(headerRef, ref)}
       data-page-header
+      data-scrolled={scrolled ? "true" : "false"}
       minHeight="56px"
       flexShrink={0}
       paddingX={6}
       paddingY={2}
       alignItems="center"
       width="full"
-      borderBottom={withBorder ? "1px solid" : undefined}
-      borderBottomColor={withBorder ? "border.muted" : undefined}
+      borderBottomWidth={withBorder ? "1px" : 0}
+      borderBottomStyle={withBorder ? "solid" : "none"}
+      borderBottomColor={withBorder && scrolled ? "border.card" : "transparent"}
+      transition="border-color 160ms ease"
+      _motionReduce={{ transition: "none" }}
       gap={3}
       position="sticky"
       top={0}
       zIndex={10}
-      background="bg.surface"
+      background="color-mix(in srgb, var(--chakra-colors-bg-surface) var(--lw-panel-alpha, 65%), transparent)"
+      backdropFilter="var(--lw-backdrop-blur, blur(16px))"
       {...props}
     >
       {children}
