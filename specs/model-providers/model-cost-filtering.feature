@@ -13,6 +13,17 @@ Feature: Filtering the model costs table
     And the count line reads "Showing 1 of 3 models."
 
   @integration
+  Scenario: Asking which rule matches a model string narrows the table to those rules
+    When I type "anthropic/claude-haiku-4-5-20260101" into "Which rule matches this model?"
+    Then only models whose regex rule matches that string are listed
+
+  @integration
+  Scenario: The cost drawer tests a regex against a sample model string as you type
+    Given the cost drawer is open with a regex
+    When I type a sample model string
+    Then it says "Match" or "No match", and an invalid regex shows an inline error
+
+  @integration
   Scenario: The provider filter narrows the table to one provider
     When I pick the "openai" provider
     Then only models named "openai/..." are listed

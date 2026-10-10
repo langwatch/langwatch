@@ -1,5 +1,7 @@
 import type { SignInMethod } from "@langwatch/identity-contract";
 
+import { rememberPasskeyOnThisDevice } from "./passkey-on-this-device.ts";
+
 /** Last-used sign-in method badge (device-local, never account-linked). */
 const STORAGE_KEY = "langwatch.auth.last-used-method.v2";
 const LEGACY_STORAGE_KEY = "langwatch.auth.last-used-method";
@@ -25,6 +27,8 @@ export function readLastUsedMethodId(): string | null {
  * slot. It retires any parked method, so an abandoned dial cannot overwrite it.
  */
 export function rememberLastUsedMethod(method: Pick<SignInMethod, "id">): void {
+  // A passkey that got somebody in is one this browser can offer again.
+  if (method.id === "passkey") rememberPasskeyOnThisDevice();
   try {
     window.localStorage.setItem(STORAGE_KEY, method.id);
     window.localStorage.removeItem(PENDING_KEY);

@@ -120,4 +120,40 @@ describe("EventLogReadSeat", () => {
       ).rejects.toBeInstanceOf(ValidationError);
     });
   });
+
+  describe("when one aggregate's whole stream is asked", () => {
+    async function streamSeat() {
+      const { seat, eventId } = await seatHolding({ occurredAt: (t) => t - 30 * DAY_MS });
+      return { seat, eventId };
+    }
+
+    /** @scenario "One aggregate's stream is answered whole, whatever its age" */
+    it("answers every event of that stream, outside the one-event window too", async () => {
+      const { seat, eventId } = await streamSeat();
+
+      const events = await seat.findAggregateEvents({
+        tenantId: TENANT,
+        aggregateType: "trace",
+        aggregateId: "trace-1",
+      });
+
+      expect(events.map((event) => event.id)).toEqual([eventId]);
+    });
+
+    /** @scenario "Another tenant's stream answers nothing" */
+    it("answers nothing for another tenant or an empty aggregate id", async () => {
+      const { seat } = await streamSeat();
+
+      await expect(
+        seat.findAggregateEvents({
+          tenantId: createTenantId("project-2"),
+          aggregateType: "trace",
+          aggregateId: "trace-1",
+        }),
+      ).resolves.toEqual([]);
+      await expect(
+        seat.findAggregateEvents({ tenantId: TENANT, aggregateType: "trace", aggregateId: " " }),
+      ).resolves.toEqual([]);
+    });
+  });
 });

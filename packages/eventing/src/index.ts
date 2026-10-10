@@ -155,6 +155,7 @@ export type {
   EventStoreReadContext,
 } from "./stores/eventStore.types.ts";
 export {
+  type AggregateEventsReadInput,
   EVENT_READ_WINDOW_MS,
   EventLogReadSeat,
   eventReadWindow,

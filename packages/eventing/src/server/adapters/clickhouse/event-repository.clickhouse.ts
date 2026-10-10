@@ -138,10 +138,10 @@ export class EventingClickHouseEventRepository implements EventRepository {
     private readonly retention: EventingRetentionConfiguration | undefined,
   ) {}
 
-  /** One-event reads only, for a read seat: a process that appends nothing states no retention. */
+  /** Reads only, for a read seat: a process that appends nothing states no retention. */
   static createForEventReads(options: {
     resolveClient: EventingClickHouseClientResolver;
-  }): Pick<EventRepository, "getEventRecord"> {
+  }): Pick<EventRepository, "getEventRecord" | "getEventRecords"> {
     return new EventingClickHouseEventRepository(options.resolveClient, undefined);
   }
 

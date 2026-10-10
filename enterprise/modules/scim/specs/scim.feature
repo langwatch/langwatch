@@ -475,17 +475,11 @@ Feature: Enterprise SCIM package boundary
   Rule: One connection's recent directory activity reads the sync log in words (ADR-126)
 
     @unit
-    Scenario: Directory activity is refused by name where no sync log can be read
-      Given a process composed without an event stack
+    Scenario: Directory activity reads the sync log through the event read seat
+      Given a connection whose sync log holds directory facts
       When a connection's activity is read
-      Then the read is refused as an unavailable capability rather than answered empty
-
-    @unit
-    Scenario: Directory activity reads the sync log through the sync pipeline's own event store
-      Given the process runs SCIM's directory-sync pipeline
-      When a connection's activity is read
-      Then it is read through the store that pipeline was handed, for that connection's sync in the organization's tenant
-      And a pipeline built only to be listed hands its store to nobody
+      Then it is read through the event read seat, for that connection's sync in the organization's tenant
+      And the facts are answered newest first without the pipeline's own store
 
     @unit
     Scenario: Recent directory activity is served in words under sso:view

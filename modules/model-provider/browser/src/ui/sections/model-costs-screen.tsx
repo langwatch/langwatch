@@ -24,6 +24,7 @@ import { ArrowDown, ArrowUp, ArrowUpDown, Coins, MoreVertical, Plus, SearchX } f
 import { useState } from "react";
 
 import { modelProviderApi } from "../../behavior/model-provider-api.ts";
+import { useAllModelProvidersList } from "../../behavior/use-all-model-providers-list.ts";
 import { toLLMModelCostRow } from "../../model/llm-model-cost-row.ts";
 import {
   filterAndSortCosts,
@@ -36,6 +37,7 @@ import {
   MODEL_COST_MANAGE_PERMISSION,
   useModelProviderHost,
 } from "../../model/model-provider-host.ts";
+import { RegexHighlight } from "../elements/regex-highlight.tsx";
 
 /**
  * One per-token rate, rendered at full precision. Rates run to nine decimal
@@ -51,6 +53,40 @@ function RateCell({ rate, isCustom }: { rate: number | undefined; isCustom: bool
         })}
       </Text>
     </Table.Cell>
+  );
+}
+
+/** The model name in code style; a link to its provider's drawer when that provider is set up. */
+function ModelNameCell(props: { model: string; isCustom: boolean; modelProviderId?: string }) {
+  const host = useModelProviderHost();
+  const { organizationId, projectId } = host.scope();
+  const code = (
+    <Code truncate maxWidth="220px" color={props.isCustom ? "green.fg" : undefined}>
+      {props.model}
+    </Code>
+  );
+  if (!props.modelProviderId) return code;
+  return (
+    <Button
+      variant="plain"
+      size="xs"
+      padding={0}
+      height="auto"
+      aria-label={`Open provider for ${props.model}`}
+      onClick={() =>
+        host.openPlatformDrawer({
+          drawer: "editModelProvider",
+          params: {
+            projectId,
+            organizationId,
+            providerKey: props.model.split("/")[0],
+            modelProviderId: props.modelProviderId,
+          },
+        })
+      }
+    >
+      {code}
+    </Button>
   );
 }
 
@@ -86,6 +122,8 @@ function countLine(args: { loaded: boolean; isFiltering: boolean; shown: number;
 function FilterBar(props: {
   search: string;
   onSearch: (value: string) => void;
+  matchModel: string;
+  onMatchModel: (value: string) => void;
   provider: string;
   onProvider: (value: string) => void;
   customOnly: boolean;
@@ -103,6 +141,13 @@ function FilterBar(props: {
         aria-label="Search model costs"
         value={props.search}
         onChange={(event) => props.onSearch(event.target.value)}
+      />
+      <SearchInput
+        maxWidth="320px"
+        placeholder="Which rule matches this model?"
+        aria-label="Which rule matches this model?"
+        value={props.matchModel}
+        onChange={(event) => props.onMatchModel(event.target.value)}
       />
       <NativeSelect.Root width="56">
         <NativeSelect.Field
@@ -147,6 +192,7 @@ export default function ModelCostsScreen() {
   );
 
   const [search, setSearch] = useState("");
+  const [matchModel, setMatchModel] = useState("");
   const [provider, setProvider] = useState("");
   const [customOnly, setCustomOnly] = useState(false);
   const [sort, setSort] = useState<ModelCostSort | null>(null);
@@ -157,13 +203,21 @@ export default function ModelCostsScreen() {
   for (const row of rows) {
     providerCounts.set(providerOf(row), (providerCounts.get(providerOf(row)) ?? 0) + 1);
   }
-  const visibleRows = filterAndSortCosts({ rows, search, provider, customOnly, sort });
+  const { providers } = useAllModelProvidersList();
+  const providerRows = new Map<string, string>();
+  for (const candidate of providers) {
+    if (candidate.enabled && !providerRows.has(candidate.provider)) {
+      providerRows.set(candidate.provider, candidate.id);
+    }
+  }
+  const visibleRows = filterAndSortCosts({ rows, search, matchModel, provider, customOnly, sort });
   const needle = search.trim();
-  const isFiltering = !!needle || !!provider || customOnly;
+  const isFiltering = !!needle || !!matchModel.trim() || !!provider || customOnly;
   const noCosts = llmModelCosts.data?.length === 0;
   const noMatches = rows.length > 0 && visibleRows.length === 0;
   const clearFilters = () => {
     setSearch("");
+    setMatchModel("");
     setProvider("");
     setCustomOnly(false);
   };
@@ -196,6 +250,8 @@ export default function ModelCostsScreen() {
           <FilterBar
             search={search}
             onSearch={setSearch}
+            matchModel={matchModel}
+            onMatchModel={setMatchModel}
             provider={provider}
             onProvider={setProvider}
             customOnly={customOnly}
@@ -278,22 +334,14 @@ export default function ModelCostsScreen() {
                   {visibleRows.map((row) => (
                     <Table.Row key={row.model} width="full">
                       <Table.Cell>
-                        <Text
-                          truncate
-                          maxWidth="220px"
-                          color={row.updatedAt ? "green.fg" : undefined}
-                        >
-                          {row.model}
-                        </Text>
+                        <ModelNameCell
+                          model={row.model}
+                          isCustom={!!row.updatedAt}
+                          modelProviderId={providerRows.get(providerOf(row))}
+                        />
                       </Table.Cell>
                       <Table.Cell>
-                        <Code
-                          truncate
-                          maxWidth="220px"
-                          color={row.updatedAt ? "green.fg" : undefined}
-                        >
-                          {row.regex}
-                        </Code>
+                        <RegexHighlight pattern={row.regex} />
                       </Table.Cell>
                       <RateCell rate={row.inputCostPerToken} isCustom={!!row.id} />
                       <RateCell rate={row.outputCostPerToken} isCustom={!!row.id} />

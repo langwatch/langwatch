@@ -30,7 +30,7 @@ const normalizeHandler =
     deps: Pick<DatasetNormalizeDeps, "repository" | "chunks" | "storedObjects"> &
       Partial<DatasetNormalizeDeps>,
   ) =>
-  (payload: DatasetNormalizePayload): Promise<void> =>
+  (payload: DatasetNormalizePayload): Promise<unknown> =>
     DatasetNormalizeService.create({
       requestBounds: createDatasetTestRequestBounds(),
       inlineAttachments: createDatasetTestInlineAttachments(),

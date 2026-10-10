@@ -15,7 +15,11 @@ import {
 } from "@langwatch/dataset-contract";
 import type { StoredObjectApi } from "@langwatch/stored-object-contract";
 
-import type { DatasetNormalize, DatasetNormalizeQueue } from "../app/dataset.app.ts";
+import type {
+  DatasetNormalize,
+  DatasetNormalizeOutcome,
+  DatasetNormalizeQueue,
+} from "../app/dataset.app.ts";
 import type { DatasetChunkRepository } from "../repositories/dataset-chunk.repository.ts";
 import type { DatasetContentRepository as DatasetRepository } from "../repositories/dataset-content.repository.ts";
 import { onceMaxBytes } from "../rules/dataset-inline-file.rules.ts";
@@ -327,7 +331,11 @@ export class DatasetNormalizeService implements DatasetNormalize, DatasetNormali
   private runInline(payload: DatasetNormalizePayload): Promise<void> {
     const key = `${payload.projectId}:${payload.datasetId}`;
     const prior = this.inlineChains.get(key) ?? Promise.resolve();
-    const next = prior.catch(() => undefined).then(() => this.normalize(payload));
+    const next = prior
+      .catch(() => undefined)
+      .then(async () => {
+        await this.normalize(payload);
+      });
     this.inlineChains.set(key, next);
     void next.finally(() => {
       if (this.inlineChains.get(key) === next) {
@@ -338,15 +346,16 @@ export class DatasetNormalizeService implements DatasetNormalize, DatasetNormali
     return next;
   }
 
-  async normalize(payload: DatasetNormalizePayload): Promise<void> {
+  async normalize(payload: DatasetNormalizePayload): Promise<DatasetNormalizeOutcome> {
     const { projectId, datasetId } = payload;
     const staged = "stagingKey" in payload;
 
     const dataset = await this.deps.repository.findOne({ id: datasetId, projectId });
     // Idempotent re-drive guard (I-IDEM): only a `processing` dataset is
     // normalizable. A re-enqueue after success (ready) or a concurrent finalize
-    // race is a no-op.
-    if (dataset?.status !== "processing") return;
+    // race is a no-op, answering where the row already rests: a retry after a failure settles it.
+    if (dataset?.status === "ready" || dataset?.status === "failed") return dataset.status;
+    if (dataset?.status !== "processing") return "skipped";
     const payloadSource = staged ? payload.stagingKey : payload.sourceStoredObjectId;
     const rowSource = staged ? dataset.stagingKey : dataset.sourceStoredObjectId;
     if (rowSource !== payloadSource) {
@@ -375,6 +384,7 @@ export class DatasetNormalizeService implements DatasetNormalize, DatasetNormali
         },
       });
       if (staged) await this.removeStaged({ projectId, stagingKey: payload.stagingKey });
+      return "ready";
     } catch (error: unknown) {
       // A failed dataset owns no valid chunks. parseInto flushes chunk objects to S3 as it
       // streams, so a mid-stream failure (e.g. a JSONL parse error at row N of M) leaves

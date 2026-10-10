@@ -347,9 +347,16 @@ function MemberRowActions({
   );
 }
 
-/** A fast launcher: the first keystroke hands off to the invite drawer carrying it. */
-function InlineInviteBox({ onStartTyping }: { onStartTyping: (email: string) => void }) {
-  const [value, setValue] = useState("");
+/** Holds a whole address; Enter opens the invite drawer carrying it (WEB-8700). */
+function InlineInviteBox({
+  value,
+  onChange,
+  onSubmit,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  onSubmit: () => void;
+}) {
   return (
     <Input
       value={value}
@@ -357,16 +364,11 @@ function InlineInviteBox({ onStartTyping }: { onStartTyping: (email: string) => 
       maxWidth="240px"
       placeholder="Invite by email…"
       aria-label="Invite a teammate by email"
-      onChange={(event) => {
-        const next = event.target.value;
-        if (next.trim().length > 0) {
-          onStartTyping(next);
-          setValue("");
-          // Else further keystrokes land here and reopen the drawer with just that character.
-          event.target.blur();
-        } else {
-          setValue(next);
-        }
+      onChange={(event) => onChange(event.target.value)}
+      onKeyDown={(event) => {
+        if (event.key !== "Enter") return;
+        event.preventDefault();
+        onSubmit();
       }}
     />
   );
@@ -520,6 +522,12 @@ function PeopleHeader({
   requestCount: number;
   onInvite: ReturnType<typeof useDrawer>["openDrawer"];
 }) {
+  const [draft, setDraft] = useState("");
+  const openInvite = () => {
+    const email = draft.trim();
+    onInvite(InviteMemberDrawerToken, email ? { initialEmail: email } : undefined);
+    setDraft("");
+  };
   return (
     <>
       <SectionTitle
@@ -528,15 +536,11 @@ function PeopleHeader({
         right={
           canManage ? (
             <HStack gap={2}>
-              <InlineInviteBox
-                onStartTyping={(email) =>
-                  onInvite(InviteMemberDrawerToken, email ? { initialEmail: email } : undefined)
-                }
-              />
+              <InlineInviteBox value={draft} onChange={setDraft} onSubmit={openInvite} />
               <Button
                 size="sm"
                 colorPalette="orange"
-                onClick={() => onInvite(InviteMemberDrawerToken)}
+                onClick={openInvite}
                 data-testid="members-invite-open"
               >
                 <Plus size={14} />

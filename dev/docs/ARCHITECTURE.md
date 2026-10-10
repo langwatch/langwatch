@@ -1634,6 +1634,7 @@ tables, and declares its own LWQL catalogue entries for the event-table views, w
 composes (Alex, 2026-10-06, round 4, Q205). One stored event's payload (trace's offloaded fields) is
 read through a narrow single-event read seat beside the producer-only store, within main's 2-day
 window; the producer-only rule stands for everything else (Alex, 2026-10-06, round 3, Q209).
+2026-10-10: identity reads one aggregate's history through the read seat; WEB-9103.
 
 **A ClickHouse table has one owner, and others read it through that owner** (Alex, 2026-10-06,
 round 3, Q207). A plain read of another module's table is a query operation on its owner's `*Api`
@@ -2007,7 +2008,7 @@ acyclic; event causation may loop (a request and its completion) and idempotency
 seat-raised event and sends its own invoicing command; `LicensingApi.findSeatChanges` and the minute
 poll go (Alex, 2026-09-29).
 A module reading its own event-sourced state writes optimistically or tolerates eventual consistency
-with a pending answer, never a reverse read; identity's history and proposals are read through the
+with a pending answer, never a reverse read; identity's history and proposals and SCIM's sync activity are read through the
 eventing member's surface (Alex, 2026-09-29).
 Enterprise `nurturing` shows the subscriber rule (Alex, 2026-09-29): nurturing's own subscribers listen to
 each owner's events, which carry ids and the non-personal, point-in-time facts; no owner knows nurturing and

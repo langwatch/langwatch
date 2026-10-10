@@ -9,5 +9,9 @@ export function liveRepositories(prisma: PrismaClient): IdentityRepositories {
     prisma,
     encryption: { encrypt: (value) => value, decrypt: (value) => value },
     rateLimiter: { check: async () => ({ allowed: true }) },
+    eventReadSeat: {
+      getEvent: () => Promise.reject(new Error("no event log in this test")),
+      findAggregateEvents: async () => [],
+    },
   });
 }

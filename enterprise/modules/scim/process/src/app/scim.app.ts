@@ -81,10 +81,6 @@ import {
   buildScimDirectoryPipeline,
   type ScimDirectoryDefinition,
 } from "../eventing/scim-directory.pipeline.ts";
-import {
-  EventingScimSyncActivityRepository,
-  type ScimSyncEventReads,
-} from "../repositories/eventing/eventing.scim-sync-activity.repository.ts";
 import { scimOperatorReads } from "../repositories/prisma/prisma.scim-sync-projection.repository.ts";
 import type { ScimRepositories } from "../repositories/scim.repositories.ts";
 import { newScimSyncCommandId } from "../rules/scim-sync-id.rules.ts";
@@ -263,7 +259,6 @@ export class ScimModule implements ScimApiContract {
   #requestDirectoryMove: ScimDirectoryMoveSender | undefined;
   #scimSyncLedger: ScimSyncLedgerWriterService | undefined;
   #costCenterFacts: ScimCostCenterFactsService | undefined;
-  #syncReads: ScimSyncReadsService | undefined;
 
   private constructor(options: ScimAppOptions) {
     this.#scim = options.scim;
@@ -302,8 +297,10 @@ export class ScimModule implements ScimApiContract {
       ledger: scimSyncLedger,
       newCommandId: newScimSyncCommandId,
     });
-    // The activity log arrives when scim_sync is built over its own store; see readScimSyncFrom.
-    const syncs = ScimSyncReadsService.create({ syncs: repositories.scimSyncs, activity: null });
+    const syncs = ScimSyncReadsService.create({
+      syncs: repositories.scimSyncs,
+      activity: repositories.scimSyncActivity,
+    });
     const connections = ScimConnectionsService.create(repositories.scimSsoConnections);
     const costCenterFacts = ScimCostCenterFactsService.create();
     const scim = PostgresScimService.create({
@@ -359,7 +356,6 @@ export class ScimModule implements ScimApiContract {
     });
     app.#scimSyncLedger = scimSyncLedger;
     app.#costCenterFacts = costCenterFacts;
-    app.#syncReads = syncs;
     return app;
   }
 
@@ -385,11 +381,6 @@ export class ScimModule implements ScimApiContract {
   /** scim-sync's senders: the directory-sync history stages each fact through them. */
   connectScimSync(commands: ScimSyncSenders): void {
     this.#scimSyncLedger?.connect(commands);
-  }
-
-  /** scim_sync's own event store: a connection's directory activity is read from it. */
-  readScimSyncFrom(eventStore: ScimSyncEventReads): void {
-    this.#syncReads?.readActivityFrom(EventingScimSyncActivityRepository.create({ eventStore }));
   }
 
   moveToConnection: ScimApiContract["moveToConnection"] = async (input) => {

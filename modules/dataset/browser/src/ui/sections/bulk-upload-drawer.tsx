@@ -531,7 +531,6 @@ function BulkFileRow({
     {
       enabled: isPolling,
       refetchOnWindowFocus: false,
-      // needs a read hint: dataset normalisation finished (ready or failed)
     },
   );
   const polledStatus = statusQuery.data?.status;
