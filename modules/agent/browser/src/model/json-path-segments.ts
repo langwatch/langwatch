@@ -3,11 +3,14 @@ export type PathSegment = {
   kind: "root" | "dot" | "property" | "index" | "other";
   /** The object key or array index this segment steps into, when it is a plain one. */
   key?: string | number;
+  /** A `[start:end]` slice; either bound may be absent or negative, as in Python. */
+  slice?: { start?: number; end?: number };
 };
 
 export type SegmentStatus = "ok" | "missing" | "unchecked";
 
-const TOKEN = /\$|\.(?=[A-Za-z_])|\.\.|\[\d+\]|\[['"][^'"]*['"]\]|[A-Za-z_][\w-]*|\[[^\]]*\]|./g;
+const TOKEN =
+  /\$|\.(?=[A-Za-z_])|\.\.|\[-?\d+\]|\[-?\d*:-?\d*\]|\[['"][^'"]*['"]\]|[A-Za-z_][\w-]*|\[[^\]]*\]|./g;
 
 /** Splits a JSONPath into the pieces the field colours: root, dots, names, indexes. */
 export function parseJsonPath({ path }: { path: string }): PathSegment[] {
@@ -15,9 +18,15 @@ export function parseJsonPath({ path }: { path: string }): PathSegment[] {
   for (const [text] of path.matchAll(TOKEN)) {
     if (text === "$") segments.push({ text, kind: "root" });
     else if (text === "." || text === "..") segments.push({ text, kind: "dot" });
-    else if (/^\[\d+\]$/.test(text))
+    else if (/^\[-?\d+\]$/.test(text))
       segments.push({ text, kind: "index", key: Number(text.slice(1, -1)) });
-    else if (/^\[['"].*['"]\]$/.test(text))
+    else if (/^\[-?\d*:-?\d*\]$/.test(text)) {
+      const [start, end] = text
+        .slice(1, -1)
+        .split(":")
+        .map((bound) => (bound === "" ? undefined : Number(bound)));
+      segments.push({ text, kind: "index", slice: { start, end } });
+    } else if (/^\[['"].*['"]\]$/.test(text))
       segments.push({ text, kind: "property", key: text.slice(2, -2) });
     else if (/^[A-Za-z_][\w-]*$/.test(text)) segments.push({ text, kind: "property", key: text });
     else segments.push({ text, kind: "other" });
@@ -25,21 +34,44 @@ export function parseJsonPath({ path }: { path: string }): PathSegment[] {
   return segments;
 }
 
+/** The concrete array indexes an index or slice segment picks out of an array this long. */
+function pickIndexes({ segment, length }: { segment: PathSegment; length: number }): number[] {
+  const resolve = (bound: number) =>
+    Math.min(Math.max(bound < 0 ? bound + length : bound, 0), length);
+  if (segment.slice) {
+    const start = resolve(segment.slice.start ?? 0);
+    const end = resolve(segment.slice.end ?? length);
+    return Array.from({ length: Math.max(end - start, 0) }, (_, offset) => start + offset);
+  }
+  if (typeof segment.key !== "number") return [];
+  const index = segment.key < 0 ? segment.key + length : segment.key;
+  return index >= 0 && index < length ? [index] : [];
+}
+
 function step({
   node,
-  key,
+  segment,
   anyIndex,
 }: {
   node: unknown;
-  key: string | number;
+  segment: PathSegment;
   anyIndex: boolean;
 }): { found: boolean; next?: unknown } {
-  if (typeof key === "number" && Array.isArray(node)) {
+  const key = segment.key;
+  if (segment.kind === "index" && Array.isArray(node)) {
     if (anyIndex) return { found: node.length > 0, next: node[0] };
-    return { found: key < node.length, next: node[key] };
+    const [index] = pickIndexes({ segment, length: node.length });
+    return index === undefined ? { found: false } : { found: true, next: node[index] };
   }
-  if (typeof key === "string" && node !== null && typeof node === "object" && !Array.isArray(node)) {
-    return Object.hasOwn(node, key) ? { found: true, next: Reflect.get(node, key) } : { found: false };
+  if (
+    typeof key === "string" &&
+    node !== null &&
+    typeof node === "object" &&
+    !Array.isArray(node)
+  ) {
+    return Object.hasOwn(node, key)
+      ? { found: true, next: Reflect.get(node, key) }
+      : { found: false };
   }
   return { found: false };
 }
@@ -62,8 +94,9 @@ export function checkJsonPath({
   let broken = false;
   return segments.map((segment) => {
     if (broken) return "unchecked";
-    if (segment.key === undefined) return segment.kind === "other" ? "unchecked" : "ok";
-    const result = step({ node, key: segment.key, anyIndex });
+    if (segment.key === undefined && !segment.slice)
+      return segment.kind === "other" ? "unchecked" : "ok";
+    const result = step({ node, segment, anyIndex });
     if (!result.found) {
       broken = true;
       return "missing";
@@ -73,12 +106,39 @@ export function checkJsonPath({
   });
 }
 
-/** The keys the path walks, or undefined when the path holds something we cannot follow. */
-function pathKeys({ path }: { path: string }): (string | number)[] | undefined {
+/** The one concrete key `segment` steps into at `node`; undefined when it picks none or many. */
+function concreteKey({
+  node,
+  segment,
+}: {
+  node: unknown;
+  segment: PathSegment;
+}): string | number | undefined {
+  if (segment.kind !== "index") return segment.key;
+  const picked = Array.isArray(node) ? pickIndexes({ segment, length: node.length }) : [];
+  return picked.length === 1 ? picked[0] : undefined;
+}
+
+/**
+ * The concrete keys the path walks through `value`, or undefined when it holds something
+ * we cannot follow or a slice that picks more than one element.
+ */
+function pathKeys({
+  path,
+  value,
+}: {
+  path: string;
+  value: unknown;
+}): (string | number)[] | undefined {
   const keys: (string | number)[] = [];
+  let node = value;
   for (const segment of parseJsonPath({ path })) {
     if (segment.kind === "other") return undefined;
-    if (segment.key !== undefined) keys.push(segment.key);
+    if (segment.key === undefined && !segment.slice) continue;
+    const key = concreteKey({ node, segment });
+    if (key === undefined) return undefined;
+    keys.push(key);
+    node = step({ node, segment: { ...segment, key, slice: undefined }, anyIndex: false }).next;
   }
   return keys;
 }
@@ -87,17 +147,19 @@ function pathKeys({ path }: { path: string }): (string | number)[] | undefined {
  * Pretty-prints a value and reports the character range of the node `path` picks out,
  * so a preview can mark it. Returns no range when the path does not resolve.
  */
-export function locateJsonPathNode({
-  value,
-  path,
-}: {
-  value: unknown;
-  path: string;
-}): { text: string; range?: { start: number; end: number } } {
-  const keys = pathKeys({ path });
+export function locateJsonPathNode({ value, path }: { value: unknown; path: string }): {
+  text: string;
+  range?: { start: number; end: number };
+} {
+  const keys = pathKeys({ path, value });
   let range: { start: number; end: number } | undefined;
 
-  const write = (node: unknown, indent: string, remaining: (string | number)[] | undefined, at: number) => {
+  const write = (
+    node: unknown,
+    indent: string,
+    remaining: (string | number)[] | undefined,
+    at: number,
+  ) => {
     const marked = remaining?.length === 0;
     let out = "";
     if (node !== null && typeof node === "object") {
@@ -112,7 +174,12 @@ export function locateJsonPathNode({
           const prefix = `${indent}  ${Array.isArray(node) ? "" : `${JSON.stringify(key)}: `}`;
           const onPath = remaining !== undefined && remaining[0] === key;
           out += prefix;
-          out += write(child, `${indent}  `, onPath ? remaining?.slice(1) : undefined, at + out.length);
+          out += write(
+            child,
+            `${indent}  `,
+            onPath ? remaining?.slice(1) : undefined,
+            at + out.length,
+          );
           out += index < entries.length - 1 ? ",\n" : "\n";
         });
         out += `${indent}${close}`;

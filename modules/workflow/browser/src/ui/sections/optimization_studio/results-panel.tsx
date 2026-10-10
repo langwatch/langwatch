@@ -85,7 +85,6 @@ export function EvaluationResults({
         workflowId,
       }),
       refetchOnWindowFocus: false,
-      // needs a read hint: workflow experiment created by the running evaluation
     },
   );
 

@@ -20,6 +20,10 @@ describe("checkJsonPath", () => {
   it("checks an index against the real array length", () => {
     expect(check("$.a[2]", { a: [1] }).at(-1)).toBe("missing");
   });
+
+  it("follows a negative slice into the element it picks", () => {
+    expect(check("$.a[-1:].b", { a: [{ c: 1 }, { b: 2 }] }).every((s) => s === "ok")).toBe(true);
+  });
 });
 
 describe("locateJsonPathNode", () => {
@@ -29,6 +33,19 @@ describe("locateJsonPathNode", () => {
       path: "$.choices[0].message.content",
     });
     expect(range && text.slice(range.start, range.end)).toBe('"hi"');
+  });
+
+  it("marks the element a negative slice picks", () => {
+    const { text, range } = locateJsonPathNode({
+      value: { messages: [{ content: "first" }, { content: "last" }] },
+      path: "$.messages[-1:].content",
+    });
+    expect(range && text.slice(range.start, range.end)).toBe('"last"');
+  });
+
+  it("marks the element a negative index picks", () => {
+    const { text, range } = locateJsonPathNode({ value: { a: [1, 2] }, path: "$.a[-1]" });
+    expect(range && text.slice(range.start, range.end)).toBe("2");
   });
 
   it("reports no range when the path does not resolve", () => {
