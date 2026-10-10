@@ -1,30 +1,31 @@
 /**
- * The OTLP metrics receiver: `POST /api/otel/v1/metrics` and the misconfigured exporter bases main
- * serves it under (otel-path-aliases.ts), behind the `otlp_ingest` door, which resolves the key
- * through Trace before the body is read. Answers, refusals included, are in OTLP's wire.
+ * The OTLP metrics receiver: `POST /api/otel/v1/metrics`, which the host rewrites misconfigured
+ * exporter bases onto (main: otel-path-aliases.ts), behind the `otlp_ingest` door, which
+ * resolves the key through Trace before the body is read. Answers are in OTLP's wire.
  */
 import { anyAuthenticated } from "@langwatch/api/access";
 import {
+  defineRestDoor,
   defineRestRouter,
   MANAGEMENT_API_VERSION,
-  OtlpIngestIdentity,
-  type RestDoor,
   type RestProtocolRefusal,
 } from "@langwatch/api/rest";
-import { MetricApi, otlpMetricAliasParamsSchema } from "@langwatch/metric-contract";
+import { MetricApi } from "@langwatch/metric-contract";
 import { createLogger } from "@langwatch/observability";
 import {
   ingestDoorRefusalBody,
   ingestDoorRefusalStatus,
   isIngestDoorRefusal,
+  OTLP_CORRECTED_PATH_HEADER,
   OTLP_REFUSED_MEDIA_TYPES,
+  readCorrectedPath,
   type OtlpDoorAnswer,
 } from "@langwatch/otlp";
 import { resolveRequestBound } from "@langwatch/plans";
 import {
   otlpIngestCredentialSchema,
   type OtlpIngestCredential,
-  type TraceApi,
+  TraceApi,
 } from "@langwatch/trace-contract";
 
 import { otlpMetricAnswer } from "../rules/otlp-metric-answer.rules.ts";
@@ -47,29 +48,28 @@ const BODY_HEADERS: ReadonlySet<string> = new Set(["content-type", "content-enco
 const BODY_LIMIT_BULK_BYTES = resolveRequestBound("bodyLimitBulkBytes", "ENTERPRISE");
 
 /** The `otlp_ingest` door over Trace's key directory; a refusal is logged with its fingerprint. */
-export function otlpMetricsDoor(credential: TraceApi["otlpCredential"]): RestDoor {
-  return OtlpIngestIdentity.create({
-    verify: async ({ diagnostics, ...presented }) => {
-      try {
-        const resolution = await credential(presented);
-        const { apiKeyId } = resolution.identity;
-        const actor = apiKeyId ? { type: "api_key" as const, id: apiKeyId } : null;
+export const otlpMetricsDoor = defineRestDoor("otlp_ingest", {
+  needs: TraceApi,
+  identify: async ({ authorization, xAuthToken, xProjectId, diagnostics }, traces) => {
+    try {
+      const resolution = await traces.otlpCredential({ authorization, xAuthToken, xProjectId });
+      const { apiKeyId } = resolution.identity;
+      const actor = apiKeyId ? { type: "api_key" as const, id: apiKeyId } : null;
 
-        return { actor, projectId: resolution.project.id, session: resolution };
-      } catch (error) {
-        if (!isIngestDoorRefusal(error)) throw error;
+      return { actor, scope: { tier: "project", id: resolution.project.id }, session: resolution };
+    } catch (error) {
+      if (!isIngestDoorRefusal(error)) throw error;
 
-        logger.warn(
-          { ...diagnostics, refusalStatus: ingestDoorRefusalStatus(error) },
-          diagnostics.hasEmptyAuthToken
-            ? "Authentication failed: X-Auth-Token sent but empty"
-            : "Authentication failed",
-        );
-        throw error;
-      }
-    },
-  });
-}
+      logger.warn(
+        { ...diagnostics, refusalStatus: ingestDoorRefusalStatus(error) },
+        diagnostics.hasEmptyAuthToken
+          ? "Authentication failed: X-Auth-Token sent but empty"
+          : "Authentication failed",
+      );
+      throw error;
+    }
+  },
+});
 
 /** The door's credential refusals in main's body; anything else goes to the family boundary. */
 const otlpIngestRefusal: RestProtocolRefusal = ({ failure, response }) =>
@@ -98,7 +98,9 @@ async function receive({
     await app.receiveOtlpMetrics({
       request: {
         method: request.method,
-        path: new URL(request.url).pathname,
+        path:
+          readCorrectedPath(request.headers.get(OTLP_CORRECTED_PATH_HEADER) ?? undefined) ??
+          new URL(request.url).pathname,
         headers: Object.fromEntries(
           [...request.headers].filter(([name]) => BODY_HEADERS.has(name)),
         ),
@@ -117,87 +119,6 @@ export const otlpMetricsRest = defineRestRouter(MetricApi)
   .withCredential("otlp_ingest")
 
   .post("/api/otel/v1/metrics", "ingestOtlpMetrics")
-  .withCredential("otlp_ingest", { session: otlpIngestCredentialSchema })
-  .withRawBody("bytes", { refuses: OTLP_REFUSED_MEDIA_TYPES })
-  .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES })
-  .withAccess(INGEST_ACCESS)
-  .withResponse("protocol", {
-    produces: PRODUCES_JSON,
-    because: OTLP_PROTOCOL_REASON,
-    refusal: otlpIngestRefusal,
-  })
-  .withDocs({ hide: true })
-  .handle(async ({ app, raw, request, response, session }) =>
-    response.write(await receive({ app, raw, request, credential: session })),
-  )
-
-  // Exporters append `/v1/metrics` to their configured base; the receiver serves
-  // only the bases `canonicalOtlpPath` allows, and answers 404 to the rest.
-  .post("/:otlpBase{.+}/v1/metrics", "ingestOtlpMetricsAlias")
-  .withParams(otlpMetricAliasParamsSchema)
-  .withCredential("otlp_ingest", { session: otlpIngestCredentialSchema })
-  .withRawBody("bytes", { refuses: OTLP_REFUSED_MEDIA_TYPES })
-  .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES })
-  .withAccess(INGEST_ACCESS)
-  .withResponse("protocol", {
-    produces: PRODUCES_JSON,
-    because: OTLP_PROTOCOL_REASON,
-    refusal: otlpIngestRefusal,
-  })
-  .withDocs({ hide: true })
-  .handle(async ({ app, raw, request, response, session }) =>
-    response.write(await receive({ app, raw, request, credential: session })),
-  )
-
-  .post("/:otlpBase{.+}/v1/metrics/", "ingestOtlpMetricsAliasSlash")
-  .withParams(otlpMetricAliasParamsSchema)
-  .withCredential("otlp_ingest", { session: otlpIngestCredentialSchema })
-  .withRawBody("bytes", { refuses: OTLP_REFUSED_MEDIA_TYPES })
-  .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES })
-  .withAccess(INGEST_ACCESS)
-  .withResponse("protocol", {
-    produces: PRODUCES_JSON,
-    because: OTLP_PROTOCOL_REASON,
-    refusal: otlpIngestRefusal,
-  })
-  .withDocs({ hide: true })
-  .handle(async ({ app, raw, request, response, session }) =>
-    response.write(await receive({ app, raw, request, credential: session })),
-  )
-
-  // A stray double slash before the signal: the receiver canonicalises the path itself.
-  .post("/:otlpBase{.+}/v1//metrics", "ingestOtlpMetricsAliasDoubled")
-  .withParams(otlpMetricAliasParamsSchema)
-  .withCredential("otlp_ingest", { session: otlpIngestCredentialSchema })
-  .withRawBody("bytes", { refuses: OTLP_REFUSED_MEDIA_TYPES })
-  .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES })
-  .withAccess(INGEST_ACCESS)
-  .withResponse("protocol", {
-    produces: PRODUCES_JSON,
-    because: OTLP_PROTOCOL_REASON,
-    refusal: otlpIngestRefusal,
-  })
-  .withDocs({ hide: true })
-  .handle(async ({ app, raw, request, response, session }) =>
-    response.write(await receive({ app, raw, request, credential: session })),
-  )
-
-  .post("/v1/metrics", "ingestOtlpMetricsRootV1")
-  .withCredential("otlp_ingest", { session: otlpIngestCredentialSchema })
-  .withRawBody("bytes", { refuses: OTLP_REFUSED_MEDIA_TYPES })
-  .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES })
-  .withAccess(INGEST_ACCESS)
-  .withResponse("protocol", {
-    produces: PRODUCES_JSON,
-    because: OTLP_PROTOCOL_REASON,
-    refusal: otlpIngestRefusal,
-  })
-  .withDocs({ hide: true })
-  .handle(async ({ app, raw, request, response, session }) =>
-    response.write(await receive({ app, raw, request, credential: session })),
-  )
-
-  .post("/v1/metrics/", "ingestOtlpMetricsRootV1Slash")
   .withCredential("otlp_ingest", { session: otlpIngestCredentialSchema })
   .withRawBody("bytes", { refuses: OTLP_REFUSED_MEDIA_TYPES })
   .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES })

@@ -6,7 +6,7 @@ The server half of [connect](../README.md). The hosted end of LangWatch Connect:
 
 ## Installation
 
-`defineProcessModule("connect").withApi(ConnectModule).withTransports(connectHostedRest).withEventing(connectContractBudgetEventing).withTransportFacts(…)`, `src/connect.module.ts:10`.
+`defineProcessModule("connect").withApi(ConnectModule).withTransports(connectHostedRest).withEventing(connectContractBudgetEventing).provideMiddlewareBindings(…)`, `src/connect.module.ts:10`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 The hosted end of Connect (ADR-156 §5), which only LangWatch Cloud serves: a self-hosted install's calls, made under the managed key its license runs on.
 
-Peers call these through the token, declared at `../contract/src/connect.api.ts:11`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/connect.api.ts:15`; nothing else in this package is public.
 
 #### `classifyForHostedCaller`
 
@@ -46,42 +46,42 @@ setHostedBudgetCap(input: { caller: HostedCaller; payload: unknown }): Promise<H
 
 |             |                                           |
 | ----------- | ----------------------------------------- |
-| Declared at | `src/transport/connect-hosted.rest.ts:65` |
+| Declared at | `src/transport/connect-hosted.rest.ts:63` |
 | Base URL    | none: each route's path is its address    |
 | Addressing  | literal                                   |
 | Credential  | internal_secret                           |
 
 #### `POST /api/internal/gateway/connect/instant-evals-classify` · `classifyForHostedCaller`
 
-Authenticated: the Go data plane signs every call with the deployment's own gateway secret, and the hosted Connect door verifies it under this family's paths before any route runs. Hidden from the OpenAPI document. Declared at `src/transport/connect-hosted.rest.ts:71`.
+Authenticated: the Go data plane signs every call with the deployment's own gateway secret, and the hosted Connect door verifies it under this family's paths before any route runs. Hidden from the OpenAPI document. Declared at `src/transport/connect-hosted.rest.ts:69`.
 
 Answers at `/api/internal/gateway/connect/instant-evals-classify`.
 
 ```typescript
-// Rawbody: "text" (inline, src/transport/connect-hosted.rest.ts:72)
-type Response = z.infer<typeof hostedClassifyAnswerSchema>; // ../contract/src/connect-hosted.ts:34
+// Rawbody: "text" (inline, src/transport/connect-hosted.rest.ts:70)
+type Response = z.infer<typeof hostedClassifyAnswerSchema>; // ../contract/src/connect-hosted.ts:48
 ```
 
 #### `POST /api/internal/gateway/connect/usage` · `getHostedUsage`
 
-Authenticated: the Go data plane signs every call with the deployment's own gateway secret, and the hosted Connect door verifies it under this family's paths before any route runs. Hidden from the OpenAPI document. Declared at `src/transport/connect-hosted.rest.ts:86`.
+Authenticated: the Go data plane signs every call with the deployment's own gateway secret, and the hosted Connect door verifies it under this family's paths before any route runs. Hidden from the OpenAPI document. Declared at `src/transport/connect-hosted.rest.ts:84`.
 
 Answers at `/api/internal/gateway/connect/usage`.
 
 ```typescript
-// Rawbody: "text" (inline, src/transport/connect-hosted.rest.ts:87)
-type Response = z.infer<typeof hostedUsageAnswerSchema>; // ../../licensing/contract/src/connect-hosted.ts:72
+// Rawbody: "text" (inline, src/transport/connect-hosted.rest.ts:85)
+type Response = z.infer<typeof hostedUsageAnswerSchema>; // ../contract/src/connect-hosted.ts:83
 ```
 
 #### `POST /api/internal/gateway/connect/budget` · `setHostedBudgetCap`
 
-Authenticated: the Go data plane signs every call with the deployment's own gateway secret, and the hosted Connect door verifies it under this family's paths before any route runs. Hidden from the OpenAPI document. Declared at `src/transport/connect-hosted.rest.ts:94`.
+Authenticated: the Go data plane signs every call with the deployment's own gateway secret, and the hosted Connect door verifies it under this family's paths before any route runs. Hidden from the OpenAPI document. Declared at `src/transport/connect-hosted.rest.ts:92`.
 
 Answers at `/api/internal/gateway/connect/budget`.
 
 ```typescript
-// Rawbody: "text" (inline, src/transport/connect-hosted.rest.ts:95)
-// Response: hostedCapAnswerSchema, ../contract/src/connect-hosted.ts:42
+// Rawbody: "text" (inline, src/transport/connect-hosted.rest.ts:93)
+// Response: hostedCapAnswerSchema, ../contract/src/connect-hosted.ts:56
 interface Response {
   cap_usd: number;
   maximum_cap_usd: number;

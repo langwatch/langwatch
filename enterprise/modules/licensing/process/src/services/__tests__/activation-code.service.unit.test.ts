@@ -151,7 +151,7 @@ describe("redeeming an activation code", () => {
     const { service, repository, licenses } = harness();
 
     const caller = await service.verifyPresented({
-      authorization: `Bearer ${CODE}`,
+      bearer: CODE,
       instanceId: " install-1 ",
     });
 

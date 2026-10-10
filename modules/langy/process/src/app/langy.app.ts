@@ -1,8 +1,8 @@
-import { AgentApi, INSTANCE_TOKEN_HEADER } from "@langwatch/agent-contract";
+import { AgentApi } from "@langwatch/agent-contract";
 import type { ProtocolConnection } from "@langwatch/api";
 import { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { RestIdentity } from "@langwatch/api/hosting";
-import { BearerIdentity, SessionKeyIdentity } from "@langwatch/api/rest";
+import { BearerIdentity } from "@langwatch/api/rest";
 import type { SessionKeyPresented } from "@langwatch/authorization";
 import { AuthzApi } from "@langwatch/authz-contract";
 import { DataRetentionApi } from "@langwatch/data-retention-contract";
@@ -208,7 +208,6 @@ type LangyAppDependencies = {
   /** This process's long-poll shares, over the one session core. */
   longPoll: LocalControlLongPollService;
   sockets: LocalControlConnectionService;
-  sessionKeyDoor: RestIdentity;
   panelConversations: LangyPanelConversationService;
   panelTurnStream: LangyPanelTurnStreamService;
   panelLocal: LangyPanelLocalService;
@@ -405,10 +404,6 @@ export class LangyModule implements LangyApiContract {
     );
     setup.resources.own("Langy local-control long-poll sessions", () => longPoll.close());
     setup.resources.own("Langy local-control sockets", () => sockets.close());
-    const sessionKeyDoor = SessionKeyIdentity.create({
-      instanceTokenHeader: INSTANCE_TOKEN_HEADER,
-      verify: (presented) => longPoll.verifySessionKey(presented),
-    });
     const turnBounds = LangyTurnsBoundsService.create({
       entitlement: setup.dependencies.plans,
       projects: setup.dependencies.projects,
@@ -465,7 +460,6 @@ export class LangyModule implements LangyApiContract {
       }),
       longPoll,
       sockets,
-      sessionKeyDoor,
       panelConversations: LangyPanelConversationService.create({
         access,
         langy,
@@ -642,11 +636,6 @@ export class LangyModule implements LangyApiContract {
 
   get internalDoor(): RestIdentity {
     return this.dependencies.internalDoor;
-  }
-
-  /** The door the long-poll register authenticates its minted session key at (§8). */
-  get sessionKeyDoor(): RestIdentity {
-    return this.dependencies.sessionKeyDoor;
   }
 
   readonly #internal: LangyInternalService;

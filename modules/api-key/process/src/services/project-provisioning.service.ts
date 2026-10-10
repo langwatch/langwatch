@@ -50,6 +50,7 @@ export class ProjectProvisioningService {
   private constructor(
     private readonly options: {
       apiKeys: Pick<ApiKeyApi, "create" | "resolveVisibleProjects">;
+      organizations: Pick<OrganizationApi, "isMember" | "getMember">;
       projects: Pick<ProjectApi, "createInOrganization" | "listByOrganization">;
     },
   ) {}

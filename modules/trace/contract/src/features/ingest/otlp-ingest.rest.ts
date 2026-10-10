@@ -7,9 +7,6 @@ import { otlpSourcePolicySchema } from "@langwatch/otlp/door";
 import type { IExportTraceServiceRequest } from "@opentelemetry/otlp-transformer";
 import { z } from "zod";
 
-/** The exporter base a `/v1/traces` suffix was appended to; the receiver checks it. */
-export const otlpTraceAliasParamsSchema = z.object({ otlpBase: z.string() });
-
 export type OtlpIngestCredentialInput = Readonly<{
   authorization: string | null;
   xAuthToken: string | null;

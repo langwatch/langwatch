@@ -76,7 +76,7 @@ function mount() {
     otlpUsageLimit: async () => {},
   });
   const hono = createRestRuntime({
-    doors: { otlp_ingest: otlpIngestDoor((input) => app.otlpCredential(input)) },
+    doors: { otlp_ingest: otlpIngestDoor.open(app) },
     authorization: restTestAuthorization(),
     identity: {
       authenticate: () => {

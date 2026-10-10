@@ -1,4 +1,3 @@
-import { bindRestCredential } from "@langwatch/api/rest";
 import type { LicensingApi, LicensingServerConfig } from "@langwatch/enterprise-licensing-contract";
 import { defineProcessModule, type PublishedProcessModule } from "@langwatch/process";
 import { defineMigrationStep } from "@langwatch/upgrade/step";
@@ -26,9 +25,7 @@ export const licensingProcessModule: PublishedProcessModule<
   .withEventing(licenseSyncEventing)
   .withEventing(licensingCustomerEventing)
   // The connect host's bearer, verified before the body (W02-DOOR-SHAPE, 2026-10-10).
-  .withTransportFacts(({ app }) => [
-    bindRestCredential("licence_token", () => connectHostDoor(app)),
-  ])
+  .withDoors({ licence_token: connectHostDoor })
   .withTasks(({ app, repositories }) => [
     GenerateLicenseTask.create({
       mint: LicenseMintService.create({

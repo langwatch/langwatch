@@ -11,7 +11,7 @@ const FLUENT_ENDPOINT_METHODS = new Set([
   "withPermission",
   "withoutPermission",
   "withStatus",
-  "withMiddleware",
+  "withMiddlewareContext",
   "withRateLimit",
   "withoutRateLimit",
   "withResourceLimit",

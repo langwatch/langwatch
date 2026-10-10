@@ -21,11 +21,9 @@ import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it, vi } from "vitest";
 
 import { HttpConnectLicenseChannel } from "../../channels/http/http.connect-license.channel.ts";
-import {
-  connectHostDoor,
-  connectHostRest,
-  type ConnectBearerVerifiers,
-} from "../connect-host.rest.ts";
+import { connectHostDoor, connectHostRest } from "../connect-host.rest.ts";
+
+type ConnectBearerVerifiers = Pick<LicensingApi, "verifyLicenceToken" | "verifyActivationCode">;
 
 const TOKEN = `lwl_${"a".repeat(64)}`;
 const credential = { token: TOKEN, instanceId: "install-1" };
@@ -44,21 +42,21 @@ const activationCaller = {
 
 /** The door's checks as the services answer them: a refusal is thrown by its own code. */
 const accepting: ConnectBearerVerifiers = {
-  verifyLicenceToken: async ({ authorization, instanceId }: ConnectPresentedCredential) => {
-    if (authorization !== `Bearer ${TOKEN}`) throw new ConnectLicenseTokenMalformedError();
+  verifyLicenceToken: async ({ bearer, instanceId }: ConnectPresentedCredential) => {
+    if (bearer !== TOKEN) throw new ConnectLicenseTokenMalformedError();
     if (!instanceId) throw new ConnectInstanceRequiredError();
     return licenceCaller;
   },
-  verifyActivationCode: async ({ authorization }: ConnectPresentedCredential) => {
-    if (authorization === "Bearer LW-REVOKED") throw new ActivationCodeNotFoundError();
-    if (authorization === "Bearer LW-EXPIRED") throw new ActivationCodeExpiredError();
+  verifyActivationCode: async ({ bearer }: ConnectPresentedCredential) => {
+    if (bearer === "LW-REVOKED") throw new ActivationCodeNotFoundError();
+    if (bearer === "LW-EXPIRED") throw new ActivationCodeExpiredError();
     return activationCaller;
   },
 };
 
 function mount(app: Partial<LicensingApi>, verifiers: ConnectBearerVerifiers = accepting) {
   const hono = createRestRuntime({
-    doors: { licence_token: connectHostDoor(verifiers) },
+    doors: { licence_token: connectHostDoor.open(createApiFixture<LicensingApi>(verifiers)) },
     authorization: restTestAuthorization(),
     identity: {
       authenticate: () => {

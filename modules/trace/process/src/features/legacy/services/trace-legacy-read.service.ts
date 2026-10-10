@@ -1,3 +1,4 @@
+import type { Authorization } from "@langwatch/authorization";
 import { createLogger } from "@langwatch/observability";
 import type {
   Protections,
@@ -152,11 +153,13 @@ export class TraceLegacyReadService {
   }
 
   async findById({
+    authorization,
     projectId,
     traceId,
     protections,
     opts,
   }: {
+    authorization: Authorization;
     projectId: string;
     traceId: string;
     protections: Protections;
@@ -175,6 +178,7 @@ export class TraceLegacyReadService {
           });
 
         const traces = await this.mapping.findTracesWithSpans({
+          authorization,
           projectId,
           traceIds: [traceId],
           protections,
@@ -213,6 +217,7 @@ export class TraceLegacyReadService {
 
           span.setAttribute("trace.id.prefix.resolved", candidates[0]!);
           const resolved = await this.mapping.findTracesWithSpans({
+            authorization,
             projectId,
             traceIds: [candidates[0]!],
             protections,
@@ -229,12 +234,14 @@ export class TraceLegacyReadService {
 
   /** @param occurredAt bounds the partition scan. */
   async getTracesWithSpans({
+    authorization,
     projectId,
     traceIds,
     protections,
     occurredAt,
     opts,
   }: {
+    authorization: Authorization;
     projectId: string;
     traceIds: string[];
     protections: Protections;
@@ -248,6 +255,7 @@ export class TraceLegacyReadService {
       },
       async () => {
         const traces = await this.mapping.findTracesWithSpans({
+          authorization,
           projectId,
           traceIds,
           protections,
@@ -265,11 +273,13 @@ export class TraceLegacyReadService {
   }
 
   async getTracesByThreadId({
+    authorization,
     projectId,
     threadId,
     protections,
     opts,
   }: {
+    authorization: Authorization;
     projectId: string;
     threadId: string;
     protections: Protections;
@@ -280,6 +290,7 @@ export class TraceLegacyReadService {
       { attributes: { "tenant.id": projectId, "thread.id": threadId } },
       async () => {
         const traces = await this.mapping.findTracesByThreadId({
+          authorization,
           projectId,
           threadId,
           protections,
@@ -299,7 +310,8 @@ export class TraceLegacyReadService {
   getAllTracesForProject = async (
     input: GetAllTracesForProjectInput,
     protections: Protections,
-    options: GetAllTracesForProjectOptions = {},
+    /** `ownRead` is the own-only proof the span, evaluation and event reads go through. */
+    options: GetAllTracesForProjectOptions & { ownRead: Authorization },
   ): Promise<TracesForProjectResult> => {
     return this.tracer.withActiveSpan(
       "TraceService.getAllTracesForProject",
@@ -360,11 +372,13 @@ export class TraceLegacyReadService {
   }
 
   async getTracesWithSpansByThreadIds({
+    authorization,
     projectId,
     threadIds,
     protections,
     opts,
   }: {
+    authorization: Authorization;
     projectId: string;
     threadIds: string[];
     protections: Protections;
@@ -380,6 +394,7 @@ export class TraceLegacyReadService {
       },
       async () => {
         const traces = await this.mapping.findTracesWithSpansByThreadIds({
+          authorization,
           projectId,
           threadIds,
           protections,

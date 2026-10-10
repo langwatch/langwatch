@@ -2,8 +2,7 @@ import type { AgentApi } from "@langwatch/agent-contract";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import {
   canonicalErrorResponse,
-  bindRestHeader,
-  bindRestMiddleware,
+  bindMiddlewareContext,
   createRestRuntime,
 } from "@langwatch/api/rest";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
@@ -174,11 +173,13 @@ async function buildApi(
     app: () => app,
     credential: "project",
     onError: canonicalErrorResponse,
-    facts: [
-      bindRestMiddleware(governanceRestCaller, (context) => ({
-        viewerUserId: viewerOf(context.req.raw),
+    middlewareContext: [
+      bindMiddlewareContext(governanceRestCaller, (request) => ({
+        viewerUserId: viewerOf(request),
       })),
-      bindRestHeader(governanceRestSurface, "X-LangWatch-Surface"),
+      bindMiddlewareContext(governanceRestSurface, (request) =>
+        request.headers.get("X-LangWatch-Surface"),
+      ),
     ],
   });
 

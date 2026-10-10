@@ -32,7 +32,6 @@ function host(browser?: RestIdentity) {
       project: closed,
       organization: closed,
       api_key: closed,
-      scim_token: closed,
       instance_admin: closed,
       browser: browser ?? closed,
     },
@@ -52,7 +51,7 @@ describe("module credential bindings", () => {
       ["second", "second-secret"],
     ] as const) {
       server.mount(family(namespace, `/internal/${namespace}`).router(), app, {
-        facts: [
+        middlewareBindings: [
           bindRestCredential("internal_secret", () =>
             BearerIdentity.create({ name: namespace, token }),
           ),
@@ -89,7 +88,7 @@ describe("module credential bindings", () => {
 
     expect(() =>
       host().mount(family("duplicate", "/internal/duplicate").router(), app, {
-        facts: [binding, binding],
+        middlewareBindings: [binding, binding],
       }),
     ).toThrow("binds internal_secret more than once");
   });

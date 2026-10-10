@@ -12,7 +12,6 @@ import {
 import {
   defineRestRouter,
   MANAGEMENT_API_VERSION,
-  type RestTransportDeclaration,
 } from "@langwatch/api/rest";
 import { moduleApi } from "@langwatch/module";
 
@@ -30,11 +29,7 @@ const ORGANIZATIONS_SHARED_PATH = {
   deprecate: "fold into /api/organizations once organization provisions without api-key",
 } as const;
 
-export const apiKeyOrganizationsRest: Readonly<{
-  protocol: "rest";
-  namespace: string;
-  router: () => RestTransportDeclaration<ApiKeyOrganizationsDoorApi>;
-}> = defineRestRouter(ApiKeyOrganizationsDoorApi)
+export const apiKeyOrganizationsRest = defineRestRouter(ApiKeyOrganizationsDoorApi)
   .withNamespace("organizations")
   .withVersion(MANAGEMENT_API_VERSION)
   .withCredential("instance_admin")

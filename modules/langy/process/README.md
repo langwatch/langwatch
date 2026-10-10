@@ -6,7 +6,7 @@ The server half of [langy](../README.md). Langy, the in-product assistant: conve
 
 ## Installation
 
-`defineProcessModule("langy").withRepositories(langyRepositories).withChannels(langyChannels).withApi(LangyModule).withTransports(langyTurnsRest, langyUiActionsRest, langyInternalRest, langyLocalRest, langyLocalControlRest, langyLocalControlConnectRest, ...langyLocalControlDatedRests, ...langyLocalControlConnectDatedRests, …, setupSkillsTrpcTransport, langyTrpcTransport, langyEgressTrpcTransport).withTransportFacts(…).withEventing(langyConversationEventing).withEventing(langyGuidedOnboardingEventing).withEventing(langyMaintenanceEventing)`, `src/langy.module.ts:28`.
+`defineProcessModule("langy").withRepositories(langyRepositories).withChannels(langyChannels).withApi(LangyModule).withTransports(langyTurnsRest, langyUiActionsRest, langyInternalRest, langyLocalRest, langyLocalControlRest, langyLocalControlConnectRest, ...langyLocalControlDatedRests, ...langyLocalControlConnectDatedRests, …, setupSkillsTrpcTransport, langyTrpcTransport, langyEgressTrpcTransport).provideMiddlewareBindings(…).withEventing(langyConversationEventing).withEventing(langyGuidedOnboardingEventing).withEventing(langyMaintenanceEventing)`, `src/langy.module.ts:28`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 

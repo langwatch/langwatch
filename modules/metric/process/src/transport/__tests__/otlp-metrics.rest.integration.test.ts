@@ -6,7 +6,11 @@
 import { gzipSync } from "node:zlib";
 
 import { ProjectMissingCredentialsError } from "@langwatch/api";
-import { canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
+import {
+  canonicalErrorResponse,
+  createRestRuntime,
+  withOtlpPathAliases,
+} from "@langwatch/api/rest";
 import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { EventingCommands } from "@langwatch/eventing";
@@ -93,7 +97,7 @@ function deployment() {
   apis.ready();
 
   const runtime = createRestRuntime({
-    doors: { otlp_ingest: otlpMetricsDoor((input) => traces.otlpCredential(input)) },
+    doors: { otlp_ingest: otlpMetricsDoor.open(traces) },
     authorization: restTestAuthorization(),
     identity: {
       authenticate: () => {
@@ -106,11 +110,14 @@ function deployment() {
   const declaredRest: readonly FeatureTransportDescriptor[] = metricProcessModule.transports ?? [];
   const mounted = declaredRest.includes(otlpMetricsRest)
     ? [
-        runtime.mount(otlpMetricsRest.router(), {
-          app: () => apis.reference(MetricApi),
-          credential: "otlp_ingest",
-          onError: canonicalErrorResponse,
-        }),
+        // The host rewrites a misconfigured exporter path before routing, as RestHost does.
+        withOtlpPathAliases(
+          runtime.mount(otlpMetricsRest.router(), {
+            app: () => apis.reference(MetricApi),
+            credential: "otlp_ingest",
+            onError: canonicalErrorResponse,
+          }),
+        ),
       ]
     : [];
 
@@ -226,8 +233,8 @@ describe("given the metric module as a process composes it", () => {
   );
 
   describe("when an exporter posts to a path the receiver does not recognise", () => {
-    /** @scenario "The log and metric doors refuse a missing key before they judge the exporter path" */
-    it("refuses a missing key with 401 in the receiver's body before the path's 404", async () => {
+    /** @scenario "The log and metric doors answer an unknown exporter path as not found before they ask for the key" */
+    it("answers 404 with or without a key and collects nothing", async () => {
       const { post, sentPoints } = deployment();
       const path = "/not-an-exporter/v1/metrics";
 
@@ -238,9 +245,7 @@ describe("given the metric module as a process composes it", () => {
       });
       const keyed = await post({ body: otlpMetricBody(), path });
 
-      expect(anonymous.status).toBe(401);
-      expect(await anonymous.json()).toEqual({ message: expect.any(String) });
-      expect(keyed.status).toBe(404);
+      expect([anonymous.status, keyed.status]).toEqual([404, 404]);
       expect(sentPoints).toHaveLength(0);
     });
   });

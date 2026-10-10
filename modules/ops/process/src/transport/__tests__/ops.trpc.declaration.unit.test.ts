@@ -54,13 +54,13 @@ function boundAccess(declaration: Declaration): Record<string, string> {
   return declared;
 }
 
-/** Every fact a declaration asks the mount to bind, by procedure. */
-function boundFacts(declaration: Declaration): Record<string, string[]> {
+/** Every middleware context a declaration asks the mount to bind, by procedure. */
+function boundContexts(declaration: Declaration): Record<string, string[]> {
   const declared: Record<string, string[]> = {};
 
   const runtime: TrpcProcedureFactory<object> = {
-    procedure: ({ procedure, facts }) => {
-      declared[wireName(procedure)] = facts.map((fact) => fact.name);
+    procedure: ({ procedure, contexts }) => {
+      declared[wireName(procedure)] = contexts.map((context) => context.name);
 
       return {};
     },
@@ -285,7 +285,7 @@ describe("the ops tRPC declarations", () => {
 
     /** The operator is bound only where the handler reads the person, beyond who may call it. */
     it("binds the operator only where the handler reads who it is", () => {
-      const facts = Object.assign({}, ...OPS_TRANSPORTS.map(boundFacts)) as Record<
+      const facts = Object.assign({}, ...OPS_TRANSPORTS.map(boundContexts)) as Record<
         string,
         string[]
       >;
@@ -314,8 +314,8 @@ describe("the ops tRPC declarations", () => {
       expect(boundAccess(opsTrpcTransport)).toEqual(
         Object.assign({}, ...OPS_TRANSPORTS.map(boundAccess)),
       );
-      expect(boundFacts(opsTrpcTransport)).toEqual(
-        Object.assign({}, ...OPS_TRANSPORTS.map(boundFacts)),
+      expect(boundContexts(opsTrpcTransport)).toEqual(
+        Object.assign({}, ...OPS_TRANSPORTS.map(boundContexts)),
       );
     });
   });
@@ -325,7 +325,7 @@ describe("the ops tRPC declarations", () => {
     it("answers the ten under ops.upgrade and nowhere else", () => {
       const names = Object.keys(MIGRATION_PROCEDURES).toSorted();
       const upgradeAccess = boundAccess(opsUpgradeTrpcTransport);
-      const upgradeFacts = boundFacts(opsUpgradeTrpcTransport);
+      const upgradeFacts = boundContexts(opsUpgradeTrpcTransport);
       const leaf = (procedure: string) => procedure.replace("upgrade.", "");
 
       expect(opsUpgradeTrpc.namespace).toBe("ops.upgrade");
@@ -357,7 +357,7 @@ describe("the ops tRPC declarations", () => {
         getAll: "permission-platform:ops:view",
         getById: "permission-platform:ops:view",
       });
-      expect(boundFacts(opsBugReportTrpcTransport)).toEqual({ getAll: [], getById: [] });
+      expect(boundContexts(opsBugReportTrpcTransport)).toEqual({ getAll: [], getById: [] });
     });
   });
 });

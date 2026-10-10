@@ -21,7 +21,6 @@ import {
   BACKEND_READY_MSG,
   disposeGeneration,
   drainBackend,
-  forwardPort,
   freeLoopbackPort,
   listenersAddedSince,
   replaceBackend,
@@ -34,10 +33,12 @@ import {
 } from "./backend.process.ts";
 import {
   createReloadTrigger,
+  createRetrySchedule,
   invalidateModules,
   recycleReason,
   staleModuleIds,
 } from "./backend.reload.ts";
+import { bootFailureOf, type BootFailure } from "./boot-failure.ts";
 import { buildOrb, forwardPortWithOrb, servesOrb, type OrbBuild } from "./haven-orb.ts";
 
 /**
@@ -91,6 +92,12 @@ let stopping: Promise<void> | undefined;
 const watchers: FSWatcher[] = [];
 /** Files changed while the stack is held, applied by the next on-demand reload. */
 const held = new Set<string>();
+/** A failed boot or link retries on its own as well as on a change (Alex, 2026-10-10). */
+const retries = createRetrySchedule({
+  retry: () => {
+    reloading = reloading.then(() => reload([]));
+  },
+});
 
 const stop = (code: number): Promise<void> => {
   stopping ??= (async () => {
@@ -107,6 +114,7 @@ const stop = (code: number): Promise<void> => {
     let exitCode = code;
     try {
       for (const watcher of watchers) watcher.close();
+      retries.reset();
       await reloading;
       if (halves) await drainBackend(halves);
       await apiPort?.close();
@@ -254,21 +262,34 @@ async function disposeOld({
   }
 }
 
-/** A boot that threw: logged by the half that refused it, and retried on the next change. */
-function bootRefused(error: unknown): void {
+/** Logs a failure by the half it came from, shows it on the api's port, and arms the retry. */
+function reportFailure({
+  half,
+  event,
+  error,
+  level,
+}: {
+  half: BootFailure["half"];
+  event: string;
+  error: unknown;
+  level: "fatal" | "warn";
+}): void {
   isRetryOwed = true;
-  const half = backendHalfOf(error);
-  const event = halves
-    ? `${half ?? "backend"} boot failed; generation ${generation} keeps serving what it can`
-    : "boot failed; waiting for a change";
-  write(
-    processFailureLine({
-      service: half ? BACKEND_HALF_SERVICE[half] : APP_SERVICE,
-      event,
-      error,
-      level: "warn",
-    }),
-  );
+  const delay = retries.failed();
+  apiPort?.report(bootFailureOf({ half, error, retryAt: Date.now() + delay }));
+  const service = half === "backend" ? APP_SERVICE : BACKEND_HALF_SERVICE[half];
+  const retry = `retrying in ${delay / 1000}s or on a change`;
+  write(processFailureLine({ service, event: `${event}; ${retry}`, error, level }));
+}
+
+/** A boot that threw: fatal, named by the half that refused it; the api serves if it can. */
+function bootRefused(error: unknown): void {
+  const half = backendHalfOf(error) ?? "backend";
+  let event = `${half} failed to boot; no api is serving`;
+  if (half === "worker")
+    event = "worker failed to boot; the api keeps serving but jobs are not running";
+  else if (halves) event = `${half} failed to boot; generation ${generation} keeps serving`;
+  reportFailure({ half, event, error, level: "fatal" });
 }
 
 /**
@@ -288,11 +309,13 @@ async function bootNext({
   const port = await freeLoopbackPort();
   const old = halves;
   if (!old) {
-    halves = await startBackend({
+    const started = await startBackend({
       startWorker: worker.startWorker,
       startApi: (options) => api.startApi({ ...options, port }),
     });
+    halves = started.halves;
     apiPort?.route(port);
+    if (started.workerFailure !== undefined) throw started.workerFailure;
     return 0;
   }
   let removed = 0;
@@ -340,11 +363,10 @@ async function reload(files: string[]): Promise<void> {
     // A module that failed to evaluate caches its rejection; reset what this attempt ran.
     const added = [...modules.idToModuleMap.keys()].filter((id) => !known.has(id));
     invalidateModules({ modules, ids: [...stale, ...added] });
-    isRetryOwed = true;
     const event = halves
       ? `backend did not link; generation ${generation} keeps serving`
-      : "backend did not link; waiting for a change";
-    write(processFailureLine({ service: APP_SERVICE, event, error, level: "warn" }));
+      : "backend did not link; no api is serving";
+    reportFailure({ half: "backend", event, error, level: "warn" });
     return;
   }
   const drainedAt = Date.now();
@@ -359,6 +381,8 @@ async function reload(files: string[]): Promise<void> {
   }
   const swapMs = Date.now() - drainedAt;
   isRetryOwed = false;
+  retries.reset();
+  apiPort?.report(undefined);
   generation += 1;
   const record = {
     level: "info",
@@ -425,13 +449,12 @@ export async function bootApp({ withUi }: { withUi: boolean }): Promise<void> {
     ui = await startUi();
   }
   const port = envPositive({ name: "API_PORT", fallback: 6_560 });
-  apiPort = servesOrb({ withUi, slug: process.env.LANGWATCH_SLUG })
-    ? await forwardPortWithOrb({
-        port,
-        orb: loadOrb,
-        isUiWatch: process.env.LANGWATCH_UI_WATCH === "1",
-      })
-    : await forwardPort({ port });
+  const withOrb = servesOrb({ withUi, slug: process.env.LANGWATCH_SLUG });
+  apiPort = await forwardPortWithOrb({
+    port,
+    orb: withOrb ? loadOrb : undefined,
+    isUiWatch: withOrb && process.env.LANGWATCH_UI_WATCH === "1",
+  });
   backendVite = await startBackendVite();
   const ssr = backendVite.environments.ssr;
   runner = createBackendRunner(ssr);
@@ -439,7 +462,7 @@ export async function bootApp({ withUi }: { withUi: boolean }): Promise<void> {
     quietMs: envPositive({ name: "LANGWATCH_DEV_WATCH_DEBOUNCE_MS", fallback: 2_000 }),
     maxWaitMs: envPositive({ name: "LANGWATCH_DEV_WATCH_MAX_WAIT_MS", fallback: 30_000 }),
     run: (files) => {
-      reloading = reload(files);
+      reloading = reloading.then(() => reload(files));
       return reloading;
     },
   });
@@ -450,8 +473,9 @@ export async function bootApp({ withUi }: { withUi: boolean }): Promise<void> {
       const isLoaded = runner?.evaluatedModules.getModulesByFile(file) !== undefined;
       if (!isLoaded && !(isRetryOwed && CODE_FILE.test(file))) return;
       ssr.moduleGraph.onFileChange(file);
-      if (isWatching) trigger.note(file);
-      else held.add(file);
+      if (!isWatching) return void held.add(file);
+      retries.reset();
+      trigger.note(file);
     },
   });
   process.on("SIGUSR2", () => {

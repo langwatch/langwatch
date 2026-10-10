@@ -59,6 +59,14 @@ func newLogSinkSince(path string, since time.Time) *logSink {
 }
 
 func (s *logSink) writeLine(line string) {
+	if s != nil {
+		s.writeLineAt(s.now(), line)
+	}
+}
+
+// writeLineAt is writeLine stamped at, so a line split across captures keeps
+// one instant and a reader of several can fold it back to one.
+func (s *logSink) writeLineAt(at time.Time, line string) {
 	if s == nil {
 		return
 	}
@@ -73,7 +81,7 @@ func (s *logSink) writeLine(line string) {
 			return
 		}
 	}
-	n, err := fmt.Fprintf(s.file, "%s %s\n", s.now().UTC().Format(time.RFC3339Nano), line)
+	n, err := fmt.Fprintf(s.file, "%s %s\n", at.UTC().Format(time.RFC3339Nano), line)
 	s.written += int64(n)
 	if err != nil {
 		// The descriptor is unusable (the disk filled, the file was replaced).

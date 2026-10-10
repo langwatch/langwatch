@@ -9,6 +9,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { TraceCanonicalisationService } from "#features/derivation/services/trace-canonicalisation.service";
 
+import { ownProof } from "../../../../../__tests__/support/authorization-proofs.fixture.ts";
 import { traceSummaryRow } from "../../../../../repositories/clickhouse/__tests__/support/trace-summary-row.support.ts";
 import { blobStoreResolving } from "../../../../../services/__tests__/support/trace-blob-store.support.ts";
 import { TraceOffloadResolutionService } from "../../../../../services/trace-offload-resolution.service.ts";
@@ -16,6 +17,8 @@ import { TraceIOExtractionService } from "../../../../derivation/services/trace-
 import type { TraceBlobStoreService } from "../../../../media/services/trace-blob-store.service.ts";
 import type { ResolveTraceSpansFn } from "../../trace-legacy-read.repository.ts";
 import { mappedLegacyRead } from "./support/legacy-trace-mapping.support.ts";
+
+const OWN_READ = ownProof({ projectId: "proj-1" });
 
 // ---------------------------------------------------------------------------
 // Hoisted mocks — mock only the CH SQL boundary
@@ -197,6 +200,7 @@ describe("TraceLegacyReadClickHouseRepository — eventref resolution seam (ADR-
 
           // Per-call gate (#4888): resolution fires only when resolveBlobs:true.
           const traces = await service.findTracesWithSpans({
+            authorization: OWN_READ,
             projectId: "proj-1",
             traceIds: ["trace-1"],
             protections,

@@ -72,6 +72,24 @@ Feature: haven logs
     Then the api lane's lines appear under the lane's own name
     And the launcher's own lines, which belong to neither half, are among them
 
+  # A Node host lane (the one-process app lane, or the api lane with the backend
+  # split) is captured per application, so every list names what a developer
+  # thinks about rather than the process that happens to host it.
+  Scenario: The one-process lane's logs are captured per application
+    Given the app lane runs the ui, the api and the worker in one process
+    When the worker, the api and the UI bundle each write a line
+    Then the worker's line is captured under worker, the api's under api and the bundle's under ui
+    And a launcher or supervisor line is captured under both api and worker, and shown once
+    And the logs page and "haven logs" list ui, api and worker, with no app
+    And "haven logs app" still reads all three together
+
+  # dev-runtime logs a refused boot at warn while an older generation serves on.
+  Scenario: haven errors reports a worker that failed to boot
+    Given the worker refused to boot and the launcher logged "boot failed" at warn
+    When the developer runs "haven errors"
+    Then the boot failure is listed against the worker
+    And an ordinary warning is not
+
   # The dashboard's list is what a person selects from, so anything it reports
   # has to be in it. Reporting the shared machinery on a line of its own as
   # well said everything twice and left half of it unreachable.

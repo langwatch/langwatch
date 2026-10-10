@@ -3,7 +3,7 @@ export { organizationManagementRest } from "./transport/organization-management.
 export { groupTrpcTransport } from "./transport/group.trpc.ts";
 export { licenseEnforcementTrpcTransport } from "./transport/license-enforcement.trpc.ts";
 export {
-  organizationSessionPersonFact,
+  organizationSessionPersonContext,
   organizationTrpcTransport,
 } from "./transport/organization.trpc.ts";
 export { personalWorkspaceFeaturesTrpcTransport } from "./transport/personal-workspace-features.trpc.ts";

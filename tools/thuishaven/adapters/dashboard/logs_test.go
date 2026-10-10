@@ -108,3 +108,30 @@ func TestWebLogBoundaries(t *testing.T) {
 		t.Fatalf("symlink dir accepted: %d", response.Code)
 	}
 }
+
+// @scenario "The one-process lane's logs are captured per application"
+func TestWebLogsReadTheOneProcessLanePerApplication(t *testing.T) {
+	s, root := logServer(t)
+	dir := filepath.Join(root, "project")
+	launcher := "2026-09-15T10:00:01Z {\"level\":\"info\",\"msg\":\"backend ready\"}\n"
+	writeLog(t, filepath.Join(dir, "ui.log"), "2026-09-15T10:00:00Z built in 812ms\n")
+	writeLog(t, filepath.Join(dir, "api.log"), launcher+"2026-09-15T10:00:02Z {\"service\":\"langwatch-api\",\"msg\":\"GET /\"}\n")
+	writeLog(t, filepath.Join(dir, "worker.log"), launcher+"2026-09-15T10:00:03Z {\"service\":\"langwatch-worker\",\"msg\":\"drained\"}\n")
+	var data struct {
+		Lines    []logLine `json:"lines"`
+		Services []string  `json:"services"`
+	}
+	if err := json.Unmarshal(requestLogs(s, "stack=project&service=app").Body.Bytes(), &data); err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.Join(data.Services, ","); got != "api,ui,worker" {
+		t.Errorf("services = %s, want api,ui,worker with no app", got)
+	}
+	var texts []string
+	for _, line := range data.Lines {
+		texts = append(texts, line.Text)
+	}
+	if got := strings.Join(texts, "|"); strings.Count(got, "backend ready") != 1 || !strings.Contains(got, "built in") || !strings.Contains(got, "drained") {
+		t.Errorf("app reads %q, want ui, api and worker with the launcher line once", got)
+	}
+}

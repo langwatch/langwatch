@@ -53,8 +53,9 @@ function httpSource(raw: string): StoredEventSource {
   };
   async function* lines(body: ReadableStream<Uint8Array>): AsyncGenerator<string> {
     let buffered = "";
-    for await (const chunk of body.pipeThrough(new TextDecoderStream())) {
-      buffered += chunk;
+    const decoder = new TextDecoder();
+    for await (const bytes of body) {
+      buffered += decoder.decode(bytes, { stream: true });
       const parts = buffered.split("\n");
       buffered = parts.pop() ?? "";
       yield* parts.filter((line) => line !== "");

@@ -10,13 +10,15 @@ import type {
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { ownProof } from "../../../../../__tests__/support/authorization-proofs.fixture.ts";
 import { openProtections } from "../../../../../repositories/clickhouse/__tests__/open-protections.ts";
 import {
   startMigratedTraceClickHouse,
   testClickHouseConfigured,
 } from "../../../../../repositories/clickhouse/__tests__/support/clickhouse-endpoint.support.ts";
 import { TraceCanonicalisationService } from "../../../../derivation/services/trace-canonicalisation.service.ts";
-import { TraceLegacyReadClickHouseRepository } from "../trace-legacy-read.repository.ts";
+import type { LegacyTraceMappingService } from "../../../services/legacy-trace-mapping.service.ts";
+import { mappedLegacyRead } from "./support/legacy-trace-mapping.support.ts";
 
 const clickHouseConfigured = testClickHouseConfigured();
 
@@ -106,7 +108,7 @@ function makeQueryInput(
 }
 
 let ch: ClickHouseClient;
-let service: TraceLegacyReadClickHouseRepository;
+let service: LegacyTraceMappingService;
 
 async function insert(values: Record<string, unknown>[]) {
   await ch.insert({
@@ -128,6 +130,7 @@ async function fetchUpdatedAxisPage(
       downloadMode: true,
       dateField: "updated",
       scrollId,
+      ownRead: ownProof({ projectId: tenantId }),
     },
   );
   expect(results).not.toBeNull();
@@ -142,7 +145,7 @@ describe.skipIf(!clickHouseConfigured)("updated date-axis pagination (integratio
   beforeAll(async () => {
     if (!clickHouseConfigured) return;
     ch = await startMigratedTraceClickHouse();
-    service = TraceLegacyReadClickHouseRepository.create({
+    service = mappedLegacyRead({
       resolveClickHouseClient: async () => ch,
       traceCanonicalisation: TraceCanonicalisationService.create(),
     });
@@ -253,6 +256,7 @@ describe.skipIf(!clickHouseConfigured)("updated date-axis pagination (integratio
         {
           downloadMode: true,
           dateField: "updated",
+          ownRead: ownProof({ projectId: tenantId }),
         },
       );
 

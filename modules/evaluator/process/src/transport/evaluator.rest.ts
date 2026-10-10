@@ -8,7 +8,8 @@ import {
   defineRestRouter,
   documentedResponses,
   MANAGEMENT_API_VERSION,
-  projectRestFacts,
+  projectRequestContext,
+  type RestDoorCredential,
   type RestTransportDeclaration,
 } from "@langwatch/api/rest";
 import {
@@ -33,7 +34,7 @@ const notFound = documentedResponses({ 404: badRequestSchema });
 const badRequest = documentedResponses({ 400: badRequestSchema, 404: badRequestSchema });
 
 /** What a route knows about the project behind the credential. */
-type ProjectFacts = z.output<typeof projectRestFacts.schema>;
+type ProjectContext = z.output<typeof projectRequestContext.schema>;
 
 /** One evaluator as the wire publishes it, with its editor address. */
 function evaluatorWire(params: {
@@ -75,7 +76,7 @@ async function readEvaluator(params: {
 async function createEvaluator(params: {
   app: EvaluatorApi;
   input: z.infer<typeof createEvaluatorInputSchema>;
-  project: ProjectFacts;
+  project: ProjectContext;
   projectId: string;
 }): Promise<z.infer<typeof evaluatorWireSchema>> {
   const { app, projectId } = params;
@@ -104,7 +105,7 @@ async function createEvaluator(params: {
 async function updateEvaluator(params: {
   app: EvaluatorApi;
   input: z.infer<typeof evaluatorIdParamsSchema> & z.infer<typeof updateEvaluatorInputSchema>;
-  project: ProjectFacts;
+  project: ProjectContext;
   projectId: string;
 }): Promise<z.infer<typeof evaluatorWireSchema>> {
   const { app, input, projectId } = params;
@@ -155,15 +156,16 @@ async function archiveEvaluator(params: {
   return { success: true };
 }
 
-/** The inert declaration a process mounts, once the routes are declared. */
-type EvaluatorRestDeclaration = Readonly<{
+/** The `/api/evaluators` collection and item endpoints. */
+export function createEvaluatorRest(): Readonly<{
   protocol: "rest";
   namespace: string;
-  router: () => RestTransportDeclaration<EvaluatorApi>;
-}>;
-
-/** The `/api/evaluators` collection and item endpoints. */
-export function createEvaluatorRest(): EvaluatorRestDeclaration {
+  router: () => RestTransportDeclaration<
+    EvaluatorApi,
+    RestDoorCredential,
+    typeof projectRequestContext
+  >;
+}> {
   return (
     defineRestRouter(EvaluatorApi)
       .withNamespace("evaluators")
@@ -173,7 +175,7 @@ export function createEvaluatorRest(): EvaluatorRestDeclaration {
       .withPermission("evaluations:view")
       .withOutput(z.array(evaluatorWireSchema))
       .withDocs({ description: "Get all evaluators for a project" })
-      .withMiddleware(projectRestFacts)
+      .withMiddlewareContext(projectRequestContext)
       .handle(async ({ app, scope }, project) => {
         logger.info({ projectId: scope.id }, "Getting all evaluators for project");
         const rows = await app.getAllWithFields({ projectId: scope.id });
@@ -191,7 +193,7 @@ export function createEvaluatorRest(): EvaluatorRestDeclaration {
         description: "Get a specific evaluator by ID or slug",
         responses: notFound,
       })
-      .withMiddleware(projectRestFacts)
+      .withMiddlewareContext(projectRequestContext)
       .handle(async ({ app, input, scope }, project) => {
         logger.info({ projectId: scope.id, idOrSlug: input.idOrSlug }, "Getting evaluator");
 
@@ -209,7 +211,7 @@ export function createEvaluatorRest(): EvaluatorRestDeclaration {
       .withPermission("evaluations:create")
       .withOutput(evaluatorWireSchema)
       .withDocs({ description: "Create a new evaluator" })
-      .withMiddleware(projectRestFacts)
+      .withMiddlewareContext(projectRequestContext)
       .handle(({ app, input, scope }, project) =>
         createEvaluator({ app, input, project, projectId: scope.id }),
       )
@@ -223,7 +225,7 @@ export function createEvaluatorRest(): EvaluatorRestDeclaration {
         description: "Update an existing evaluator",
         responses: badRequest,
       })
-      .withMiddleware(projectRestFacts)
+      .withMiddlewareContext(projectRequestContext)
       .handle(({ app, input, scope }, project) =>
         updateEvaluator({ app, input, project, projectId: scope.id }),
       )

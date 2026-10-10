@@ -6,7 +6,6 @@
 import {
   defineRestRouter,
   MANAGEMENT_API_VERSION,
-  type RestTransportDeclaration,
 } from "@langwatch/api/rest";
 import {
   DashboardApi,
@@ -34,11 +33,7 @@ const graphResponse = (graph: Graph) => ({
   updatedAt: graph.updatedAt.toISOString(),
 });
 
-export const graphRest: Readonly<{
-  protocol: "rest";
-  namespace: string;
-  router: () => RestTransportDeclaration<DashboardApi>;
-}> = defineRestRouter(DashboardApi)
+export const graphRest = defineRestRouter(DashboardApi)
   .withNamespace("graphs")
   .withVersion(MANAGEMENT_API_VERSION)
 

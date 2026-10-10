@@ -139,7 +139,8 @@ export interface ScimApi {
    * connection can no longer write through single sign-on.
    */
   authenticateDirectory(input: {
-    authorization: string | null;
+    /** The bearer the framework pulled off the request, null when none was presented. */
+    bearer: string | null;
     /** What the provider asked for, so an attributable refusal can be filed
      *  against the connection it was meant for (ADR-126). A door that does
      *  not supply them refuses exactly as before and records nothing. */

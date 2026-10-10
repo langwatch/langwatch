@@ -30,9 +30,10 @@ export {
 // The declaration half: one complete declaration per route, and the vocabulary
 // a route states its sources, its answers and its door with.
 export {
+  browserSessionContext,
   defineRestRouter,
   permissionOf,
-  projectRestFacts,
+  projectRequestContext,
   type FeatureApiWitness,
   type RestDeprecation,
   type RestDoorCredential,
@@ -48,6 +49,7 @@ export {
 // The runtime half: the ports a process fills, and the mount that puts a
 // family's declaration behind the one execution path.
 export { RestHost, type RestIdentities, type RestFamilyBearers } from "./host.ts";
+export { canonicalOtlpRequest, withOtlpPathAliases } from "./otlp-path-alias.ts";
 
 export {
   createRestRuntime,
@@ -59,7 +61,7 @@ export {
 
 // The request half: the validator that fails the way the boundary fails, the
 // wire-size cap nine ingestion families apply, the tracer and request logger,
-// the declared middleware facts, SSE, and `Idempotency-Key` with its ledger.
+// the declared middleware context, SSE, and `Idempotency-Key` with its ledger.
 // The `Idempotency-Key` half: the header and its bounds, the declared
 // parameter and replay marker, and the receipt ledger a create replays from.
 export {
@@ -97,11 +99,10 @@ export type {
 } from "./repositories/prisma/prisma.idempotency-receipt.ts";
 
 export {
-  bindRestHeader,
-  bindRestMiddleware,
+  bindMiddlewareContext,
   bodyLimit,
   createSSEResponse,
-  defineRestMiddleware,
+  defineMiddlewareContext,
   loggerMiddleware,
   multipartMiddleware,
   RequestValidationError,
@@ -127,8 +128,8 @@ export {
   type RestRawBodyOut,
   type RestRawResponse,
   type RestRawResult,
-  type RestTransportMiddleware,
-  type RestTransportMiddlewareBinding,
+  type MiddlewareContext,
+  type MiddlewareContextBinding,
   type SSEHandler,
   type TypedSSEStream,
 } from "./request.ts";
@@ -141,6 +142,7 @@ export {
   type AppRestOrganizationVariables,
   type AppRestProjectVariables,
   browserCallerOfRequest,
+  browserSessionOfRequest,
   credentialPrincipalOf,
   credentialPrincipalOfToken,
   keyCredentialOfRequest,
@@ -156,6 +158,7 @@ export {
   PersonalUsageServiceKeyUnsupportedError,
   principalOfCredential,
   projectCredentialOfRequest,
+  projectRequestContextOf,
   projectOf,
   type ProjectScopedContext,
   recordBrowserCaller,
@@ -293,19 +296,18 @@ export {
 export { BrowserSessionIdentity, BrowserOriginRefusedError } from "./browser-session.ts";
 
 export { bindRestCredential, type RestCredentialBinding, type RestDoor } from "./request.ts";
+export {
+  defineRestDoor,
+  type ApiOfToken,
+  type DoorContract,
+  type DoorCredential,
+  type DoorIdentified,
+  type DoorPresented,
+  type ErasedRestDoorDefinition,
+  type RestDoorDefinition,
+} from "./door.ts";
 
 export { BearerIdentity } from "./bearer-identity.ts";
-export { SessionKeyIdentity } from "./session-key-identity.ts";
-export {
-  LicenceTokenIdentity,
-  type LicenceTokenHolder,
-  type LicenceTokenPresented,
-} from "./licence-token-identity.ts";
-export {
-  OtlpIngestIdentity,
-  type OtlpIngestHolder,
-  type OtlpIngestPresented,
-} from "./otlp-ingest-identity.ts";
 export {
   CliTokenIdentity,
   type CliTokenHolder,

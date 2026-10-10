@@ -58,7 +58,7 @@ anything; the process mounts every installed module's declarations.
    permission (`.withPermission("triggers:view")`), never a credential source. The caller arrives as
    `actor`/`scope`; no handler reads headers or looks the key's owner up.
    The door asks the permission before the handler runs. Never declare
-   `.withAccess(anyAuthenticated(...))` and then ask a permission in a middleware fact, the handler or
+   `.withAccess(anyAuthenticated(...))` and then ask a permission in a middleware context, the handler or
    the `*Api`: that is a bypass. `{ at: "route", param }` asks at the scope the path names; on the
    `api_key` door `{ at: "grants" }` passes a key naming no project on any scope it is granted at, and
    `{ at: "organization" }` asks at the organization. If none fits, extend `packages/api` and the
@@ -76,6 +76,18 @@ anything; the process mounts every installed module's declarations.
    Alex 2026-10-05; `modules/instant-eval/process/src/transport/instant-eval.trpc.ts`). The door resolves
    the organization; never write an audit row by hand.
 10. **A query never returns a credential.** Secrets come back only from a mutation.
+11. **What a route needs beyond its input is middleware context its own module provides** (record §8,
+   Alex 2026-10-10). Declare it `defineMiddlewareContext("name", schema)`, name it on the route with
+   `.withMiddlewareContext(name)` (the handler gets the parsed value after its arguments), and supply
+   every one in the module installer: `.provideMiddlewareContext({ name: (request, { app, dependencies })
+   => value })`. A missing key, an extra key or a value of the wrong type does not compile, and a module
+   whose routes need context it never provides does not publish. No process supplies it: a value several
+   modules need is a shared helper (`projectRequestContext: projectRequestContextOf`). `.withHeaders(...)`
+   values bind themselves. A tRPC procedure uses the same `.withMiddlewareContext(x)`; its mount binds it
+   with `bindTrpcMiddlewareContext(x, (ctx) => value)` or `bindTrpcHeader`. Anything else a module binds by
+   hand (tRPC, websocket, the API door) goes in `.provideMiddlewareBindings(() => [...])`, type-checked the
+   same way. Need the browser session the door resolved? `.withMiddlewareContext(browserSessionContext)`,
+   provided by `browserSession: browserSessionOfRequest`; never verify the cookie again.
 
 ## Worked example: one contract, one tRPC binding, one REST route
 

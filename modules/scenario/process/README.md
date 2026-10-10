@@ -6,7 +6,7 @@ The server half of [scenario](../README.md). Scenarios and simulations: authored
 
 ## Installation
 
-`defineProcessModule("scenario").withRepositories(scenarioRepositories).withChannels(scenarioChannels).withApi(ScenarioModule).withTransports(…, …, …, scenarioAgentTestRest, scenarioEventsRest, scenarioGenerateRest, scenarioRunExportRest, scenarioVoiceRest, scenarioTrpcTransport).withTransportFacts(…).withEventing(scenarioLifecycleEventing).withEventing(simulationProcessingEventing).withMigrations(…)`, `src/scenario.module.ts:32`.
+`defineProcessModule("scenario").withRepositories(scenarioRepositories).withChannels(scenarioChannels).withApi(ScenarioModule).withTransports(…, …, …, scenarioAgentTestRest, scenarioEventsRest, scenarioGenerateRest, scenarioRunExportRest, scenarioVoiceRest, scenarioTrpcTransport).provideMiddlewareBindings(…).withEventing(scenarioLifecycleEventing).withEventing(simulationProcessingEventing).withMigrations(…)`, `src/scenario.module.ts:32`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 

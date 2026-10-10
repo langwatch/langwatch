@@ -49,14 +49,13 @@ function hostReading(read: () => { ok: boolean }) {
       project: closed,
       organization: closed,
       api_key: closed,
-      scim_token: closed,
       instance_admin: closed,
       browser: closed,
     },
     audit: { record: async () => {} },
   });
   host.mount(declaration.router(), () => ({ read }), {
-    facts: [
+    middlewareBindings: [
       bindRestCredential("internal_secret", () =>
         BearerIdentity.create({ name: "internal", token: "internal-marker" }),
       ),

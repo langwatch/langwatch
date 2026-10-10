@@ -11,15 +11,15 @@ SCIM provisioning: directory connections, their tokens, and syncing users from a
 | Classification | enterprise (`modules/catalogue.json`)                                                       |
 | Subjects       | scim, scim-sync                                                                             |
 | Halves         | [contract](contract) · [process](process/README.md) · [browser](browser) · [client](client) |
-| Api token      | `ScimApi` = `moduleApi<ScimApi>()("scim")`, `contract/src/scim.api.ts:287` (33 operations)  |
+| Api token      | `ScimApi` = `moduleApi<ScimApi>()("scim")`, `contract/src/scim.api.ts:293` (34 operations)  |
 | Installed by   | api, worker, tasks (process); ui (browser)                                                  |
 
 ## What scim owns
 
 | Kind            | Name                                                                                                                                                                               | Declared at                                                      |
 | --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| Stores required |                                                                                                                                                                                    | `process/src/channels/scim.channels.ts:13`                       |
-| Stores required | prisma, operatorReads                                                                                                                                                              | `process/src/repositories/prisma/prisma.scim.repositories.ts:15` |
+| Stores required |                                                                                                                                                                                    | `process/src/channels/scim-channels.registry.ts:13`              |
+| Stores required | prisma, operatorReads, eventReadSeat                                                                                                                                               | `process/src/repositories/prisma/prisma.scim.repositories.ts:17` |
 | Secrets         | `auth0WebhookSecret` (AUTH0_SCIM_WEBHOOK_SECRET), `tokenPepper` (CREDENTIALS_SECRET), `tokenPepperFallback` (NEXTAUTH_SECRET), `tokenPepperPrevious` (CREDENTIALS_SECRET_PREVIOUS) | `contract/src/scim.config.ts:14`                                 |
 | Config          | `provenOffboarding` (SCIM_V2_GRANTS)                                                                                                                                               | `contract/src/scim.config.ts:7`                                  |
 

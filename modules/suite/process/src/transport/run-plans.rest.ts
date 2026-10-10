@@ -10,7 +10,8 @@ import {
   defineRestRouter,
   documentedResponses,
   MANAGEMENT_API_VERSION,
-  projectRestFacts,
+  projectRequestContext,
+  type RestDoorCredential,
   type RestTransportDeclaration,
 } from "@langwatch/api/rest";
 import { deriveRunActor } from "@langwatch/scenario-contract";
@@ -30,14 +31,14 @@ import {
   rerunInputSchema,
   runPlanRunInputSchema,
   runPlanRunResultSchema,
-  suiteRunOriginFact,
+  suiteRunOrigin,
   toRunItemsWire,
 } from "../rules/suite-wire-v1.rules.ts";
 
 const notFound = documentedResponses({ 404: badRequestSchema });
 
 /** What a route knows about the project and the person behind the credential. */
-type ProjectFacts = z.output<typeof projectRestFacts.schema>;
+type ProjectContext = z.output<typeof projectRequestContext.schema>;
 
 /** What every run of this family answers with. */
 function runWire(params: {
@@ -65,7 +66,7 @@ async function runConfiguration(params: {
   app: SuiteApi;
   input: z.infer<typeof runPlanRunInputSchema>;
   projectId: string;
-  project: ProjectFacts;
+  project: ProjectContext;
   surface: string | null;
   callerKey: string | null;
 }): Promise<z.infer<typeof runPlanRunResultSchema>> {
@@ -98,7 +99,7 @@ async function rerunStoredPlan(params: {
   app: SuiteApi;
   input: z.infer<typeof runPlanIdParamsSchema> & z.infer<typeof rerunInputSchema>;
   projectId: string;
-  project: ProjectFacts;
+  project: ProjectContext;
   surface: string | null;
   callerKey: string | null;
 }): Promise<z.infer<typeof runPlanRunResultSchema>> {
@@ -146,7 +147,11 @@ async function archivePlan(params: {
 export function createRunPlansRest(): Readonly<{
   protocol: "rest";
   namespace: string;
-  router: () => RestTransportDeclaration<SuiteApi>;
+  router: () => RestTransportDeclaration<
+    SuiteApi,
+    RestDoorCredential,
+    typeof projectRequestContext | typeof suiteRunOrigin
+  >;
 }> {
   return defineRestRouter(SuiteApi)
     .withNamespace("run-plans")
@@ -162,7 +167,7 @@ export function createRunPlansRest(): Readonly<{
       description:
         "List the project's run plans. Archived plans are left out unless includeArchived is set. Test suites are not run plans and are listed by the test suites family.",
     })
-    .withMiddleware(projectRestFacts)
+    .withMiddlewareContext(projectRequestContext)
     .handle(({ app, input, scope }, project) =>
       app.listRunPlans({
         projectId: scope.id,
@@ -180,7 +185,7 @@ export function createRunPlansRest(): Readonly<{
       description:
         "Run a configuration under a name. The name identifies the run plan: send a name already in use and that plan's configuration is replaced with this one, send a new name and the plan is created, send no name and one is derived from what the run covers and what it runs against.",
     })
-    .withMiddleware(projectRestFacts, suiteRunOriginFact)
+    .withMiddlewareContext(projectRequestContext, suiteRunOrigin)
     .handle(({ app, input, scope }, project, origin) =>
       runConfiguration({
         app,
@@ -202,7 +207,7 @@ export function createRunPlansRest(): Readonly<{
         "Read one run plan. An id the project does not hold, and a test suite id, both answer 404 suite_not_found.",
       responses: notFound,
     })
-    .withMiddleware(projectRestFacts)
+    .withMiddlewareContext(projectRequestContext)
     .handle(({ app, input, scope }, project) =>
       app.getRunPlan({ id: input.id, projectId: scope.id, projectSlug: project.projectSlug }),
     )
@@ -219,7 +224,7 @@ export function createRunPlansRest(): Readonly<{
         "Run a run plan again, with the configuration it already holds. To run a different configuration, post it to /run under the plan's name.",
       responses: notFound,
     })
-    .withMiddleware(projectRestFacts, suiteRunOriginFact)
+    .withMiddlewareContext(projectRequestContext, suiteRunOrigin)
     .handle(({ app, input, scope }, project, origin) =>
       rerunStoredPlan({
         app,

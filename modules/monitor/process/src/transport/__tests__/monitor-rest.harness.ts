@@ -1,8 +1,8 @@
 import {
-  bindRestMiddleware,
+  bindMiddlewareContext,
   createRestRuntime,
   canonicalErrorResponse,
-  projectRestFacts,
+  projectRequestContext,
 } from "@langwatch/api/rest";
 /**
  * The `/api/monitors` family over the REAL monitor application: memory
@@ -66,8 +66,8 @@ export function mountMonitorRest(
     app: () => app,
     credential: "project",
     onError: canonicalErrorResponse,
-    facts: [
-      bindRestMiddleware(projectRestFacts, () => ({
+    middlewareContext: [
+      bindMiddlewareContext(projectRequestContext, () => ({
         projectSlug: TEST_PROJECT.slug,
         viewerUserId: "user-1",
         actorId: "user-1",

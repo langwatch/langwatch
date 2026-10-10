@@ -3,16 +3,23 @@
  * answered behind, and one call into the application.
  * ADR-026, ADR-031, ADR-040, ADR-041, ADR-043, ADR-044.
  */
-import { defineTrpcFact, defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
+import {
+  defineMiddlewareContext,
+  defineTrpcRouter,
+  type TrpcRouterDeclaration,
+} from "@langwatch/api/trpc";
 import { AutomationApi, automationTrpc } from "@langwatch/automation-contract";
 import { z } from "zod";
 
 /**
  * The address a test fire is delivered to, resolved by the PROCESS for
- * the caller -- a fact, not part of the actor: ADR-031 says a test fire
+ * the caller -- middleware context, not part of the actor: ADR-031 says a test fire
  * is not an open relay, so nothing a client sends can stand in for it.
  */
-export const automationCallerEmailFact = defineTrpcFact("callerEmail", z.string().nullable());
+export const automationCallerEmailContext = defineMiddlewareContext(
+  "callerEmail",
+  z.string().nullable(),
+);
 
 export const automationTrpcTransport: TrpcRouterDeclaration<AutomationApi, typeof automationTrpc> =
   defineTrpcRouter(AutomationApi, automationTrpc)
@@ -130,7 +137,7 @@ export const automationTrpcTransport: TrpcRouterDeclaration<AutomationApi, typeo
     .handle(({ app, input }) => app.replaceAutomationFilters(input))
 
     .procedure("testFireTemplate")
-    .withFacts(automationCallerEmailFact)
+    .withMiddlewareContext(automationCallerEmailContext)
     .withPermission("triggers:update")
     .handle(({ app, input, actor }, email) => app.sendTestFire(input, { id: actor.id, email }))
 

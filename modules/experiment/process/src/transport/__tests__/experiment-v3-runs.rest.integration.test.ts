@@ -5,10 +5,10 @@
  */
 import { AgentOwnerOnlyError } from "@langwatch/agent-contract";
 import {
-  bindRestMiddleware,
+  bindMiddlewareContext,
   canonicalErrorResponse,
   createRestRuntime,
-  projectRestFacts,
+  projectRequestContext,
   RestHost,
 } from "@langwatch/api/rest";
 import type { DatasetApi } from "@langwatch/dataset-contract";
@@ -230,13 +230,13 @@ async function harness({
     authorization: restTestAuthorization(),
     identity,
   });
-  const keyedFacts = [
-    bindRestMiddleware(projectRestFacts, () => ({
+  const keyedContext = [
+    bindMiddlewareContext(projectRequestContext, () => ({
       projectSlug: "acme",
       viewerUserId: "user-1",
       actorId: "user-1",
     })),
-    bindRestMiddleware(experimentWorkbenchCredential, () => ({
+    bindMiddlewareContext(experimentWorkbenchCredential, () => ({
       kind: "apiKey" as const,
       userId: "user-1",
     })),
@@ -246,7 +246,7 @@ async function harness({
       app: () => app,
       credential: "project",
       onError: canonicalErrorResponse,
-      facts: keyedFacts,
+      middlewareContext: keyedContext,
     });
   const browserFamily = (family: typeof experimentWorkbenchRunRest) =>
     runtime.mount(family.router(), { app: () => app, onError: canonicalErrorResponse });
@@ -261,7 +261,6 @@ async function harness({
       project: identity,
       organization: identity,
       api_key: identity,
-      scim_token: identity,
       instance_admin: identity,
       browser: identity,
     },
@@ -271,9 +270,9 @@ async function harness({
   for (const transport of experimentProcessModule.transports ?? []) {
     if (transport.protocol !== "rest") continue;
     host.mount(transport.router(), () => app, {
-      facts: [
-        ...keyedFacts,
-        bindRestMiddleware(experimentRestCredential, () => ({
+      middlewareBindings: [
+        ...keyedContext,
+        bindMiddlewareContext(experimentRestCredential, () => ({
           kind: "apiKey" as const,
           userId: "user-1",
         })),

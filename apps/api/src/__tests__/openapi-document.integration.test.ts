@@ -36,7 +36,7 @@ function routeTable(app: Hono): string[] {
   return [...new Set(app.routes.map(({ method, path }) => `${method} ${path}`))].toSorted();
 }
 
-/** Describing the routes needs no credential, so every door refuses and every fact throws. */
+/** Describing routes needs no credential: every door refuses, every middleware context throws. */
 async function bootedApi() {
   const refuse = () => {
     throw new Error("the test describes routes and answers no request");
@@ -48,7 +48,7 @@ async function bootedApi() {
     authorize: refuse,
     authorizePlatform: refuse,
   };
-  const facts = new Map<string, { middleware: { name: string }; resolve: () => never }>();
+  const contexts = new Map<string, { middlewareContext: string; resolve: () => never }>();
   for (const module of processModules) {
     for (const transport of module.transports ?? []) {
       if (transport.protocol !== "rest") continue;
@@ -56,8 +56,8 @@ async function bootedApi() {
         routes: readonly { middleware?: readonly { name: string }[] }[];
       };
       for (const route of declaration.routes) {
-        for (const fact of route.middleware ?? []) {
-          facts.set(fact.name, { middleware: fact, resolve: refuse });
+        for (const declared of route.middleware ?? []) {
+          contexts.set(declared.name, { middlewareContext: declared.name, resolve: refuse });
         }
       }
     }
@@ -72,7 +72,6 @@ async function bootedApi() {
           project: closed,
           organization: closed,
           api_key: closed,
-          scim_token: closed,
           instance_admin: closed,
           browser: closed,
         },
@@ -80,7 +79,7 @@ async function bootedApi() {
         audit: { record: async () => {} },
         idempotency: refuse,
         rateLimiter: { check: refuse },
-        facts: [...facts.values()] as never,
+        middlewareContext: [...contexts.values()] as never,
         entitlements: { holds: refuse },
       });
       const mountNothing = { mount: () => {} };

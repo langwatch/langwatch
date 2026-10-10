@@ -36,7 +36,6 @@ import {
   normaliseActivationCode,
   statusOfActivationCode,
 } from "../rules/activation-code.rules.ts";
-import { bearerTokenOf } from "../rules/connect-presented-credential.rules.ts";
 import { isInstanceIdShape } from "../rules/license-token.rules.ts";
 
 const HOURS_PER_DAY = 24;
@@ -143,7 +142,7 @@ export class ActivationCodeService {
 
   /** The `licence_token` door's check: the code travels as the bearer, as a license token does. */
   verifyPresented(input: ConnectPresentedCredential): Promise<ConnectActivationCaller> {
-    return this.verify({ code: bearerTokenOf(input.authorization), instanceId: input.instanceId });
+    return this.verify({ code: input.bearer ?? "", instanceId: input.instanceId });
   }
 
   /** The connect host's answer to a code its door found redeemable. */

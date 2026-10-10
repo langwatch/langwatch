@@ -11,7 +11,7 @@ Share links: creating, resolving and revoking them, and the retention pin an act
 | Classification | core (`modules/catalogue.json`)                                                               |
 | Subjects       | share                                                                                         |
 | Halves         | [contract](contract) · [process](process/README.md) · [browser](browser)                      |
-| Api token      | `ShareApi` = `moduleApi<ShareApi>()("share")`, `contract/src/share.api.ts:36` (12 operations) |
+| Api token      | `ShareApi` = `moduleApi<ShareApi>()("share")`, `contract/src/share.api.ts:38` (13 operations) |
 | Installed by   | api, worker, tasks (process); ui (browser)                                                    |
 
 ## What share owns
@@ -36,6 +36,6 @@ Anything else share needs belongs to another module and is reached through its `
 
 ## Who depends on share
 
-[trace](../trace/README.md) (as a peer).
+[ops](../ops/README.md), [trace](../trace/README.md) (as a peer).
 
 <!-- readme:generated:end -->

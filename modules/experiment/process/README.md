@@ -6,7 +6,7 @@ The server half of [experiment](../README.md). Experiments: saved definitions, t
 
 ## Installation
 
-`defineProcessModule("experiment").withRepositories(experimentRepositories).withApi(ExperimentModule).withTransports(experimentV3Rest, experimentRest, experimentInitRest, experimentDspyStepsRest, experimentWorkbenchRunRest, experimentV3LegacyRest, experimentWorkbenchRunLegacyRest, experimentBatchLogRest, experimentDatasetEvaluationRest, experimentWorkflowEvaluationRest, experimentTrpcTransport, batchRecordTrpcTransport).withTransportFacts(…).withEventing(experimentRunProcessingEventing).withEventing(experimentLifecycleEventing)`, `src/experiment.module.ts:37`.
+`defineProcessModule("experiment").withRepositories(experimentRepositories).withApi(ExperimentModule).withTransports(experimentV3Rest, experimentRest, experimentInitRest, experimentDspyStepsRest, experimentWorkbenchRunRest, experimentV3LegacyRest, experimentWorkbenchRunLegacyRest, experimentBatchLogRest, experimentDatasetEvaluationRest, experimentWorkflowEvaluationRest, experimentTrpcTransport, batchRecordTrpcTransport).provideMiddlewareBindings(…).withEventing(experimentRunProcessingEventing).withEventing(experimentLifecycleEventing)`, `src/experiment.module.ts:37`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -1175,7 +1175,7 @@ interface Input {
 type Output = z.infer<typeof experimentSchema>; // ../contract/src/experiment.ts:13
 
 // experiments.getExperimentWithDSLBySlug
-// Input: inline, ../contract/src/experiment.trpc.ts:202
+// Input: inline, ../contract/src/experiment.trpc.ts:203
 interface Input {
   projectId: string;
   experimentSlug: string;
@@ -1185,7 +1185,7 @@ type Output = z.infer<typeof experimentWithDslSchema>; // ../contract/src/experi
 
 // experiments.getAllByProjectId
 type Input = z.infer<typeof projectScopeSchema>; // ../contract/src/experiment.trpc.ts:30
-// Output: z.array(experimentSchema) (inline, ../contract/src/experiment.trpc.ts:212)
+// Output: z.array(experimentSchema) (inline, ../contract/src/experiment.trpc.ts:213)
 
 // experiments.getAllForEvaluationsList
 // Input: experimentEvaluationsListInputSchema, ../contract/src/experiment.trpc.ts:99
@@ -1198,10 +1198,10 @@ type Output = z.infer<typeof experimentEvaluationsListPageSchema>; // ../contrac
 
 // experiments.getLastExperiment
 type Input = z.infer<typeof projectScopeSchema>; // ../contract/src/experiment.trpc.ts:30
-// Output: experimentSchema.nullable() (inline, ../contract/src/experiment.trpc.ts:221)
+// Output: experimentSchema.nullable() (inline, ../contract/src/experiment.trpc.ts:222)
 
 // experiments.deleteExperiment
-// Input: inline, ../contract/src/experiment.trpc.ts:229
+// Input: inline, ../contract/src/experiment.trpc.ts:230
 interface Input {
   projectId: string;
   experimentId: string;
@@ -1222,15 +1222,15 @@ interface Input {
 type Output = z.infer<typeof experimentCopiedSchema>; // ../contract/src/experiment.responses.ts:120
 
 // experiments.getExperimentDSPyRuns
-// Input: inline, ../contract/src/experiment.trpc.ts:239
+// Input: inline, ../contract/src/experiment.trpc.ts:240
 interface Input {
   projectId: string;
   experimentSlug: string;
 }
-// Output: z.array(dSPyRunsSummarySchema) (inline, ../contract/src/experiment.trpc.ts:240)
+// Output: z.array(dSPyRunsSummarySchema) (inline, ../contract/src/experiment.trpc.ts:241)
 
 // experiments.getExperimentDSPyStep
-// Input: inline, ../contract/src/experiment.trpc.ts:244
+// Input: inline, ../contract/src/experiment.trpc.ts:245
 interface Input {
   projectId: string;
   experimentSlug: string;
@@ -1240,7 +1240,7 @@ interface Input {
 type Output = z.infer<typeof dSPyStepSchema>; // ../contract/src/experiment-legacy.ts:60
 
 // experiments.getExperimentBatchEvaluationRuns
-// Input: inline, ../contract/src/experiment.trpc.ts:257
+// Input: inline, ../contract/src/experiment.trpc.ts:258
 interface Input {
   projectId: string;
   experimentId: string;
@@ -1248,13 +1248,13 @@ interface Input {
 type Output = z.infer<typeof experimentRunListSchema>; // ../contract/src/experiment.responses.ts:111
 
 // experiments.getExperimentBatchEvaluationRun
-// Input: inline, ../contract/src/experiment.trpc.ts:268
+// Input: inline, ../contract/src/experiment.trpc.ts:269
 interface Input {
   projectId: string;
   experimentId: string;
   runId: string;
 }
-// Output: experimentRunWithItemsSchema.nullable() (inline, ../contract/src/experiment.trpc.ts:269)
+// Output: experimentRunWithItemsSchema.nullable() (inline, ../contract/src/experiment.trpc.ts:270)
 ```
 
 ## Sockets

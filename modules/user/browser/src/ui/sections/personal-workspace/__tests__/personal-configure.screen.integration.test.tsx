@@ -154,6 +154,7 @@ function personalContext(overrides: Partial<PersonalContext> = {}): PersonalCont
     personalProjectId: "proj_me",
     personalProjectSlug: "me",
     isPersonalProjectResolved: true,
+    isWorkspacePending: false,
     apiKeys: [],
     ...overrides,
   };

@@ -280,7 +280,7 @@ describe("given the GitHub installation routes", () => {
 
   describe("when the instance registered no GitHub App", () => {
     /**
-     * The session is an operation this handler calls, not a declared fact the
+     * The session is an operation this handler calls, not declared middleware context the
      * runtime resolves ahead of it, so an instance that cannot start a flow
      * answers without asking who is on the other end.
      */

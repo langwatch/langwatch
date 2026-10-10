@@ -121,8 +121,8 @@ import {
   type RestRawAnswer,
   type RestInputMediaType,
   type RestRawBody,
-  type RestTransportMiddlewareBinding,
-  type RestTransportMiddleware,
+  type MiddlewareContextBinding,
+  type MiddlewareContext,
 } from "./request.ts";
 import {
   isProducedAnswer,
@@ -151,7 +151,7 @@ const outputLogger = createLogger("langwatch:api:output-validation");
 const ROUTE_PARAMS = "routeParams" as const;
 const VERSION_REQUEST = "apiVersionRequest" as const;
 const ROUTE_INPUT = "endpointInput" as const;
-const ROUTE_HEADER_FACTS = "endpointHeaderFacts" as const;
+const ROUTE_HEADER_CONTEXT = "endpointHeaderContext" as const;
 const ROUTE_RAW_BODY = "endpointRawBody" as const;
 const ROUTE_BODY_SCOPE = "endpointBodyScope" as const;
 const ROUTE_FORM_FIELDS = "endpointFormFields" as const;
@@ -207,10 +207,10 @@ export type RestMountOptions<Api> = Readonly<{
   /** Applied under the family's paths before any route: the app container. */
   middleware?: readonly MiddlewareHandler[];
   /**
-   * One binding per fact the declaration's routes name. A declared fact with
-   * no binding here is refused at mount rather than reaching a handler unset.
+   * One binding per middleware context the declaration's routes name. A declared
+   * context with no binding here is refused at mount rather than reaching a handler unset.
    */
-  facts?: readonly RestTransportMiddlewareBinding[];
+  middlewareContext?: readonly MiddlewareContextBinding[];
   /** Why the door, rather than a middleware chain, is what enforces the route. */
   reason?: string;
 }>;
@@ -237,7 +237,7 @@ function mountFamilyRoutes<Api>({
   declaration,
   ports,
   options,
-  facts,
+  contexts,
   credential,
 }: {
   app: HonoApp;
@@ -245,7 +245,7 @@ function mountFamilyRoutes<Api>({
   declaration: RestTransportDeclaration<Api>;
   ports: RestRuntimeMembers;
   options: RestMountOptions<Api>;
-  facts: ReadonlyMap<string, RestTransportMiddlewareBinding>;
+  contexts: ReadonlyMap<string, MiddlewareContextBinding>;
   credential: Credential;
 }): Map<string, Set<HttpMethod>> {
   const served = new Map<string, Set<HttpMethod>>();
@@ -263,7 +263,7 @@ function mountFamilyRoutes<Api>({
           declaration,
           ports,
           options,
-          facts,
+          contexts,
           ...mount.context,
         }),
         policy: registryPolicy({ route, options, credential }),
@@ -328,7 +328,7 @@ export function createRestRuntime(ports: RestRuntimeMembers): RestRuntime {
       const basePath = basePathOf(declaration);
       const app = new Hono();
       const scopes = middlewareScopesOf(declaration);
-      const facts = factBindings({ declaration, options });
+      const contexts = contextBindings({ declaration, options });
       const credential = mountCredential({ declaration, options });
 
       assertSharedPaths(declaration);
@@ -348,13 +348,13 @@ export function createRestRuntime(ports: RestRuntimeMembers): RestRuntime {
         declaration,
         ports,
         options,
-        facts,
+        contexts,
         credential,
       });
 
       mountMethodGuards({ app, served });
 
-      if (dated) mountVersionGuards({ app, basePath, declaration, ports, options, facts });
+      if (dated) mountVersionGuards({ app, basePath, declaration, ports, options, contexts });
 
       app.onError(withRetryAfter(protocolRefusals(withLegacyError(options.onError))));
 
@@ -656,37 +656,39 @@ function assertCapabilityPorts({
 }
 
 /**
- * Every binding the declaration's facts need, checked once at mount. A fact
- * the mount did not bind is refused here, naming the fact and the route,
+ * Every binding the declaration's middleware context needs, checked once at mount. A
+ * context the module did not provide is refused here, naming it and the route,
  * rather than reaching a handler as an unset argument.
  */
-function factBindings<Api>({
+function contextBindings<Api>({
   declaration,
   options,
 }: {
   declaration: RestTransportDeclaration<Api>;
   options: RestMountOptions<Api>;
-}): ReadonlyMap<string, RestTransportMiddlewareBinding> {
+}): ReadonlyMap<string, MiddlewareContextBinding> {
   const bound = new Map(
-    (options.facts ?? []).map((binding) => [binding.middleware.name, binding] as const),
+    (options.middlewareContext ?? []).map(
+      (binding) => [binding.middlewareContext, binding] as const,
+    ),
   );
 
   for (const route of declaration.routes) {
-    for (const fact of route.middleware ?? []) {
-      if (fact.source === "headers") {
-        bound.set(fact.name, {
-          middleware: fact,
-          resolve: (context) => Object.fromEntries(context.req.raw.headers),
+    for (const declared of route.middleware ?? []) {
+      if (declared.source === "headers") {
+        bound.set(declared.name, {
+          middlewareContext: declared.name,
+          resolve: (request) => Object.fromEntries(request.headers),
         });
 
         continue;
       }
 
-      if (bound.has(fact.name)) continue;
+      if (bound.has(declared.name)) continue;
 
       throw new Error(
         `REST ${route.method.toUpperCase()} /api/${declaration.namespace}${route.path} declares ` +
-          `the fact "${fact.name}", and this mount bound no value for it`,
+          `the middleware context "${declared.name}", and its module provides no value for it`,
       );
     }
   }
@@ -703,7 +705,7 @@ function routeStack<Api>({
   declaration,
   ports,
   options,
-  facts,
+  contexts,
   version,
   status,
   paramSource = "route",
@@ -713,7 +715,7 @@ function routeStack<Api>({
   declaration: RestTransportDeclaration<Api>;
   ports: RestRuntimeMembers;
   options: RestMountOptions<Api>;
-  facts: ReadonlyMap<string, RestTransportMiddlewareBinding>;
+  contexts: ReadonlyMap<string, MiddlewareContextBinding>;
   version: string;
   status: VersionStatus;
   paramSource?: "route" | "context";
@@ -779,7 +781,7 @@ function routeStack<Api>({
     // The media type is asked after the door either way (E9): a missing credential answers 401.
     ...(doorReadsBody(route)
       ? [...cap, ...raw, door, ...media, ...refused]
-      : [door, ...credentialFacts({ route, facts }), ...media, ...refused, ...cap, ...raw]),
+      : [door, ...credentialContexts({ route, contexts }), ...media, ...refused, ...cap, ...raw]),
     ...(route.multipart
       ? [
           multipartMiddleware({
@@ -797,7 +799,7 @@ function routeStack<Api>({
       credential,
       ports,
       options,
-      facts,
+      contexts,
       family,
       version,
     }),
@@ -852,22 +854,22 @@ function authenticateMiddleware({
   };
 }
 
-/** A public route's facts read off the credential alone, resolved before the body (§8). */
-const earlyFacts = new WeakMap<Context, ReadonlyMap<string, unknown>>();
+/** A public route's middleware context, read off the credential alone before the body (§8). */
+const earlyContexts = new WeakMap<Context, ReadonlyMap<string, unknown>>();
 
 /**
  * Credential, then body, then what the body names (Alex, 2026-09-30): a public route's
- * credential facts refuse before its body is capped, parsed or validated. A capped door route
+ * credential context refuses before its body is capped, parsed or validated. A capped door route
  * resolves them here too, since the cap replaces the request its door recorded the credential on.
  */
-function credentialFacts({
+function credentialContexts({
   route,
-  facts,
+  contexts,
 }: {
   route: RestTransportRoute<unknown>;
-  facts: ReadonlyMap<string, RestTransportMiddlewareBinding>;
+  contexts: ReadonlyMap<string, MiddlewareContextBinding>;
 }): MiddlewareHandler[] {
-  const early = (route.middleware ?? []).filter((fact) => fact.source === undefined);
+  const early = (route.middleware ?? []).filter((declared) => declared.source === undefined);
 
   if (early.length === 0 || (route.access?.kind !== "public" && !route.bodyLimit)) return [];
 
@@ -875,11 +877,14 @@ function credentialFacts({
     async (context, next) => {
       const resolved = new Map<string, unknown>();
 
-      for (const fact of early) {
-        resolved.set(fact.name, await resolveBoundFact({ route, fact, facts, context }));
+      for (const declared of early) {
+        resolved.set(
+          declared.name,
+          await resolveBoundContext({ route, declared, contexts, context }),
+        );
       }
 
-      earlyFacts.set(context, resolved);
+      earlyContexts.set(context, resolved);
       await next();
     },
   ];
@@ -1332,7 +1337,7 @@ function handlerMiddleware<Api>({
   credential,
   ports,
   options,
-  facts,
+  contexts,
   family,
   version,
 }: {
@@ -1340,7 +1345,7 @@ function handlerMiddleware<Api>({
   credential: RestDoorCredential;
   ports: RestRuntimeMembers;
   options: RestMountOptions<Api>;
-  facts: ReadonlyMap<string, RestTransportMiddlewareBinding>;
+  contexts: ReadonlyMap<string, MiddlewareContextBinding>;
   family: string;
   version: string;
 }): MiddlewareHandler {
@@ -1360,7 +1365,7 @@ function handlerMiddleware<Api>({
           scope: null,
           target: null,
         }),
-        ...(await resolveFacts({ route, facts, context })),
+        ...(await resolveContexts({ route, contexts, context, input })),
       );
 
       return answerWith({ context, next, route, result });
@@ -1382,7 +1387,7 @@ function handlerMiddleware<Api>({
           scope: null,
           target: null,
         }),
-        ...(await resolveFacts({ route, facts, context })),
+        ...(await resolveContexts({ route, contexts, context, input })),
       );
 
       return answerWith({ context, next, route, result: anonymous });
@@ -1456,7 +1461,7 @@ function handlerMiddleware<Api>({
               session: sessionOf({ route, credential, caller }),
               key: keyOf({ route, credential, request: context.req.raw }),
             }),
-            ...(await resolveFacts({ route, facts, context })),
+            ...(await resolveContexts({ route, contexts, context, input })),
           ),
       });
 
@@ -1926,11 +1931,11 @@ function headerScopeInput(
   context: Context,
   target: Readonly<{ param: string; header: string }>,
 ): Record<string, unknown> {
-  const fact = route.middleware?.find((candidate) => candidate.source === "headers");
+  const declared = route.middleware?.find((candidate) => candidate.source === "headers");
 
-  if (!fact) throw new Error(`REST ${route.operation} has no declared header schema`);
+  if (!declared) throw new Error(`REST ${route.operation} has no declared header schema`);
 
-  const headers = resolveHeaderFact(fact, context);
+  const headers = resolveHeaderContext(declared, context);
 
   if (typeof headers !== "object" || headers === null)
     throw new Error(`REST ${route.operation} header schema returned no object`);
@@ -1980,18 +1985,18 @@ function pathScopeInput(
   return { [target.param]: Reflect.get(input, target.field) };
 }
 
-function resolveHeaderFact(fact: RestTransportMiddleware, context: Context): unknown {
+function resolveHeaderContext(declared: MiddlewareContext, context: Context): unknown {
   const cached: Map<string, unknown> =
-    context.get(ROUTE_HEADER_FACTS) ?? new Map<string, unknown>();
+    context.get(ROUTE_HEADER_CONTEXT) ?? new Map<string, unknown>();
 
-  if (cached.has(fact.name)) return cached.get(fact.name);
+  if (cached.has(declared.name)) return cached.get(declared.name);
 
-  const parsed = fact.schema.safeParse(Object.fromEntries(context.req.raw.headers.entries()));
+  const parsed = declared.schema.safeParse(Object.fromEntries(context.req.raw.headers.entries()));
 
   if (!parsed.success) throw requestValidationErrorFrom({ target: "header", error: parsed.error });
 
-  cached.set(fact.name, parsed.data);
-  context.set(ROUTE_HEADER_FACTS, cached);
+  cached.set(declared.name, parsed.data);
+  context.set(ROUTE_HEADER_CONTEXT, cached);
 
   return parsed.data;
 }
@@ -2256,57 +2261,64 @@ function requireAuthorize(door: RestIdentity): NonNullable<RestIdentity["authori
 }
 
 /**
- * The declared facts, in declaration order, each parsed by the schema that
+ * The declared middleware context, in declaration order, each parsed by the schema that
  * declared it. Resolved after the access decision, so a refused request never
  * asks the process for anything.
  */
-async function resolveFacts({
+async function resolveContexts({
   route,
-  facts,
+  contexts,
   context,
+  input,
 }: {
   route: RestTransportRoute<unknown>;
-  facts: ReadonlyMap<string, RestTransportMiddlewareBinding>;
+  contexts: ReadonlyMap<string, MiddlewareContextBinding>;
   context: Context;
+  input: unknown;
 }): Promise<unknown[]> {
   const resolved: unknown[] = [];
 
-  for (const fact of route.middleware ?? []) {
-    if (fact.source === "headers") {
-      resolved.push(resolveHeaderFact(fact, context));
+  for (const declared of route.middleware ?? []) {
+    if (declared.source === "headers") {
+      resolved.push(resolveHeaderContext(declared, context));
       continue;
     }
 
-    const early = earlyFacts.get(context);
+    const early = earlyContexts.get(context);
 
     resolved.push(
-      early?.has(fact.name)
-        ? early.get(fact.name)
-        : await resolveBoundFact({ route, fact, facts, context }),
+      early?.has(declared.name)
+        ? early.get(declared.name)
+        : await resolveBoundContext({ route, declared, contexts, context, input }),
     );
   }
 
   return resolved;
 }
 
-async function resolveBoundFact({
+async function resolveBoundContext({
   route,
-  fact,
-  facts,
+  declared,
+  contexts,
   context,
+  input,
 }: {
   route: RestTransportRoute<unknown>;
-  fact: RestTransportMiddleware;
-  facts: ReadonlyMap<string, RestTransportMiddlewareBinding>;
+  declared: MiddlewareContext;
+  contexts: ReadonlyMap<string, MiddlewareContextBinding>;
   context: Context;
+  /** The validated input, for a context declared `source: "input"`; absent before the body. */
+  input?: unknown;
 }): Promise<unknown> {
-  const binding = facts.get(fact.name);
+  const binding = contexts.get(declared.name);
 
   if (!binding) {
-    throw new Error(`REST ${route.operation} declares the fact "${fact.name}" and none is bound`);
+    throw new Error(
+      `REST ${route.operation} declares the middleware context "${declared.name}" and none is provided`,
+    );
   }
 
-  const parsed = fact.schema.safeParse(await binding.resolve(context));
+  const parsed = declared.schema.safeParse(await binding.resolve(context.req.raw, input));
 
   if (!parsed.success) throw parsed.error;
 
@@ -2655,17 +2667,17 @@ function mountVersionGuards<Api>({
   declaration,
   ports,
   options,
-  facts,
+  contexts,
 }: {
   app: Hono;
   basePath: string;
   declaration: RestTransportDeclaration<Api>;
   ports: RestRuntimeMembers;
   options: RestMountOptions<Api>;
-  facts: ReadonlyMap<string, RestTransportMiddlewareBinding>;
+  contexts: ReadonlyMap<string, MiddlewareContextBinding>;
 }): void {
   const namespace = VERSION_NAMESPACE;
-  const fallback = dateFallback({ basePath, declaration, ports, options, facts });
+  const fallback = dateFallback({ basePath, declaration, ports, options, contexts });
   const notFound: MiddlewareHandler = async (context, next) =>
     anotherFamilyServesTheVersion(context) ? next() : context.notFound();
 
@@ -2700,13 +2712,13 @@ function dateFallback<Api>({
   declaration,
   ports,
   options,
-  facts,
+  contexts,
 }: {
   basePath: string;
   declaration: RestTransportDeclaration<Api>;
   ports: RestRuntimeMembers;
   options: RestMountOptions<Api>;
-  facts: ReadonlyMap<string, RestTransportMiddlewareBinding>;
+  contexts: ReadonlyMap<string, MiddlewareContextBinding>;
 }): MiddlewareHandler {
   const candidates = declaration.routes.map((route) => ({
     methods: route.methods ?? [route.method],
@@ -2717,7 +2729,7 @@ function dateFallback<Api>({
       declaration,
       ports,
       options,
-      facts,
+      contexts,
       version: declaration.version,
       status: "stable",
       paramSource: "context",

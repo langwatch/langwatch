@@ -4,8 +4,8 @@
  * Spec: specs/identity/mfa-and-session-shape.feature.
  */
 import {
-  browserSessionFact,
-  defineTrpcFact,
+  browserSessionContext,
+  defineMiddlewareContext,
   defineTrpcRouter,
   type TrpcRouterDeclaration,
 } from "@langwatch/api/trpc";
@@ -19,7 +19,7 @@ const OWN_TWO_STEP =
   "the caller's own two-step verification, answered for the session's user id alone";
 
 /** The headers the request arrived with, bound by identity's own install, as auth's is. */
-export const twoStepRequestHeadersFact = defineTrpcFact(
+export const twoStepRequestHeadersContext = defineMiddlewareContext(
   "twoStepRequestHeaders",
   requestHeaderRecordSchema.nullable().transform((record) => record ?? {}),
 );
@@ -33,7 +33,7 @@ export const twoStepVerificationTrpcTransport: TrpcRouterDeclaration<
   .handle(({ app, actor }) => app.getTwoStepAccountStanding({ userId: actor.id }))
 
   .procedure("disable")
-  .withFacts(twoStepRequestHeadersFact)
+  .withMiddlewareContext(twoStepRequestHeadersContext)
   .noPermission({
     reason:
       "the caller turning off their own two-step verification, matched on the session's user id; the password and a current code are the proof",
@@ -48,7 +48,7 @@ export const twoStepVerificationTrpcTransport: TrpcRouterDeclaration<
   )
 
   .procedure("standing")
-  .withFacts(browserSessionFact)
+  .withMiddlewareContext(browserSessionContext)
   .noPermission({
     reason:
       "the caller asking whether an organization's second-factor requirement holds them; answered for the session's own user id, and the same shape for a member and a stranger",

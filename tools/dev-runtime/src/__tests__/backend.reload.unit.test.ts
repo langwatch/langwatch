@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   createReloadTrigger,
+  createRetrySchedule,
   invalidateModules,
   recycleReason,
   staleModuleIds,
@@ -114,6 +115,43 @@ describe("given the in-process host's recycle bounds", () => {
       expect(recycleReason({ generation: 1, rssMiB: 300, isDrainFailed: true, limits })).toBe(
         "generation 1 did not drain",
       );
+    });
+  });
+});
+
+describe("given a boot that failed", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  describe("when it keeps failing", () => {
+    /** @scenario "A failed boot retries on its own with a backoff" */
+    it("retries after 2 s, 5 s, 15 s, then every 30 s", async () => {
+      const retry = vi.fn();
+      const retries = createRetrySchedule({ retry });
+      const delays = Array.from({ length: 5 }, () => retries.failed());
+      expect(delays).toEqual([2_000, 5_000, 15_000, 30_000, 30_000]);
+      await vi.advanceTimersByTimeAsync(29_999);
+      expect(retry).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(1);
+      expect(retry).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("when a change arrives or a boot succeeds", () => {
+    /** @scenario "A failed boot retries on its own with a backoff" */
+    it("starts the schedule over and drops the pending retry", async () => {
+      const retry = vi.fn();
+      const retries = createRetrySchedule({ retry });
+      retries.failed();
+      retries.failed();
+      retries.reset();
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(retry).not.toHaveBeenCalled();
+      expect(retries.failed()).toBe(2_000);
     });
   });
 });

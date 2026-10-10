@@ -17,17 +17,17 @@ export const CONTROL_CONNECT_PATH = "/api/v1/langy/control/connect";
 
 const MAX_FRAME_BYTES = 8 * 1024 * 1024;
 
-const noFacts = z.object({});
+const noContext = z.object({});
 
 export function createLangyLocalControlWebSocketProtocol(): WebSocketProtocol<
   LangyApi,
-  typeof noFacts,
+  typeof noContext,
   typeof localControlCredentialSchema
 > {
   return WebSocketProtocol.create({
     path: CONTROL_CONNECT_PATH,
     maxPayloadBytes: MAX_FRAME_BYTES,
-    facts: noFacts,
+    middlewareContext: noContext,
     headers: {},
     door: { credential: "session_key", session: localControlCredentialSchema },
     handle: (

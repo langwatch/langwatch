@@ -321,6 +321,31 @@ Feature: The local development process topology
     Then the new api keeps serving and the worker's failure is logged by name
     And the next code change retries the boot
 
+  # --- A half that fails to boot is loud and retried (Alex, 2026-10-10) ---
+
+  # A worker that threw on boot used to drain the api too, so every page was a
+  # bare 502 until the next file change. Now the api keeps serving and says why.
+  @unit
+  Scenario: A worker that fails to boot never takes the api down
+    Given the backend launcher booting the api and the worker
+    When the worker throws while booting
+    Then the api keeps serving and the worker's failure is a fatal record naming it
+    And every app page carries a banner naming the worker, its error and when it retries
+    And the banner is gone once a retry boots the worker
+
+  @unit
+  Scenario: A backend that cannot serve answers every request with why
+    Given the in-process host holding API_PORT with no api serving after a failed boot
+    When a browser asks for a page
+    Then it gets a 503 page naming the half, the error message and stack, the retry time and "haven logs api"
+    And an API request gets a JSON 503 with the same fields
+
+  @unit
+  Scenario: A failed boot retries on its own with a backoff
+    Given a backend boot that failed
+    Then it is retried after 2 seconds, 5 seconds, 15 seconds and then every 30 seconds
+    And a code change or a boot that succeeds starts the schedule over
+
   # --- One mode switch, and a still stack reloads on demand (ADR-064 amendment 2026-10-10 b) ---
 
   # `haven up` is still: nothing reloads on a file change, and the Node host

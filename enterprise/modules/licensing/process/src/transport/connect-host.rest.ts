@@ -5,12 +5,7 @@
  * The `licence_token` door verifies the bearer before the body; refusals keep their codes.
  */
 import { anyAuthenticated } from "@langwatch/api/access";
-import {
-  defineRestRouter,
-  LicenceTokenIdentity,
-  MANAGEMENT_API_VERSION,
-  type RestDoor,
-} from "@langwatch/api/rest";
+import { defineRestDoor, defineRestRouter, MANAGEMENT_API_VERSION } from "@langwatch/api/rest";
 import {
   connectActivationAnswerSchema,
   connectActivationCallerSchema,
@@ -35,28 +30,19 @@ const SYNC_MAX_BODY_BYTES = 4 * 1024;
 /** An activation carries its code in a header, so its body is empty. */
 const ACTIVATE_MAX_BODY_BYTES = 1024;
 
-/** The two checks behind the door: an activation code on the activate path, else a licence token. */
-export type ConnectBearerVerifiers = Pick<
-  LicensingApi,
-  "verifyLicenceToken" | "verifyActivationCode"
->;
+/** An activation code on the activate path, else a licence token; the framework hands the bearer. */
+export const connectHostDoor = defineRestDoor("licence_token", {
+  needs: LicensingApi,
+  identify: async ({ bearer, instanceId, path }, licensing) => {
+    const presented = { bearer, instanceId: instanceId ?? undefined };
+    const caller =
+      path === ACTIVATE_PATH
+        ? await licensing.verifyActivationCode(presented)
+        : await licensing.verifyLicenceToken(presented);
 
-export function connectHostDoor(verifiers: ConnectBearerVerifiers): RestDoor {
-  return LicenceTokenIdentity.create({
-    verify: async ({ authorization, instanceId, path }) => {
-      const presented = {
-        authorization: authorization ?? undefined,
-        instanceId: instanceId ?? undefined,
-      };
-      const caller =
-        path === ACTIVATE_PATH
-          ? await verifiers.verifyActivationCode(presented)
-          : await verifiers.verifyLicenceToken(presented);
-
-      return { organizationId: caller.organizationId, session: caller };
-    },
-  });
-}
+    return { scope: { tier: "organization", id: caller.organizationId }, session: caller };
+  },
+});
 
 export const connectHostRest = defineRestRouter(LicensingApi)
   .withNamespace("connect-host")

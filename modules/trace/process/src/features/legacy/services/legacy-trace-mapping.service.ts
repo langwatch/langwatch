@@ -1,3 +1,4 @@
+import type { Authorization } from "@langwatch/authorization";
 import type { RetentionDaysProvider } from "@langwatch/clickhouse-client";
 import type {
   GetAllTracesForProjectInput,
@@ -72,11 +73,13 @@ export class LegacyTraceMappingService {
   /** @param opts.resolveBlobs resolves offloaded IO. */
   async findTracesWithSpans({
     projectId,
+    authorization,
     traceIds,
     protections,
     occurredAt,
     opts,
   }: {
+    authorization: Authorization;
     projectId: string;
     traceIds: string[];
     protections: Protections;
@@ -84,6 +87,7 @@ export class LegacyTraceMappingService {
     opts?: { resolveBlobs?: boolean | undefined };
   }): Promise<Trace[]> {
     const rows = await this.repository.findTracesWithSpans({
+      authorization,
       projectId,
       traceIds,
       occurredAt,
@@ -99,17 +103,20 @@ export class LegacyTraceMappingService {
   }
 
   async findTracesByThreadId({
+    authorization,
     projectId,
     threadId,
     protections,
     opts,
   }: {
+    authorization: Authorization;
     projectId: string;
     threadId: string;
     protections: Protections;
     opts?: { resolveBlobs?: boolean | undefined };
   }): Promise<Trace[]> {
     const rows = await this.repository.findTracesByThreadId({
+      authorization,
       projectId,
       threadId,
       retentionDays: this.retentionDays,
@@ -126,17 +133,20 @@ export class LegacyTraceMappingService {
 
   /** @param opts.maxTraces traces the read may return across every thread asked for. */
   async findTracesWithSpansByThreadIds({
+    authorization,
     projectId,
     threadIds,
     protections,
     opts,
   }: {
+    authorization: Authorization;
     projectId: string;
     threadIds: string[];
     protections: Protections;
     opts?: { resolveBlobs?: boolean | undefined; maxTraces?: number | undefined };
   }): Promise<Trace[]> {
     const rows = await this.repository.findTracesWithSpansByThreadIds({
+      authorization,
       projectId,
       threadIds,
       maxTraces: opts?.maxTraces,
@@ -155,7 +165,7 @@ export class LegacyTraceMappingService {
   async listAllTracesForProject(
     input: GetAllTracesForProjectInput,
     protections: Protections,
-    options: GetAllTracesForProjectOptions = {},
+    { ownRead, ...options }: GetAllTracesForProjectOptions & { ownRead: Authorization },
   ): Promise<TracesForProjectResult> {
     const projectId = input.projectId;
     const { summaries, spans, evaluations, events, annotations, totalHits, scrollId, ...rest } =
@@ -164,6 +174,7 @@ export class LegacyTraceMappingService {
         protections,
         options,
         retentionDays: this.retentionDays,
+        ownRead,
       });
 
     const fetched = summaries.map((summary) =>

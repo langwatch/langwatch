@@ -5,7 +5,7 @@
  * Spec: modules/ops/specs/upgrades.feature
  */
 import {
-  bindTrpcFact,
+  bindTrpcMiddlewareContext,
   createTrpcRuntime,
   TrpcRootDefinition,
   type TrpcProcedureFactory,
@@ -23,7 +23,7 @@ import { MemoryOpsRepositories } from "../../repositories/memory/memory.ops.repo
 import { MemoryUpgradeLedgerRepository } from "../../repositories/memory/memory.upgrade-ledger.repository.ts";
 import type { SystemMigrationsServiceDependencies } from "../../rules/system-migration-support.rules.ts";
 import { statusOf, stepOf } from "../../services/__tests__/support/upgrade-ledger.ts";
-import { opsOperatorFact } from "../ops-operator.trpc.ts";
+import { opsOperatorContext } from "../ops-operator.trpc.ts";
 import { opsUpgradeTrpcTransport } from "../ops-upgrade.trpc.ts";
 import { opsTrpcMembers, type OpsTrpcTestContext } from "./ops.trpc.harness.ts";
 
@@ -132,7 +132,9 @@ function mount({
     procedure: root.procedure,
     members: opsTrpcMembers({ holders }),
   }).mount(opsUpgradeTrpcTransport, () => app, {
-    facts: [bindTrpcFact(opsOperatorFact, (ctx: OpsTrpcTestContext) => ctx.operator)],
+    middlewareContext: [
+      bindTrpcMiddlewareContext(opsOperatorContext, (ctx: OpsTrpcTestContext) => ctx.operator),
+    ],
   });
 
   return {

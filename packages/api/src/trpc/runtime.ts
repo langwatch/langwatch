@@ -17,7 +17,13 @@ import {
   type ProofBearingPermission,
 } from "@langwatch/authorization";
 import { HandledError, isZodLikeError, ValidationError } from "@langwatch/handled-error";
-import type { ModuleApiToken, TrpcContract, TrpcContractMember } from "@langwatch/module";
+import {
+  defineMiddlewareContext,
+  type MiddlewareContext,
+  type ModuleApiToken,
+  type TrpcContract,
+  type TrpcContractMember,
+} from "@langwatch/module";
 import { createLogger, validationMeta, type RequestContext } from "@langwatch/observability";
 import { runWithContext } from "@langwatch/observability/context";
 import { nowInstant } from "@langwatch/time";
@@ -213,48 +219,46 @@ export async function parseGovernedOutput<TSchema extends z.ZodType>(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Declared facts: what a procedure asks the PROCESS for beyond its own input, bound once at
-// the mount — the same split REST makes, so nothing a caller sends can stand in for a fact
-// and no handler reaches for the request itself.
+// Declared middleware context: what a procedure asks the PROCESS for beyond its own input,
+// bound once at the mount — the same split REST makes, so nothing a caller sends can stand in
+// for it and no handler reaches for the request itself.
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** One fact: the name a mount binds it by, and the schema its value is parsed with. */
-export interface TrpcFact<Schema extends z.ZodType = z.ZodType> {
-  readonly name: string;
-  readonly schema: Schema;
-}
-
-export function defineTrpcFact<Schema extends z.ZodType>(
-  name: string,
-  schema: Schema,
-): TrpcFact<Schema> {
-  return Object.freeze({ name, schema });
-}
-
-/** Where one fact's value comes from, as this process's mount reads it. */
-export interface TrpcFactBinding<TContext = never> {
-  readonly fact: TrpcFact;
-  resolve(ctx: TContext): unknown;
+/** Where one middleware context's value comes from, as this process's mount reads it. */
+export interface TrpcMiddlewareContextBinding<
+  TContext = never,
+  Name extends string = string,
+  Value = unknown,
+> {
+  readonly trpcMiddlewareContext: MiddlewareContext<Name>;
+  resolve(ctx: TContext): Value | Promise<Value>;
 }
 
 /** A mount binds request access; handlers receive only the parsed result. */
-export function bindTrpcFact<Schema extends z.ZodType, TContext>(
-  fact: TrpcFact<Schema>,
+export function bindTrpcMiddlewareContext<
+  const Name extends string,
+  Schema extends z.ZodType,
+  TContext,
+>(
+  context: MiddlewareContext<Name, Schema>,
   resolve: (ctx: TContext) => z.input<Schema> | Promise<z.input<Schema>>,
-): TrpcFactBinding<TContext> {
-  return { fact, resolve };
+): TrpcMiddlewareContextBinding<TContext, Name, z.input<Schema>> {
+  return { trpcMiddlewareContext: context, resolve };
 }
 
 /**
- * The twin of REST's `bindRestHeader`: the mount names the header, so which
+ * The twin of REST's `bindMiddlewareContext`: the mount names the header, so which
  * proxy header this deployment trusts is the process's answer and not a
  * feature's. A header the request did not carry resolves to null.
  */
-export function bindTrpcHeader<Schema extends z.ZodType>(
-  fact: TrpcFact<Schema>,
+export function bindTrpcHeader<const Name extends string, Schema extends z.ZodType>(
+  context: MiddlewareContext<Name, Schema>,
   header: string,
-): TrpcFactBinding<TrpcRuntimeContext> {
-  return { fact, resolve: (ctx) => headerValue(ctx.req?.headers[header]) };
+): TrpcMiddlewareContextBinding<TrpcRuntimeContext, Name, string | null> {
+  return {
+    trpcMiddlewareContext: context,
+    resolve: (ctx) => headerValue(ctx.req?.headers[header]),
+  };
 }
 
 function headerValue(value: string | readonly string[] | undefined): string | null {
@@ -264,14 +268,17 @@ function headerValue(value: string | readonly string[] | undefined): string | nu
 }
 
 /**
- * The browser session row this request arrived on. A fact, not part of the
+ * The browser session row this request arrived on. Middleware context, not part of the
  * actor: one person on two tabs is one actor and two sessions, so "end every
  * session but this one" is a question about the request, not about who asked.
  */
-export const browserSessionFact = defineTrpcFact("browserSession", z.string().nullable());
+export const browserSessionContext = defineMiddlewareContext(
+  "browserSession",
+  z.string().nullable(),
+);
 
 /** Where the request came from, as the process's own mount reads the address. */
-export const callerAddressFact = defineTrpcFact("callerAddress", z.string().nullable());
+export const callerAddressContext = defineMiddlewareContext("callerAddress", z.string().nullable());
 
 // The server half of a tRPC contract: `.procedure(name)` selects a declared member and
 // inherits its kind, parser, and answer (see transport-declaration-split.feature)
@@ -309,9 +316,9 @@ type HandlerArgumentsFor<Caller extends TrpcCallerKind, Input, App> = Caller ext
     ? TrpcContractHandlerArguments<Input, App> & Readonly<{ authorization: Authorization }>
     : TrpcContractHandlerArguments<Input, App>;
 
-/** The facts a handler is handed beside its input, in the order it declared them. */
-type TrpcFactValues<Facts extends readonly TrpcFact[]> = {
-  [Index in keyof Facts]: z.output<Facts[Index]["schema"]>;
+/** The middleware context a handler is handed beside its input, in declaration order. */
+type TrpcMiddlewareContextValues<Contexts extends readonly MiddlewareContext[]> = {
+  [Index in keyof Contexts]: z.output<Contexts[Index]["schema"]>;
 };
 
 type ValueResult<Output extends z.ZodType> = z.input<Output> | Promise<z.input<Output>>;
@@ -382,8 +389,8 @@ export type TrpcProcedureRequest<TContext extends object> = Readonly<{
   /** Present exactly when the module hears of a caller its door refused (Q51). */
   onRefused?: TrpcRefusalHook<unknown, unknown>;
   /** What the procedure asks the process for; the mount binds each one. */
-  facts: readonly TrpcFact[];
-  handle(args: never, ...facts: never[]): unknown;
+  contexts: readonly MiddlewareContext[];
+  handle(args: never, ...contexts: never[]): unknown;
   app(ctx: TContext): unknown;
 }>;
 
@@ -467,16 +474,16 @@ export interface TrpcRouterAccess<
   Contract extends TrpcContract,
   Implemented extends string,
   Name extends keyof Contract["members"] & string,
-  Facts extends readonly TrpcFact[],
+  Contexts extends readonly MiddlewareContext[],
 > {
   /**
    * What this procedure needs the process to resolve, beside its own input:
    * the address the caller reached us at, the session row it arrived on. Each
    * one is bound at the mount, and reaches the handler after its arguments.
    */
-  withFacts<const Added extends readonly TrpcFact[]>(
-    ...facts: Added
-  ): TrpcRouterAccess<Api, Contract, Implemented, Name, [...Facts, ...Added]>;
+  withMiddlewareContext<const Added extends readonly MiddlewareContext[]>(
+    ...contexts: Added
+  ): TrpcRouterAccess<Api, Contract, Implemented, Name, [...Contexts, ...Added]>;
   /**
    * What the tenant must hold beside the permission, asked after access at the scope it
    * resolved (refused access never reaches the plan). `feature` is named on the refusal;
@@ -485,7 +492,7 @@ export interface TrpcRouterAccess<
   withEntitlement(
     entitlement: ApiEntitlement,
     options?: Omit<EntitlementOptions, "before">,
-  ): TrpcRouterAccess<Api, Contract, Implemented, Name, Facts>;
+  ): TrpcRouterAccess<Api, Contract, Implemented, Name, Contexts>;
   /**
    * The procedure mints a credential (a key, token or secret). The runtime refuses it with
    * PermissionDeniedError naming `permission` whenever the actor carries an impersonatorId,
@@ -493,25 +500,25 @@ export interface TrpcRouterAccess<
    */
   mintsCredential(
     permission: AuthzPermission,
-  ): TrpcRouterAccess<Api, Contract, Implemented, Name, Facts>;
+  ): TrpcRouterAccess<Api, Contract, Implemented, Name, Contexts>;
   /**
    * The mutation writes under its project although its permission is exempt from the aggregate
    * write guard, so the door refuses it on an aggregate (ADR-177 decision 8). Refused on a query.
    */
-  refusedOnAggregate(): TrpcRouterAccess<Api, Contract, Implemented, Name, Facts>;
+  refusedOnAggregate(): TrpcRouterAccess<Api, Contract, Implemented, Name, Contexts>;
   /**
    * The mutation's audit row names the organization holding the scope its `via` input field
    * names, as its organization and its target. Refused on a query, twice, for a field the input
    * does not carry, and on a procedure that runs with no caller.
    */
-  withAudit(target: TrpcAuditTarget): TrpcRouterAccess<Api, Contract, Implemented, Name, Facts>;
+  withAudit(target: TrpcAuditTarget): TrpcRouterAccess<Api, Contract, Implemented, Name, Contexts>;
   /**
    * What the module does when the door refuses a caller: handed the parsed input and the caller,
    * awaited before the refusal is answered unchanged; a hook that throws fails the call.
    */
   onRefused(
     hook: TrpcRefusalHook<Api, z.output<Contract["members"][Name]["input"]>>,
-  ): TrpcRouterAccess<Api, Contract, Implemented, Name, Facts>;
+  ): TrpcRouterAccess<Api, Contract, Implemented, Name, Contexts>;
   /**
    * The permission the parsed input chooses (`permissionBy`): its map names every value the
    * field holds. A bare entry is asked at `via`'s scope, an entry with a tier at its own field.
@@ -520,19 +527,19 @@ export interface TrpcRouterAccess<
   withPermission(
     permission: ProofBearingPermission,
     options?: { via: ScopeTierField },
-  ): TrpcRouterImplementation<Api, Contract, Implemented, Name, Facts, "proven">;
+  ): TrpcRouterImplementation<Api, Contract, Implemented, Name, Contexts, "proven">;
   withPermission<const Choice extends InputPermission>(
     choice: Choice & ExactInputPermission<z.output<Contract["members"][Name]["input"]>, Choice>,
     options?: { via: ScopeTierField },
-  ): TrpcRouterImplementation<Api, Contract, Implemented, Name, Facts, "authenticated">;
+  ): TrpcRouterImplementation<Api, Contract, Implemented, Name, Contexts, "authenticated">;
   withPermission(
     access: AuthzPermission | AuthzDeclaration,
-  ): TrpcRouterImplementation<Api, Contract, Implemented, Name, Facts, "authenticated">;
+  ): TrpcRouterImplementation<Api, Contract, Implemented, Name, Contexts, "authenticated">;
   /** One permission, asked at the scope the named input field holds. */
   withPermission(
     permission: AuthzPermission,
     options: { via: ScopeTierField },
-  ): TrpcRouterImplementation<Api, Contract, Implemented, Name, Facts, "authenticated">;
+  ): TrpcRouterImplementation<Api, Contract, Implemented, Name, Contexts, "authenticated">;
   /**
    * A platform-tier permission, asked of the operator's PLATFORM grant before the handler (E4);
    * `hidden` answers NOT_FOUND to every caller it refuses, an anonymous one included.
@@ -540,7 +547,7 @@ export interface TrpcRouterAccess<
   withPermission<P extends PlatformTierPermission>(
     permission: P,
     options: PlatformPermissionTarget,
-  ): TrpcRouterImplementation<Api, Contract, Implemented, Name, Facts, "authenticated">;
+  ): TrpcRouterImplementation<Api, Contract, Implemented, Name, Contexts, "authenticated">;
   /**
    * Every one of them, asked before the handler at the one scope the input
    * names. Naming an array is what says AND; a single permission is declared
@@ -549,7 +556,7 @@ export interface TrpcRouterAccess<
   withPermission(
     permissions: readonly [AuthzPermission, AuthzPermission, ...AuthzPermission[]],
     options?: { via: ScopeTierField },
-  ): TrpcRouterImplementation<Api, Contract, Implemented, Name, Facts, "authenticated">;
+  ): TrpcRouterImplementation<Api, Contract, Implemented, Name, Contexts, "authenticated">;
   /**
    * Runs with no caller at all: the sign-up that predates the account it
    * creates. `publicRoute({ reason })` is the same declaration REST writes,
@@ -557,20 +564,20 @@ export interface TrpcRouterAccess<
    */
   withAccess(
     access: PublicRouteAccess,
-  ): TrpcRouterImplementation<Api, Contract, Implemented, Name, Facts, "anonymous">;
+  ): TrpcRouterImplementation<Api, Contract, Implemented, Name, Contexts, "anonymous">;
   /** Authenticated and deliberately unchecked, with the reason it needs none. */
   noPermission(declaration: {
     reason: string;
     allow?: Record<string, string>;
     /** Exempt from the second-factor gate: the read a held member recovers through. */
     mfaRecovery?: Readonly<{ reason: string }>;
-  }): TrpcRouterImplementation<Api, Contract, Implemented, Name, Facts, "authenticated">;
+  }): TrpcRouterImplementation<Api, Contract, Implemented, Name, Contexts, "authenticated">;
   /** The handler proves standing itself; `enforces` records which fields it covers. */
   serviceAuthorized(declaration: {
     reason: string;
     permissions: readonly AuthzPermission[];
     enforces?: EnforcedScopeFields;
-  }): TrpcRouterImplementation<Api, Contract, Implemented, Name, Facts, "authenticated">;
+  }): TrpcRouterImplementation<Api, Contract, Implemented, Name, Contexts, "authenticated">;
 }
 
 /** The handler, over the contract's parsed input and declared answer. */
@@ -579,13 +586,13 @@ export interface TrpcRouterImplementation<
   Contract extends TrpcContract,
   Implemented extends string,
   Name extends keyof Contract["members"] & string,
-  Facts extends readonly TrpcFact[] = [],
+  Contexts extends readonly MiddlewareContext[] = [],
   Caller extends TrpcCallerKind = "authenticated",
 > {
   handle(
     handler: (
       args: HandlerArgumentsFor<Caller, z.output<Contract["members"][Name]["input"]>, Api>,
-      ...facts: TrpcFactValues<Facts>
+      ...contexts: TrpcMiddlewareContextValues<Contexts>
     ) => DeclaredResult<Contract["members"][Name]>,
   ): TrpcRouterBuilder<Api, Contract, Implemented | Name>;
 }
@@ -597,8 +604,8 @@ type Implementation = Readonly<{
   refusedOnAggregate?: true;
   audit?: TrpcAuditTarget;
   onRefused?: TrpcRefusalHook<unknown, unknown>;
-  facts: readonly TrpcFact[];
-  handle(args: never, ...facts: never[]): unknown;
+  contexts: readonly MiddlewareContext[];
+  handle(args: never, ...contexts: never[]): unknown;
 }>;
 
 function mountRouter<Api, Contract extends TrpcContract>(
@@ -638,7 +645,7 @@ type PermissionArgument =
   | InputPermission
   | readonly AuthzPermission[];
 
-/** What a selected procedure has declared beside its facts, before its access. */
+/** What a selected procedure has declared beside its middleware context, before its access. */
 type ProcedureMarks = Readonly<{
   entitlement?: EntitlementGate;
   mintsCredential?: AuthzPermission;
@@ -711,8 +718,12 @@ function routerBuilder<Api, Contract extends TrpcContract, Implemented extends s
   contract: Contract,
   implementations: ReadonlyMap<string, Implementation>,
 ): TrpcRouterBuilder<Api, Contract, Implemented> {
-  /** One selected procedure, with the facts it has named so far. */
-  const selected = (name: string, facts: readonly TrpcFact[], marks: ProcedureMarks = {}) => {
+  /** One selected procedure, with the middleware context it has named so far. */
+  const selected = (
+    name: string,
+    contexts: readonly MiddlewareContext[],
+    marks: ProcedureMarks = {},
+  ) => {
     const { entitlement } = marks;
     const implement = (access: TrpcAccess) => {
       assertRefusable({ contract, name, access, onRefused: marks.onRefused });
@@ -722,42 +733,45 @@ function routerBuilder<Api, Contract extends TrpcContract, Implemented extends s
           routerBuilder(
             api,
             contract,
-            new Map(implementations).set(name, { access, facts, handle, ...marks }),
+            new Map(implementations).set(name, { access, contexts, handle, ...marks }),
           ),
       };
     };
 
     return {
-      withFacts: (...added: readonly TrpcFact[]) => {
-        assertFactsDistinct({ contract, name, facts: [...facts, ...added] });
+      withMiddlewareContext: (...added: readonly MiddlewareContext[]) => {
+        assertContextsDistinct({ contract, name, contexts: [...contexts, ...added] });
 
-        return selected(name, [...facts, ...added], marks);
+        return selected(name, [...contexts, ...added], marks);
       },
       withEntitlement: (named: ApiEntitlement, options: EntitlementOptions = {}) => {
         assertSingleEntitlement({ contract, name, entitlement });
 
         assertNoPlanFirst({ address: `tRPC ${contract.namespace}.${name}`, options });
 
-        return selected(name, facts, { ...marks, entitlement: { entitlement: named, ...options } });
+        return selected(name, contexts, {
+          ...marks,
+          entitlement: { entitlement: named, ...options },
+        });
       },
       mintsCredential: (permission: AuthzPermission) =>
-        selected(name, facts, { ...marks, mintsCredential: permission }),
+        selected(name, contexts, { ...marks, mintsCredential: permission }),
       refusedOnAggregate: () => {
         assertRefusableOnAggregate({ contract, name, declared: marks.refusedOnAggregate });
 
-        return selected(name, facts, { ...marks, refusedOnAggregate: true });
+        return selected(name, contexts, { ...marks, refusedOnAggregate: true });
       },
       onRefused: (hook: TrpcRefusalHook<unknown, unknown>) => {
         if (marks.onRefused) {
           throw new Error(`tRPC ${contract.namespace}.${name} declares onRefused twice`);
         }
 
-        return selected(name, facts, { ...marks, onRefused: hook });
+        return selected(name, contexts, { ...marks, onRefused: hook });
       },
       withAudit: (target: TrpcAuditTarget) => {
         assertAuditTarget({ contract, name, target, declared: marks.audit });
 
-        return selected(name, facts, {
+        return selected(name, contexts, {
           ...marks,
           audit: { target: target.target, via: target.via },
         });
@@ -1030,20 +1044,20 @@ function assertAnonymousProcedure({
   }
 }
 
-/** Two facts of one name would reach the handler as one argument twice. */
-function assertFactsDistinct({
+/** Two contexts of one name would reach the handler as one argument twice. */
+function assertContextsDistinct({
   contract,
   name,
-  facts,
+  contexts,
 }: {
   contract: TrpcContract;
   name: string;
-  facts: readonly TrpcFact[];
+  contexts: readonly MiddlewareContext[];
 }): void {
-  const names = facts.map((fact) => fact.name);
+  const names = contexts.map((declared) => declared.name);
 
   if (new Set(names).size !== names.length) {
-    throw new Error(`tRPC ${contract.namespace}.${name} declares one fact twice`);
+    throw new Error(`tRPC ${contract.namespace}.${name} declares one middleware context twice`);
   }
 }
 
@@ -1145,8 +1159,8 @@ export type TrpcRuntimeMembers<TContext> = Readonly<{
 
 /** What one mount supplies beyond the application slice. */
 export type TrpcMountOptions<TContext> = Readonly<{
-  /** One binding per fact the mounted declaration's procedures name. */
-  facts?: readonly TrpcFactBinding<TContext>[];
+  /** One binding per middleware context the mounted declaration's procedures name. */
+  middlewareContext?: readonly TrpcMiddlewareContextBinding<TContext>[];
 }>;
 
 /** Mounts declared namespaces on one process's root. */
@@ -1199,10 +1213,10 @@ export function createTrpcRuntime<
 
   const build = (
     request: TrpcProcedureRequest<TContext>,
-    bound: ReadonlyMap<string, TrpcFactBinding<TContext>>,
+    bound: ReadonlyMap<string, TrpcMiddlewareContextBinding<TContext>>,
   ): unknown => {
     const anonymous = request.access.kind === "public";
-    const facts = boundFacts({ request, bound });
+    const contexts = boundContexts({ request, bound });
 
     // The parser FIRST, then the check: a check installed ahead of `.input()`
     // reads `undefined` and silently authorizes nothing.
@@ -1218,7 +1232,7 @@ export function createTrpcRuntime<
           procedure: request.procedure,
           kind: request.member.kind,
           app: request.app,
-          facts,
+          contexts,
           ...(request.entitlement ? { entitlement: request.entitlement } : {}),
           ...(request.mintsCredential ? { mintsCredential: request.mintsCredential } : {}),
           refusedOnAggregate: request.refusedOnAggregate === true,
@@ -1260,7 +1274,7 @@ export function createTrpcRuntime<
       declaration.router(
         {
           procedure: (request: TrpcProcedureRequest<TContext>) =>
-            build(request, factBindings(declaration.namespace, options)),
+            build(request, contextBindings(declaration.namespace, options)),
           router,
         },
         app,
@@ -1268,46 +1282,49 @@ export function createTrpcRuntime<
   };
 }
 
-/** The bindings this mount supplied, by the fact name each one answers for. */
-function factBindings<TContext>(
+/** The bindings this mount supplied, by the context name each one answers for. */
+function contextBindings<TContext>(
   namespace: unknown,
   options: TrpcMountOptions<TContext> | undefined,
-): ReadonlyMap<string, TrpcFactBinding<TContext>> {
-  const facts = options?.facts ?? [];
+): ReadonlyMap<string, TrpcMiddlewareContextBinding<TContext>> {
+  const contexts = options?.middlewareContext ?? [];
 
-  facts.forEach((binding, index) => {
-    if (!binding?.fact?.name) {
+  contexts.forEach((binding, index) => {
+    if (!binding?.trpcMiddlewareContext?.name) {
       throw new Error(
-        `Namespace "${String(namespace)}" binds a fact that is undefined at index ${index} of ${facts.length} - a circular import in the module that declares it usually explains this.`,
+        `Namespace "${String(namespace)}" binds a middleware context that is undefined at index ${index} of ${contexts.length} - a circular import in the module that declares it usually explains this.`,
       );
     }
   });
 
-  return new Map(facts.map((binding) => [binding.fact.name, binding] as const));
+  return new Map(contexts.map((binding) => [binding.trpcMiddlewareContext.name, binding] as const));
 }
 
 /**
- * Every fact the procedure declared, paired with the binding that answers it.
- * A fact the mount bound no value for is refused here, naming the fact and the
+ * Every middleware context the procedure declared, paired with the binding that answers
+ * it. One the mount bound no value for is refused here, naming the context and the
  * procedure, rather than reaching a handler as an unset argument.
  */
-function boundFacts<TContext extends object>({
+function boundContexts<TContext extends object>({
   request,
   bound,
 }: {
   request: TrpcProcedureRequest<TContext>;
-  bound: ReadonlyMap<string, TrpcFactBinding<TContext>>;
-}): readonly Readonly<{ fact: TrpcFact; binding: TrpcFactBinding<TContext> }>[] {
-  return request.facts.map((fact) => {
-    const binding = bound.get(fact.name);
+  bound: ReadonlyMap<string, TrpcMiddlewareContextBinding<TContext>>;
+}): readonly Readonly<{
+  declared: MiddlewareContext;
+  binding: TrpcMiddlewareContextBinding<TContext>;
+}>[] {
+  return request.contexts.map((declared) => {
+    const binding = bound.get(declared.name);
 
     if (!binding) {
       throw new Error(
-        `tRPC ${request.procedure} declares the fact "${fact.name}", and this mount bound no value for it`,
+        `tRPC ${request.procedure} declares the middleware context "${declared.name}", and this mount bound no value for it`,
       );
     }
 
-    return { fact, binding };
+    return { declared, binding };
   });
 }
 
@@ -1365,12 +1382,12 @@ type HandlerArguments = Readonly<{
 }>;
 
 /**
- * What the access step establishes: the handler's own arguments, and the facts
- * it declared, resolved after the decision so a refused request never asks the
+ * What the access step establishes: the handler's own arguments, and the middleware
+ * context it declared, resolved after the decision so a refused request never asks the
  * process for anything.
  */
 type ResolvedAccess = Omit<HandlerArguments, "input" | "signal"> &
-  Readonly<{ facts: readonly unknown[] }>;
+  Readonly<{ contexts: readonly unknown[] }>;
 
 /**
  * The resolver's own options. `handlerArguments` is written onto the context by
@@ -1384,9 +1401,9 @@ type ResolverOptions = Readonly<{
 }>;
 
 /**
- * The access step: the one check, run on the validated input, writing the facts the handler
- * is handed. A procedure that ran no check cannot exist — every mounted procedure carries
- * this middleware, and the machine-readable declaration the router sweep reads back off it.
+ * The access step: the one check, run on the validated input, writing the middleware context
+ * the handler is handed. A procedure that ran no check cannot exist — every mounted procedure
+ * carries this middleware, and the machine-readable declaration the router sweep reads back off it.
  */
 function access<TContext extends object>({
   members,
@@ -1398,7 +1415,7 @@ function access<TContext extends object>({
   refusedOnAggregate,
   onRefused,
   app,
-  facts,
+  contexts,
 }: {
   members: TrpcRuntimeMembers<TContext>;
   declaration: TrpcAccess;
@@ -1409,7 +1426,7 @@ function access<TContext extends object>({
   refusedOnAggregate: boolean;
   onRefused?: TrpcRefusalHook<unknown, unknown>;
   app: (ctx: TContext) => unknown;
-  facts: readonly BoundFact<TContext>[];
+  contexts: readonly BoundContext<TContext>[];
 }) {
   if (entitlement && !members.entitlements) {
     throw new Error(
@@ -1426,7 +1443,7 @@ function access<TContext extends object>({
       procedure,
       kind,
       app,
-      facts,
+      contexts,
       ...(entitlement ? { entitlement } : {}),
       ...(mintsCredential ? { mintsCredential } : {}),
       refusedOnAggregate,
@@ -1435,7 +1452,10 @@ function access<TContext extends object>({
   );
 }
 
-type BoundFact<TContext> = Readonly<{ fact: TrpcFact; binding: TrpcFactBinding<TContext> }>;
+type BoundContext<TContext> = Readonly<{
+  declared: MiddlewareContext;
+  binding: TrpcMiddlewareContextBinding<TContext>;
+}>;
 
 function check<TContext extends object>({
   members,
@@ -1447,7 +1467,7 @@ function check<TContext extends object>({
   refusedOnAggregate,
   onRefused,
   app,
-  facts,
+  contexts,
 }: {
   members: TrpcRuntimeMembers<TContext>;
   declaration: TrpcAccess;
@@ -1458,7 +1478,7 @@ function check<TContext extends object>({
   refusedOnAggregate: boolean;
   onRefused?: TrpcRefusalHook<unknown, unknown>;
   app: (ctx: TContext) => unknown;
-  facts: readonly BoundFact<TContext>[];
+  contexts: readonly BoundContext<TContext>[];
 }) {
   return async ({
     ctx,
@@ -1480,7 +1500,7 @@ function check<TContext extends object>({
         actor: null,
         scope: null,
         authorization: null,
-        facts: await resolveFacts({ facts, ctx }),
+        contexts: await resolveContexts({ contexts, ctx }),
       };
 
       return next({ ctx: { handlerArguments: anonymous } });
@@ -1532,7 +1552,7 @@ function check<TContext extends object>({
         procedure,
         authorize: members.authorization.forRequest(ctx),
       })),
-      facts: await resolveFacts({ facts, ctx }),
+      contexts: await resolveContexts({ contexts, ctx }),
     };
 
     return next({ ctx: { handlerArguments } });
@@ -1580,21 +1600,21 @@ async function admittedScope({
 }
 
 /**
- * The declared facts, in declaration order, each parsed by the schema that
+ * The declared middleware context, in declaration order, each parsed by the schema that
  * declared it. A value the schema refuses is the mount's fault, and it is
  * raised here rather than reaching a handler that trusted the type.
  */
-async function resolveFacts<TContext extends object>({
-  facts,
+async function resolveContexts<TContext extends object>({
+  contexts,
   ctx,
 }: {
-  facts: readonly BoundFact<TContext>[];
+  contexts: readonly BoundContext<TContext>[];
   ctx: TContext;
 }): Promise<readonly unknown[]> {
   const resolved: unknown[] = [];
 
-  for (const { fact, binding } of facts) {
-    resolved.push(fact.schema.parse(await binding.resolve(ctx)));
+  for (const { declared, binding } of contexts) {
+    resolved.push(declared.schema.parse(await binding.resolve(ctx)));
   }
 
   return resolved;
@@ -1681,12 +1701,15 @@ function guardOutput({
   procedure: string;
   kind: TrpcContractMember["kind"];
   output: z.ZodType | undefined;
-  handler: (args: never, ...facts: never[]) => unknown;
+  handler: (args: never, ...contexts: never[]) => unknown;
 }): (opts: ResolverOptions) => unknown {
   const invoke = (opts: ResolverOptions, input: unknown = opts.input): unknown => {
-    const { args, facts } = invocation(opts, input);
+    const { args, contexts } = invocation(opts, input);
 
-    return (handler as (args: HandlerArguments, ...values: unknown[]) => unknown)(args, ...facts);
+    return (handler as (args: HandlerArguments, ...values: unknown[]) => unknown)(
+      args,
+      ...contexts,
+    );
   };
 
   if (!output) {
@@ -1725,21 +1748,21 @@ function voidOutput({ procedure, value }: { procedure: string; value: unknown })
   throw new Error(`tRPC ${procedure} answered a value but declares no output schema`);
 }
 
-/** The handler's own arguments, and the facts that follow them. */
+/** The handler's own arguments, and the middleware context that follows them. */
 function invocation(
   request: ResolverOptions,
   input: unknown = request.input,
 ): {
   args: HandlerArguments;
-  facts: readonly unknown[];
+  contexts: readonly unknown[];
 } {
   const resolved = resolvedAccessOf(request.ctx);
 
   if (!resolved) throw new Error("tRPC procedure reached its handler with no access decision");
 
-  const { facts, ...access } = resolved;
+  const { contexts, ...access } = resolved;
 
-  return { args: { ...access, input, signal: request.signal }, facts };
+  return { args: { ...access, input, signal: request.signal }, contexts };
 }
 
 /** Reads back what the access step wrote, and nothing it did not write. */
@@ -1754,7 +1777,7 @@ function resolvedAccessOf(ctx: object): ResolvedAccess | undefined {
 function isResolvedAccess(value: unknown): value is ResolvedAccess {
   const named = typeof value === "object" && value !== null;
 
-  return named && "app" in value && "actor" in value && "scope" in value && "facts" in value;
+  return named && "app" in value && "actor" in value && "scope" in value && "contexts" in value;
 }
 
 /** Puts a failed call on its span the way the log line already puts it in Loki. */

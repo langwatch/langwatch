@@ -195,7 +195,7 @@ function deployment(access: CollectorAccess = {}) {
     ? [
         runtime.mount(collectorRest.router(), {
           app: () => apis.reference(CollectorApi),
-          // The collector binds NO transport fact: it is declared public and
+          // The collector binds NO middleware context: it is declared public and
           // resolves the project credential inside its handler.
           credential: "public",
           onError: canonicalErrorResponse,

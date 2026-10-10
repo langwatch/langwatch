@@ -3,7 +3,11 @@
  * The upgrade runner's read hints as the mounted `presence.onUpgradeReadHints` door relays them:
  * operators only, and only the platform upgrade scope. Spec: modules/ops/specs/upgrades.feature
  */
-import { bindTrpcFact, createTrpcRuntime, TrpcRootDefinition } from "@langwatch/api/trpc";
+import {
+  bindTrpcMiddlewareContext,
+  createTrpcRuntime,
+  TrpcRootDefinition,
+} from "@langwatch/api/trpc";
 import { READ_INVALIDATED_BROADCAST_EVENT_TYPE } from "@langwatch/presence-contract";
 import { trpcTestMembers } from "@langwatch/test-harness/trpc-members";
 import { UPGRADE_READ_HINT_SCOPE, upgradeReadHintMessage } from "@langwatch/upgrade/runner";
@@ -13,7 +17,7 @@ import {
   createPresenceTestApp,
   TestPresenceEmitters,
 } from "../../app/__tests__/presence.fixture.ts";
-import { presenceSessionPersonFact, presenceTrpcTransport } from "../presence.trpc.ts";
+import { presenceSessionPersonContext, presenceTrpcTransport } from "../presence.trpc.ts";
 
 type DoorContext = { actor: { id: string } | null };
 
@@ -44,7 +48,7 @@ async function mountedDoor() {
       },
     },
   }).mount(presenceTrpcTransport, () => app, {
-    facts: [bindTrpcFact(presenceSessionPersonFact, () => null)],
+    middlewareContext: [bindTrpcMiddlewareContext(presenceSessionPersonContext, () => null)],
   });
 
   return { router, emitters };

@@ -70,7 +70,17 @@ export function bootBackendEntry(): Promise<void> {
   // both, and startBackend decides which half sets telemetry up.
   return startBackend({ startWorker, startApi })
     .then((started) => {
-      halves = started;
+      halves = started.halves;
+      // A refused worker never takes the api down (Alex, 2026-10-10); this entry does not retry.
+      if (started.workerFailure !== undefined) {
+        write(
+          processFailureLine({
+            service: BACKEND_HALF_SERVICE.worker,
+            event: "worker failed to boot; the api keeps serving but jobs are not running",
+            error: started.workerFailure,
+          }),
+        );
+      }
       // `haven reload` waits for this line.
       process.stdout.write(`${JSON.stringify({ level: "info", msg: BACKEND_READY_MSG })}\n`);
     })

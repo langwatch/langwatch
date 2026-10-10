@@ -405,5 +405,6 @@ describe("given an account whose organization's single sign-on governs sign-in",
       "Your organization's single sign-on handles sign-in for this account.",
     );
     expect(screen.queryByTestId("password-action")).toBeNull();
+    expect(screen.getByTestId("password-empty")).not.toHaveTextContent("second way in");
   });
 });

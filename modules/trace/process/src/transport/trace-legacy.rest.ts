@@ -383,7 +383,7 @@ export const traceLegacyRest = defineRestRouter(TraceLegacyApi)
   .withParams(traceLegacyIdParamsSchema)
   .withQuery(traceFormatQuerySchema)
   .withPermission("traces:view")
-  .withMiddleware(tracesRestCredential)
+  .withMiddlewareContext(tracesRestCredential)
   .withResponse("protocol", { produces: PRODUCES_JSON, because: LEGACY_PROTOCOL_REASON })
   .withDocs({
     operationId: "getApiTraceId",
@@ -449,7 +449,7 @@ export const traceLegacyRest = defineRestRouter(TraceLegacyApi)
   .withInput(z.looseObject({}), { mediaType: PRODUCES_JSON, mismatch: "malformed_request" })
   .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES })
   .withPermission("traces:view")
-  .withMiddleware(tracesRestCredential)
+  .withMiddlewareContext(tracesRestCredential)
   .withResponse("protocol", {
     produces: PRODUCES_JSON,
     because: LEGACY_PROTOCOL_REASON,
@@ -475,7 +475,7 @@ export const traceLegacyRest = defineRestRouter(TraceLegacyApi)
   .get("/api/thread/:threadId", "getLegacyThread")
   .withParams(traceLegacyThreadParamsSchema)
   .withPermission("traces:view")
-  .withMiddleware(tracesRestCredential)
+  .withMiddlewareContext(tracesRestCredential)
   .withResponse("protocol", { produces: PRODUCES_JSON, because: LEGACY_PROTOCOL_REASON })
   .withDocs({ hide: true })
   .handle(async ({ app, input, scope, response }, caller) =>

@@ -6,7 +6,6 @@
 import {
   defineRestRouter,
   MANAGEMENT_API_VERSION,
-  type RestTransportDeclaration,
 } from "@langwatch/api/rest";
 import { createLogger } from "@langwatch/observability";
 import {
@@ -33,11 +32,7 @@ function slackConnectionWire(connection: SlackConnectionView): SlackConnectionRe
   };
 }
 
-export const slackRest: Readonly<{
-  protocol: "rest";
-  namespace: string;
-  router: () => RestTransportDeclaration<SlackApi>;
-}> = defineRestRouter(SlackApi)
+export const slackRest = defineRestRouter(SlackApi)
   .withNamespace("slack-connections")
   .withVersion(MANAGEMENT_API_VERSION)
 

@@ -249,7 +249,7 @@ func containsAny(value string, needles []string) bool {
 func (s Supervisor) superviseChild(ctx context.Context, ac app.Child) {
 	c := proc{
 		name: ac.Name, dir: ac.Dir, shell: ac.Shell, env: ac.Env, color: ac.Color, isPlain: s.isPlain,
-		preview: s.recent, sink: newLogSinkSince(ac.LogPath, s.startedAt), crash: &crashDedup{},
+		preview: s.recent, sink: newCapture(ac, s.startedAt), crash: &crashDedup{},
 	}
 	// Gate the start on a dependency being ready (e.g. the web lane on the API),
 	// so this process — and the hostname routed to it — never comes up before what
@@ -334,7 +334,7 @@ type proc struct {
 	// sink captures every line (timestamped) to the per-service log file the
 	// `haven logs` command reads — nil for one-shot lanes. Capture always
 	// gets the full line, dedup or not: only the live echo below is folded.
-	sink *logSink
+	sink *capture
 	// crash collapses a fatal line repeated across consecutive restarts into
 	// a short counter instead of the same failure once per restart — nil for
 	// a proc that never restarts (RunOnce, RunOnceBounded, WaitReady).
@@ -515,7 +515,7 @@ type rawWindow struct {
 // line to the window instead of rendering it immediately.
 func (c proc) captureLine(w *rawWindow, line string) {
 	line = strings.TrimRight(line, "\r\n")
-	c.sink.writeLine(line)
+	c.sink.write(line, false)
 	if logfmt.Muted(c.name, line) {
 		return
 	}
@@ -565,7 +565,7 @@ var crashLine = regexp.MustCompile(`^\s+at |\w*Error:|^panic:|^goroutine \d+ \[`
 // unstructured output collapses to one line rather than one per frame.
 func (c proc) logln(line string) {
 	line = strings.TrimRight(line, "\r\n")
-	c.sink.writeLine(line)
+	c.sink.write(line, true)
 	// Captured first, echoed second: a tool banner — or a fatal line about to
 	// be folded into a repeat counter below — is still in the log file
 	// `haven logs --raw` replays in full, it just does not reach the terminal

@@ -1,5 +1,5 @@
 import {
-  bindRestMiddleware,
+  bindMiddlewareContext,
   createCanonicalFamilyErrorHandler,
   createRestRuntime,
   UnauthorizedError,
@@ -21,7 +21,7 @@ import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it, vi } from "vitest";
 
 import { groupsRest } from "../group.rest.ts";
-import { organizationKeyFacts } from "../organization-management.rest.ts";
+import { organizationKeyContext } from "../organization-management.rest.ts";
 
 const ORGANIZATION_ID = "organization-1";
 const CREDENTIAL = "organization-credential";
@@ -61,7 +61,9 @@ function mount(
   const hono = runtime.mount(groupsRest.router(), {
     app: () => createApiFixture<OrganizationApi>(app),
     onError,
-    facts: [bindRestMiddleware(organizationKeyFacts, () => ({ apiKeyId: KEY_ID }))],
+    middlewareContext: [
+      bindMiddlewareContext(organizationKeyContext, () => ({ apiKeyId: KEY_ID })),
+    ],
   });
 
   return (

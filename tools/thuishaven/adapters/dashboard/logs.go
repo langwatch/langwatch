@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -126,7 +127,7 @@ func readLogTail(root *os.Root, selected string) ([]logLine, []string, error) {
 	}
 	var lines []logLine
 	for _, name := range services {
-		if selected != "" && selected != name {
+		if !selects(selected, name, services) {
 			continue
 		}
 		part, readErr := readServiceTail(root, name)
@@ -136,10 +137,22 @@ func readLogTail(root *os.Root, selected string) ([]logLine, []string, error) {
 		lines = append(lines, part...)
 	}
 	sort.SliceStable(lines, func(i, j int) bool { return lines[i].At.Before(lines[j].At) })
+	// A launcher line is captured for both backend halves at one instant: show it once.
+	lines = slices.CompactFunc(lines, func(a, b logLine) bool { return a.At.Equal(b.At) && a.Text == b.Text })
 	if len(lines) > logTailLines {
 		lines = lines[len(lines)-logTailLines:]
 	}
 	return lines, services, nil
+}
+
+// selects reports whether a capture belongs to the selected service. `app`, the
+// one-process lane, is captured per application and reads as all three.
+func selects(selected, name string, services []string) bool {
+	if selected == "" || selected == name {
+		return true
+	}
+	return selected == domain.MonolithAppLane && !slices.Contains(services, selected) &&
+		slices.Contains([]string{"ui", "api", "worker"}, name)
 }
 
 func readServiceTail(root *os.Root, service string) ([]logLine, error) {

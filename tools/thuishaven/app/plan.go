@@ -469,7 +469,7 @@ func (p *childPlan) backendChild() Child {
 		// its own configuration and composes its own graph, and nothing reads
 		// WORKERS_IN_PROCESS or START_WORKERS. Production still deploys them
 		// separately.
-		Name: APILane, Dir: p.repoDir, Color: palette[0], LogPath: p.logPath(APILane),
+		Name: APILane, Dir: p.repoDir, Color: palette[0], LogPath: p.logPath(APILane), SplitLog: true,
 		Shell: "pnpm --silent --filter " + BackendPackage + " dev",
 		Env:   p.nodeEnv(APILane),
 	}
@@ -482,7 +482,7 @@ func (p *childPlan) backendChild() Child {
 // No readiness probe, as for the ui lane: the UI's boot-wait screen covers it.
 func oneProcessChild(repoDir string, env []string, logPath string) Child {
 	return Child{
-		Name: AppLane, Dir: repoDir, Color: palette[1], LogPath: logPath,
+		Name: AppLane, Dir: repoDir, Color: palette[1], LogPath: logPath, SplitLog: true,
 		Shell: "pnpm --silent --filter " + BackendPackage + " dev:one",
 		Env:   env,
 	}
@@ -495,7 +495,7 @@ func oneProcessChild(repoDir string, env []string, logPath string) Child {
 func builtUIChild(repoDir string, env []string, logPath string) Child {
 	build := uiPruneStaleShell + "(" + UIBuildShell + ") && "
 	return Child{
-		Name: AppLane, Dir: repoDir, Color: palette[1], LogPath: logPath,
+		Name: AppLane, Dir: repoDir, Color: palette[1], LogPath: logPath, SplitLog: true,
 		Shell: build + "pnpm --silent --filter " + BackendPackage + " dev",
 		Env:   env,
 	}

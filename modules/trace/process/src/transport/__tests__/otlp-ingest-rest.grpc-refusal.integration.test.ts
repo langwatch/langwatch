@@ -137,7 +137,7 @@ function deployment() {
 
   const runtime = createRestRuntime({
     doors: {
-      otlp_ingest: otlpIngestDoor((input) => apis.reference(TraceApi).otlpCredential(input)),
+      otlp_ingest: otlpIngestDoor.open(apis.reference(TraceApi)),
     },
     authorization: restTestAuthorization(),
     identity: {

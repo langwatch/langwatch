@@ -2,7 +2,7 @@ import {
   baseResponses,
   defineRestRouter,
   MANAGEMENT_API_VERSION,
-  projectRestFacts,
+  projectRequestContext,
   resolver,
 } from "@langwatch/api/rest";
 import {
@@ -38,7 +38,7 @@ export const scenarioEventsRest = defineRestRouter(ScenarioApi)
       },
     },
   })
-  .withMiddleware(projectRestFacts)
+  .withMiddlewareContext(projectRequestContext)
   .handle(({ app, input, scope }, project) =>
     app.reportScenarioEvent({
       event: input,
@@ -56,7 +56,7 @@ export const scenarioEventsRest = defineRestRouter(ScenarioApi)
       "Offer a batch run to an already-open simulations tab on the caller's machine. Returns whether a live tab took it.",
     responses: baseResponses,
   })
-  .withMiddleware(projectRestFacts)
+  .withMiddlewareContext(projectRequestContext)
   .handle(({ app, input, scope }, project) =>
     app.offerScenarioBrowserTab({
       ...input,

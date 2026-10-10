@@ -157,7 +157,11 @@ export function PasswordSection() {
           <SettingsEmptyState
             icon={<KeyRound size={20} />}
             title="No password set"
-            description="You sign in without one. Setting a password gives you a second way in, for a browser or a device your passkey provider does not reach."
+            description={
+              governance.data?.governedBySso
+                ? "You sign in without one."
+                : "You sign in without one. Setting a password gives you a second way in, for a browser or a device your passkey provider does not reach."
+            }
             data-testid="password-empty"
             action={
               <SetPasswordAction

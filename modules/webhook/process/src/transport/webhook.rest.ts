@@ -2,7 +2,6 @@ import {
   defineRestRouter,
   MANAGEMENT_API_VERSION,
   BadRequestError,
-  type RestTransportDeclaration,
 } from "@langwatch/api/rest";
 import { toStoredEnum, toWireEnum } from "@langwatch/gateway-contract";
 import { Temporal, type Instant } from "@langwatch/time";
@@ -144,11 +143,7 @@ function parseDeliveriesCursor(
   return { firedAt: Temporal.Instant.fromEpochMilliseconds(parsedMs), id: cursorId };
 }
 
-export const webhookRest: Readonly<{
-  protocol: "rest";
-  namespace: string;
-  router: () => RestTransportDeclaration<WebhookApi>;
-}> = defineRestRouter(WebhookApi)
+export const webhookRest = defineRestRouter(WebhookApi)
   .withNamespace("webhooks")
   .withVersion(MANAGEMENT_API_VERSION)
   .withCredential("organization")

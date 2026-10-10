@@ -62,13 +62,13 @@ export {
 } from "./raw-http.ts";
 
 export type {
-  BoundTransportFacts,
+  BoundMiddlewareBindings,
   FeatureRestHost,
   FeatureRestMountOptions,
   FeatureTrpcHost,
   FeatureTrpcMountOptions,
   MountableTransport,
-  TransportFactBinding,
+  MiddlewareBinding,
   TransportPeers,
 } from "./hosting/transport-hosts.ts";
 

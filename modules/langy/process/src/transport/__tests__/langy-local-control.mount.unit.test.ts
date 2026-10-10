@@ -1,7 +1,7 @@
 import { createServer, type Server } from "node:http";
 
 import { WebSocketHost } from "@langwatch/api";
-import { bindRestCredential, SessionKeyIdentity } from "@langwatch/api/rest";
+import { bindRestCredential } from "@langwatch/api/rest";
 import {
   type LangyApi,
   LangySessionKeyInvalidError,
@@ -14,6 +14,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import WebSocket from "ws";
 
 import { langyProcessModule } from "../../langy.module.ts";
+import { localControlSessionKeyDoor } from "../langy-local-control-connect.rest.ts";
 import {
   CONTROL_CONNECT_PATH,
   createLangyLocalControlWebSocketProtocol,
@@ -39,15 +40,16 @@ describe("the local folder's socket", () => {
   const accepted: LocalControlConnectionOpened[] = [];
   const presented: { token: string; projectId: string | null }[] = [];
   const host = WebSocketHost.create();
-  const door = SessionKeyIdentity.create({
-    instanceTokenHeader: "x-agent-instance-token",
-    verify: async ({ token, projectId }) => {
-      presented.push({ token, projectId });
-      const refusal = KEYS[token];
-      if (refusal) throw refusal();
-      return { actor: { type: "user", id: CREDENTIAL.userId }, ...CREDENTIAL };
-    },
-  });
+  const door = localControlSessionKeyDoor.open(
+    createApiFixture<LangyApi>({
+      verifyLocalControlSessionKey: async ({ token, projectId }) => {
+        presented.push({ token, projectId });
+        const refusal = KEYS[token];
+        if (refusal) throw refusal();
+        return { actor: { type: "user", id: CREDENTIAL.userId }, ...CREDENTIAL };
+      },
+    }),
+  );
   let server: Server;
   let url: string;
 
@@ -66,7 +68,7 @@ describe("the local folder's socket", () => {
             connection.close(1000, "seen");
           },
         }),
-      { facts: [bindRestCredential("session_key", () => door)] },
+      { middlewareBindings: [bindRestCredential("session_key", () => door)] },
     );
     server = createServer((_request, response) => response.writeHead(404).end());
     server.on("upgrade", (request, socket, head) => host.upgrade(request, socket, head));

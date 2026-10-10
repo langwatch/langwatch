@@ -36,12 +36,14 @@ vi.mock("langwatch", () => ({
   }),
 }));
 
+import { ownProof } from "../../../../__tests__/support/authorization-proofs.fixture.ts";
 import type { TraceEditOverlayService } from "../../../edit-overlay/services/trace-edit-overlay.service.ts";
 import type { TraceLegacyReadRepository } from "../../repositories/trace-legacy-read.repository.ts";
 import type { LegacyTraceMappingService } from "../legacy-trace-mapping.service.ts";
 import { TraceLegacyReadService } from "../trace-legacy-read.service.ts";
 
 const PROJECT_ID = "project_test";
+const OWN_READ = ownProof({ projectId: PROJECT_ID });
 const TRACE_ID = "a3c6656cf433e97549f654034be02955";
 const REQUEST_ID = "req_011CcuGBf1aBcDeFgHiJkLmN";
 const REPL = "repl_main_thread";
@@ -194,6 +196,7 @@ describe("TraceService.findById — Claude Code log content enrichment", () => {
       const service = makeService(getLogs);
 
       const trace = await service.findById({
+        authorization: OWN_READ,
         projectId: PROJECT_ID,
         traceId: TRACE_ID,
         protections,
@@ -218,7 +221,12 @@ describe("TraceService.findById — Claude Code log content enrichment", () => {
       const getLogs = vi.fn().mockResolvedValue(CLAUDE_LOG_ROWS);
       const service = makeService(getLogs);
 
-      await service.findById({ projectId: PROJECT_ID, traceId: TRACE_ID, protections });
+      await service.findById({
+        authorization: OWN_READ,
+        projectId: PROJECT_ID,
+        traceId: TRACE_ID,
+        protections,
+      });
 
       expect(getLogs).toHaveBeenCalledTimes(1);
       expect(getLogs).toHaveBeenCalledWith({
@@ -235,6 +243,7 @@ describe("TraceService.findById — Claude Code log content enrichment", () => {
       const service = makeService(vi.fn().mockResolvedValue(CLAUDE_LOG_ROWS));
 
       const trace = await service.findById({
+        authorization: OWN_READ,
         projectId: PROJECT_ID,
         traceId: TRACE_ID,
         protections,
@@ -255,6 +264,7 @@ describe("TraceService.findById — Claude Code log content enrichment", () => {
       const service = makeService(getLogs);
 
       const trace = await service.findById({
+        authorization: OWN_READ,
         projectId: PROJECT_ID,
         traceId: TRACE_ID,
         protections,
@@ -274,6 +284,7 @@ describe("TraceService.findById — Claude Code log content enrichment", () => {
       const service = makeService(vi.fn().mockResolvedValue([]));
 
       const trace = await service.findById({
+        authorization: OWN_READ,
         projectId: PROJECT_ID,
         traceId: TRACE_ID,
         protections,
@@ -292,6 +303,7 @@ describe("TraceService.findById — Claude Code log content enrichment", () => {
       const service = makeService(vi.fn().mockRejectedValue(new Error("clickhouse down")));
 
       const trace = await service.findById({
+        authorization: OWN_READ,
         projectId: PROJECT_ID,
         traceId: TRACE_ID,
         protections,
@@ -321,6 +333,7 @@ describe("TraceService — multi-trace read enrichment", () => {
       const service = makeService(getLogs);
 
       const traces = await service.getTracesWithSpans({
+        authorization: OWN_READ,
         projectId: PROJECT_ID,
         traceIds: [TRACE_ID],
         protections,
@@ -340,6 +353,7 @@ describe("TraceService — multi-trace read enrichment", () => {
       const service = makeService(getLogs);
 
       const traces = await service.getTracesWithSpans({
+        authorization: OWN_READ,
         projectId: PROJECT_ID,
         traceIds: [TRACE_ID],
         protections,
@@ -359,6 +373,7 @@ describe("TraceService — multi-trace read enrichment", () => {
       const service = makeService(getLogs);
 
       const traces = await service.getTracesByThreadId({
+        authorization: OWN_READ,
         projectId: PROJECT_ID,
         threadId: "thread-1",
         protections,
@@ -376,6 +391,7 @@ describe("TraceService — multi-trace read enrichment", () => {
       const service = makeService(getLogs);
 
       await service.getTracesByThreadId({
+        authorization: OWN_READ,
         projectId: PROJECT_ID,
         threadId: "thread-1",
         protections,
@@ -413,6 +429,7 @@ describe("TraceService — multi-trace read enrichment", () => {
 
       const result = await service.getAllTracesForProject(searchInput as never, protections, {
         includeSpans: true,
+        ownRead: OWN_READ,
       });
 
       expect(result.groups[0]?.[0]?.spans?.[0]?.input).toEqual(enrichedInput);
@@ -432,7 +449,9 @@ describe("TraceService — multi-trace read enrichment", () => {
       const getLogs = vi.fn().mockResolvedValue(CLAUDE_LOG_ROWS);
       const service = makeService(getLogs);
 
-      const result = await service.getAllTracesForProject(searchInput as never, protections, {});
+      const result = await service.getAllTracesForProject(searchInput as never, protections, {
+        ownRead: OWN_READ,
+      });
 
       expect(getLogs).not.toHaveBeenCalled();
       expect(result).toBe(page);
@@ -450,6 +469,7 @@ describe("TraceService — multi-trace read enrichment", () => {
 
       const result = await service.getAllTracesForProject(searchInput as never, protections, {
         includeSpans: true,
+        ownRead: OWN_READ,
       });
 
       expect(getLogs).not.toHaveBeenCalled();
@@ -467,6 +487,7 @@ describe("TraceService — multi-trace read enrichment", () => {
       const service = makeService(getLogs);
 
       const traces = await service.getTracesWithSpansByThreadIds({
+        authorization: OWN_READ,
         projectId: PROJECT_ID,
         threadIds: ["thread-1"],
         protections,
@@ -486,6 +507,7 @@ describe("TraceService — multi-trace read enrichment", () => {
       const service = makeService(getLogs);
 
       await service.getTracesWithSpansByThreadIds({
+        authorization: OWN_READ,
         projectId: PROJECT_ID,
         threadIds: ["thread-1"],
         protections,

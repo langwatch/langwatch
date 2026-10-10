@@ -1,4 +1,4 @@
-import { bindRestMiddleware, createRestRuntime } from "@langwatch/api/rest";
+import { bindMiddlewareContext, createRestRuntime } from "@langwatch/api/rest";
 import type { AuditLogApi, RecordAuditLogCommand } from "@langwatch/audit-log-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
@@ -161,8 +161,8 @@ function mount({
     app: () => app,
     credential: "project",
     onError: renderHandled,
-    facts: [
-      bindRestMiddleware(codingAgentRestCaller, () => ({
+    middlewareContext: [
+      bindMiddlewareContext(codingAgentRestCaller, () => ({
         project: { isPersonal: project.isPersonal, ownerUserId: project.ownerUserId },
         credential,
       })),

@@ -23,19 +23,22 @@ export function createAgentWebSocketProtocol(
   return WebSocketProtocol.create({
     path: CONNECT_PATH,
     maxPayloadBytes: relayPayloadCaps(relayMaxPayloadMb).frameBytes,
-    facts: agentConnectHeadersSchema,
+    middlewareContext: agentConnectHeadersSchema,
     headers: { instanceToken: "x-agent-instance-token" },
     door: { credential: "project", permission: CONNECT_PERMISSION, keyKinds: CONNECT_KEY_KINDS },
     handle: (
       app: AgentApi,
       connection: ProtocolConnection,
       {
-        facts,
+        middlewareContext,
         caller,
-      }: { facts: z.output<typeof agentConnectHeadersSchema>; caller: WebSocketCaller },
+      }: {
+        middlewareContext: z.output<typeof agentConnectHeadersSchema>;
+        caller: WebSocketCaller;
+      },
     ) =>
       app.acceptConnection(connection, {
-        admitted: { ...facts, caller: connectCallerOf(caller.credential) },
+        admitted: { ...middlewareContext, caller: connectCallerOf(caller.credential) },
       }),
     refuse: (app: AgentApi, connection: ProtocolConnection, failure: Error) =>
       app.acceptConnection(connection, { refused: protocolRefusalOf(failure) }),

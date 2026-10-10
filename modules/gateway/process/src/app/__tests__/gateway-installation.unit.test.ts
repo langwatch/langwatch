@@ -225,14 +225,15 @@ function servedInternalDoor(state: InstalledGateway, app: GatewayModule) {
       project: closed,
       organization: closed,
       api_key: closed,
-      scim_token: closed,
       instance_admin: closed,
       browser: closed,
     },
     bearers: () => closed,
     audit: { record: async () => undefined },
   });
-  runtime.mount(gatewayInternalRest.router(), () => app, { facts: state.facts });
+  runtime.mount(gatewayInternalRest.router(), () => app, {
+    middlewareBindings: state.middlewareBindings,
+  });
 
   return runtime.app;
 }
@@ -280,7 +281,7 @@ describe("gateway app installation", () => {
         if (!(app instanceof GatewayModule)) {
           throw new Error("Gateway installation did not provide GatewayModule");
         }
-        const credential = state.facts?.find(isInternalCredential);
+        const credential = state.middlewareBindings?.find(isInternalCredential);
         if (!credential)
           throw new Error("Gateway installation did not bind its internal credential");
 

@@ -14,6 +14,8 @@ import { ownProof } from "../../../../../__tests__/support/authorization-proofs.
 import type { TraceClickHouseClient } from "../../../../../repositories/clickhouse/clickhouse.trace-member-client.repository.ts";
 import { mappedLegacyRead } from "./support/legacy-trace-mapping.support.ts";
 
+const OWN_READ = ownProof({ projectId: "project-1" });
+
 const PROTECTIONS = { canSeeCosts: true, canSeeCapturedInput: true, canSeeCapturedOutput: true };
 
 function compose() {
@@ -46,7 +48,9 @@ describe("TraceLegacyReadClickHouseRepository filtered list", () => {
     it("narrows the count query by the error condition", async () => {
       const { repository, query } = compose();
 
-      await repository.listAllTracesForProject(search({ "traces.error": ["true"] }), PROTECTIONS);
+      await repository.listAllTracesForProject(search({ "traces.error": ["true"] }), PROTECTIONS, {
+        ownRead: OWN_READ,
+      });
 
       expect(query.mock.calls.at(0)?.at(0)?.query).toContain("ts.ContainsErrorStatus = true");
     });
@@ -60,6 +64,7 @@ describe("TraceLegacyReadClickHouseRepository filtered list", () => {
       await repository.listAllTracesForProject(
         search({ "metadata.labels": ["otlp2"] }),
         PROTECTIONS,
+        { ownRead: OWN_READ },
       );
 
       const first = query.mock.calls.at(0)?.at(0);
@@ -74,7 +79,9 @@ describe("TraceLegacyReadClickHouseRepository filtered list", () => {
       const { repository, query } = compose();
 
       await expect(
-        repository.listAllTracesForProject(search({ "bogus.field": ["x"] }), PROTECTIONS),
+        repository.listAllTracesForProject(search({ "bogus.field": ["x"] }), PROTECTIONS, {
+          ownRead: OWN_READ,
+        }),
       ).rejects.toThrow(/unsupported fields/);
       expect(query).not.toHaveBeenCalled();
     });
@@ -92,6 +99,7 @@ describe("TraceLegacyReadClickHouseRepository filtered list", () => {
       await repository.listAllTracesForProject(search({}), PROTECTIONS, {
         filterWhere,
         authorization: ownProof({ projectId: "project-1" }),
+        ownRead: OWN_READ,
       });
 
       const statements = query.mock.calls.map((call) => call[0]);
@@ -106,7 +114,10 @@ describe("TraceLegacyReadClickHouseRepository filtered list", () => {
       const { repository, query } = compose();
 
       await expect(
-        repository.listAllTracesForProject(search({}), PROTECTIONS, { filterWhere }),
+        repository.listAllTracesForProject(search({}), PROTECTIONS, {
+          filterWhere,
+          ownRead: OWN_READ,
+        }),
       ).rejects.toThrow(/needs the proof/);
       expect(query).not.toHaveBeenCalled();
     });

@@ -628,7 +628,7 @@ Framework classes implement hosting. **The container** (`server.container(role)`
 modules, opens the stores and boots. Nothing more (Alex, 2026-10-01): it holds no members, answers
 no supply and takes no `.provide` or `withMember`. Authentication policy stays in the API runtime. auth
 binds the one API door (sessions, key credentials, plan gate, audit sinks) from
-the peers it already holds, in its own transport facts; the process opens it
+the peers it already holds, in its own middleware bindings; the process opens it
 before its hosts and builds both over it. A process with no door, or two,
 refuses boot by name, and `@langwatch/process` names no module contract but ops (its
 admin edge). This keeps transport machinery out of `main.ts` without making
@@ -1821,6 +1821,12 @@ office deactivates only through user, so it keeps no picked date (Alex, 2026-10-
   routes need context it never provides does not publish, and the mount still refuses an unprovided name. No
   process supplies a module's context; a value several modules need is a shared helper (`projectRequestContextOf`
   in `@langwatch/api/rest`). `.withHeaders(...)` values bind themselves.
+- **tRPC and hand-bound values speak the same vocabulary** (Alex, 2026-10-10). A procedure names a declared
+  context with `.withMiddlewareContext(x)`; its mount binds it with `bindTrpcMiddlewareContext` or
+  `bindTrpcHeader`, and the host binds `browserSessionContext` and `callerAddressContext`. Bindings a module
+  writes by hand (tRPC, websocket, the API door) go in `.provideMiddlewareBindings(() => [...])`; a REST context
+  bound there counts as provided and a mistyped value does not compile. A REST route that needs the browser
+  session reads the door's (`browserSessionContext`, supplied by `browserSessionOfRequest`), never re-verifies it.
 - `GET /api/checkup` keeps the branch's `organization:view` guard; main answers any project key. The drift is
   accepted, since the checkup reads organisation-wide state (Alex, 2026-09-30).
 - REST authenticates with API keys only and tRPC with the session (Alex, 2026-09-30); `/api/files` and
@@ -1898,8 +1904,8 @@ office deactivates only through user, so it keeps no picked date (Alex, 2026-10-
   everything beneath it, and `open(app)` run once at mount returning `{ handle({ request, response }),
 close() }`. The api's `serve()` answers a claimed request ahead of every route, as main's listener did;
   `close` runs at shutdown, before the stores close (Alex, 2026-09-27).
-- The API door is bound once, by auth, with `bindApiDoor` in its `withTransportFacts`; the container
-  hands installed facts to the surface factory, which opens it ahead of REST and tRPC. None or two
+- The API door is bound once, by auth, with `bindApiDoor` in its `provideMiddlewareBindings`; the container
+  hands installed bindings to the surface factory, which opens it ahead of REST and tRPC. None or two
   binders refuse boot by name (`MissingApiDoorError`, `DuplicateApiDoorError`) (Alex, 2026-10-01).
 - The **process** mounts declarations; `boot()` opens the hosts. A module
   never mounts anything.
@@ -3115,6 +3121,13 @@ the rest `@langwatch/process`), `@langwatch/process-server`, `@langwatch/ui-kern
 `.withMiddlewareContext(...)`), `bindRestMiddleware`, `bindRestHeader` and `RestTransportMiddlewareBinding` in a
 module (now keys of `.provideMiddlewareContext({ ... })`), `projectRestFacts` (now `projectRequestContext`), and
 a REST context value bound in `withTransportFacts` or by the process.
+· "Facts" for transport values (Alex, 2026-10-10; §8): `defineTrpcFact` and `TrpcFact` (now
+`defineMiddlewareContext` and `MiddlewareContext`), `.withFacts(...)` (now `.withMiddlewareContext(...)`),
+`bindTrpcFact` and `TrpcFactBinding` (now `bindTrpcMiddlewareContext`, `TrpcMiddlewareContextBinding`),
+`withTransportFacts`, `TransportFactBinding` and `BoundTransportFacts` (now `provideMiddlewareBindings`,
+`MiddlewareBinding`, `BoundMiddlewareBindings`), a host or runtime mount's `{ facts }` (now `middlewareBindings`, or
+`middlewareContext` on a tRPC mount), a websocket protocol's `facts:` (now `middlewareContext:`), `<x>Fact`
+constants (now `<x>Context`), and ops' `adminAuthSession` (the door's `browserSessionContext`).
 
 ---
 

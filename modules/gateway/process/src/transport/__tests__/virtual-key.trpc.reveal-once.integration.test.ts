@@ -1,4 +1,4 @@
-import { bindTrpcFact, createTrpcRuntime } from "@langwatch/api/trpc";
+import { bindTrpcMiddlewareContext, createTrpcRuntime } from "@langwatch/api/trpc";
 /**
  * The app's virtual-key create over the real application on its memory twins: the dialog keeps
  * the secret, and a reveal id parked beside it carries the same secret to the Langy card.
@@ -19,7 +19,7 @@ import { GatewayModule } from "../../app/gateway.app.ts";
 import { MemoryGatewayChannels } from "../../channels/memory/memory.gateway.channels.ts";
 import { MemoryGatewayRepositories } from "../../repositories/memory/memory.gateway.repositories.ts";
 import { MemoryGatewayStore } from "../../repositories/memory/memory.gateway.store.ts";
-import { gatewaySessionFact, virtualKeyTrpcTransport } from "../virtual-key.trpc.ts";
+import { gatewaySessionContext, virtualKeyTrpcTransport } from "../virtual-key.trpc.ts";
 
 type TrpcTestContext = { actor: { id: string } };
 
@@ -99,7 +99,9 @@ async function mountedCreate({ stashed }: { stashed: StashRevealInput[] }) {
     procedure: trpc.procedure,
     members: trpcTestMembers<TrpcTestContext>(),
   }).mount(virtualKeyTrpcTransport, () => app, {
-    facts: [bindTrpcFact(gatewaySessionFact, (ctx) => ({ user: { id: ctx.actor.id } }))],
+    middlewareContext: [
+      bindTrpcMiddlewareContext(gatewaySessionContext, (ctx) => ({ user: { id: ctx.actor.id } })),
+    ],
   });
 
   return router.createCaller({ actor: { id: "usr_1" } });

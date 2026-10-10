@@ -6,7 +6,7 @@ The server half of [slack](../README.md). A project's Slack connections: the bot
 
 ## Installation
 
-`defineProcessModule("slack").withRepositories(slackRepositories).withChannels(slackChannels).withApi(SlackModule).withTransports(slackIntegrationTrpcTransport, slackRest)`, `src/slack.module.ts:10`.
+`defineProcessModule("slack").withRepositories(slackRepositories).withChannels(slackChannels).withApi(SlackModule).withTransports(slackIntegrationTrpcTransport, slackRest)`, `src/slack.module.ts:11`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -193,10 +193,11 @@ None: slack declares no pipeline, process manager, subscriber or task.
 
 ## Configuration
 
-| Kind   | Leaf                     | Environment variable          | Declared at               |
-| ------ | ------------------------ | ----------------------------- | ------------------------- |
-| secret | `fingerprintKey`         | `CREDENTIALS_SECRET`          | `src/app/slack.app.ts:42` |
-| secret | `fingerprintKeyFallback` | `NEXTAUTH_SECRET`             | `src/app/slack.app.ts:43` |
-| secret | `fingerprintKeyPrevious` | `CREDENTIALS_SECRET_PREVIOUS` | `src/app/slack.app.ts:45` |
+| Kind   | Leaf                     | Environment variable          | Declared at                         |
+| ------ | ------------------------ | ----------------------------- | ----------------------------------- |
+| secret | `fingerprintKey`         | `CREDENTIALS_SECRET`          | `src/app/slack.app.ts:45`           |
+| secret | `fingerprintKeyFallback` | `NEXTAUTH_SECRET`             | `src/app/slack.app.ts:46`           |
+| secret | `fingerprintKeyPrevious` | `CREDENTIALS_SECRET_PREVIOUS` | `src/app/slack.app.ts:48`           |
+| config | `slackApiBase`           | `SLACK_API_BASE`              | `../contract/src/slack.config.ts:4` |
 
 <!-- readme:generated:end -->

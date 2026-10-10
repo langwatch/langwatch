@@ -3,11 +3,7 @@
  * credential, clearing the Enterprise plan gate SCIM groups require; writes
  * attribute to the grants ledger as the credential's own member.
  */
-import {
-  defineRestRouter,
-  MANAGEMENT_API_VERSION,
-  type RestTransportDeclaration,
-} from "@langwatch/api/rest";
+import { defineRestRouter, MANAGEMENT_API_VERSION } from "@langwatch/api/rest";
 import {
   OrganizationApi,
   organizationGroupGrantInputSchema,
@@ -30,7 +26,7 @@ import {
   type OrganizationGroupMember,
 } from "@langwatch/organization-contract";
 
-import { keyCallerOf, organizationKeyFacts } from "./organization-management.rest.ts";
+import { keyCallerOf, organizationKeyContext } from "./organization-management.rest.ts";
 
 /** One binding, as every route that reports one answers it. */
 const bindingWire = (binding: OrganizationGroupGrant) => ({
@@ -49,11 +45,7 @@ const memberWire = (member: OrganizationGroupMember) => ({
   email: member.email,
 });
 
-export const groupsRest: Readonly<{
-  protocol: "rest";
-  namespace: string;
-  router: () => RestTransportDeclaration<OrganizationApi>;
-}> = defineRestRouter(OrganizationApi)
+export const groupsRest = defineRestRouter(OrganizationApi)
   .withNamespace("groups")
   .withVersion(MANAGEMENT_API_VERSION)
   .withCredential("organization")
@@ -92,7 +84,7 @@ export const groupsRest: Readonly<{
   .withOutput(organizationGroupRestCreatedSchema)
   .withStatus(201)
   .withDocs({ tags: ["Groups"], description: "Create a new group" })
-  .withMiddleware(organizationKeyFacts)
+  .withMiddlewareContext(organizationKeyContext)
   .withEntitlement("enterprise", { feature: "GROUPS" })
   .withAudit("management.group.create")
   .handle(async ({ app, input, scope, actor }, key) => {
@@ -158,7 +150,7 @@ export const groupsRest: Readonly<{
   .withParams(organizationGroupRestParamsSchema)
   .withOutput(organizationRestSuccessSchema)
   .withDocs({ tags: ["Groups"], description: "Delete a group" })
-  .withMiddleware(organizationKeyFacts)
+  .withMiddlewareContext(organizationKeyContext)
   .withEntitlement("enterprise", { feature: "GROUPS" })
   .withAudit("management.group.delete")
   .handle(async ({ app, input, scope, actor }, key) => {
@@ -189,7 +181,7 @@ export const groupsRest: Readonly<{
   .withOutput(organizationRestSuccessSchema)
   .withStatus(201)
   .withDocs({ tags: ["Groups"], description: "Add a member to a group" })
-  .withMiddleware(organizationKeyFacts)
+  .withMiddlewareContext(organizationKeyContext)
   .withEntitlement("enterprise", { feature: "GROUPS" })
   .withAudit("management.group.add-member")
   .handle(async ({ app, input, scope, actor }, key) => {
@@ -240,7 +232,7 @@ export const groupsRest: Readonly<{
   .withOutput(organizationGroupRestBindingSchema)
   .withStatus(201)
   .withDocs({ tags: ["Groups"], description: "Add a role binding to a group" })
-  .withMiddleware(organizationKeyFacts)
+  .withMiddlewareContext(organizationKeyContext)
   .withEntitlement("enterprise", { feature: "GROUPS" })
   .handle(async ({ app, input, scope, actor }, key) => {
     const { groupId: id, ...binding } = input;
@@ -262,7 +254,7 @@ export const groupsRest: Readonly<{
   .withParams(organizationGroupRestBindingParamsSchema)
   .withOutput(organizationRestSuccessSchema)
   .withDocs({ tags: ["Groups"], description: "Remove a role binding from a group" })
-  .withMiddleware(organizationKeyFacts)
+  .withMiddlewareContext(organizationKeyContext)
   .withEntitlement("enterprise", { feature: "GROUPS" })
   .handle(async ({ app, input, scope, actor }, key) => {
     await app.removeGroupGrant(

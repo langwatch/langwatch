@@ -40,31 +40,40 @@ const logger = createLogger("langwatch:export");
  * `for await (const { chunk, progress } of service.exportTraces(request))` to stream chunks to the
  * response while updating progress.
  */
+type OwnReadAuthorizer = (input: { projectId: string }) => Promise<Authorization>;
+
 export class TraceExportService {
   private readonly traceService: TraceLegacyRead;
   private readonly compileFilter: (input: { request: ExportRequest }) => ExportFilter;
+  private readonly authorizeOwnRead: OwnReadAuthorizer;
 
   private constructor({
     traceService,
     compileFilter,
+    authorizeOwnRead,
   }: {
     traceService: TraceLegacyRead;
     compileFilter: (input: { request: ExportRequest }) => ExportFilter;
+    authorizeOwnRead: OwnReadAuthorizer;
   }) {
     this.traceService = traceService;
     this.compileFilter = compileFilter;
+    this.authorizeOwnRead = authorizeOwnRead;
   }
 
   /** Creates the process-owned export facade over the composed trace reader. */
   static create({
     traceService,
     compileFilter,
+    authorizeOwnRead,
   }: {
     traceService: TraceLegacyRead;
     /** The Explorer's compiled filter for the request's query. */
     compileFilter: (input: { request: ExportRequest }) => ExportFilter;
+    /** Mints the own-only proof the span and evaluation reads go through (TRACE-PROOF-SHARE). */
+    authorizeOwnRead: OwnReadAuthorizer;
   }): TraceExportService {
-    return new TraceExportService({ traceService, compileFilter });
+    return new TraceExportService({ traceService, compileFilter, authorizeOwnRead });
   }
 
   /**
@@ -96,6 +105,7 @@ export class TraceExportService {
         scrollId: null,
         filterWhere: this.compileFilter({ request }),
         authorization,
+        ownRead: await this.authorizeOwnRead({ projectId: request.projectId }),
       },
     );
 
@@ -209,6 +219,7 @@ export class TraceExportService {
         scrollId: scrollId ?? null,
         filterWhere: this.compileFilter({ request }),
         authorization,
+        ownRead: await this.authorizeOwnRead({ projectId: request.projectId }),
       },
     );
   }

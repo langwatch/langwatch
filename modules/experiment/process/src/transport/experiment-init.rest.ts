@@ -1,6 +1,10 @@
 /** POST /api/experiment/init: find-or-create by slug; refusals are handled errors. */
 import { PayloadTooLargeError } from "@langwatch/api";
-import { defineRestRouter, MANAGEMENT_API_VERSION, projectRestFacts } from "@langwatch/api/rest";
+import {
+  defineRestRouter,
+  MANAGEMENT_API_VERSION,
+  projectRequestContext,
+} from "@langwatch/api/rest";
 import {
   ExperimentApi,
   experimentInitBodySchema,
@@ -40,8 +44,8 @@ export const experimentInitRest = defineRestRouter(ExperimentApi)
       },
     ],
   })
-  .withMiddleware(projectRestFacts)
-  .handle(async ({ app, input, scope }, facts) => {
+  .withMiddlewareContext(projectRequestContext)
+  .handle(async ({ app, input, scope }, context) => {
     // Both identifiers are forwarded: an id-only request used to pass
     // validation and then fail as a 500.
     const experiment = await app.findOrCreateForRun({
@@ -54,7 +58,7 @@ export const experimentInitRest = defineRestRouter(ExperimentApi)
     });
 
     return {
-      path: `/${facts.projectSlug}/experiments/${experiment.slug}`,
+      path: `/${context.projectSlug}/experiments/${experiment.slug}`,
       slug: experiment.slug,
     };
   })

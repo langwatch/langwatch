@@ -25,7 +25,7 @@ function mountedGraphs() {
   });
   const hono = runtime.mount(graphRest.router(), {
     app: () => app,
-    facts: [],
+    middlewareContext: [],
     onError: canonicalErrorResponse,
   });
   const send = async ({

@@ -24,7 +24,7 @@ const ROW = {
 };
 
 function repositoryAnswering(rows: unknown[]) {
-  const query = vi.fn(async (_request: { query: string }) => ({ json: async () => rows }));
+  const query = vi.fn(async (_request: { query: string }) => ({ json: async () => JSON.parse(JSON.stringify(rows)) }));
   class FakeStoredObjectsClickHouse implements StoredObjectsClickHouse {
     async resolveClient() {
       return { query };

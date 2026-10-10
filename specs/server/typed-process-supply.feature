@@ -158,11 +158,11 @@ Feature: A process cannot boot without what its modules declared
     # family (record section 4), so there is no host-side name to misspell.
 
     @integration
-    Scenario: A host given no deployment bearers leaves an unbound internal family closed
+    Scenario: A host given no deployment bearers refuses to mount an unbound internal family
       Given a REST host created with no bearers option
       And a family naming the internal secret credential that binds no door of its own
-      When a caller presents a bearer to it
-      Then the call is refused and the handler is never reached
+      When the host mounts it
+      Then the mount throws naming the internal secret credential, and nothing serves
 
     @unit
     Scenario: A door whose credential was never supplied refuses callers

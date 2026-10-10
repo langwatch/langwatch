@@ -1,4 +1,5 @@
-import { bindRestCredential } from "@langwatch/api/rest";
+import { ClientAddress } from "@langwatch/api/policy";
+import { bindRestCredential, browserSessionOfRequest } from "@langwatch/api/rest";
 import type { OpsApi, OpsServerConfig } from "@langwatch/ops-contract";
 import { defineProcessModule, type PublishedProcessModule } from "@langwatch/process";
 import { type CodeStepId, defineMigrationStep } from "@langwatch/upgrade/step";
@@ -49,10 +50,16 @@ export const opsProcessModule: PublishedProcessModule<"ops", OpsApi, OpsServerCo
       checkupRest,
     )
     // The EXPLAIN door compares the operator secret before the body is read.
-    .withTransportFacts(({ app }) => {
-      if (!(app instanceof OpsModule))
-        throw new TypeError("Ops transport requires its constructed application");
-      return [bindRestCredential("internal_secret", () => app.operatorDoor)];
+    .provideMiddlewareBindings(({ app }) => [
+      bindRestCredential("internal_secret", () => app.operatorDoor),
+    ])
+    // The impersonation routes record against the session the browser door resolved.
+    .provideMiddlewareContext({
+      browserSession: browserSessionOfRequest,
+      adminAuditRequest: (request) => ({
+        headers: Object.fromEntries(request.headers),
+        remoteAddress: ClientAddress.resolvedFor(request) ?? undefined,
+      }),
     })
     .withEventing(usageReportEventing)
     .withEventing(anomalyDetectionEventing)

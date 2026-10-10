@@ -25,12 +25,12 @@ Feature: tRPC framework boundary
     And a process whose runtime has no anonymous procedure is refused at the mount, naming the procedure
 
   @unit
-  Scenario: A tRPC procedure reads a fact its mount resolved, never the request
+  Scenario: A tRPC procedure reads middleware context its mount resolved, never the request
     Given a procedure that needs the address a caller reached us at, and one that needs the browser session it arrived on
-    When each declares the facts it needs and the process binds one value for each at the mount
-    Then each handler is handed the facts it declared, parsed, after its own arguments and in the order it declared them
+    When each declares the middleware context it needs and the process binds one value for each at the mount
+    Then each handler is handed the values it declared, parsed, after its own arguments and in the order it declared them
     And where an address comes from is the mount's answer, so the header a deployment trusts is named once, by it
-    And a mount that bound no value for a declared fact is refused, naming the fact and the procedure
+    And a mount that bound no value for a declared middleware context is refused, naming it and the procedure
 
   @unit
   Scenario: A procedure may require several permissions together

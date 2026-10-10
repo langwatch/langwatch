@@ -6,19 +6,19 @@
 import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
 import { EnterpriseOpsApi, selfHostedInstancesTrpc } from "@langwatch/enterprise-ops-contract";
 
-import { operatorFact, STAFF } from "./license-registry.trpc.ts";
+import { operatorContext, STAFF } from "./license-registry.trpc.ts";
 
 export const selfHostedInstancesTrpcTransport: TrpcRouterDeclaration<
   EnterpriseOpsApi,
   typeof selfHostedInstancesTrpc
 > = defineTrpcRouter(EnterpriseOpsApi, selfHostedInstancesTrpc)
   .procedure("getAll")
-  .withFacts(operatorFact)
+  .withMiddlewareContext(operatorContext)
   .withPermission("ops:view", STAFF)
   .handle(({ app, input }, operator) => app.listSelfHostedInstances({ ...input, operator }))
 
   .procedure("getById")
-  .withFacts(operatorFact)
+  .withMiddlewareContext(operatorContext)
   .withPermission("ops:view", STAFF)
   .handle(({ app, input }, operator) => app.getSelfHostedInstance({ ...input, operator }))
   .build();

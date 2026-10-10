@@ -489,7 +489,9 @@ func surfaceLanes(name string, layout domain.Layout) []string {
 	switch {
 	case name == "app":
 		return []string{domain.MonolithAppLane, "ui"}
-	case name == domain.APIService || name == "worker":
+	case name == "worker":
+		return []string{"worker", "api", "backend", domain.MonolithAppLane}
+	case name == domain.APIService:
 		return []string{"api", "backend", domain.MonolithAppLane}
 	case simulators[name]:
 		return []string{name, "sims", "go"}
@@ -593,7 +595,7 @@ func reasonFor(h homeState, sf surfaceJSON) (string, bool) {
 func newestErrors(lines []logLine) []logLine {
 	var out []logLine
 	for i := len(lines) - 1; i >= 0 && len(out) < recentErrorsPerLane; i-- {
-		if level := logfmt.Level(lines[i].Level); level == logfmt.LevelError || level == logfmt.LevelFatal {
+		if rec, ok := logfmt.Parse(lines[i].Text); ok && logfmt.Failed(rec) {
 			out = append(out, lines[i])
 		}
 	}

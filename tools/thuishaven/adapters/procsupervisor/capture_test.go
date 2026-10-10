@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/langwatch/langwatch/tools/thuishaven/app"
 )
 
 // captureSink builds a proc that writes only to a file, so a test can read back
@@ -15,7 +17,7 @@ import (
 func captureSink(t *testing.T) (proc, string) {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "api.log")
-	return proc{name: "api", isPlain: true, preview: &recentLogs{}, sink: newLogSink(path)}, path
+	return proc{name: "api", isPlain: true, preview: &recentLogs{}, sink: newCapture(app.Child{Name: "api", LogPath: path}, time.Time{})}, path
 }
 
 // The api lane prints its errors as one-line JSON, so a stack dump arrives as a

@@ -5,9 +5,9 @@
  * shipped, against a stubbed application.
  */
 import {
-  bindRestMiddleware,
+  bindMiddlewareContext,
   createRestRuntime,
-  projectRestFacts,
+  projectRequestContext,
   canonicalErrorResponse,
 } from "@langwatch/api/rest";
 import {
@@ -67,8 +67,8 @@ function buildApi(overrides: Partial<EvaluatorApi> = {}) {
     app: () => stub,
     credential: "project",
     onError: canonicalErrorResponse,
-    facts: [
-      bindRestMiddleware(projectRestFacts, () => ({
+    middlewareContext: [
+      bindMiddlewareContext(projectRequestContext, () => ({
         projectSlug: "project-one",
         viewerUserId: null,
         actorId: "project-key-1",

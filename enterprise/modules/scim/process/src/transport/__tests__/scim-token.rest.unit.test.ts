@@ -56,9 +56,9 @@ function mount(
   });
   const hono = runtime.mount(scimTokenRest.router(), {
     app: () => app,
-    facts: [
+    middlewareContext: [
       {
-        middleware: scimTokenRestActor,
+        middlewareContext: scimTokenRestActor.name,
         resolve: () => ({ actorId: "user_ana", apiKeyId: "key_ana" }),
       },
     ],

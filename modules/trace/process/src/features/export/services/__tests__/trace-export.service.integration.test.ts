@@ -119,6 +119,7 @@ describe("TraceExportService", () => {
           totalHits: 2,
         });
         const service = TraceExportService.create({
+          authorizeOwnRead: async () => authorization,
           compileFilter: hiddenOriginsOnly,
           traceService,
         });
@@ -153,6 +154,7 @@ describe("TraceExportService", () => {
           totalHits: 5,
         });
         const service = TraceExportService.create({
+          authorizeOwnRead: async () => authorization,
           compileFilter: hiddenOriginsOnly,
           traceService,
         });
@@ -194,6 +196,7 @@ describe("TraceExportService", () => {
           totalHits: 1,
         });
         const service = TraceExportService.create({
+          authorizeOwnRead: async () => authorization,
           compileFilter: hiddenOriginsOnly,
           traceService,
         });
@@ -229,6 +232,7 @@ describe("TraceExportService", () => {
           totalHits: 2,
         });
         const service = TraceExportService.create({
+          authorizeOwnRead: async () => authorization,
           compileFilter: hiddenOriginsOnly,
           traceService,
         });
@@ -282,6 +286,7 @@ describe("TraceExportService", () => {
           totalHits: 1,
         });
         const service = TraceExportService.create({
+          authorizeOwnRead: async () => authorization,
           compileFilter: hiddenOriginsOnly,
           traceService,
         });
@@ -311,6 +316,7 @@ describe("TraceExportService", () => {
           totalHits: 0,
         });
         const service = TraceExportService.create({
+          authorizeOwnRead: async () => authorization,
           compileFilter: hiddenOriginsOnly,
           traceService,
         });
@@ -338,6 +344,7 @@ describe("TraceExportService", () => {
           totalHits: 0,
         });
         const service = TraceExportService.create({
+          authorizeOwnRead: async () => authorization,
           compileFilter: hiddenOriginsOnly,
           traceService,
         });
@@ -365,6 +372,7 @@ describe("TraceExportService", () => {
           totalHits: 0,
         });
         const service = TraceExportService.create({
+          authorizeOwnRead: async () => authorization,
           compileFilter: hiddenOriginsOnly,
           traceService,
         });

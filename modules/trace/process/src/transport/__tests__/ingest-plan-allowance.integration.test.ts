@@ -100,7 +100,11 @@ function bootIngestDoors(assertWithinUsageLimit: EntitlementApi["assertWithinUsa
   });
   const runtime = createRestRuntime({
     doors: {
-      otlp_ingest: otlpIngestDoor((input) => apis.reference(TraceApi).otlpCredential(input)),
+      otlp_ingest: otlpIngestDoor.open(
+        createApiFixture<TraceApi>({
+          otlpCredential: (input) => apis.reference(TraceApi).otlpCredential(input),
+        }),
+      ),
     },
     authorization: restTestAuthorization(),
     identity: { authenticate: () => ({ authenticated: false }) as never },

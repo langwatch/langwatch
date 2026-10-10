@@ -120,6 +120,7 @@ function harness(
   const summary: TraceSummaryReader = reads.summary ?? { getByTraceId };
 
   const app = TraceModule.fromDependencies({
+    authorizeRead: async ({ projectId }) => ownProof({ projectId }),
     storedObjects: createApiFixture<StoredObjectApi>(),
     spanCostSuggestions: createApiFixture<TraceSpanCostSuggestion>(),
     traces: {
@@ -182,6 +183,7 @@ describe("TraceModule", () => {
         });
 
         expect(tryGetById).toHaveBeenCalledWith({
+          authorization: expect.anything(),
           projectId: "project-1",
           traceId: "trace-1",
           protections: PROTECTIONS,
@@ -218,6 +220,7 @@ describe("TraceModule", () => {
         });
 
         expect(tryGetById).toHaveBeenCalledWith({
+          authorization: expect.anything(),
           projectId: "project-1",
           traceId: "trace-1",
           protections: PROTECTIONS,
@@ -571,8 +574,13 @@ describe("TraceModule", () => {
           groupBy: "none",
           pageSize: 10,
         });
-        expect(getAllTracesForProject.mock.calls[0]?.[2]).toBeUndefined();
+        const ownRead = getAllTracesForProject.mock.calls[0]?.[2]?.ownRead;
+        expect(getAllTracesForProject.mock.calls[0]?.[2]).toEqual({ ownRead });
+        expect(ownRead?.grants).toEqual([
+          expect.objectContaining({ projectId: "project-1", kind: "own" }),
+        ]);
         expect(getTracesWithSpans).toHaveBeenCalledWith({
+          authorization: ownRead,
           projectId: "project-1",
           traceIds: ["trace-1", "trace-2"],
           protections: PROTECTIONS,

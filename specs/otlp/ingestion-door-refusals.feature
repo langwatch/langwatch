@@ -86,24 +86,18 @@ Feature: OTLP ingestion doors refuse what they cannot safely hold
       Then the batch is accepted
       And its data point is sent on to the metric pipeline against the credential's own project
 
-  Rule: The trace door asks for the key before it reads the path alias or the body
+  Rule: An exporter path no known misconfiguration produces is not found before any key is asked
 
     @integration
-    Scenario: The trace door refuses a missing key before it judges the exporter path
-      Given the trace door verifies the exporter's key before the body (Alex, 2026-10-10, W02-DOOR-SHAPE)
-      When an exporter with no key posts to an exporter path the receiver does not recognise
-      Then the export is refused as unauthenticated, in the receiver's own body
-      When an exporter with a valid key posts to that same path
+    Scenario: The trace door answers an unknown exporter path as not found before it asks for the key
+      Given only the canonical OTLP routes are declared, and the host rewrites known misconfigured paths onto them before routing (Alex, 2026-10-10, OTLP-404-SHAPE)
+      When an exporter with or without a key posts to an exporter path no known misconfiguration produces
       Then the export is answered as not found
       And nothing is recorded
 
-  Rule: The log and metric doors ask for the key before they read the path alias or the body
-
     @integration
-    Scenario: The log and metric doors refuse a missing key before they judge the exporter path
-      Given the log and metric doors verify the exporter's key before the body (Alex, 2026-10-10, W02-DOOR-SHAPE)
-      When an exporter with no key posts to an exporter path the log or metric receiver does not recognise
-      Then the export is refused as unauthenticated, in the receiver's own body
-      When an exporter with a valid key posts to that same path
+    Scenario: The log and metric doors answer an unknown exporter path as not found before they ask for the key
+      Given only the canonical OTLP routes are declared, and the host rewrites known misconfigured paths onto them before routing (Alex, 2026-10-10, OTLP-404-SHAPE)
+      When an exporter with or without a key posts to an exporter path the log or metric receiver does not recognise
       Then the export is answered as not found
       And nothing is recorded

@@ -30,7 +30,6 @@ import type {
   IssuedLicenseRecord,
   IssuedLicenseRepository,
 } from "../repositories/issued-license.repository.ts";
-import { bearerTokenOf } from "../rules/connect-presented-credential.rules.ts";
 import type { ConnectCredentialOutcome } from "./connect-credential.service.ts";
 import type { ConnectManagedKeys } from "./license-registry.service.ts";
 
@@ -75,7 +74,7 @@ export class LicenseSyncService {
   /** The `licence_token` door's check: who presented this bearer, or its refusal thrown. */
   async verify(input: ConnectPresentedCredential): Promise<ConnectLicenceCaller> {
     const resolution = await this.options.credentials.resolve({
-      token: bearerTokenOf(input.authorization),
+      token: input.bearer ?? "",
       instanceId: input.instanceId,
     });
     if (!resolution.ok) throw SYNC_REFUSALS[resolution.code]();

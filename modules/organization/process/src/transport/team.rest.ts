@@ -1,8 +1,4 @@
-import {
-  defineRestRouter,
-  MANAGEMENT_API_VERSION,
-  type RestTransportDeclaration,
-} from "@langwatch/api/rest";
+import { defineRestRouter, MANAGEMENT_API_VERSION } from "@langwatch/api/rest";
 import type { AuthzApi, AuthzTeamMemberBinding } from "@langwatch/authz-contract";
 import { moduleApi } from "@langwatch/module";
 /**
@@ -32,7 +28,7 @@ import {
 import type { Project } from "@langwatch/project-contract";
 import type { z } from "zod";
 
-import { keyCallerOf, organizationKeyFacts } from "./organization-management.rest.ts";
+import { keyCallerOf, organizationKeyContext } from "./organization-management.rest.ts";
 
 /**
  * What the `/api/teams` family reaches, as flat operations the organization's
@@ -94,14 +90,9 @@ function memberResponse(
 }
 
 /**
- * The `/api/teams` family, and its `/api/v1/teams` canonical twin. The type is
- * written out rather than inferred so the declaration emit stays portable.
+ * The `/api/teams` family, and its `/api/v1/teams` canonical twin.
  */
-export const teamsRest: Readonly<{
-  protocol: "rest";
-  namespace: string;
-  router: () => RestTransportDeclaration<TeamManagementApi>;
-}> = defineRestRouter(TeamManagementApi)
+export const teamsRest = defineRestRouter(TeamManagementApi)
   .withNamespace("teams")
   .withVersion(MANAGEMENT_API_VERSION)
   .withCredential("organization")
@@ -248,7 +239,7 @@ export const teamsRest: Readonly<{
     tags: ["Teams"],
     description: "Add a member to a team",
   })
-  .withMiddleware(organizationKeyFacts)
+  .withMiddlewareContext(organizationKeyContext)
   .withAudit("management.team.add-member")
   .handle(async ({ app, input, scope, actor }, key) => {
     const ledgerActor =
@@ -278,7 +269,7 @@ export const teamsRest: Readonly<{
     tags: ["Teams"],
     description: "Remove a member from a team",
   })
-  .withMiddleware(organizationKeyFacts)
+  .withMiddlewareContext(organizationKeyContext)
   .withAudit("management.team.remove-member")
   .handle(async ({ app, input, scope, actor }, key) => {
     await app.removeTeamMember(

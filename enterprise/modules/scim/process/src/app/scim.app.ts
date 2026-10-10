@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import type { RestIdentity } from "@langwatch/api/hosting";
 /**
  * The SCIM feature's application: what its six doors call.
  *
@@ -19,7 +18,6 @@ import type { RestIdentity } from "@langwatch/api/hosting";
  * is returned once and never again — and a rule about which tenant a push
  * provisions have one place to live rather than six.
  */
-import { recordScimCredential } from "@langwatch/api/rest";
 import { AuditLogApi } from "@langwatch/audit-log-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
 import {
@@ -208,14 +206,6 @@ function readJson(body: string): unknown {
 }
 
 /** The bearer a request presented, or nothing where it presented none. */
-function findBearer(authorization: string | null): string | null {
-  if (!authorization?.startsWith("Bearer ")) return null;
-
-  const token = authorization.slice(7).trim();
-
-  return token.length > 0 ? token : null;
-}
-
 type ScimDirectoryMoveSender = Pick<EventingCommandSender<RequestDirectoryMoveCommandData>, "send">;
 
 type ScimAppOptions = {
@@ -470,36 +460,12 @@ export class ScimModule implements ScimApiContract {
 
   // ── The directory credential ─────────────────────────────────────────────
 
-  /** The `scimToken` door, bound to this module's own families (ARCHITECTURE.md §4). */
-  get directoryDoor(): RestIdentity {
-    return {
-      authenticate: () => {
-        throw new Error("The SCIM door asks no permission of the bearer it was opened on.");
-      },
-      identify: async ({ request }) => {
-        const directory = await this.authenticateDirectory({
-          // oxlint-disable-next-line langwatch/auth-header-read -- this is the SCIM door's own read
-          authorization: request.headers.get("authorization"),
-          method: request.method,
-          path: new URL(request.url).pathname,
-        });
-
-        recordScimCredential(request, directory);
-
-        return {
-          actor: { type: "api_key", id: directory.id },
-          scope: { tier: "organization", id: directory.organizationId },
-        };
-      },
-    };
-  }
-
   async authenticateDirectory(input: {
-    authorization: string | null;
+    bearer: string | null;
     method?: string | undefined;
     path?: string | undefined;
   }): Promise<ScimDirectoryScope> {
-    const token = findBearer(input.authorization);
+    const token = input.bearer;
 
     // Unattributable by construction — there is no organization to file it
     // under, and a table unauthenticated traffic can write is a table anybody

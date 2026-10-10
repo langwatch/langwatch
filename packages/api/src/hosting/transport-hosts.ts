@@ -9,22 +9,22 @@ import type { DependencyToken } from "@langwatch/module";
 export type MountableTransport = object;
 
 /**
- * One value a module bound for a fact its own routes declare, as the doors
- * carry it. The shape is erased here on purpose: what a fact is and how it
- * resolves belongs to the transport toolkit, and this package knows neither.
+ * One thing a module bound for its own doors (a credential, its API door or a middleware
+ * context), as the doors carry it. The shape is erased here on purpose: what each is and
+ * how it resolves belongs to the transport toolkit, and this file knows neither.
  */
-export type TransportFactBinding = object;
+export type MiddlewareBinding = object;
 
 /** What one install states beyond the declaration, as a REST host reads it. */
 export type FeatureRestMountOptions = Readonly<{
-  /** One binding per module-specific fact the declaration's routes name. */
-  facts?: readonly TransportFactBinding[];
+  /** What the module bound for the declaration's routes. */
+  middlewareBindings?: readonly MiddlewareBinding[];
 }>;
 
 /** What one install states beyond the declaration, as a tRPC host reads it. */
 export type FeatureTrpcMountOptions = Readonly<{
-  /** One binding per module-specific fact the declaration's procedures name. */
-  facts?: readonly TransportFactBinding[];
+  /** What the module bound for the declaration's procedures. */
+  middlewareBindings?: readonly MiddlewareBinding[];
 }>;
 
 /** A process's REST door, as the installer calls it. */
@@ -46,9 +46,9 @@ export interface FeatureTrpcHost<Mounted> {
 }
 
 /** What one installed module bound for the doors, by the module's name. */
-export type BoundTransportFacts = Readonly<{
+export type BoundMiddlewareBindings = Readonly<{
   feature: string;
-  facts: readonly TransportFactBinding[];
+  middlewareBindings: readonly MiddlewareBinding[];
 }>;
 
 /** One module's App this build installed, reached by its contract token. */
@@ -64,6 +64,6 @@ export interface TransportPeers {
    * Only a door a deployment may legitimately run without asks this way.
    */
   find<Instance>(token: DependencyToken<Instance>): Instance | undefined;
-  /** Every installed module's fact bindings, for the door the process opens before its hosts. */
-  readonly facts: readonly BoundTransportFacts[];
+  /** Every installed module's bindings, for the door the process opens before its hosts. */
+  readonly middlewareBindings: readonly BoundMiddlewareBindings[];
 }

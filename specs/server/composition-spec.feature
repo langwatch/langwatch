@@ -305,7 +305,7 @@ Feature: Composing a process from feature installers
       Then architecture lint requests an inline inferred handler beside those declarations
 
     @unimplemented @typecheck @unit
-    Scenario: Middleware facts are parsed trailing arguments
+    Scenario: Middleware context values are parsed trailing arguments
       Given two middleware declarations with distinct output schemas
       When both middleware results pass parsing
       Then the handler receives the two inferred values as trailing arguments in declaration order
@@ -313,7 +313,7 @@ Feature: Composing a process from feature installers
       And omitting a middleware removes its argument from the handler type
 
     @unimplemented @integration
-    Scenario: Malformed middleware facts never reach a handler
+    Scenario: Malformed middleware context never reaches a handler
       Given authentication middleware declares a tenant identity output schema
       When its result does not match that schema
       Then the handler is not invoked
@@ -322,11 +322,11 @@ Feature: Composing a process from feature installers
     @unimplemented @typecheck @architecture @unit
     Scenario: Middleware cannot smuggle transport objects into domain input
       Given middleware reads a SCIM credential or verifies a webhook signature
-      When it supplies facts to a governed handler
-      Then only parsed semantic facts are supplied as trailing arguments
+      When it supplies middleware context to a governed handler
+      Then only parsed semantic values are supplied as trailing arguments
       And headers, credentials, request and response objects remain inaccessible
       And aliases and nested input properties do not bypass that boundary
-      And the facts cannot replace the authorized principal or tenant target
+      And those values cannot replace the authorized principal or tenant target
 
     @unimplemented @integration
     Scenario: Special response protocols have explicit framework contracts

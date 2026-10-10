@@ -14994,6 +14994,9 @@ importers:
         specifier: 'catalog:'
         version: 4.6.5
     devDependencies:
+      '@types/node':
+        specifier: ^26.0.1
+        version: 26.2.0
       typescript:
         specifier: 'catalog:'
         version: 7.0.2

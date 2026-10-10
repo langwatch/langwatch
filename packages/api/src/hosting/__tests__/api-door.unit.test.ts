@@ -33,13 +33,16 @@ function door(): ApiDoor {
   };
 }
 
-const someFact = { fact: "callerEmail" };
+const someBinding = { middlewareContext: "callerEmail" };
 
 describe("opening the API door", () => {
   describe("given no installed module binds it", () => {
     /** @scenario "An api process with no module binding the door refuses to boot" */
     it("refuses by name, pointing at auth", () => {
-      const opening = () => openApiDoor({ facts: [{ feature: "trace", facts: [someFact] }] });
+      const opening = () =>
+        openApiDoor({
+          middlewareBindings: [{ feature: "trace", middlewareBindings: [someBinding] }],
+        });
 
       expect(opening).toThrow(MissingApiDoorError);
       expect(opening).toThrow(/"auth"/);
@@ -51,9 +54,9 @@ describe("opening the API door", () => {
     it("refuses, naming both", () => {
       const opening = () =>
         openApiDoor({
-          facts: [
-            { feature: "auth", facts: [bindApiDoor(door())] },
-            { feature: "impostor", facts: [bindApiDoor(door())] },
+          middlewareBindings: [
+            { feature: "auth", middlewareBindings: [bindApiDoor(door())] },
+            { feature: "impostor", middlewareBindings: [bindApiDoor(door())] },
           ],
         });
 
@@ -62,15 +65,15 @@ describe("opening the API door", () => {
     });
   });
 
-  describe("given auth binds it among its other facts", () => {
+  describe("given auth binds it among its other middleware bindings", () => {
     /** @scenario "The bound door is the one every host answers through" */
     it("opens exactly the door auth bound", () => {
       const bound = door();
 
       const opened = openApiDoor({
-        facts: [
-          { feature: "trace", facts: [someFact] },
-          { feature: "auth", facts: [someFact, bindApiDoor(bound)] },
+        middlewareBindings: [
+          { feature: "trace", middlewareBindings: [someBinding] },
+          { feature: "auth", middlewareBindings: [someBinding, bindApiDoor(bound)] },
         ],
       });
 
@@ -78,10 +81,14 @@ describe("opening the API door", () => {
     });
 
     /** @scenario "The bound door is the one every host answers through" */
-    it("carries none of the keys a REST or tRPC mount takes a fact by", () => {
+    it("carries none of the keys a REST or tRPC mount takes middleware context by", () => {
       const binding = bindApiDoor(door());
 
-      expect("middleware" in binding || "credential" in binding || "fact" in binding).toBe(false);
+      expect(
+        "middlewareContext" in binding ||
+          "trpcMiddlewareContext" in binding ||
+          "credential" in binding,
+      ).toBe(false);
     });
   });
 });

@@ -142,18 +142,18 @@ Feature: The REST runtime renders what a transport may not hand-roll
       And a matching signature hands the handler the exact bytes that were verified
 
     @integration
-    Scenario: A public route's credential fact refuses before the body is validated
-      Given a public route whose fact reads the credential alone and refuses with a hidden 404
+    Scenario: A public route's credential context refuses before the body is validated
+      Given a public route whose middleware context reads the credential alone and refuses with a hidden 404
       When a caller it refuses sends a body that fails its schema
       Then it is refused with 404, never 422, and the handler is not reached
       And a caller it admits is refused with 422 for the same body, and reaches the handler with a valid one
 
     @integration
-    Scenario: A fact that reads the parsed input resolves after the body is validated
-      Given a route whose fact is declared to read the parsed input
+    Scenario: A middleware context that reads the parsed input resolves after the body is validated
+      Given a route whose middleware context is declared to read the parsed input
       When a caller sends a valid body
-      Then the fact sees the validated body
-      And a body that fails its schema is refused with 422 before the fact resolves
+      Then the context sees the validated body
+      And a body that fails its schema is refused with 422 before the context resolves
 
     @integration
     Scenario: The project a route acts on is still resolved from its parsed input

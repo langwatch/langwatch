@@ -101,13 +101,16 @@ export function resolveIdentity(env: NodeJS.ProcessEnv = process.env): DaemonIde
   // endpoint and API key happen to match (this is also what keeps tests from
   // colliding with a developer's real daemon).
   const configPath = env.LANGWATCH_CLI_CONFIG ?? "";
+  // The CA bundle is fixed when a process starts, so a daemon booted without
+  // the caller's NODE_EXTRA_CA_CERTS must not serve a caller that has it.
+  const caBundle = env.NODE_EXTRA_CA_CERTS ?? "";
 
   // API keys are high-entropy identity material, not user passwords. This
   // digest is a deterministic, non-reversible namespace key shared by the CLI
   // and daemon; a password KDF would add latency without improving that model.
   const hasher = crypto.createHash("sha256");
   // lgtm[js/insufficient-password-hash]
-  const fingerprint = hasher.update(`${endpoint}\0${apiKey}\0${uid}\0${configPath}`).digest("hex");
+  const fingerprint = hasher.update(`${endpoint}\0${apiKey}\0${uid}\0${configPath}\0${caBundle}`).digest("hex");
 
   const socketDir = daemonSocketDir();
   // 16 hex chars = 64 bits. A collision needs ~2^32 distinct identities on one

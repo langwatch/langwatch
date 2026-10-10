@@ -59,7 +59,7 @@ describe("the Agent Testing route", () => {
       renderWithDesignSystem(<AgentTestingRoute />);
 
       expect(screen.queryByTestId("agent-testing-page")).toBeNull();
-      expect(screen.getByText(/You need access to/)).toBeInTheDocument();
+      expect(screen.getByText(/You don't have access to/)).toBeInTheDocument();
     });
   });
 

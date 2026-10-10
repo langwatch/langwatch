@@ -5,7 +5,7 @@
  * @see specs/rbac/grants-rest-api.feature
  */
 import {
-  bindRestMiddleware,
+  bindMiddlewareContext,
   createCanonicalFamilyErrorHandler,
   createRestRuntime,
   IdempotencyConflictError,
@@ -23,8 +23,8 @@ import type { AuthzCompatibilityLedger } from "../../app/authz.app.ts";
 import { StubAuthzManagedGrantRepository } from "../../repositories/__tests__/support/authz-managed-grant.stub.ts";
 import { AuthzGrantManagementService } from "../../services/authz-grant-management.service.ts";
 import { AuthzGrantWriterService } from "../../services/authz-grant-writer.service.ts";
-import { authzGrantRest, grantRestFacts } from "../authz-grant.rest.ts";
-import { authzRoleBindingRest, roleBindingRestFacts } from "../authz-role-binding.rest.ts";
+import { authzGrantRest, grantRestContext } from "../authz-grant.rest.ts";
+import { authzRoleBindingRest, roleBindingRestContext } from "../authz-role-binding.rest.ts";
 
 const ORG = "org-1";
 const KEY: AuthzPrincipalRef = { type: "apiKey", id: "key-caller" };
@@ -186,7 +186,7 @@ function world({
     actor: { type: "user" as const, id: "user-owner" },
     scope: { tier: "organization" as const, id: ORG },
   });
-  const facts = () => ({
+  const context = () => ({
     organizationId: ORG,
     actor: { type: "user" as const, id: "user-owner" },
     caller: KEY,
@@ -209,12 +209,12 @@ function world({
   const grantsHono = runtime.mount(authzGrantRest.router(), {
     app: () => app,
     onError,
-    facts: [bindRestMiddleware(grantRestFacts, facts)],
+    middlewareContext: [bindMiddlewareContext(grantRestContext, context)],
   });
   const bindingsHono = runtime.mount(authzRoleBindingRest.router(), {
     app: () => app,
     onError,
-    facts: [bindRestMiddleware(roleBindingRestFacts, facts)],
+    middlewareContext: [bindMiddlewareContext(roleBindingRestContext, context)],
   });
 
   const send = (

@@ -1,8 +1,4 @@
-import {
-  bindRestMiddleware,
-  principalOfCredential,
-  projectCredentialOfRequest,
-} from "@langwatch/api/rest";
+import { principalOfCredential, projectCredentialOfRequest } from "@langwatch/api/rest";
 import type {
   ModelProviderApi,
   ModelProviderServerConfig,
@@ -17,7 +13,7 @@ import { ModelProviderKeysSealService } from "./services/model-provider-keys-sea
 import { ModelProviderCustomModelsMigrateTask } from "./tasks/model-provider-custom-models-migrate.task.ts";
 import { ModelRegistrySyncTask } from "./tasks/model-registry-sync.task.ts";
 import { llmModelCostTrpcTransport } from "./transport/llm-model-cost.trpc.ts";
-import { modelDefaultsRest, modelDefaultsRestCredential } from "./transport/model-defaults.rest.ts";
+import { modelDefaultsRest } from "./transport/model-defaults.rest.ts";
 import { modelProviderRest } from "./transport/model-provider.rest.ts";
 import { modelProviderTrpcTransport } from "./transport/model-provider.trpc.ts";
 import { playgroundRest } from "./transport/playground.rest.ts";
@@ -39,15 +35,15 @@ export const modelProviderProcessModule: PublishedProcessModule<
     llmModelCostTrpcTransport,
     translateTrpcTransport,
   )
-  .withTransportFacts(() => [
-    bindRestMiddleware(modelDefaultsRestCredential, (context) => {
-      const credential = projectCredentialOfRequest(context.req.raw);
+  .provideMiddlewareContext({
+    modelDefaultsRestCredential: (request) => {
+      const credential = projectCredentialOfRequest(request);
       const principal = principalOfCredential(credential);
       if (principal === null || credential.type === "legacyProjectKey") return null;
 
       return { principal, userId: credential.userId, organizationId: credential.organizationId };
-    }),
-  ])
+    },
+  })
   .withTasks(async ({ secrets, repositories }) => [
     await secrets.into(ModelProviderModule.operationalSecrets.openRouter, (apiKey) =>
       ModelRegistrySyncTask.create({ apiKey: () => apiKey }),

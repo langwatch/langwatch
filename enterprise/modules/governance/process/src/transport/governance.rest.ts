@@ -6,7 +6,7 @@
  */
 import {
   baseResponses,
-  defineRestMiddleware,
+  defineMiddlewareContext,
   defineRestRouter,
   MANAGEMENT_API_VERSION,
 } from "@langwatch/api/rest";
@@ -32,7 +32,7 @@ const logger = createLogger("langwatch:api:governance");
  * The member behind the project credential, or nothing for a legacy project
  * token. The org template administration routes refuse the latter.
  */
-export const governanceRestCaller = defineRestMiddleware(
+export const governanceRestCaller = defineMiddlewareContext(
   "governanceRestCaller",
   z.object({ viewerUserId: z.string().nullable() }),
 );
@@ -42,7 +42,7 @@ export const governanceRestCaller = defineRestMiddleware(
  * anything else reads as the route mount, so the wire cannot claim to be an
  * in-process surface (`trpc` / `mcp`).
  */
-export const governanceRestSurface = defineRestMiddleware(
+export const governanceRestSurface = defineMiddlewareContext(
   "governanceRestSurface",
   z
     .string()
@@ -50,8 +50,8 @@ export const governanceRestSurface = defineRestMiddleware(
     .transform((declared): "hono" | "cli" => (declared?.toLowerCase() === "cli" ? "cli" : "hono")),
 );
 
-type CallerFacts = z.output<typeof governanceRestCaller.schema>;
-type SurfaceFacts = z.output<typeof governanceRestSurface.schema>;
+type CallerContext = z.output<typeof governanceRestCaller.schema>;
+type SurfaceContext = z.output<typeof governanceRestSurface.schema>;
 
 /** One template row on the wire this family has always published. */
 function toTemplateDto(row: {
@@ -87,21 +87,21 @@ function toTemplateDto(row: {
  * project token bypasses the `aiTools:manage` ceiling, so without this its
  * holder could read every org template's OTTL and mutate org config.
  */
-function boundMemberId(facts: CallerFacts): string {
-  if (facts.viewerUserId === null) throw new UserBoundCallerRequiredError();
+function boundMemberId(context: CallerContext): string {
+  if (context.viewerUserId === null) throw new UserBoundCallerRequiredError();
 
-  return facts.viewerUserId;
+  return context.viewerUserId;
 }
 
 /** Who a write is attributed to. A key acting as nobody is refused upstream. */
 function callerOf(input: {
   projectId: string;
-  facts: CallerFacts;
-  surface: SurfaceFacts;
+  context: CallerContext;
+  surface: SurfaceContext;
 }): GovernanceProjectCaller {
   return {
     projectId: input.projectId,
-    userId: boundMemberId(input.facts),
+    userId: boundMemberId(input.context),
     surface: input.surface,
   };
 }
@@ -130,7 +130,7 @@ export const governanceRest = defineRestRouter(GovernanceRestApi)
   .get("/ingestion-templates/admin", "listIngestionTemplatesForAdmin")
   .withPermission("aiTools:manage")
   .withOutput(governanceRestTemplateListSchema)
-  .withMiddleware(governanceRestCaller)
+  .withMiddlewareContext(governanceRestCaller)
   .withDocs({
     operationId: "getApiGovernanceIngestionTemplatesAdmin",
     summary: "List ingestion templates (admin shape, includes OTTL)",
@@ -139,8 +139,8 @@ export const governanceRest = defineRestRouter(GovernanceRestApi)
       "Same union as the user list but includes the canonical `ottl_rules` source for every row. Used by admin tooling to render the transparency block / authoring drawer.",
     responses: { ...baseResponses },
   })
-  .handle(async ({ app, scope }, facts) => {
-    boundMemberId(facts);
+  .handle(async ({ app, scope }, context) => {
+    boundMemberId(context);
     const rows = await app.listIngestionTemplatesForAdmin({ projectId: scope.id });
 
     return { data: rows.map(toTemplateDto) };
@@ -154,7 +154,7 @@ export const governanceRest = defineRestRouter(GovernanceRestApi)
   .withParams(governanceRestTemplateParamsSchema)
   .withPermission("aiTools:manage")
   .withOutput(governanceRestTemplateDetailSchema)
-  .withMiddleware(governanceRestCaller)
+  .withMiddlewareContext(governanceRestCaller)
   .withDocs({
     operationId: "getApiGovernanceIngestionTemplatesById",
     summary: "Get ingestion template",
@@ -163,8 +163,8 @@ export const governanceRest = defineRestRouter(GovernanceRestApi)
       "Single-template lookup by id, scoped to the caller's organization, including the canonical `ottl_rules`. Cross-org probes collapse to 404 (no enumeration vector). Members read the same row without `ottl_rules` from GET /ingestion-templates.",
     responses: { ...baseResponses },
   })
-  .handle(async ({ app, input, scope }, facts) => {
-    boundMemberId(facts);
+  .handle(async ({ app, input, scope }, context) => {
+    boundMemberId(context);
 
     return {
       ingestion_template: toTemplateDto(
@@ -178,7 +178,7 @@ export const governanceRest = defineRestRouter(GovernanceRestApi)
   .withPermission("aiTools:manage")
   .withOutput(governanceRestTemplateDetailSchema)
   .withStatus(201)
-  .withMiddleware(governanceRestCaller, governanceRestSurface)
+  .withMiddlewareContext(governanceRestCaller, governanceRestSurface)
   .withDocs({
     operationId: "postApiGovernanceIngestionTemplates",
     summary: "Create org-authored ingestion template",
@@ -187,8 +187,8 @@ export const governanceRest = defineRestRouter(GovernanceRestApi)
       "Creates a brand-new template scoped to the caller's organization. Slug is auto-generated. Platform rows (organizationId IS NULL) are NEVER created via this endpoint — admins customize platform defaults via POST /ingestion-templates/clone instead.",
     responses: { ...baseResponses },
   })
-  .handle(async ({ app, input, scope }, facts, surface) => {
-    const by = callerOf({ projectId: scope.id, facts, surface });
+  .handle(async ({ app, input, scope }, context, surface) => {
+    const by = callerOf({ projectId: scope.id, context, surface });
     const row = await app.createIngestionTemplate(
       {
         sourceType: input.source_type,
@@ -215,7 +215,7 @@ export const governanceRest = defineRestRouter(GovernanceRestApi)
   .withInput(governanceRestUpdateOttlRulesSchema)
   .withPermission("aiTools:manage")
   .withOutput(governanceRestTemplateDetailSchema)
-  .withMiddleware(governanceRestCaller, governanceRestSurface)
+  .withMiddlewareContext(governanceRestCaller, governanceRestSurface)
   .withDocs({
     operationId: "patchApiGovernanceIngestionTemplatesByIdOttlRules",
     summary: "Replace ottl_rules on an org-authored template",
@@ -224,10 +224,10 @@ export const governanceRest = defineRestRouter(GovernanceRestApi)
       "Audit-logged with line counts pre/post. Platform-published rows reject with 403. Admins must clone a platform row before editing it.",
     responses: { ...baseResponses },
   })
-  .handle(async ({ app, input, scope }, facts, surface) => {
+  .handle(async ({ app, input, scope }, context, surface) => {
     const row = await app.updateIngestionTemplateOttlRules(
       { id: input.ingestionTemplateId, ottlRules: input.ottl_rules },
-      callerOf({ projectId: scope.id, facts, surface }),
+      callerOf({ projectId: scope.id, context, surface }),
     );
 
     return { ingestion_template: toTemplateDto(row) };
@@ -237,7 +237,7 @@ export const governanceRest = defineRestRouter(GovernanceRestApi)
   .withParams(governanceRestTemplateParamsSchema)
   .withPermission("aiTools:manage")
   .withOutput(governanceRestTemplateArchivedSchema)
-  .withMiddleware(governanceRestCaller, governanceRestSurface)
+  .withMiddlewareContext(governanceRestCaller, governanceRestSurface)
   .withDocs({
     operationId: "deleteApiGovernanceIngestionTemplatesById",
     summary: "Soft-archive an org-authored template",
@@ -246,10 +246,10 @@ export const governanceRest = defineRestRouter(GovernanceRestApi)
       "Marks the row archived; existing ingestion keys continue to land traces but the row disappears from list views. Platform-published rows reject with 403.",
     responses: { ...baseResponses },
   })
-  .handle(async ({ app, input, scope }, facts, surface) => {
+  .handle(async ({ app, input, scope }, context, surface) => {
     await app.archiveIngestionTemplate(
       { id: input.ingestionTemplateId },
-      callerOf({ projectId: scope.id, facts, surface }),
+      callerOf({ projectId: scope.id, context, surface }),
     );
 
     return { archived: true as const };
@@ -260,7 +260,7 @@ export const governanceRest = defineRestRouter(GovernanceRestApi)
   .withPermission("aiTools:manage")
   .withOutput(governanceRestTemplateDetailSchema)
   .withStatus(201)
-  .withMiddleware(governanceRestCaller, governanceRestSurface)
+  .withMiddlewareContext(governanceRestCaller, governanceRestSurface)
   .withDocs({
     operationId: "postApiGovernanceIngestionTemplatesClone",
     summary: "Clone a platform-published template into the caller's org",
@@ -269,10 +269,10 @@ export const governanceRest = defineRestRouter(GovernanceRestApi)
       "Forks the source row's source_type / display_name / OTTL into a fresh org-authored row that the admin can then edit via PATCH /ingestion-templates/:id/ottl-rules.",
     responses: { ...baseResponses },
   })
-  .handle(async ({ app, input, scope }, facts, surface) => {
+  .handle(async ({ app, input, scope }, context, surface) => {
     const row = await app.cloneIngestionTemplate(
       { sourceTemplateId: input.source_template_id },
-      callerOf({ projectId: scope.id, facts, surface }),
+      callerOf({ projectId: scope.id, context, surface }),
     );
 
     return { ingestion_template: toTemplateDto(row) };

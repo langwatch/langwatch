@@ -13,7 +13,7 @@ import type { z } from "zod";
 
 import { SurfaceUnverifiedError } from "./errors.ts";
 import type { ApiDoor, RestIdentity } from "./hosting/api-door.ts";
-import type { TransportFactBinding } from "./hosting/transport-hosts.ts";
+import type { MiddlewareBinding } from "./hosting/transport-hosts.ts";
 import { ConnectUpgradeRouter, type UpgradeHandler } from "./ports.ts";
 import { projectCredentialOfRequest } from "./rest/credential.ts";
 import { assertKeyKind, keyCredentialOf, type RestKeyKinds } from "./rest/key-credential.ts";
@@ -134,50 +134,53 @@ export type WebSocketSessionCaller<Session extends z.ZodType> = Readonly<{
   session: z.output<Session>;
 }>;
 
-type ProtocolShape<Facts extends z.ZodObject> = Readonly<{
+type ProtocolShape<Context extends z.ZodObject> = Readonly<{
   path: string;
   maxPayloadBytes: number;
-  facts: Facts;
-  headers: { [Key in keyof z.input<Facts>]: string };
+  middlewareContext: Context;
+  headers: { [Key in keyof z.input<Context>]: string };
 }>;
 
-type OpenProtocol<App, Facts extends z.ZodObject> = ProtocolShape<Facts> &
+type OpenProtocol<App, Context extends z.ZodObject> = ProtocolShape<Context> &
   Readonly<{
     door?: undefined;
-    handle: (app: App, connection: ProtocolConnection, facts: z.output<Facts>) => Promise<void>;
+    handle: (app: App, connection: ProtocolConnection, context: z.output<Context>) => Promise<void>;
   }>;
 
 /** A door refusal opens the socket too, so the protocol answers it in its own frames. */
-type DooredProtocol<App, Facts extends z.ZodObject> = ProtocolShape<Facts> &
+type DooredProtocol<App, Context extends z.ZodObject> = ProtocolShape<Context> &
   Readonly<{
     door: WebSocketDoor;
     handle: (
       app: App,
       connection: ProtocolConnection,
-      admitted: Readonly<{ facts: z.output<Facts>; caller: WebSocketCaller }>,
+      admitted: Readonly<{ middlewareContext: z.output<Context>; caller: WebSocketCaller }>,
     ) => Promise<void>;
     refuse: (app: App, connection: ProtocolConnection, failure: Error) => Promise<void>;
   }>;
 
 type SessionKeyProtocol<
   App,
-  Facts extends z.ZodObject,
+  Context extends z.ZodObject,
   Session extends z.ZodType,
-> = ProtocolShape<Facts> &
+> = ProtocolShape<Context> &
   Readonly<{
     door: WebSocketSessionKeyDoor<Session>;
     handle: (
       app: App,
       connection: ProtocolConnection,
-      admitted: Readonly<{ facts: z.output<Facts>; caller: WebSocketSessionCaller<Session> }>,
+      admitted: Readonly<{
+        middlewareContext: z.output<Context>;
+        caller: WebSocketSessionCaller<Session>;
+      }>,
     ) => Promise<void>;
     refuse: (app: App, connection: ProtocolConnection, failure: Error) => Promise<void>;
   }>;
 
-type ProtocolOptions<App, Facts extends z.ZodObject, Session extends z.ZodType> =
-  | OpenProtocol<App, Facts>
-  | DooredProtocol<App, Facts>
-  | SessionKeyProtocol<App, Facts, Session>;
+type ProtocolOptions<App, Context extends z.ZodObject, Session extends z.ZodType> =
+  | OpenProtocol<App, Context>
+  | DooredProtocol<App, Context>
+  | SessionKeyProtocol<App, Context, Session>;
 
 type Admission<Caller> = Readonly<{ caller: Caller }> | Readonly<{ failure: Error }>;
 
@@ -187,30 +190,30 @@ type ProtocolDoors = Readonly<{
   session_key: () => RestIdentity | null;
 }>;
 
-function isSessionKeyProtocol<App, Facts extends z.ZodObject, Session extends z.ZodType>(
-  options: ProtocolOptions<App, Facts, Session>,
-): options is SessionKeyProtocol<App, Facts, Session> {
+function isSessionKeyProtocol<App, Context extends z.ZodObject, Session extends z.ZodType>(
+  options: ProtocolOptions<App, Context, Session>,
+): options is SessionKeyProtocol<App, Context, Session> {
   return options.door?.credential === "session_key";
 }
 
-/** Owns the upgrade and socket lifecycle; feature code receives only declared facts. */
+/** Owns the upgrade and socket lifecycle; feature code receives only declared context. */
 export class WebSocketProtocol<
   App,
-  Facts extends z.ZodObject,
+  Context extends z.ZodObject,
   Session extends z.ZodType = z.ZodType,
 > {
   readonly protocol = "websocket" as const;
-  readonly #options: ProtocolOptions<App, Facts, Session>;
+  readonly #options: ProtocolOptions<App, Context, Session>;
   /** One server per mount: a dev reload mounts the next generation before the old one drains. */
   readonly #servers = new Set<WebSocketServer>();
 
-  static create<App, Facts extends z.ZodObject, Session extends z.ZodType = z.ZodType>(
-    options: ProtocolOptions<App, Facts, Session>,
-  ): WebSocketProtocol<App, Facts, Session> {
+  static create<App, Context extends z.ZodObject, Session extends z.ZodType = z.ZodType>(
+    options: ProtocolOptions<App, Context, Session>,
+  ): WebSocketProtocol<App, Context, Session> {
     return new WebSocketProtocol(options);
   }
 
-  private constructor(options: ProtocolOptions<App, Facts, Session>) {
+  private constructor(options: ProtocolOptions<App, Context, Session>) {
     this.#options = options;
   }
 
@@ -240,9 +243,9 @@ export class WebSocketProtocol<
         }),
       );
 
-      const facts = this.#options.facts.safeParse(values);
+      const parsed = this.#options.middlewareContext.safeParse(values);
 
-      if (!facts.success) {
+      if (!parsed.success) {
         socket.destroy();
 
         return;
@@ -252,7 +255,7 @@ export class WebSocketProtocol<
       if (!options.door) {
         server.handleUpgrade(request, socket, head, (opened) => {
           const connection = openConnection(opened);
-          void options.handle(app, connection, facts.data).catch(() => {
+          void options.handle(app, connection, parsed.data).catch(() => {
             connection.close(1011, "Connection setup failed");
           });
         });
@@ -277,7 +280,7 @@ export class WebSocketProtocol<
           ...upgrade,
           admitted: admitSessionKey({ door: options.door, identity, request }),
           handle: (connection, caller) =>
-            options.handle(app, connection, { facts: facts.data, caller }),
+            options.handle(app, connection, { middlewareContext: parsed.data, caller }),
           refuse,
         });
 
@@ -288,7 +291,7 @@ export class WebSocketProtocol<
         ...upgrade,
         admitted: admit({ door: options.door, identity, request }),
         handle: (connection, caller) =>
-          options.handle(app, connection, { facts: facts.data, caller }),
+          options.handle(app, connection, { middlewareContext: parsed.data, caller }),
         refuse,
       });
     });
@@ -443,16 +446,16 @@ export class WebSocketHost extends ConnectUpgradeRouter {
     this.#handlers.set(pathname, handler);
   }
 
-  /** `facts` are the module's own bindings; its session key door is the one a socket may name. */
+  /** The module's own bindings; its session key door is the one a socket may name. */
   mount(
     declaration: object,
     app: () => unknown,
-    options: Readonly<{ facts?: readonly TransportFactBinding[] }> = {},
+    options: Readonly<{ middlewareBindings?: readonly MiddlewareBinding[] }> = {},
   ): void {
     if (!(declaration instanceof WebSocketProtocol))
       throw new TypeError("A websocket transport must be declared with WebSocketProtocol.create.");
 
-    const sessionKey = (options.facts ?? []).find(
+    const sessionKey = (options.middlewareBindings ?? []).find(
       (binding) => isRestCredentialBinding(binding) && binding.credential === "session_key",
     );
     const close = declaration.mount(this, app(), {

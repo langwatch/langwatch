@@ -1,3 +1,4 @@
+import type { Authorization } from "@langwatch/authorization";
 import type { RetentionDaysProvider } from "@langwatch/clickhouse-client";
 import type {
   Event,
@@ -81,6 +82,8 @@ export abstract class TraceLegacyReadRepository {
       input: GetAllTracesForProjectInput;
       protections: Protections;
       options: GetAllTracesForProjectOptions;
+      /** The own-only proof the span, evaluation and event reads go through. */
+      ownRead: Authorization;
     },
   ): Promise<TraceLegacyPage>;
 
@@ -102,11 +105,16 @@ export abstract class TraceLegacyReadRepository {
   abstract findTopicCounts(input: AggregationFiltersInput): Promise<TopicCountsResult>;
 
   abstract findTracesByThreadId(
-    params: TraceLegacySpanFloor & { projectId: string; threadId: string },
+    params: TraceLegacySpanFloor & {
+      authorization: Authorization;
+      projectId: string;
+      threadId: string;
+    },
   ): Promise<TraceLegacyRow[]>;
 
   abstract findTracesWithSpans(
     params: TraceLegacySpanFloor & {
+      authorization: Authorization;
       projectId: string;
       traceIds: string[];
       occurredAt?: TraceOccurredAtRange | undefined;
@@ -115,6 +123,7 @@ export abstract class TraceLegacyReadRepository {
 
   abstract findTracesWithSpansByThreadIds(
     params: TraceLegacySpanFloor & {
+      authorization: Authorization;
       projectId: string;
       threadIds: string[];
       maxTraces?: number | undefined;

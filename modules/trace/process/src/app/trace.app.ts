@@ -91,7 +91,6 @@ import {
   type TraceListPage,
   type NormalizedSpan,
   type RecordSpanCommandData,
-  type TraceContentReadService,
   type TraceViewerService,
   type TraceApi,
   type OtlpTracesInput,
@@ -313,7 +312,7 @@ import { TraceQueryEvaluationService } from "../features/query/services/trace-qu
 import { TraceQueryFieldsService } from "../features/query/services/trace-query-fields.service.ts";
 import { TraceQueryTranslationService } from "../features/query/services/trace-query-translation.service.ts";
 import { TraceSearchRouterService } from "../features/query/services/trace-search-router.service.ts";
-import { TraceContentReadService as ConcreteTraceContentReadService } from "../features/read/services/trace-content-read.service.ts";
+import { TraceContentReadService } from "../features/read/services/trace-content-read.service.ts";
 import { TraceListService } from "../features/read/services/trace-list-read.service.ts";
 import { TraceLogRecordIOService } from "../features/read/services/trace-log-record-io.service.ts";
 import { LogRecordStorageService } from "../features/read/services/trace-log-record-read.service.ts";
@@ -1050,6 +1049,11 @@ export class TraceModule implements TraceApi, CollectorApp {
       discoverUpdates: options.tenantBroadcast,
     });
     const protections = TraceViewerProtectionService.create(options.protections);
+    // Own-only: the records and viewer reads carry no door proof (ruling TRACE-PROOF-SHARE).
+    const ownReadAuthorizer = foldReadAuthorizer({
+      authz: options.protections.authz,
+      codePath: FOLD_READ_CODE_PATH,
+    });
     // Every role reads the summary off the trace_summaries row the worker's fold writes, as main's
     // traceSummaryStore did; a test may hand in its own store.
     const summaryStore =
@@ -1081,6 +1085,10 @@ export class TraceModule implements TraceApi, CollectorApp {
                 publiclyShared: false,
               });
               const trace = await read.findById({
+                authorization: await ownReadAuthorizer({
+                  projectId,
+                  purpose: { kind: "operator", entry: "TraceRecords.getById" },
+                }),
                 projectId,
                 traceId,
                 protections: { ...resolved, canSeeCosts: true },
@@ -1142,6 +1150,7 @@ export class TraceModule implements TraceApi, CollectorApp {
       viewer: TraceViewerReadService.create({
         read,
         protections,
+        authorize: ownReadAuthorizer,
       }),
       annotationCommands: {
         add: async (input) => {
@@ -1385,7 +1394,7 @@ export class TraceModule implements TraceApi, CollectorApp {
           recordDecision: () => {},
         })
       : null;
-    this.#contentReader = ConcreteTraceContentReadService.create(dependencies.traces.read);
+    this.#contentReader = TraceContentReadService.create(dependencies.traces.read);
     this.#scenarioEventMedia = TraceScenarioEventMediaService.create(dependencies.storedObjects);
     this.#legacyFilterMatching = LegacyFilterMatchingService.create({
       preconditionTraceData: PreconditionTraceDataService.create(),
@@ -1404,6 +1413,12 @@ export class TraceModule implements TraceApi, CollectorApp {
                   query: request.query ?? "",
                   tenantId: request.projectId,
                   timeRange: { from: request.startDate, to: request.endDate },
+                }),
+              authorizeOwnRead: ({ projectId }) =>
+                this.#authorizeOwnRead({
+                  projectId,
+                  codePath: "api/routers/export",
+                  route: "TraceApi.downloadTraceExport",
                 }),
             }),
             protections: dependencies.protections,
@@ -1618,6 +1633,10 @@ export class TraceModule implements TraceApi, CollectorApp {
 
     return this.#contentReader.listTraces({
       ...input,
+      authorization: await this.#authorizeContentRead({
+        projectId: input.query.projectId,
+        route: "TraceApi.listTraces",
+      }),
       query: {
         ...input.query,
         ...(pageSize === undefined ? {} : { pageSize }),
@@ -1653,8 +1672,14 @@ export class TraceModule implements TraceApi, CollectorApp {
       query: { ...input.query, ...(pageSize === undefined ? {} : { pageSize }) },
     });
   }
-  findTrace(input: TraceFindTraceInput): Promise<Trace | undefined> {
-    return this.#contentReader.findTrace(input);
+  async findTrace(input: TraceFindTraceInput): Promise<Trace | undefined> {
+    return this.#contentReader.findTrace({
+      ...input,
+      authorization: await this.#authorizeContentRead({
+        projectId: input.projectId,
+        route: "TraceApi.findTrace",
+      }),
+    });
   }
   async getTraceForViewer(input: {
     projectId: string;
@@ -2049,29 +2074,66 @@ export class TraceModule implements TraceApi, CollectorApp {
   async readTracesWithSpans(input: TraceReadTracesWithSpansInput): Promise<Trace[]> {
     await this.#readBounds.assertIdsWithinBound(input.projectId, input.traceIds);
 
-    return this.#contentReader.readTracesWithSpans(input);
+    return this.#contentReader.readTracesWithSpans({
+      ...input,
+      authorization: await this.#authorizeContentRead({
+        projectId: input.projectId,
+        route: "TraceApi.readTracesWithSpans",
+      }),
+    });
   }
 
   async readTracesWithSpansPreview(input: TraceReadTracesWithSpansPreviewInput): Promise<Trace[]> {
     await this.#readBounds.assertIdsWithinBound(input.projectId, input.traceIds);
 
-    return this.#contentReader.readTracesWithSpansPreview(input);
+    return this.#contentReader.readTracesWithSpansPreview({
+      ...input,
+      authorization: await this.#authorizeContentRead({
+        projectId: input.projectId,
+        route: "TraceApi.readTracesWithSpansPreview",
+      }),
+    });
   }
-  readOrderedSpansForTrace(input: TraceReadOrderedSpansInput): Promise<Span[]> {
-    return this.#contentReader.readOrderedSpansForTrace(input);
+  async readOrderedSpansForTrace(input: TraceReadOrderedSpansInput): Promise<Span[]> {
+    return this.#contentReader.readOrderedSpansForTrace({
+      ...input,
+      authorization: await this.#authorizeContentRead({
+        projectId: input.projectId,
+        route: "TraceApi.readOrderedSpansForTrace",
+      }),
+    });
   }
-  readThreadTraces(input: TraceReadThreadTracesInput): Promise<Trace[]> {
-    return this.#contentReader.readThreadTraces(input);
+  async readThreadTraces(input: TraceReadThreadTracesInput): Promise<Trace[]> {
+    return this.#contentReader.readThreadTraces({
+      ...input,
+      authorization: await this.#authorizeContentRead({
+        projectId: input.projectId,
+        route: "TraceApi.readThreadTraces",
+      }),
+    });
   }
   async readThreadsTraces(input: TraceReadThreadsTracesInput): Promise<Trace[]> {
     await this.#readBounds.assertIdsWithinBound(input.projectId, input.threadIds);
 
-    return this.#contentReader.readThreadsTraces(input);
+    return this.#contentReader.readThreadsTraces({
+      ...input,
+      authorization: await this.#authorizeContentRead({
+        projectId: input.projectId,
+        route: "TraceApi.readThreadsTraces",
+      }),
+    });
   }
   async readSampleTraces(input: TraceReadSampleTracesInput): Promise<Trace[]> {
     const pageSize = await this.#readBounds.clampPageSize(input.query.projectId, input.pageSize);
 
-    return this.#contentReader.readSampleTraces({ ...input, pageSize });
+    return this.#contentReader.readSampleTraces({
+      ...input,
+      pageSize,
+      authorization: await this.#authorizeContentRead({
+        projectId: input.query.projectId,
+        route: "TraceApi.readSampleTraces",
+      }),
+    });
   }
   readForViewer(input: TraceViewerReadInput): Promise<Trace[]> {
     if (!this.#dependencies.viewer) throw new Error("Trace viewer service is unavailable");
@@ -3433,6 +3495,17 @@ export class TraceModule implements TraceApi, CollectorApp {
     }
     if (!trace) throw new TraceNotFoundError(input.traceId);
     return trace;
+  }
+
+  /** The own-only proof the content reads' store reads go through (ruling TRACE-PROOF-SHARE). */
+  #authorizeContentRead({
+    projectId,
+    route,
+  }: {
+    projectId: string;
+    route: string;
+  }): Promise<Authorization> {
+    return this.#authorizeOwnRead({ projectId, codePath: "api/routers/traces", route });
   }
 
   /** The own-only proof for a read the door minted none for (ruling TRACE-PROOF-SHARE). */

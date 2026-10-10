@@ -5,7 +5,11 @@ import { ProjectInvalidCredentialsError, ProjectMissingCredentialsError } from "
  * all required members are read and refusals answer correctly.
  */
 import type { ResolvedApiKeyCredential } from "@langwatch/api-key-contract";
-import { bindRestMiddleware, canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
+import {
+  bindMiddlewareContext,
+  canonicalErrorResponse,
+  createRestRuntime,
+} from "@langwatch/api/rest";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import type { PlanProvider } from "@langwatch/entitlement-contract";
@@ -137,7 +141,7 @@ function bootTraceApp(options: {
   const family = runtime.mount(traceLegacyRest.router(), {
     app: () => app,
     onError: canonicalErrorResponse,
-    facts: [bindRestMiddleware(tracesRestCredential, () => ({ principal: null }))],
+    middlewareContext: [bindMiddlewareContext(tracesRestCredential, () => ({ principal: null }))],
   });
 
   return { family, findById };

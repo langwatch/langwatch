@@ -117,7 +117,7 @@ class RegistryHost extends ConnectLicenseChannel {
     seats,
   }: Parameters<ConnectLicenseChannel["syncLicense"]>[0]) {
     const caller = await this.sync.verify({
-      authorization: `Bearer ${credential.token}`,
+      bearer: credential.token,
       instanceId: credential.instanceId,
     });
     return this.sync.answer({ caller, body: { version, seats } });

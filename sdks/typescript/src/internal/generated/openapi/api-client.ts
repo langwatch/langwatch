@@ -410,6 +410,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/organizations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List every organization this instance hosts, self-hosted instance administrators only. */
+        get: operations["listOrganizations"];
+        put?: never;
+        /** @description Provision a new organization with its first team and a bootstrap admin service key, self-hosted instance administrators only. */
+        post: operations["provisionOrganization"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/cli/device-code": {
         parameters: {
             query?: never;
@@ -3343,24 +3361,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/organizations": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** @description List every organization this instance hosts, self-hosted instance administrators only. */
-        get: operations["listOrganizations"];
-        put?: never;
-        /** @description Provision a new organization with its first team and a bootstrap admin service key, self-hosted instance administrators only. */
-        post: operations["provisionOrganization"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/v1/organizations/{organizationId}": {
         parameters: {
             query?: never;
@@ -5675,6 +5675,18 @@ export interface components {
                     result?: unknown;
                 } | {
                     /** @constant */
+                    type: "tool-call";
+                    toolName?: string;
+                    toolCallId?: string;
+                    input?: unknown;
+                } | {
+                    /** @constant */
+                    type: "tool-result";
+                    toolName?: string;
+                    toolCallId?: string;
+                    output?: unknown;
+                } | {
+                    /** @constant */
                     type: "binary";
                     mimeType: string;
                     data?: string;
@@ -5746,6 +5758,18 @@ export interface components {
                     toolName?: string;
                     toolCallId?: string;
                     result?: unknown;
+                } | {
+                    /** @constant */
+                    type: "tool-call";
+                    toolName?: string;
+                    toolCallId?: string;
+                    input?: unknown;
+                } | {
+                    /** @constant */
+                    type: "tool-result";
+                    toolName?: string;
+                    toolCallId?: string;
+                    output?: unknown;
                 } | {
                     /** @constant */
                     type: "binary";
@@ -7808,6 +7832,7 @@ export interface operations {
                     groupByKey?: string;
                     timeScale?: "full" | number;
                     timeZone: string;
+                    shouldSkipPreviousPeriod?: boolean;
                 };
             };
         };
@@ -8325,6 +8350,7 @@ export interface operations {
                     groupByKey?: string;
                     timeScale?: "full" | number;
                     timeZone: string;
+                    shouldSkipPreviousPeriod?: boolean;
                 };
             };
         };
@@ -8448,6 +8474,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -8472,6 +8504,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -8496,6 +8534,42 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
+                        tips?: string[];
+                        docs_url?: string;
+                        /** @enum {string} */
+                        fault?: "customer" | "platform" | "provider" | "presumed_platform";
+                        reasons?: unknown[];
+                    };
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        code: string;
+                        message: string;
+                        retryable: boolean;
+                        meta?: {
+                            [key: string]: unknown;
+                        };
+                        trace_id?: string;
+                        span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -8520,6 +8594,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -8544,6 +8624,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -8622,6 +8708,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -8646,6 +8738,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -8670,6 +8768,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -8694,6 +8798,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -8841,6 +8951,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -8865,6 +8981,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -8889,6 +9011,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -8913,6 +9041,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -9752,6 +9886,77 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    listOrganizations: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        organizations: {
+                            id: string;
+                            name: string;
+                            slug: string;
+                            /** Format: date-time */
+                            createdAt: string;
+                        }[];
+                    };
+                };
+            };
+        };
+    };
+    provisionOrganization: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    name: string;
+                    slug?: string;
+                    adminApiKeyName?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Success */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        organization: {
+                            id: string;
+                            name: string;
+                            slug: string;
+                        };
+                        team: {
+                            id: string;
+                            name: string;
+                            slug: string;
+                        };
+                        adminApiKey: {
+                            id: string;
+                            token: string;
+                        };
+                    };
+                };
             };
         };
     };
@@ -12750,6 +12955,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -12774,6 +12985,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -12798,6 +13015,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -12822,6 +13045,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -12910,6 +13139,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -12934,6 +13169,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -12958,6 +13199,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -12982,6 +13229,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -13054,6 +13307,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -13078,6 +13337,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -13102,6 +13367,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -13126,6 +13397,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -13150,6 +13427,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -13204,6 +13487,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -13228,6 +13517,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -13252,6 +13547,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -13276,6 +13577,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -13300,6 +13607,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -13389,6 +13702,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -13413,6 +13732,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -13437,6 +13762,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -13461,6 +13792,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -13485,6 +13822,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -13563,6 +13906,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -13587,6 +13936,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -13611,6 +13966,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -13635,6 +13996,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -13659,6 +14026,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -13932,6 +14305,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -13956,6 +14335,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -13980,6 +14365,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -14004,6 +14395,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -14078,6 +14475,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -14102,6 +14505,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -14126,6 +14535,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -14150,6 +14565,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -14218,6 +14639,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -14242,6 +14669,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -14266,6 +14699,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -14290,6 +14729,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -14314,6 +14759,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -14368,6 +14819,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -14392,6 +14849,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -14416,6 +14879,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -14440,6 +14909,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -14464,6 +14939,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -14539,6 +15020,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -14563,6 +15050,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -14587,6 +15080,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -14611,6 +15110,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -14635,6 +15140,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -14713,6 +15224,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -14737,6 +15254,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -14761,6 +15284,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -14785,6 +15314,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -14809,6 +15344,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -14863,6 +15404,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -14887,6 +15434,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -14911,6 +15464,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -14935,6 +15494,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -14959,6 +15524,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -17798,14 +18369,12 @@ export interface operations {
                     };
                 };
             };
-            /** @description The body is larger than 30MB. Refused before it is read, so the response is the plain sentence `Payload Too Large` rather than a JSON error */
+            /** @description The body is larger than 30MB; refused before it is read with the `payload_too_large` HandledError */
             413: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content: {
-                    "text/plain": string;
-                };
+                content?: never;
             };
         };
     };
@@ -17922,6 +18491,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -17946,6 +18521,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -17970,6 +18551,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -17994,6 +18581,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -18050,6 +18643,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -18074,6 +18673,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -18098,6 +18703,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -18122,6 +18733,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -18171,6 +18788,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -18195,6 +18818,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -18219,6 +18848,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -18243,6 +18878,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -18300,6 +18941,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -18324,6 +18971,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -18348,6 +19001,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -18372,6 +19031,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -18488,6 +19153,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -18512,6 +19183,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -18536,6 +19213,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -18560,6 +19243,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -18752,6 +19441,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -18776,6 +19471,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -18800,6 +19501,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -18824,6 +19531,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -18848,6 +19561,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -18933,6 +19652,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -18957,6 +19682,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -18981,6 +19712,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -19005,6 +19742,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -19185,6 +19928,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -19209,6 +19958,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -19233,6 +19988,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -19257,6 +20018,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -19314,6 +20081,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -19338,6 +20111,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -19362,6 +20141,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -19386,6 +20171,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -19475,6 +20266,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -19499,6 +20296,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -19523,6 +20326,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -19547,6 +20356,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -19638,6 +20453,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -19662,6 +20483,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -19686,6 +20513,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -19710,6 +20543,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -19795,6 +20634,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -19819,6 +20664,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -19843,6 +20694,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -19867,6 +20724,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -19952,6 +20815,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -19976,6 +20845,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -20000,6 +20875,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -20024,6 +20905,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -20114,6 +21001,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -20138,6 +21031,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -20162,6 +21061,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -20186,6 +21091,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -20320,6 +21231,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -20344,6 +21261,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -20368,6 +21291,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -20392,6 +21321,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -20416,6 +21351,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -20499,6 +21440,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -20523,6 +21470,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -20547,6 +21500,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -20571,6 +21530,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -20653,6 +21618,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -20677,6 +21648,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -20701,6 +21678,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -20725,6 +21708,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -20822,6 +21811,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -20846,6 +21841,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -20870,6 +21871,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -20894,6 +21901,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -20984,6 +21997,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -21008,6 +22027,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -21032,6 +22057,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -21056,6 +22087,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -21128,6 +22165,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -21152,6 +22195,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -21176,6 +22225,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -21200,6 +22255,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -21295,6 +22356,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -21319,6 +22386,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -21343,6 +22416,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -21367,6 +22446,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -21391,6 +22476,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -21460,6 +22551,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -21484,6 +22581,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -21508,6 +22611,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -21532,6 +22641,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -21601,6 +22716,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -21625,6 +22746,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -21649,6 +22776,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -21673,6 +22806,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -21767,6 +22906,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -21791,6 +22936,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -21815,6 +22966,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -21839,6 +22996,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -21883,6 +23046,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -21907,6 +23076,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -21931,6 +23106,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -21955,6 +23136,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -21979,6 +23166,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -22023,6 +23216,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -22047,6 +23246,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -22071,6 +23276,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -22095,6 +23306,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -22119,6 +23336,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -22165,6 +23388,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -22189,6 +23418,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -22213,6 +23448,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -22237,6 +23478,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -22261,6 +23508,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -22307,6 +23560,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -22331,6 +23590,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -22355,6 +23620,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -22379,6 +23650,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -22403,6 +23680,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -22503,6 +23786,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -22527,6 +23816,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -22551,6 +23846,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -22575,6 +23876,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -22686,6 +23993,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -22710,6 +24023,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -22734,6 +24053,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -22758,6 +24083,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -22848,6 +24179,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -22872,6 +24209,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -22896,6 +24239,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -22920,6 +24269,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -26108,6 +27463,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -28764,6 +30125,7 @@ export interface operations {
                                 scopeId: string;
                                 scopeName: string | null;
                                 permissions: string[];
+                                cappedBySeat: boolean;
                             }[];
                         }[];
                         directBindings: {
@@ -28775,6 +30137,7 @@ export interface operations {
                             scopeId: string;
                             scopeName: string | null;
                             permissions: string[];
+                            cappedBySeat: boolean;
                         }[];
                     };
                 };
@@ -28895,77 +30258,6 @@ export interface operations {
                     "application/json": {
                         /** @constant */
                         success: true;
-                    };
-                };
-            };
-        };
-    };
-    listOrganizations: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Success */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        organizations: {
-                            id: string;
-                            name: string;
-                            slug: string;
-                            /** Format: date-time */
-                            createdAt: string;
-                        }[];
-                    };
-                };
-            };
-        };
-    };
-    provisionOrganization: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    name: string;
-                    slug?: string;
-                    adminApiKeyName?: string;
-                };
-            };
-        };
-        responses: {
-            /** @description Success */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        organization: {
-                            id: string;
-                            name: string;
-                            slug: string;
-                        };
-                        team: {
-                            id: string;
-                            name: string;
-                            slug: string;
-                        };
-                        adminApiKey: {
-                            id: string;
-                            token: string;
-                        };
                     };
                 };
             };
@@ -39475,6 +40767,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -39499,6 +40797,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -39523,6 +40827,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */
@@ -39547,6 +40857,12 @@ export interface operations {
                         };
                         trace_id?: string;
                         span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
                         tips?: string[];
                         docs_url?: string;
                         /** @enum {string} */

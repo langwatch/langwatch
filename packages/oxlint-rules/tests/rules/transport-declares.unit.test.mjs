@@ -700,13 +700,13 @@ describe("given a transport or server file that re-checks the request itself", (
   /** @scenario "A transport or middleware binding that re-checks the request's media type or body is refused" */
   it("reports a middleware binding that decides on the media type or reads the body", () => {
     const code = [
-      'import { bindRestMiddleware } from "@langwatch/api/rest";',
-      "export const facts = [",
-      "  bindRestMiddleware(bodyIsJson, (context) =>",
-      '    Boolean(context.req.header("content-type")?.includes("application/json")),',
+      'import { bindMiddlewareContext } from "@langwatch/api/rest";',
+      "export const middlewareContext = [",
+      "  bindMiddlewareContext(bodyIsJson, (request) =>",
+      '    Boolean(request.headers.get("content-type")?.includes("application/json")),',
       "  ),",
-      "  bindRestMiddleware(payload, async (context) => context.req.json()),",
-      '  bindRestMiddleware(caller, (context) => context.req.header("authorization")),',
+      "  bindMiddlewareContext(payload, async (request) => request.json()),",
+      '  bindMiddlewareContext(caller, (request) => request.headers.get("authorization")),',
       "];",
     ].join("\n");
 

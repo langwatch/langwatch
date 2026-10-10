@@ -38,14 +38,14 @@ import {
   type TrpcRequestLike,
 } from "./policy.ts";
 import {
-  bindTrpcFact,
-  browserSessionFact,
-  callerAddressFact,
+  bindTrpcMiddlewareContext,
+  browserSessionContext,
+  callerAddressContext,
   createTrpcErrorFormatter,
   createTrpcRuntime,
   TrpcRootDefinition,
   type TrpcErrorCausePayload,
-  type TrpcFactBinding,
+  type TrpcMiddlewareContextBinding,
   type TrpcRoot,
   type TrpcRuntime,
   type TrpcRouterDeclaration,
@@ -128,8 +128,8 @@ export class TrpcHost implements FeatureTrpcHost<TrpcNamespace> {
     throttle?:
       | Readonly<{ limiter: RateLimiter; policies: Readonly<Record<string, TrpcThrottlePolicy>> }>
       | undefined;
-    /** What the process knows about a caller on every namespace at once. */
-    facts?: readonly TrpcFactBinding<TrpcRequestContext>[] | undefined;
+    /** Middleware context the process answers on every namespace at once. */
+    middlewareContext?: readonly TrpcMiddlewareContextBinding<TrpcRequestContext>[] | undefined;
     /** The caller's session version (ADR-170). Absent, answers carry no version and no tag. */
     sessionVersions?: TrpcSessionVersions | undefined;
     /** The plans a procedure declaring an entitlement asks; absent, it is refused at mount. */
@@ -204,7 +204,7 @@ export class TrpcHost implements FeatureTrpcHost<TrpcNamespace> {
     });
   }
 
-  /** One declared namespace on this root. The process's own facts come first. */
+  /** One declared namespace on this root. The process's own middleware context comes first. */
   mount(
     declaration: MountableTransport,
     app: () => unknown,
@@ -218,9 +218,10 @@ export class TrpcHost implements FeatureTrpcHost<TrpcNamespace> {
     const namespace = trpcDeclaration.namespace;
 
     const mounted = this.#runtime.mount(trpcDeclaration, () => app(), {
-      facts: [
-        ...this.#processFacts(),
-        ...((options?.facts ?? []) as readonly TrpcFactBinding<TrpcRequestContext>[]),
+      middlewareContext: [
+        ...this.#processContext(),
+        ...((options?.middlewareBindings ??
+          []) as readonly TrpcMiddlewareContextBinding<TrpcRequestContext>[]),
       ],
     });
 
@@ -327,15 +328,21 @@ export class TrpcHost implements FeatureTrpcHost<TrpcNamespace> {
   }
 
   /**
-   * What this process knows about a caller that no module can. The two facts
+   * What this process knows about a caller that no module can. The two contexts
    * the tRPC toolkit publishes are bound for EVERY namespace, because they
    * describe the request rather than the feature answering it.
    */
-  #processFacts(): readonly TrpcFactBinding<TrpcRequestContext>[] {
+  #processContext(): readonly TrpcMiddlewareContextBinding<TrpcRequestContext>[] {
     return [
-      bindTrpcFact(browserSessionFact, (ctx: TrpcRequestContext) => ctx.session?.sessionId ?? null),
-      bindTrpcFact(callerAddressFact, (ctx: TrpcRequestContext) => ctx.clientIp() ?? null),
-      ...(this.#options.facts ?? []),
+      bindTrpcMiddlewareContext(
+        browserSessionContext,
+        (ctx: TrpcRequestContext) => ctx.session?.sessionId ?? null,
+      ),
+      bindTrpcMiddlewareContext(
+        callerAddressContext,
+        (ctx: TrpcRequestContext) => ctx.clientIp() ?? null,
+      ),
+      ...(this.#options.middlewareContext ?? []),
     ];
   }
 

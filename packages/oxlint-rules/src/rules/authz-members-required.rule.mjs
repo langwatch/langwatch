@@ -1,7 +1,7 @@
 import { defineRule } from "../define-rule.mjs";
 
 // Authorization fails closed (ARCHITECTURE.md §8): a question a port may leave unanswered is a
-// check the door may skip. Data members (declaration options, caller facts) are not questions.
+// check the door may skip. Data members (declaration options, caller context) are not questions.
 
 const GOVERNED = /^packages\/api\/src\/(?:access\/.+|hosting\/api-door)\.ts$/;
 

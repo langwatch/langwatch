@@ -8,6 +8,7 @@ import type { OtlpDoorRequest } from "@langwatch/otlp";
  */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
+import type { TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
 import { otlpLogsDoor, otlpLogsRest } from "../otlp-logs.rest.ts";
@@ -33,24 +34,27 @@ function mountedDoor() {
       project: closed,
       organization: closed,
       api_key: closed,
-      scim_token: closed,
       instance_admin: closed,
       browser: closed,
     },
     bearers: () => closed,
     audit: { record: async () => {} },
   });
-  const door = otlpLogsDoor(async () => ({
-    project: { id: "project-1", teamId: "team-1", organizationId: "organization-1" },
-    identity: {
-      apiKeyId: "key-1",
-      organizationId: "organization-1",
-      ingestSourceType: null,
-      ingestionTemplateId: null,
-    },
-  }));
+  const door = otlpLogsDoor.open(
+    createApiFixture<TraceApi>({
+      otlpCredential: async () => ({
+        project: { id: "project-1", teamId: "team-1", organizationId: "organization-1" },
+        identity: {
+          apiKeyId: "key-1",
+          organizationId: "organization-1",
+          ingestSourceType: null,
+          ingestionTemplateId: null,
+        },
+      }),
+    }),
+  );
   host.mount(otlpLogsRest.router(), () => app, {
-    facts: [bindRestCredential("otlp_ingest", () => door)],
+    middlewareBindings: [bindRestCredential("otlp_ingest", () => door)],
   });
   const post = (path: string) =>
     host.app.fetch(

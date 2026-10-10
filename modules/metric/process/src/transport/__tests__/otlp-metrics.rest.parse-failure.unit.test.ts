@@ -83,7 +83,7 @@ function mount() {
     receiveOtlpMetrics: (input) => receiver.receive(input),
   });
   const hono = createRestRuntime({
-    doors: { otlp_ingest: otlpMetricsDoor((input) => traces.otlpCredential(input)) },
+    doors: { otlp_ingest: otlpMetricsDoor.open(traces) },
     authorization: restTestAuthorization(),
     identity: {
       authenticate: () => {

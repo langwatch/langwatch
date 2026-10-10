@@ -4,7 +4,11 @@ import type { ApiKeyApi, ResolvedApiKeyCredential } from "@langwatch/api-key-con
  * `POST /api/otel/v1/{...}` against the COMPOSITION-built app and
  * MODULE-declared transports — sibling of the collector composition test.
  */
-import { canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
+import {
+  canonicalErrorResponse,
+  createRestRuntime,
+  withOtlpPathAliases,
+} from "@langwatch/api/rest";
 import { AuthzApi } from "@langwatch/authz-contract";
 import { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import { DataRetentionApi } from "@langwatch/data-retention-contract";
@@ -207,7 +211,7 @@ function deployment(
 
   const runtime = createRestRuntime({
     doors: {
-      otlp_ingest: otlpIngestDoor((input) => apis.reference(TraceApi).otlpCredential(input)),
+      otlp_ingest: otlpIngestDoor.open(apis.reference(TraceApi)),
     },
     authorization: restTestAuthorization(),
     identity: {
@@ -226,11 +230,14 @@ function deployment(
 
   const mounted = servesOtlp
     ? [
-        runtime.mount(otlpIngestRest.router(), {
-          app: () => apis.reference(TraceApi),
-          credential: "otlp_ingest",
-          onError: canonicalErrorResponse,
-        }),
+        // The host rewrites a misconfigured exporter path before routing, as RestHost does.
+        withOtlpPathAliases(
+          runtime.mount(otlpIngestRest.router(), {
+            app: () => apis.reference(TraceApi),
+            credential: "otlp_ingest",
+            onError: canonicalErrorResponse,
+          }),
+        ),
       ]
     : [];
 
@@ -403,8 +410,8 @@ describe("given the trace module as a process composes it", () => {
   });
 
   describe("when an exporter posts to a path the receiver does not recognise", () => {
-    /** @scenario "The trace door refuses a missing key before it judges the exporter path" */
-    it("refuses a missing key with 401 before the path's 404", async () => {
+    /** @scenario "The trace door answers an unknown exporter path as not found before it asks for the key" */
+    it("answers 404 with or without a key and records nothing", async () => {
       const { post, recordedSpans } = deployment();
 
       const anonymous = await post("/not-an-exporter/v1/traces", otlpTraceBody(), {
@@ -412,9 +419,7 @@ describe("given the trace module as a process composes it", () => {
       });
       const keyed = await post("/not-an-exporter/v1/traces", otlpTraceBody());
 
-      expect(anonymous.status).toBe(401);
-      expect(await anonymous.json()).toMatchObject({ message: expect.any(String) });
-      expect(keyed.status).toBe(404);
+      expect([anonymous.status, keyed.status]).toEqual([404, 404]);
       expect(recordedSpans).toHaveLength(0);
     });
   });

@@ -4,7 +4,7 @@
  * Spec: modules/langy/specs/langy-panel-trpc.feature
  */
 import {
-  defineTrpcFact,
+  defineMiddlewareContext,
   defineTrpcRouter,
   type TrpcHandlerActor,
   type TrpcRouterDeclaration,
@@ -18,12 +18,12 @@ import {
 import { z } from "zod";
 
 /** The signed-in person, bound by the process under this name for every namespace. */
-const sessionPersonFact = defineTrpcFact(
+const sessionPersonContext = defineMiddlewareContext(
   "organizationSessionPerson",
   z.object({ name: z.string().nullable(), email: z.string().nullable() }).nullable(),
 );
 
-type SessionPerson = z.infer<typeof sessionPersonFact.schema>;
+type SessionPerson = z.infer<typeof sessionPersonContext.schema>;
 
 function callerOf(actor: TrpcHandlerActor, person: SessionPerson): LangyPanelCaller {
   return { userId: actor.id, name: person?.name ?? null, email: person?.email ?? null };
@@ -32,21 +32,21 @@ function callerOf(actor: TrpcHandlerActor, person: SessionPerson): LangyPanelCal
 export const langyTrpcTransport: TrpcRouterDeclaration<LangyApi, typeof langyTrpc> =
   defineTrpcRouter(LangyApi, langyTrpc)
     .procedure("list")
-    .withFacts(sessionPersonFact)
+    .withMiddlewareContext(sessionPersonContext)
     .withPermission("langy:view")
     .handle(({ app, input, actor }, person) =>
       app.listConversations({ ...input, caller: callerOf(actor, person) }),
     )
 
     .procedure("conversationEventsAfter")
-    .withFacts(sessionPersonFact)
+    .withMiddlewareContext(sessionPersonContext)
     .withPermission("langy:view")
     .handle(({ app, input, actor }, person) =>
       app.getConversationEventsAfter({ ...input, caller: callerOf(actor, person) }),
     )
 
     .procedure("detail")
-    .withFacts(sessionPersonFact)
+    .withMiddlewareContext(sessionPersonContext)
     .withPermission("langy:view")
     .handle(async ({ app, input, actor }, person) => {
       const [detail] = await app.findVisibleConversationDetails({
@@ -57,168 +57,168 @@ export const langyTrpcTransport: TrpcRouterDeclaration<LangyApi, typeof langyTrp
     })
 
     .procedure("messages")
-    .withFacts(sessionPersonFact)
+    .withMiddlewareContext(sessionPersonContext)
     .withPermission("langy:view")
     .handle(({ app, input, actor }, person) =>
       app.getConversationMessages({ ...input, caller: callerOf(actor, person) }),
     )
 
     .procedure("deleteConversation")
-    .withFacts(sessionPersonFact)
+    .withMiddlewareContext(sessionPersonContext)
     .withPermission("langy:delete")
     .handle(({ app, input, actor }, person) =>
       app.archiveConversation({ ...input, caller: callerOf(actor, person) }),
     )
 
     .procedure("renameConversation")
-    .withFacts(sessionPersonFact)
+    .withMiddlewareContext(sessionPersonContext)
     .withPermission("langy:update")
     .handle(({ app, input, actor }, person) =>
       app.renameConversation({ ...input, caller: callerOf(actor, person) }),
     )
 
     .procedure("forkConversation")
-    .withFacts(sessionPersonFact)
+    .withMiddlewareContext(sessionPersonContext)
     .withPermission("langy:create")
     .handle(({ app, input, actor }, person) =>
       app.forkConversation({ ...input, caller: callerOf(actor, person) }),
     )
 
     .procedure("createConversation")
-    .withFacts(sessionPersonFact)
+    .withMiddlewareContext(sessionPersonContext)
     .withPermission("langy:create")
     .handle(({ app, input, actor }, person) =>
       app.createConversationTurn({ ...input, caller: callerOf(actor, person) }),
     )
 
     .procedure("continueConversation")
-    .withFacts(sessionPersonFact)
+    .withMiddlewareContext(sessionPersonContext)
     .withPermission("langy:create")
     .handle(({ app, input, actor }, person) =>
       app.continueConversationTurn({ ...input, caller: callerOf(actor, person) }),
     )
 
     .procedure("stopTurn")
-    .withFacts(sessionPersonFact)
+    .withMiddlewareContext(sessionPersonContext)
     .withPermission("langy:create")
     .handle(({ app, input, actor }, person) =>
       app.stopPanelTurn({ ...input, caller: callerOf(actor, person) }),
     )
 
     .procedure("claimUiAction")
-    .withFacts(sessionPersonFact)
+    .withMiddlewareContext(sessionPersonContext)
     .withPermission("langy:view")
     .handle(({ app, input, actor }, person) =>
       app.claimUiAction({ ...input, caller: callerOf(actor, person) }),
     )
 
     .procedure("completeUiAction")
-    .withFacts(sessionPersonFact)
+    .withMiddlewareContext(sessionPersonContext)
     .withPermission("langy:view")
     .handle(({ app, input, actor }, person) =>
       app.completeUiAction({ ...input, caller: callerOf(actor, person) }),
     )
 
     .procedure("answerLocalPermission")
-    .withFacts(sessionPersonFact)
+    .withMiddlewareContext(sessionPersonContext)
     .withPermission("langy:create")
     .handle(({ app, input, actor }, person) =>
       app.answerLocalPermission({ ...input, caller: callerOf(actor, person) }),
     )
 
     .procedure("answerQuestion")
-    .withFacts(sessionPersonFact)
+    .withMiddlewareContext(sessionPersonContext)
     .withPermission("langy:create")
     .handle(({ app, input, actor }, person) =>
       app.answerLocalQuestion({ ...input, caller: callerOf(actor, person) }),
     )
 
     .procedure("setLocalPolicy")
-    .withFacts(sessionPersonFact)
+    .withMiddlewareContext(sessionPersonContext)
     .withPermission("langy:create")
     .handle(({ app, input, actor }, person) =>
       app.setLocalPolicy({ ...input, caller: callerOf(actor, person) }),
     )
 
     .procedure("disconnectLocalWorkspace")
-    .withFacts(sessionPersonFact)
+    .withMiddlewareContext(sessionPersonContext)
     .withPermission("langy:create")
     .handle(({ app, input, actor }, person) =>
       app.disconnectLocalWorkspace({ ...input, caller: callerOf(actor, person) }),
     )
 
     .procedure("setCodeAccessPreference")
-    .withFacts(sessionPersonFact)
+    .withMiddlewareContext(sessionPersonContext)
     .withPermission("langy:update")
     .handle(({ app, input, actor }, person) =>
       app.setCodeAccessPreference({ ...input, caller: callerOf(actor, person) }),
     )
 
     .procedure("getCodeAccessPreference")
-    .withFacts(sessionPersonFact)
+    .withMiddlewareContext(sessionPersonContext)
     .withPermission("langy:view")
     .handle(({ app, input, actor }, person) =>
       app.getCodeAccessPreference({ ...input, caller: callerOf(actor, person) }),
     )
 
     .procedure("localRecord")
-    .withFacts(sessionPersonFact)
+    .withMiddlewareContext(sessionPersonContext)
     .withPermission("langy:view")
     .handle(({ app, input, actor }, person) =>
       app.getPanelLocalRecord({ ...input, caller: callerOf(actor, person) }),
     )
 
     .procedure("getLocalWorkspace")
-    .withFacts(sessionPersonFact)
+    .withMiddlewareContext(sessionPersonContext)
     .withPermission("langy:view")
     .handle(({ app, input, actor }, person) =>
       app.getPanelLocalWorkspace({ ...input, caller: callerOf(actor, person) }),
     )
 
     .procedure("renewLocalControlRequest")
-    .withFacts(sessionPersonFact)
+    .withMiddlewareContext(sessionPersonContext)
     .withPermission("langy:create")
     .handle(({ app, input, actor }, person) =>
       app.renewLocalControlRequest({ ...input, caller: callerOf(actor, person) }),
     )
 
     .procedure("warmWorker")
-    .withFacts(sessionPersonFact)
+    .withMiddlewareContext(sessionPersonContext)
     .withPermission("langy:create")
     .handle(({ app, input, actor }, person) =>
       app.warmPanelWorker({ ...input, caller: callerOf(actor, person) }),
     )
 
     .procedure("modelsAllowed")
-    .withFacts(sessionPersonFact)
+    .withMiddlewareContext(sessionPersonContext)
     .withPermission("langy:view")
     .handle(({ app, input, actor }, person) =>
       app.getModelsAllowed({ ...input, caller: callerOf(actor, person) }),
     )
 
     .procedure("recordFeedback")
-    .withFacts(sessionPersonFact)
+    .withMiddlewareContext(sessionPersonContext)
     .withPermission("langy:create")
     .handle(({ app, input, actor }, person) =>
       app.recordFeedback({ ...input, caller: callerOf(actor, person) }),
     )
 
     .procedure("feedbackPromptShown")
-    .withFacts(sessionPersonFact)
+    .withMiddlewareContext(sessionPersonContext)
     .withPermission("langy:create")
     .handle(({ app, input, actor }, person) =>
       app.markFeedbackPromptShown({ ...input, caller: callerOf(actor, person) }),
     )
 
     .procedure("onConversationUpdate")
-    .withFacts(sessionPersonFact)
+    .withMiddlewareContext(sessionPersonContext)
     .withPermission("langy:view")
     .handle(({ app, input, actor, signal }, person) =>
       app.watchConversationUpdates({ ...input, caller: callerOf(actor, person), signal }),
     )
 
     .procedure("onTurnStream")
-    .withFacts(sessionPersonFact)
+    .withMiddlewareContext(sessionPersonContext)
     .withPermission("langy:view")
     .handle(({ app, input, actor, signal }, person) =>
       app.watchTurnStream({ ...input, caller: callerOf(actor, person), signal }),
@@ -227,14 +227,14 @@ export const langyTrpcTransport: TrpcRouterDeclaration<LangyApi, typeof langyTrp
 
 export const langyEgressTrpcTransport = defineTrpcRouter(LangyApi, langyEgressTrpc)
   .procedure("get")
-  .withFacts(sessionPersonFact)
+  .withMiddlewareContext(sessionPersonContext)
   .withPermission("langy:view")
   .handle(({ app, input, actor }, person) =>
     app.getEgressState({ ...input, caller: callerOf(actor, person) }),
   )
 
   .procedure("set")
-  .withFacts(sessionPersonFact)
+  .withMiddlewareContext(sessionPersonContext)
   .withPermission("langy:manage")
   .handle(({ app, input, actor }, person) =>
     app.setEgressState({ ...input, caller: callerOf(actor, person) }),

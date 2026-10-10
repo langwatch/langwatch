@@ -7,7 +7,7 @@
 import { MAX_LWQL_LENGTH } from "@langwatch/analytics-contract";
 import type { RestProjectCredentialPrincipal } from "@langwatch/authorization";
 import { INSTANT_EVAL_CLASSIFIER_LIMITS } from "@langwatch/instant-eval-judge-contract";
-import { defineRestMiddleware } from "@langwatch/module";
+import { defineMiddlewareContext } from "@langwatch/module";
 import { z } from "zod";
 
 import {
@@ -457,7 +457,7 @@ export const instantEvalRestCredentialSchema: z.ZodType<RestProjectCredentialPri
     z.object({ kind: z.literal("legacyProjectKey") }),
   ]);
 
-export const instantEvalRestCredential = defineRestMiddleware(
+export const instantEvalRestCredential = defineMiddlewareContext(
   "instantEvalRestCredential",
   instantEvalRestCredentialSchema,
 );

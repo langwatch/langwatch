@@ -1,4 +1,3 @@
-import { bindRestCredential } from "@langwatch/api/rest";
 import type { LogApi, LogServerConfig } from "@langwatch/log-contract";
 import { defineProcessModule, type PublishedProcessModule } from "@langwatch/process";
 
@@ -14,8 +13,4 @@ export const logProcessModule: PublishedProcessModule<"log", LogApi, LogServerCo
     .withTransports(otlpLogsRest)
     .withEventing(logEventing)
     // The exporter's key, resolved through Trace before the body (W02-DOOR-SHAPE, 2026-10-10).
-    .withTransportFacts(({ dependencies }) => [
-      bindRestCredential("otlp_ingest", () =>
-        otlpLogsDoor((input) => dependencies.traces.otlpCredential(input)),
-      ),
-    ]);
+    .withDoors({ otlp_ingest: otlpLogsDoor });

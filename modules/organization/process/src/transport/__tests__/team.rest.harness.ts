@@ -5,7 +5,7 @@
  */
 import {
   canonicalErrorResponse,
-  bindRestMiddleware,
+  bindMiddlewareContext,
   createRestRuntime,
   ForbiddenError,
   UnauthorizedError,
@@ -13,7 +13,7 @@ import {
 import { LocalFeatureApis } from "@langwatch/process";
 import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 
-import { organizationKeyFacts } from "../organization-management.rest.ts";
+import { organizationKeyContext } from "../organization-management.rest.ts";
 import { teamsRest, TeamManagementApi } from "../team.rest.ts";
 
 export const ORGANIZATION_ID = "organization-1";
@@ -93,7 +93,9 @@ export function mountTeamsRestApplication(
   const hono = runtime.mount(teamsRest.router(), {
     app: () => apis.reference(TeamManagementApi),
     onError: canonicalErrorResponse,
-    facts: [bindRestMiddleware(organizationKeyFacts, () => ({ apiKeyId: KEY_ID }))],
+    middlewareContext: [
+      bindMiddlewareContext(organizationKeyContext, () => ({ apiKeyId: KEY_ID })),
+    ],
   });
 
   const send = (

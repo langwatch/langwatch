@@ -2,7 +2,7 @@
 
 import type { AuthzDeclaration } from "@langwatch/api/access";
 import {
-  defineTrpcFact,
+  defineMiddlewareContext,
   defineTrpcRouter,
   type TrpcHandlerActor,
   type TrpcRouterDeclaration,
@@ -34,7 +34,7 @@ import { z } from "zod";
 export const customRoleGate = { feature: "RBAC", when: assignsOrganizationCustomRole };
 
 /** The signed-in person as the process's session carries them, beside their id. */
-export const organizationSessionPersonFact = defineTrpcFact(
+export const organizationSessionPersonContext = defineMiddlewareContext(
   "organizationSessionPerson",
   z.object({ name: z.string().nullable(), email: z.string().nullable() }).nullable(),
 );
@@ -79,7 +79,7 @@ export const organizationTrpcTransport: TrpcRouterDeclaration<
   typeof organizationTrpc
 > = defineTrpcRouter(OrganizationApi, organizationTrpc)
   .procedure("createAndAssign")
-  .withFacts(organizationSessionPersonFact)
+  .withMiddlewareContext(organizationSessionPersonContext)
   .noPermission(BEFORE_MEMBERSHIP)
   .handle(async ({ app, input, actor }, person) => {
     const caller = callerOf(actor, person);
@@ -100,7 +100,7 @@ export const organizationTrpcTransport: TrpcRouterDeclaration<
   // The self-removal guard lives in the service: it refuses with
   // `cannot_remove_self`, which the client renders its own copy for.
   .procedure("deleteMember")
-  .withFacts(organizationSessionPersonFact)
+  .withMiddlewareContext(organizationSessionPersonContext)
   .withPermission("organization:manage")
   .handle(async ({ app, input, actor }, person) => {
     await app.deleteMember(input, callerOf(actor, person));
@@ -113,7 +113,7 @@ export const organizationTrpcTransport: TrpcRouterDeclaration<
    * to the seats its licence covers. See seat-reconciliation.feature.
    */
   .procedure("setMemberDisabled")
-  .withFacts(organizationSessionPersonFact)
+  .withMiddlewareContext(organizationSessionPersonContext)
   .withPermission("organization:manage")
   .handle(async ({ app, input, actor }, person) => {
     await app.setMemberDisabled(input, callerOf(actor, person));
@@ -123,7 +123,7 @@ export const organizationTrpcTransport: TrpcRouterDeclaration<
 
   /** The shell's first read: every organization this person can reach. */
   .procedure("getAll")
-  .withFacts(organizationSessionPersonFact)
+  .withMiddlewareContext(organizationSessionPersonContext)
   .noPermission(BEFORE_MEMBERSHIP)
   .handle(({ app, input, actor }, person) =>
     app
@@ -133,7 +133,7 @@ export const organizationTrpcTransport: TrpcRouterDeclaration<
 
   /** The shell's scope skeleton: what every page resolves its scope against. */
   .procedure("getScopeGraph")
-  .withFacts(organizationSessionPersonFact)
+  .withMiddlewareContext(organizationSessionPersonContext)
   .noPermission({
     reason: "answers the scope skeleton of the caller's own memberships; no single scope holds it",
   })
@@ -169,7 +169,7 @@ export const organizationTrpcTransport: TrpcRouterDeclaration<
    * are redacted for a caller who cannot administer, in the application.
    */
   .procedure("getOrganizationWithMembersAndTheirTeams")
-  .withFacts(organizationSessionPersonFact)
+  .withMiddlewareContext(organizationSessionPersonContext)
   .withPermission("organization:view")
   .handle(({ app, input, actor }, person) =>
     app
@@ -193,7 +193,7 @@ export const organizationTrpcTransport: TrpcRouterDeclaration<
    * assignments, team memberships - is an admin-surface read.
    */
   .procedure("getMemberById")
-  .withFacts(organizationSessionPersonFact)
+  .withMiddlewareContext(organizationSessionPersonContext)
   .withPermission("organization:manage")
   .handle(({ app, input, actor }, person) =>
     app.getMemberOrRefuse(input, callerOf(actor, person)).then(memberRecordOnWire),
@@ -206,7 +206,7 @@ export const organizationTrpcTransport: TrpcRouterDeclaration<
 
   .procedure("updateTeamMemberRole")
   .withEntitlement("enterprise", customRoleGate)
-  .withFacts(organizationSessionPersonFact)
+  .withMiddlewareContext(organizationSessionPersonContext)
   .withPermission(MANAGE_VIA_TEAM)
   .handle(async ({ app, input, actor }, person) => {
     await app.changeTeamMemberRole(input, callerOf(actor, person));
@@ -229,7 +229,7 @@ export const organizationTrpcTransport: TrpcRouterDeclaration<
 
   .procedure("updateMemberRole")
   .withEntitlement("enterprise", customRoleGate)
-  .withFacts(organizationSessionPersonFact)
+  .withMiddlewareContext(organizationSessionPersonContext)
   .withPermission("organization:manage")
   .handle(async ({ app, input, actor }, person) => {
     const caller = callerOf(actor, person);
@@ -255,7 +255,7 @@ export const organizationTrpcTransport: TrpcRouterDeclaration<
 
   .procedure("getAuditLogs")
   .withEntitlement("enterprise", { feature: "AUDIT_LOGS" })
-  .withFacts(organizationSessionPersonFact)
+  .withMiddlewareContext(organizationSessionPersonContext)
   .withPermission(AUDIT_LOG_VIEW)
   .handle(({ app, input, actor }, person) =>
     app.readAuditLogs(input, callerOf(actor, person)).then(auditLogPageOnWire),

@@ -152,6 +152,8 @@ func runLogsCmd(ctx context.Context, d deps, inv invocation) error {
 	}
 
 	lines, offsets, elided := readLogTails(dir, services)
+	// A launcher line is captured for both backend halves at one instant: show it once.
+	lines = slices.CompactFunc(lines, func(a, b logLine) bool { return a.ts.Equal(b.ts) && a.text == b.text })
 	lines = filterLogLines(lines, since, level)
 	lines = grepLogLines(lines, inv.value("--grep"))
 	if since.IsZero() && len(lines) > logsTailLines {
@@ -205,6 +207,17 @@ func selectLogServices(dir string, args []string) ([]logSource, error) {
 	}
 	var out []logSource
 	for _, a := range args {
+		if a == app.AppLane && !availableSet[a] {
+			// The one-process lane is captured per application: `app` reads all three.
+			for _, name := range []string{"ui", "api", "worker"} {
+				if src, ok := resolveLogSource(name, availableSet); ok {
+					out = append(out, src)
+				}
+			}
+			if len(out) > 0 {
+				continue
+			}
+		}
 		src, ok := resolveLogSource(a, availableSet)
 		if !ok {
 			return nil, fmt.Errorf("no captured logs for %q — this stack has: %s (plus obs)", a, strings.Join(logSelectableNames(available), ", "))
@@ -217,7 +230,8 @@ func selectLogServices(dir string, args []string) ([]logSource, error) {
 // resolveLogSource reads one CLI name as a view: an application of the backend
 // lane, or a capture file of its own.
 func resolveLogSource(name string, available map[string]bool) (logSource, bool) {
-	if file := apiLaneFile(available); file != "" && slices.Contains(apiLaneApps, name) {
+	// A worker capture of its own means the lane is split at capture (procsupervisor).
+	if file := apiLaneFile(available); file != "" && slices.Contains(apiLaneApps, name) && !available["worker"] {
 		return logSource{file: file, label: name, app: name}, true
 	}
 	// A one-process stack (LANGWATCH_DEV_ONE_PROCESS) writes ui, api and worker
@@ -250,6 +264,8 @@ func logSelectableNames(available []string) []string {
 		}
 		out = append(out, fileToCLIService(s))
 	}
+	slices.Sort(out)
+	out = slices.Compact(out)
 	if slices.Contains(available, app.GoLane) || slices.Contains(available, app.SimsLane) {
 		for _, sim := range goLaneSimulators {
 			if !slices.Contains(out, sim) {

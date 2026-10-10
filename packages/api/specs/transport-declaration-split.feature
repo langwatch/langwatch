@@ -55,7 +55,7 @@ Feature: Transport declaration split
     When a caller invokes it
     Then the framework authenticates, parses the input, authorizes the exact declared target, runs the handler, checks the output and serializes, in that order
     And the handler receives input, app, actor, scope and signal, and nothing else
-    And a fact the process's mount resolved reaches the handler beside input, never inside it
+    And middleware context the process's mount resolved reaches the handler beside input, never inside it
 
   @unit
   Scenario: A tRPC check reads the validated input, never the unparsed request
@@ -154,12 +154,12 @@ Feature: Transport declaration split
     Then the operation lists that answer beside its success, with the status's own name
 
   @integration
-  Scenario: A route's declared facts are bound once at the mount and reach every handler
-    Given routes declaring facts the process resolves, rather than the caller sends
-    When the process mounts the declaration and binds one value for each fact
-    Then each handler is handed the facts it declared, parsed, in the order it declared them
-    And every address the route answers at resolves them the same way
-    And a mount that bound no value for a declared fact is refused, naming the fact and the route
+  Scenario: A route's declared middleware context is provided by its module and reaches every handler
+    Given routes declaring middleware context their module resolves, rather than the caller sends
+    When the module provides one value for each context with provideMiddlewareContext
+    Then each handler is handed the context it declared, parsed, in the order it declared it
+    And every address the route answers at resolves it the same way
+    And a module that provides no value for a declared context does not compile, and a mount without one is refused, naming the context and the route
 
   @unit
   Scenario: A declaration names the credential its routes accept
@@ -421,7 +421,6 @@ Feature: Transport declaration split
     Then the handler is handed the holder's actor, its project as the scope and the resolution as the session
     When an exporter presents no key, or one the module refuses
     Then the module's own refusal answers before the body is read, and the handler never runs
-    And a family no module bound the door for lets nobody in
 
   @integration
   Scenario: The licence token door verifies a connect host bearer before the body
@@ -430,7 +429,27 @@ Feature: Transport declaration split
     Then the handler is handed no actor, the holder's organization as the scope and the resolution as the session
     When an install presents a bearer the module refuses, with a body that fails the schema
     Then the module's own refusal answers with its code and status, before the body is read
-    And a family no module bound the door for lets nobody in
+
+  @integration
+  Scenario: A route naming a credential nobody bound refuses the boot
+    Given a family whose routes answer behind a module-bound credential (Alex, 2026-10-10, TYPED-DOORS)
+    And neither the module nor the host binds a door for it
+    When the host mounts the family
+    Then the mount throws naming the credential nobody bound, and no request is ever served
+
+  @integration
+  Scenario: The framework hands a module-bound door the bearer
+    Given a door declared with defineRestDoor for a module-bound credential (Alex, 2026-10-10, W02-DOOR-BEARER)
+    When a caller presents an Authorization header with the Bearer scheme in any case
+    Then the door's identify is handed the token alone as the bearer, and the request beside it
+    When a caller presents no Bearer scheme
+    Then the door is handed no bearer
+
+  @unit
+  Scenario: A module's doors must match the credentials its routes name
+    Given a module whose routes answer behind module-bound credentials (Alex, 2026-10-10, TYPED-DOORS)
+    When it binds .withDoors with a key missing, an extra key, a door of another credential, or a door needing an Api it cannot reach
+    Then the module does not compile
 
   @integration
   Scenario: A route admits only the key kinds it names

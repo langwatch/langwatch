@@ -3,7 +3,11 @@
  * header, then a geo-IP lookup, then the default. SaaS-only: a self-hosted
  * installation mounts an empty router rather than a surface that guesses.
  */
-import { defineTrpcFact, defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
+import {
+  defineMiddlewareContext,
+  defineTrpcRouter,
+  type TrpcRouterDeclaration,
+} from "@langwatch/api/trpc";
 import {
   currencyTrpc,
   currencyRequestHeadersSchema,
@@ -25,7 +29,7 @@ export const BillingCurrencyApi = moduleApi<BillingCurrencyApi>()("billing");
  * transport. Null on a mount that has no request, which the application already
  * answers for by falling back to the default currency.
  */
-export const currencyRequestHeadersFact = defineTrpcFact(
+export const currencyRequestHeadersContext = defineMiddlewareContext(
   "currencyRequestHeaders",
   currencyRequestHeadersSchema,
 );
@@ -41,7 +45,7 @@ const PUBLIC_REFERENCE_DATA =
 export const currencyTrpcTransport: TrpcRouterDeclaration<BillingCurrencyApi, typeof currencyTrpc> =
   defineTrpcRouter(BillingCurrencyApi, currencyTrpc)
     .procedure("detectCurrency")
-    .withFacts(currencyRequestHeadersFact)
+    .withMiddlewareContext(currencyRequestHeadersContext)
     .noPermission({ reason: PUBLIC_REFERENCE_DATA })
     .handle(({ app }, headers) => app.detectCurrency(headers === null ? {} : { headers }))
     .build();

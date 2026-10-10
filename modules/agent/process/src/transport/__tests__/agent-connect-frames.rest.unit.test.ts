@@ -11,7 +11,7 @@ import { Hono } from "hono";
 import { describe, expect, it, vi } from "vitest";
 
 import { createAgentConnectRest } from "../agent-connect.rest.ts";
-import { connectCredentialsFact, connectDoor } from "./agent-connect-door.fixture.ts";
+import { connectCredentialsContext, connectDoor } from "./agent-connect-door.fixture.ts";
 
 function buildApi(relayMaxPayloadMb?: number) {
   const framesSpy = vi.fn(async () => ({ accepted: 1 }));
@@ -26,7 +26,7 @@ function buildApi(relayMaxPayloadMb?: number) {
     runtime.mount(createAgentConnectRest(relayMaxPayloadMb).router(), {
       app: () => app,
       onError: canonicalErrorResponse,
-      facts: [connectCredentialsFact],
+      middlewareContext: [connectCredentialsContext],
     }),
   );
   return {

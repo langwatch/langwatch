@@ -119,6 +119,14 @@ class RecordingFeedback extends UiFeedback {
     throw new Error("The waiting screen reported a success.");
   }
 
+  warned(_notice: UiSuccessNotice): void {
+    throw new Error("The waiting screen reported a warning.");
+  }
+
+  informed(_notice: UiSuccessNotice): void {
+    throw new Error("The waiting screen reported a notice.");
+  }
+
   failed(failure: UiFailureNotice): void {
     this.failures.push(failure);
   }

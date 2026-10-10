@@ -182,6 +182,9 @@ type Child struct {
 	// size-capped with one rotated generation — whether the stack runs attached
 	// or detached. It is what `haven logs` reads (ADR-064: logs are a tap).
 	LogPath string
+	// SplitLog captures a Node host lane per application (ui, api, worker) beside
+	// LogPath instead of into it, so logs list what a developer thinks about.
+	SplitLog bool
 }
 
 // ProcessSample is one live process as the tsgo governor's sampler sees it.

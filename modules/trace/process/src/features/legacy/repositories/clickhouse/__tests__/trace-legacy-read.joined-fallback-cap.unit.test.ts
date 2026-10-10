@@ -6,8 +6,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { TraceCanonicalisationService } from "#features/derivation/services/trace-canonicalisation.service";
 
+import { ownProof } from "../../../../../__tests__/support/authorization-proofs.fixture.ts";
 import { traceSummaryRow } from "../../../../../repositories/clickhouse/__tests__/support/trace-summary-row.support.ts";
 import { mappedLegacyRead } from "./support/legacy-trace-mapping.support.ts";
+
+const OWN_READ = ownProof({ projectId: "proj-1" });
 
 const mockClickHouseQuery = vi.hoisted(() => vi.fn());
 
@@ -175,6 +178,7 @@ describe("the traces-with-spans memory-limit fallback", () => {
 
       chain = await rejectionChain(
         service.findTracesWithSpans({
+          authorization: OWN_READ,
           projectId: PROJECT,
           traceIds: traceIds(400),
           protections: openProtections,
@@ -214,6 +218,7 @@ describe("the traces-with-spans memory-limit fallback", () => {
 
       const chain = await rejectionChain(
         service.findTracesWithSpans({
+          authorization: OWN_READ,
           projectId: PROJECT,
           traceIds: traceIds(400),
           protections: openProtections,
@@ -236,6 +241,7 @@ describe("the traces-with-spans memory-limit fallback", () => {
 
       await rejectionChain(
         service.findTracesWithSpans({
+          authorization: OWN_READ,
           projectId: PROJECT,
           traceIds: traceIds(400),
           protections: openProtections,
@@ -259,6 +265,7 @@ describe("the traces-with-spans memory-limit fallback", () => {
       });
 
       const traces = await service.findTracesWithSpans({
+        authorization: OWN_READ,
         projectId: PROJECT,
         traceIds: traceIds(60),
         protections: openProtections,

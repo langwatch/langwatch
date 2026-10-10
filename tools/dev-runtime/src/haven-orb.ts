@@ -5,6 +5,13 @@ import path from "node:path";
 import { build } from "vite";
 
 import type { PortForwarder } from "./backend.process.ts";
+import {
+  failureBody,
+  failurePage,
+  injectBanner,
+  retryInSeconds,
+  type BootFailure,
+} from "./boot-failure.ts";
 
 /**
  * The haven orb on a built-UI stack (ADR-064, 2026-10-10; specs/setup/haven-dev-orb.feature).
@@ -26,7 +33,9 @@ export function injectOrb({ html, entry }: { html: string; entry: string }): str
   return html.replace(/<\/head>/iu, `<script type="module" src="${ORB_PATH}${entry}"></script>$&`);
 }
 
-/** Marks a page a `haven up --watch` stack served; browser-host reloads it once idle after a swap. */
+/**
+ * Marks a page a `haven up --watch` stack served; browser-host reloads it once idle after a swap.
+ */
 export const UI_WATCH_META = '<meta name="haven-ui-watch" content="1">';
 
 /** Builds apps/ui/vite/haven-orb.config.ts in memory; undefined when it cannot. */
@@ -68,25 +77,28 @@ async function serveOrb({
   response.end(body);
 }
 
-/** A page answer, read whole and sent on with the orb's script in its head. */
+/** A page answer, read whole and sent on with the orb's script and any boot failure's banner. */
 function answerPage({
   orb,
   isUiWatch,
+  failure,
   answer,
   response,
 }: {
-  orb: Orb;
+  orb: Orb | undefined;
   isUiWatch: boolean;
+  failure: BootFailure | undefined;
   answer: http.IncomingMessage;
   response: http.ServerResponse;
 }) {
   const chunks: Buffer[] = [];
   answer.on("data", (chunk: Buffer) => chunks.push(chunk));
   answer.on("end", () => {
-    void orb().then((built) => {
+    void (orb?.() ?? Promise.resolve(undefined)).then((built) => {
       const html = Buffer.concat(chunks).toString("utf8");
       const withOrb = built ? injectOrb({ html, entry: built.entry }) : html;
-      const body = isUiWatch ? withOrb.replace(/<\/head>/iu, `${UI_WATCH_META}$&`) : withOrb;
+      const watched = isUiWatch ? withOrb.replace(/<\/head>/iu, `${UI_WATCH_META}$&`) : withOrb;
+      const body = failure ? injectBanner({ html: watched, failure, now: Date.now() }) : watched;
       const {
         "content-length": _,
         "transfer-encoding": __,
@@ -128,9 +140,67 @@ function tunnel({
   upstream.on("error", end).on("end", end).on("close", end);
 }
 
+/** While no api serves: a browser gets the plain 503 page, anything else the JSON 503. */
+function answerFailure({
+  failure,
+  request,
+  response,
+}: {
+  failure: BootFailure;
+  request: http.IncomingMessage;
+  response: http.ServerResponse;
+}) {
+  const now = Date.now();
+  const isPage = request.method === "GET" && /text\/html/iu.test(request.headers.accept ?? "");
+  const body = isPage
+    ? failurePage({ failure, now })
+    : JSON.stringify(failureBody({ failure, now }));
+  response.writeHead(503, {
+    "content-type": isPage ? "text/html; charset=utf-8" : "application/json",
+    "cache-control": "no-store",
+    "retry-after": String(retryInSeconds({ failure, now })),
+  });
+  response.end(body);
+}
+
+/** One request sent on to the serving api; a page answer goes through `answerPage`. */
+function proxy({
+  target,
+  agent,
+  page,
+  request,
+  response,
+}: {
+  target: number;
+  agent: http.Agent;
+  page: { orb: Orb | undefined; isUiWatch: boolean; failure: BootFailure | undefined };
+  request: http.IncomingMessage;
+  response: http.ServerResponse;
+}) {
+  const options = {
+    host: "127.0.0.1",
+    port: target,
+    method: request.method,
+    path: request.url ?? "/",
+    headers: request.headers,
+    agent,
+  };
+  const upstream = http.request(options, (answer) => {
+    if (isPage(answer)) return answerPage({ ...page, answer, response });
+    response.writeHead(answer.statusCode ?? 502, answer.headers);
+    answer.pipe(response);
+  });
+  upstream.on("error", () => response.destroy());
+  response.on("close", () => {
+    if (!response.writableFinished) upstream.destroy();
+  });
+  request.pipe(upstream);
+}
+
 /**
- * forwardPort over HTTP: the same stable port moved between generations, but a page answer gets
- * the orb's script and ORB_PATH answers from the orb's build, asked for on first use.
+ * The api's stable port over HTTP, moved between generations. A page answer gets the orb's script
+ * (when given) and a reported boot failure's banner; with no api routed, a reported failure
+ * answers 503. ORB_PATH answers from the orb's build, asked for on first use.
  */
 export async function forwardPortWithOrb({
   port,
@@ -138,34 +208,21 @@ export async function forwardPortWithOrb({
   isUiWatch = false,
 }: {
   port: number;
-  orb: Orb;
+  orb?: Orb;
   isUiWatch?: boolean;
 }): Promise<PortForwarder> {
   let target: number | undefined;
+  let failure: BootFailure | undefined;
   const agent = new http.Agent({ keepAlive: true });
 
   const server = http.createServer((request, response) => {
     const url = request.url ?? "/";
-    if (url.startsWith(ORB_PATH)) return void serveOrb({ orb, url, response });
-    if (target === undefined) return void request.socket.destroy();
-    const options = {
-      host: "127.0.0.1",
-      port: target,
-      method: request.method,
-      path: url,
-      headers: request.headers,
-      agent,
-    };
-    const upstream = http.request(options, (answer) => {
-      if (isPage(answer)) return answerPage({ orb, isUiWatch, answer, response });
-      response.writeHead(answer.statusCode ?? 502, answer.headers);
-      answer.pipe(response);
-    });
-    upstream.on("error", () => response.destroy());
-    response.on("close", () => {
-      if (!response.writableFinished) upstream.destroy();
-    });
-    request.pipe(upstream);
+    if (orb && url.startsWith(ORB_PATH)) return void serveOrb({ orb, url, response });
+    if (target === undefined) {
+      if (failure) return answerFailure({ failure, request, response });
+      return void request.socket.destroy();
+    }
+    proxy({ target, agent, page: { orb, isUiWatch, failure }, request, response });
   });
   server.on("upgrade", (request: http.IncomingMessage, client: net.Socket, head: Buffer) => {
     if (target === undefined) return void client.destroy();
@@ -179,6 +236,9 @@ export async function forwardPortWithOrb({
   return {
     route(next) {
       target = next;
+    },
+    report(next) {
+      failure = next;
     },
     close: () =>
       new Promise<void>((resolve) => {

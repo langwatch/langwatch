@@ -1,5 +1,5 @@
 import {
-  bindRestMiddleware,
+  bindMiddlewareContext,
   canonicalErrorResponse,
   createRestRuntime,
   type IdempotentRunner,
@@ -161,13 +161,13 @@ async function mountedSpendRead({
   const hono = runtime.mount(gatewayPlatformRest.router(), {
     app: () => app,
     onError: canonicalErrorResponse,
-    facts: [
-      bindRestMiddleware(gatewayRestCredential, () => ({ kind: "legacyProjectKey" as const })),
-      bindRestMiddleware(gatewayKeyCaller, () => ({
+    middlewareContext: [
+      bindMiddlewareContext(gatewayRestCredential, () => ({ kind: "legacyProjectKey" as const })),
+      bindMiddlewareContext(gatewayKeyCaller, () => ({
         kind: "project" as const,
         projectId: PROJECT_ID,
       })),
-      bindRestMiddleware(gatewayVirtualKeyCaller, () => ({
+      bindMiddlewareContext(gatewayVirtualKeyCaller, () => ({
         kind: "project" as const,
         projectId: PROJECT_ID,
       })),

@@ -4,7 +4,7 @@ import { Secret } from "@langwatch/secrets/secret";
 
 /** `provenOffboarding` selects one process-wide offboarding path at boot. */
 export const scimConfig = Config.define((c) => ({
-  provenOffboarding: c.env("SCIM_V2_GRANTS", environmentBooleanSchema.default(false)),
+  provenOffboarding: c.env("SCIM_V2_GRANTS", environmentBooleanSchema.default(true)),
 }));
 
 export type ScimServerConfig = ConfigOf<typeof scimConfig>;

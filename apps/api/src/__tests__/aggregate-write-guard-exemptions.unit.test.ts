@@ -5,8 +5,9 @@
  * @vitest-environment node
  * @see specs/governance/aggregate-project.feature
  */
-import type { TrpcAccess, TrpcProcedureRequest } from "@langwatch/api/trpc";
+import type { TrpcAccess, TrpcProcedureRequest, TrpcRouterDeclaration } from "@langwatch/api/trpc";
 import { type AuthzPermission, writesUnderProject } from "@langwatch/authorization";
+import type { TrpcContract } from "@langwatch/module";
 import { describe, expect, it } from "vitest";
 
 import { processModules } from "../process-modules.generated.ts";
@@ -53,6 +54,11 @@ function carriesProjectId(schema: unknown, depth = 0): boolean {
   return typeof shape === "object" && shape !== null && "projectId" in shape;
 }
 
+const declaresTrpcRouter = (transport: {
+  readonly protocol: string;
+}): transport is TrpcRouterDeclaration<unknown, TrpcContract> =>
+  transport.protocol === "trpc" && "router" in transport;
+
 /** Every installed mutation that names permissions, mounted on a runtime that only records. */
 function declaredMutations(): Mutation[] {
   const mutations: Mutation[] = [];
@@ -70,7 +76,7 @@ function declaredMutations(): Mutation[] {
   };
   for (const module of processModules) {
     for (const transport of module.transports ?? []) {
-      if (transport.protocol !== "trpc" || !("router" in transport)) continue;
+      if (!declaresTrpcRouter(transport)) continue;
       transport.router({ procedure: record, router: (routes) => routes }, () => {
         throw new Error("the recording runtime binds no application");
       });

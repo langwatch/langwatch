@@ -4,7 +4,8 @@ import {
   defineRestRouter,
   InternalServerError,
   MANAGEMENT_API_VERSION,
-  projectRestFacts,
+  projectRequestContext,
+  type RestDoorCredential,
   type RestTransportDeclaration,
 } from "@langwatch/api/rest";
 import {
@@ -130,14 +131,15 @@ const uploadBodyLimit = {
 const UPLOAD_THEN_IMPORT =
   "upload the file as a stored object with the purpose dataset_import, then create the dataset from it";
 
-/** The inert declaration the process mounts on its own project-key door. */
-type DatasetRestDeclaration = Readonly<{
+export function createDatasetRest(): Readonly<{
   protocol: "rest";
   namespace: string;
-  router: () => RestTransportDeclaration<DatasetApi>;
-}>;
-
-export function createDatasetRest(): DatasetRestDeclaration {
+  router: () => RestTransportDeclaration<
+    DatasetApi,
+    RestDoorCredential,
+    typeof projectRequestContext
+  >;
+}> {
   return (
     defineRestRouter(DatasetApi)
       .withNamespace("dataset")
@@ -146,7 +148,7 @@ export function createDatasetRest(): DatasetRestDeclaration {
       .get("/", "getApiDataset")
       .withQuery(datasetRestPaginationQuerySchema)
       .withPermission("datasets:view")
-      .withMiddleware(projectRestFacts)
+      .withMiddlewareContext(projectRequestContext)
       .withOutput(datasetRestListResponseSchema)
       .withDocs({
         description: "List all non-archived datasets for the project (paginated)",
@@ -179,7 +181,7 @@ export function createDatasetRest(): DatasetRestDeclaration {
       .post("/", "postApiDataset")
       .withInput(datasetRestCreateSchema)
       .withPermission("datasets:create")
-      .withMiddleware(projectRestFacts)
+      .withMiddlewareContext(projectRequestContext)
       .withStatus(201)
       .withOutput(datasetRestSummarySchema)
       .withDocs({ description: "Create a new dataset" })
@@ -377,7 +379,7 @@ export function createDatasetRest(): DatasetRestDeclaration {
       .get("/:slugOrId", "getApiDatasetBySlugOrId")
       .withParams(datasetRestSlugOrIdParamsSchema)
       .withPermission("datasets:view")
-      .withMiddleware(projectRestFacts)
+      .withMiddlewareContext(projectRequestContext)
       .withOutput(datasetRestDetailResponseSchema)
       .withDocs({
         description:
@@ -408,7 +410,7 @@ export function createDatasetRest(): DatasetRestDeclaration {
       .withParams(datasetRestSlugOrIdParamsSchema)
       .withInput(datasetRestUpdateSchema)
       .withPermission("datasets:manage")
-      .withMiddleware(projectRestFacts)
+      .withMiddlewareContext(projectRequestContext)
       .withOutput(datasetRestSummarySchema)
       .withDocs({ description: "Update a dataset by its slug or id" })
       .handle(async ({ app, input, scope }, project) => {
@@ -448,7 +450,7 @@ export function createDatasetRest(): DatasetRestDeclaration {
       .withParams(datasetRestSlugOrIdParamsSchema)
       .withQuery(datasetRestPaginationQuerySchema)
       .withPermission("datasets:view")
-      .withMiddleware(projectRestFacts)
+      .withMiddlewareContext(projectRequestContext)
       .withOutput(datasetRestRecordPageSchema)
       .withDocs({
         description:
@@ -473,7 +475,7 @@ export function createDatasetRest(): DatasetRestDeclaration {
       .withParams(datasetRestSlugParamsSchema)
       .withQuery(datasetRestPaginationQuerySchema)
       .withPermission("datasets:view")
-      .withMiddleware(projectRestFacts)
+      .withMiddlewareContext(projectRequestContext)
       .withOutput(datasetRestRecordPageSchema)
       .withDocs({
         description: "List entries of a dataset (paginated). Same as GET /:slugOrId/records.",

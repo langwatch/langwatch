@@ -1,8 +1,7 @@
 import {
-  bindRestCredential,
-  bindRestMiddleware,
   principalOfCredential,
   projectCredentialOfRequest,
+  projectRequestContextOf,
 } from "@langwatch/api/rest";
 import { defineProcessModule, type PublishedProcessModule } from "@langwatch/process";
 import type { TraceApi, TraceServerConfig } from "@langwatch/trace-contract";
@@ -24,7 +23,7 @@ import { spansTrpcTransport } from "./transport/spans.trpc.ts";
 import { traceEditOverlayTrpcTransport } from "./transport/trace-edit-overlay.trpc.ts";
 import { traceExportRest } from "./transport/trace-export.rest.ts";
 import { traceLegacyRest } from "./transport/trace-legacy.rest.ts";
-import { tracesRest, tracesRestCredential } from "./transport/traces.rest.ts";
+import { tracesRest } from "./transport/traces.rest.ts";
 import { tracesTrpcTransport } from "./transport/traces.trpc.ts";
 import { trackedEventLegacyPathRest, trackedEventRest } from "./transport/tracked-event.rest.ts";
 
@@ -64,17 +63,18 @@ export const traceProcessModule: PublishedProcessModule<"trace", TraceApi, Trace
       // of the REST families — the path alias's wildcard must come after it.
       otlpIngestRest,
     )
-    .withTransportFacts(({ app }) => [
+    .provideMiddlewareContext({
+      projectRequestContext: projectRequestContextOf,
       // The v1 trace reads answer through the key's own grants, so the routes
       // read the CREDENTIAL - its api key id and the member it acts as - rather
       // than whoever holds it. A legacy project key names neither.
-      bindRestMiddleware(tracesRestCredential, (context) => {
-        const credential = projectCredentialOfRequest(context.req.raw);
+      tracesRestCredential: (request) => {
+        const credential = projectCredentialOfRequest(request);
         return { principal: principalOfCredential(credential) };
-      }),
-      // The OTLP receiver's key, resolved before the body is read (W02-DOOR-SHAPE, 2026-10-10).
-      bindRestCredential("otlp_ingest", () => otlpIngestDoor((input) => app.otlpCredential(input))),
-    ])
+      },
+    })
+    // The OTLP receiver's key, resolved before the body is read (W02-DOOR-SHAPE, 2026-10-10).
+    .withDoors({ otlp_ingest: otlpIngestDoor })
     .withEventing(traceProcessingEventing)
     .withEventing(traceProjectMilestonesEventing)
     .withEventing(traceCollectorEvaluationsEventing)

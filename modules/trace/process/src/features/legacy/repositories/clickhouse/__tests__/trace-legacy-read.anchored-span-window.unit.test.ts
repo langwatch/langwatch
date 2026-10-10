@@ -6,8 +6,11 @@ import { beforeAll, describe, expect, it, vi } from "vitest";
 
 import { TraceCanonicalisationService } from "#features/derivation/services/trace-canonicalisation.service";
 
+import { ownProof } from "../../../../../__tests__/support/authorization-proofs.fixture.ts";
 import { traceSummaryRow } from "../../../../../repositories/clickhouse/__tests__/support/trace-summary-row.support.ts";
 import { mappedLegacyRead } from "./support/legacy-trace-mapping.support.ts";
+
+const OWN_READ = ownProof({ projectId: "proj-1" });
 
 const { mockClickHouseQuery } = vi.hoisted(() => ({
   mockClickHouseQuery: vi.fn(),
@@ -124,7 +127,12 @@ async function readTraces(traceIds: string[]) {
     resolveClickHouseClient: testResolveClickHouseClient,
     traceCanonicalisation,
   });
-  await service.findTracesWithSpans({ projectId: "proj-1", traceIds, protections });
+  await service.findTracesWithSpans({
+    authorization: OWN_READ,
+    projectId: "proj-1",
+    traceIds,
+    protections,
+  });
   const spanCall = mockClickHouseQuery.mock.calls.find(([args]) =>
     String(args.query).includes("FROM stored_spans AS t"),
   );

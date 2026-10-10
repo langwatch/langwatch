@@ -327,7 +327,7 @@ describe("a license sync", () => {
     /** The door's check, then the sync, as the connect host runs them. */
     const syncAs = async ({ token, body }: { token: string; body: unknown }) =>
       sync.recordSync({
-        caller: await sync.verify({ authorization: `Bearer ${token}`, instanceId: "install-1" }),
+        caller: await sync.verify({ bearer: token, instanceId: "install-1" }),
         body,
       });
     return { repository, managedKeys, sync, syncAs };
@@ -362,9 +362,10 @@ describe("a license sync", () => {
   it("throws pending by its code at the door while the licence has no managed key", async () => {
     const { sync } = syncHarness([rowFor()]);
 
-    await expect(
-      sync.verify({ authorization: `Bearer ${TOKEN}`, instanceId: "install-1" }),
-    ).rejects.toMatchObject({ code: "connect_credential_pending", httpStatus: 503 });
+    await expect(sync.verify({ bearer: TOKEN, instanceId: "install-1" })).rejects.toMatchObject({
+      code: "connect_credential_pending",
+      httpStatus: 503,
+    });
   });
 
   it("tells the gateway a license granting nothing serves nothing", async () => {
@@ -401,9 +402,10 @@ describe("a license sync", () => {
   it("throws the credential's own refusal at the door", async () => {
     const { sync } = syncHarness([rowFor({ revokedAt: NOW })]);
 
-    await expect(
-      sync.verify({ authorization: `Bearer ${TOKEN}`, instanceId: "install-1" }),
-    ).rejects.toMatchObject({ code: "connect_license_revoked", httpStatus: 403 });
+    await expect(sync.verify({ bearer: TOKEN, instanceId: "install-1" })).rejects.toMatchObject({
+      code: "connect_license_revoked",
+      httpStatus: 403,
+    });
   });
 
   /** @scenario "The connect host's door refuses a malformed licence token before the body" */
@@ -411,7 +413,7 @@ describe("a license sync", () => {
   it("reads the bearer header at the door, and throws a refusal by its code", async () => {
     const { sync } = syncHarness([rowFor({ virtualKeyId: "vk-1" })]);
 
-    const caller = await sync.verify({ authorization: `Bearer ${TOKEN}`, instanceId: "install-1" });
+    const caller = await sync.verify({ bearer: TOKEN, instanceId: "install-1" });
     expect(caller).toEqual({
       licenseRowId: "license-1",
       organizationId: caller.organizationId,
@@ -419,15 +421,14 @@ describe("a license sync", () => {
       virtualKeyId: "vk-1",
     });
     await expect(sync.answer({ caller, body })).resolves.toEqual({ services: ["instant_evals"] });
-    await expect(
-      sync.verify({ authorization: TOKEN, instanceId: "install-1" }),
-    ).rejects.toMatchObject({ code: "connect_license_token_malformed", httpStatus: 401 });
-    await expect(
-      sync.verify({ authorization: undefined, instanceId: "install-1" }),
-    ).rejects.toMatchObject({ code: "connect_license_token_malformed", httpStatus: 401 });
-    await expect(
-      sync.verify({ authorization: `Bearer ${TOKEN}`, instanceId: undefined }),
-    ).rejects.toMatchObject({ code: "connect_instance_required", httpStatus: 400 });
+    await expect(sync.verify({ bearer: null, instanceId: "install-1" })).rejects.toMatchObject({
+      code: "connect_license_token_malformed",
+      httpStatus: 401,
+    });
+    await expect(sync.verify({ bearer: TOKEN, instanceId: undefined })).rejects.toMatchObject({
+      code: "connect_instance_required",
+      httpStatus: 400,
+    });
   });
 
   /** @scenario "The replaced license is retired once the new one is in use" */

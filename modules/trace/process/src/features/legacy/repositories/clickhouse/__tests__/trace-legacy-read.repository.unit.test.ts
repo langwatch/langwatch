@@ -4,7 +4,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { TraceCanonicalisationService } from "#features/derivation/services/trace-canonicalisation.service";
 
+import { ownProof } from "../../../../../__tests__/support/authorization-proofs.fixture.ts";
 import { mappedLegacyRead } from "./support/legacy-trace-mapping.support.ts";
+
+const OWN_READ = ownProof({ projectId: "proj_123" });
 
 // ---------------------------------------------------------------------------
 // Hoisted mocks
@@ -146,7 +149,9 @@ describe("TraceLegacyReadClickHouseRepository", () => {
           traceCanonicalisation,
         });
 
-        const result = await service.listAllTracesForProject(baseInput, protections);
+        const result = await service.listAllTracesForProject(baseInput, protections, {
+          ownRead: OWN_READ,
+        });
 
         expect(result).not.toBeNull();
         const traces = result!.groups.flat();
@@ -169,7 +174,9 @@ describe("TraceLegacyReadClickHouseRepository", () => {
           traceIds: ["trace-A", "trace-B"],
         } as GetAllTracesForProjectInput;
 
-        const result = await service.listAllTracesForProject(inputWithTraceIds, protections);
+        const result = await service.listAllTracesForProject(inputWithTraceIds, protections, {
+          ownRead: OWN_READ,
+        });
 
         expect(result).not.toBeNull();
 
@@ -197,7 +204,9 @@ describe("TraceLegacyReadClickHouseRepository", () => {
           traceIds: ["trace-A"],
         } as GetAllTracesForProjectInput;
 
-        const result = await service.listAllTracesForProject(inputWithTraceIds, protections);
+        const result = await service.listAllTracesForProject(inputWithTraceIds, protections, {
+          ownRead: OWN_READ,
+        });
 
         expect(result).not.toBeNull();
         const traces = result!.groups.flat();
@@ -215,7 +224,9 @@ describe("TraceLegacyReadClickHouseRepository", () => {
           traceCanonicalisation,
         });
 
-        const result = await service.listAllTracesForProject(baseInput, protections);
+        const result = await service.listAllTracesForProject(baseInput, protections, {
+          ownRead: OWN_READ,
+        });
 
         expect(result).not.toBeNull();
 
@@ -260,6 +271,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
 
           const result = await service.listAllTracesForProject(baseInput, protections, {
             scrollId,
+            ownRead: OWN_READ,
           });
 
           expect(result).not.toBeNull();
@@ -289,7 +301,9 @@ describe("TraceLegacyReadClickHouseRepository", () => {
             scrollId,
           } as GetAllTracesForProjectInput;
 
-          const result = await service.listAllTracesForProject(inputWithScrollId, protections);
+          const result = await service.listAllTracesForProject(inputWithScrollId, protections, {
+            ownRead: OWN_READ,
+          });
 
           expect(result).not.toBeNull();
 
@@ -313,7 +327,9 @@ describe("TraceLegacyReadClickHouseRepository", () => {
             traceCanonicalisation,
           });
 
-          const result = await service.listAllTracesForProject(baseInput, protections);
+          const result = await service.listAllTracesForProject(baseInput, protections, {
+            ownRead: OWN_READ,
+          });
 
           expect(result).not.toBeNull();
 
@@ -339,6 +355,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
 
           const result = await service.listAllTracesForProject(baseInput, protections, {
             scrollId: "not-valid-base64!!!",
+            ownRead: OWN_READ,
           });
 
           expect(result).not.toBeNull();
@@ -368,6 +385,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
 
           const result = await service.listAllTracesForProject(baseInput, protections, {
             scrollId,
+            ownRead: OWN_READ,
           });
 
           expect(result).not.toBeNull();
@@ -395,6 +413,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
 
           const result = await service.listAllTracesForProject(baseInput, protections, {
             scrollId,
+            ownRead: OWN_READ,
           });
 
           expect(result).not.toBeNull();
@@ -423,6 +442,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
 
           await service.listAllTracesForProject(baseInput, protections, {
             scrollId: makeScrollId(overrides),
+            ownRead: OWN_READ,
           });
 
           const dataCall = mockClickHouseQuery.mock.calls[1]!;
@@ -439,7 +459,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
           resolveClickHouseClient: testResolveClickHouseClient,
           traceCanonicalisation,
         });
-        return service.listAllTracesForProject(baseInput, protections);
+        return service.listAllTracesForProject(baseInput, protections, { ownRead: OWN_READ });
       };
 
       describe("when the page is full", () => {
@@ -484,6 +504,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
         await service.listAllTracesForProject(
           { ...baseInput, query: "Hello World" } as GetAllTracesForProjectInput,
           protections,
+          { ownRead: OWN_READ },
         );
 
         const countCall = mockClickHouseQuery.mock.calls[0]!;
@@ -506,6 +527,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
         await service.listAllTracesForProject(
           { ...baseInput, query: "Hello World" } as GetAllTracesForProjectInput,
           protections,
+          { ownRead: OWN_READ },
         );
 
         const dataCall = mockClickHouseQuery.mock.calls[1]!;
@@ -528,6 +550,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
         await service.listAllTracesForProject(
           { ...baseInput, query: "Hello World" } as GetAllTracesForProjectInput,
           protections,
+          { ownRead: OWN_READ },
         );
 
         const countCall = mockClickHouseQuery.mock.calls[0]!;
@@ -548,6 +571,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
             query: "100% success_rate",
           } as GetAllTracesForProjectInput,
           protections,
+          { ownRead: OWN_READ },
         );
 
         const countCall = mockClickHouseQuery.mock.calls[0]!;
@@ -571,6 +595,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
         await service.listAllTracesForProject(
           { ...baseInput, query: "codex" } as GetAllTracesForProjectInput,
           protections,
+          { ownRead: OWN_READ },
         );
 
         const call = mockClickHouseQuery.mock.calls[callIdx as number]!;
@@ -593,6 +618,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
         await service.listAllTracesForProject(
           { ...baseInput, query: "codex" } as GetAllTracesForProjectInput,
           protections,
+          { ownRead: OWN_READ },
         );
 
         const sql = mockClickHouseQuery.mock.calls[callIdx as number]![0].query;
@@ -615,6 +641,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
         await service.listAllTracesForProject(
           { ...baseInput, query: "codex" } as GetAllTracesForProjectInput,
           protections,
+          { ownRead: OWN_READ },
         );
 
         const sql = mockClickHouseQuery.mock.calls[0]![0].query;
@@ -651,6 +678,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
         await service.listAllTracesForProject(
           { ...baseInput, query: "co" } as GetAllTracesForProjectInput,
           protections,
+          { ownRead: OWN_READ },
         );
 
         const call = mockClickHouseQuery.mock.calls[0]!;
@@ -673,6 +701,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
         await service.listAllTracesForProject(
           { ...baseInput, query: "codex" } as GetAllTracesForProjectInput,
           { ...protections, canSeeCapturedOutput: false },
+          { ownRead: OWN_READ },
         );
 
         const sql = mockClickHouseQuery.mock.calls[0]![0].query;
@@ -696,6 +725,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
             canSeeCapturedInput: false,
             canSeeCapturedOutput: false,
           },
+          { ownRead: OWN_READ },
         );
 
         expect(result!.groups).toEqual([]);
@@ -717,6 +747,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
             canSeeCapturedInput: false,
             canSeeCapturedOutput: true,
           },
+          { ownRead: OWN_READ },
         );
 
         const countCall = mockClickHouseQuery.mock.calls[0]!;
@@ -738,6 +769,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
             canSeeCapturedInput: true,
             canSeeCapturedOutput: false,
           },
+          { ownRead: OWN_READ },
         );
 
         const countCall = mockClickHouseQuery.mock.calls[0]!;
@@ -758,6 +790,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
         await service.listAllTracesForProject(
           { ...baseInput, query: "ab" } as GetAllTracesForProjectInput,
           protections,
+          { ownRead: OWN_READ },
         );
 
         const countCall = mockClickHouseQuery.mock.calls[0]!;
@@ -775,7 +808,9 @@ describe("TraceLegacyReadClickHouseRepository", () => {
           traceCanonicalisation,
         });
 
-        const result = await service.listAllTracesForProject(baseInput, protections);
+        const result = await service.listAllTracesForProject(baseInput, protections, {
+          ownRead: OWN_READ,
+        });
 
         expect(result).not.toBeNull();
 
@@ -832,6 +867,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
         const result = await service.listAllTracesForProject(
           { ...baseInput, pageSize: 4 } as GetAllTracesForProjectInput,
           protections,
+          { ownRead: OWN_READ },
         );
 
         expect(result).not.toBeNull();
@@ -879,6 +915,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
         const result = await service.listAllTracesForProject(
           { ...baseInput, pageSize: 30 } as GetAllTracesForProjectInput,
           protections,
+          { ownRead: OWN_READ },
         );
 
         expect(result).not.toBeNull();
@@ -909,9 +946,9 @@ describe("TraceLegacyReadClickHouseRepository", () => {
           traceCanonicalisation,
         });
 
-        await expect(service.listAllTracesForProject(baseInput, protections)).rejects.toThrow(
-          "SYNTAX_ERROR",
-        );
+        await expect(
+          service.listAllTracesForProject(baseInput, protections, { ownRead: OWN_READ }),
+        ).rejects.toThrow("SYNTAX_ERROR");
       });
     });
 
@@ -947,7 +984,9 @@ describe("TraceLegacyReadClickHouseRepository", () => {
           traceCanonicalisation,
         });
 
-        const result = await service.listAllTracesForProject(baseInput, protections);
+        const result = await service.listAllTracesForProject(baseInput, protections, {
+          ownRead: OWN_READ,
+        });
 
         expect(result).not.toBeNull();
         expect(result!.groups.flat()).toHaveLength(1);
@@ -992,6 +1031,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
 
         const result = await service.listAllTracesForProject(baseInput, protections, {
           includeSpans: true,
+          ownRead: OWN_READ,
         });
 
         expect(result).not.toBeNull();
@@ -1043,6 +1083,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
         });
 
         const traces = await service.findTracesWithSpans({
+          authorization: OWN_READ,
           projectId: "proj_123",
           traceIds,
           protections,
@@ -1087,6 +1128,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
         });
 
         const traces = await service.findTracesWithSpans({
+          authorization: OWN_READ,
           projectId: "proj_123",
           traceIds,
           protections,
@@ -1111,6 +1153,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
 
         await expect(
           service.findTracesWithSpans({
+            authorization: OWN_READ,
             projectId: "proj_123",
             traceIds: ["trace-0"],
             protections,
@@ -1140,6 +1183,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
         });
 
         await service.findTracesWithSpans({
+          authorization: OWN_READ,
           projectId: "proj_123",
           traceIds: ["trace-0"],
           protections,
@@ -1184,6 +1228,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
         });
 
         await service.findTracesWithSpans({
+          authorization: OWN_READ,
           projectId: "proj_123",
           traceIds: ["trace-0"],
           protections,
@@ -1221,6 +1266,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
         });
 
         await service.findTracesWithSpans({
+          authorization: OWN_READ,
           projectId: "proj_123",
           traceIds: ["trace-0"],
           protections,
@@ -1251,6 +1297,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
         });
 
         const traces = await service.findTracesWithSpans({
+          authorization: OWN_READ,
           projectId: "proj_123",
           traceIds: ["trace-0"],
           protections,

@@ -1,7 +1,6 @@
 import {
   defineRestRouter,
   MANAGEMENT_API_VERSION,
-  type RestTransportDeclaration,
 } from "@langwatch/api/rest";
 /** `/api/organizations` reads, instance bearer key; api-key serves the POST (R3). */
 import {
@@ -12,11 +11,7 @@ import {
 } from "@langwatch/organization-contract";
 import { toDate } from "@langwatch/time";
 
-export const organizationsProvisioningRest: Readonly<{
-  protocol: "rest";
-  namespace: string;
-  router: () => RestTransportDeclaration<OrganizationApi>;
-}> = defineRestRouter(OrganizationApi)
+export const organizationsProvisioningRest = defineRestRouter(OrganizationApi)
   .withNamespace("organizations")
   .withVersion(MANAGEMENT_API_VERSION)
   .withCredential("instance_admin")

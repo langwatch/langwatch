@@ -1,13 +1,12 @@
 import {
   badRequestSchema,
-  defineRestMiddleware,
+  defineMiddlewareContext,
   defineRestRouter,
   documentedResponses,
   MANAGEMENT_API_VERSION,
-  projectRestFacts,
+  projectRequestContext,
   RequestValidationError,
   resolver,
-  type RestTransportDeclaration,
 } from "@langwatch/api/rest";
 import type { Authorization, PrincipalRef } from "@langwatch/authorization";
 import { createLogger } from "@langwatch/observability";
@@ -61,7 +60,7 @@ const logger = createLogger("langwatch:api:traces");
 const DEFAULT_TRACES_PAGE_SIZE = resolveRequestBound("tracesPageSizeMax", "FREE");
 
 /** The credential a route reads: an API key's own id, and the member it acts as. */
-export const tracesRestCredential = defineRestMiddleware(
+export const tracesRestCredential = defineMiddlewareContext(
   "tracesRestCredential",
   tracesRestCredentialSchema,
 );
@@ -303,11 +302,7 @@ async function searchTraces({
   return streamSearchEnvelope(serializedTraces, pagination, schemaSuffix);
 }
 
-function createTracesRest(): Readonly<{
-  protocol: "rest";
-  namespace: string;
-  router: () => RestTransportDeclaration<TraceApi>;
-}> {
+function createTracesRest() {
   let router = defineRestRouter(TraceApi)
     .withNamespace("traces")
     .withVersion(MANAGEMENT_API_VERSION)
@@ -316,7 +311,7 @@ function createTracesRest(): Readonly<{
     .withInput(traceSearchBodySchema)
     .withPermission("traces:view")
     .withResponse("bytes", { produces: "application/json" })
-    .withMiddleware(projectRestFacts, tracesRestCredential)
+    .withMiddlewareContext(projectRequestContext, tracesRestCredential)
     .withDocs({
       operationId: "postApiTracesSearch",
       description: "Search traces for a project",
@@ -341,7 +336,7 @@ function createTracesRest(): Readonly<{
     .withQuery(traceFacetsQuerySchema)
     .withPermission("traces:view")
     .withOutput(traceFacetsResponseSchema)
-    .withMiddleware(projectRestFacts, tracesRestCredential)
+    .withMiddlewareContext(projectRequestContext, tracesRestCredential)
     .withDocs({
       operationId: "getApiTracesFacets",
       summary: "Discover what the trace filter fields hold",
@@ -374,7 +369,7 @@ function createTracesRest(): Readonly<{
     .withParams(traceIdParamsSchema)
     .withPermission("traces:view")
     .withOutput(transcriptRestResponseSchema)
-    .withMiddleware(projectRestFacts, tracesRestCredential)
+    .withMiddlewareContext(projectRequestContext, tracesRestCredential)
     .withDocs({
       operationId: "getApiTracesByTraceIdTranscript",
       description:
@@ -438,7 +433,7 @@ function createTracesRest(): Readonly<{
     .withQuery(traceFormatQuerySchema)
     .withPermission("traces:view")
     .withOutput(traceDetailResponseSchema)
-    .withMiddleware(projectRestFacts, tracesRestCredential)
+    .withMiddlewareContext(projectRequestContext, tracesRestCredential)
     .withDocs({
       operationId: "getApiTracesByTraceId",
       description: "Get a single trace by ID.",

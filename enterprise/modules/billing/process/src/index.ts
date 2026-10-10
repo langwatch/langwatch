@@ -1,6 +1,6 @@
 /**
- * The three declared transports, and the facts two of them ask the process to
- * resolve. A mount binds a fact; nothing else may.
+ * The three declared transports, and the middleware context two of them ask the
+ * process to resolve. A mount binds each value; nothing else may.
  */
 export { billingProcessModule } from "./billing.module.ts";
 export {
@@ -9,11 +9,11 @@ export {
 } from "./transport/billing-stripe-webhook.rest.ts";
 export {
   type BillingCurrencyApi,
-  currencyRequestHeadersFact,
+  currencyRequestHeadersContext,
   currencyTrpcTransport,
 } from "./transport/currency.trpc.ts";
 export {
-  billingCallerEmailFact,
+  billingCallerEmailContext,
   type BillingSubscriptionApi,
   subscriptionTrpcTransport,
   type BillingSubscriber,

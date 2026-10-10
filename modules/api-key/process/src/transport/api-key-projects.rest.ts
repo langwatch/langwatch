@@ -32,7 +32,13 @@ import { apiKeyRestCredential } from "./api-key.rest.ts";
 export interface ApiKeyProjectsDoorApi {
   /** The organization's projects, cut to those the presented key reaches. */
   listVisibleProjects(
-    input: Readonly<{ apiKeyId: string; organizationId: string; page: number; limit: number }>,
+    input: Readonly<{
+      apiKeyId: string;
+      userId: string | null;
+      organizationId: string;
+      page: number;
+      limit: number;
+    }>,
   ): Promise<PaginatedProjects>;
   /** A project provisioned in the organization, with its freshly minted service key. */
   provisionProject(input: ProjectProvisioningRequest): Promise<ProvisionedProject>;
@@ -96,7 +102,7 @@ export const apiKeyProjectsRest = defineRestRouter(ApiKeyProjectsDoorApi)
       { status: 403, description: "Insufficient permissions for this operation" },
     ],
   })
-  .withMiddleware(apiKeyRestCredential)
+  .withMiddlewareContext(apiKeyRestCredential)
   .handle(async ({ app, input, scope }, credential) => {
     const result = await app.listVisibleProjects({
       apiKeyId: credential.apiKeyId,
@@ -127,7 +133,7 @@ export const apiKeyProjectsRest = defineRestRouter(ApiKeyProjectsDoorApi)
       { status: 422, description: "Validation error (missing required fields)" },
     ],
   })
-  .withMiddleware(apiKeyRestCredential)
+  .withMiddlewareContext(apiKeyRestCredential)
   .withAudit("management.project.create")
   .handle(async ({ app, input, scope }, credential) => {
     const { project, serviceKey } = await provisionProject({

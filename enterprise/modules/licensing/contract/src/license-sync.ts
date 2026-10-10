@@ -30,9 +30,9 @@ export type LicenseSyncBody = z.infer<typeof licenseSyncBodySchema>;
 /** An activation carries its code in the bearer header, so its body names nothing. */
 export const connectActivationRequestSchema = z.object({});
 
-/** A credential as presented: the raw bearer header and the instance id, both unchecked. */
+/** A credential as presented: the bearer the framework read and the instance id, both unchecked. */
 export interface ConnectPresentedCredential {
-  authorization: string | undefined;
+  bearer: string | null;
   instanceId: string | undefined;
 }
 
