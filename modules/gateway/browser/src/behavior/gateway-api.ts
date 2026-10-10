@@ -164,7 +164,7 @@ export type GatewayOrganizationGraph = {
   teams: {
     id: string;
     name: string;
-    projects: { id: string; name: string; slug: string }[];
+    projects: { id: string; name: string; slug: string; kind?: string }[];
   }[];
 };
 

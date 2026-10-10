@@ -2,7 +2,7 @@
  * Every entitlement procedure, declared once: the plan an organization is on,
  * what it has used against that plan, and what it has spent.
  */
-import { defineTrpcContract } from "@langwatch/module";
+import { defineTrpcContract, type Named } from "@langwatch/module";
 import { z } from "zod";
 
 import {
@@ -31,11 +31,16 @@ export const usageLimitsTrpc = defineTrpcContract("limits")
   .build();
 
 /** The window the billing screen asks its rollup over. */
-export const aggregatedCostsInputSchema = z.object({
+const aggregatedCostsInputSchemaDefinition = z.object({
   organizationId: z.string(),
   startDate: z.number(),
   endDate: z.number(),
 });
+export interface AggregatedCostsInputSchema extends Named<
+  typeof aggregatedCostsInputSchemaDefinition
+> {}
+export const aggregatedCostsInputSchema: AggregatedCostsInputSchema =
+  aggregatedCostsInputSchemaDefinition;
 
 export const organizationSpendTrpc = defineTrpcContract("costs")
   .query("getAggregatedCostsForOrganization")

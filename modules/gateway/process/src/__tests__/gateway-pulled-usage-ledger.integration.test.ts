@@ -63,7 +63,7 @@ function suiteProjects(): ProjectApi {
       listTraceDestinations: (projectIds) =>
         prisma.project.findMany({
           where: { id: { in: projectIds } },
-          select: { id: true, teamId: true, archivedAt: true },
+          select: { id: true, teamId: true, archivedAt: true, kind: true },
         }),
     },
     "ProjectApi",

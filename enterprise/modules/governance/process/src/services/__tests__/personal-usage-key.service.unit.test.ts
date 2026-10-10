@@ -35,6 +35,7 @@ const personalProject: ProjectIdentity = {
   organizationId: ORGANIZATION_ID,
   isPersonal: true,
   ownerUserId: "user-1",
+  kind: "application",
 };
 
 const governanceProject: InternalProject = {

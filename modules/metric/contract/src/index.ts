@@ -5,6 +5,8 @@ export {
   metricEventEnvelopeSchema,
   type MetricDataPointReceivedEvent,
   type MetricProcessingEvent,
+  type MetricDataPointReceivedEventSchema,
+  type MetricEventEnvelopeSchema,
 } from "./metric.events.ts";
 export {
   recordMetricDataPointCommandDataSchema,
@@ -35,6 +37,7 @@ export {
   type MetricKind,
   type MetricRollupRow,
   type MetricTraceCorrelation,
+  type CanonicalMetricDataPointSchema,
 } from "./schemas/metric-processing/metric-data-point.ts";
 export { affectedRollupBuckets, buildMetricRollups } from "./metric-rollup/metric-rollup.ts";
 export { MAX_DENSE_BUCKET_SPAN } from "./metric-rollup/exponential-bucket.ts";

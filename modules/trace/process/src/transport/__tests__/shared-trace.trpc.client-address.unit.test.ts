@@ -4,14 +4,15 @@
  */
 import { SessionReader } from "@langwatch/api/hosting";
 import { ClientAddress } from "@langwatch/api/policy";
-import { bindTrpcFact, composeTrpcRouters, TrpcHost } from "@langwatch/api/trpc";
+import { bindTrpcMiddlewareContext, composeTrpcRouters, TrpcHost } from "@langwatch/api/trpc";
 import { ShareReadRateLimitedError } from "@langwatch/share-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { testAuthorizeDefaults } from "@langwatch/test-harness/trpc-members";
 import type { TraceApi } from "@langwatch/trace-contract";
 import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
 import { describe, expect, it } from "vitest";
 
-import { shareViewerFact, sharedTraceTrpcTransport } from "../shared-trace.trpc.ts";
+import { shareViewerContext, sharedTraceTrpcTransport } from "../shared-trace.trpc.ts";
 
 type SharedTraceRead = Parameters<TraceApi["getSharedTrace"]>[0];
 
@@ -20,7 +21,12 @@ async function readShared({ socketAddress }: { socketAddress: string }): Promise
   const refuse = () => Promise.reject(new Error("no decision is asked here"));
   const trpc = TrpcHost.create({
     sessions: SessionReader.unverified(),
-    authz: { getDecision: refuse, getProjectAnyDecision: refuse, checkScopeLineage: refuse },
+    authz: {
+      ...testAuthorizeDefaults,
+      getDecision: refuse,
+      getProjectAnyDecision: refuse,
+      checkScopeLineage: refuse,
+    },
   });
   trpc.mount(
     composeTrpcRouters("sharedTrace", [sharedTraceTrpcTransport]),
@@ -31,7 +37,11 @@ async function readShared({ socketAddress }: { socketAddress: string }): Promise
           throw new ShareReadRateLimitedError();
         },
       }),
-    { facts: [bindTrpcFact(shareViewerFact, () => ({ userId: null, userAgent: null }))] },
+    {
+      middlewareBindings: [
+        bindTrpcMiddlewareContext(shareViewerContext, () => ({ userId: null, userAgent: null })),
+      ],
+    },
   );
 
   const request = new Request(

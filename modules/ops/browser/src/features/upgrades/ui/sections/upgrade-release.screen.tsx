@@ -1,4 +1,5 @@
 import { PageLayout } from "@langwatch/design-system/page-layout";
+import { VStack } from "@langwatch/design-system/primitives";
 
 import { api } from "../../../../behavior/ops-api.ts";
 import { useOpsOverlay } from "../../../../behavior/ops-overlays.ts";
@@ -20,12 +21,24 @@ export default function UpgradeReleaseScreen() {
 
   return (
     <>
-      <PageLayout.Header>
-        <PageLayout.Heading>
-          {release ? `Release ${release}` : "Unreleased steps"}
-        </PageLayout.Heading>
+      <PageLayout.Header
+        flexWrap="wrap"
+        actions={
+          <PageLayout.HeaderButton onClick={() => router.push("/ops/upgrades")}>
+            Back to upgrades
+          </PageLayout.HeaderButton>
+        }
+      >
+        <VStack gap={1} align="start" minWidth={0}>
+          <PageLayout.Heading>
+            {release ? `Release ${release}` : "Unreleased steps"}
+          </PageLayout.Heading>
+          <PageLayout.Subtitle>
+            Track outstanding steps and inspect their execution details.
+          </PageLayout.Subtitle>
+        </VStack>
       </PageLayout.Header>
-      <PageLayout.Container>
+      <PageLayout.Container maxWidth="full">
         <UpgradeReadState read={steps} failedTitle="The release's steps could not load">
           {(page) => (
             <UpgradeReleaseSteps

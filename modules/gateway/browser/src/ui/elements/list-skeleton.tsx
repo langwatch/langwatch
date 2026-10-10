@@ -3,7 +3,7 @@ import { Card, Skeleton, SkeletonText, VStack } from "@langwatch/design-system/p
 
 export function ListSkeleton({ rows = 4 }: { rows?: number }) {
   return (
-    <Card.Root width="full" data-testid="gateway-list-skeleton">
+    <Card.Root variant="showcase" width="full" data-testid="gateway-list-skeleton">
       <Card.Body>
         <VStack align="stretch" gap={5}>
           <Skeleton height="16px" width="40%" />

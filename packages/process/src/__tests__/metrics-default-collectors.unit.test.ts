@@ -50,19 +50,24 @@ async function serve(environment: Readonly<Record<string, string>>) {
       response.writeHead(404).end();
     },
   });
-  const scrape = () => fetch(`http://127.0.0.1:${pullPort}/metrics`);
+  const scrape = () =>
+    fetch(`http://127.0.0.1:${pullPort}/metrics`, {
+      headers: { authorization: "Bearer scrape-me" },
+    });
   return { scrape, lines };
 }
+
+const keyed = { METRICS_API_KEY: "scrape-me" };
 
 describe("a process whose registry already carries the default collectors", () => {
   describe("when a second composition installs them again", () => {
     /** @scenario "A registry that already carries default collectors is left intact" */
     it("composes, and a scrape renders each default collector once beside the rest", async () => {
-      const first = await serve({});
+      const first = await serve(keyed);
       const before = await (await first.scrape()).text();
       expect(before).toContain("# TYPE process_cpu_user_seconds_total ");
 
-      const { scrape } = await serve({});
+      const { scrape } = await serve(keyed);
 
       const response = await scrape();
       expect(response.status).toBe(200);

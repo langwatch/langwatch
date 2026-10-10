@@ -9,6 +9,7 @@ import type {
   ModelProviderPlaygroundCompletion,
   ModelProviderPlaygroundRequest,
 } from "@langwatch/model-provider-contract";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it } from "vitest";
 
 import { playgroundRest } from "../playground.rest.ts";
@@ -23,6 +24,7 @@ function mount(
     projectHeader?: string;
     modelHeader?: string;
     modelProviders?: Partial<ModelProviderApi>;
+    authorised?: unknown[];
   } = {},
 ) {
   const { app } = mountableModelProviderApp({ modelProviders: options.modelProviders ?? {} });
@@ -33,12 +35,19 @@ function mount(
   const identity = {
     identify: () => caller,
     authenticate: () => caller,
-    authorize: () => ({ permitted: options.permitted ?? true, organizationRole: null }),
+    authorize: ({ target }: { target: unknown }) => {
+      options.authorised?.push(target);
+
+      return { permitted: options.permitted ?? true, organizationRole: null };
+    },
   };
-  const hono = createRestRuntime({ identity }).mount(playgroundRest.router(), {
-    app: () => app,
-    onError: createErrorHandler(),
-  });
+  const hono = createRestRuntime({ identity, authorization: restTestAuthorization() }).mount(
+    playgroundRest.router(),
+    {
+      app: () => app,
+      onError: createErrorHandler(),
+    },
+  );
 
   return (body: unknown = { messages: [] }, path = "/api/playground") =>
     hono.fetch(
@@ -89,6 +98,48 @@ describe("the playground door", () => {
       systemPrompt: null,
       messages: [{ role: "user", content: "hello" }],
     });
+  });
+
+  it("runs the completion in the project the door authorised", async () => {
+    const authorised: unknown[] = [];
+    let received: ModelProviderPlaygroundRequest | undefined;
+    const response = await mount({
+      authorised,
+      projectHeader: "project-from-door",
+      modelProviders: {
+        runPlaygroundCompletion: async (input) => {
+          received = input;
+
+          return {
+            status: 200,
+            mediaType: "text/plain",
+            headers: { "content-type": "text/plain" },
+            body: (async function* () {})(),
+          };
+        },
+      },
+    })();
+
+    expect(response.status).toBe(200);
+    expect(authorised).toEqual([{ tier: "project", id: "project-from-door" }]);
+    expect(received?.projectId).toBe("project-from-door");
+  });
+
+  it("refuses a blank project header before the completion runs", async () => {
+    let ran = false;
+    const response = await mount({
+      projectHeader: " ",
+      modelProviders: {
+        runPlaygroundCompletion: async () => {
+          ran = true;
+          throw new Error("must not run");
+        },
+      },
+    })();
+
+    expect(response.status).toBeGreaterThanOrEqual(400);
+    expect(response.status).toBeLessThan(500);
+    expect(ran).toBe(false);
   });
 
   it.each(["/api/v1/playground", "/api/playground"])(

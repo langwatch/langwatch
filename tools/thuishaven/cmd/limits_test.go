@@ -43,7 +43,7 @@ func limitsJSON(t *testing.T) domain.LimitsReport {
 		}
 	})
 	if err := json.Unmarshal([]byte(out), &report); err != nil {
-		t.Fatalf("haven limits --json is not JSON: %v\n%s", err, out)
+		t.Fatalf("haven machine limits --json is not JSON: %v\n%s", err, out)
 	}
 	return report
 }
@@ -102,7 +102,7 @@ func TestLimitPrecedence(t *testing.T) {
 	})
 }
 
-// @scenario "haven limits set and unset round-trip through the settings file"
+// @scenario "haven machine limits set and unset round-trip through the settings file"
 func TestLimitsSetUnsetRoundTrip(t *testing.T) {
 	t.Run("given no settings file", func(t *testing.T) {
 		isolateLimits(t)

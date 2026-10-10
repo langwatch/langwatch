@@ -1,3 +1,4 @@
+import { system } from "@langwatch/design-system/system";
 import type React from "react";
 
 const VIEWBOX_WIDTH = 1000;
@@ -15,8 +16,7 @@ interface Curtain {
   rx: number;
   ry: number;
   /**
-   * Decorative aurora gradient stops: sky/blue/cyan/indigo hex values that
-   * have no semantic equivalent in the Chakra theme.
+   * Decorative gradient stops follow the active palette roles.
    */
   color: string;
   durationMs: number;
@@ -34,7 +34,7 @@ const CURTAINS: Curtain[] = [
     cx: 50,
     rx: 170,
     ry: 270,
-    color: "#7dd3fc",
+    color: system.token.var("colors.cyan.muted"),
     durationMs: 5750,
     delayMs: -1100,
   },
@@ -42,7 +42,7 @@ const CURTAINS: Curtain[] = [
     cx: 160,
     rx: 160,
     ry: 290,
-    color: "#3b82f6",
+    color: system.token.var("colors.blue.solid"),
     durationMs: 4500,
     delayMs: -2750,
     reverse: true,
@@ -51,7 +51,7 @@ const CURTAINS: Curtain[] = [
     cx: 270,
     rx: 175,
     ry: 260,
-    color: "#22d3ee",
+    color: system.token.var("colors.cyan.solid"),
     durationMs: 6500,
     delayMs: -750,
   },
@@ -59,7 +59,7 @@ const CURTAINS: Curtain[] = [
     cx: 380,
     rx: 165,
     ry: 295,
-    color: "#60a5fa",
+    color: system.token.var("colors.blue.emphasized"),
     durationMs: 4250,
     delayMs: -3500,
     reverse: true,
@@ -68,7 +68,7 @@ const CURTAINS: Curtain[] = [
     cx: 490,
     rx: 175,
     ry: 270,
-    color: "#6366f1",
+    color: system.token.var("colors.purple.solid"),
     durationMs: 6000,
     delayMs: -1750,
   },
@@ -76,7 +76,7 @@ const CURTAINS: Curtain[] = [
     cx: 600,
     rx: 160,
     ry: 285,
-    color: "#38bdf8",
+    color: system.token.var("colors.cyan.solid"),
     durationMs: 5000,
     delayMs: -4250,
     reverse: true,
@@ -85,7 +85,7 @@ const CURTAINS: Curtain[] = [
     cx: 710,
     rx: 170,
     ry: 265,
-    color: "#818cf8",
+    color: system.token.var("colors.purple.emphasized"),
     durationMs: 5750,
     delayMs: -1400,
   },
@@ -93,7 +93,7 @@ const CURTAINS: Curtain[] = [
     cx: 820,
     rx: 165,
     ry: 290,
-    color: "#0ea5e9",
+    color: system.token.var("colors.blue.solid"),
     durationMs: 4750,
     delayMs: -3100,
     reverse: true,
@@ -102,7 +102,7 @@ const CURTAINS: Curtain[] = [
     cx: 940,
     rx: 175,
     ry: 275,
-    color: "#a5b4fc",
+    color: system.token.var("colors.purple.muted"),
     durationMs: 6750,
     delayMs: -2200,
   },

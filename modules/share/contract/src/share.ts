@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 export const SHARE_KSUID_RESOURCE = "share";
@@ -8,7 +9,7 @@ export type ShareResourceType = z.infer<typeof shareResourceTypeSchema>;
 export const shareVisibilitySchema = z.enum(["PUBLIC", "ORGANIZATION", "PROJECT"]);
 export type ShareVisibility = z.infer<typeof shareVisibilitySchema>;
 
-export const shareLinkSchema = z
+const shareLinkSchemaDefinition = z
   .object({
     id: z.string().min(1),
     token: z.string().min(1),
@@ -25,9 +26,11 @@ export const shareLinkSchema = z
     updatedAt: z.date(),
   })
   .strict();
+export interface ShareLinkSchema extends Named<typeof shareLinkSchemaDefinition> {}
+export const shareLinkSchema: ShareLinkSchema = shareLinkSchemaDefinition;
 export type ShareLink = z.infer<typeof shareLinkSchema>;
 
-export const shareWithProjectSchema = shareLinkSchema.safeExtend({
+const shareWithProjectSchemaDefinition = shareLinkSchema.safeExtend({
   project: z
     .object({
       traceSharingEnabled: z.boolean(),
@@ -40,24 +43,33 @@ export const shareWithProjectSchema = shareLinkSchema.safeExtend({
     })
     .strict(),
 });
+export interface ShareWithProjectSchema extends Named<typeof shareWithProjectSchemaDefinition> {}
+export const shareWithProjectSchema: ShareWithProjectSchema = shareWithProjectSchemaDefinition;
 export type ShareWithProject = z.infer<typeof shareWithProjectSchema>;
 
-export const shareViewerSchema = z.discriminatedUnion("type", [
+const shareViewerSchemaDefinition = z.discriminatedUnion("type", [
   z.object({ type: z.literal("anonymous") }).strict(),
   z.object({ type: z.literal("user"), id: z.string().min(1) }).strict(),
 ]);
+export interface ShareViewerSchema extends Named<typeof shareViewerSchemaDefinition> {}
+export const shareViewerSchema: ShareViewerSchema = shareViewerSchemaDefinition;
 export type ShareViewer = z.infer<typeof shareViewerSchema>;
 
-export const shareResourceInputSchema = z
+const shareResourceInputSchemaDefinition = z
   .object({
     projectId: z.string().min(1),
     resourceType: shareResourceTypeSchema,
     resourceId: z.string().min(1),
   })
   .strict();
+export interface ShareResourceInputSchema extends Named<
+  typeof shareResourceInputSchemaDefinition
+> {}
+export const shareResourceInputSchema: ShareResourceInputSchema =
+  shareResourceInputSchemaDefinition;
 export type ShareResourceInput = z.infer<typeof shareResourceInputSchema>;
 
-export const createShareInputSchema = shareResourceInputSchema
+const createShareInputSchemaDefinition = shareResourceInputSchema
   .safeExtend({
     visibility: shareVisibilitySchema.optional(),
     expiresAt: z.date().nullable().optional(),
@@ -65,34 +77,49 @@ export const createShareInputSchema = shareResourceInputSchema
     userId: z.string().min(1).nullable().optional(),
   })
   .strict();
+export interface CreateShareInputSchema extends Named<typeof createShareInputSchemaDefinition> {}
+export const createShareInputSchema: CreateShareInputSchema = createShareInputSchemaDefinition;
 export type CreateShareInput = z.infer<typeof createShareInputSchema>;
 
-export const resolveShareInputSchema = z
+const resolveShareInputSchemaDefinition = z
   .object({
     token: z.string().min(1),
     viewer: shareViewerSchema,
     viewerKey: z.string().min(1).optional(),
   })
   .strict();
+export interface ResolveShareInputSchema extends Named<typeof resolveShareInputSchemaDefinition> {}
+export const resolveShareInputSchema: ResolveShareInputSchema = resolveShareInputSchemaDefinition;
 export type ResolveShareInput = z.infer<typeof resolveShareInputSchema>;
 
-export const revokeShareInputSchema = z
+const revokeShareInputSchemaDefinition = z
   .object({ id: z.string().min(1), projectId: z.string().min(1) })
   .strict();
+export interface RevokeShareInputSchema extends Named<typeof revokeShareInputSchemaDefinition> {}
+export const revokeShareInputSchema: RevokeShareInputSchema = revokeShareInputSchemaDefinition;
 export type RevokeShareInput = z.infer<typeof revokeShareInputSchema>;
 
-export const tracePinInputSchema = z
+const tracePinInputSchemaDefinition = z
   .object({ projectId: z.string().min(1), traceId: z.string().min(1) })
   .strict();
+export interface TracePinInputSchema extends Named<typeof tracePinInputSchemaDefinition> {}
+export const tracePinInputSchema: TracePinInputSchema = tracePinInputSchemaDefinition;
 export type TracePinInput = z.infer<typeof tracePinInputSchema>;
 
-export const shareProjectScopeSchema = z.object({ projectId: z.string().min(1) }).strict();
+const shareProjectScopeSchemaDefinition = z.object({ projectId: z.string().min(1) }).strict();
+export interface ShareProjectScopeSchema extends Named<typeof shareProjectScopeSchemaDefinition> {}
+export const shareProjectScopeSchema: ShareProjectScopeSchema = shareProjectScopeSchemaDefinition;
 export type ShareProjectScope = z.infer<typeof shareProjectScopeSchema>;
 
-export const sharedPayloadCacheInputSchema = z
+const sharedPayloadCacheInputSchemaDefinition = z
   .object({
     token: z.string().min(1),
     protections: z.unknown(),
   })
   .strict();
+export interface SharedPayloadCacheInputSchema extends Named<
+  typeof sharedPayloadCacheInputSchemaDefinition
+> {}
+export const sharedPayloadCacheInputSchema: SharedPayloadCacheInputSchema =
+  sharedPayloadCacheInputSchemaDefinition;
 export type SharedPayloadCacheInput = z.infer<typeof sharedPayloadCacheInputSchema>;

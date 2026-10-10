@@ -60,6 +60,12 @@ Feature: Optimization studio execution on a per-project Lambda
     And the engine's own explanation is carried with it
 
   @unit
+  Scenario: A failure the caller raises while reading keeps its own type and fields
+    Given a studio run whose caller rejects an event with a typed failure
+    When the stream is read
+    Then the same failure reaches the caller's caller, not a rewritten error event
+
+  @unit
   Scenario: Cancelling the stream aborts the invocation
     Given a studio run in progress
     When the viewer stops watching it

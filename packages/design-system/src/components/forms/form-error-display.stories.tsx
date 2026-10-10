@@ -4,7 +4,14 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { FormErrorDisplay } from "./form-error-display.tsx";
 
 const meta = {
-  title: "Primitives/Form error display",
+  title: "Inputs and forms/Form error display",
+  parameters: {
+    usage: {
+      use: "The messages from a form or schema error object, under the field they belong to.",
+      avoid:
+        "A whole-form server refusal: an Alert at the top of the form. Never a toast (alerts-toasts-and-field-errors.md).",
+    },
+  },
   component: FormErrorDisplay,
   tags: ["autodocs"],
   args: { error: "Enter an email address." },

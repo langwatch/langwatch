@@ -69,7 +69,7 @@ export const TableCell = <TData extends DatasetTableRowData>({
   };
 
   const selectedStyles = {
-    outline: isSelected ? "2px solid var(--chakra-colors-blue-500)" : "none",
+    outline: isSelected ? "2px solid var(--chakra-colors-blue-emphasized)" : "none",
     outlineOffset: "-1px",
     position: isSelected ? ("relative" as const) : void 0,
     zIndex: isSelected ? 5 : void 0,

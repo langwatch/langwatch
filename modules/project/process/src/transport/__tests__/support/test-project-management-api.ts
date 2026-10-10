@@ -1,7 +1,7 @@
 import type { ProjectManagementApi } from "../../project.rest.ts";
 
 /**
- * The five operations the management door reaches, keeping a transport
+ * The seven operations the management door reaches, keeping a transport
  * suite at that boundary — cared-about answers overridden, the rest refuse
  * by name. Typed against the door's witness, so a served member is one production serves too.
  */
@@ -22,6 +22,12 @@ export class TestProjectManagementApi implements ProjectManagementApi {
 
   setPiiRedactionLevel: ProjectManagementApi["setPiiRedactionLevel"] = (input) =>
     this.overrides.setPiiRedactionLevel?.(input) ?? this.unimplemented("setPiiRedactionLevel");
+
+  isMember: ProjectManagementApi["isMember"] = (input) =>
+    this.overrides.isMember?.(input) ?? this.unimplemented("isMember");
+
+  getMember: ProjectManagementApi["getMember"] = (input) =>
+    this.overrides.getMember?.(input) ?? this.unimplemented("getMember");
 
   private unimplemented(operation: string): Promise<never> {
     return Promise.reject(new Error(`TestProjectManagementApi does not implement ${operation}`));

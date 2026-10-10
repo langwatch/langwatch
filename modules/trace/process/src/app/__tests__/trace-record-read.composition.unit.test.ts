@@ -20,7 +20,12 @@ import type { StoredObjectApi } from "@langwatch/stored-object-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
+import { ownProof } from "../../__tests__/support/authorization-proofs.fixture.ts";
 import { S3TraceLegacySpoolChannel } from "../../channels/s3/s3.trace-legacy-spool.channel.ts";
+import { TraceCanonicalisationService } from "../../features/derivation/services/trace-canonicalisation.service.ts";
+import { fencedOver } from "../../features/legacy/repositories/clickhouse/__tests__/support/legacy-trace-mapping.support.ts";
+import { TraceLegacyReadClickHouseRepository } from "../../features/legacy/repositories/clickhouse/trace-legacy-read.repository.ts";
+import { TraceBlobStoreService } from "../../features/media/services/trace-blob-store.service.ts";
 import { traceSummaryRow } from "../../repositories/clickhouse/__tests__/support/trace-summary-row.support.ts";
 import type {
   TraceClickHouseClient,
@@ -28,8 +33,6 @@ import type {
 } from "../../repositories/clickhouse/clickhouse.trace-member-client.repository.ts";
 import { MemoryTraceSpanDedupRepository } from "../../repositories/memory/memory.trace-span-dedup.repository.ts";
 import { MemoryTraceRepositories } from "../../repositories/memory/memory.trace.repositories.ts";
-import { TraceBlobStoreService } from "../../features/media/services/trace-blob-store.service.ts";
-import { TraceCanonicalisationService } from "../../features/derivation/services/trace-canonicalisation.service.ts";
 import { TraceModule } from "../trace.app.ts";
 
 const PROJECT = "project-1";
@@ -40,13 +43,18 @@ const LONG_INPUT = "the settled trace's captured input, ".repeat(20);
 
 type Query = { tenantId: string; query: string; params: Record<string, unknown> };
 
+/** A statement bound to PROJECT: by its own tenant param, or by the proof's fence. */
+const readsProject = (params: Record<string, unknown>) =>
+  params.tenantId === PROJECT ||
+  (Array.isArray(params.tenantScope_own) && params.tenantScope_own.every((id) => id === PROJECT));
+
 /** A ClickHouse that holds one trace for PROJECT, started `ageDays` ago. */
 function clickHouseHolding({ ageDays, asked }: { ageDays: number; asked: Query[] }) {
   const startedAt = Date.now() - ageDays * DAY_MS;
   const resolve: TraceClickHouseResolver = async (tenantId): Promise<TraceClickHouseClient> => ({
     query: async ({ query, query_params = {} }) => {
       asked.push({ tenantId, query, params: query_params });
-      const held = query_params.tenantId === PROJECT;
+      const held = readsProject(query_params);
       if (held && query.includes("trace_summaries")) {
         return {
           json: async () => [
@@ -76,7 +84,7 @@ function compose({
   resolve,
   plans,
   dataPrivacy = createApiFixture<DataPrivacyApi>({
-    getResolvedForProject: async () => PLATFORM_DEFAULT_DATA_PRIVACY,
+    getResolvedForProjects: async () => PLATFORM_DEFAULT_DATA_PRIVACY,
   }),
   askedOrganizations = [],
 }: {
@@ -101,7 +109,13 @@ function compose({
   });
 
   const deps = TraceModule.composeDependencies({
-    repositories: MemoryTraceRepositories.create(),
+    repositories: {
+      ...MemoryTraceRepositories.create(),
+      legacyRead: TraceLegacyReadClickHouseRepository.create({
+        resolveClickHouseClient: resolve,
+        clickhouse: fencedOver(resolve),
+      }),
+    },
     resolveClickHouseClient: resolve,
     storedObjects: createApiFixture<StoredObjectApi>(),
     canonicalisation: TraceCanonicalisationService.create(),
@@ -124,7 +138,9 @@ function compose({
     },
     tenantBroadcast: { publishProjectEvent: async () => {} },
     protections: {
-      authz: apis.reference(AuthzApi),
+      authz: createApiFixture<AuthzApi>({
+        authorizeInternal: async ({ projectId }) => ownProof({ projectId }),
+      }),
       projects,
       plans: countingPlans,
       dataPrivacy,
@@ -163,7 +179,7 @@ describe("given a process that composed its own ClickHouse", () => {
     expect(record.trace_id).toBe(TRACE);
     expect(inputOf(record)).toBe(LONG_INPUT);
     expect(asked.length).toBeGreaterThan(0);
-    expect(asked.every((q) => q.tenantId === PROJECT && q.params.tenantId === PROJECT)).toBe(true);
+    expect(asked.every((q) => q.tenantId === PROJECT && readsProject(q.params))).toBe(true);
 
     await expect(
       tree.getById({ projectId: "project-elsewhere", traceId: TRACE }),
@@ -173,7 +189,7 @@ describe("given a process that composed its own ClickHouse", () => {
       resolve: clickHouseHolding({ ageDays: 1, asked: [] }),
       plans: planWithWindow(null),
       dataPrivacy: createApiFixture<DataPrivacyApi>({
-        getResolvedForProject: () => Promise.reject(new Error("policy store down")),
+        getResolvedForProjects: () => Promise.reject(new Error("policy store down")),
       }),
     });
     const hidden = await unresolvedPolicy.getById({ projectId: PROJECT, traceId: TRACE });

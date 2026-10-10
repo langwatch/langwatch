@@ -7,7 +7,7 @@
 
 import {
   BrowserUiDocumentTitle,
-  UiCapabilityContextProvider,
+  UiHostServicesContextProvider,
   UiFeedback,
   UiNavigation,
   UiRoute,
@@ -15,7 +15,7 @@ import {
   UiSession,
   type UiActiveScope,
   type UiActor,
-  type UiCapabilities,
+  type UiHostServices,
   UiScope,
 } from "@langwatch/browser-host/capabilities";
 import { resetGraphicsQualityOverrideForTests } from "@langwatch/browser-host/facilities";
@@ -30,10 +30,10 @@ import { MemoryRouter, Route, Routes } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import UiAppChrome from "../ui-app-chrome";
-import { loadUiRootCapabilities } from "../ui-root-capabilities";
+import { loadUiRootHostServices } from "../ui-root-host-services";
 
-const LOADED = await loadUiRootCapabilities();
-/** The lent chrome capability stands in for the shell, so the test reads the host alone. */
+const LOADED = await loadUiRootHostServices();
+/** The lent chrome host service stands in for the shell, so the test reads the host alone. */
 const ROOT: typeof LOADED = {
   ...LOADED,
   navigationChrome: {
@@ -99,6 +99,8 @@ class TracesRoute extends UiRoute {
 
 class SilentFeedback extends UiFeedback {
   succeeded(): void {}
+  warned(): void {}
+  informed(): void {}
   failed(): void {}
 }
 
@@ -135,12 +137,9 @@ class SignedInSession extends UiSession {
   isSettled(): boolean {
     return true;
   }
-  featureFlag(): boolean | undefined {
-    return void 0;
-  }
 }
 
-const CAPABILITIES: UiCapabilities = {
+const HOST_SERVICES: UiHostServices = {
   documentTitle: BrowserUiDocumentTitle.create(),
   feedback: new SilentFeedback(),
   navigation: new SilentNavigation(),
@@ -187,7 +186,7 @@ class SettlingSession extends SignedInSession {
 }
 
 function renderChrome(
-  capabilities: UiCapabilities = CAPABILITIES,
+  hostServices: UiHostServices = HOST_SERVICES,
   address: { path: string; pattern: string } = {
     path: "/my-project/traces",
     pattern: "/:project/traces",
@@ -198,15 +197,15 @@ function renderChrome(
       <QueryClientProvider
         client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
       >
-        <UiCapabilityContextProvider value={capabilities}>
+        <UiHostServicesContextProvider value={hostServices}>
           <UiDesignSystemShell>
             <Routes>
-              <Route element={<UiAppChrome capabilities={ROOT} process={PROCESS} />}>
+              <Route element={<UiAppChrome rootHostServices={ROOT} process={PROCESS} />}>
                 <Route path={address.pattern} element={<HostProbe />} />
               </Route>
             </Routes>
           </UiDesignSystemShell>
-        </UiCapabilityContextProvider>
+        </UiHostServicesContextProvider>
       </QueryClientProvider>
     </MemoryRouter>,
   );
@@ -256,15 +255,15 @@ describe("the application chrome", () => {
     const tree = (session: UiSession) => (
       <MemoryRouter initialEntries={["/my-project/traces"]}>
         <QueryClientProvider client={client}>
-          <UiCapabilityContextProvider value={{ ...CAPABILITIES, rpc, session }}>
+          <UiHostServicesContextProvider value={{ ...HOST_SERVICES, rpc, session }}>
             <UiDesignSystemShell>
               <Routes>
-                <Route element={<UiAppChrome capabilities={ROOT} process={PROCESS} />}>
+                <Route element={<UiAppChrome rootHostServices={ROOT} process={PROCESS} />}>
                   <Route path="/:project/traces" element={<HostProbe />} />
                 </Route>
               </Routes>
             </UiDesignSystemShell>
-          </UiCapabilityContextProvider>
+          </UiHostServicesContextProvider>
         </QueryClientProvider>
       </MemoryRouter>
     );
@@ -305,7 +304,7 @@ describe("the application chrome", () => {
         }
       }
 
-      renderChrome({ ...CAPABILITIES, rpc: new PendingRpc() });
+      renderChrome({ ...HOST_SERVICES, rpc: new PendingRpc() });
 
       await waitFor(() => expect(screen.getByTestId("probe")).toBeTruthy());
       expect(screen.getByTestId("probe").getAttribute("data-loading")).toBe("true");
@@ -317,7 +316,11 @@ describe("the application chrome", () => {
     /** @scenario "A project address is not called missing while its scope is still settling" */
     /** @scenario The workspace is still resolving while the session is */
     it("reports the workspace as still resolving rather than a project that is not there", async () => {
-      renderChrome({ ...CAPABILITIES, scope: new SettlingScope(), session: new SettlingSession() });
+      renderChrome({
+        ...HOST_SERVICES,
+        scope: new SettlingScope(),
+        session: new SettlingSession(),
+      });
 
       await waitFor(() =>
         expect(screen.getByTestId("probe").getAttribute("data-organizations")).toBe("1"),
@@ -346,7 +349,7 @@ describe("the application chrome", () => {
 
     /** @scenario A graph that refused the read is not a graph still reading */
     it("draws the refusal rather than a chrome still reading", async () => {
-      renderChrome({ ...CAPABILITIES, rpc: new FailingRpc() });
+      renderChrome({ ...HOST_SERVICES, rpc: new FailingRpc() });
 
       await waitFor(() => expect(screen.getByTestId("retry-workspace")).toBeTruthy());
       expect(screen.queryByTestId("probe")).toBeNull();
@@ -354,7 +357,7 @@ describe("the application chrome", () => {
 
     /** @scenario The landing address says a refused read failed rather than waiting on it */
     it("says the workspace could not be opened on the landing address", async () => {
-      renderChrome({ ...CAPABILITIES, rpc: new FailingRpc() }, { path: "/", pattern: "/" });
+      renderChrome({ ...HOST_SERVICES, rpc: new FailingRpc() }, { path: "/", pattern: "/" });
 
       await waitFor(() => expect(screen.getByTestId("retry-workspace")).toBeTruthy());
       expect(screen.getByText(/couldn't open your workspace/i)).toBeTruthy();
@@ -388,7 +391,7 @@ describe("the application chrome", () => {
     render(
       <MemoryRouter initialEntries={["/my-project/traces"]}>
         <Routes>
-          <Route element={<UiAppChrome capabilities={ROOT} process={PROCESS} />}>
+          <Route element={<UiAppChrome rootHostServices={ROOT} process={PROCESS} />}>
             <Route path="/:project/traces" element={<HostProbe />} />
           </Route>
         </Routes>
@@ -426,15 +429,15 @@ describe("the application chrome", () => {
           <QueryClientProvider
             client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
           >
-            <UiCapabilityContextProvider value={{ ...CAPABILITIES, rpc: new FailingRpc() }}>
+            <UiHostServicesContextProvider value={{ ...HOST_SERVICES, rpc: new FailingRpc() }}>
               <UiDesignSystemShell>
                 <Routes>
-                  <Route element={<UiAppChrome capabilities={ROOT} process={PROCESS} />}>
+                  <Route element={<UiAppChrome rootHostServices={ROOT} process={PROCESS} />}>
                     <Route path="/:project/traces" element={<HostProbe />} />
                   </Route>
                 </Routes>
               </UiDesignSystemShell>
-            </UiCapabilityContextProvider>
+            </UiHostServicesContextProvider>
           </QueryClientProvider>
         </MemoryRouter>,
       );

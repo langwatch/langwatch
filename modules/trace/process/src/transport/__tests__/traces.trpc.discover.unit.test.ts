@@ -17,6 +17,9 @@ type TestContext = { actor: { id: string } };
 
 const PROJECT_ID = "project-1";
 const TIME_RANGE = { from: 1_000, to: 2_000, live: true };
+const PROOF = expect.objectContaining({
+  grants: [expect.objectContaining({ projectId: PROJECT_ID, kind: "own" })],
+});
 const FACET = {
   key: "status",
   kind: "categorical" as const,
@@ -55,11 +58,10 @@ function harness() {
   });
 
   const trpc = initTRPC.context<TestContext>().create();
-  const members = trpcTestMembers<TestContext>();
   const router = createTrpcRuntime<TestContext>({
     root: trpc,
     procedure: trpc.procedure,
-    members,
+    members: trpcTestMembers<TestContext>(),
   }).mount(tracesTrpcTransport, () => app);
 
   return {
@@ -81,6 +83,7 @@ describe("given the sidebar's facet read", () => {
       ).resolves.toEqual({ facets: [FACET], pending: false });
       expect(readDiscoverForQuery).toHaveBeenCalledWith({
         projectId: PROJECT_ID,
+        authorization: PROOF,
         timeRange: TIME_RANGE,
         query: "status:error",
         evalRuns: undefined,

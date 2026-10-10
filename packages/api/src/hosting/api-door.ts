@@ -9,7 +9,7 @@ import type {
 import type { Authorize, Entitlements, PlatformDecision } from "../access/access.ts";
 import type { RestKeyKind } from "../rest/key-credential.ts";
 import type { SessionVerification } from "./session-reader.ts";
-import type { TransportFactBinding, TransportPeers } from "./transport-hosts.ts";
+import type { MiddlewareBinding, TransportPeers } from "./transport-hosts.ts";
 
 /**
  * The one door every API request passes: who is calling, and what they may do. auth binds it
@@ -35,7 +35,7 @@ export type ApiDoor = Readonly<{
 
 type ApiDoorBinding = Readonly<{ apiDoor: ApiDoor }>;
 
-/** The owner's one binding of the door, among the facts its own transport setup binds. */
+/** The owner's one binding of the door, among the middleware bindings it provides. */
 export function bindApiDoor(door: ApiDoor): ApiDoorBinding {
   return { apiDoor: door };
 }
@@ -60,9 +60,9 @@ export class DuplicateApiDoorError extends Error {
 }
 
 /** The one door the installed modules bound; none or two refuse boot by name. */
-export function openApiDoor(peers: Pick<TransportPeers, "facts">): ApiDoor {
-  const bound = peers.facts.flatMap(({ feature, facts }) =>
-    facts.filter(isApiDoorBinding).map(({ apiDoor }) => ({ feature, apiDoor })),
+export function openApiDoor(peers: Pick<TransportPeers, "middlewareBindings">): ApiDoor {
+  const bound = peers.middlewareBindings.flatMap(({ feature, middlewareBindings }) =>
+    middlewareBindings.filter(isApiDoorBinding).map(({ apiDoor }) => ({ feature, apiDoor })),
   );
   const [only, second] = bound;
   if (!only) throw new MissingApiDoorError();
@@ -71,7 +71,7 @@ export function openApiDoor(peers: Pick<TransportPeers, "facts">): ApiDoor {
   return only.apiDoor;
 }
 
-function isApiDoorBinding(binding: TransportFactBinding): binding is ApiDoorBinding {
+function isApiDoorBinding(binding: MiddlewareBinding): binding is ApiDoorBinding {
   return "apiDoor" in binding;
 }
 
@@ -96,6 +96,8 @@ export type RestCaller = Readonly<{
   markUsed?: () => void;
   /** What a session-bearing door resolved beside the actor; a route parses it by its schema. */
   session?: unknown;
+  /** A person in a browser session, the caller the second-factor gate holds (Q184). */
+  browserSession?: Readonly<{ id: string | null }>;
 }>;
 
 /**
@@ -172,6 +174,13 @@ export type RestAuditRow = Readonly<{
   resultId: string | null;
   /** The handled error's own code, on a refusal; absent on an answer. */
   errorCode?: string;
+  /** The operator behind an impersonated call. */
+  impersonatorId?: string;
+  /** The API key the call presented, whether it acts as its person or as nobody (E11). */
+  apiKeyId?: string;
+  /** Where the call came from, as the door resolved it, and the caller's user agent. */
+  ipAddress?: string;
+  userAgent?: string;
 }>;
 
 /** One mutation on the deployment's trail, as this transport leaves it. */
@@ -188,6 +197,11 @@ export type TrpcAuditSink = Readonly<{
     targetId?: string;
     /** The human behind an impersonated call, as `impersonatorId`. */
     metadata?: Record<string, string>;
+    /** The operator behind an impersonated call, in the column an incident filters on. */
+    actorUserId?: string;
+    /** Where the call came from, as the door resolved it, and the caller's browser. */
+    ipAddress?: string;
+    userAgent?: string;
   }): Promise<void> | void;
   /**
    * The organization holding a project or team, null when none does. A procedure declaring

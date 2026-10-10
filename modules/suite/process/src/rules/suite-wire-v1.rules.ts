@@ -3,7 +3,7 @@
  * Speaks the domain's own scope vocabulary (all/test_suites/labels/scenarios) — unlike the
  * deprecated `/api/suites` alias, which remaps to folders/cases.
  */
-import { defineRestMiddleware } from "@langwatch/api/rest";
+import { defineMiddlewareContext } from "@langwatch/api/rest";
 import { modelOverrideSchema } from "@langwatch/model-provider-contract";
 import {
   type EvaluatorAttachment,
@@ -30,7 +30,7 @@ import { z } from "zod";
  * spells it, and the API key the run started with so the run's own key holds no more. The key is
  * null for a legacy API key or a project-bound access token, which have no key row.
  */
-export const suiteRunOriginFact = defineRestMiddleware(
+export const suiteRunOrigin = defineMiddlewareContext(
   "suiteRunOrigin",
   z.object({
     surface: z.string().nullable(),

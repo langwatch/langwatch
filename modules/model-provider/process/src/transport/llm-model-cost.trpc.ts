@@ -78,5 +78,7 @@ export const llmModelCostTrpcTransport: TrpcRouterDeclaration<
   // Gated on traces:view: the answer exposes span metadata, not cost-rule config.
   .procedure("previewMatchingSpans")
   .withPermission("traces:view")
-  .handle(({ app, input }) => app.previewCostRuleMatchingSpans(input))
+  .handle(({ app, input, authorization }) =>
+    app.previewCostRuleMatchingSpans(input, { authorization }),
+  )
   .build();

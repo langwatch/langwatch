@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { planNextStepCeilingsShape } from "@langwatch/plans";
 import { z } from "zod";
 
@@ -5,7 +6,7 @@ import { z } from "zod";
  * Where an organization can upgrade next. Three answers: self_serve (public ladder),
  * account_team (negotiated), none (already at top).
  */
-export const planNextStepSchema = z.discriminatedUnion("kind", [
+const planNextStepSchemaDefinition = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("self_serve"),
     /** The plan type, with an annual variant collapsed onto its monthly tier. */
@@ -21,6 +22,8 @@ export const planNextStepSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("account_team") }),
   z.object({ kind: z.literal("none") }),
 ]);
+export interface PlanNextStepSchema extends Named<typeof planNextStepSchemaDefinition> {}
+export const planNextStepSchema: PlanNextStepSchema = planNextStepSchemaDefinition;
 
 export type PlanNextStep = z.infer<typeof planNextStepSchema>;
 

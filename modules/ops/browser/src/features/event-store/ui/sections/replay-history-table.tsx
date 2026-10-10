@@ -1,3 +1,4 @@
+import { ListTable } from "@langwatch/design-system/list-table";
 import { Badge, Card, HStack, Status, Table, Text } from "@langwatch/design-system/primitives";
 import type { ReplayHistoryEntry } from "@langwatch/ops-contract";
 import { readableDate } from "@langwatch/time";
@@ -16,18 +17,20 @@ export function ReplayHistoryTable() {
   if (!history || history.length === 0) return null;
 
   return (
-    <Card.Root overflow={"hidden"}>
+    <Card.Root borderColor="border.muted" boxShadow="none" overflow={"hidden"}>
       <Card.Body padding={0}>
         <HStack paddingX={4} paddingY={3}>
           <Text textStyle="sm" fontWeight="medium">
-            Replay History
+            Replay history
           </Text>
         </HStack>
         <Table.ScrollArea>
-          <Table.Root
+          <ListTable
+            density="compact"
+            columnRules={false}
+            containerProps={{ overflowX: "auto" }}
             size="sm"
             variant="line"
-            css={{ "& tr:last-child td": { borderBottom: "none" } }}
           >
             <Table.Header>
               <Table.Row>
@@ -101,7 +104,7 @@ export function ReplayHistoryTable() {
                 );
               })}
             </Table.Body>
-          </Table.Root>
+          </ListTable>
         </Table.ScrollArea>
       </Card.Body>
     </Card.Root>

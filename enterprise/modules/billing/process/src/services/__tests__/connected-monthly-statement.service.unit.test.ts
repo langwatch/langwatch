@@ -5,7 +5,7 @@
 import { Temporal, type Instant } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
-import { MemoryConnectedStatementMailChannel } from "../../channels/memory/memory.connected-statement-mail.channel.ts";
+import { MemoryConnectedStatementMailChannel } from "../../channels/memory/memory.billing.channels.ts";
 import {
   ConnectedMonthlyStatementService,
   type CommitDrawdown,

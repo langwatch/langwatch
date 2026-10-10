@@ -18,6 +18,7 @@ export function usePromptProject() {
         ? {
             id: scope.projectId,
             slug: scope.projectSlug ?? "",
+            kind: scope.projectKind,
           }
         : void 0,
       projectId: scope.projectId ?? "",
@@ -25,6 +26,13 @@ export function usePromptProject() {
       teamId: scope.teamId,
       hasPermission: (permission: string) => host.hasPermission(permission),
     }),
-    [host, scope.projectId, scope.projectSlug, scope.organizationId, scope.teamId],
+    [
+      host,
+      scope.projectId,
+      scope.projectSlug,
+      scope.projectKind,
+      scope.organizationId,
+      scope.teamId,
+    ],
   );
 }

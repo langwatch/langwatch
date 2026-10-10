@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 export const SSO_FEATURE_ID = "sso" as const;
@@ -7,7 +8,7 @@ export const SSO_FEATURE_ID = "sso" as const;
  * tRPC procedure publishes what its handler returns, so an `unknown` here is
  * what the browser gets, and the list reads every row field below.
  */
-export const adminSsoConnectionSchema = z
+const adminSsoConnectionSchemaDefinition = z
   .object({
     connectionId: z.string(),
     organizationId: z.string(),
@@ -45,35 +46,57 @@ export const adminSsoConnectionSchema = z
     updatedAtMs: z.number(),
   })
   .strict();
+export interface AdminSsoConnectionSchema extends Named<
+  typeof adminSsoConnectionSchemaDefinition
+> {}
+export const adminSsoConnectionSchema: AdminSsoConnectionSchema =
+  adminSsoConnectionSchemaDefinition;
 
 /** One page of connections, with the total the pager reads. */
-export const adminSsoConnectionPageSchema = z
+const adminSsoConnectionPageSchemaDefinition = z
   .object({
     connections: z.array(adminSsoConnectionSchema),
     total: z.number().int().nonnegative(),
   })
   .strict();
+export interface AdminSsoConnectionPageSchema extends Named<
+  typeof adminSsoConnectionPageSchemaDefinition
+> {}
+export const adminSsoConnectionPageSchema: AdminSsoConnectionPageSchema =
+  adminSsoConnectionPageSchemaDefinition;
 
 export type AdminSsoConnection = z.infer<typeof adminSsoConnectionSchema>;
 export type AdminSsoConnectionPage = z.infer<typeof adminSsoConnectionPageSchema>;
 
 /** One page of the back office's list, as the pager asks for it. */
-export const listSsoConnectionsInputSchema = z.object({
+const listSsoConnectionsInputSchemaDefinition = z.object({
   page: z.number().int().min(0).default(0),
   pageSize: z.number().int().min(1).max(100).default(25),
   search: z.string().max(253).optional(),
 });
+export interface ListSsoConnectionsInputSchema extends Named<
+  typeof listSsoConnectionsInputSchemaDefinition
+> {}
+export const listSsoConnectionsInputSchema: ListSsoConnectionsInputSchema =
+  listSsoConnectionsInputSchemaDefinition;
 export type ListSsoConnectionsInput = z.infer<typeof listSsoConnectionsInputSchema>;
 
-export const ssoConnectionByIdSchema = z.object({ connectionId: z.string().min(1) });
+const ssoConnectionByIdSchemaDefinition = z.object({ connectionId: z.string().min(1) });
+export interface SsoConnectionByIdSchema extends Named<typeof ssoConnectionByIdSchemaDefinition> {}
+export const ssoConnectionByIdSchema: SsoConnectionByIdSchema = ssoConnectionByIdSchemaDefinition;
 export type SsoConnectionByIdInput = z.infer<typeof ssoConnectionByIdSchema>;
 
 /** One page of a cutover's members, found by connection alone: the operator is cross-tenant. */
-export const operatorSsoMigrationProgressInputSchema = z.object({
+const operatorSsoMigrationProgressInputSchemaDefinition = z.object({
   ...ssoConnectionByIdSchema.shape,
   cursor: z.string().nullable().default(null),
   limit: z.number().int().min(1).max(100).default(50),
 });
+export interface OperatorSsoMigrationProgressInputSchema extends Named<
+  typeof operatorSsoMigrationProgressInputSchemaDefinition
+> {}
+export const operatorSsoMigrationProgressInputSchema: OperatorSsoMigrationProgressInputSchema =
+  operatorSsoMigrationProgressInputSchemaDefinition;
 export type OperatorSsoMigrationProgressInput = z.infer<
   typeof operatorSsoMigrationProgressInputSchema
 >;
@@ -82,30 +105,47 @@ export type OperatorSsoMigrationProgressInput = z.infer<
  * The organization is routing, not reach: it says whose connection history the
  * command is appended to. Who may issue it is the platform-operator grant, and nothing else.
  */
-export const ssoConnectionTargetSchema = z.object({
+const ssoConnectionTargetSchemaDefinition = z.object({
   organizationId: z.string().min(1),
   connectionId: z.string().min(1),
 });
+export interface SsoConnectionTargetSchema extends Named<
+  typeof ssoConnectionTargetSchemaDefinition
+> {}
+export const ssoConnectionTargetSchema: SsoConnectionTargetSchema =
+  ssoConnectionTargetSchemaDefinition;
 export type SsoConnectionTarget = z.infer<typeof ssoConnectionTargetSchema>;
 
-export const ssoDomainTargetSchema = z.object({
+const ssoDomainTargetSchemaDefinition = z.object({
   ...ssoConnectionTargetSchema.shape,
   domain: z.string().min(1).max(253),
 });
+export interface SsoDomainTargetSchema extends Named<typeof ssoDomainTargetSchemaDefinition> {}
+export const ssoDomainTargetSchema: SsoDomainTargetSchema = ssoDomainTargetSchemaDefinition;
 export type SsoDomainTarget = z.infer<typeof ssoDomainTargetSchema>;
 
-export const rejectSsoDomainClaimInputSchema = z.object({
+const rejectSsoDomainClaimInputSchemaDefinition = z.object({
   ...ssoDomainTargetSchema.shape,
   note: z.string().min(1).max(1000),
 });
+export interface RejectSsoDomainClaimInputSchema extends Named<
+  typeof rejectSsoDomainClaimInputSchemaDefinition
+> {}
+export const rejectSsoDomainClaimInputSchema: RejectSsoDomainClaimInputSchema =
+  rejectSsoDomainClaimInputSchemaDefinition;
 export type RejectSsoDomainClaimInput = z.infer<typeof rejectSsoDomainClaimInputSchema>;
 
 /** Vouching for a domain names the evidence and why it proves control. */
-export const attestSsoDomainInputSchema = z.object({
+const attestSsoDomainInputSchemaDefinition = z.object({
   ...ssoDomainTargetSchema.shape,
   evidenceRef: z.string().trim().min(1).max(500),
   note: z.string().trim().min(1).max(1_000),
 });
+export interface AttestSsoDomainInputSchema extends Named<
+  typeof attestSsoDomainInputSchemaDefinition
+> {}
+export const attestSsoDomainInputSchema: AttestSsoDomainInputSchema =
+  attestSsoDomainInputSchemaDefinition;
 export type AttestSsoDomainInput = z.infer<typeof attestSsoDomainInputSchema>;
 
 /**
@@ -113,7 +153,7 @@ export type AttestSsoDomainInput = z.infer<typeof attestSsoDomainInputSchema>;
  * and is refused BY NAME. Narrowing it to `"oidc"` would tell the operator the
  * field is wrong rather than that the protocol is not self-serve yet.
  */
-export const registerSsoConnectionInputSchema = z.object({
+const registerSsoConnectionInputSchemaDefinition = z.object({
   organizationId: z.string().min(1),
   type: z.enum(["oidc", "saml"]),
   providerId: z.string().min(1).max(100),
@@ -123,17 +163,32 @@ export const registerSsoConnectionInputSchema = z.object({
    *  caller states none. */
   arrivalPolicy: z.enum(["admit", "request", "refuse"]).optional(),
 });
+export interface RegisterSsoConnectionInputSchema extends Named<
+  typeof registerSsoConnectionInputSchemaDefinition
+> {}
+export const registerSsoConnectionInputSchema: RegisterSsoConnectionInputSchema =
+  registerSsoConnectionInputSchemaDefinition;
 export type RegisterSsoConnectionInput = z.infer<typeof registerSsoConnectionInputSchema>;
 
-export const activateSsoConnectionInputSchema = z.object({
+const activateSsoConnectionInputSchemaDefinition = z.object({
   ...ssoConnectionTargetSchema.shape,
   testLoginAccountId: z.string().min(1),
 });
+export interface ActivateSsoConnectionInputSchema extends Named<
+  typeof activateSsoConnectionInputSchemaDefinition
+> {}
+export const activateSsoConnectionInputSchema: ActivateSsoConnectionInputSchema =
+  activateSsoConnectionInputSchemaDefinition;
 export type ActivateSsoConnectionInput = z.infer<typeof activateSsoConnectionInputSchema>;
 
 /** Suspending and requesting a teardown both carry the same optional reason. */
-export const ssoConnectionReasonInputSchema = z.object({
+const ssoConnectionReasonInputSchemaDefinition = z.object({
   ...ssoConnectionTargetSchema.shape,
   reason: z.string().min(1).max(1000).nullable().default(null),
 });
+export interface SsoConnectionReasonInputSchema extends Named<
+  typeof ssoConnectionReasonInputSchemaDefinition
+> {}
+export const ssoConnectionReasonInputSchema: SsoConnectionReasonInputSchema =
+  ssoConnectionReasonInputSchemaDefinition;
 export type SsoConnectionReasonInput = z.infer<typeof ssoConnectionReasonInputSchema>;

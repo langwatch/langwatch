@@ -16,9 +16,9 @@ import type { Component, Entry } from "@langwatch/workflow-contract";
 import { transposeColumnsFirstToRowsFirstWithId } from "@langwatch/workflow-contract";
 import type { Node, NodeProps } from "@xyflow/react";
 import { useUpdateNodeInternals } from "@xyflow/react";
+import { ArrowLeft, Database, Plus, Upload } from "lucide-react";
 import type React from "react";
 import { useRef, useState } from "react";
-import { ArrowLeft, Database, Plus, Upload } from "react-feather";
 
 import { DatasetEditorTable } from "../../../behavior/optimization_studio/lent-dataset-editor-table.tsx";
 import { DatasetPickerList } from "../../../behavior/optimization_studio/lent-dataset-picker-list.tsx";
@@ -183,7 +183,6 @@ export function DatasetModal({
   return (
     <Dialog.Root open={open} onOpenChange={({ open }) => !open && onClose()} size="full">
       <Dialog.Content
-        bg="bg"
         css={{
           marginX: "32px",
           marginTop: "32px",

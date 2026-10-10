@@ -5,8 +5,8 @@ import {
   createInitState,
   createTestSpan,
 } from "../../../../eventing/__tests__/trace-summary-test.fixtures.ts";
-import { TraceAttributeAccumulationService } from "../trace-attribute-accumulation.service.ts";
 import { TraceOriginService } from "../../../../services/trace-origin.service.ts";
+import { TraceAttributeAccumulationService } from "../trace-attribute-accumulation.service.ts";
 
 describe("TraceAttributeAccumulationService", () => {
   describe("given spans marked partial and fully-skipped by PII redaction", () => {

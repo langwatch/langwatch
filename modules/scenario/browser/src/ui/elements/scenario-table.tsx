@@ -124,7 +124,7 @@ export function ScenarioTable({
             <Menu.Content portalled={false}>
               <Menu.Item
                 value="archive"
-                color="orange.500"
+                color="orange.fg"
                 onClick={(event) => {
                   event.stopPropagation();
                   onArchive(row.original);

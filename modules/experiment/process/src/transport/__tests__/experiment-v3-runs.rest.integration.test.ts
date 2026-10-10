@@ -5,10 +5,10 @@
  */
 import { AgentOwnerOnlyError } from "@langwatch/agent-contract";
 import {
-  bindRestMiddleware,
+  bindMiddlewareContext,
   canonicalErrorResponse,
   createRestRuntime,
-  projectRestFacts,
+  projectRequestContext,
   RestHost,
 } from "@langwatch/api/rest";
 import type { DatasetApi } from "@langwatch/dataset-contract";
@@ -16,6 +16,7 @@ import type { ExecutionSummary, Experiment, ExperimentRun } from "@langwatch/exp
 import { NotFoundError } from "@langwatch/handled-error";
 import { resolveRequestBound } from "@langwatch/plans";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 
@@ -225,14 +226,17 @@ async function harness({
     }),
     authorize: () => ({ permitted: true, organizationRole: null }),
   };
-  const runtime = createRestRuntime({ identity });
-  const keyedFacts = [
-    bindRestMiddleware(projectRestFacts, () => ({
+  const runtime = createRestRuntime({
+    authorization: restTestAuthorization(),
+    identity,
+  });
+  const keyedContext = [
+    bindMiddlewareContext(projectRequestContext, () => ({
       projectSlug: "acme",
       viewerUserId: "user-1",
       actorId: "user-1",
     })),
-    bindRestMiddleware(experimentWorkbenchCredential, () => ({
+    bindMiddlewareContext(experimentWorkbenchCredential, () => ({
       kind: "apiKey" as const,
       userId: "user-1",
     })),
@@ -242,7 +246,7 @@ async function harness({
       app: () => app,
       credential: "project",
       onError: canonicalErrorResponse,
-      facts: keyedFacts,
+      middlewareContext: keyedContext,
     });
   const browserFamily = (family: typeof experimentWorkbenchRunRest) =>
     runtime.mount(family.router(), { app: () => app, onError: canonicalErrorResponse });
@@ -252,11 +256,11 @@ async function harness({
   const legacyBrowser = browserFamily(experimentWorkbenchRunLegacyRest);
   // Every REST family the module declares, mounted in its declared order on the host.
   const host = RestHost.create({
+    authz: restTestAuthorization().forRequest(),
     identities: {
       project: identity,
       organization: identity,
       api_key: identity,
-      scim_token: identity,
       instance_admin: identity,
       browser: identity,
     },
@@ -266,9 +270,9 @@ async function harness({
   for (const transport of experimentProcessModule.transports ?? []) {
     if (transport.protocol !== "rest") continue;
     host.mount(transport.router(), () => app, {
-      facts: [
-        ...keyedFacts,
-        bindRestMiddleware(experimentRestCredential, () => ({
+      middlewareBindings: [
+        ...keyedContext,
+        bindMiddlewareContext(experimentRestCredential, () => ({
           kind: "apiKey" as const,
           userId: "user-1",
         })),

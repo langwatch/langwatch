@@ -7,6 +7,7 @@ import { defineTrpcContract, moduleApi } from "@langwatch/module";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
+import { authorizeDefaults } from "../../__tests__/api-double.ts";
 import { permissionBy } from "../../access/input-permission.ts";
 import {
   createTrpcRuntime,
@@ -79,6 +80,7 @@ function members({
     identity: { caller: (ctx) => ({ actor: { type: "user", id: ctx.actor.id } }) },
     authorization: {
       forRequest: () => ({
+        ...authorizeDefaults,
         getDecision: async ({ permission, scope }) => {
           asked.push({ permission, scope });
 

@@ -28,6 +28,8 @@ export type RestProjectIdentity = {
   isPersonal: boolean;
   /** That person, when the workspace is personal. */
   ownerUserId: string | null;
+  /** What the project is; the door refuses every credential of an aggregate (ADR-177). */
+  kind: string;
 };
 
 /**

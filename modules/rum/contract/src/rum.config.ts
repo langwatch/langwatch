@@ -1,5 +1,6 @@
 import { Config, type ConfigOf, telemetryExporterEndpoint } from "@langwatch/config";
 import { defineBrowserConfig } from "@langwatch/config/public-app-config";
+import type { Named } from "@langwatch/module";
 import { Secret } from "@langwatch/secrets/secret";
 import { telemetryExporterHeaders } from "@langwatch/secrets/shared-secrets";
 import { z } from "zod";
@@ -39,10 +40,12 @@ export const rumSecrets = {
 } as const;
 
 /** All a browser learns: whether to trace, and what share of sessions to record. */
-export const rumWebConfigSchema = z.strictObject({
+const rumWebConfigSchemaDefinition = z.strictObject({
   enabled: z.boolean(),
   sampleRatio: z.number().min(0).max(1),
 });
+export interface RumWebConfigSchema extends Named<typeof rumWebConfigSchemaDefinition> {}
+export const rumWebConfigSchema: RumWebConfigSchema = rumWebConfigSchemaDefinition;
 
 export type RumWebConfig = z.infer<typeof rumWebConfigSchema>;
 

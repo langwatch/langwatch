@@ -27,6 +27,7 @@ import {
 } from "../../features/guided-onboarding/model/resume.ts";
 import { GuidedTakeover } from "../../features/guided-onboarding/ui/takeover/guided-takeover.tsx";
 import { TAKEOVER_FADE_MS } from "../../features/guided-onboarding/ui/takeover/takeover-stage.tsx";
+import { getSafeReturnToPath } from "../../model/get-safe-return-to-path.ts";
 import { useOnboardingHost } from "../../model/onboarding-host.ts";
 import {
   resolveWelcomeRedirect,
@@ -146,16 +147,9 @@ function welcomeTakeoverProps({
 }
 
 function progressDotColor({ index, currentIndex }: { index: number; currentIndex: number }) {
-  if (index === currentIndex) return "orange.400";
-  if (index < currentIndex) return "orange.300";
-  return "gray.200";
-}
-
-/** Same-origin continuations only: a relative in-app path, never a protocol-relative URL. */
-function parseReturnTo(rawReturnTo: unknown): string | undefined {
-  if (typeof rawReturnTo !== "string") return undefined;
-  if (!rawReturnTo.startsWith("/") || rawReturnTo.startsWith("//")) return undefined;
-  return rawReturnTo;
+  if (index === currentIndex) return "accent.solid";
+  if (index < currentIndex) return "accent.muted";
+  return "bg.control";
 }
 
 function buildSignUpData({
@@ -288,7 +282,7 @@ export const WelcomeScreen: React.FC = () => {
   // Same-origin continuation (e.g. the CLI device-approval page sends a
   // fresh signup here with return_to=/cli/auth?user_code=… so the approval
   // survives onboarding). Only relative in-app paths are honored.
-  const returnTo = parseReturnTo(router.query.return_to) ?? null;
+  const returnTo = getSafeReturnToPath(router.query.return_to);
 
   useEffect(() => {
     // Nothing is decided while the org data loads, nor for the organization this page just
@@ -423,6 +417,7 @@ export const WelcomeScreen: React.FC = () => {
         subTitle={currentScreen?.subHeading}
         showBackButton={false}
         widthVariant={guided ? "guided" : "narrow"}
+        below={currentScreen?.footer ? <currentScreen.footer surface={screenSurface} /> : null}
       >
         <VStack gap={5} align="stretch" w="full" minW="0">
           <Box position="relative" overflow="hidden" py="1" px="2" my="-1" mx="-2">

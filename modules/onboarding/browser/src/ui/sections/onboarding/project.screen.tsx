@@ -14,7 +14,7 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import { useEffect } from "react";
-import { type SubmitHandler, useForm } from "react-hook-form";
+import { type SubmitHandler, useForm, useWatch } from "react-hook-form";
 
 import { api } from "../../../behavior/onboarding-api.ts";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
@@ -56,8 +56,10 @@ export default function ProjectOnboarding() {
       framework: "openai",
     },
   });
-  const { watch } = form;
-  const teamId = watch("teamId");
+  // The React Compiler memoises `form.watch()` on the stable form; useWatch subscribes.
+  const teamId = useWatch({ control: form.control, name: "teamId" });
+  const language = useWatch({ control: form.control, name: "language" });
+  const framework = useWatch({ control: form.control, name: "framework" });
 
   const router = useRouter();
   const { organization } = useOrganizationTeamProject({
@@ -180,11 +182,7 @@ export default function ProjectOnboarding() {
                 )}
               </>
             )}
-            <TechStackSelector
-              form={form}
-              language={form.watch("language")}
-              framework={form.watch("framework")}
-            />
+            <TechStackSelector form={form} language={language} framework={framework} />
             {createProject.error && (
               <Text role="alert" fontSize="12.5px" color="fg.error">
                 Something went wrong!

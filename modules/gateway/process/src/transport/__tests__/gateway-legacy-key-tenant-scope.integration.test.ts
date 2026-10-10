@@ -1,4 +1,8 @@
-import { bindRestMiddleware, canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
+import {
+  bindMiddlewareContext,
+  canonicalErrorResponse,
+  createRestRuntime,
+} from "@langwatch/api/rest";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type { GatewayRequestCredential } from "@langwatch/gateway-contract";
@@ -18,6 +22,7 @@ import { ScopedSecrets } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { memoryRedisDouble } from "@langwatch/test-harness/client-doubles/redis";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it, vi } from "vitest";
 
 import { GatewayModule } from "../../app/gateway.app.ts";
@@ -203,6 +208,7 @@ async function mountAsLegacyProjectKey() {
       traces: createApiFixture({}),
       oneTimeReveals: createApiFixture({}),
       apiKeys: createApiFixture({}),
+      licensing: createApiFixture({}),
     },
     repositories: LiveGatewayRepositories.create({
       prisma,
@@ -237,6 +243,7 @@ async function mountAsLegacyProjectKey() {
     scope: { tier: "organization" as const, id: ORG_A },
   });
   const runtime = createRestRuntime({
+    authorization: restTestAuthorization(),
     identity: { authenticate: door, identify: door },
     doors: { api_key: { authenticate: keyDoor, identify: keyDoor } },
     idempotency: async ({ handler }) => {
@@ -247,13 +254,13 @@ async function mountAsLegacyProjectKey() {
   const hono = runtime.mount(gatewayPlatformRest.router(), {
     app: () => app,
     onError: canonicalErrorResponse,
-    facts: [
-      bindRestMiddleware(gatewayRestCredential, () => legacyProjectKey),
-      bindRestMiddleware(gatewayKeyCaller, () => ({
+    middlewareContext: [
+      bindMiddlewareContext(gatewayRestCredential, () => legacyProjectKey),
+      bindMiddlewareContext(gatewayKeyCaller, () => ({
         kind: "project" as const,
         projectId: PROJECT_A,
       })),
-      bindRestMiddleware(gatewayVirtualKeyCaller, () => ({
+      bindMiddlewareContext(gatewayVirtualKeyCaller, () => ({
         kind: "project" as const,
         projectId: PROJECT_A,
       })),

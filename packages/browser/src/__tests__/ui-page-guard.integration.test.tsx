@@ -5,13 +5,13 @@
 
 import {
   BrowserUiDocumentTitle,
-  UiCapabilityContextProvider,
+  UiHostServicesContextProvider,
   UiNavigation,
   UiRoute,
   UiSession,
   type UiActiveScope,
   type UiActor,
-  type UiCapabilities,
+  type UiHostServices,
   UiFeedback,
   UiHostServiceProvider,
 } from "@langwatch/browser-host/capabilities";
@@ -40,6 +40,8 @@ class SilentRoute extends UiRoute {
 
 class SilentFeedback extends UiFeedback {
   succeeded(): void {}
+  warned(): void {}
+  informed(): void {}
   failed(): void {}
 }
 
@@ -69,13 +71,9 @@ class AnsweringSession extends UiSession {
   isSettled(): boolean {
     return this.answers.settled;
   }
-
-  featureFlag(flag: string): boolean | undefined {
-    return this.answers.flags[flag];
-  }
 }
 
-function capabilities(session: UiSession): UiCapabilities {
+function hostServices(session: UiSession): UiHostServices {
   return {
     documentTitle: BrowserUiDocumentTitle.create({ title: "" }),
     feedback: new SilentFeedback(),
@@ -102,7 +100,7 @@ function renderGuarded(session: AnsweringSession) {
   })(Page);
 
   render(
-    <UiCapabilityContextProvider value={capabilities(session)}>
+    <UiHostServicesContextProvider value={hostServices(session)}>
       <UiHostServiceProvider
         value={
           new Map([
@@ -115,7 +113,7 @@ function renderGuarded(session: AnsweringSession) {
       >
         <Guarded />
       </UiHostServiceProvider>
-    </UiCapabilityContextProvider>,
+    </UiHostServicesContextProvider>,
   );
 }
 
@@ -317,8 +315,8 @@ describe("given a module declaring a screen that requires a grant", () => {
     const { default: Screen } = await load();
 
     renderWithDesignSystem(
-      <UiCapabilityContextProvider
-        value={capabilities(new AnsweringSession({ flags, permissions, settled: true }))}
+      <UiHostServicesContextProvider
+        value={hostServices(new AnsweringSession({ flags, permissions, settled: true }))}
       >
         <UiHostServiceProvider
           value={
@@ -327,7 +325,7 @@ describe("given a module declaring a screen that requires a grant", () => {
         >
           <Screen />
         </UiHostServiceProvider>
-      </UiCapabilityContextProvider>,
+      </UiHostServicesContextProvider>,
     );
   }
 
@@ -335,7 +333,7 @@ describe("given a module declaring a screen that requires a grant", () => {
   it("shows the missing grant instead of the screen to a viewer without it", async () => {
     await renderDeclared({ page: "pages/[project]/probe", permissions: [] });
 
-    expect(screen.getByText("Missing permission: workflows:view")).toBeDefined();
+    expect(screen.getByText("workflows:view")).toBeDefined();
     expect(screen.queryByText("the page")).toBeNull();
   });
 
@@ -347,10 +345,10 @@ describe("given a module declaring a screen that requires a grant", () => {
   });
 
   /** @scenario "A refused viewer reads main's Access Restricted notice" */
-  it("titles the refusal Access Restricted, as main's PermissionAlert did", async () => {
+  it("titles the refusal with the area the viewer needs access to", async () => {
     await renderDeclared({ page: "pages/[project]/probe", permissions: [] });
 
-    expect(screen.getByText("Access Restricted")).toBeDefined();
+    expect(screen.getByText(/You need access to/)).toBeDefined();
   });
 
   /** @scenario "A declared screen behind a release flag that is off answers not found" */

@@ -1,5 +1,5 @@
 import {
-  bindTrpcFact,
+  bindTrpcMiddlewareContext,
   createTrpcRuntime,
   TrpcRootDefinition,
   type TrpcRuntimeMembers,
@@ -12,9 +12,10 @@ import {
 import type { BillingApi } from "@langwatch/enterprise-billing-contract";
 import type { OpsOperator } from "@langwatch/ops-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { testAuthorizeDefaults } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it } from "vitest";
 
-import { connectedBillingTrpcTransport, operatorFact } from "../connected-billing.trpc.ts";
+import { connectedBillingTrpcTransport, operatorContext } from "../connected-billing.trpc.ts";
 
 type Context = { actor: { type: "user"; id: string } | null; operator: OpsOperator | null };
 
@@ -30,6 +31,7 @@ function members(): TrpcRuntimeMembers<Context> {
     identity: { caller: (ctx) => ({ actor: ctx.actor }) },
     authorization: {
       forRequest: () => ({
+        ...testAuthorizeDefaults,
         getDecision: async () => ({ permitted: false, organizationRole: null }),
         getProjectAnyDecision: async () => ({ permitted: false, organizationRole: null }),
         checkScopeLineage: async () => ({ kind: "consistent" }),
@@ -69,14 +71,16 @@ function billingBackOffice(reached: string[]) {
     procedure: root.procedure,
     members: members(),
   });
-  const facts = { facts: [bindTrpcFact(operatorFact, (ctx: Context) => ctx.operator)] };
+  const mountOptions = {
+    middlewareContext: [bindTrpcMiddlewareContext(operatorContext, (ctx: Context) => ctx.operator)],
+  };
   const as = (id: string | null) => ({
     actor: id ? ({ type: "user", id } as const) : null,
     operator: id ? { id, email: `${id}@langwatch.test` } : null,
   });
 
   return (id: string | null) =>
-    runtime.mount(connectedBillingTrpcTransport, () => app, facts).createCaller(as(id));
+    runtime.mount(connectedBillingTrpcTransport, () => app, mountOptions).createCaller(as(id));
 }
 
 function codeOf(failure: unknown): { trpc: string; code: string } {

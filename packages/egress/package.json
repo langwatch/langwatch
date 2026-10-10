@@ -1,6 +1,5 @@
 {
   "name": "@langwatch/egress",
-  "langwatch": { "group": "libraries" },
   "version": "0.0.1",
   "private": true,
   "description": "The fence outbound requests leave LangWatch through: the SSRF address policy, the IP-pinned fetch it resolves, and the outbound proxy",
@@ -46,5 +45,8 @@
     "typescript": "catalog:",
     "vitest": "catalog:"
   },
-  "packageManager": "pnpm@12.6.0"
+  "packageManager": "pnpm@12.6.0",
+  "langwatch": {
+    "group": "libraries"
+  }
 }

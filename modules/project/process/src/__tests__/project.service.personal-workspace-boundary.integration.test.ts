@@ -1,3 +1,4 @@
+import type { AuthzApi } from "@langwatch/authz-contract";
 import { TeamNotFoundError, type OrganizationApi } from "@langwatch/organization-contract";
 import {
   PrismaConfigService,
@@ -20,6 +21,12 @@ import { PrismaProjectRepository } from "../repositories/prisma/prisma.project.r
 import { ProjectCreatedNoticeService } from "../services/project-created-notice.service.ts";
 import type { ProjectCredentials } from "../services/project-credentials.service.ts";
 import { ProjectService } from "../services/project.service.ts";
+
+/** These cases are about the boundary and the gateway, not the caller's standing. */
+const PERMITS_EVERYTHING = createApiFixture<AuthzApi>({
+  checkByIds: async () => ({ allowed: true, organizationRole: null }),
+});
+const MEMBER = { type: "user", id: "user_1" } as const;
 
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;
 
@@ -64,6 +71,7 @@ describe.skipIf(!DB_URL)(
       repository: PrismaProjectRepository.create({ prisma }),
       credentials,
       organizations,
+      authorization: PERMITS_EVERYTHING,
     });
 
     let organizationId: string;
@@ -165,6 +173,7 @@ describe.skipIf(!DB_URL)(
         projects.update({
           id: personalProjectId,
           organizationId,
+          by: MEMBER,
           data: { teamId: sharedTeamId },
         });
 
@@ -208,6 +217,7 @@ describe.skipIf(!DB_URL)(
         projects.update({
           id: sharedProjectId,
           organizationId,
+          by: MEMBER,
           data: { teamId: personalTeamId },
         });
 

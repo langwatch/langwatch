@@ -1,5 +1,5 @@
 /**
- * Reads the active gateway scope (organization, project, team, capabilities).
+ * Reads the active gateway scope (organization, project, team); permissions come from the host.
  * Landing policy moved to the platform hook; this hook now handles only the reading half.
  */
 
@@ -18,8 +18,6 @@ export type GatewayScopeReading = {
   organization: GatewayOrganization | undefined;
   project: GatewayProject | undefined;
   team: GatewayTeam | undefined;
-  hasPermission: (permission: string) => boolean;
-  hasAnyPermission: (permission: string) => boolean;
 };
 
 export function useOrganizationTeamProject(): GatewayScopeReading {
@@ -29,8 +27,6 @@ export function useOrganizationTeamProject(): GatewayScopeReading {
       organization: host.organization(),
       project: host.project(),
       team: host.team(),
-      hasPermission: (permission: string) => host.hasPermission(permission),
-      hasAnyPermission: (permission: string) => host.hasPermission(permission),
     }),
     [host],
   );

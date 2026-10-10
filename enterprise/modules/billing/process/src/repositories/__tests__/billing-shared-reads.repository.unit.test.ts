@@ -125,7 +125,6 @@ describe("billing's shared reads", () => {
           stripeCustomerId: null,
           pricingModel: "SEAT_EVENT",
           currency: null,
-          license: null,
           selfHostedCustomer,
           teamIds: [],
           signupData: {},

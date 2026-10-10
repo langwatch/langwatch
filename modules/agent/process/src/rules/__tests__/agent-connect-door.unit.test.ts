@@ -23,6 +23,7 @@ const project = {
   organizationId: "org_1",
   isPersonal: false,
   ownerUserId: null,
+  kind: "application",
 };
 
 function apiKey(userId: string | null) {

@@ -10,7 +10,7 @@ Feature: Unproven accounts an older image finalized are reopened once it is gone
     And it waits until no older image serves
 
   @unit
-  Scenario: The after-rollout step makes the same sweep as the blocking step
+  Scenario: The after-rollout step sweeps unproven accounts back to the legacy path
     Given no unproven account is finalized
     When the after-rollout step runs
     Then it reports no account reopened

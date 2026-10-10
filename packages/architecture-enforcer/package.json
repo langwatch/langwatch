@@ -1,6 +1,5 @@
 {
   "name": "@langwatch/architecture-enforcer",
-  "langwatch": { "group": "tooling" },
   "version": "0.1.0",
   "private": true,
   "description": "Executable package-boundary policies for the LangWatch monorepo.",
@@ -39,5 +38,8 @@
     "js-yaml": "catalog:",
     "oxlint": "catalog:",
     "vitest": "catalog:"
+  },
+  "langwatch": {
+    "group": "tooling"
   }
 }

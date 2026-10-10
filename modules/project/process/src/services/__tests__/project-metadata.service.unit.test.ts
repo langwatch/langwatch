@@ -1,3 +1,4 @@
+import type { AuthzApi } from "@langwatch/authz-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 /**
@@ -94,6 +95,7 @@ describe("the project metadata seam", () => {
         credentials: createApiFixture<ProjectCredentials>({}),
         organizations: createApiFixture<OrganizationApi>({}),
         created: createApiFixture<ProjectCreatedNoticeService>({}),
+        authorization: createApiFixture<AuthzApi>({}),
       });
 
       await expect(service.resolveOrgAdmin("project_1")).resolves.toEqual(

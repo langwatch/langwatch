@@ -112,6 +112,13 @@ Feature: License sync
     Then the post is accepted as before
 
   @unit
+  Scenario: An install whose managed key is pending syncs that organisation again 30 seconds later
+    Given the connect host answers an organisation's sync with connect_credential_pending
+    When the daily sync pass runs
+    Then the pass waits 30 seconds and syncs that organisation once more
+    And it records how that second sync ended, retrying no further
+
+  @unit
   Scenario: An install without a license sends no sync
     Given an organization with no license
     When the daily jobs run
@@ -142,6 +149,18 @@ Feature: License sync
   Scenario: A sync from an unregistered, revoked or wrong-instance license is refused
     When a sync arrives with a license that is not registered, is revoked, or is bound to another instance
     Then it is refused with the same codes the gateway uses
+    And no seats are recorded
+
+  @unit
+  Scenario: The connect host's door refuses a malformed licence token before the body
+    When a sync arrives with no bearer, or a bearer that is not a licence token
+    Then the licence token door refuses it as connect_license_token_malformed with status 401
+    And the body is not read and no seats are recorded
+
+  @unit
+  Scenario: The connect host's door refuses a licence token presented without an instance id
+    When a sync arrives with a well-formed licence token and no instance id
+    Then the licence token door refuses it as connect_instance_required with status 400
     And no seats are recorded
 
   @unit

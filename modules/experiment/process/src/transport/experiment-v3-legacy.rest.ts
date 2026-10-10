@@ -3,7 +3,11 @@
  * Python and TypeScript SDKs still call. Same operations, permissions, doors and bodies; kept out
  * of the published document, as main kept it.
  */
-import { defineRestRouter, MANAGEMENT_API_VERSION, projectRestFacts } from "@langwatch/api/rest";
+import {
+  defineRestRouter,
+  MANAGEMENT_API_VERSION,
+  projectRequestContext,
+} from "@langwatch/api/rest";
 import {
   abortExperimentRunRequestSchema,
   abortExperimentRunResponseSchema,
@@ -49,9 +53,10 @@ export const experimentV3LegacyRest = defineRestRouter(ExperimentV3RestApi)
   .withRawBody("text", { mediaType: "application/json", mismatch: "accepted" })
   .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES })
   .withPermission("evaluations:create")
+  .withoutAudit("run, not a change")
   .withResponse("negotiated", {})
   .withDocs(HIDDEN)
-  .withMiddleware(projectRestFacts, experimentWorkbenchCredential)
+  .withMiddlewareContext(projectRequestContext, experimentWorkbenchCredential)
   .handle(async ({ app, input, raw, response, scope }, project, credential) =>
     negotiatedRunAnswer(
       response,
@@ -106,9 +111,10 @@ export const experimentV3LegacyRest = defineRestRouter(ExperimentV3RestApi)
   .withParams(evaluationSlugParamsSchema)
   .withInput(saveWorkbenchStateBodySchema)
   .withPermission("experiments:update")
+  .withAudit("experiments.saveEvaluationsV3")
   .withOutput(saveWorkbenchStateResponseSchema)
   .withDocs(HIDDEN)
-  .withMiddleware(projectRestFacts, experimentWorkbenchCredential)
+  .withMiddlewareContext(projectRequestContext, experimentWorkbenchCredential)
   .handle(({ app, input: { evaluationSlug, ...body }, scope }, _project, credential) =>
     app.saveWorkbenchStateBySlug(
       { ...body, projectId: scope.id, slug: evaluationSlug },
@@ -132,10 +138,11 @@ export const experimentV3LegacyRest = defineRestRouter(ExperimentV3RestApi)
   )
   .withParams(evaluationSlugVersionParamsSchema)
   .withPermission("experiments:update")
+  .withAudit("experiments.restoreWorkbenchVersion")
   .withInput(restoreWorkbenchVersionBodySchema)
   .withOutput(restoreWorkbenchVersionResponseSchema)
   .withDocs(HIDDEN)
-  .withMiddleware(projectRestFacts, experimentWorkbenchCredential)
+  .withMiddlewareContext(projectRequestContext, experimentWorkbenchCredential)
   .handle(async ({ app, input, scope }, _project, credential) => ({
     version: (
       await app.restoreWorkbenchVersionBySlug(
@@ -157,6 +164,7 @@ export const experimentWorkbenchRunLegacyRest = defineRestRouter(ExperimentV3Res
   .post("/execute", "executeEvaluationsV3Experiment")
   .withInput(executionRequestSchema)
   .withPermission("evaluations:manage", { at: "route", param: "projectId" })
+  .withoutAudit("run, not a change")
   .withResponse("sse", {})
   .withDocs(HIDDEN)
   .handle(async ({ app, input, actor, response }) =>
@@ -166,6 +174,7 @@ export const experimentWorkbenchRunLegacyRest = defineRestRouter(ExperimentV3Res
   .post("/abort", "abortEvaluationsV3ExperimentRun")
   .withInput(abortExperimentRunRequestSchema)
   .withPermission("evaluations:manage", { at: "route", param: "projectId" })
+  .withoutAudit("run, not a change")
   .withOutput(abortExperimentRunResponseSchema)
   .withDocs(HIDDEN)
   .handle(({ app, input, actor }) => app.abortWorkbenchRun(input, actor))

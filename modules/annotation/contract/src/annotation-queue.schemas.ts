@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import {
@@ -10,7 +11,7 @@ import { annotationUserSchema } from "./annotation.schemas.ts";
 export const annotationQueueItemStatusSchema = z.enum(["pending", "completed", "all"]);
 export type AnnotationQueueItemStatus = z.infer<typeof annotationQueueItemStatusSchema>;
 
-export const annotationQueueItemSchema = z.object({
+const annotationQueueItemSchemaDefinition = z.object({
   id: z.string(),
   annotationQueueId: z.string().nullable(),
   userId: z.string().nullable(),
@@ -22,12 +23,17 @@ export const annotationQueueItemSchema = z.object({
   doneAt: z.date().nullable(),
   markedForDatasetAt: z.date().nullable(),
 });
+export interface AnnotationQueueItemSchema extends Named<
+  typeof annotationQueueItemSchemaDefinition
+> {}
+export const annotationQueueItemSchema: AnnotationQueueItemSchema =
+  annotationQueueItemSchemaDefinition;
 const annotationQueueItemWithReviewerSchema = z.object({
   ...annotationQueueItemSchema.shape,
   user: annotationUserSchema.nullable(),
   createdByUser: annotationUserSchema.nullable(),
 });
-export const annotationQueueListedItemSchema = z.object({
+const annotationQueueListedItemSchemaDefinition = z.object({
   ...annotationQueueItemWithReviewerSchema.shape,
   annotationQueue: z
     .object({
@@ -36,11 +42,21 @@ export const annotationQueueListedItemSchema = z.object({
     })
     .nullable(),
 });
-export const annotationQueuePageItemSchema = z.object({
+export interface AnnotationQueueListedItemSchema extends Named<
+  typeof annotationQueueListedItemSchemaDefinition
+> {}
+export const annotationQueueListedItemSchema: AnnotationQueueListedItemSchema =
+  annotationQueueListedItemSchemaDefinition;
+const annotationQueuePageItemSchemaDefinition = z.object({
   ...annotationQueueItemWithReviewerSchema.shape,
   annotationQueue: annotationQueueDetailSchema.nullable(),
 });
-export const annotationQueueWithItemsSchema = z.object({
+export interface AnnotationQueuePageItemSchema extends Named<
+  typeof annotationQueuePageItemSchemaDefinition
+> {}
+export const annotationQueuePageItemSchema: AnnotationQueuePageItemSchema =
+  annotationQueuePageItemSchemaDefinition;
+const annotationQueueWithItemsSchemaDefinition = z.object({
   ...annotationQueueDetailSchema.shape,
   AnnotationQueueItems: z.array(
     z.object({
@@ -50,6 +66,11 @@ export const annotationQueueWithItemsSchema = z.object({
     }),
   ),
 });
+export interface AnnotationQueueWithItemsSchema extends Named<
+  typeof annotationQueueWithItemsSchemaDefinition
+> {}
+export const annotationQueueWithItemsSchema: AnnotationQueueWithItemsSchema =
+  annotationQueueWithItemsSchemaDefinition;
 export type AnnotationQueueItem = z.infer<typeof annotationQueueItemSchema>;
 export type AnnotationQueueListedItem = z.infer<typeof annotationQueueListedItemSchema>;
 export type AnnotationQueuePageItem = z.infer<typeof annotationQueuePageItemSchema>;

@@ -45,6 +45,20 @@ cp ../../modules/evaluator/contract/src/evaluators.native.ts src/internal/genera
 cp ../../modules/scenario/contract/src/suite-fields.ts src/internal/generated/types/suite-fields.ts
 node scripts/generate-evaluator-attachments.mjs
 
+# Contract schemas name their types with `Named` from @langwatch/module
+# (ADR-178), which the published SDK cannot depend on. It is the identity type,
+# so each copy declares it locally instead of importing it.
+node -e "
+const fs = require('fs');
+const dir = 'src/internal/generated/types';
+const named = 'import type { Named } from \"@langwatch/module\";';
+for (const name of fs.readdirSync(dir).filter((file) => file.endsWith('.ts'))) {
+  const path = dir + '/' + name;
+  const source = fs.readFileSync(path, 'utf8');
+  if (source.includes(named)) fs.writeFileSync(path, source.replace(named, 'type Named<T> = T;'));
+}
+"
+
 # Default prompt model — derive the newest plain `openai/gpt-<major>.<minor>`
 # flagship from the same model catalogue the feature reads, so `langwatch
 # prompt create` and the platform stay in lock-step without a hand-edited

@@ -31,6 +31,8 @@ export abstract class ModelProviderEgress {
     request: ModelProviderEgressRequest,
   ): Promise<ModelProviderEgressResponse>;
   abstract isRedirectRefusal(error: unknown): boolean;
+  /** Throws when the fence would refuse the URL; a saved endpoint is held to the probe's policy. */
+  abstract assertDestination(url: string): Promise<void>;
 }
 
 /** The address policy a deployment fences its outbound probes with. */
@@ -95,5 +97,9 @@ export class SsrfModelProviderEgressService extends ModelProviderEgress {
 
   isRedirectRefusal(error: unknown): boolean {
     return error instanceof RedirectRefusedError;
+  }
+
+  async assertDestination(url: string): Promise<void> {
+    await this.validate(url);
   }
 }

@@ -3,7 +3,7 @@
  * RTL coverage: health strip renders, delivery log paginates with Load more,
  * and advancing the page passes the previous cursor back to the query.
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemTestProvider } from "@langwatch/design-system/testing";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -56,9 +56,9 @@ function delivery(id: string) {
 
 function renderDrawer() {
   render(
-    <ChakraProvider value={defaultSystem}>
+    <DesignSystemTestProvider>
       <WebhookDeliveriesDrawer organizationId="org_1" endpoint={endpoint} onClose={vi.fn()} />
-    </ChakraProvider>,
+    </DesignSystemTestProvider>,
   );
 }
 

@@ -1,8 +1,11 @@
 package webconsole
 
 import (
+	"bytes"
+	"encoding/base64"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -76,6 +79,41 @@ func TestConsoleWithoutABundleNamesTheBuildCommand(t *testing.T) {
 		}
 		if rec.Header().Get("Cache-Control") != "no-store" {
 			t.Errorf("GET %s: the not-built page must not be cached, got %q", target, rec.Header().Get("Cache-Control"))
+		}
+	}
+}
+
+func TestNotBuiltPageEscapesBuildInstructionsAndEmbedsCanonicalIcon(t *testing.T) {
+	svg, err := os.ReadFile("../../packages/design-system-internal/assets/haven.svg")
+	if err != nil {
+		t.Fatal(err)
+	}
+	encoded := strings.TrimPrefix(havenIconDataURL, "data:image/svg+xml;base64,")
+	decoded, err := base64.StdEncoding.DecodeString(encoded)
+	if err != nil || !bytes.Equal(decoded, svg) {
+		t.Fatal("Go favicon differs from the canonical SVG; run pnpm --filter @langwatch/design-system-internal generate:haven-icon")
+	}
+	page := NotBuiltPage("build <script>alert(1)</script>")
+	if strings.Contains(page, "<script>") || !strings.Contains(page, "&lt;script&gt;") {
+		t.Fatal("build instructions must be escaped in HTML")
+	}
+	if !strings.Contains(page, `rel="icon" type="image/svg+xml" href="`+havenIconDataURL+`"`) {
+		t.Fatal("the fallback page must include the shared favicon")
+	}
+}
+
+func TestNotBuiltPageHasHTMLContentTypeAndNoHeadBody(t *testing.T) {
+	c := New(fstest.MapFS{}, "make haven-web")
+	for _, method := range []string{http.MethodGet, http.MethodHead} {
+		rec := get(t, c, method, "/")
+		if rec.Code != http.StatusServiceUnavailable || rec.Header().Get("Content-Type") != "text/html; charset=utf-8" {
+			t.Fatalf("%s: got status %d, content type %q", method, rec.Code, rec.Header().Get("Content-Type"))
+		}
+		if method == http.MethodHead && rec.Body.Len() != 0 {
+			t.Fatal("HEAD must not send an HTML body")
+		}
+		if method == http.MethodGet && !strings.Contains(rec.Body.String(), `rel="icon"`) {
+			t.Fatal("GET must serve the HTML fallback with its favicon")
 		}
 	}
 }

@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import { stripePricesFile } from "./stripe-price-catalog.ts";
@@ -11,9 +12,11 @@ export const currencySchema = z.enum(Currency);
  * The currency a reader is quoted in, and the country it was decided from.
  * Null country means nothing named one and the default was used.
  */
-export const detectedCurrencySchema = z
+const detectedCurrencySchemaDefinition = z
   .object({ currency: currencySchema, country: z.string().nullable() })
   .strict();
+export interface DetectedCurrencySchema extends Named<typeof detectedCurrencySchemaDefinition> {}
+export const detectedCurrencySchema: DetectedCurrencySchema = detectedCurrencySchemaDefinition;
 export type DetectedCurrency = z.infer<typeof detectedCurrencySchema>;
 
 function getUnitAmountCents(name: StripePriceName, prices: StripePriceMap): number {

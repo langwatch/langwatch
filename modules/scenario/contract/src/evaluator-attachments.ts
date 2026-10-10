@@ -3,6 +3,7 @@
  */
 
 import type { EvaluatorWithFields } from "@langwatch/evaluator-contract";
+import type { Named } from "@langwatch/module";
 import type { ComponentType, Field } from "@langwatch/workflow-contract";
 import { z } from "zod";
 
@@ -64,7 +65,7 @@ export const MAX_EVALUATOR_ATTACHMENTS = 20;
 /** How long a literal mapping value may be. */
 export const MAX_MAPPING_VALUE_LENGTH = 65_536;
 
-export const scenarioMappingSchema = z.discriminatedUnion("type", [
+const scenarioMappingSchemaDefinition = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("source"),
     sourceId: z.enum(SCENARIO_MAPPING_SOURCE_IDS),
@@ -75,9 +76,11 @@ export const scenarioMappingSchema = z.discriminatedUnion("type", [
     value: z.string().max(MAX_MAPPING_VALUE_LENGTH),
   }),
 ]);
+export interface ScenarioMappingSchema extends Named<typeof scenarioMappingSchemaDefinition> {}
+export const scenarioMappingSchema: ScenarioMappingSchema = scenarioMappingSchemaDefinition;
 export type ScenarioMapping = z.infer<typeof scenarioMappingSchema>;
 
-export const evaluatorAttachmentSchema = z.object({
+const evaluatorAttachmentSchemaDefinition = z.object({
   id: z
     .string()
     .min(1)
@@ -93,11 +96,21 @@ export const evaluatorAttachmentSchema = z.object({
     .record(z.string().min(1).max(128), scenarioMappingSchema)
     .describe("Where each evaluator input reads its value from, keyed by input name."),
 });
+export interface EvaluatorAttachmentSchema extends Named<
+  typeof evaluatorAttachmentSchemaDefinition
+> {}
+export const evaluatorAttachmentSchema: EvaluatorAttachmentSchema =
+  evaluatorAttachmentSchemaDefinition;
 export type EvaluatorAttachment = z.infer<typeof evaluatorAttachmentSchema>;
 
-export const evaluatorAttachmentsSchema = z
+const evaluatorAttachmentsSchemaDefinition = z
   .array(evaluatorAttachmentSchema)
   .max(MAX_EVALUATOR_ATTACHMENTS);
+export interface EvaluatorAttachmentsSchema extends Named<
+  typeof evaluatorAttachmentsSchemaDefinition
+> {}
+export const evaluatorAttachmentsSchema: EvaluatorAttachmentsSchema =
+  evaluatorAttachmentsSchemaDefinition;
 
 /** Reads a stored `evaluators` column. Null and a bad shape both read as none. */
 export function parseEvaluatorAttachments(raw: unknown): EvaluatorAttachment[] {

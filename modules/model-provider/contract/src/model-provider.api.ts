@@ -1,3 +1,4 @@
+import type { Authorization } from "@langwatch/authorization";
 import { moduleApi } from "@langwatch/module";
 import type { z } from "zod";
 
@@ -317,6 +318,7 @@ export interface ModelProviderApi {
   /** What a cost rule the caller is still typing would match, over the recent window. */
   previewCostRuleMatchingSpans(
     input: ModelCostPreviewRequest,
+    options?: { authorization?: Authorization },
   ): Promise<CostRuleMatchingSpansPreview>;
   upsertCost(input: ModelCostWriteRequest, by: ModelProviderCaller): Promise<ModelCost>;
   deleteCost(input: ModelCostDeleteRequest, by: ModelProviderCaller): Promise<void>;

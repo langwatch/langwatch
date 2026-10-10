@@ -7,7 +7,6 @@
 import {
   MIGRATION_FINALIZED_EVENT_TYPE,
   SSO_CONNECTION_AGGREGATE_TYPE,
-  SSO_CONNECTION_PIPELINE_NAME,
 } from "@langwatch/identity-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
@@ -20,7 +19,6 @@ import {
 } from "../../__tests__/support/in-memory-connections.ts";
 import { liveRepositories } from "../../__tests__/support/live-repositories.ts";
 import { ConnectedIdentityEventing } from "../../eventing/identity-command-senders.store.ts";
-import { IdentityEventStores } from "../../eventing/identity-event-stores.store.ts";
 import { migrationFinalizedEventSchema } from "../../features/sso-connection/eventing/sso-connection-state.projection.ts";
 import {
   composeSsoConnectionGraph,
@@ -65,8 +63,7 @@ function testGraph(directoryMove: TestDirectoryMove = new TestDirectoryMove()): 
   return composeSsoConnectionGraph({
     repositories: liveRepositories(testDatabase()),
     breakGlass: new StubBreakGlassBindings(true),
-    // No store kept and no senders: this process has not built the pipeline, so nothing commits.
-    eventStore: IdentityEventStores.create().of({ pipeline: SSO_CONNECTION_PIPELINE_NAME }),
+    // No senders: this process has not connected the pipeline, so nothing commits.
     commands: ConnectedIdentityEventing.create(),
     directoryMove,
     licensing: licensingFixture(),

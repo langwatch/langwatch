@@ -4,7 +4,8 @@ import {
   defineRestRouter,
   InternalServerError,
   MANAGEMENT_API_VERSION,
-  projectRestFacts,
+  projectRequestContext,
+  type RestDoorCredential,
   type RestTransportDeclaration,
 } from "@langwatch/api/rest";
 import {
@@ -130,14 +131,15 @@ const uploadBodyLimit = {
 const UPLOAD_THEN_IMPORT =
   "upload the file as a stored object with the purpose dataset_import, then create the dataset from it";
 
-/** The inert declaration the process mounts on its own project-key door. */
-type DatasetRestDeclaration = Readonly<{
+export function createDatasetRest(): Readonly<{
   protocol: "rest";
   namespace: string;
-  router: () => RestTransportDeclaration<DatasetApi>;
-}>;
-
-export function createDatasetRest(): DatasetRestDeclaration {
+  router: () => RestTransportDeclaration<
+    DatasetApi,
+    RestDoorCredential,
+    typeof projectRequestContext
+  >;
+}> {
   return (
     defineRestRouter(DatasetApi)
       .withNamespace("dataset")
@@ -146,7 +148,7 @@ export function createDatasetRest(): DatasetRestDeclaration {
       .get("/", "getApiDataset")
       .withQuery(datasetRestPaginationQuerySchema)
       .withPermission("datasets:view")
-      .withMiddleware(projectRestFacts)
+      .withMiddlewareContext(projectRequestContext)
       .withOutput(datasetRestListResponseSchema)
       .withDocs({
         description: "List all non-archived datasets for the project (paginated)",
@@ -177,9 +179,10 @@ export function createDatasetRest(): DatasetRestDeclaration {
       // still implies `:create` through the RBAC hierarchy, so every role and
       // key that could create a dataset yesterday still can.
       .post("/", "postApiDataset")
+      .withAudit("dataset.upsert")
       .withInput(datasetRestCreateSchema)
       .withPermission("datasets:create")
-      .withMiddleware(projectRestFacts)
+      .withMiddlewareContext(projectRequestContext)
       .withStatus(201)
       .withOutput(datasetRestSummarySchema)
       .withDocs({ description: "Create a new dataset" })
@@ -204,6 +207,7 @@ export function createDatasetRest(): DatasetRestDeclaration {
       // Rows live inside a dataset; adding them mutates that dataset —
       // `:update`, not `:create`.
       .post("/:slugOrId/records", "postApiDatasetBySlugOrIdRecords")
+      .withAudit("datasetRecord.create")
       .withParams(datasetRestSlugOrIdParamsSchema)
       .withInput(datasetRestBatchCreateRecordsSchema)
       .withPermission("datasets:update")
@@ -225,6 +229,7 @@ export function createDatasetRest(): DatasetRestDeclaration {
       // The legacy spelling of the batch-records route above; same grain, and
       // the same application operation, so the two can never disagree.
       .post("/:datasetSlug/entries", "postApiDatasetBySlugEntries")
+      .withAudit("datasetRecord.create")
       .withParams(datasetRestSlugParamsSchema)
       .withInput(datasetRestLegacyEntriesSchema)
       .withPermission("datasets:update")
@@ -245,6 +250,7 @@ export function createDatasetRest(): DatasetRestDeclaration {
       // A dataset is built from a confirmed `dataset_import` file; the bytes never
       // pass through here (ADR-158 §6). Preparation runs in the background.
       .post("/imports", "postApiDatasetImports")
+      .withAudit("dataset.createFromStoredObject")
       .withInput(datasetRestImportSchema)
       .withPermission("datasets:create")
       .withStatus(201)
@@ -258,6 +264,7 @@ export function createDatasetRest(): DatasetRestDeclaration {
       )
 
       .post("/:slugOrId/imports", "postApiDatasetBySlugOrIdImports")
+      .withAudit("dataset.appendStoredObject")
       .withParams(datasetRestSlugOrIdParamsSchema)
       .withInput(datasetRestAppendImportSchema)
       .withPermission("datasets:update")
@@ -273,6 +280,7 @@ export function createDatasetRest(): DatasetRestDeclaration {
       // Deprecated, time-boxed exception to "no bytes": the Python SDK still posts
       // files here. Both retire in the next release (ADR-158 §8).
       .post("/upload", "postApiDatasetUpload")
+      .withAudit("dataset.createFromStoredObject")
       .withMultipart({ fields: datasetRestUploadFieldsSchema, files: { file: { required: true } } })
       .withBodyLimit(uploadBodyLimit)
       .withPermission("datasets:create")
@@ -291,6 +299,7 @@ export function createDatasetRest(): DatasetRestDeclaration {
       )
 
       .post("/:slugOrId/upload", "postApiDatasetBySlugOrIdUpload")
+      .withAudit("dataset.appendStoredObject")
       .withParams(datasetRestSlugOrIdParamsSchema)
       .withMultipart({
         fields: datasetRestNoUploadFieldsSchema,
@@ -314,6 +323,7 @@ export function createDatasetRest(): DatasetRestDeclaration {
       // Deprecated, the same time-boxed exception as the /upload pair: the posted
       // file is stored as a dataset attachment. Retires in the next release (ADR-158 §8).
       .post("/attachments", "postApiDatasetAttachments")
+      .withAudit("dataset.createAttachmentUpload")
       .withQuery(datasetRestAttachmentQuerySchema)
       .withMultipart({
         fields: datasetRestAttachmentFieldsSchema,
@@ -355,6 +365,7 @@ export function createDatasetRest(): DatasetRestDeclaration {
       // The file's bytes never pass through here: the answer is the signed
       // address they are sent to, within the organization's per-file limit.
       .post("/attachments/uploads", "postApiDatasetAttachmentsUploads")
+      .withAudit("dataset.createAttachmentUpload")
       .withInput(datasetRestAttachmentUploadSchema)
       .withRateLimit({ requests: ATTACHMENT_UPLOADS_PER_MINUTE, seconds: 60 })
       .withPermission("datasets:update")
@@ -377,7 +388,7 @@ export function createDatasetRest(): DatasetRestDeclaration {
       .get("/:slugOrId", "getApiDatasetBySlugOrId")
       .withParams(datasetRestSlugOrIdParamsSchema)
       .withPermission("datasets:view")
-      .withMiddleware(projectRestFacts)
+      .withMiddlewareContext(projectRequestContext)
       .withOutput(datasetRestDetailResponseSchema)
       .withDocs({
         description:
@@ -405,10 +416,11 @@ export function createDatasetRest(): DatasetRestDeclaration {
       // record onto the new set, so the shape of the whole dataset follows the
       // payload — that is administering a dataset, which is what `:manage` names.
       .patch("/:slugOrId", "patchApiDatasetBySlugOrId")
+      .withAudit("dataset.upsert")
       .withParams(datasetRestSlugOrIdParamsSchema)
       .withInput(datasetRestUpdateSchema)
       .withPermission("datasets:manage")
-      .withMiddleware(projectRestFacts)
+      .withMiddlewareContext(projectRequestContext)
       .withOutput(datasetRestSummarySchema)
       .withDocs({ description: "Update a dataset by its slug or id" })
       .handle(async ({ app, input, scope }, project) => {
@@ -436,6 +448,7 @@ export function createDatasetRest(): DatasetRestDeclaration {
       // Destruction deliberately stays at `:manage` — it is the only grain that
       // carries it, and a read-and-write credential must not inherit it.
       .delete("/:slugOrId", "deleteApiDatasetBySlugOrId")
+      .withAudit("dataset.deleteById")
       .withParams(datasetRestSlugOrIdParamsSchema)
       .withPermission("datasets:manage")
       .withOutput(datasetRestArchivedSchema)
@@ -448,7 +461,7 @@ export function createDatasetRest(): DatasetRestDeclaration {
       .withParams(datasetRestSlugOrIdParamsSchema)
       .withQuery(datasetRestPaginationQuerySchema)
       .withPermission("datasets:view")
-      .withMiddleware(projectRestFacts)
+      .withMiddlewareContext(projectRequestContext)
       .withOutput(datasetRestRecordPageSchema)
       .withDocs({
         description:
@@ -473,7 +486,7 @@ export function createDatasetRest(): DatasetRestDeclaration {
       .withParams(datasetRestSlugParamsSchema)
       .withQuery(datasetRestPaginationQuerySchema)
       .withPermission("datasets:view")
-      .withMiddleware(projectRestFacts)
+      .withMiddlewareContext(projectRequestContext)
       .withOutput(datasetRestRecordPageSchema)
       .withDocs({
         description: "List entries of a dataset (paginated). Same as GET /:slugOrId/records.",
@@ -493,6 +506,7 @@ export function createDatasetRest(): DatasetRestDeclaration {
 
       // 201 when the record did not exist yet and was created, 200 when it was updated.
       .patch("/:slugOrId/records/:recordId", "patchApiDatasetBySlugOrIdRecordsByRecordId")
+      .withAudit("datasetRecord.update")
       .withParams(datasetRestRecordParamsSchema)
       .withInput(datasetRestUpdateRecordSchema)
       .withPermission("datasets:update")
@@ -511,6 +525,7 @@ export function createDatasetRest(): DatasetRestDeclaration {
 
       // Destructive — stays at `:manage`, like the dataset archive above.
       .delete("/:slugOrId/records", "deleteApiDatasetBySlugOrIdRecords")
+      .withAudit("datasetRecord.deleteMany")
       .withParams(datasetRestSlugOrIdParamsSchema)
       .withInput(datasetRestDeleteRecordsSchema)
       .withPermission("datasets:manage")

@@ -12,8 +12,8 @@ import { defineRepositories } from "../src/repository-registry.ts";
 
 /**
  * The one termination rule, pinned in types: `withTransports`, `withWorkers`, `withTasks`,
- * `withEventing` and `withTransportFacts` each answer something installable, so the value carries
- * no `.build()`.
+ * `withEventing` and `provideMiddlewareBindings` each answer something installable, so the value
+ * carries no `.build()`.
  */
 
 type Equal<Left, Right> =
@@ -93,7 +93,9 @@ describe("given a module that states its doors", () => {
       const contributed = withoutBuild
         .withWorkers("consumer")
         .withTasks("backfill")
-        .withTransportFacts(({ app }) => [{ fact: "catalogueSize", read: () => app.read() }]);
+        .provideMiddlewareBindings(({ app }) => [
+          { trpcMiddlewareContext: "catalogueSize", read: () => app.read() },
+        ]);
       const installable: InstallableServerFeature<"annotation", Config> = contributed;
 
       expect(installable.name).toBe("annotation");

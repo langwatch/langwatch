@@ -29,17 +29,20 @@ Feature: The local development topology
   # --- The backend process ---
 
   @unit
-  Scenario: The backend process starts the worker before the API
+  Scenario: The backend process starts the API without waiting for the worker's upgrade
     Given the backend launcher booting both applications
+    And the worker is still running the upgrade
     When it starts
-    Then the worker application is started first
-    And the API application is started after it
+    Then the API application is started beside the worker, not after it
+    And work the API enqueues meanwhile waits for the worker (Alex, 2026-10-09)
 
+  # A refused worker no longer drains the api (Alex, 2026-10-10): see
+  # "A worker that fails to boot never takes the api down" in dev-process-topology.feature.
   @unit
   Scenario: A half-started backend drains what it did start
-    Given a worker that started and an API that refuses to boot
+    Given a worker that started and an api that refuses to boot
     When the backend launcher boots
-    Then the worker is closed before the failure is reported
+    Then the worker is closed before the api's failure is reported
     And the caller is left with no half-started process to handle
 
   # The worker's jobs call back into the API's in-process graph. Closing the
@@ -173,16 +176,16 @@ Feature: The local development topology
     And the go lane keeps only the gateway and the NLP engine, so load on a simulator cannot starve them
     And no "idp", "mail", "storage", "voice", "llm" or "analytics" lane is planned
 
-  # A trial (one-dev-server step 6): one Go process for the data plane and the
-  # simulators. The split stays the default.
+  # One Go process for the data plane and the simulators is the default
+  # (HAVEN-ONE-SWITCH); LANGWATCH_DEV_ONE_PROCESS=0 splits it.
   @unit
-  Scenario: One Go process hosts the data plane and the simulators when asked
+  Scenario: One Go process hosts the data plane and the simulators unless split
     Given a checkout whose dev build links the simulators
-    And LANGWATCH_GO_ONE_PROCESS is 1
+    And the one-process switch is on
     When haven plans a stack selecting the data plane, every simulator and Langy
     Then the "go" lane hosts aigateway, nlpgo, idpsim, mailsim, storagesim, voicesim, llmsim and analyticssim, each on its own address variable
     And no "sims" lane is planned
-    And with the variable unset the "go" and "sims" lanes are planned as before
+    And with LANGWATCH_DEV_ONE_PROCESS=0 the "go" and "sims" lanes are planned as before
     And Langy keeps a lane of its own either way
 
   @unit
@@ -196,7 +199,7 @@ Feature: The local development topology
   @unit
   Scenario: One Go process retires the sims log a split run left behind
     Given an earlier split run left a sims lane capture
-    When a stack with LANGWATCH_GO_ONE_PROCESS=1 comes up with no sims lane
+    When a stack in one-process mode comes up with no sims lane
     Then the stale sims capture is removed
     And "haven logs <simulator>" reads the go lane's live capture instead
 

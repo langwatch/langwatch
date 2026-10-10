@@ -1,11 +1,11 @@
 /**
  * Personal workspace's answer to the port its screens declare: every method
- * projects a `@langwatch/browser-host` capability, so the module mounts it,
+ * projects a `@langwatch/browser-host` host service, so the module mounts it,
  * not the application. ARCHITECTURE.md §10.1.
  */
 
 import {
-  useUiCapabilities,
+  useUiHostServices,
   useUiDeployment,
   useUiScope,
   type UiFeedback,
@@ -101,7 +101,7 @@ function projectOf(
   return void 0;
 }
 
-class CapabilityPersonalWorkspaceHost extends PersonalWorkspaceHostApi {
+class HostServicePersonalWorkspaceHost extends PersonalWorkspaceHostApi {
   private readonly session: UiSession;
   private readonly flags: UiFlags;
   private readonly navigationCapability: UiNavigation;
@@ -279,6 +279,14 @@ class CapabilityPersonalWorkspaceHost extends PersonalWorkspaceHostApi {
     this.feedback.succeeded(notice);
   }
 
+  warned(notice: PersonalSuccessNotice): void {
+    this.feedback.warned(notice);
+  }
+
+  informed(notice: PersonalSuccessNotice): void {
+    this.feedback.informed(notice);
+  }
+
   failed(failure: PersonalFailureNotice): void {
     this.feedback.failed(failure);
   }
@@ -290,7 +298,7 @@ class CapabilityPersonalWorkspaceHost extends PersonalWorkspaceHostApi {
  * that is what `mounts.load` resolves.
  */
 export default function PersonalWorkspaceHostMount({ children }: { children?: ReactNode }) {
-  const { session, navigation, route, feedback } = useUiCapabilities();
+  const { session, navigation, route, feedback } = useUiHostServices();
   const flags = useUiFlags();
   const scope = useUiScope();
   const activeScope = scope.activeScope();
@@ -320,7 +328,7 @@ export default function PersonalWorkspaceHostMount({ children }: { children?: Re
   // renders that carry the same reading.
   const host = useMemo(
     () =>
-      new CapabilityPersonalWorkspaceHost({
+      new HostServicePersonalWorkspaceHost({
         session,
         flags,
         navigationCapability: navigation,
@@ -334,6 +342,7 @@ export default function PersonalWorkspaceHostMount({ children }: { children?: Re
           passkeysEnabled: deployment.passkeysEnabled ?? false,
           authProvider: deployment.authProvider,
           emailPasswordEnabled: deployment.emailPasswordEnabled ?? false,
+          federatedProviders: deployment.federatedProviders,
         },
         organization,
         project,
@@ -354,6 +363,7 @@ export default function PersonalWorkspaceHostMount({ children }: { children?: Re
       deployment.passkeysEnabled,
       deployment.authProvider,
       deployment.emailPasswordEnabled,
+      deployment.federatedProviders,
       organization,
       project,
       lent,

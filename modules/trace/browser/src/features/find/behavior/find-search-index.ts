@@ -6,10 +6,10 @@ export type TraceSearchItem = {
   serviceName: string;
   input: string | null;
   output: string | null;
-  error?: string;
+  error?: string | null;
   errorSpanName?: string;
-  conversationId?: string;
-  userId?: string;
+  conversationId?: string | null;
+  userId?: string | null;
   traceName?: string;
   models: string[];
   evaluations: {

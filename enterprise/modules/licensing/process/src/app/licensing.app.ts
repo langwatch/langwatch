@@ -1,6 +1,5 @@
 import { SYSTEM_ACTORS } from "@langwatch/authorization";
-import { AuthzApi } from "@langwatch/authz-contract";
-import { releaseVersionOf } from "@langwatch/config";
+import { isReleaseBuild, releaseVersionOf } from "@langwatch/config";
 import { parseOutboundProxyConfig } from "@langwatch/egress";
 import {
   LicenseGenerationService,
@@ -16,6 +15,8 @@ import {
   type ActivationCodePage,
   type ActivationCodeView,
   type ActivationAnswer,
+  type ConnectActivationCaller,
+  type ConnectLicenceCaller,
   type ConnectPresentedCredential,
   type LicenseSyncAnswer,
   type LicenseSyncBody,
@@ -31,12 +32,9 @@ import {
   type ConnectService,
   type ConnectServiceState,
   type ConnectStatus,
+  type ConnectUpstream,
   type InstanceIdentityView,
   type ContractTerms,
-  type HostedCapAnswer,
-  type HostedCaller,
-  type HostedClassifyAnswer,
-  type HostedUsageAnswer,
   type IncomingUsageReport,
   type SelfHostedInstanceDetail,
   type SelfHostedInstancePage,
@@ -66,11 +64,8 @@ import {
 } from "@langwatch/enterprise-licensing-contract";
 import type { EntitlementGrant, ResolvePlanInput } from "@langwatch/entitlement-contract";
 import type { EventingCommands } from "@langwatch/eventing";
-import { GatewayApi } from "@langwatch/gateway-contract";
-import { InstantEvalApi } from "@langwatch/instant-eval-contract";
 import { createLogger } from "@langwatch/observability";
 import { optionalUsageReportKeys } from "@langwatch/ops-contract";
-import { OrganizationApi } from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
 import { nowInstant, Temporal } from "@langwatch/time";
 
@@ -88,9 +83,11 @@ import type { ConnectOrganizationRepository } from "../repositories/connect-orga
 import type { InstanceIdentityRepository } from "../repositories/instance-identity.repository.ts";
 import type { IssuedLicenseRepository } from "../repositories/issued-license.repository.ts";
 import type { LicensingRepositories } from "../repositories/licensing.repositories.ts";
+import type { MemberSeatRepository } from "../repositories/member-seat.repository.ts";
 import type { SelfHostedInstanceRepository } from "../repositories/self-hosted-instance.repository.ts";
 import { ACTIVATION_ATTEMPTS_LIMIT } from "../rules/activation-code.rules.ts";
 import { LICENSE_SYNCS_LIMIT } from "../rules/issued-license.rules.ts";
+import { licenseVerifyingKeyOf } from "../rules/license-verifying-key.rules.ts";
 import { ActivationCodeService } from "../services/activation-code.service.ts";
 import type { ActivationRateLimit } from "../services/activation-code.service.ts";
 import {
@@ -99,17 +96,10 @@ import {
 } from "../services/configured-activation.service.ts";
 import { ConnectCredentialService } from "../services/connect-credential.service.ts";
 import { ConnectInstallService } from "../services/connect-install.service.ts";
-import type { ConnectUpstreamSlot } from "../services/connect-install.service.ts";
-import { ConnectSpendBufferService } from "../services/connect-spend-buffer.service.ts";
-import type { HostedSpendRecorder } from "../services/connect-spend-buffer.service.ts";
-import { ContractBudgetStoreService } from "../services/contract-budget-store.service.ts";
 import { ContractBudgetService } from "../services/contract-budget.service.ts";
-import type { ContractBudgetStore } from "../services/contract-budget.service.ts";
+import type { ContractBudgets } from "../services/contract-budget.service.ts";
 import { DomainClaimAuthorityService } from "../services/domain-claim-authority.service.ts";
 import { HostedServicesService } from "../services/hosted-services.service.ts";
-import type { HostedJudge } from "../services/hosted-services.service.ts";
-import { HostedUsageReaderService } from "../services/hosted-usage-reader.service.ts";
-import type { HostedUsageReader } from "../services/hosted-usage-reader.service.ts";
 import { InstanceIdentityService } from "../services/instance-identity.service.ts";
 import { LicenseRefreshService } from "../services/license-refresh.service.ts";
 import { LicenseRegistryService } from "../services/license-registry.service.ts";
@@ -125,9 +115,9 @@ import { SelfHostedCrmService } from "../services/self-hosted-crm.service.ts";
 import type { SelfHostedLeadsInfrastructure } from "../services/self-hosted-crm.service.ts";
 import { SelfHostedInstanceService } from "../services/self-hosted-instance.service.ts";
 
-/** Seat counts are organization's: one peer read, the same count its own seat checks use. */
+/** Seat counts over organization's membership rows, read through its shares (R-C1f, Q9). */
 function seatCountsOver(
-  organizations: Pick<OrganizationApi, "countMemberSeats">,
+  organizations: Pick<MemberSeatRepository, "countMemberSeats">,
 ): Pick<LicensingInfrastructure["repository"], "getMemberCount" | "getMembersLiteCount"> {
   return {
     getMemberCount: async (organizationId) =>
@@ -154,7 +144,7 @@ export type LicensingInfrastructure = Readonly<{
   reportSigningFailure: (entry: Readonly<{ organizationId: string; error: Error }>) => void;
 }>;
 
-export type LicensingRuntime = Readonly<Omit<LicensingInfrastructure, "repository">>;
+type LicensingRuntime = Readonly<Omit<LicensingInfrastructure, "repository">>;
 
 const logger = createLogger("langwatch:licensing");
 
@@ -166,16 +156,7 @@ type LicensingSetup = FeatureSetup<
 
 export class LicensingModule implements LicensingApiContract {
   static readonly contract: typeof LicensingApi = LicensingApi;
-  static readonly dependencies = {
-    /** Where an install's hosted provider slot is kept: a gateway fact licensing writes. */
-    gateway: GatewayApi,
-    /** Whose memberships a licence's seats are counted from. */
-    organizations: OrganizationApi,
-    /** The judge a hosted classify call reaches, its price, and where its spend is recorded. */
-    instantEval: InstantEvalApi,
-    /** Whose team a hosted caller's project belongs to, for the budgets that apply to it. */
-    scopes: AuthzApi,
-  };
+  static readonly dependencies = {};
   static readonly config = licensingConfig;
   /**
    * Each secret has one owner: SSO's gate asks this module for `LANGWATCH_LICENSE_KEY`, and
@@ -196,7 +177,6 @@ export class LicensingModule implements LicensingApiContract {
   readonly #contractBudgets: ContractBudgetService;
   readonly #activation: ActivationCodeService;
   readonly #hosted: HostedServicesService;
-  readonly #hostedSpend: ConnectSpendBufferService;
   readonly #instances: SelfHostedInstanceService;
   readonly #install: ConnectInstallService;
   readonly #identity: InstanceIdentityService;
@@ -209,12 +189,19 @@ export class LicensingModule implements LicensingApiContract {
 
   /** The licensing_customer pipeline, whose facts organization applies (R42). */
   customerPipeline(): LicensingCustomerPipeline {
-    return buildLicensingCustomerPipeline();
+    return buildLicensingCustomerPipeline({
+      attachManagedKey: (provisioned) => this.#credentials.attachProvisioned(provisioned),
+    });
   }
 
   /** Binds the licensing_customer pipeline's senders into the facts service. */
   connectCustomerCommands(commands: EventingCommands<LicensingCustomerPipeline>): void {
     this.#customerFacts.connect(commands);
+  }
+
+  /** The facts service those senders bind into, for the licence writes of this module's tasks. */
+  customerFactsService(): LicensingCustomerFactsService {
+    return this.#customerFacts;
   }
 
   private constructor({
@@ -253,7 +240,6 @@ export class LicensingModule implements LicensingApiContract {
     this.#contractBudgets = registry.contractBudgets;
     this.#activation = registry.activation;
     this.#hosted = registry.hosted;
-    this.#hostedSpend = registry.spend;
     this.#instances = registry.instances;
     this.#install = install.install;
     this.#identity = install.identity;
@@ -274,33 +260,41 @@ export class LicensingModule implements LicensingApiContract {
   }
 
   static #assemble(
-    { config, resources, dependencies, repositories, role }: LicensingSetup,
+    { config, resources, repositories, role }: LicensingSetup,
     {
       instanceLicenseKey,
       licensePrivateKey,
     }: { instanceLicenseKey: string | undefined; licensePrivateKey: string | undefined },
   ): LicensingModule {
-    const cryptography = NodeLicenseCryptographyService.create({ publicKey: config.publicKey });
+    const { publicKey, ignoredVariable, refuseDevStack } = licenseVerifyingKeyOf({
+      override: config.publicKey,
+      isReleaseBuild,
+    });
+    if (ignoredVariable) {
+      logger.warn(
+        { variable: ignoredVariable },
+        `${ignoredVariable} is ignored on a release build; licences verify against the embedded LangWatch key`,
+      );
+    }
+    const cryptography = NodeLicenseCryptographyService.create({ publicKey, refuseDevStack });
     // The variable takes a signed key or an activation code. A code is not a
     // license: it is redeemed at start and stored on an organization.
     const configured = detectLicenseInputForm(instanceLicenseKey);
     const signedInstanceKey = configured.form === "license_key" ? configured.licenseKey : undefined;
+    const customerFacts = LicensingCustomerFactsService.create();
     // The licence rows are this module's own; the seat counts are organization's
     // own membership classification (a peer, not owned here).
     const { repository, ...runtime } = LicensingInfrastructureService.create({ role }).withStorage({
       licenses: repositories.organizationLicenses,
-      organizations: dependencies.organizations,
-      ...seatCountsOver(dependencies.organizations),
+      facts: customerFacts,
+      ...seatCountsOver(repositories.memberSeats),
     });
-    const customerFacts = LicensingCustomerFactsService.create();
     const registryParts = licenseRegistryParts({
       infrastructure: licenseRegistryOver({
         repositories,
         customerFacts,
-        gateway: dependencies.gateway,
         signingKey: licensePrivateKey,
       }),
-      hosted: hostedServicesOverPeers(dependencies),
       instances: selfHostedInstancesOver({ repositories }),
       cryptography,
       logger,
@@ -314,7 +308,6 @@ export class LicensingModule implements LicensingApiContract {
     });
     const connectInfrastructure = connectInstallOver({
       repositories,
-      gateway: dependencies.gateway,
       config,
       cryptography,
       version: releaseVersionOf(config),
@@ -337,6 +330,7 @@ export class LicensingModule implements LicensingApiContract {
         seats: repository,
         licenses: service,
         config,
+        publicKey,
         logger,
       }),
       isSaas: config.isSaas,
@@ -344,11 +338,9 @@ export class LicensingModule implements LicensingApiContract {
       domainClaims: DomainClaimAuthorityService.create({
         isSaas: config.isSaas,
         licenses: service,
-        organizations: dependencies.organizations,
+        organizations: repositories.connectOrganizations,
       }),
     });
-    // Hosted spend a gateway reported but the buffer has not written yet is written at shutdown.
-    resources.own("hosted-service spend buffer", () => app.flushHostedSpend());
     if (!config.isSaas && configured.form === "activation_code") {
       app.#configuredActivation = ConfiguredActivationService.create({
         configured,
@@ -594,15 +586,28 @@ export class LicensingModule implements LicensingApiContract {
     };
   }
 
-  recordLicenseSync(
-    input: ConnectPresentedCredential & { body: LicenseSyncBody },
-  ): Promise<LicenseSyncAnswer> {
+  verifyLicenceToken(input: ConnectPresentedCredential): Promise<ConnectLicenceCaller> {
+    return this.#sync.verify(input);
+  }
+
+  verifyActivationCode(input: ConnectPresentedCredential): Promise<ConnectActivationCaller> {
+    return this.#activation.verifyPresented(input);
+  }
+
+  recordLicenseSync(input: {
+    caller: ConnectLicenceCaller;
+    body: LicenseSyncBody;
+  }): Promise<LicenseSyncAnswer> {
     return this.#sync.answer(input);
   }
 
   /** The install end of Connect (ADR-156, section 9). */
   getConnectStatus(input: { organizationId: string }): Promise<ConnectStatus> {
     return this.#install.getStatus(input.organizationId);
+  }
+
+  findConnectUpstream(input: { organizationId: string }): Promise<ConnectUpstream[]> {
+    return this.#install.findUpstream(input.organizationId);
   }
 
   findEnabledConnectServices(input: { organizationId: string }): Promise<ConnectService[]> {
@@ -681,23 +686,6 @@ export class LicensingModule implements LicensingApiContract {
     return this.#refresh.refresh(input.organizationId);
   }
 
-  /** The hosted end of Connect (ADR-156, section 5), on LangWatch Cloud. */
-  classifyForHostedCaller(input: {
-    caller: HostedCaller;
-    payload: unknown;
-    signal?: AbortSignal;
-  }): Promise<HostedClassifyAnswer> {
-    return this.#hosted.classify(input);
-  }
-
-  getHostedUsage(input: { caller: HostedCaller }): Promise<HostedUsageAnswer> {
-    return this.#hosted.usage(input);
-  }
-
-  setHostedBudgetCap(input: { caller: HostedCaller; payload: unknown }): Promise<HostedCapAnswer> {
-    return this.#hosted.setBudget(input);
-  }
-
   getContractTerms(input: { organizationId: string }): Promise<ContractTerms> {
     return this.#contractBudgets.termsOf(input.organizationId);
   }
@@ -718,19 +706,18 @@ export class LicensingModule implements LicensingApiContract {
     return this.#registry.raiseCommit(input);
   }
 
-  syncContractBudget(input: { organizationId: string; operatorId: string }): Promise<void> {
-    return this.#contractBudgets.sync(input);
-  }
-
-  resetContractBudget(input: { organizationId: string; operatorId: string }): Promise<void> {
-    return this.#contractBudgets.reset(input);
-  }
-
   findConnectServicesForManagedKey(input: {
     virtualKeyId: string;
     organizationId: string;
   }): Promise<ConnectService[]> {
     return this.#credentials.findEntitledServices(input);
+  }
+
+  findManagedKeyLicense(input: {
+    virtualKeyId: string;
+    organizationId: string;
+  }): Promise<{ services: ConnectService[] }[]> {
+    return this.#hosted.findManagedKeyLicense(input);
   }
 
   /** Activation codes (ADR-156, section 5). */
@@ -750,7 +737,7 @@ export class LicensingModule implements LicensingApiContract {
     return this.#activation.revoke(input);
   }
 
-  redeemActivationCode(input: ConnectPresentedCredential): Promise<ActivationAnswer> {
+  redeemActivationCode(input: ConnectActivationCaller): Promise<ActivationAnswer> {
     return this.#activation.answer(input);
   }
 
@@ -769,11 +756,6 @@ export class LicensingModule implements LicensingApiContract {
   getSelfHostedInstance(input: { id: string }): Promise<SelfHostedInstanceDetail> {
     return this.#instances.getById(input);
   }
-
-  /** Writes hosted spend the buffer still holds. Called by the drain. */
-  flushHostedSpend(): Promise<void> {
-    return this.#hostedSpend.flush();
-  }
 }
 
 /** A redemption at start gives up well before the transport's own timeout. */
@@ -787,33 +769,23 @@ type LicenseRegistryParts = Readonly<{
   contractBudgets: ContractBudgetService;
   activation: ActivationCodeService;
   hosted: HostedServicesService;
-  spend: ConnectSpendBufferService;
   instances: SelfHostedInstanceService;
 }>;
 
 function licenseRegistryParts({
   infrastructure,
-  hosted,
   instances,
   cryptography,
   logger,
 }: {
   infrastructure: LicenseRegistryInfrastructure;
-  hosted: HostedServicesInfrastructure;
   instances: SelfHostedInstancesInfrastructure;
   cryptography: LicenseCryptography;
   logger?: LicenseLogger;
 }): LicenseRegistryParts {
   const now = () => nowInstant();
   const contractBudgets = ContractBudgetService.create({
-    store: hosted.budgets,
     licensesOf: (organizationId) => infrastructure.repository.findAllByOrganization(organizationId),
-    systemActorId: infrastructure.systemActorId,
-    now,
-  });
-  const spend = ConnectSpendBufferService.create({
-    recorder: hosted.spend,
-    ...(logger ? { logger } : {}),
     now,
   });
   const credentials = ConnectCredentialService.create({
@@ -827,7 +799,7 @@ function licenseRegistryParts({
     repository: infrastructure.repository,
     organizations: infrastructure.organizations,
     managedKeys: infrastructure.managedKeys,
-    contractBudgets,
+    contractBudgets: infrastructure.contractBudgets,
     cryptography,
     generation: LicenseGenerationService.create(cryptography),
     signingKey: infrastructure.signingKey,
@@ -837,7 +809,6 @@ function licenseRegistryParts({
     credentials,
     contractBudgets,
     registry,
-    spend,
     instances: SelfHostedInstanceService.create({
       repository: instances.repository,
       licenses: instances.licenses,
@@ -863,10 +834,6 @@ function licenseRegistryParts({
     }),
     hosted: HostedServicesService.create({
       licenses: infrastructure.repository,
-      judge: hosted.judge,
-      spend,
-      usage: hosted.usage,
-      contractBudgets,
       now,
     }),
     sync: LicenseSyncService.create({
@@ -887,7 +854,6 @@ function licenseRegistryParts({
  */
 function licenseRegistryOver({
   repositories,
-  gateway,
   signingKey,
   customerFacts,
 }: {
@@ -895,14 +861,15 @@ function licenseRegistryOver({
     LicensingRepositories,
     "issuedLicenses" | "activationCodes" | "rateLimits" | "connectOrganizations"
   >;
-  customerFacts: Pick<LicensingCustomerFactsService, "selfHostedCustomerLicensed">;
-  gateway: Pick<
-    GatewayApi,
-    | "provisionConnectManagedKey"
-    | "revokeManagedInternal"
-    | "invalidateManagedInternal"
-    | "setManagedKeyConnectServicesInternal"
-    | "setManagedKeyLicenseInternal"
+  customerFacts: Pick<
+    LicensingCustomerFactsService,
+    | "selfHostedCustomerLicensed"
+    | "managedKeyRetired"
+    | "managedKeyInvalidated"
+    | "managedKeyLicenseSet"
+    | "managedKeyServicesSet"
+    | "connectCredentialIssued"
+    | "contractTermsChanged"
   >;
   signingKey: string | undefined;
 }): LicenseRegistryInfrastructure {
@@ -917,17 +884,14 @@ function licenseRegistryOver({
         customerFacts.selfHostedCustomerLicensed({ organizationId: id, name }),
     },
     managedKeys: {
-      provision: ({ organizationId, licenseId }) =>
-        gateway.provisionConnectManagedKey({
-          organizationId,
-          licenseId,
-          actorUserId: systemActorId,
-        }),
-      retire: (key) => gateway.revokeManagedInternal(key),
-      invalidate: (key) => gateway.invalidateManagedInternal(key),
-      setConnectServices: (key) => gateway.setManagedKeyConnectServicesInternal(key),
-      setLicense: (key) => gateway.setManagedKeyLicenseInternal(key),
+      issue: (issued) => customerFacts.connectCredentialIssued(issued),
+      retire: (key) => customerFacts.managedKeyRetired(key),
+      invalidate: (key) => customerFacts.managedKeyInvalidated(key),
+      setConnectServices: (key) => customerFacts.managedKeyServicesSet(key),
+      setLicense: (key) => customerFacts.managedKeyLicenseSet(key),
     },
+    // Connect syncs the budget from the fact, so licensing writes none (C3a-S2).
+    contractBudgets: { sync: (input) => customerFacts.contractTermsChanged(input) },
     activationCodes: repositories.activationCodes,
     activationRateLimit: {
       allow: ({ codeHash }) => allowed(`activation_code:${codeHash}`, ACTIVATION_ATTEMPTS_LIMIT),
@@ -937,40 +901,6 @@ function licenseRegistryOver({
     },
     signingKey: () => signingKey,
     systemActorId,
-  };
-}
-
-/**
- * The hosted end of Connect composed from its owners, as main composed it on every deployment:
- * instant-eval judges, prices and records the spend, and the gateway keeps the budgets. The door
- * the family answers behind is the gateway's own, bound in licensing.module.ts.
- */
-function hostedServicesOverPeers({
-  gateway,
-  instantEval,
-  scopes,
-}: {
-  gateway: Pick<
-    GatewayApi,
-    | "listBudgetsWithHealth"
-    | "createBudget"
-    | "updateBudget"
-    | "resetBudget"
-    | "findVirtualKeyById"
-    | "resolveApplicableBudgets"
-  >;
-  instantEval: Pick<InstantEvalApi, "classify" | "priceOf" | "recordSpendForHostedCalls">;
-  scopes: Pick<AuthzApi, "getScope">;
-}): HostedServicesInfrastructure {
-  return {
-    budgets: ContractBudgetStoreService.create({ gateway }),
-    usage: HostedUsageReaderService.create({ gateway, scopes }),
-    judge: {
-      classify: (input, signal) =>
-        instantEval.classify({ ...input, ...(signal ? { signal } : {}) }),
-      priceOf: (input) => instantEval.priceOf(input),
-    },
-    spend: { recordSpend: (entry) => instantEval.recordSpendForHostedCalls(entry) },
   };
 }
 
@@ -1020,14 +950,12 @@ type ConnectInstallParts = Readonly<{
  */
 function connectInstallOver({
   repositories,
-  gateway,
   config,
   cryptography,
   version,
   instanceLicenseKey,
 }: {
   repositories: Pick<LicensingRepositories, "connectOrganizations" | "instanceIdentity">;
-  gateway: Pick<GatewayApi, "setConnectUpstreamInternal" | "clearConnectUpstreamInternal">;
   config: LicensingServerConfig;
   cryptography: LicenseCryptography;
   version: string;
@@ -1052,10 +980,6 @@ function connectInstallOver({
           }),
         }
       : {}),
-    upstream: {
-      set: (slot) => gateway.setConnectUpstreamInternal(slot),
-      clear: (slot) => gateway.clearConnectUpstreamInternal(slot),
-    },
     instanceLicenseKey: () => instanceLicenseKey,
     newInstanceId: () => cryptography.generateInstanceId(),
     version: () => version,
@@ -1070,6 +994,7 @@ function connectInstallParts({
   seats,
   licenses,
   config,
+  publicKey,
   logger,
 }: {
   infrastructure: ConnectInstallInfrastructure;
@@ -1078,6 +1003,8 @@ function connectInstallParts({
   seats: LicenseStorage;
   licenses: LicenseService;
   config: LicensingServerConfig;
+  /** The key licences verify against, as the build allows it; undefined is the embedded key. */
+  publicKey: string | undefined;
   logger?: LicenseLogger;
 }): ConnectInstallParts {
   const identity = InstanceIdentityService.create({
@@ -1099,8 +1026,7 @@ function connectInstallParts({
     },
     ...(infrastructure.gateway ? { gateway: infrastructure.gateway } : {}),
     instanceLicenseKey: infrastructure.instanceLicenseKey,
-    ...(config.publicKey ? { publicKey: config.publicKey } : {}),
-    ...(infrastructure.upstream ? { upstream: infrastructure.upstream } : {}),
+    ...(publicKey ? { publicKey } : {}),
     ...(logger ? { logger } : {}),
   });
   return {
@@ -1121,19 +1047,13 @@ function connectInstallParts({
   };
 }
 
-/** The hosted end of Connect (ADR-156, section 5), composed on every deployment. */
-type HostedServicesInfrastructure = Readonly<{
-  budgets: ContractBudgetStore;
-  usage: HostedUsageReader;
-  judge: HostedJudge;
-  spend: HostedSpendRecorder;
-}>;
-
 /** Everything the license registry needs from the rest of the deployment. */
 type LicenseRegistryInfrastructure = Readonly<{
   repository: IssuedLicenseRepository;
   organizations: LicenseCustomers;
   managedKeys: ConnectManagedKeys;
+  /** Records that the customer's terms moved; connect syncs the budget from the fact. */
+  contractBudgets: ContractBudgets;
   /** The codes a fresh install pastes instead of a license blob (ADR-156 §5). */
   activationCodes: ActivationCodeRepository;
   /** What bounds guessing a code: one limiter, keyed by the code's own hash. */
@@ -1156,8 +1076,6 @@ type ConnectInstallInfrastructure = Readonly<{
   /** Composed only where Connect is permitted; absent means no outbound call. */
   gateway?: ConnectGatewayChannel;
   licenseHost?: ConnectLicenseChannel;
-  /** The gateway's hosted provider slot; absent where no gateway is composed beside. */
-  upstream?: ConnectUpstreamSlot;
   /** The key this whole deployment is licensed by, where one is set. */
   instanceLicenseKey: () => string | undefined;
   /** A fresh instance identity. Supplied, so a suite mints a predictable one. */

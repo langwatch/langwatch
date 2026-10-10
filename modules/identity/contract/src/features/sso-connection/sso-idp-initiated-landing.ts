@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 /**
@@ -25,12 +26,17 @@ export function isAllowableLandingTarget(target: string): boolean {
 const landingTargetSchema = z.string().refine((target) => isAllowableLandingTarget(target));
 
 /** A SAML connection's opt-in to sign-ins its IdP starts; older documents parse as off. */
-export const ssoSamlIdpInitiatedSchema = z
+const ssoSamlIdpInitiatedSchemaDefinition = z
   .object({
     enabled: z.boolean().default(false),
     landingTargets: z.array(landingTargetSchema).max(20).default([]),
   })
   .default({ enabled: false, landingTargets: [] });
+export interface SsoSamlIdpInitiatedSchema extends Named<
+  typeof ssoSamlIdpInitiatedSchemaDefinition
+> {}
+export const ssoSamlIdpInitiatedSchema: SsoSamlIdpInitiatedSchema =
+  ssoSamlIdpInitiatedSchemaDefinition;
 
 /** The listed target the RelayState names, or `defaultTarget` for anything else. */
 export function idpInitiatedLanding({

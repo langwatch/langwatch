@@ -4,11 +4,11 @@
  * modules/agent/specs/setup-with-agent-lend.feature.
  */
 import {
-  UiCapabilityContextProvider,
-  type UiCapabilities,
+  UiHostServicesContextProvider,
+  type UiHostServices,
 } from "@langwatch/browser-host/capabilities";
 import { uiDeclarations, type UiDeclarations } from "@langwatch/browser-host/declarations";
-import { createUiCapabilitiesFromHost } from "@langwatch/browser-host/testing";
+import { createUiHostServicesFromHost } from "@langwatch/browser-host/testing";
 import { SetupWithAgentButtonToken } from "@langwatch/trace-client";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
@@ -33,19 +33,19 @@ const traceLendsTheMenu = uiDeclarations([
 ]);
 
 function renderMenu({ declarations }: { declarations?: UiDeclarations }) {
-  const capabilities: UiCapabilities = {
-    ...createUiCapabilitiesFromHost({
+  const capabilities: UiHostServices = {
+    ...createUiHostServicesFromHost({
       route: () => ({ params: {}, query: {} }),
       navigate: () => void 0,
     }),
     ...(declarations ? { declarations } : {}),
   };
   return render(
-    <UiCapabilityContextProvider value={capabilities}>
+    <UiHostServicesContextProvider value={capabilities}>
       <div data-testid="empty-state">
         <SetupWithAgentButton surface="connectedAgents" />
       </div>
-    </UiCapabilityContextProvider>,
+    </UiHostServicesContextProvider>,
   );
 }
 

@@ -62,7 +62,7 @@ function TargetSummaryTooltipContent({
           <Text fontWeight="medium">
             {aggregates.completedRows}/{aggregates.totalRows}
             {aggregates.errorRows > 0 && (
-              <Text as="span" color="red.300" marginLeft={1}>
+              <Text as="span" color="red.fg" marginLeft={1}>
                 ({aggregates.errorRows} {aggregates.errorRows === 1 ? "error" : "errors"})
               </Text>
             )}
@@ -186,7 +186,7 @@ function TargetSummaryTooltipContent({
                     </Text>
                   )}
                   {evaluator.errors > 0 && (
-                    <Text fontSize="11px" color="red.300">
+                    <Text fontSize="11px" color="red.fg">
                       {evaluator.errors} {evaluator.errors === 1 ? "error" : "errors"}
                     </Text>
                   )}

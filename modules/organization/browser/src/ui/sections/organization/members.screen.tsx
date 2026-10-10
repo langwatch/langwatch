@@ -127,10 +127,9 @@ function usePeopleListState({
   activePlan: PlanInfo;
 }) {
   const { data: session } = useRequiredSession();
-  const { hasPermission } = useOrganizationTeamProject();
-  const canManage = hasPermission("organization:manage");
-
   const host = useOrganizationHost();
+  const canManage = host.hasPermission("organization:manage");
+
   const governanceEnabled = host.isFeatureEnabled(FrontendFlags.release_ui_ai_governance_enabled);
   const department = useDepartmentColumn(organization.id, governanceEnabled);
   const showDepartment = department.show && canManage;
@@ -140,7 +139,8 @@ function usePeopleListState({
   );
 
   const { openDrawer } = useDrawer();
-  const { cut, selectCut } = useCutFromAddress();
+  const joinRequestsEnabled = host.isFeatureEnabled(FrontendFlags.join_requests);
+  const { cut: addressCut, selectCut } = useCutFromAddress();
 
   const invitesFlow = useInviteFlow({ organization, activePlan });
   const removal = useMemberRemoval(organization.id);
@@ -150,9 +150,13 @@ function usePeopleListState({
     userId: session?.user?.id,
     pendingInvites: invitesFlow.pendingInvites,
   });
+  // Requests an SSO "ask" arrival queued exist whatever the flag says, so their cut does too.
+  const waitingShown = joinRequestsEnabled || reads.joinRequests.requests.length > 0;
+  const cut = !waitingShown && addressCut === "waiting" ? "all" : addressCut;
 
   return {
     canManage,
+    joinRequestsEnabled,
     department,
     showDepartment,
     departmentNameById,
@@ -188,6 +192,7 @@ function PeopleList({
           memberCount={people.sortedMembers.length}
           openInviteCount={people.openInvites.length}
           requestCount={people.joinRequests.requests.length}
+          joinRequestsEnabled={people.joinRequestsEnabled}
           onInvite={people.openDrawer}
         />
 
@@ -348,9 +353,16 @@ function MemberRowActions({
   );
 }
 
-/** A fast launcher: the first keystroke hands off to the invite drawer carrying it. */
-function InlineInviteBox({ onStartTyping }: { onStartTyping: (email: string) => void }) {
-  const [value, setValue] = useState("");
+/** Holds a whole address; Enter opens the invite drawer carrying it (WEB-8700). */
+function InlineInviteBox({
+  value,
+  onChange,
+  onSubmit,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  onSubmit: () => void;
+}) {
   return (
     <Input
       value={value}
@@ -358,14 +370,11 @@ function InlineInviteBox({ onStartTyping }: { onStartTyping: (email: string) => 
       maxWidth="240px"
       placeholder="Invite by email…"
       aria-label="Invite a teammate by email"
-      onChange={(event) => {
-        const next = event.target.value;
-        if (next.trim().length > 0) {
-          onStartTyping(next);
-          setValue("");
-        } else {
-          setValue(next);
-        }
+      onChange={(event) => onChange(event.target.value)}
+      onKeyDown={(event) => {
+        if (event.key !== "Enter") return;
+        event.preventDefault();
+        onSubmit();
       }}
     />
   );
@@ -507,6 +516,7 @@ function PeopleHeader({
   memberCount,
   openInviteCount,
   requestCount,
+  joinRequestsEnabled,
   onInvite,
 }: {
   organizationId: string;
@@ -517,8 +527,15 @@ function PeopleHeader({
   memberCount: number;
   openInviteCount: number;
   requestCount: number;
+  joinRequestsEnabled: boolean;
   onInvite: ReturnType<typeof useDrawer>["openDrawer"];
 }) {
+  const [draft, setDraft] = useState("");
+  const openInvite = () => {
+    const email = draft.trim();
+    onInvite(InviteMemberDrawerToken, email ? { initialEmail: email } : undefined);
+    setDraft("");
+  };
   return (
     <>
       <SectionTitle
@@ -527,15 +544,11 @@ function PeopleHeader({
         right={
           canManage ? (
             <HStack gap={2}>
-              <InlineInviteBox
-                onStartTyping={(email) =>
-                  onInvite(InviteMemberDrawerToken, email ? { initialEmail: email } : undefined)
-                }
-              />
+              <InlineInviteBox value={draft} onChange={setDraft} onSubmit={openInvite} />
               <Button
                 size="sm"
                 colorPalette="orange"
-                onClick={() => onInvite(InviteMemberDrawerToken)}
+                onClick={openInvite}
                 data-testid="members-invite-open"
               >
                 <Plus size={14} />
@@ -554,7 +567,7 @@ function PeopleHeader({
         groupLabel="Filter people by how they got here"
         countNoun={{ singular: "person", plural: "people" }}
         testId="people-cuts"
-        items={peopleCutItems({ memberCount, openInviteCount, requestCount })}
+        items={peopleCutItems({ memberCount, openInviteCount, requestCount, joinRequestsEnabled })}
       />
     </>
   );
@@ -572,7 +585,7 @@ function InviteLinkDialog({
 }) {
   return (
     <Dialog.Root open={open} onOpenChange={({ open }) => (open ? undefined : onClose())}>
-      <Dialog.Content bg="bg">
+      <Dialog.Content>
         <Dialog.Header>
           <Dialog.Title textStyle="xl" fontWeight="semibold">
             Invite Link

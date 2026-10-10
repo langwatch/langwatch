@@ -64,6 +64,9 @@ export const FRONT_DOOR_PRIMARY_STYLE = {
   color: "frontDoor.onAction",
   _hover: { backgroundColor: "frontDoor.actionHover" },
   _active: { backgroundColor: "frontDoor.actionHover" },
-  _focusVisible: { outline: "none", boxShadow: "0 0 0 3px {colors.frontDoor.focusRing}" },
+  _focusVisible: {
+    outline: "none",
+    boxShadow: "0 0 0 2px {colors.bg}, 0 0 0 4px {colors.frontDoor.focusRing}",
+  },
   _disabled: { cursor: "not-allowed", opacity: 0.55 },
 } as const;

@@ -1,20 +1,34 @@
-import type { BillingApi } from "@langwatch/enterprise-billing-contract";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
- * Connected customers' billing (ADR-156 section 7): the daily tick, and the seat
- * invoicing pass every minute over the seat changes licensing recorded. Scheduled
- * processes with no events of their own; `global`, as each walks every customer.
+ * Connected customers' billing (ADR-156 section 7): the daily tick, the seat invoicing pass every
+ * minute, and the onboarding and renewal facts connect moves the contract budget on (C3a). Keyed
+ * by organization; the two scheduled processes still walk every customer.
  */
+import {
+  CONNECTED_BILLING_AGGREGATE_TYPE,
+  type BillingApi,
+  type ConnectedCustomerOnboardedEventData,
+  type ConnectedTermRenewedEventData,
+} from "@langwatch/enterprise-billing-contract";
 import {
   defineAggregate,
   defineEventingModule,
   definePipeline,
   type EventingSetup,
+  type Projection,
   type StaticPipelineDefinition,
 } from "@langwatch/eventing";
 import { nowInstant } from "@langwatch/time";
 
+import type { BillingModule } from "../app/billing.app.ts";
 import type { BillingRepositories } from "../repositories/billing.repositories.ts";
+import {
+  type ConnectedBillingEvent,
+  connectedCustomerOnboardedEventSchema,
+  connectedTermRenewedEventSchema,
+  RecordConnectedCustomerOnboardedCommand,
+  RecordConnectedTermRenewedCommand,
+} from "./connected-billing.commands.ts";
 import {
   CONNECTED_BILLING_PROCESS_NAME,
   runConnectedBillingTick,
@@ -38,6 +52,13 @@ import {
 
 export const CONNECTED_BILLING_PIPELINE_NAME = "connected_billing";
 
+export type ConnectedBillingPipeline = StaticPipelineDefinition<
+  ConnectedBillingEvent,
+  Record<string, Projection>,
+  | { name: "recordConnectedCustomerOnboarded"; payload: ConnectedCustomerOnboardedEventData }
+  | { name: "recordConnectedTermRenewed"; payload: ConnectedTermRenewedEventData }
+>;
+
 /** The pipeline, over only the app operations it calls. */
 function buildConnectedBilling({
   app,
@@ -48,12 +69,14 @@ function buildConnectedBilling({
   Pick<BillingApi, "runConnectedBillingTick" | "invoicePendingSeatChanges">
 > & {
   bootedAt?: number;
-}): StaticPipelineDefinition<never> {
+}): ConnectedBillingPipeline {
   return definePipeline({
     name: CONNECTED_BILLING_PIPELINE_NAME,
-    aggregate: defineAggregate({ type: "global" }),
+    aggregate: defineAggregate({ type: CONNECTED_BILLING_AGGREGATE_TYPE }),
   })
-    .withEvents([])
+    .withEvents([connectedCustomerOnboardedEventSchema, connectedTermRenewedEventSchema])
+    .withCommand("recordConnectedCustomerOnboarded", RecordConnectedCustomerOnboardedCommand)
+    .withCommand("recordConnectedTermRenewed", RecordConnectedTermRenewedCommand)
     .withProcessManager(CONNECTED_BILLING_PROCESS_NAME, (pm) =>
       pm
         .state(connectedBillingTickStateSchema, CONNECTED_BILLING_INITIAL_STATE)
@@ -93,5 +116,6 @@ function buildConnectedBilling({
 
 export const connectedBillingEventing = defineEventingModule({
   pipeline: CONNECTED_BILLING_PIPELINE_NAME,
-  build: (setup: EventingSetup<BillingRepositories, BillingApi>) => buildConnectedBilling(setup),
+  build: (setup: EventingSetup<BillingRepositories, BillingModule>) => buildConnectedBilling(setup),
+  connect: ({ app, commands }) => app.connectConnectedBillingCommands(commands),
 });

@@ -4,12 +4,12 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   BrowserUiDocumentTitle,
-  UiCapabilityContextProvider,
+  UiHostServicesContextProvider,
   UiNavigation,
   UiRoute,
   UNAVAILABLE_UI_FEEDBACK,
   UNAVAILABLE_UI_SESSION,
-  type UiCapabilities,
+  type UiHostServices,
   type UiRouteReadingValues,
 } from "../capabilities.ts";
 import { useRouter } from "../use-router.ts";
@@ -49,7 +49,7 @@ class RecordingRoute extends UiRoute {
   }
 }
 
-function capabilities(values: UiRouteReadingValues): UiCapabilities {
+function hostServices(values: UiRouteReadingValues): UiHostServices {
   return {
     documentTitle: BrowserUiDocumentTitle.create(),
     feedback: UNAVAILABLE_UI_FEEDBACK,
@@ -61,14 +61,14 @@ function capabilities(values: UiRouteReadingValues): UiCapabilities {
 
 function mounted(values: UiRouteReadingValues) {
   return ({ children }: { children: ReactNode }) => (
-    <UiCapabilityContextProvider value={capabilities(values)}>
+    <UiHostServicesContextProvider value={hostServices(values)}>
       {children}
-    </UiCapabilityContextProvider>
+    </UiHostServicesContextProvider>
   );
 }
 
 describe("useRouter", () => {
-  describe("when capabilities are mounted above it", () => {
+  describe("when host services are mounted above it", () => {
     it("merges the path parameters over the query string", () => {
       const { result } = renderHook(() => useRouter(), {
         wrapper: mounted({
@@ -151,7 +151,7 @@ describe("useRouter", () => {
     });
   });
 
-  describe("when no capabilities are mounted", () => {
+  describe("when no host services are mounted", () => {
     it("answers an empty address instead of throwing", async () => {
       const { result } = renderHook(() => useRouter());
 

@@ -10,6 +10,7 @@ import type {
   ResolvedApiKeyCredential,
 } from "@langwatch/api-key-contract";
 import { HandledError } from "@langwatch/handled-error";
+import { PROJECT_KIND } from "@langwatch/project-contract";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -25,6 +26,7 @@ const PROJECT = {
   organizationId: "org-1",
   isPersonal: false,
   ownerUserId: null,
+  kind: "application",
 };
 
 /** An in-memory key store: tokens it knows resolve, everything else is unusable. */
@@ -578,4 +580,41 @@ describe("given a pre-2025 legacy API key, an opaque `eyJ` value never verified 
       });
     });
   }
+});
+
+describe("given a credential for an aggregate project", () => {
+  const AGGREGATE = { ...PROJECT, id: "project-aggregate", kind: PROJECT_KIND.AGGREGATE };
+  const aggregateDoor = doorOver(
+    new KeyStore(
+      new Map<string, ResolvedApiKeyCredential>([
+        ["legacy-aggregate", { type: "legacyProjectKey", project: AGGREGATE }],
+        [
+          "sk-lw-aggregate",
+          {
+            type: "apiKey",
+            apiKeyId: "key-aggregate",
+            userId: "user-1",
+            organizationId: "org-1",
+            ingestSourceType: null,
+            ingestionTemplateId: null,
+            project: AGGREGATE,
+          },
+        ],
+      ]),
+      new Map(),
+    ),
+  );
+
+  it.each([
+    ["its own legacy project key", "legacy-aggregate"],
+    ["a scoped API key", "sk-lw-aggregate"],
+  ] as const)("refuses %s before any permission is asked", async (_name, token) => {
+    const asked = request({ authorization: `Bearer ${token}` });
+
+    expect(
+      await refusalCode(
+        aggregateDoor.authenticate({ request: asked, permissions: ["traces:view"] }),
+      ),
+    ).toBe("aggregate_project_has_no_credential");
+  });
 });

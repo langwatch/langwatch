@@ -3,6 +3,7 @@ import {
   type HandledErrorFault,
   handledErrorFaultSchema,
 } from "@langwatch/handled-error";
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import type { StoredObjectId, StoredObjectOperationId, StoredObjectProjectId } from "./ids.ts";
@@ -28,7 +29,7 @@ export const storedObjectProblemCodeSchema = z.enum(STORED_OBJECT_PROBLEM_CODES)
 export type StoredObjectProblemCode = z.infer<typeof storedObjectProblemCodeSchema>;
 
 /** Client-safe problem envelope consumed by REST, RPC, tRPC, and byte delivery. */
-export const storedObjectProblemSchema = z
+const storedObjectProblemSchemaDefinition = z
   .object({
     code: storedObjectProblemCodeSchema,
     type: storedObjectProblemCodeSchema.optional(),
@@ -49,6 +50,11 @@ export const storedObjectProblemSchema = z
     docsUrl: z.string().url().optional(),
   })
   .strict();
+export interface StoredObjectProblemSchema extends Named<
+  typeof storedObjectProblemSchemaDefinition
+> {}
+export const storedObjectProblemSchema: StoredObjectProblemSchema =
+  storedObjectProblemSchemaDefinition;
 export type StoredObjectProblem = z.infer<typeof storedObjectProblemSchema>;
 
 export const STORED_OBJECT_PROBLEM_HTTP_STATUS = {

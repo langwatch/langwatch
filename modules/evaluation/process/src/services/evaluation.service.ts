@@ -1,3 +1,5 @@
+import { type Authorization, internalActor, narrowAuthorization } from "@langwatch/authorization";
+import type { AuthzApi } from "@langwatch/authz-contract";
 import {
   EvaluationNotFoundError,
   evaluationInputsQuerySchema,
@@ -14,7 +16,9 @@ import {
   type OnlineEvaluationPerformance,
   type ExecuteEvaluationCommand,
   type UpsertEvaluationRunCommand,
+  type EvaluationInputsQuery,
 } from "@langwatch/evaluation-contract";
+import { canReadCapturedContent, type TraceApi } from "@langwatch/trace-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 
 import type { EvaluationExecutionService } from "../features/execution/services/evaluation-execution.service.ts";
@@ -33,7 +37,13 @@ type EvaluationServiceOptions = {
   execution: Pick<EvaluationExecutionService, "execute">;
   inputResolution: Pick<EvaluationInputsOffloadService, "resolveInputs">;
   workflows: WorkflowApi;
+  traces: Pick<TraceApi, "resolveViewerProtections">;
+  /** Mints the own-only proof the `*Api` run reads are fenced by (ruling AGG-EVAL-PROOF). */
+  authz: Pick<AuthzApi, "authorizeInternal">;
 };
+
+/** The internal actor the `*Api` run reads mint their proof as. */
+const RUN_READ_CODE_PATH = "evaluation.run-read";
 
 /** One canonical Evaluation capability for API, workers and projections. */
 export class EvaluationService {
@@ -86,8 +96,13 @@ export class EvaluationService {
   }
 
   async getRunByEvaluationId(input: EvaluationRunLookup): Promise<EvaluationRunData> {
+    const { tenantId, ...lookup } = evaluationRunLookupSchema.parse(input);
     return this.options.repository.getByEvaluationId({
-      ...evaluationRunLookupSchema.parse(input),
+      ...lookup,
+      authorization: await this.ownProof({
+        projectId: tenantId,
+        entry: "EvaluationService.getRunByEvaluationId",
+      }),
       retention: this.options.retention,
     });
   }
@@ -101,23 +116,67 @@ export class EvaluationService {
     }
   }
 
-  findRunsByTraceId(input: { tenantId: string; traceId: string }): Promise<EvaluationRunData[]> {
-    return this.options.repository.findByTraceId(evaluationRunsByTraceQuerySchema.parse(input));
+  async findRunsByTraceId(input: {
+    tenantId: string;
+    traceId: string;
+  }): Promise<EvaluationRunData[]> {
+    const { tenantId, traceId } = evaluationRunsByTraceQuerySchema.parse(input);
+    return this.options.repository.findByTraceId({
+      authorization: await this.ownProof({
+        projectId: tenantId,
+        entry: "EvaluationService.findRunsByTraceId",
+      }),
+      traceId,
+    });
   }
 
-  async findInputs(input: {
-    tenantId: string;
-    evaluationId: string;
-  }): Promise<Record<string, unknown> | null> {
+  /** The `*Api` names a tenant, not a proof: the platform reads that one project as itself. */
+  private ownProof({
+    projectId,
+    entry,
+  }: {
+    projectId: string;
+    entry: string;
+  }): Promise<Authorization> {
+    return this.options.authz.authorizeInternal({
+      actor: internalActor(RUN_READ_CODE_PATH),
+      projectId,
+      permission: "traces:view",
+      purpose: { kind: "operator", entry },
+    });
+  }
+
+  /**
+   * One evaluation's inputs through the proof (ADR-177 block F): on an aggregate it narrows to the
+   * member holding them. Gated on the viewer's protections before any offload marker resolves,
+   * and the marker resolves under the member the row was read from.
+   */
+  async findInputs(
+    input: EvaluationInputsQuery & { authorization: Authorization; userId: string | null },
+  ): Promise<Record<string, unknown> | null> {
     const query = evaluationInputsQuerySchema.parse(input);
-    const inputs = await this.options.repository.findInputs(query);
-    if (inputs === null) {
-      return null;
-    }
+    const authorization =
+      query.tenantId === undefined
+        ? input.authorization
+        : narrowAuthorization({ authorization: input.authorization, projectId: query.tenantId });
+    if (authorization === null) throw new EvaluationNotFoundError(query.evaluationId);
+
+    const protections = await this.options.traces.resolveViewerProtections({
+      projectId: query.projectId,
+      userId: input.userId,
+      authorization,
+    });
+    if (!canReadCapturedContent(protections)) return null;
+
+    const read = await this.options.repository.findInputs({
+      authorization,
+      evaluationId: query.evaluationId,
+    });
+    if (read === null || read.inputs === null) return null;
 
     return this.options.inputResolution.resolveInputs({
-      tenantId: query.tenantId,
-      inputs,
+      tenantId: read.tenantId,
+      inputs: read.inputs,
     });
   }
 

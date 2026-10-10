@@ -5,8 +5,10 @@
  */
 
 import { INSTANCE_TOKEN_HEADER } from "@langwatch/agent-contract";
+import { ProjectMissingCredentialsError } from "@langwatch/api";
 import { anyAuthenticated } from "@langwatch/api/access";
 import {
+  defineRestDoor,
   defineRestRouter,
   documentedResponses,
   MANAGEMENT_API_VERSION,
@@ -20,6 +22,7 @@ import {
   langyControlPollAnswerSchema,
   langyControlPollQuerySchema,
   langyControlRegisterAnswerSchema,
+  localControlCredentialSchema,
 } from "@langwatch/langy-contract";
 import { z } from "zod";
 
@@ -36,6 +39,24 @@ import {
 } from "./langy-local-control.rest.ts";
 
 const JSON_MEDIA_TYPE = "application/json";
+
+/** Register's door: the framework parsed the minted key, the session core says who holds it. */
+export const localControlSessionKeyDoor = defineRestDoor("session_key", {
+  needs: LangyApi,
+  identify: async ({ sessionKey, request }, langy) => {
+    if (sessionKey === null) throw new ProjectMissingCredentialsError();
+    const holder = await langy.verifyLocalControlSessionKey({
+      ...sessionKey,
+      instanceToken: request.headers.get(INSTANCE_TOKEN_HEADER),
+    });
+
+    return {
+      actor: holder.actor,
+      scope: { tier: "project", id: holder.projectId },
+      session: holder,
+    };
+  },
+});
 
 const BECAUSE = "The local folder reads its answers and refusals as relay frames.";
 
@@ -60,7 +81,8 @@ function localControlConnectRest(mount: LangyControlMount) {
     .withAddressing("literal", { v1Twin: true })
 
     .post(`/api/langy/control${mount}/connect/register`, "langyControlConnectRegister")
-    .withCredential("session_key")
+    .withAudit("langy.registerLocalControl")
+    .withCredential("session_key", { session: localControlCredentialSchema })
     .withAccess(
       anyAuthenticated({
         reason:
@@ -68,7 +90,6 @@ function localControlConnectRest(mount: LangyControlMount) {
       }),
     )
     .withInput(registerFrameSchema)
-    .withHeaders(z.object({ authorization: z.string() }))
     .withResponse("protocol", {
       produces: JSON_MEDIA_TYPE,
       because: BECAUSE,
@@ -82,7 +103,7 @@ function localControlConnectRest(mount: LangyControlMount) {
         responses: documentedResponses({ 200: langyControlRegisterAnswerSchema }),
       }),
     )
-    .handle(async ({ app, input, actor, scope, response }, headers) =>
+    .handle(async ({ app, input, actor, scope, session, response }) =>
       response.write({
         status: 200,
         mediaType: JSON_MEDIA_TYPE,
@@ -90,7 +111,7 @@ function localControlConnectRest(mount: LangyControlMount) {
           await app.registerLocalControlSession({
             actor,
             projectId: scope.id,
-            authorization: headers.authorization,
+            credential: session,
             frame: input,
           }),
         ),
@@ -129,6 +150,7 @@ function localControlConnectRest(mount: LangyControlMount) {
     )
 
     .post(`/api/langy/control${mount}/connect/frames`, "langyControlConnectFrames")
+    .withoutAudit("ingestion")
     .withAccess({ kind: "public", reason: ADDRESSED_BY_INSTANCE_TOKEN })
     .withInput(langyControlFramesBodySchema)
     .withHeaders(instanceTokenHeaders)

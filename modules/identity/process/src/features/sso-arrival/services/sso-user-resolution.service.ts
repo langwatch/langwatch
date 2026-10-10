@@ -11,6 +11,7 @@ import {
   type SsoConnectionState,
   SsoDomainNotVerifiedError,
   SsoExistingAccountUnconfirmedError,
+  SsoMemberDeactivatedError,
   type SsoUserResolution,
   type SsoUserResolutionInput,
 } from "@langwatch/identity-contract";
@@ -79,7 +80,9 @@ export class SsoUserResolutionService {
     const email = normalizeIdentifierValue(input.email);
     const candidates = await this.deps.people.findUsersByEmail({ email });
 
-    if (await this.isDirectoryInactive({ connection, input, candidates })) return REFUSE;
+    if (await this.isDirectoryInactive({ connection, input, candidates })) {
+      return refuseWith({ error: new SsoMemberDeactivatedError(), providerId: input.providerId });
+    }
     if (candidates.length > 1) {
       // One proposal per candidate: picking one to hang it on would be the guess.
       for (const candidate of candidates) {
@@ -450,7 +453,7 @@ function refuseWith({
   error,
   providerId,
 }: {
-  error: IdentityLinkProposedError | IdentityJitDisabledError;
+  error: IdentityLinkProposedError | IdentityJitDisabledError | SsoMemberDeactivatedError;
   providerId: string;
 }): SsoUserResolution {
   logger.info({ code: error.code, providerId }, "single sign-on sign-in refused");

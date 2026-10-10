@@ -17,7 +17,7 @@ import { z } from "zod";
 export const PROMPT_LIFECYCLE_PIPELINE_NAME = "prompt_lifecycle" as const;
 export const PROMPT_AGGREGATE_TYPE = "prompt" as const;
 
-export const PROMPT_CREATED_EVENT_VERSION = "2026-09-29" as const;
+const PROMPT_CREATED_EVENT_VERSION = "2026-09-29" as const;
 const RECORD_PROMPT_CREATED_COMMAND_TYPE = "lw.prompt.record_created" as const;
 
 export const promptCreatedEventSchema = z.object({
@@ -26,7 +26,7 @@ export const promptCreatedEventSchema = z.object({
   version: z.literal(PROMPT_CREATED_EVENT_VERSION),
   data: promptCreatedEventDataSchema,
 });
-export type PromptCreatedEvent = z.infer<typeof promptCreatedEventSchema>;
+type PromptCreatedEvent = z.infer<typeof promptCreatedEventSchema>;
 export type PromptLifecycleEvent = PromptCreatedEvent;
 
 const recordPromptCreatedCommandDataSchema = withCommandEnvelope(promptCreatedEventDataSchema);

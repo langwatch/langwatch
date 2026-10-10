@@ -151,7 +151,7 @@ export type ResolvedScenarioRunParametersForScenario = ResolvedScenarioRunParame
   scenarioId: string;
 };
 
-/** The project facts a scenario-events transport resolves before calling the app. */
+/** The project values a scenario-events transport resolves before calling the app. */
 export type ScenarioEventProject = {
   projectId: string;
   projectSlug: string;

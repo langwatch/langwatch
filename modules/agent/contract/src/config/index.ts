@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import { codeAgentConfigSchema, workflowAgentConfigSchema } from "./code.ts";
@@ -27,7 +28,7 @@ export const agentTypeSchema = z.enum([
 ]);
 export type AgentType = z.infer<typeof agentTypeSchema>;
 
-export const agentConfigSchema = z.discriminatedUnion("type", [
+const agentConfigSchemaDefinition = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("signature"),
     config: signatureAgentConfigSchema,
@@ -38,6 +39,8 @@ export const agentConfigSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("connected"), config: connectedAgentConfigSchema }),
   z.object({ type: z.literal("voice"), config: voiceAgentConfigSchema }),
 ]);
+export interface AgentConfigSchema extends Named<typeof agentConfigSchemaDefinition> {}
+export const agentConfigSchema: AgentConfigSchema = agentConfigSchemaDefinition;
 
 export type AgentConfig =
   | z.infer<typeof signatureAgentConfigSchema>

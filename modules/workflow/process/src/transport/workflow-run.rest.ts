@@ -1,6 +1,6 @@
 import { PayloadTooLargeError } from "@langwatch/api";
 import {
-  defineRestMiddleware,
+  defineMiddlewareContext,
   defineRestRouter,
   MANAGEMENT_API_VERSION,
 } from "@langwatch/api/rest";
@@ -25,7 +25,7 @@ const bodyLimit = {
  * The API key a run was started with, so the run's own key holds no more; null for a legacy
  * API key or a project-bound access token, which have no key row.
  */
-export const workflowRunCallerKey = defineRestMiddleware(
+export const workflowRunCallerKey = defineMiddlewareContext(
   "workflowRunCallerKey",
   z.string().min(1).nullable(),
 );
@@ -51,6 +51,7 @@ export const workflowRunRest = defineRestRouter(WorkflowApi)
   .withAddressing("literal", { v1Twin: true })
 
   .post("/api/optimization/:workflowId/:versionId", "postApiOptimizationByWorkflowIdByVersionId")
+  .withoutAudit("run, not a change")
   .withParams(workflowRunRestVersionedParamsSchema)
   .withInput(workflowRunRestBodySchema)
   .withBodyLimit(bodyLimit)
@@ -66,7 +67,7 @@ export const workflowRunRest = defineRestRouter(WorkflowApi)
     tags: ["Workflows"],
     requestBody: { schema: workflowRunRestBodySchema },
   })
-  .withMiddleware(workflowRunCallerKey)
+  .withMiddlewareContext(workflowRunCallerKey)
   .handle(({ app, input, scope, actor }, callerKey) => {
     const { workflowId, versionId, ...inputs } = input;
 
@@ -80,6 +81,7 @@ export const workflowRunRest = defineRestRouter(WorkflowApi)
   })
 
   .post("/api/workflows/:workflowId/run", "postApiWorkflowsByWorkflowIdRun")
+  .withoutAudit("run, not a change")
   .withParams(workflowRunRestParamsSchema)
   .withInput(workflowRunRestBodySchema)
   .withBodyLimit(bodyLimit)
@@ -94,7 +96,7 @@ export const workflowRunRest = defineRestRouter(WorkflowApi)
     tags: ["Workflows"],
     requestBody: { schema: workflowRunRestBodySchema },
   })
-  .withMiddleware(workflowRunCallerKey)
+  .withMiddlewareContext(workflowRunCallerKey)
   .handle(({ app, input, scope, actor }, callerKey) => {
     const { workflowId, ...inputs } = input;
 
@@ -107,6 +109,7 @@ export const workflowRunRest = defineRestRouter(WorkflowApi)
   })
 
   .post("/api/workflows/:workflowId/:versionId/run", "postApiWorkflowsByWorkflowIdByVersionIdRun")
+  .withoutAudit("run, not a change")
   .withParams(workflowRunRestVersionedParamsSchema)
   .withInput(workflowRunRestBodySchema)
   .withBodyLimit(bodyLimit)
@@ -121,7 +124,7 @@ export const workflowRunRest = defineRestRouter(WorkflowApi)
     tags: ["Workflows"],
     requestBody: { schema: workflowRunRestBodySchema },
   })
-  .withMiddleware(workflowRunCallerKey)
+  .withMiddlewareContext(workflowRunCallerKey)
   .handle(({ app, input, scope, actor }, callerKey) => {
     const { workflowId, versionId, ...inputs } = input;
 

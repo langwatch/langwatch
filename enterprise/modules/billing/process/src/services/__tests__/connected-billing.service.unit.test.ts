@@ -2,10 +2,13 @@ import type {
   ConnectedOnboardInput,
   ConnectedRenewInput,
 } from "@langwatch/enterprise-billing-contract";
+import type { EventingCommands } from "@langwatch/eventing";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal, type Instant } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
 import { MemoryConnectedInvoicingChannel } from "../../channels/memory/memory.connected-invoicing.channel.ts";
+import type { ConnectedBillingPipeline } from "../../eventing/connected-billing.pipeline.ts";
 import {
   ConnectedBillingService,
   type ConnectedBillingTerms,
@@ -24,8 +27,6 @@ const BANK_DETAILS = "IBAN NL00 BANK 0000 0000 00";
 
 /** The license registry, holding the commit an operator agreed on the license. */
 class AgreedTerms implements ConnectedBillingTerms {
-  readonly syncedBudgets: { organizationId: string; operatorId: string }[] = [];
-  readonly resetBudgets: { organizationId: string; operatorId: string }[] = [];
   readonly raises: { organizationId: string; byUsdCents: number; operatorId: string }[] = [];
 
   constructor(public commitUsdCents: number) {}
@@ -42,14 +43,24 @@ class AgreedTerms implements ConnectedBillingTerms {
     this.raises.push(input);
     this.commitUsdCents += input.byUsdCents;
   }
+}
 
-  async syncBudget(input: { organizationId: string; operatorId: string }): Promise<void> {
-    this.syncedBudgets.push(input);
-  }
+type Senders = EventingCommands<ConnectedBillingPipeline>;
 
-  async resetBudget(input: { organizationId: string; operatorId: string }): Promise<void> {
-    this.resetBudgets.push(input);
-  }
+/** The connected_billing facts the service recorded, by command name. */
+function recordedFacts() {
+  const facts: { command: string; payload: Record<string, unknown> }[] = [];
+  const senders = createApiFixture<Senders>({
+    recordConnectedCustomerOnboarded: createApiFixture<Senders["recordConnectedCustomerOnboarded"]>(
+      {
+        send: async (payload) => void facts.push({ command: "onboarded", payload }),
+      },
+    ),
+    recordConnectedTermRenewed: createApiFixture<Senders["recordConnectedTermRenewed"]>({
+      send: async (payload) => void facts.push({ command: "renewed", payload }),
+    }),
+  });
+  return { facts, senders };
 }
 
 function harness({
@@ -71,8 +82,10 @@ function harness({
     bankDetails: () => bankDetails,
     now: () => NOW,
   });
+  const { facts, senders } = recordedFacts();
+  service.connect(senders);
 
-  return { store, repository, invoicing, terms, service };
+  return { store, repository, invoicing, terms, facts, service };
 }
 
 const onboarding = (patch: Partial<ConnectedOnboardInput> = {}): ConnectedOnboardInput => ({
@@ -167,12 +180,23 @@ describe("onboarding a connected customer", () => {
   });
 
   /** @scenario "The organization budget equals the commit" */
-  it("asks the registry to sync the organization budget to the commit", async () => {
-    const { terms, service } = harness();
+  /** @scenario "Onboarding a connected customer records connected_customer_onboarded" */
+  it("records the onboarding fact connect syncs the organization budget from", async () => {
+    const { facts, service } = harness();
 
     await service.onboard(onboarding());
 
-    expect(terms.syncedBudgets).toEqual([{ organizationId: ACME, operatorId: OPERATOR }]);
+    expect(facts).toEqual([
+      {
+        command: "onboarded",
+        payload: {
+          tenantId: ACME,
+          occurredAt: NOW.epochMilliseconds,
+          organizationId: ACME,
+          operatorId: OPERATOR,
+        },
+      },
+    ]);
   });
 
   /** @scenario "Onboarding twice does not create anything twice" */
@@ -210,12 +234,12 @@ describe("onboarding a connected customer", () => {
 
   /** @scenario "Onboarding without a commit gives no hosted usage" */
   it("creates no credit when there is no commit", async () => {
-    const { invoicing, terms, service } = harness({ commitUsdCents: 0 });
+    const { invoicing, facts, service } = harness({ commitUsdCents: 0 });
 
     await service.onboard(onboarding({ commitUsdCents: 0 }));
 
     expect(invoicing.grants).toHaveLength(0);
-    expect(terms.syncedBudgets).toHaveLength(1);
+    expect(facts.map(({ command }) => command)).toEqual(["onboarded"]);
   });
 
   /** @scenario "A customer who cannot pay through a virtual bank account is invoiced without one" */
@@ -299,8 +323,9 @@ describe("renewing a term", () => {
   };
 
   /** @scenario "Renewal keeps the one usage subscription and resets the budget" */
-  it("keeps the usage subscription, resets the budget and syncs it to the new commit", async () => {
-    const { invoicing, terms, service } = harness();
+  /** @scenario "Renewal records connected_term_renewed and the budget resets" */
+  it("keeps the usage subscription and records the renewal fact connect resets from", async () => {
+    const { invoicing, terms, facts, service } = harness();
     const before = await service.onboard(onboarding());
     terms.commitUsdCents = 200_000;
 
@@ -308,7 +333,8 @@ describe("renewing a term", () => {
 
     expect(after.usageSubscriptionId).toBe(before.usageSubscriptionId);
     expect(invoicing.subscriptions).toHaveLength(1);
-    expect(terms.resetBudgets).toEqual([{ organizationId: ACME, operatorId: OPERATOR }]);
+    expect(facts.map(({ command }) => command)).toEqual(["onboarded", "renewed"]);
+    expect(facts[1]?.payload).toMatchObject({ organizationId: ACME, operatorId: OPERATOR });
     expect(after).toMatchObject({ commitUsdCents: 200_000, termEndsAt: NEXT_TERM_ENDS });
     expect(invoicing.raised).toHaveLength(2);
   });

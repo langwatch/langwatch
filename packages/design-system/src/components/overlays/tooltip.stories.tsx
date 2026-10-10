@@ -4,7 +4,14 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { Tooltip } from "./tooltip.tsx";
 
 const meta = {
-  title: "Primitives/Tooltip",
+  title: "Overlays/Tooltip",
+  parameters: {
+    usage: {
+      use: "A short label for an icon button or a value that needs its full form.",
+      avoid:
+        "Anything interactive: use Popover. Something every reader needs: write it on the page.",
+    },
+  },
   component: Tooltip,
   tags: ["autodocs"],
   args: {

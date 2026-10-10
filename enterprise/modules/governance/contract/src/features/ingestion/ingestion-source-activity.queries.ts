@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 export const spendSortFieldSchema = z.enum(["spend", "requests", "lastActivity"]);
@@ -9,23 +10,35 @@ export type GovernanceSortDirection = z.infer<typeof governanceSortDirectionSche
 export const spendOverTimeGroupBySchema = z.enum(["team", "user", "model"]);
 export type SpendOverTimeGroupBy = z.infer<typeof spendOverTimeGroupBySchema>;
 
-export const activityMonitorWindowQuerySchema = z
+const activityMonitorWindowQuerySchemaDefinition = z
   .object({
     organizationId: z.string().min(1),
     windowDays: z.number().int().positive(),
   })
   .strict();
+export interface ActivityMonitorWindowQuerySchema extends Named<
+  typeof activityMonitorWindowQuerySchemaDefinition
+> {}
+export const activityMonitorWindowQuerySchema: ActivityMonitorWindowQuerySchema =
+  activityMonitorWindowQuerySchemaDefinition;
 export type ActivityMonitorWindowQuery = z.infer<typeof activityMonitorWindowQuerySchema>;
 
-export const activityMonitorPagedWindowQuerySchema = activityMonitorWindowQuerySchema.safeExtend({
-  limit: z.number().int().positive().optional(),
-  offset: z.number().int().nonnegative().optional(),
-  sortBy: spendSortFieldSchema.optional(),
-  sortDir: governanceSortDirectionSchema.optional(),
-});
+const activityMonitorPagedWindowQuerySchemaDefinition = activityMonitorWindowQuerySchema.safeExtend(
+  {
+    limit: z.number().int().positive().optional(),
+    offset: z.number().int().nonnegative().optional(),
+    sortBy: spendSortFieldSchema.optional(),
+    sortDir: governanceSortDirectionSchema.optional(),
+  },
+);
+export interface ActivityMonitorPagedWindowQuerySchema extends Named<
+  typeof activityMonitorPagedWindowQuerySchemaDefinition
+> {}
+export const activityMonitorPagedWindowQuerySchema: ActivityMonitorPagedWindowQuerySchema =
+  activityMonitorPagedWindowQuerySchemaDefinition;
 export type ActivityMonitorPagedWindowQuery = z.infer<typeof activityMonitorPagedWindowQuerySchema>;
 
-export const activityMonitorSummarySchema = z
+const activityMonitorSummarySchemaDefinition = z
   .object({
     spentThisWindowUsd: z.number(),
     windowOverPreviousPct: z.number(),
@@ -42,9 +55,14 @@ export const activityMonitorSummarySchema = z
       .strict(),
   })
   .strict();
+export interface ActivityMonitorSummarySchema extends Named<
+  typeof activityMonitorSummarySchemaDefinition
+> {}
+export const activityMonitorSummarySchema: ActivityMonitorSummarySchema =
+  activityMonitorSummarySchemaDefinition;
 export type ActivityMonitorSummary = z.infer<typeof activityMonitorSummarySchema>;
 
-export const spendByUserRowSchema = z
+const spendByUserRowSchemaDefinition = z
   .object({
     actor: z.string(),
     spendUsd: z.string(),
@@ -55,9 +73,11 @@ export const spendByUserRowSchema = z
     mostUsedTarget: z.string().nullable(),
   })
   .strict();
+export interface SpendByUserRowSchema extends Named<typeof spendByUserRowSchemaDefinition> {}
+export const spendByUserRowSchema: SpendByUserRowSchema = spendByUserRowSchemaDefinition;
 export type SpendByUserRow = z.infer<typeof spendByUserRowSchema>;
 
-export const spendByTeamRowSchema = z
+const spendByTeamRowSchemaDefinition = z
   .object({
     teamId: z.string().nullable(),
     teamName: z.string(),
@@ -69,9 +89,11 @@ export const spendByTeamRowSchema = z
     sourceCount: z.number().int().nonnegative(),
   })
   .strict();
+export interface SpendByTeamRowSchema extends Named<typeof spendByTeamRowSchemaDefinition> {}
+export const spendByTeamRowSchema: SpendByTeamRowSchema = spendByTeamRowSchemaDefinition;
 export type SpendByTeamRow = z.infer<typeof spendByTeamRowSchema>;
 
-export const spendByDepartmentRowSchema = z
+const spendByDepartmentRowSchemaDefinition = z
   .object({
     departmentId: z.string().nullable(),
     departmentName: z.string(),
@@ -80,9 +102,14 @@ export const spendByDepartmentRowSchema = z
     lastActivityIso: z.string().nullable(),
   })
   .strict();
+export interface SpendByDepartmentRowSchema extends Named<
+  typeof spendByDepartmentRowSchemaDefinition
+> {}
+export const spendByDepartmentRowSchema: SpendByDepartmentRowSchema =
+  spendByDepartmentRowSchemaDefinition;
 export type SpendByDepartmentRow = z.infer<typeof spendByDepartmentRowSchema>;
 
-export const ingestionSourceHealthRowSchema = z
+const ingestionSourceHealthRowSchemaDefinition = z
   .object({
     id: z.string(),
     name: z.string(),
@@ -92,9 +119,14 @@ export const ingestionSourceHealthRowSchema = z
     eventsLast24h: z.number().int().nonnegative(),
   })
   .strict();
+export interface IngestionSourceHealthRowSchema extends Named<
+  typeof ingestionSourceHealthRowSchemaDefinition
+> {}
+export const ingestionSourceHealthRowSchema: IngestionSourceHealthRowSchema =
+  ingestionSourceHealthRowSchemaDefinition;
 export type IngestionSourceHealthRow = z.infer<typeof ingestionSourceHealthRowSchema>;
 
-export const spendOverTimeBucketSchema = z
+const spendOverTimeBucketSchemaDefinition = z
   .object({
     bucketIso: z.string(),
     points: z.array(
@@ -102,13 +134,23 @@ export const spendOverTimeBucketSchema = z
     ),
   })
   .strict();
+export interface SpendOverTimeBucketSchema extends Named<
+  typeof spendOverTimeBucketSchemaDefinition
+> {}
+export const spendOverTimeBucketSchema: SpendOverTimeBucketSchema =
+  spendOverTimeBucketSchemaDefinition;
 export type SpendOverTimeBucket = z.infer<typeof spendOverTimeBucketSchema>;
-export const spendOverTimeResultSchema = z
+const spendOverTimeResultSchemaDefinition = z
   .object({ buckets: z.array(spendOverTimeBucketSchema) })
   .strict();
+export interface SpendOverTimeResultSchema extends Named<
+  typeof spendOverTimeResultSchemaDefinition
+> {}
+export const spendOverTimeResultSchema: SpendOverTimeResultSchema =
+  spendOverTimeResultSchemaDefinition;
 export type SpendOverTimeResult = z.infer<typeof spendOverTimeResultSchema>;
 
-export const activityEventDetailRowSchema = z
+const activityEventDetailRowSchemaDefinition = z
   .object({
     eventId: z.string(),
     eventType: z.string(),
@@ -123,9 +165,14 @@ export const activityEventDetailRowSchema = z
     rawPayload: z.string(),
   })
   .strict();
+export interface ActivityEventDetailRowSchema extends Named<
+  typeof activityEventDetailRowSchemaDefinition
+> {}
+export const activityEventDetailRowSchema: ActivityEventDetailRowSchema =
+  activityEventDetailRowSchemaDefinition;
 export type ActivityEventDetailRow = z.infer<typeof activityEventDetailRowSchema>;
 
-export const recentAnomalyRowSchema = z
+const recentAnomalyRowSchemaDefinition = z
   .object({
     id: z.string(),
     ruleId: z.string(),
@@ -144,9 +191,11 @@ export const recentAnomalyRowSchema = z
     sourceLabel: z.string(),
   })
   .strict();
+export interface RecentAnomalyRowSchema extends Named<typeof recentAnomalyRowSchemaDefinition> {}
+export const recentAnomalyRowSchema: RecentAnomalyRowSchema = recentAnomalyRowSchemaDefinition;
 export type RecentAnomalyRow = z.infer<typeof recentAnomalyRowSchema>;
 
-export const sourceHealthMetricsSchema = z
+const sourceHealthMetricsSchemaDefinition = z
   .object({
     events24h: z.number().int().nonnegative(),
     events7d: z.number().int().nonnegative(),
@@ -154,4 +203,9 @@ export const sourceHealthMetricsSchema = z
     lastSuccessIso: z.string().nullable(),
   })
   .strict();
+export interface SourceHealthMetricsSchema extends Named<
+  typeof sourceHealthMetricsSchemaDefinition
+> {}
+export const sourceHealthMetricsSchema: SourceHealthMetricsSchema =
+  sourceHealthMetricsSchemaDefinition;
 export type SourceHealthMetrics = z.infer<typeof sourceHealthMetricsSchema>;

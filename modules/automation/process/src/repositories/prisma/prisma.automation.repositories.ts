@@ -4,14 +4,11 @@ import type { RedisConnection } from "@langwatch/redis-client";
 import { nowInstant } from "@langwatch/time";
 
 import type { AutomationClock, AutomationRepositories } from "../automation.repositories.ts";
-import type { TriggerSecretCipher } from "../trigger.repository.ts";
-
-/** The client the automation rows live in, as a process hands it over. */
-export type AutomationDatabase = PrismaClient;
 import { RedisAutomationCallCounterRepository } from "../redis/redis.automation-call-counter.repository.ts";
 import { RedisAutomationContainmentClaimRepository } from "../redis/redis.automation-containment-claim.repository.ts";
 import { RedisAutomationEmailCapRepository } from "../redis/redis.automation-email-cap.repository.ts";
 import { RedisAutomationPersistCapRepository } from "../redis/redis.automation-persist-cap.repository.ts";
+import type { TriggerSecretCipher } from "../trigger.repository.ts";
 import { PrismaCustomGraphRepository } from "./prisma.custom-graph.repository.ts";
 import { PrismaEmailSuppressionNameRepository } from "./prisma.email-suppression-name.repository.ts";
 import { PrismaEmailSuppressionRepository } from "./prisma.email-suppression.repository.ts";

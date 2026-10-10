@@ -1,6 +1,5 @@
 {
   "name": "@langwatch/csv",
-  "langwatch": { "group": "libraries" },
   "version": "0.0.1",
   "private": true,
   "description": "The one rule every CSV LangWatch writes has to apply: the spreadsheet formula guard, plus the browser-side CSV download writer that applies it.",
@@ -40,5 +39,8 @@
     "@types/papaparse": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
+  },
+  "langwatch": {
+    "group": "libraries"
   }
 }

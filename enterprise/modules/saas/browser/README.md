@@ -4,7 +4,7 @@ The browser half of [saas](../README.md). What a browser installs when it instal
 
 <!-- readme:generated:start (tools/readmegen; edit the code, then `pnpm generate:readmes`) -->
 
-Declared in `src/saas.web.ts:9` (`defineBrowserModule("saas")`), exported as `saasWeb` at `./declaration`.
+Declared in `src/saas.web.ts:11` (`defineBrowserModule("saas")`), exported as `saasWeb` at `./declaration`.
 
 Installed by ui, from the app's generated module list (`pnpm generate:modules`).
 
@@ -18,6 +18,6 @@ None.
 
 ## Calls
 
-- Capabilities: `extraFooterComponents`.
+- Capabilities: `supportChat`, `extraFooterComponents`.
 
 <!-- readme:generated:end -->

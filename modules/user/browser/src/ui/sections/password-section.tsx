@@ -5,6 +5,11 @@
  */
 
 import { Box, Button, HStack, Spacer, Text, VStack } from "@langwatch/design-system/primitives";
+import {
+  SettingsEmptyState,
+  SettingsSection,
+  SettingsSectionRow,
+} from "@langwatch/design-system/settings-section";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { AccountIdentifier } from "@langwatch/identity-contract";
 import { KeyRound } from "lucide-react";
@@ -16,6 +21,7 @@ import {
   type SignInMethodRemovalTarget,
 } from "../../behavior/use-sign-in-method-removal.ts";
 import { refusalCopy } from "../../features/account-identifiers/model/refusal-copy.ts";
+import { SSO_HANDLES_SIGN_IN } from "../../model/last-way-in.ts";
 import { usePersonalWorkspaceHost } from "../../model/personal-workspace-host.ts";
 import { isCredentialAccount, passwordOfferFor } from "../../model/sign-in-methods.ts";
 import { ChangePasswordDialog } from "./change-password-dialog.tsx";
@@ -60,6 +66,28 @@ function RemovePasswordButton({
   );
 }
 
+function SetPasswordAction({
+  governedBySso,
+  onSet,
+}: {
+  governedBySso: boolean | undefined;
+  onSet: () => void;
+}) {
+  if (governedBySso === undefined) return null;
+  if (governedBySso) {
+    return (
+      <Text fontSize="sm" color="fg.muted" data-testid="password-sso-governed">
+        {SSO_HANDLES_SIGN_IN}
+      </Text>
+    );
+  }
+  return (
+    <Button variant="outline" onClick={onSet} data-testid="password-action">
+      Set a password
+    </Button>
+  );
+}
+
 export function PasswordSection() {
   const host = usePersonalWorkspaceHost();
   const deployment = host.deployment();
@@ -69,6 +97,7 @@ export function PasswordSection() {
     successTitle: "Password removed",
     failureTitle: "Couldn't remove your password",
   });
+  const governance = api.identity.mySignInGovernance.useQuery({});
   const [dialogOpen, setDialogOpen] = useState(false);
 
   const offer = passwordOfferFor({
@@ -83,53 +112,81 @@ export function PasswordSection() {
   const verdict = passwordAccount ? removal.verdictFor(passwordAccount.id) : null;
 
   return (
-    <VStack align="start" gap={4} width="full" data-testid="password-section">
-      <VStack align="start" gap={1}>
-        <HStack gap={2}>
-          <KeyRound size={18} />
-          <Text fontWeight={600}>Password</Text>
-        </HStack>
-        <Text color="fg.muted" fontSize="sm">
-          {hasPassword
-            ? "The password this account signs in with, on the screens that ask for one."
-            : "You sign in without one. Setting a password gives you a second way in, for a device your passkey provider does not reach."}
-        </Text>
-      </VStack>
-
-      <HStack width="full">
-        <Spacer />
-        {hasPassword && passwordAccount && verdict ? (
-          <RemovePasswordButton
-            verdict={verdict}
-            accountId={passwordAccount.id}
-            isPending={removal.isRemoving}
-            onAsk={removal.ask}
+    <SettingsSection
+      anchorId="password"
+      icon={<KeyRound size={18} />}
+      title="Password"
+      hint="The password this account signs in with, on the screens that ask for one."
+      data-testid="password-settings-section"
+    >
+      <VStack width="full" align="stretch" gap={4} data-testid="password-section">
+        {hasPassword ? (
+          <SettingsSectionRow data-testid="password-row">
+            <Box color="fg.muted" display="flex">
+              <KeyRound size={16} />
+            </Box>
+            <VStack align="start" gap={0} minWidth={0}>
+              <Text fontSize="sm" fontWeight={500}>
+                Password
+              </Text>
+              <Text fontSize="xs" color="fg.muted">
+                Used on the screens that ask for one.
+              </Text>
+            </VStack>
+            <Spacer />
+            <HStack gap={2}>
+              <Button
+                size="xs"
+                variant="outline"
+                onClick={() => setDialogOpen(true)}
+                data-testid="password-action"
+              >
+                Change Password
+              </Button>
+              {passwordAccount && verdict ? (
+                <RemovePasswordButton
+                  verdict={verdict}
+                  accountId={passwordAccount.id}
+                  isPending={removal.isRemoving}
+                  onAsk={removal.ask}
+                />
+              ) : null}
+            </HStack>
+          </SettingsSectionRow>
+        ) : (
+          <SettingsEmptyState
+            icon={<KeyRound size={20} />}
+            title="No password set"
+            description={
+              governance.data?.governedBySso
+                ? "You sign in without one."
+                : "You sign in without one. Setting a password gives you a second way in, for a browser or a device your passkey provider does not reach."
+            }
+            data-testid="password-empty"
+            action={
+              <SetPasswordAction
+                governedBySso={governance.data?.governedBySso}
+                onSet={() => setDialogOpen(true)}
+              />
+            }
           />
-        ) : null}
-        <Button
-          size="sm"
-          colorPalette="orange"
-          onClick={() => setDialogOpen(true)}
-          data-testid="password-action"
-        >
-          {hasPassword ? "Change Password" : "Set a password"}
-        </Button>
-      </HStack>
+        )}
 
-      <ChangePasswordDialog
-        open={dialogOpen}
-        onClose={() => setDialogOpen(false)}
-        mode={hasPassword ? "change" : "set"}
-      />
+        <ChangePasswordDialog
+          open={dialogOpen}
+          onClose={() => setDialogOpen(false)}
+          mode={hasPassword ? "change" : "set"}
+        />
 
-      <RemoveSignInMethodDialog
-        target={removal.target}
-        staysBehind={removal.staysBehind}
-        organizationEnforcesSso={false}
-        isRemoving={removal.isRemoving}
-        onClose={removal.cancel}
-        onConfirm={removal.confirm}
-      />
-    </VStack>
+        <RemoveSignInMethodDialog
+          target={removal.target}
+          staysBehind={removal.staysBehind}
+          organizationEnforcesSso={false}
+          isRemoving={removal.isRemoving}
+          onClose={removal.cancel}
+          onConfirm={removal.confirm}
+        />
+      </VStack>
+    </SettingsSection>
   );
 }

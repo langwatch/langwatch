@@ -5,7 +5,7 @@
  * Spec: specs/ai-gateway/governance/me-usage-rest-api.feature
  */
 import { createErrorHandler, ProjectMissingCredentialsError } from "@langwatch/api";
-import { bindRestMiddleware, createRestRuntime } from "@langwatch/api/rest";
+import { bindMiddlewareContext, createRestRuntime } from "@langwatch/api/rest";
 import type {
   GovernanceRestApi,
   MePersonalCredential,
@@ -20,6 +20,7 @@ import {
   type ProjectIdentity,
 } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { PersonalUsageKeyMismatchError, type UserApi } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
 
@@ -39,6 +40,7 @@ const workspace = (overrides: Partial<ProjectIdentity>): ProjectIdentity => ({
   organizationId: ORGANIZATION_ID,
   isPersonal: true,
   ownerUserId: OWNER_ID,
+  kind: "application",
   ...overrides,
 });
 
@@ -121,6 +123,7 @@ async function mounted({
   });
 
   const hono = createRestRuntime({
+    authorization: restTestAuthorization(),
     identity: {
       authenticate: () => {
         if (!authenticated) throw new ProjectMissingCredentialsError();
@@ -134,7 +137,7 @@ async function mounted({
   }).mount(meUsageRest.router(), {
     app: () => app,
     onError: createErrorHandler(),
-    facts: [bindRestMiddleware(mePersonalCredential, () => credential)],
+    middlewareContext: [bindMiddlewareContext(mePersonalCredential, () => credential)],
   });
 
   return { hono, personalUsage };

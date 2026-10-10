@@ -69,12 +69,20 @@ class RecordingFeedback extends UiFeedback {
     throw new Error("The session read reported a success.");
   }
 
+  warned(_notice: UiSuccessNotice): void {
+    throw new Error("The session read reported a warning.");
+  }
+
+  informed(_notice: UiSuccessNotice): void {
+    throw new Error("The session read reported a notice.");
+  }
+
   failed(failure: UiFailureNotice): void {
     this.failures.push(failure);
   }
 }
 
-/** The scope capability beside this one, already settled on nothing. */
+/** The scope host service beside this one, already settled on nothing. */
 const RESOLVED_SCOPE: UiActiveScopeReading = {
   status: "ready",
   organization: void 0,

@@ -13,10 +13,12 @@ import type {
  */
 import { describe, expect, it } from "vitest";
 
+import { ownProof } from "../../../../__tests__/support/authorization-proofs.fixture.ts";
 import type { TraceLegacyReadService } from "../../../legacy/services/trace-legacy-read.service.ts";
 import { TraceExportService } from "../trace-export.service.ts";
-import { legacyReadAnswering } from "./support/trace-legacy-read.support.ts";
+import { hiddenOriginsOnly, legacyReadAnswering } from "./support/trace-legacy-read.support.ts";
 
+const authorization = ownProof({ projectId: "proj-1" });
 const fullProtections: Protections = {
   canSeeCosts: true,
   canSeeCapturedInput: true,
@@ -116,7 +118,11 @@ describe("TraceExportService", () => {
           batches: [traces],
           totalHits: 2,
         });
-        const service = TraceExportService.create({ traceService });
+        const service = TraceExportService.create({
+          authorizeOwnRead: async () => authorization,
+          compileFilter: hiddenOriginsOnly,
+          traceService,
+        });
 
         const chunks: {
           chunk: string;
@@ -125,6 +131,7 @@ describe("TraceExportService", () => {
         for await (const item of service.exportTraces({
           request: buildExportRequest(),
           protections: fullProtections,
+          authorization,
         })) {
           chunks.push(item);
         }
@@ -146,7 +153,11 @@ describe("TraceExportService", () => {
           batches: [batch1, batch2],
           totalHits: 5,
         });
-        const service = TraceExportService.create({ traceService });
+        const service = TraceExportService.create({
+          authorizeOwnRead: async () => authorization,
+          compileFilter: hiddenOriginsOnly,
+          traceService,
+        });
 
         const chunks: {
           chunk: string;
@@ -155,6 +166,7 @@ describe("TraceExportService", () => {
         for await (const item of service.exportTraces({
           request: buildExportRequest(),
           protections: fullProtections,
+          authorization,
         })) {
           chunks.push(item);
         }
@@ -183,7 +195,11 @@ describe("TraceExportService", () => {
           batches: [traces],
           totalHits: 1,
         });
-        const service = TraceExportService.create({ traceService });
+        const service = TraceExportService.create({
+          authorizeOwnRead: async () => authorization,
+          compileFilter: hiddenOriginsOnly,
+          traceService,
+        });
 
         const chunks: {
           chunk: string;
@@ -192,6 +208,7 @@ describe("TraceExportService", () => {
         for await (const item of service.exportTraces({
           request: buildExportRequest({ mode: "full" }),
           protections: fullProtections,
+          authorization,
         })) {
           chunks.push(item);
         }
@@ -214,7 +231,11 @@ describe("TraceExportService", () => {
           batches: [traces],
           totalHits: 2,
         });
-        const service = TraceExportService.create({ traceService });
+        const service = TraceExportService.create({
+          authorizeOwnRead: async () => authorization,
+          compileFilter: hiddenOriginsOnly,
+          traceService,
+        });
 
         const chunks: {
           chunk: string;
@@ -223,6 +244,7 @@ describe("TraceExportService", () => {
         for await (const item of service.exportTraces({
           request: buildExportRequest({ format: "json" }),
           protections: fullProtections,
+          authorization,
         })) {
           chunks.push(item);
         }
@@ -263,7 +285,11 @@ describe("TraceExportService", () => {
           batches: [traces],
           totalHits: 1,
         });
-        const service = TraceExportService.create({ traceService });
+        const service = TraceExportService.create({
+          authorizeOwnRead: async () => authorization,
+          compileFilter: hiddenOriginsOnly,
+          traceService,
+        });
 
         const chunks: {
           chunk: string;
@@ -272,6 +298,7 @@ describe("TraceExportService", () => {
         for await (const item of service.exportTraces({
           request: buildExportRequest({ mode: "full", format: "json" }),
           protections: fullProtections,
+          authorization,
         })) {
           chunks.push(item);
         }
@@ -288,7 +315,11 @@ describe("TraceExportService", () => {
           batches: [[]],
           totalHits: 0,
         });
-        const service = TraceExportService.create({ traceService });
+        const service = TraceExportService.create({
+          authorizeOwnRead: async () => authorization,
+          compileFilter: hiddenOriginsOnly,
+          traceService,
+        });
 
         const chunks: {
           chunk: string;
@@ -297,6 +328,7 @@ describe("TraceExportService", () => {
         for await (const item of service.exportTraces({
           request: buildExportRequest(),
           protections: fullProtections,
+          authorization,
         })) {
           chunks.push(item);
         }
@@ -311,11 +343,16 @@ describe("TraceExportService", () => {
           batches: [[]],
           totalHits: 0,
         });
-        const service = TraceExportService.create({ traceService });
+        const service = TraceExportService.create({
+          authorizeOwnRead: async () => authorization,
+          compileFilter: hiddenOriginsOnly,
+          traceService,
+        });
 
         for await (const _ of service.exportTraces({
           request: buildExportRequest({ mode: "full" }),
           protections: fullProtections,
+          authorization,
         })) {
           // consume
         }
@@ -334,11 +371,16 @@ describe("TraceExportService", () => {
           batches: [[]],
           totalHits: 0,
         });
-        const service = TraceExportService.create({ traceService });
+        const service = TraceExportService.create({
+          authorizeOwnRead: async () => authorization,
+          compileFilter: hiddenOriginsOnly,
+          traceService,
+        });
 
         for await (const _ of service.exportTraces({
           request: buildExportRequest(),
           protections: fullProtections,
+          authorization,
         })) {
           // consume
         }

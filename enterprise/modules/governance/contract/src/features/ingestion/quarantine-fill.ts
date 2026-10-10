@@ -1,18 +1,24 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 export const QUARANTINE_DEFAULT_WINDOW_SECONDS = 60;
 export const QUARANTINE_DEFAULT_THRESHOLD = 100;
 
-export const quarantineFillInputSchema = z
+const quarantineFillInputSchemaDefinition = z
   .object({
     organizationId: z.string().min(1),
     windowSeconds: z.number().positive().default(QUARANTINE_DEFAULT_WINDOW_SECONDS),
     threshold: z.number().nonnegative().default(QUARANTINE_DEFAULT_THRESHOLD),
   })
   .strict();
+export interface QuarantineFillInputSchema extends Named<
+  typeof quarantineFillInputSchemaDefinition
+> {}
+export const quarantineFillInputSchema: QuarantineFillInputSchema =
+  quarantineFillInputSchemaDefinition;
 export type QuarantineFillInput = z.input<typeof quarantineFillInputSchema>;
 
-export const quarantineFillStatsSchema = z
+const quarantineFillStatsSchemaDefinition = z
   .object({
     windowSeconds: z.number().positive(),
     threshold: z.number().nonnegative(),
@@ -29,4 +35,9 @@ export const quarantineFillStatsSchema = z
     ),
   })
   .strict();
+export interface QuarantineFillStatsSchema extends Named<
+  typeof quarantineFillStatsSchemaDefinition
+> {}
+export const quarantineFillStatsSchema: QuarantineFillStatsSchema =
+  quarantineFillStatsSchemaDefinition;
 export type QuarantineFillStats = z.infer<typeof quarantineFillStatsSchema>;

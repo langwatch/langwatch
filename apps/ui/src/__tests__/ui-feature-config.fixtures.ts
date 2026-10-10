@@ -18,6 +18,7 @@ export const servedConfig = {
     identityFrontDoor: false,
     authProvider: "auth0",
     emailPasswordEnabled: true,
+    federatedProviders: [],
     signUpMode: "invite_only",
   },
   authz: {},

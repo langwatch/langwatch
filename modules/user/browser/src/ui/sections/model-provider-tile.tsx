@@ -1,4 +1,5 @@
 import {
+  Alert,
   Box,
   Button,
   Code,
@@ -139,7 +140,14 @@ export function ModelProviderTile({
   };
 
   return (
-    <Box borderWidth="1px" borderColor="border.muted" borderRadius="md" padding={4} width="full">
+    <Box
+      background="bg.card"
+      borderWidth="1px"
+      borderColor="border.muted"
+      borderRadius="md"
+      padding={4}
+      width="full"
+    >
       <HStack cursor="pointer" onClick={() => setExpanded(!expanded)} gap={3}>
         <TileIcon
           iconAsset={iconAsset}
@@ -150,7 +158,7 @@ export function ModelProviderTile({
           <Text fontSize="sm" fontWeight="semibold">
             {displayName}
           </Text>
-          <Text fontSize="xs" color={providerConfigured ? "fg.muted" : "orange.700"}>
+          <Text fontSize="xs" color={providerConfigured ? "fg.muted" : "orange.fg"}>
             {providerConfigured ? "Issue your own virtual key" : "Provider not configured"}
           </Text>
         </VStack>
@@ -158,44 +166,30 @@ export function ModelProviderTile({
       </HStack>
 
       {expanded && !providerConfigured && (
-        <Box
-          marginTop={4}
-          padding={3}
-          borderWidth="1px"
-          borderColor="orange.200"
-          borderRadius="sm"
-          backgroundColor="orange.50"
-        >
-          <Text fontSize="sm" color="orange.900" marginBottom={2}>
-            Your organization doesn&apos;t have {articleFor(displayName)} {displayName} credential
-            configured yet, so issuing a key here would mint a VK that fails on first call with{" "}
-            <Code fontSize="xs" backgroundColor="transparent">
-              provider_error
-            </Code>
-            .
-          </Text>
-          <Text fontSize="xs" color="orange.800">
-            Ask your organization admin to add {articleFor(displayName)} {displayName} provider in{" "}
-            <Link
-              href="/settings/model-providers"
-              color="orange.800"
-              fontWeight="medium"
-              textDecoration="underline"
-            >
-              Settings → Model Providers
-            </Link>
-            . They&apos;ll also need to bind it into the{" "}
-            <Link
-              href="/gateway/routing-policies"
-              color="orange.800"
-              fontWeight="medium"
-              textDecoration="underline"
-            >
-              default routing policy
-            </Link>{" "}
-            so personal keys can route to it.
-          </Text>
-        </Box>
+        <Alert.Root status="warning" size="sm" marginTop={4}>
+          <Alert.Indicator />
+          <Alert.Content>
+            <Alert.Title>
+              Your organization doesn&apos;t have {articleFor(displayName)} {displayName} credential
+              configured yet, so issuing a key here would mint a VK that fails on first call with{" "}
+              <Code fontSize="xs" backgroundColor="transparent">
+                provider_error
+              </Code>
+              .
+            </Alert.Title>
+            <Alert.Description>
+              Ask your organization admin to add {articleFor(displayName)} {displayName} provider in{" "}
+              <Link href="/settings/model-providers" fontWeight="medium">
+                Settings → Model Providers
+              </Link>
+              . They&apos;ll also need to bind it into the{" "}
+              <Link href="/gateway/routing-policies" fontWeight="medium">
+                default routing policy
+              </Link>{" "}
+              so personal keys can route to it.
+            </Alert.Description>
+          </Alert.Content>
+        </Alert.Root>
       )}
 
       {expanded && providerConfigured && !issued && (
@@ -246,17 +240,12 @@ export function ModelProviderTile({
             </Text>
           )}
           {errorMessage && (
-            <Box
-              padding={2}
-              borderWidth="1px"
-              borderColor="red.300"
-              borderRadius="sm"
-              backgroundColor="red.50"
-            >
-              <Text fontSize="xs" color="red.700">
-                {errorMessage}
-              </Text>
-            </Box>
+            <Alert.Root status="error" size="sm">
+              <Alert.Indicator />
+              <Alert.Content>
+                <Alert.Description>{errorMessage}</Alert.Description>
+              </Alert.Content>
+            </Alert.Root>
           )}
         </VStack>
       )}

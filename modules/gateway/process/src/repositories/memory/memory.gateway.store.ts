@@ -61,6 +61,7 @@ type MemoryGatewayConnectColumns = {
   licenseTokenHash: string | null;
   licenseInstanceId: string | null;
   licenseExpiresAt: Instant | null;
+  licenseId: string | null;
 };
 
 /** Rows other modules own, seeded as their tables would answer gateway's reads. */

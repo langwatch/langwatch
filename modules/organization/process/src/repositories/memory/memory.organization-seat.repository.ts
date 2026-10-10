@@ -1,5 +1,8 @@
 import { isDeveloper, isFullMember, isLiteMember } from "@langwatch/entitlement-contract";
-import { OrganizationUserRole } from "@langwatch/organization-contract";
+import {
+  type OrganizationMemberSeats,
+  OrganizationUserRole,
+} from "@langwatch/organization-contract";
 import { nowInstant, type Instant } from "@langwatch/time";
 import { z } from "zod";
 
@@ -68,6 +71,14 @@ export class MemoryOrganizationSeatRepository extends OrganizationSeatRepository
 
   async getMembersDeveloperCount(organizationId: string): Promise<number> {
     return this.#count(organizationId, isDeveloper);
+  }
+
+  async countMemberSeats(organizationId: string): Promise<OrganizationMemberSeats> {
+    return {
+      fullMembers: this.#count(organizationId, isFullMember),
+      liteMembers: this.#count(organizationId, isLiteMember),
+      developers: this.#count(organizationId, isDeveloper),
+    };
   }
 
   #count(organizationId: string, predicate: SeatPredicate): number {

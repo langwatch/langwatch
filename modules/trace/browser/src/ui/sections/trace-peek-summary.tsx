@@ -3,7 +3,15 @@ import {
   formatDuration,
   formatTokens,
 } from "@langwatch/design-system/display-formatters";
-import { Box, Circle, HStack, Skeleton, Text, VStack } from "@langwatch/design-system/primitives";
+import {
+  Alert,
+  Box,
+  Circle,
+  HStack,
+  Skeleton,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 
 import { STATUS_COLORS } from "../../model/display-formatters.ts";
 import { useTraceHeader } from "./use-trace-header.ts";
@@ -16,16 +24,24 @@ type TracePeekSummaryProps = {
    * partition-pruning hint.
    */
   occurredAtMs?: number;
+  /** The member that owns the trace on an aggregate (ADR-177 block F); null on a plain project. */
+  tenantId?: string | null;
 };
 
 /**
  * The compact trace summary a hover-peek shows.
  */
-export function TracePeekSummary({ projectId, traceId, occurredAtMs }: TracePeekSummaryProps) {
+export function TracePeekSummary({
+  projectId,
+  traceId,
+  occurredAtMs,
+  tenantId,
+}: TracePeekSummaryProps) {
   const { header: trace, isLoading } = useTraceHeader({
     projectId,
     traceId,
     occurredAtMs,
+    tenantId,
     full: false,
   });
 
@@ -73,11 +89,12 @@ export function TracePeekSummary({ projectId, traceId, occurredAtMs }: TracePeek
 
       {trace.error && (
         <Box paddingX={3} paddingBottom={2}>
-          <Box padding={2} borderRadius="sm" bg="red.subtle">
-            <Text textStyle="xs" color="red.fg" lineClamp={2}>
-              {trace.error}
-            </Text>
-          </Box>
+          <Alert.Root status="error" size="sm">
+            <Alert.Indicator />
+            <Alert.Content>
+              <Alert.Description lineClamp={2}>{trace.error}</Alert.Description>
+            </Alert.Content>
+          </Alert.Root>
         </Box>
       )}
     </VStack>

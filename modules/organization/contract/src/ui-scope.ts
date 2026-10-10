@@ -22,6 +22,8 @@ export type UiScopeProject = {
   readonly name?: string;
   /** The project's user link, read by a screen that shows a user id; never by the resolution. */
   readonly userLinkTemplate?: string | null;
+  /** The project's kind (ADR-177): the switcher marks an aggregate, a landing skips one. */
+  readonly kind?: string;
 };
 
 export type UiScopeTeam = {

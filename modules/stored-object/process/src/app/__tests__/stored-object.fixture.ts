@@ -108,7 +108,7 @@ export function createStoredObjectTestSigner(): StoredObjectUploadSignerService 
 export class GrantedStoredObjectPermissions implements StoredObjectPermissions {
   constructor(
     readonly granted: readonly string[] = ["traces:view", "scenarios:view", "datasets:view"],
-    readonly denialReason: AuthzDenialReason = "no-binding",
+    readonly denialReason: AuthzDenialReason = "no-grant",
   ) {}
 
   async getDecision(input: { permission: string }): Promise<PermissionDecision> {

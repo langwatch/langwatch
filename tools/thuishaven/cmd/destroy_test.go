@@ -5,8 +5,11 @@ import (
 	"testing"
 )
 
-// The ceremony is the whole safety of `haven destroy`: a person answers a
-// prompt, a script passes --yes, and an agent gets the flag or nothing.
+// The ceremony is the whole safety of `haven down --destroy`: a person types
+// the slug, a script passes --yes, and an agent gets the flag or nothing.
+//
+// @scenario "In a terminal only the typed slug destroys"
+// @scenario "An agent without --yes is refused"
 func TestConfirmDestroy(t *testing.T) {
 	cases := []struct {
 		name     string
@@ -17,12 +20,14 @@ func TestConfirmDestroy(t *testing.T) {
 		proceed  bool
 		wantErr  bool
 		wantSaid string
+		wantCode int
 	}{
-		{name: "a person answering yes proceeds", slug: "apidiff-run1-branch", answer: "y\n", proceed: true},
+		{name: "a person typing the slug proceeds", slug: "apidiff-run1-branch", answer: "apidiff-run1-branch\n", proceed: true},
+		{name: "a person answering y aborts: only the slug counts", slug: "apidiff-run1-branch", answer: "y\n", wantSaid: "aborted"},
 		{name: "a person answering nothing aborts", slug: "apidiff-run1-branch", answer: "\n", wantSaid: "aborted"},
 		{name: "a person answering no aborts", slug: "apidiff-run1-branch", answer: "n\n", wantSaid: "aborted"},
 		{name: "--yes proceeds without a prompt", slug: "apidiff-run1-branch", yes: true, proceed: true},
-		{name: "an agent without --yes is refused", slug: "apidiff-run1-branch", isAgent: true, wantErr: true},
+		{name: "an agent without --yes is refused", slug: "apidiff-run1-branch", isAgent: true, wantErr: true, wantCode: exitUsage},
 		{name: "an agent with --yes proceeds", slug: "apidiff-run1-branch", isAgent: true, yes: true, proceed: true},
 		{name: "the shared main database is refused even with --yes", slug: "main", yes: true, wantErr: true},
 		{name: "the shared main database is refused for an agent", slug: "main", isAgent: true, yes: true, wantErr: true},
@@ -41,6 +46,9 @@ func TestConfirmDestroy(t *testing.T) {
 			if (err != nil) != testCase.wantErr {
 				t.Fatalf("err = %v, wantErr %v", err, testCase.wantErr)
 			}
+			if testCase.wantCode != 0 && ExitCode(err) != testCase.wantCode {
+				t.Errorf("exit code = %d, want %d", ExitCode(err), testCase.wantCode)
+			}
 			if proceed != testCase.proceed {
 				t.Errorf("proceed = %v, want %v", proceed, testCase.proceed)
 			}
@@ -51,27 +59,16 @@ func TestConfirmDestroy(t *testing.T) {
 	}
 }
 
-// destroy is dispatchable and declares exactly the flag its ceremony reads.
-func TestDestroyIsOnTheCommandTable(t *testing.T) {
-	var spec commandSpec
-	for _, candidate := range table {
-		if candidate.name == "destroy" {
-			spec = candidate
-		}
-	}
-	if spec.name == "" {
-		t.Fatal("destroy must be on the command table, or nothing documents or dispatches it")
-	}
-	if spec.maxArgs != 1 || spec.args == "" {
-		t.Errorf("destroy takes exactly one positional slug, got args=%q maxArgs=%d", spec.args, spec.maxArgs)
-	}
+// down declares the destroy ceremony's flags, and says the data goes.
+func TestDownDeclaresDestroy(t *testing.T) {
+	spec := specByName(t, "down")
 	if !strings.Contains(strings.ToLower(spec.summary), "drop") {
-		t.Errorf("destroy's summary %q must disclose that the databases go", spec.summary)
+		t.Errorf("down's summary %q must disclose that --destroy drops the databases", spec.summary)
 	}
-	if _, err := parse(spec, []string{"apidiff-run1-branch", "--yes"}); err != nil {
-		t.Errorf("destroy must accept a slug and --yes: %v", err)
+	if _, err := parse(spec, []string{"--destroy", "--yes"}); err != nil {
+		t.Errorf("down must accept --destroy --yes: %v", err)
 	}
-	if _, err := parse(spec, []string{"apidiff-run1-branch", "--force"}); err == nil {
-		t.Error("destroy must not accept an undeclared flag")
+	if _, err := parse(spec, []string{"apidiff-run1-branch"}); err == nil {
+		t.Error("down takes no positional: the stack is named with --stack")
 	}
 }

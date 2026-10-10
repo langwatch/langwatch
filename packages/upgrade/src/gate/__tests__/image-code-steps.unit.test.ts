@@ -111,6 +111,7 @@ describe("servingImageTree", () => {
             const row = {
               ...declaration,
               steps: [...declaration.steps],
+              credentialKeys: [...(declaration.credentialKeys ?? [])],
               startedAt: at,
               heartbeatAt: at,
             };
@@ -130,8 +131,9 @@ describe("servingImageTree", () => {
         image: { name: "3.21.0", release: "3.21.0", blockingSteps, declaredSteps },
         ledger: {
           findSteps: async () =>
-            done.map((id) => ({
+            [...done, ...declaredSteps].map((id) => ({
               id,
+              kind: "data" as const,
               status: "done" as const,
               mode: "blocking" as const,
               release: null,

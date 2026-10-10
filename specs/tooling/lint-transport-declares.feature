@@ -1,8 +1,8 @@
 Feature: The transport-declares lint rule
   A transport declares; it never implements (ARCHITECTURE.md section 8). The
   framework parses, refuses and serialises, and a handler takes
-  `{ input, app, actor, scope, signal }`, calls exactly one API operation, and
-  returns a plain value or throws. The rule reads a module's process source
+  `{ input, app, actor, scope, authorization, signal }`, calls exactly one API
+  operation, and returns a plain value or throws. The rule reads a module's process source
   four ways: every source for the process-only roots it may not build, the
   `transport/` folder for its handlers, transport and `*.module.ts` files for a
   request re-checked by hand, and route families for the HTTP and tRPC
@@ -14,6 +14,13 @@ Feature: The transport-declares lint rule
     Given a declared handler that destructures a raw context field and reads raw members through aliases
     When the transport-declares rule runs over it
     Then it reports rawContextField on the field's line and rawContextAccess on each access
+
+  @unit
+  Scenario: A handler passes the door's authorization through to its one operation
+    Given a declared handler that takes authorization and hands it to one app operation
+    When the transport-declares rule runs over it
+    Then it reports nothing
+    And a handler that branches on authorization is still reported at the branch
 
   @unit
   Scenario: A handler takes the producer its own route declared

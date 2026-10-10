@@ -8,7 +8,7 @@ import {
   baseResponses,
   buildStandardSuccessResponse,
   conflictResponses,
-  defineRestMiddleware,
+  defineMiddlewareContext,
   defineRestRouter,
   MANAGEMENT_API_VERSION,
   resolver,
@@ -39,15 +39,15 @@ import {
 } from "@langwatch/prompt-contract";
 import { z } from "zod";
 
-// ── the facts the process resolves ───────────────────────────────────────────
+// ── the middleware context the module provides ───────────────────────────────
 
 /**
  * What this family knows about the project that the credential itself does
  * not carry: the organization it belongs to (a tag catalogue is an
  * organization row), and the deep link back into the library, from the deployment's own origin.
  */
-export const promptRestFacts = defineRestMiddleware(
-  "promptRestFacts",
+export const promptRestContext = defineMiddlewareContext(
+  "promptRestContext",
   z.object({
     organizationId: z.string(),
     promptsUrl: z.string(),
@@ -73,7 +73,7 @@ export const promptRest = defineRestRouter(PromptApi)
   .get("/api/prompts", "getApiPrompts")
   .withPermission("prompts:view")
   .withOutput(z.array(promptWireSchema))
-  .withMiddleware(promptRestFacts)
+  .withMiddlewareContext(promptRestContext)
   .withDocs({
     description: "Get all prompts for a project",
     responses: {
@@ -102,11 +102,12 @@ export const promptRest = defineRestRouter(PromptApi)
   // deployment, and it belongs with the grain that administers the prompt
   // rather than with the one that edits its text.
   .put("/api/prompts/:id{.+?}/tags/:tag", "putApiPromptsByIdTagsByTag")
+  .withAudit("prompts.assignTag")
   .withParams(idTagParamsSchema)
   .withInput(assignTagInputSchema)
   .withPermission("prompts:manage")
   .withOutput(assignTagResponseSchema)
-  .withMiddleware(promptRestFacts)
+  .withMiddlewareContext(promptRestContext)
   .withDocs({
     description: 'Assign a tag (e.g. "production", "staging") to a specific prompt version',
     responses: {
@@ -141,7 +142,7 @@ export const promptRest = defineRestRouter(PromptApi)
   .get("/api/prompts/tags", "getApiPromptsTags")
   .withPermission("prompts:view")
   .withOutput(z.array(tagDefinitionSchema))
-  .withMiddleware(promptRestFacts)
+  .withMiddlewareContext(promptRestContext)
   .withDocs({
     description: "List all prompt tag definitions for the organization",
     responses: {
@@ -156,11 +157,12 @@ export const promptRest = defineRestRouter(PromptApi)
   })
 
   .post("/api/prompts/tags", "postApiPromptsTags")
+  .withAudit("promptTags.create")
   .withInput(createTagInputSchema)
   .withPermission("prompts:manage")
   .withOutput(tagDefinitionSchema)
   .withStatus(201)
-  .withMiddleware(promptRestFacts)
+  .withMiddlewareContext(promptRestContext)
   .withDocs({
     description: "Create a custom prompt tag definition for the organization",
     responses: {
@@ -178,11 +180,12 @@ export const promptRest = defineRestRouter(PromptApi)
   })
 
   .put("/api/prompts/tags/:tag", "putApiPromptsTagsByTag")
+  .withAudit("promptTags.rename")
   .withParams(tagParamsSchema)
   .withInput(renameTagInputSchema)
   .withPermission("prompts:manage")
   .withOutput(tagDefinitionSchema)
-  .withMiddleware(promptRestFacts)
+  .withMiddlewareContext(promptRestContext)
   .withDocs({
     description: "Rename a prompt tag definition",
     responses: {
@@ -201,10 +204,11 @@ export const promptRest = defineRestRouter(PromptApi)
   })
 
   .delete("/api/prompts/tags/:tag", "deleteApiPromptsTagsByTag")
+  .withAudit("promptTags.delete")
   .withParams(tagParamsSchema)
   .withPermission("prompts:manage")
   .withOutput(z.void())
-  .withMiddleware(promptRestFacts)
+  .withMiddlewareContext(promptRestContext)
   .withDocs({
     description: "Delete a prompt tag definition and cascade to assignments",
     responses: { ...baseResponses, 204: { description: "Tag deleted", content: {} } },
@@ -217,7 +221,7 @@ export const promptRest = defineRestRouter(PromptApi)
   .withParams(idParamsSchema)
   .withPermission("prompts:view")
   .withOutput(z.array(promptWireSchema))
-  .withMiddleware(promptRestFacts)
+  .withMiddlewareContext(promptRestContext)
   .withDocs({
     description:
       "Get all versions for a prompt. Does not include base prompt data, only versioned data.",
@@ -253,11 +257,12 @@ export const promptRest = defineRestRouter(PromptApi)
     "/api/prompts/:id{.+?}/versions/:versionId/restore",
     "postApiPromptsByIdVersionsByVersionIdRestore",
   )
+  .withAudit("prompts.restoreVersion")
   .withParams(idVersionParamsSchema)
   .withInput(restorePromptVersionBodySchema)
   .withPermission("prompts:update")
   .withOutput(promptWireSchema)
-  .withMiddleware(promptRestFacts)
+  .withMiddlewareContext(promptRestContext)
   .withDocs({
     description:
       "Restore a prompt to a previous version. Creates a new version with the same config data as the specified version.",
@@ -301,7 +306,7 @@ export const promptRest = defineRestRouter(PromptApi)
   .withQuery(promptWindowQuerySchema)
   .withPermission("prompts:view")
   .withOutput(promptWireSchema)
-  .withMiddleware(promptRestFacts)
+  .withMiddlewareContext(promptRestContext)
   .withDocs({
     description:
       "Get a specific prompt by slug, with optional shorthand syntax for tags and versions. " +
@@ -336,10 +341,11 @@ export const promptRest = defineRestRouter(PromptApi)
   // still implies it, so no existing caller changes, and a viewer holding only
   // `prompts:view` is declined exactly as before.
   .post("/api/prompts", "postApiPrompts")
+  .withAudit("prompts.create")
   .withInput(createPromptInputSchema)
   .withPermission("prompts:create")
   .withOutput(promptWireSchema)
-  .withMiddleware(promptRestFacts)
+  .withMiddlewareContext(promptRestContext)
   .withDocs({
     description: "Create a new prompt with default initial version",
     responses: {
@@ -362,11 +368,12 @@ export const promptRest = defineRestRouter(PromptApi)
   })
 
   .post("/api/prompts/:id{.+?}/sync", "postApiPromptsByIdSync")
+  .withAudit("prompts.syncFromSource")
   .withParams(idParamsSchema)
   .withInput(syncInputSchema)
   .withPermission("prompts:manage")
   .withOutput(promptSyncResultSchema)
-  .withMiddleware(promptRestFacts)
+  .withMiddlewareContext(promptRestContext)
   .withDocs({
     description: "Sync/upsert a prompt with local content",
     responses: {
@@ -390,11 +397,12 @@ export const promptRest = defineRestRouter(PromptApi)
   )
 
   .put("/api/prompts/:id{.+}", "putApiPromptsById")
+  .withAudit("prompts.update")
   .withParams(idParamsSchema)
   .withInput(updatePromptInputSchema)
   .withPermission("prompts:update")
   .withOutput(promptWireSchema)
-  .withMiddleware(promptRestFacts)
+  .withMiddlewareContext(promptRestContext)
   .withDocs({
     description: "Update a prompt",
     responses: {
@@ -425,10 +433,11 @@ export const promptRest = defineRestRouter(PromptApi)
   })
 
   .delete("/api/prompts/:id{.+}", "deleteApiPromptsById")
+  .withAudit("prompts.delete")
   .withParams(idParamsSchema)
   .withPermission("prompts:manage")
   .withOutput(successSchema)
-  .withMiddleware(promptRestFacts)
+  .withMiddlewareContext(promptRestContext)
   .withDocs({
     description: "Delete a prompt",
     responses: {

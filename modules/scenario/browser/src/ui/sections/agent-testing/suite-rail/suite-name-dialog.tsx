@@ -51,12 +51,10 @@ export function SuiteNameDialog({
       onOpenChange={({ open: nextOpen }) => !nextOpen && onClose()}
       placement="center"
     >
-      <Dialog.Content bg="bg" maxWidth="420px" data-testid="agent-testing-suite-name-dialog">
+      <Dialog.Content maxWidth="420px" data-testid="agent-testing-suite-name-dialog">
         <Dialog.CloseTrigger />
         <Dialog.Header>
-          <Dialog.Title fontSize="md" fontWeight="500">
-            New test suite
-          </Dialog.Title>
+          <Dialog.Title>New test suite</Dialog.Title>
         </Dialog.Header>
         <Dialog.Body>
           <Input
@@ -74,7 +72,7 @@ export function SuiteNameDialog({
             }}
           />
           {problem && (
-            <Text paddingTop={2} fontSize="12px" color="red.600" data-testid="suite-name-problem">
+            <Text paddingTop={2} fontSize="12px" color="red.fg" data-testid="suite-name-problem">
               {problem}
             </Text>
           )}
@@ -84,7 +82,7 @@ export function SuiteNameDialog({
             Cancel
           </Button>
           <Button
-            colorPalette="blue"
+            colorPalette="orange"
             size="sm"
             loading={isCreating}
             onClick={submit}

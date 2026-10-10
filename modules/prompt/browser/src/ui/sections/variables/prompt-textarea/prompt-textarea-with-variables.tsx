@@ -267,7 +267,9 @@ function textareaStyle({
   height: string | undefined;
   reservedBottomPadding: number | null;
 }): CSSProperties {
-  const borderColor = hasError ? "var(--chakra-colors-red-500)" : "var(--chakra-colors-border)";
+  const borderColor = hasError
+    ? "var(--chakra-colors-border-error)"
+    : "var(--chakra-colors-border)";
   return {
     width: "100%",
     minHeight: fillHeight ? "100%" : minHeight,
@@ -303,8 +305,10 @@ function paintFrame({
   hasError: boolean;
   reservedBottomPadding: number | null;
 }) {
-  const idleColor = focused ? "var(--chakra-colors-blue-500)" : "var(--chakra-colors-border)";
-  element.style.borderColor = hasError ? "var(--chakra-colors-red-500)" : idleColor;
+  const idleColor = focused
+    ? "var(--chakra-colors-blue-emphasized)"
+    : "var(--chakra-colors-border)";
+  element.style.borderColor = hasError ? "var(--chakra-colors-border-error)" : idleColor;
   element.style.borderWidth = focused ? "2px" : "1px";
   element.style.padding = focused ? "7px 9px" : "8px 10px";
   if (reservedBottomPadding !== null) {
@@ -392,10 +396,11 @@ export const PromptTextAreaWithVariables = ({
 
   const [isHovered, setIsHovered] = useState(false);
 
-  const { localValue, handleValueChange, setValueImmediate } = useDebouncedTextarea({
-    value,
-    onChange,
-  });
+  const { localValue, handleValueChange, setValueImmediate, flushPendingChange } =
+    useDebouncedTextarea({
+      value,
+      onChange,
+    });
 
   const { existingVariableIds, invalidVariables, isKnownVariable } = useVariableUsage({
     variables,
@@ -535,7 +540,10 @@ export const PromptTextAreaWithVariables = ({
             reservedBottomPadding,
           })}
           onFocus={paintOnFocusChange(true)}
-          onBlur={paintOnFocusChange(false)}
+          onBlur={(e) => {
+            flushPendingChange();
+            paintOnFocusChange(false)(e);
+          }}
         >
           {renderText}
         </RichTextarea>

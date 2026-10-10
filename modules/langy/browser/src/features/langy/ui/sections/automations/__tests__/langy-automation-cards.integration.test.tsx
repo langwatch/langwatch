@@ -52,6 +52,9 @@ class FakeLangyHost extends LangyHostApi {
   currentUser() {
     return { id: "user-1" };
   }
+  hasOrganizationPermission() {
+    return false;
+  }
   hasPermission() {
     return true;
   }

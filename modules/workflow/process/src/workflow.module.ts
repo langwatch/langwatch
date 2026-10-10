@@ -1,7 +1,7 @@
 import {
-  bindRestMiddleware,
   principalOfCredential,
   projectCredentialOfRequest,
+  projectRequestContextOf,
 } from "@langwatch/api/rest";
 import { defineProcessModule, type PublishedProcessModule } from "@langwatch/process";
 import { defineMigrationStep } from "@langwatch/upgrade/step";
@@ -14,11 +14,11 @@ import { workflowLifecycleEventing } from "#eventing/workflow-lifecycle.pipeline
 import { workflowNlpLambdaCleanupEventing } from "#eventing/workflow-nlp-lambda-cleanup.pipeline";
 import { workflowRepositories } from "#repositories/workflow-repositories.registry";
 import { WorkflowCurrentVersionBackfillService } from "#services/workflow-current-version-backfill.service";
+import { WorkflowHttpCredentialsBackfillService } from "#services/workflow-http-credentials-backfill.service";
 import { WorkflowHttpSecretsService } from "#services/workflow-http-secrets.service";
-import { WorkflowHttpCredentialsBackfillTask } from "#tasks/workflow-http-credentials-backfill.task";
 import { workflowExecuteSyncRest } from "#transport/workflow-execute-sync.rest";
 import { workflowOptimizationTrpcTransport } from "#transport/workflow-optimization.trpc";
-import { workflowRunCallerKey, workflowRunRest } from "#transport/workflow-run.rest";
+import { workflowRunRest } from "#transport/workflow-run.rest";
 import { workflowStudioRest } from "#transport/workflow-studio.rest";
 import { createWorkflowRest } from "#transport/workflow.rest";
 import { workflowTrpcTransport } from "#transport/workflow.trpc";
@@ -42,14 +42,8 @@ export const workflowProcessModule: PublishedProcessModule<
   .withEventing(workflowNlpLambdaCleanupEventing)
   .withEventing(workflowLifecycleEventing)
   .withEventing(workflowAgentArchiveCascadeEventing)
-  .withTasks(({ repositories, dependencies }) => [
-    WorkflowHttpCredentialsBackfillTask.create({
-      workflows: repositories.workflows,
-      httpSecrets: WorkflowHttpSecretsService.create(dependencies.secrets),
-    }),
-  ])
   // Background, after old writers are gone: agent's fields arrive from version_saved (round 20).
-  .withMigrations(({ app, repositories }) => [
+  .withMigrations(({ app, dependencies, repositories }) => [
     defineMigrationStep({
       id: "workflow:record-current-version-fields",
       kind: "data",
@@ -70,10 +64,30 @@ export const workflowProcessModule: PublishedProcessModule<
         });
       },
     }),
-  ])
-  .withTransportFacts(() => [
-    bindRestMiddleware(workflowRunCallerKey, (context) => {
-      const principal = principalOfCredential(projectCredentialOfRequest(context.req.raw));
-      return principal?.type === "apiKey" ? principal.id : null;
+    defineMigrationStep({
+      id: "workflow:move-http-credentials-to-secrets",
+      kind: "data",
+      mode: "background",
+      description: "Stores credentials typed into workflow HTTP nodes as project secrets.",
+      needsOldWritersGone: true,
+      run: async ({ checkpoint, dryRun, signal }) => {
+        const resumed = checkpoint.resumeFrom?.afterProjectId;
+        return WorkflowHttpCredentialsBackfillService.create({
+          workflows: repositories.workflows,
+          httpSecrets: WorkflowHttpSecretsService.create(dependencies.secrets),
+        }).moveLiterals({
+          dryRun,
+          signal,
+          afterProjectId: typeof resumed === "string" ? resumed : null,
+          onProjectDone: (report) => checkpoint.save({ report }),
+        });
+      },
     }),
-  ]);
+  ])
+  .provideMiddlewareContext({
+    projectRequestContext: projectRequestContextOf,
+    workflowRunCallerKey: (request) => {
+      const principal = principalOfCredential(projectCredentialOfRequest(request));
+      return principal?.type === "apiKey" ? principal.id : null;
+    },
+  });

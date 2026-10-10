@@ -31,6 +31,7 @@ function toConversationContextTurn(input: { trace: TraceListItem; protections: V
 function listItem(overrides: Partial<TraceListItem> = {}): TraceListItem {
   return {
     traceId: "trace-1",
+    projectId: "project-1",
     timestamp: 1_000,
     name: "root span",
     serviceName: "claude-code",
@@ -61,6 +62,7 @@ function listItem(overrides: Partial<TraceListItem> = {}): TraceListItem {
     ttft: null,
     traceName: "claude_code.turn",
     rootSpanType: "agent",
+    evaluations: [],
     ...overrides,
   };
 }

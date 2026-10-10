@@ -13,7 +13,7 @@ export function WorkflowIcon({
 }: { icon: ReactNode; size: keyof typeof ICON_SIZE } & BoxProps) {
   return (
     <Box
-      backgroundColor="bg.subtle"
+      backgroundColor="bg.nested"
       backgroundImage="radial-gradient(circle at 4px 4px, var(--chakra-colors-border) 1px, transparent 1px)"
       backgroundSize="6px 6px"
       borderRadius="4px"
@@ -68,7 +68,7 @@ export function WorkflowCardBase({
       padding={4}
       gap={2}
       borderRadius="xl"
-      background="bg.panel"
+      background="bg.card"
       boxShadow="md"
       height="142px"
       transition="all 0.2s ease-in-out"

@@ -4,7 +4,14 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { Toaster, toaster } from "./toaster.tsx";
 
 const meta = {
-  title: "Components/Toaster",
+  title: "Feedback/Toaster",
+  parameters: {
+    usage: {
+      use: "Something just happened, and the screen does not change to show it.",
+      avoid:
+        "A failure still in effect: Alert. A wrong field: its field error. Never both a toast and an alert for one thing.",
+    },
+  },
   component: Toaster,
   tags: ["autodocs"],
   argTypes: { renderMeta: { control: false } },

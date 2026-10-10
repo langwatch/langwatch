@@ -1,10 +1,10 @@
+import { SnippetPreview } from "@langwatch/design-system/code-preview";
 import { API_KEY_PLACEHOLDER } from "@langwatch/design-system/personal-access-token-banner";
 import { Accordion, Separator, Text, VStack } from "@langwatch/design-system/primitives";
 import type React from "react";
 import { useState } from "react";
 
 import { useActiveProject } from "../active-project-context.tsx";
-import { CodePreview } from "./code-preview.tsx";
 
 export function LangflowSetup(): React.ReactElement {
   const { freshToken } = useActiveProject();
@@ -90,7 +90,7 @@ langwatch.get_current_trace().update(
           Add the following environment variable to your Langflow configuration. This will
           automatically enable LangWatch tracing for all your Langflow components.
         </Text>
-        <CodePreview
+        <SnippetPreview
           code={envVarsCode}
           filename=".env"
           codeLanguage="bash"
@@ -105,7 +105,11 @@ langwatch.get_current_trace().update(
         <Text textStyle="sm" color="fg.muted">
           Restart Langflow using:
         </Text>
-        <CodePreview code="langflow run --env-file .env" filename="terminal" codeLanguage="bash" />
+        <SnippetPreview
+          code="langflow run --env-file .env"
+          filename="terminal"
+          codeLanguage="bash"
+        />
         <Text textStyle="sm" color="fg.muted">
           Run a message through your Langflow project and check the LangWatch dashboard for
           monitoring and observability.
@@ -140,7 +144,7 @@ langwatch.get_current_trace().update(
                   <Text fontSize="sm" color="fg.muted">
                     {item.description}
                   </Text>
-                  <CodePreview code={item.code} filename={item.filename} codeLanguage="python" />
+                  <SnippetPreview code={item.code} filename={item.filename} codeLanguage="python" />
                   {item.instructions && (
                     <VStack align="stretch" gap={1}>
                       <Text fontSize="sm" fontWeight="medium">

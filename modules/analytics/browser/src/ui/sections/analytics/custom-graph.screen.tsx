@@ -1,6 +1,8 @@
 import { customGraphInputSchema } from "@langwatch/dashboard-contract";
+import { CodePreview } from "@langwatch/design-system/code-preview";
 import { getRawColorValue } from "@langwatch/design-system/color-mode";
 import { Dialog } from "@langwatch/design-system/dialog";
+import { langwatchEndpoint } from "@langwatch/design-system/langwatch-endpoint-env";
 import { Menu } from "@langwatch/design-system/menu";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import {
@@ -59,6 +61,7 @@ import { LuChartArea, LuPlus } from "react-icons/lu";
 import { useDebounceValue } from "usehooks-ts";
 
 import { analyticsApi, type AnalyticsApiMap } from "../../../behavior/analytics-api.ts";
+import { useShowErrorToast } from "../../../behavior/analytics-feedback.ts";
 import { useAnalyticsPeriod } from "../../../behavior/use-analytics-period.ts";
 import { useStoredGraph } from "../../../behavior/use-dashboards.ts";
 import { useFilterOptions } from "../../../behavior/use-filter-options.ts";
@@ -84,7 +87,6 @@ import {
   type PipelineFields,
   type SharedFiltersInput,
 } from "../../../model/analytics-vocabulary.ts";
-import { CodeSnippet } from "../../../ui/elements/code-snippet.tsx";
 import { AnalyticsPeriodPicker } from "../../../ui/sections/analytics-period-picker.tsx";
 import {
   CustomGraph,
@@ -96,6 +98,7 @@ import { FilterSidebar } from "../../../ui/sections/filter-sidebar.tsx";
 import { FilterToggle, FilterToggleButton } from "../../../ui/sections/filter-toggle.tsx";
 import { SavedViewsScope } from "../../../ui/sections/saved-views-scope.tsx";
 import { SeriesFiltersDialog } from "../../../ui/sections/series-filters-dialog.tsx";
+import { withAggregateAnalyticsGate } from "../aggregate-analytics-gate.tsx";
 
 /** Which of the builder's two addresses this render is. */
 export type CustomGraphScreenMode = "new" | "edit";
@@ -334,7 +337,8 @@ function AnalyticsCustomGraphContent({
   } = useAnalyticsPeriod();
   const { showFilters } = useFilterToggle();
 
-  const formData = JSON.stringify(form.watch() ?? {});
+  // The React Compiler memoises `form.watch()` on the stable form; useWatch subscribes.
+  const formData = JSON.stringify(useWatch({ control: form.control }) ?? {});
   const [debouncedCustomGraphInput, setDebouncedCustomGraphInput] = useDebounceValue<
     CustomGraphInput | undefined
   >(undefined, 400);
@@ -438,7 +442,7 @@ function AnalyticsCustomGraphContent({
         onOpenChange={({ open }) => jsonModal.setOpen(open)}
         size="lg"
       >
-        <Dialog.Content bg="bg">
+        <Dialog.Content>
           <Dialog.Header>
             <Dialog.Title>Graph JSON</Dialog.Title>
             <Dialog.CloseTrigger />
@@ -453,7 +457,7 @@ function AnalyticsCustomGraphContent({
         onOpenChange={({ open }) => apiModal.setOpen(open)}
         size="lg"
       >
-        <Dialog.Content bg="bg">
+        <Dialog.Content>
           <Dialog.Header>
             <Dialog.Title>JSON API</Dialog.Title>
             <Dialog.CloseTrigger />
@@ -463,11 +467,11 @@ function AnalyticsCustomGraphContent({
               Incorporate the following JSON payload within the body of your HTTP POST request to
               access identical data tailored for the custom graphs.
             </Text>
-            <Box padding={4} backgroundColor="bg.subtle">
-              <CodeSnippet
+            <Box>
+              <CodePreview
                 code={`# Set your API key and endpoint URL
 API_KEY="your_langwatch_api_key"
-ENDPOINT="https://app.langwatch.ai/api/analytics"
+ENDPOINT="${langwatchEndpoint()}/api/analytics"
 
 # Use curl to send the POST request, e.g.:
 curl -X POST "$ENDPOINT" \\
@@ -673,6 +677,7 @@ function CustomGraphForm({
   const addNewGraph = analyticsApi.graphs.create.useMutation();
   const updateGraphById = analyticsApi.graphs.updateById.useMutation();
   const host = useAnalyticsHost();
+  const showErrorToast = useShowErrorToast();
   const project = host.project();
   const trpc = analyticsApi.useUtils();
   // Which dashboard the address says this chart belongs to.
@@ -706,6 +711,9 @@ function CustomGraphForm({
           // Navigate back to the same page we came from
           host.navigate(reportsPath({ projectSlug: project?.slug, dashboardId }));
         },
+        // A refused save (an aggregate project is read only, a plan limit,
+        // a lost permission) leaves the editor open; say why.
+        onError: (error) => showErrorToast({ error, fallbackTitle: "Couldn't save the graph" }),
       },
     );
   };
@@ -734,6 +742,7 @@ function CustomGraphForm({
           // Navigate back to the same dashboard we came from
           host.navigate(reportsPath({ projectSlug: project?.slug, dashboardId }));
         },
+        onError: (error) => showErrorToast({ error, fallbackTitle: "Couldn't save the graph" }),
       },
     );
   };
@@ -1546,7 +1555,7 @@ function GraphTypeField({ form }: { form: ReturnType<typeof useForm<CustomGraphF
  * The chart builder, at both of its addresses. ONE SCREEN, TWO KEYS, AND THE MODE ARRIVES AS A
  * PROP.
  */
-export default function CustomGraphScreen({ mode }: { mode: CustomGraphScreenMode }) {
+function CustomGraphScreen({ mode }: { mode: CustomGraphScreenMode }) {
   const host = useAnalyticsHost();
   const graphId = host.route().params.id;
   const projectId = host.project()?.id ?? "";
@@ -1601,3 +1610,5 @@ export default function CustomGraphScreen({ mode }: { mode: CustomGraphScreenMod
     />
   );
 }
+
+export default withAggregateAnalyticsGate("Custom Graph", CustomGraphScreen);

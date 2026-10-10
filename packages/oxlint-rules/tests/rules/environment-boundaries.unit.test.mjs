@@ -72,6 +72,18 @@ describe("given a reusable package", () => {
     });
   });
 
+  describe("when the file is the image's telemetry preload", () => {
+    /** @scenario "The telemetry preload may read process.env" */
+    it("reports nothing", () => {
+      expect(
+        report(
+          "export const on = process.env.OTEL_NODE_ENABLED_INSTRUMENTATIONS;",
+          "packages/observability/src/register.ts",
+        ),
+      ).toEqual([]);
+    });
+  });
+
   describe("when the file is a test", () => {
     /** @scenario "A test file may read process.env" */
     it("reports nothing", () => {

@@ -6,7 +6,7 @@ The server half of [scenario](../README.md). Scenarios and simulations: authored
 
 ## Installation
 
-`defineProcessModule("scenario").withRepositories(scenarioRepositories).withChannels(scenarioChannels).withApi(ScenarioModule).withTransports(…, …, …, scenarioAgentTestRest, scenarioEventsRest, scenarioGenerateRest, scenarioRunExportRest, scenarioVoiceRest, scenarioTrpcTransport).withTransportFacts(…).withEventing(scenarioLifecycleEventing).withEventing(simulationProcessingEventing).withTasks(…)`, `src/scenario.module.ts:31`.
+`defineProcessModule("scenario").withRepositories(scenarioRepositories).withChannels(scenarioChannels).withApi(ScenarioModule).withTransports(…, …, …, scenarioAgentTestRest, scenarioEventsRest, scenarioGenerateRest, scenarioRunExportRest, scenarioVoiceRest, scenarioTrpcTransport).provideMiddlewareContext(…).withEventing(scenarioLifecycleEventing).withEventing(simulationProcessingEventing).withMigrations(…)`, `src/scenario.module.ts:31`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -770,7 +770,7 @@ type Response = unknown;
 
 |             |                                            |
 | ----------- | ------------------------------------------ |
-| Declared at | `src/transport/scenario.rest.ts:125`       |
+| Declared at | `src/transport/scenario.rest.ts:130`       |
 | Base URL    | `/api/scenarios`, twin `/api/v1/scenarios` |
 | Addressing  | dated                                      |
 | Credential  | project                                    |
@@ -780,19 +780,19 @@ type Response = unknown;
 
 Get all scenarios for a project
 
-Permission `scenarios:view`. Declared at `src/transport/scenario.rest.ts:130`.
+Permission `scenarios:view`. Declared at `src/transport/scenario.rest.ts:135`.
 
 Answers at `/api/scenarios`, `/api/v1/scenarios`; also, undocumented, `/api/scenarios/2026-08-07`, `/api/v1/scenarios/2026-08-07`, `/api/scenarios/latest`, `/api/v1/scenarios/latest`.
 
 ```typescript
-// Response: z.array(scenarioRestResponseWithPlatformUrlSchema) (inline, src/transport/scenario.rest.ts:132)
+// Response: z.array(scenarioRestResponseWithPlatformUrlSchema) (inline, src/transport/scenario.rest.ts:137)
 ```
 
 #### `GET /:id` · `getApiScenariosById`
 
 Get a specific scenario by ID
 
-Permission `scenarios:view`. Declared at `src/transport/scenario.rest.ts:151`.
+Permission `scenarios:view`. Declared at `src/transport/scenario.rest.ts:156`.
 
 Answers at `/api/scenarios/:id`, `/api/v1/scenarios/:id`; also, undocumented, `/api/scenarios/2026-08-07/:id`, `/api/v1/scenarios/2026-08-07/:id`, `/api/scenarios/latest/:id`, `/api/v1/scenarios/latest/:id`.
 
@@ -808,7 +808,7 @@ type Response = z.infer<typeof scenarioRestResponseWithPlatformUrlSchema>; // ..
 
 Create a new scenario
 
-Permission `scenarios:create`. Declared at `src/transport/scenario.rest.ts:175`.
+Permission `scenarios:create`. Declared at `src/transport/scenario.rest.ts:180`.
 
 Answers at `/api/scenarios`, `/api/v1/scenarios`; also, undocumented, `/api/scenarios/2026-08-07`, `/api/v1/scenarios/2026-08-07`, `/api/scenarios/latest`, `/api/v1/scenarios/latest`.
 
@@ -821,7 +821,7 @@ type Response = z.infer<typeof scenarioRestResponseWithPlatformUrlSchema>; // ..
 
 Update an existing scenario
 
-Permission `scenarios:update`. Declared at `src/transport/scenario.rest.ts:221`.
+Permission `scenarios:update`. Declared at `src/transport/scenario.rest.ts:226`.
 
 Answers at `/api/scenarios/:id`, `/api/v1/scenarios/:id`; also, undocumented, `/api/scenarios/2026-08-07/:id`, `/api/v1/scenarios/2026-08-07/:id`, `/api/scenarios/latest/:id`, `/api/v1/scenarios/latest/:id`.
 
@@ -835,7 +835,7 @@ type Response = z.infer<typeof scenarioRestResponseWithPlatformUrlSchema>; // ..
 
 Update an existing scenario
 
-Permission `scenarios:update`. Declared at `src/transport/scenario.rest.ts:251`.
+Permission `scenarios:update`. Declared at `src/transport/scenario.rest.ts:256`.
 
 Answers at `/api/scenarios/:id`, `/api/v1/scenarios/:id`; also, undocumented, `/api/scenarios/2026-08-07/:id`, `/api/v1/scenarios/2026-08-07/:id`, `/api/scenarios/latest/:id`, `/api/v1/scenarios/latest/:id`.
 
@@ -849,7 +849,7 @@ type Response = z.infer<typeof scenarioRestResponseWithPlatformUrlSchema>; // ..
 
 Archive (soft-delete) a scenario
 
-Permission `scenarios:manage`. Declared at `src/transport/scenario.rest.ts:284`.
+Permission `scenarios:manage`. Declared at `src/transport/scenario.rest.ts:289`.
 
 Answers at `/api/scenarios/:id`, `/api/v1/scenarios/:id`; also, undocumented, `/api/scenarios/2026-08-07/:id`, `/api/v1/scenarios/2026-08-07/:id`, `/api/scenarios/latest/:id`, `/api/v1/scenarios/latest/:id`.
 
@@ -866,7 +866,7 @@ interface Response {
 
 List the saved versions of a scenario, newest first. A scenario saved before versions were recorded closes its history with a synthesized Created entry.
 
-Permission `scenarios:view`. Declared at `src/transport/scenario.rest.ts:300`.
+Permission `scenarios:view`. Declared at `src/transport/scenario.rest.ts:305`.
 
 Answers at `/api/scenarios/:id/versions`, `/api/v1/scenarios/:id/versions`; also, undocumented, `/api/scenarios/2026-08-07/:id/versions`, `/api/v1/scenarios/2026-08-07/:id/versions`, `/api/scenarios/latest/:id/versions`, `/api/v1/scenarios/latest/:id/versions`.
 
@@ -896,7 +896,7 @@ interface Response {
 
 Get one saved version of a scenario, with the name, situation, criteria, labels and parameters as that version saved them.
 
-Permission `scenarios:view`. Declared at `src/transport/scenario.rest.ts:338`.
+Permission `scenarios:view`. Declared at `src/transport/scenario.rest.ts:343`.
 
 Answers at `/api/scenarios/:id/versions/:version`, `/api/v1/scenarios/:id/versions/:version`; also, undocumented, `/api/scenarios/2026-08-07/:id/versions/:version`, `/api/v1/scenarios/2026-08-07/:id/versions/:version`, `/api/scenarios/latest/:id/versions/:version`, `/api/v1/scenarios/latest/:id/versions/:version`.
 
@@ -913,7 +913,7 @@ type Response = z.infer<typeof scenarioRestVersionDetailResponseSchema>; // ../c
 
 |             |                                                        |
 | ----------- | ------------------------------------------------------ |
-| Declared at | `src/transport/simulation-run.rest.ts:54`              |
+| Declared at | `src/transport/simulation-run.rest.ts:50`              |
 | Base URL    | `/api/simulation-runs`, twin `/api/v1/simulation-runs` |
 | Addressing  | dated                                                  |
 | Credential  | project                                                |
@@ -923,7 +923,7 @@ type Response = z.infer<typeof scenarioRestVersionDetailResponseSchema>; // ../c
 
 List simulation runs, optionally filtered by scenarioSetId or batchRunId. Set-level and unfiltered listings trim each run to its first few messages and report the trim as `messagesTruncated`; pass `include=messages` to read whole conversations, which caps the page at 20 runs, ending on a batch boundary. A batch-scoped listing always carries whole conversations.
 
-Permission `scenarios:view`. Declared at `src/transport/simulation-run.rest.ts:58`.
+Permission `scenarios:view`. Declared at `src/transport/simulation-run.rest.ts:54`.
 
 Answers at `/api/simulation-runs`, `/api/v1/simulation-runs`; also, undocumented, `/api/simulation-runs/2026-08-07`, `/api/v1/simulation-runs/2026-08-07`, `/api/simulation-runs/latest`, `/api/v1/simulation-runs/latest`.
 
@@ -943,7 +943,7 @@ type Response = z.infer<typeof simulationRunListResponseSchema>; // ../contract/
 
 Get a single simulation run by its ID
 
-Permission `scenarios:view`. Declared at `src/transport/simulation-run.rest.ts:77`.
+Permission `scenarios:view`. Declared at `src/transport/simulation-run.rest.ts:73`.
 
 Answers at `/api/simulation-runs/:scenarioRunId`, `/api/v1/simulation-runs/:scenarioRunId`; also, undocumented, `/api/simulation-runs/2026-08-07/:scenarioRunId`, `/api/v1/simulation-runs/2026-08-07/:scenarioRunId`, `/api/simulation-runs/latest/:scenarioRunId`, `/api/v1/simulation-runs/latest/:scenarioRunId`.
 
@@ -959,7 +959,7 @@ type Response = z.infer<typeof scenarioRunRestResponseWithPlatformUrlSchema>; //
 
 List batch summaries for a scenario set (pass/fail counts per batch)
 
-Permission `scenarios:view`. Declared at `src/transport/simulation-run.rest.ts:96`.
+Permission `scenarios:view`. Declared at `src/transport/simulation-run.rest.ts:92`.
 
 Answers at `/api/simulation-runs/batches/list`, `/api/v1/simulation-runs/batches/list`; also, undocumented, `/api/simulation-runs/2026-08-07/batches/list`, `/api/v1/simulation-runs/2026-08-07/batches/list`, `/api/simulation-runs/latest/batches/list`, `/api/v1/simulation-runs/latest/batches/list`.
 
@@ -977,7 +977,7 @@ type Response = z.infer<typeof simulationBatchListResponseSchema>; // ../contrac
 
 Get the summary of a single batch run, including its completion flag
 
-Permission `scenarios:view`. Declared at `src/transport/simulation-run.rest.ts:122`.
+Permission `scenarios:view`. Declared at `src/transport/simulation-run.rest.ts:118`.
 
 Answers at `/api/simulation-runs/batches/:batchRunId`, `/api/v1/simulation-runs/batches/:batchRunId`; also, undocumented, `/api/simulation-runs/2026-08-07/batches/:batchRunId`, `/api/v1/simulation-runs/2026-08-07/batches/:batchRunId`, `/api/simulation-runs/latest/batches/:batchRunId`, `/api/v1/simulation-runs/latest/batches/:batchRunId`.
 
@@ -1472,14 +1472,6 @@ Declared at `src/eventing/simulation-processing.pipeline.ts:120`. Events: `Simul
 | lane aliases               | `≈ mainSimulationLaneAliases({ evaluationsProcess: deps.scenarioEvaluations.name })`    | –                                                                                                                                                                                                                                                                                                 | `src/eventing/simulation-processing.pipeline.ts:213` |
 | retention                  | `≈ deps.retention`                                                                      | –                                                                                                                                                                                                                                                                                                 | `src/eventing/simulation-processing.pipeline.ts:216` |
 
-### Tasks
-
-Run by the tasks process, before serve.
-
-| Task                    | Class                     | Declared at                                  |
-| ----------------------- | ------------------------- | -------------------------------------------- |
-| `stalled-runs-backfill` | `StalledRunsBackfillTask` | `src/tasks/stalled-runs-backfill.task.ts:88` |
-
 ## Configuration
 
 | Kind   | Leaf                                                  | Environment variable                      | Declared at                              |
@@ -1487,34 +1479,35 @@ Run by the tasks process, before serve.
 | secret | `voiceSessionSigning`                                 | `CREDENTIALS_SECRET`                      | `src/app/scenario.app.ts:272`            |
 | secret | `voiceSessionSigningFallback`                         | `NEXTAUTH_SECRET`                         | `src/app/scenario.app.ts:273`            |
 | secret | `nlpInternal`                                         | `LANGWATCH_NLP_INTERNAL_SECRET`           | `src/app/scenario.app.ts:275`            |
-| config | `langwatchEndpoint`                                   | `LANGWATCH_ENDPOINT`                      | `../contract/src/scenario.config.ts:94`  |
-| config | `voicePublicBaseUrl`                                  | `VOICE_PUBLIC_BASE_URL`                   | `../contract/src/scenario.config.ts:96`  |
-| config | `voiceTunnel`                                         | `VOICE_TUNNEL`                            | `../contract/src/scenario.config.ts:98`  |
-| config | `isSaas`                                              | `IS_SAAS`                                 | `../contract/src/scenario.config.ts:100` |
-| config | `nodeEnvironment`                                     | `NODE_ENV`                                | `../contract/src/scenario.config.ts:102` |
-| config | `voiceWorkerOnly`                                     | `VOICE_WORKER_ONLY`                       | `../contract/src/scenario.config.ts:104` |
-| config | `consumedResourceClasses`                             | `SCENARIO_CONSUMED_RESOURCE_CLASSES`      | `../contract/src/scenario.config.ts:106` |
-| config | `slotBudget`                                          | `SCENARIO_SLOT_BUDGET`                    | `../contract/src/scenario.config.ts:108` |
-| config | `generateTimeoutMs`                                   | `SCENARIO_GENERATE_TIMEOUT_MS`            | `../contract/src/scenario.config.ts:110` |
-| config | `voiceCallMaxSeconds`                                 | `VOICE_CALL_MAX_SECONDS`                  | `../contract/src/scenario.config.ts:112` |
-| config | `allowLoopbackVoiceProviders`                         | `VOICE_UNSAFE_ALLOW_LOOPBACK_PROVIDERS`   | `../contract/src/scenario.config.ts:114` |
-| config | `blockLocalHttpCalls`                                 | `BLOCK_LOCAL_HTTP_CALLS`                  | `../contract/src/scenario.config.ts:115` |
-| config | `allowedProxyHosts`                                   | `ALLOWED_PROXY_HOSTS`                     | `../contract/src/scenario.config.ts:116` |
-| config | `defaultModel`                                        | `LANGWATCH_DEFAULT_MODEL`                 | `../contract/src/scenario.config.ts:117` |
-| config | `nlpServiceUrl`                                       | `LANGWATCH_NLP_SERVICE`                   | `../contract/src/scenario.config.ts:119` |
-| config | `nlpCodeBlockTimeoutSeconds`                          | `NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS` | `../contract/src/scenario.config.ts:121` |
-| config | `publicBaseUrl`                                       | `BASE_HOST`                               | `../contract/src/scenario.config.ts:123` |
-| config | `rawSocketPort`                                       | `VOICE_WS_PORT`                           | `../contract/src/scenario.config.ts:125` |
-| config | `nlpTimeouts.maxTimeoutMs`                            | `NLP_FETCH_MAX_TIMEOUT_MS`                | `../contract/src/scenario.config.ts:128` |
-| config | `childParentEnvironment.path`                         | `PATH`                                    | `../contract/src/scenario.config.ts:131` |
-| config | `childParentEnvironment.home`                         | `HOME`                                    | `../contract/src/scenario.config.ts:132` |
-| config | `childParentEnvironment.user`                         | `USER`                                    | `../contract/src/scenario.config.ts:133` |
-| config | `childParentEnvironment.shell`                        | `SHELL`                                   | `../contract/src/scenario.config.ts:134` |
-| config | `childParentEnvironment.lang`                         | `LANG`                                    | `../contract/src/scenario.config.ts:135` |
-| config | `childParentEnvironment.lcAll`                        | `LC_ALL`                                  | `../contract/src/scenario.config.ts:136` |
-| config | `childParentEnvironment.term`                         | `TERM`                                    | `../contract/src/scenario.config.ts:137` |
-| config | `childParentEnvironment.nodeCompileCache`             | `NODE_COMPILE_CACHE`                      | `../contract/src/scenario.config.ts:138` |
-| config | `childParentEnvironment.corepackEnableDownloadPrompt` | `COREPACK_ENABLE_DOWNLOAD_PROMPT`         | `../contract/src/scenario.config.ts:139` |
-| config | `childParentEnvironment.nodeExtraCaCerts`             | `NODE_EXTRA_CA_CERTS`                     | `../contract/src/scenario.config.ts:140` |
+| config | `langwatchEndpoint`                                   | `LANGWATCH_ENDPOINT`                      | `../contract/src/scenario.config.ts:95`  |
+| config | `voicePublicBaseUrl`                                  | `VOICE_PUBLIC_BASE_URL`                   | `../contract/src/scenario.config.ts:97`  |
+| config | `voiceTunnel`                                         | `VOICE_TUNNEL`                            | `../contract/src/scenario.config.ts:99`  |
+| config | `isSaas`                                              | `IS_SAAS`                                 | `../contract/src/scenario.config.ts:101` |
+| config | `nodeEnvironment`                                     | `NODE_ENV`                                | `../contract/src/scenario.config.ts:103` |
+| config | `voiceWorkerOnly`                                     | `VOICE_WORKER_ONLY`                       | `../contract/src/scenario.config.ts:105` |
+| config | `consumedResourceClasses`                             | `SCENARIO_CONSUMED_RESOURCE_CLASSES`      | `../contract/src/scenario.config.ts:107` |
+| config | `slotBudget`                                          | `SCENARIO_SLOT_BUDGET`                    | `../contract/src/scenario.config.ts:109` |
+| config | `generateTimeoutMs`                                   | `SCENARIO_GENERATE_TIMEOUT_MS`            | `../contract/src/scenario.config.ts:111` |
+| config | `voiceCallMaxSeconds`                                 | `VOICE_CALL_MAX_SECONDS`                  | `../contract/src/scenario.config.ts:113` |
+| config | `allowLoopbackVoiceProviders`                         | `VOICE_UNSAFE_ALLOW_LOOPBACK_PROVIDERS`   | `../contract/src/scenario.config.ts:115` |
+| config | `blockLocalHttpCalls`                                 | `BLOCK_LOCAL_HTTP_CALLS`                  | `../contract/src/scenario.config.ts:116` |
+| config | `allowedProxyHosts`                                   | `ALLOWED_PROXY_HOSTS`                     | `../contract/src/scenario.config.ts:117` |
+| config | `defaultModel`                                        | `LANGWATCH_DEFAULT_MODEL`                 | `../contract/src/scenario.config.ts:118` |
+| config | `nlpServiceUrl`                                       | `LANGWATCH_NLP_SERVICE`                   | `../contract/src/scenario.config.ts:120` |
+| config | `nlpCodeBlockTimeoutSeconds`                          | `NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS` | `../contract/src/scenario.config.ts:122` |
+| config | `publicBaseUrl`                                       | `BASE_HOST`                               | `../contract/src/scenario.config.ts:124` |
+| config | `rawSocketPort`                                       | `VOICE_WS_PORT`                           | `../contract/src/scenario.config.ts:126` |
+| config | `nlpTimeouts.maxTimeoutMs`                            | `NLP_FETCH_MAX_TIMEOUT_MS`                | `../contract/src/scenario.config.ts:129` |
+| config | `childParentEnvironment.path`                         | `PATH`                                    | `../contract/src/scenario.config.ts:132` |
+| config | `childParentEnvironment.home`                         | `HOME`                                    | `../contract/src/scenario.config.ts:133` |
+| config | `childParentEnvironment.user`                         | `USER`                                    | `../contract/src/scenario.config.ts:134` |
+| config | `childParentEnvironment.shell`                        | `SHELL`                                   | `../contract/src/scenario.config.ts:135` |
+| config | `childParentEnvironment.lang`                         | `LANG`                                    | `../contract/src/scenario.config.ts:136` |
+| config | `childParentEnvironment.lcAll`                        | `LC_ALL`                                  | `../contract/src/scenario.config.ts:137` |
+| config | `childParentEnvironment.term`                         | `TERM`                                    | `../contract/src/scenario.config.ts:138` |
+| config | `childParentEnvironment.nodeCompileCache`             | `NODE_COMPILE_CACHE`                      | `../contract/src/scenario.config.ts:139` |
+| config | `childParentEnvironment.corepackEnableDownloadPrompt` | `COREPACK_ENABLE_DOWNLOAD_PROMPT`         | `../contract/src/scenario.config.ts:140` |
+| config | `childParentEnvironment.nodeExtraCaCerts`             | `NODE_EXTRA_CA_CERTS`                     | `../contract/src/scenario.config.ts:141` |
+| config | `childParentEnvironment.logSettings`                  | `LOG_LEVEL`                               | `../contract/src/scenario.config.ts:143` |
 
 <!-- readme:generated:end -->

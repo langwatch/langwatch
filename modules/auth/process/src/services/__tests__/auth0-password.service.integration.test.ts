@@ -5,13 +5,16 @@
 import { createServer, type IncomingMessage, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 
+import { ScopedSecrets } from "@langwatch/secrets";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
+import { NO_SIGN_IN_PROVIDERS } from "../../app/__tests__/support/sign-in-providers.ts";
 import {
   Auth0ApiError,
   buildAuth0Config,
   changeAuth0Password,
   getManagementApiToken,
+  HttpAuth0PasswordChannel,
   resetManagementApiTokenCache,
   updateUserPassword,
   verifyCurrentPassword,
@@ -553,6 +556,81 @@ describe("changeAuth0Password", () => {
         name: "Auth0ApiError",
         code: "insufficient_scope",
       });
+    });
+  });
+});
+
+describe("HttpAuth0PasswordChannel.create", () => {
+  const CHANGE = {
+    email: "user@example.com",
+    auth0UserId: "auth0|abc",
+    currentPassword: "old-pw",
+    newPassword: "new-pw-12345",
+  };
+
+  function channelOver({
+    managementClientId,
+    secretValues,
+  }: {
+    managementClientId: string | undefined;
+    secretValues: Record<string, string>;
+  }) {
+    return HttpAuth0PasswordChannel.create({
+      config: {
+        auth0ManagementClientId: managementClientId,
+        signInProviders: {
+          ...NO_SIGN_IN_PROVIDERS,
+          auth0Issuer: `${auth0Issuer}/`,
+          auth0ClientId: "login-client-id",
+        },
+      },
+      secrets: new ScopedSecrets(async (handle, build) => build(secretValues[handle.id])),
+    });
+  }
+
+  beforeEach(() => {
+    handler = () => ({ status: 403, body: { error: "invalid_grant" } });
+  });
+
+  describe("given the deployment names a Management app", () => {
+    it("proves the password with the Management app's id and secret", async () => {
+      const channel = await channelOver({
+        managementClientId: "mgmt-client-id",
+        secretValues: {
+          AUTH0_MGMT_CLIENT_SECRET: "mgmt-client-secret",
+          AUTH0_CLIENT_SECRET: "login-client-secret",
+        },
+      });
+
+      await expect(channel.changePassword(CHANGE)).resolves.toEqual({ outcome: "wrong_password" });
+      expect(captured[0]?.body).toMatchObject({
+        client_id: "mgmt-client-id",
+        client_secret: "mgmt-client-secret",
+      });
+    });
+  });
+
+  describe("given the deployment names no Management app", () => {
+    it("proves the password with the login app's id and secret", async () => {
+      const channel = await channelOver({
+        managementClientId: undefined,
+        secretValues: { AUTH0_CLIENT_SECRET: "login-client-secret" },
+      });
+
+      await expect(channel.changePassword(CHANGE)).resolves.toEqual({ outcome: "wrong_password" });
+      expect(captured[0]?.body).toMatchObject({
+        client_id: "login-client-id",
+        client_secret: "login-client-secret",
+      });
+    });
+  });
+
+  describe("given no client secret is set", () => {
+    it("answers not_configured and calls the tenant nothing", async () => {
+      const channel = await channelOver({ managementClientId: "mgmt-client-id", secretValues: {} });
+
+      await expect(channel.changePassword(CHANGE)).resolves.toEqual({ outcome: "not_configured" });
+      expect(captured).toEqual([]);
     });
   });
 });

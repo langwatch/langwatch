@@ -1,6 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Link } from "@langwatch/browser-host/link";
-import { Box, Button, Text, VStack } from "@langwatch/design-system/primitives";
+import { Button, Text, VStack } from "@langwatch/design-system/primitives";
 import { describePasswordProblem } from "@langwatch/identity-contract";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
@@ -17,6 +17,7 @@ import { AuthCard } from "../../ui/elements/auth-card.tsx";
 import { FrontDoorField } from "../../ui/elements/front-door-field.tsx";
 import { HandledErrorAlert } from "../../ui/elements/handled-error-alert.tsx";
 import { PasswordInput } from "../../ui/elements/password-input.tsx";
+import { FrontDoorLinkButton } from "../elements/front-door-link-button.tsx";
 import {
   FRONT_DOOR_PRIMARY_STYLE,
   FrontDoorPrimaryButton,
@@ -132,11 +133,7 @@ function ResetPasswordForm({ token }: { token: string }) {
       title="Choose a new password"
       intro="Type it twice so a slip cannot lock you out again."
     >
-      <HandledErrorAlert
-        error={refusal?.error}
-        fallbackTitle="Couldn't reset your password"
-        className="lw-front-door-alert"
-      />
+      <HandledErrorAlert error={refusal?.error} fallbackTitle="Couldn't reset your password" />
       {refusal?.linkIsDead ? <RequestNewLink /> : null}
       {refusal?.waitLine ? (
         <Text fontSize="13px" lineHeight="1.55" color="fg.error" data-testid="reset-wait">
@@ -201,11 +198,7 @@ function PasswordUpdatedCard() {
       title="Password updated"
       intro="You are signed in with your new password. Every other device was signed out."
     >
-      <HandledErrorAlert
-        error={failure}
-        fallbackTitle="That passkey wasn't created"
-        className="lw-front-door-alert"
-      />
+      <HandledErrorAlert error={failure} fallbackTitle="That passkey wasn't created" />
       <Button {...FRONT_DOOR_PRIMARY_STYLE} asChild>
         <Link href="/" data-testid="reset-sign-in">
           Continue
@@ -312,33 +305,9 @@ function PrimaryButton({
 }
 
 function RequestNewLink() {
-  return (
-    <Text width="full" textAlign="center" fontSize="13px" color="fg.muted">
-      <QuietLink href="/auth/forgot-password">Request a new reset link</QuietLink>
-    </Text>
-  );
+  return <FrontDoorLinkButton href="/auth/forgot-password" label="Request a new reset link" />;
 }
 
 function BackToSignIn() {
-  return (
-    <Text width="full" textAlign="center" fontSize="13px" color="fg.muted">
-      <QuietLink href="/auth/signin">Back to sign in</QuietLink>
-    </Text>
-  );
-}
-
-function QuietLink({ href, children }: { href: string; children: string }) {
-  return (
-    <Box
-      asChild
-      color="fg"
-      fontWeight={600}
-      textDecoration="underline"
-      textUnderlineOffset="3px"
-      textDecorationColor="border"
-      _hover={{ textDecorationColor: "fg" }}
-    >
-      <Link href={href}>{children}</Link>
-    </Box>
-  );
+  return <FrontDoorLinkButton href="/auth/signin" label="Back to sign in" tone="secondary" />;
 }

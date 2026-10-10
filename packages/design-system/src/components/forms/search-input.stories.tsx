@@ -4,11 +4,18 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { SearchInput } from "./search-input.tsx";
 
 const meta = {
-  title: "Components/Search input",
+  title: "Inputs and forms/Search input",
+  parameters: {
+    usage: {
+      use: "Filtering a list or table by text. It carries the search icon and the searchbox role.",
+      avoid: "Any other text field: use Input from primitives inside a Field.",
+    },
+  },
   component: SearchInput,
   tags: ["autodocs"],
   args: {
     placeholder: "Search traces",
+    containerProps: { width: "full", minWidth: 0 },
   },
   render: (args) => (
     <Box maxWidth="sm">
@@ -56,4 +63,12 @@ export const NarrowWidth: Story = {
       <SearchInput {...args} />
     </Box>
   ),
+};
+
+/** The wrapper owns the available width, including on narrow list pages. */
+export const ListToolbar: Story = {
+  args: {
+    placeholder: "Search by ID, name, email, or organization",
+    containerProps: { width: "full", maxWidth: "lg", minWidth: 0 },
+  },
 };

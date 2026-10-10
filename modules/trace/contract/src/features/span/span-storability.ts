@@ -90,8 +90,8 @@ export function spanStorabilityOf({
     skip: {
       consumer,
       tenantId: event.tenantId,
-      traceId: event.metadata.traceId,
-      spanId: event.metadata.spanId,
+      traceId: event.metadata?.traceId ?? event.aggregateId,
+      spanId: event.metadata?.spanId ?? event.data.span.spanId,
       field: decoded.unstorable.field,
       valueMs: decoded.unstorable.valueMs,
       maxStorableMs: MAX_STORABLE_SPAN_TIME_MS,

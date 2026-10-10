@@ -32,9 +32,12 @@ organization, without waiting. See
 The preparation step still fails in three cases: the migration runner itself
 fails outright, the queue behind it fails to drain, or the fleet makes no
 progress for 25 passes (about two minutes: for example because Redis is
-unreachable, or another process holds every claim). It exits non-zero, which
-fails the Helm pre-upgrade Job or the compose `migrate` service, so the
-previous version keeps serving; the next run retries from scratch.
+unreachable, or another process holds every claim).
+
+In any of them it exits non-zero, which fails the upgrade (the Helm
+pre-upgrade Job where one renders, otherwise the workers), and the new api is
+not ready until the installation is current, so the previous version keeps
+serving; the next run retries from scratch.
 
 Keep the current identity-provider configuration, callback URLs, and
 `CREDENTIALS_SECRET` during the upgrade. The migration preserves the existing
@@ -46,10 +49,11 @@ resolve held or parked tenants; they are not a routine preflight.
 ## Check the migration results
 
 Sign in with an operator account from `ADMIN_EMAILS` and open **Ops >
-Migrations** (`/ops/migrations`). It lists every registered migration with
-Held and Parked counts, and lets you search for an organization to inspect
-its status, target a migration run for it, or kick a fresh pass immediately
-rather than waiting for the next restart.
+Upgrades > Tenant migrations** (`/ops/upgrades?tab=tenants`). It lists every
+registered tenant migration with its Finalized, Held and Parked counts, and
+lets you search for an organization to inspect its status, target a migration
+run for it, or start a fresh pass immediately rather than waiting for the next
+restart.
 
 The live connection indexes deliberately refuse duplicate slots rather than
 silently choosing a connection. `REJECTED`, `DRAFT`, and `CLAIMED` still occupy
@@ -137,7 +141,7 @@ docker compose pull
 docker compose up -d
 ```
 
-The one-shot `migrate` service runs the upgrade first; the app and the workers start only after it has completed successfully. If your compose file predates the `migrate` service, copy it from [`infra/compose.yml`](https://github.com/langwatch/langwatch/blob/main/infra/compose.yml), or the app will refuse to start (see [Run the upgrade](#run-the-upgrade)).
+The workers run the upgrade when they start, and the app does not report ready until it has completed (see [Run the upgrade](#run-the-upgrade)). Compose has no separate `migrate` service; if your compose file predates this, copy the current one from [`infra/compose.yml`](https://github.com/langwatch/langwatch/blob/main/infra/compose.yml). The workers must be enabled.
 
 ## Helm Chart
 
@@ -152,7 +156,7 @@ helm upgrade langwatch langwatch/langwatch \
   --wait --timeout 45m
 ```
 
-The pre-upgrade Job can run for up to 35 minutes on a large installation. Helm's default hook timeout is 5 minutes, and a shorter `--timeout` fails the release part-way through a migration.
+The upgrade can run for up to 35 minutes on a large installation, in the pre-upgrade Job where one renders (see [Run the upgrade](#run-the-upgrade)) and otherwise in the new worker pods. Helm's default hook timeout is 5 minutes, and a shorter `--timeout` fails the release part-way through a migration.
 
 ### Pin a Specific Version
 
@@ -172,24 +176,25 @@ helm upgrade langwatch langwatch/langwatch \
 ## Run the upgrade
 
 <Warning>
-The app and the workers **never migrate the database themselves**. When they start on an installation that has not been upgraded to their release, they **refuse to start** and log which steps are outstanding:
+The **api never migrates the database itself**. The workers run the upgrade when they start; until the installation is current the api reports **not ready**, and a process started on an installation that has not been upgraded to its release **refuses to serve** and logs which steps are outstanding:
 
 ```text
 langwatch-api (api) refuses to serve: the installation is behind this image: blocking steps not done: prisma:20261006180000_..., clickhouse:00042. Run `pnpm task upgrade` from this image, then start it again.
 ```
 
-Run the upgrade from the **new** image, then start the app again.
+Starting the workers on the **new** image runs the upgrade for you. To run it yourself, use the **new** image, then start the app again.
 </Warning>
 
 Each way of running LangWatch runs the upgrade for you:
 
 | How you run LangWatch | Who runs the upgrade |
 | --- | --- |
-| Helm, `helm upgrade` | the pre-upgrade Job, on the new image, before any pod rolls |
-| Helm, first install | the app's first boot, once, on the empty database; the workers restart until it is done |
-| Helm with `app.migrations.preRoll: false` | **you**, before `helm upgrade` (below) |
-| Docker Compose | the `migrate` service, on every `docker compose up` |
-| `npx @langwatch/server` | the CLI, before it starts the services |
+| Helm, `helm upgrade` with upgrades serialised (`serializeUpgrades` on and no `app.dataplane`) | the pre-upgrade Job, on the new image, before any pod rolls |
+| Helm, `helm upgrade` otherwise | the new worker pods, on start; the new api pods are not ready until it is done |
+| Helm, first install | the worker's first boot, once, on the empty database |
+| Helm with serialised upgrades and `app.migrations.preRoll: false` | **you**, before `helm upgrade` (below) |
+| Docker Compose | the workers, on every `docker compose up`; the app is not ready until it is done |
+| `npx @langwatch/server` | the workers the CLI starts; the CLI has no migration phase of its own |
 
 To run it yourself, from the new image with the app's environment (`DATABASE_URL`, `CLICKHOUSE_URL`, `REDIS_URL`):
 
@@ -221,7 +226,7 @@ Every `1` is safe to retry: the ledger remembers what is done.
 
 ### When a PostgreSQL migration fails
 
-PostgreSQL applies a migration one statement at a time, so a statement cancelled by the 10 second `lock_timeout` leaves its earlier statements applied and a failed row in `_prisma_migrations`. Every migration written after `20261006180001_gateway_realtime_session_metering` is written to survive a second run. For those, `upgrade` marks the failed row rolled back itself (`prisma migrate resolve --rolled-back <migration>`), waits and applies it again, up to 3 attempts with a 2 second then 4 second wait.
+PostgreSQL applies a migration one statement at a time, so a statement cancelled by the 2 second `lock_timeout` leaves its earlier statements applied and a failed row in `_prisma_migrations`. Every migration written after `20261006180001_gateway_realtime_session_metering` is written to survive a second run. For those, `upgrade` marks the failed row rolled back itself (`prisma migrate resolve --rolled-back <migration>`), waits and applies it again, up to 3 attempts with a 2 second then 4 second wait.
 
 A failed row an earlier run left is cleared the same way before the schema is applied.
 
@@ -231,7 +236,7 @@ An older migration, or a failed one this image does not ship, stops the run with
 
 Two schema changes touch a whole large table while the upgrade runs.
 
-- **`AuditLog` unique index** (`170500_audit_log_idempotency_key`): PostgreSQL builds it in place and holds a lock that blocks audit writes for the build. On a large table the build can outlast the 10 second `lock_timeout` and fail. Build the index yourself first, during a quiet period, with `CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS` using the index name the migration declares. The migration then finds it and moves on.
+- **`AuditLog` unique index** (`170500_audit_log_idempotency_key`): PostgreSQL builds it in place and holds a lock that blocks audit writes for the build. On a large table the build can outlast the 2 second `lock_timeout` and fail. Build the index yourself first, during a quiet period, with `CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS` using the index name the migration declares. The migration then finds it and moves on.
 - **ClickHouse `trace_summaries` index** (`00103_trace_summaries_updated_at_index`): the index is added and then materialised over every existing row. The mutation runs in the background and competes with merges for IO, and later `ALTER` statements on that table queue behind it. Watch `system.mutations` and run the upgrade at a quiet time on a large table.
 
 ### What the upgrade does
@@ -245,7 +250,7 @@ Two schema changes touch a whole large table while the upgrade runs.
   Migrations the image ships that no release lists yet are applied in one pass at the end. A ClickHouse target that fails is reported after the others have run, and fails the upgrade.
 - **Its own record first.** The upgrade keeps its ledger, its lease and the list of running processes in their own PostgreSQL schema, `<your schema>_upgrade_ledger` (`public_upgrade_ledger` by default), which it creates before anything else. The database user in `DATABASE_URL` needs `CREATE` on the database for that; if it has none, create the schema beforehand with that user as its owner.
 - **Never below the floor.** Each release names a long-term-support floor. An installation older than the floor is refused by name (exit code `2`): upgrade to the floor release first, then to this one. [Releases and support](/self-hosting/releases) explains the LTS schedule and which LTS to stop at.
-- **Short locks and retries.** PostgreSQL statements run with a 10 second `lock_timeout`. A statement that waits longer fails instead of blocking your traffic. The upgrade makes up to 3 attempts at a failed schema apply (waiting 2 seconds, then 4), then exits; the previous version keeps serving, and running it again resumes where it stopped.
+- **Short locks and retries.** PostgreSQL statements run with a 2 second `lock_timeout`. A statement that waits longer fails instead of blocking your traffic. The upgrade makes up to 3 attempts at a failed schema apply (waiting 2 seconds, then 4), then exits; the previous version keeps serving, and running it again resumes where it stopped.
 - **One run at a time.** The upgrade holds a lease in its ledger, renews it every 15 seconds and loses it after 60 seconds without a renewal. A second run waits up to 10 minutes for a live holder, saying so every 30 seconds, then exits `3`.
 - **Background steps.** Data copies that do not block the release run on the workers after the upgrade. A step that must not run while an older version still writes waits until every running app and worker is on a version that knows it.
 
@@ -301,7 +306,7 @@ A serving process that cannot read the ledger names `DATABASE_URL` in its refusa
 
 | Variable or value | Effect |
 | --- | --- |
-| `app.migrations.preRoll` (Helm, default `true`) | Runs the upgrade in a pre-upgrade Job. `false` leaves it to you; until you run it, new pods refuse to start. |
+| `app.migrations.preRoll` (Helm, default `true`) | Renders the pre-upgrade Job, only when upgrades are serialised (`serializeUpgrades` on and no `app.dataplane`); otherwise the new worker pods run the upgrade. `false` with serialised upgrades leaves it to you; until you run it, the new api is not ready. |
 | `app.migrations.preRollTimeoutSeconds` (Helm, default `2100`) | How long that Job may run. |
 | `CLICKHOUSE_MIGRATE_WAIT_SECONDS` (default `180`) | How long the upgrade waits for ClickHouse to accept connections. `0` fails on the first refused connection. A value that is not a number of seconds, 0 or more, is refused with `Invalid CLICKHOUSE_MIGRATE_WAIT_SECONDS`. |
 | `SKIP_PRISMA_MIGRATE` (`1` or `true`) | The upgrade leaves PostgreSQL alone, and cannot mark a failed migration rolled back. The app and the workers then refuse to start until an upgrade runs without it. |
@@ -316,7 +321,7 @@ For the split into api, worker and tasks applications, see [the chart's upgrade 
 
 ## Rollback
 
-A rollback never runs migrations and never needs a down migration. Every migration in the supported window only adds, so the previous version runs on the upgraded schema as it is. The pre-upgrade Job runs on `helm upgrade` only, never on `helm rollback`.
+A rollback never runs migrations and never needs a down migration. Every migration in the supported window only adds, so the previous version runs on the upgraded schema as it is. The pre-upgrade Job, where one renders, runs on `helm upgrade` only, never on `helm rollback`.
 
 - A version at or above the installation's floor starts on the newer schema. One below the floor refuses by name.
 - The Upgrades page shows **Rolled back** while the older version runs. Background steps that an older version can undo are reopened, and run again after you upgrade again.
@@ -406,9 +411,9 @@ The upgrade keeps existing accounts working with no manual step, apart from the 
 - SSO users land on their existing user and organization. The callback URL stays `/api/auth/callback/<provider>`, so the identity provider registration does not change.
 - Azure AD accounts move to the key the new sign-in looks them up by on each user's first sign-in after the upgrade. There is no SQL to run.
 - Browser sessions and API keys keep working.
-- The identity migrations run on first start. Check **Ops > Migrations** afterwards; see [Check the migration results](#check-the-migration-results).
+- The identity migrations run on first start. Check **Ops > Upgrades > Tenant migrations** afterwards; see [Check the migration results](#check-the-migration-results).
 
-The first start runs a migration preflight before the app reports ready. `--timeout 45m` on `helm upgrade` gives it room to start. A migration that cannot finish during the preflight stays gated and does not block startup, so check **Ops > Migrations** once the rollout completes. The app can restart once or twice while the bundled ClickHouse restarts on its new image; that is expected.
+The first start runs a migration preflight before the app reports ready. `--timeout 45m` on `helm upgrade` gives it room to start. A migration that cannot finish during the preflight stays gated and does not block startup, so check **Ops > Upgrades > Tenant migrations** once the rollout completes. The app can restart once or twice while the bundled ClickHouse restarts on its new image; that is expected.
 
 **Provider setting.** The chart now passes `app.nextAuth.provider` to the app as `AUTH_PROVIDER`. `NEXTAUTH_PROVIDER` is still read and logs a deprecation warning. If you select the provider with `NEXTAUTH_PROVIDER` in `app.extraEnvs`, the chart leaves the setting to you, as before. Outside the chart, set `AUTH_PROVIDER`; when both are set it wins.
 
@@ -444,6 +449,12 @@ Check your existing PVC name:
 ```bash
 kubectl -n langwatch get pvc
 ```
+
+## Known Issues
+
+### 3.20.1 drops OTLP/JSON spans with no attributes
+
+LangWatch 3.20.1 drops an OTLP/JSON span that has no `attributes` array, but still answers `2xx`, so the SDK reports success. The api logs `Error parsing OTLP span, dropping` once per lost span. OTLP allows a span with no attributes, and later releases accept it. Spans sent to 3.20.1 this way are not recovered by upgrading; upgrade to stop the loss.
 
 ## Version Compatibility
 

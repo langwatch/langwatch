@@ -1,7 +1,7 @@
 /**
  * The routing {@link QueryDriver}: sends one statement to the server its
- * tenant or explicit organisation belongs on, regardless of an unscoped
- * declaration. Statements naming neither route to the shared instance.
+ * tenant or explicit organisation belongs on, whether or not it skipped the
+ * tenant check. Statements naming neither route to the shared instance.
  */
 import { nowInstant } from "@langwatch/time";
 

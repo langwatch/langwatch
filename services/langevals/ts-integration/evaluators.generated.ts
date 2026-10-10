@@ -2,15 +2,18 @@
 // Zod-first: the schemas below are the source of truth and the TypeScript types
 // are inferred with z.infer. Do not edit by hand.
 import { z } from "zod";
+import type { Named } from "@langwatch/module";
 
 export const evaluatorTypesSchema = z.string();
 
-export const moneySchema = z.object({
+const moneySchemaDefinition = z.object({
   currency: z.string(),
   amount: z.number(),
 });
+export interface MoneySchema extends Named<typeof moneySchemaDefinition> {}
+export const moneySchema: MoneySchema = moneySchemaDefinition;
 
-export const evaluationResultSchema = z.object({
+const evaluationResultSchemaDefinition = z.object({
   status: z.literal("processed"),
   score: z.number().nullish(),
   passed: z.boolean().nullish(),
@@ -19,29 +22,39 @@ export const evaluationResultSchema = z.object({
   cost: moneySchema.nullish(),
   raw_response: z.any().optional(),
 });
+export interface EvaluationResultSchema extends Named<typeof evaluationResultSchemaDefinition> {}
+export const evaluationResultSchema: EvaluationResultSchema = evaluationResultSchemaDefinition;
 
-export const evaluationResultSkippedSchema = z.object({
+const evaluationResultSkippedSchemaDefinition = z.object({
   status: z.literal("skipped"),
   details: z.string().nullish(),
   cost: moneySchema.nullish(),
 });
+export interface EvaluationResultSkippedSchema extends Named<typeof evaluationResultSkippedSchemaDefinition> {}
+export const evaluationResultSkippedSchema: EvaluationResultSkippedSchema = evaluationResultSkippedSchemaDefinition;
 
-export const evaluationResultErrorSchema = z.object({
+const evaluationResultErrorSchemaDefinition = z.object({
   status: z.literal("error"),
   error_type: z.string(),
   details: z.string(),
   traceback: z.array(z.string()),
 });
+export interface EvaluationResultErrorSchema extends Named<typeof evaluationResultErrorSchemaDefinition> {}
+export const evaluationResultErrorSchema: EvaluationResultErrorSchema = evaluationResultErrorSchemaDefinition;
 
-export const singleEvaluationResultSchema = z.union([
+const singleEvaluationResultSchemaDefinition = z.union([
   evaluationResultSchema,
   evaluationResultSkippedSchema,
   evaluationResultErrorSchema,
 ]);
+export interface SingleEvaluationResultSchema extends Named<typeof singleEvaluationResultSchemaDefinition> {}
+export const singleEvaluationResultSchema: SingleEvaluationResultSchema = singleEvaluationResultSchemaDefinition;
 
-export const batchEvaluationResultSchema = z.array(singleEvaluationResultSchema);
+const batchEvaluationResultSchemaDefinition = z.array(singleEvaluationResultSchema);
+export interface BatchEvaluationResultSchema extends Named<typeof batchEvaluationResultSchemaDefinition> {}
+export const batchEvaluationResultSchema: BatchEvaluationResultSchema = batchEvaluationResultSchemaDefinition;
 
-export const evaluatorsSchema = z.object({
+const evaluatorsSchemaDefinition = z.object({
   "openai/moderation": z.object({
     settings: z.object({
       model: z
@@ -740,6 +753,8 @@ export const evaluatorsSchema = z.object({
     }),
   }),
 });
+export interface EvaluatorsSchema extends Named<typeof evaluatorsSchemaDefinition> {}
+export const evaluatorsSchema: EvaluatorsSchema = evaluatorsSchemaDefinition;
 
 export type Money = z.infer<typeof moneySchema>;
 export type EvaluationResult = z.infer<typeof evaluationResultSchema>;

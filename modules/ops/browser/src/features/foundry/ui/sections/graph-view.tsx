@@ -29,13 +29,13 @@ interface SpanNodeData {
 
 /** The border and fill a span node carries: selection wins over an error. */
 function spanNodeTint({ isSelected, errored }: { isSelected: boolean; errored: boolean }) {
-  if (isSelected) return { border: "orange.400", background: "orange.subtle" };
-  if (errored) return { border: "red.600", background: "red.subtle" };
+  if (isSelected) return { border: "orange.fg", background: "orange.subtle" };
+  if (errored) return { border: "red.fg", background: "red.subtle" };
   return { border: "border", background: "bg.panel" };
 }
 
 function SpanNode({ data }: { data: SpanNodeData }) {
-  const color = SPAN_TYPE_COLORS[data.type as keyof typeof SPAN_TYPE_COLORS] ?? "gray.400";
+  const color = SPAN_TYPE_COLORS[data.type as keyof typeof SPAN_TYPE_COLORS] ?? "gray.fg";
   const tint = spanNodeTint({ isSelected: data.isSelected, errored: data.status === "error" });
 
   return (

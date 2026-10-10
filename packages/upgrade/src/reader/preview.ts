@@ -1,7 +1,8 @@
 import { z } from "zod";
 
 import { compareReleases, releaseVersionSchema } from "../manifest/manifest.ts";
-import type { UpgradePlan } from "../plan/plan-upgrade.ts";
+import { type UpgradePlan, upgradePlanSchema } from "../plan/plan-upgrade.ts";
+import { upgradePreflightRowSchema } from "./preflight.ts";
 
 /** A target this image does not ship: only the target image holds its manifests (Q-U3). */
 export const upgradeTargetRefusalSchema = z.object({
@@ -46,3 +47,11 @@ export function previewUpgradeTo({
   );
   return { ...plan, releases };
 }
+
+/** The preview page's read: the plan narrowed to `to`, beside the preflight (U6-U9-READER). */
+export const upgradePreviewSchema = z.object({
+  installed: z.string().nullable(),
+  plan: z.union([upgradePlanSchema, upgradeTargetRefusalSchema]),
+  preflight: z.array(upgradePreflightRowSchema),
+});
+export type UpgradePreview = z.infer<typeof upgradePreviewSchema>;

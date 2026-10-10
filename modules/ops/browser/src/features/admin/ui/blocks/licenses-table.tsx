@@ -1,6 +1,8 @@
+import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { Badge, Button, Table, Text, VStack } from "@langwatch/design-system/primitives";
-import { MoreVertical } from "lucide-react";
+import { Inbox, MoreVertical } from "lucide-react";
 
 import { SERVICE_LABELS, type License, type Service } from "../../model/license-terms.ts";
 import { EmptyCell, formatDate } from "../elements/admin-cells.tsx";
@@ -28,7 +30,13 @@ export function LicensesTable({
   onResetBinding: (license: License) => void;
 }) {
   return (
-    <Table.Root variant="line" size="md">
+    <ListTable
+      density="compact"
+      columnRules={false}
+      containerProps={{ overflowX: "auto" }}
+      variant="line"
+      size="sm"
+    >
       <Table.Header>
         <Table.Row>
           <Table.ColumnHeader>Customer</Table.ColumnHeader>
@@ -54,7 +62,7 @@ export function LicensesTable({
           />
         ))}
       </Table.Body>
-    </Table.Root>
+    </ListTable>
   );
 }
 
@@ -62,9 +70,11 @@ function EmptyRow() {
   return (
     <Table.Row>
       <Table.Cell colSpan={COLUMN_COUNT}>
-        <Text color="fg.muted" fontSize="sm">
-          No licenses in the registry yet.
-        </Text>
+        <NoDataInfoBlock
+          icon={<Inbox />}
+          title="No licenses in the registry yet."
+          description="Records will appear here when they are available."
+        />
       </Table.Cell>
     </Table.Row>
   );
@@ -155,7 +165,7 @@ function RowActions({
     <Menu.Root>
       <Menu.Trigger asChild>
         <Button
-          size="xs"
+          size="sm"
           variant="ghost"
           aria-label={`Actions for ${license.organizationName}`}
           onClick={(event) => event.stopPropagation()}

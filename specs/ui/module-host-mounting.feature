@@ -44,6 +44,12 @@ Feature: A module mounts the host its screens read
     # left every scenario drawer throwing on its missing ScenarioHostProvider.
 
   @integration
+  Scenario: The composition's footer reads the capabilities a screen does
+    Given a composition that installs a footer reading a capability
+    When the shell renders
+    Then the footer is drawn inside the capability provider and reads the installed capability
+
+  @integration
   Scenario: A mounted host answers the reading its screen renders from
     Given a module whose host mount resolves its organization from its own read
     When a customer opens the screen that renders from that organization

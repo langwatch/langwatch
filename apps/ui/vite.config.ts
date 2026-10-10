@@ -1,10 +1,6 @@
 import { existsSync, readdirSync, readFileSync } from "fs";
 import path from "path";
 
-import {
-  injectPublicAppConfigIntoHtml,
-  type PublicAppConfig,
-} from "@langwatch/config/public-app-config";
 import { shikiManualChunk } from "@langwatch/design-system/shiki-chunking";
 import react from "@vitejs/plugin-react";
 import dotenv from "dotenv";
@@ -13,9 +9,10 @@ import { defineConfig, type Plugin, type UserConfig } from "vite";
 import { UI_ASSET_URL_GLOBAL } from "./vite/asset-base";
 import { designSystemStorybook } from "./vite/design-system-storybook";
 import { createDevLogger } from "./vite/dev-logging";
+import { HAVEN_SLUG_ENV, havenOrb } from "./vite/haven-orb";
 import { havenHmrGate } from "./vite/havenHmrGate";
 import { mailPreview } from "./vite/mail-preview";
-import { fetchPublicConfigFromApi } from "./vite/public-config-from-api";
+import { publicConfigPages } from "./vite/public-config-from-api";
 import { pushServiceWorker } from "./vite/push-service-worker";
 import { rootDiscoveryProxyPattern } from "./vite/root-discovery-proxy";
 import { SHIKI_PREBUNDLE_INCLUDE } from "./vite/shiki-prebundle";
@@ -104,6 +101,12 @@ const rootEnvPath = path.resolve(here, "../../.env");
 
 dotenv.config({ path: rootEnvPath, quiet: true });
 
+// Set by `haven up --ui=bundled`: Vite serves incrementally rebuilt bundles from memory.
+const IS_BUNDLED = process.env.LANGWATCH_UI_BUNDLED === "1";
+
+// Set by the cached `build:local` target haven serves: gzip size reporting is pure cost there.
+const IS_LOCAL_BUILD = process.env.LANGWATCH_UI_LOCAL_BUILD === "1";
+
 const FRONTEND_PORT = parseInt(process.env.LANGWATCH_APP_PORT ?? process.env.PORT ?? "5560");
 const API_PORT = FRONTEND_PORT + 1000;
 
@@ -164,13 +167,13 @@ function patchObjectInspectBrowserStub(): Plugin {
  * HTML shell. In development and `vite preview` (the build job's boot smoke)
  * Vite owns the shell, so it performs the same explicit boot mapping itself.
  */
-function injectDevelopmentPublicConfig(config: PublicAppConfig): Plugin {
+function injectDevelopmentPublicConfig({ apiUrl }: { apiUrl: string }): Plugin {
+  // The api may boot after this server and reloads on its own, so it is read per page.
+  const pageOf = publicConfigPages({ apiUrl, warn: (message) => devLogger.warn(message) });
   return {
     name: "inject-development-public-config",
     apply: "serve",
-    transformIndexHtml(html) {
-      return injectPublicAppConfigIntoHtml({ html, config });
-    },
+    transformIndexHtml: (html) => pageOf(html),
     configurePreviewServer(server) {
       const shellPath = path.resolve(server.config.root, server.config.build.outDir, "index.html");
       server.middlewares.use((request, response, next) => {
@@ -178,8 +181,10 @@ function injectDevelopmentPublicConfig(config: PublicAppConfig): Plugin {
         const isShell = pathname.endsWith(".html") || !path.extname(pathname);
         if (request.method !== "GET" || !isShell || !existsSync(shellPath)) return next();
         const html = readFileSync(shellPath, "utf8");
-        response.setHeader("Content-Type", "text/html");
-        response.end(injectPublicAppConfigIntoHtml({ html, config }));
+        void pageOf(html).then((page) => {
+          response.setHeader("Content-Type", "text/html");
+          response.end(page);
+        }, next);
       });
     },
   };
@@ -206,11 +211,56 @@ function logDevelopmentTlsState(
   devLogger.info("[vite-config] HTTPS disabled (set LANGWATCH_DEV_HTTP2=1)");
 }
 
+const BUNDLED_ROLLDOWN = IS_BUNDLED ? { experimental: { devMode: { lazy: false } } } : {};
+
+/** Bundled dev runs plugin-react's preamble after the app's modules; stubs stop them throwing. */
+function bundledRefreshStub(): Plugin {
+  return {
+    name: "bundled-refresh-stub",
+    apply: "serve",
+    transformIndexHtml: () => [
+      {
+        tag: "script",
+        children: "window.$RefreshReg$=()=>{};window.$RefreshSig$=()=>(t)=>t;",
+        injectTo: "head-prepend",
+      },
+    ],
+  };
+}
+
+type RenderBuiltUrl = NonNullable<NonNullable<UserConfig["experimental"]>["renderBuiltUrl"]>;
+type RollupOnWarn = NonNullable<
+  NonNullable<NonNullable<UserConfig["build"]>["rollupOptions"]>["onwarn"]
+>;
+
+// A module imported both statically and dynamically splits nothing; fail the build on it.
+const failOnIneffectiveDynamicImport: RollupOnWarn = (warning, defaultHandler) => {
+  if (warning.code === "INEFFECTIVE_DYNAMIC_IMPORT") {
+    throw new Error(
+      `${warning.message}\nMove the value the entry imports statically out of the screen — into the module's model/*-host.ts, which the entry already re-exports — so the screen is reached only through its loader.`,
+    );
+  }
+  defaultHandler(warning);
+};
+
+// ADR-086: the base for content-hashed assets is chosen at container start, not build time.
+// JS assets call the runtime resolver (vite/asset-base.ts), defaulting to same-origin;
+// CSS assets stay relative, HTML refs base-absolute, public/ assets same-origin.
+const renderBuiltUrl: RenderBuiltUrl = (filename, { type, hostType }) => {
+  if (type === "public") return undefined;
+  if (hostType === "css") return { relative: true };
+  if (hostType !== "js") return undefined;
+  const literal = JSON.stringify(filename).replace(
+    /[<>/\u2028\u2029]/g,
+    (char) => `\\u${char.charCodeAt(0).toString(16).padStart(4, "0")}`,
+  );
+  return {
+    runtime: `(globalThis.${UI_ASSET_URL_GLOBAL}||function(p){return "/"+p})(${literal})`,
+  };
+};
+
 export default defineConfig(async ({ command }): Promise<UserConfig> => {
   const devHttpsCredentials = loadDevHttpsCredentials();
-  // The api renders the page's public config; the dev server lifts it from the api's shell.
-  const publicConfig =
-    command === "serve" ? await fetchPublicConfigFromApi({ apiUrl: API_TARGET }) : undefined;
 
   // Diagnostic: when Vite hot-restarts on a config change, the https block is
   // re-evaluated but in-process TLS state can land in a broken pair (server listening,
@@ -222,10 +272,16 @@ export default defineConfig(async ({ command }): Promise<UserConfig> => {
     // proxy's failures are collapsed to one line — see ./vite/dev-logging.
     customLogger: devLogger,
     plugins: [
-      react(),
+      // Oxc's Rust React Compiler, not the Babel one: auto-memoisation without slowing HMR.
+      // Skipped components are logged by the dev server only; a build stays quiet.
+      react({ compiler: command === "serve" ? { logDiagnostics: true } : true }),
       patchObjectInspectBrowserStub(),
-      ...(publicConfig ? [injectDevelopmentPublicConfig(publicConfig)] : []),
+      // The api renders the page's public config; the dev server lifts it from the api's shell.
+      ...(command === "serve" ? [injectDevelopmentPublicConfig({ apiUrl: API_TARGET })] : []),
       havenHmrGate(),
+      ...(IS_BUNDLED ? [bundledRefreshStub()] : []),
+      // Skipped when bundled: its /@fs script is not in the bundle, so it 404s.
+      havenOrb({ slug: IS_BUNDLED ? undefined : process.env[HAVEN_SLUG_ENV] }),
       designSystemStorybook({ appPort: FRONTEND_PORT }),
       mailPreview({ appPort: FRONTEND_PORT }),
       workspaceSourcePlugin(),
@@ -256,24 +312,21 @@ export default defineConfig(async ({ command }): Promise<UserConfig> => {
       // The list, and the reason each entry is named through its owner, live in
       // ./vite/shiki-prebundle so one value is what the config and its guard
       // both read.
-      include: [...SHIKI_PREBUNDLE_INCLUDE],
+      // The React Compiler's output imports its runtime; prebundled up front, not found mid-page.
+      include: [...SHIKI_PREBUNDLE_INCLUDE, "react/compiler-runtime"],
     },
     build: {
       outDir: "dist/client",
       sourcemap: true,
+      reportCompressedSize: !IS_LOCAL_BUILD,
       rollupOptions: {
+        // Vite 8.3's bundled client lacks the `requestLazy` rolldown 1.2.9 emits for lazy imports.
+        ...BUNDLED_ROLLDOWN,
         // Both statically and dynamically imported means the `import()` splits
         // nothing -- the module stays in the importer's chunk. Rolldown always
         // detected this and we only logged it, which is how 468 kB of screens
         // ended up eager across 22 modules.
-        onwarn(warning, defaultHandler) {
-          if (warning.code === "INEFFECTIVE_DYNAMIC_IMPORT") {
-            throw new Error(
-              `${warning.message}\nMove the value the entry imports statically out of the screen — into the module's model/*-host.ts, which the entry already re-exports — so the screen is reached only through its loader.`,
-            );
-          }
-          defaultHandler(warning);
-        },
+        onwarn: failOnIneffectiveDynamicImport,
         output: {
           manualChunks(id: string) {
             // Shiki chunk-splitting lives in the Design System's `shiki-chunking`
@@ -284,28 +337,8 @@ export default defineConfig(async ({ command }): Promise<UserConfig> => {
       },
     },
     experimental: {
-      // ADR-086: the base for content-hashed assets is chosen at container start, not
-      // build time. JS-referenced assets call the runtime resolver
-      // (vite/asset-base.ts); CSS-referenced assets stay relative to the CSS
-      // file; HTML entry refs stay base-absolute for the server to rewrite; public/
-      // assets stay same-origin.
-      renderBuiltUrl(filename, { type, hostType }) {
-        if (type === "public") return undefined;
-        if (hostType === "js") {
-          // Self-defaulting so the built bundle is usable even when the server hasn't
-          // injected the resolver: `vite preview`, the boot-smoke, and any raw-`dist/`
-          // static server fall back to same-origin ("/"+path).
-          const literal = JSON.stringify(filename).replace(
-            /[<>/\u2028\u2029]/g,
-            (char) => `\\u${char.charCodeAt(0).toString(16).padStart(4, "0")}`,
-          );
-          return {
-            runtime: `(globalThis.${UI_ASSET_URL_GLOBAL}||function(p){return "/"+p})(${literal})`,
-          };
-        }
-        if (hostType === "css") return { relative: true };
-        return undefined;
-      },
+      bundledDev: IS_BUNDLED,
+      renderBuiltUrl,
     },
     server: {
       watch: {

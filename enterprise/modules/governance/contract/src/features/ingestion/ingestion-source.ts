@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 export const OTTL_ENABLED_SOURCE_TYPES = ["otel_generic"] as const;
@@ -20,7 +21,7 @@ export function isOttlEnabledSourceType(sourceType: string): sourceType is OttlE
  * How the last pull went, as main's `sourcePullStatus` reports it: dates and a
  * continuation flag only, never cursors or upstream error bodies.
  */
-export const ingestionSourcePullStatusSchema = z
+const ingestionSourcePullStatusSchemaDefinition = z
   .object({
     lastRunAt: z.string().nullable(),
     outcome: z.string().nullable(),
@@ -29,6 +30,11 @@ export const ingestionSourcePullStatusSchema = z
     hasMore: z.boolean().nullable(),
   })
   .strict();
+export interface IngestionSourcePullStatusSchema extends Named<
+  typeof ingestionSourcePullStatusSchemaDefinition
+> {}
+export const ingestionSourcePullStatusSchema: IngestionSourcePullStatusSchema =
+  ingestionSourcePullStatusSchemaDefinition;
 export type IngestionSourcePullStatus = z.infer<typeof ingestionSourcePullStatusSchema>;
 
 /**
@@ -36,7 +42,7 @@ export type IngestionSourcePullStatus = z.infer<typeof ingestionSourcePullStatus
  * the stored row: the secret hash, rotation slot and credentials envelope
  * never travel, guarding against a later `select` widening putting one back.
  */
-export const ingestionSourceDtoSchema = z
+const ingestionSourceDtoSchemaDefinition = z
   .object({
     id: z.string(),
     organizationId: z.string(),
@@ -63,25 +69,40 @@ export const ingestionSourceDtoSchema = z
     createdById: z.string().nullable(),
   })
   .strict();
+export interface IngestionSourceDtoSchema extends Named<
+  typeof ingestionSourceDtoSchemaDefinition
+> {}
+export const ingestionSourceDtoSchema: IngestionSourceDtoSchema =
+  ingestionSourceDtoSchemaDefinition;
 export type IngestionSourceDto = z.infer<typeof ingestionSourceDtoSchema>;
 
 /**
  * A source plus its ingest secret — the one moment the plaintext exists on the
  * wire. Answered by a create and by a rotation, and by nothing else.
  */
-export const ingestionSourceWithSecretSchema = z
+const ingestionSourceWithSecretSchemaDefinition = z
   .object({ source: ingestionSourceDtoSchema, ingestSecret: z.string() })
   .strict();
+export interface IngestionSourceWithSecretSchema extends Named<
+  typeof ingestionSourceWithSecretSchemaDefinition
+> {}
+export const ingestionSourceWithSecretSchema: IngestionSourceWithSecretSchema =
+  ingestionSourceWithSecretSchemaDefinition;
 
 /**
  * The canonical OTTL starter statements for a source type, and whether OTTL
  * editing is offered for it at all.
  */
-export const ottlStarterTemplateSchema = z
+const ottlStarterTemplateSchemaDefinition = z
   .object({
     enabled: z.boolean(),
     statements: z.array(z.string()),
     enabledSourceTypes: z.array(z.string()),
   })
   .strict();
+export interface OttlStarterTemplateSchema extends Named<
+  typeof ottlStarterTemplateSchemaDefinition
+> {}
+export const ottlStarterTemplateSchema: OttlStarterTemplateSchema =
+  ottlStarterTemplateSchemaDefinition;
 export type OttlStarterTemplate = z.infer<typeof ottlStarterTemplateSchema>;

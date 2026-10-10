@@ -113,7 +113,7 @@ The **process mounts declarations; a module never mounts anything.** Listing
 a declaration on `.withTransports(...)` is the whole act of publishing it —
 no per-module mount file, no hand-assembled router. `boot()` opens the REST
 family, the tRPC namespace and the SSE lane for every installed module's
-role; auth binds the one API door from its own transport facts (record §4)
+role; auth binds the one API door from its own middleware bindings (record §4)
 — a declaration names a permission, never a credential source.
 
 ```ts
@@ -159,6 +159,10 @@ worker then api; **shutdown drains the worker before closing the api
 listener**, because worker consumers call back into the api's in-process graph.
 Every eventing consumer registers **drain-first** on `server.graceful` — a
 structural fact, not a convention someone could skip.
+
+The worker also owns the upgrade: at boot, while the ledger is behind its image, its gate runs
+`pnpm task upgrade` under the runner's lease and takes no job until the ledger is current; the api
+holds nothing and serves every route meanwhile (`upgrade` skill, UPGRADE-IN-WORKER, NO-HOLDS).
 
 A module declares its whole pipeline once:
 

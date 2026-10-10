@@ -21,6 +21,12 @@ Feature: A project's privacy policy resolves without the write graph
       Then the resolved policy drops the input category
 
     @unit
+    Scenario: A project created on main with no rule row resolves main's platform default
+      Given team, personal, archived and second-organisation projects with no privacy rule row anywhere in their chain
+      When each project's policy is resolved
+      Then each resolves to the platform default, content captured and visible to all, as main does
+
+    @unit
     Scenario: A second resolution inside the window reuses the first
       Given a project whose policy has just been resolved
       When it is resolved again inside the cache window

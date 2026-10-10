@@ -8,6 +8,7 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { toDate } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
+import { MemoryOttlTransformChannel } from "../../channels/memory/memory.ottl-transform.channel.ts";
 import { MemoryProviderAccountChannel } from "../../channels/memory/memory.provider-account.channel.ts";
 import { PullDestinationService } from "../../features/ingestion-pull/services/pull-destination.service.ts";
 import {
@@ -131,7 +132,7 @@ class FakeDiagnostics implements GovernanceDiagnosticsSink {
   warn = vi.fn();
 }
 
-function harness() {
+function harness({ ottl = MemoryOttlTransformChannel.create() } = {}) {
   const repository = new FakeSourceRepository();
   const entitlements = new FakeEntitlements();
   const lifecycle = new FakeLifecycle();
@@ -148,12 +149,78 @@ function harness() {
     destinations: PullDestinationService.create(),
     providerAccounts: MemoryProviderAccountChannel.create(),
     diagnostics: new FakeDiagnostics(),
+    ottl,
     now: () => NOW,
   });
   return { service, repository, projects, findWithTeam, entitlements, lifecycle };
 }
 
 describe("IngestionSourceService", () => {
+  /** @scenario "Saving a source refuses OTTL the gateway parser rejects" */
+  describe("when the gateway parser rejects a statement", () => {
+    const rejecting = MemoryOttlTransformChannel.create({
+      validationResult: {
+        status: "invalid",
+        errors: [
+          {
+            statementIndex: 1,
+            line: 1,
+            col: 15,
+            message: 'statement has invalid syntax: 1:15: unexpected token "[" (expected ")" Key*)',
+          },
+        ],
+      },
+    });
+    const statements = ['set(attributes["a"], 1)', "set(attributes[ this is not ottl"];
+
+    it("refuses the edit by name, points at the statement, and stores nothing", async () => {
+      const { service, repository } = harness({ ottl: rejecting });
+
+      const refusal = service.updateSource({
+        id: "source-1",
+        organizationId: "org-1",
+        parserConfig: { ottlStatements: statements },
+      });
+
+      await expect(refusal).rejects.toMatchObject({
+        name: "OttlStatementsInvalidError",
+        code: "validation_error",
+        meta: {
+          fieldErrors: { "ottlStatements.1": [expect.any(String)] },
+          ottlErrors: [expect.objectContaining({ statementIndex: 1, col: 15 })],
+        },
+      });
+      expect(repository.update).not.toHaveBeenCalled();
+    });
+
+    it("refuses the create and stores nothing", async () => {
+      const { service, repository } = harness({ ottl: rejecting });
+
+      await expect(
+        service.createSource({
+          organizationId: "org-1",
+          sourceType: "otel_generic",
+          name: "OTel",
+          actorUserId: "user-1",
+          parserConfig: { ottlStatements: statements },
+        }),
+      ).rejects.toMatchObject({ name: "OttlStatementsInvalidError" });
+      expect(repository.create).not.toHaveBeenCalled();
+    });
+
+    it("saves when the check is deferred, as the editor tells the admin", async () => {
+      const { service, repository } = harness();
+
+      await service.updateSource({
+        id: "source-1",
+        organizationId: "org-1",
+        parserConfig: { ottlStatements: statements },
+      });
+
+      expect(repository.updateInput?.parserConfig).toMatchObject({ ottlStatements: statements });
+    });
+  });
+
   it("hands typed credentials to the store, which seals them, and returns a one-time secret", async () => {
     const { service, repository } = harness();
     const result = await service.createSource({

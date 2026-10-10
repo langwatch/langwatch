@@ -13,12 +13,20 @@ import { describe, expect, it, vi } from "vitest";
 
 import { GrantsFake } from "../../__tests__/support/grants-fake.ts";
 import { HeldConnectionsFake } from "../../__tests__/support/held-connections-fake.ts";
-import { OrganizationAdministrationFake } from "../../__tests__/support/organization-administration-fake.ts";
+import {
+  MembersFake,
+  OrganizationAdministrationFake,
+} from "../../__tests__/support/organization-administration-fake.ts";
 import { scimRepositoryFixture } from "../../__tests__/support/scim-repository-fixture.ts";
 import type { ScimRepository } from "../../repositories/scim.repository.ts";
 import type { ScimUserProvisioning } from "../scim-provisioning.service.ts";
 import { ScimService } from "../scim.service.ts";
 import { QuietScimSyncLifecycle } from "./support/quiet-scim-sync-lifecycle.ts";
+
+/** Every seat free, so these tests admit full members (seat-limit-at-provisioning.feature). */
+const openSeats = {
+  countMemberSeats: async () => ({ fullMembers: 0, liteMembers: 0, developers: 0 }),
+};
 
 class FixedEntitlementService implements Pick<EntitlementApi, "getActivePlan"> {
   async getActivePlan() {
@@ -38,6 +46,7 @@ class FixedEntitlementService implements Pick<EntitlementApi, "getActivePlan"> {
 
 function service(repo: ScimRepository): ScimService {
   return ScimService.create({
+    members: new MembersFake(),
     connections: HeldConnectionsFake.of(),
     prisma: repo,
     writer: new GrantsFake(),
@@ -54,6 +63,7 @@ function service(repo: ScimRepository): ScimService {
     lifecycle: new QuietScimSyncLifecycle(),
     provenOffboarding: false,
     tokenPepper: "scim-test-pepper",
+    seats: openSeats,
   });
 }
 

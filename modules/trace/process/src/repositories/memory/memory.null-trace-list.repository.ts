@@ -4,6 +4,7 @@ import type {
   TraceListRepositoryPage,
   TraceListRepository,
   BatchedFacetResult,
+  TraceRef,
 } from "@langwatch/trace-contract";
 
 export class MemoryNullTraceListRepository implements TraceListRepository {
@@ -21,7 +22,7 @@ export class MemoryNullTraceListRepository implements TraceListRepository {
     return 0;
   }
 
-  async findTraceIds(): Promise<string[]> {
+  async findTraceRefs(): Promise<TraceRef[]> {
     return [];
   }
 

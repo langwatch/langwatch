@@ -6,6 +6,7 @@ import {
   chartGridCardHeightPx,
   chartGridPlacementSchema,
   fitsChartGridWidth,
+  reflowSingleColumnStack,
 } from "../chart-grid";
 
 describe("chartGridBottomRow", () => {
@@ -67,5 +68,28 @@ describe("fitsChartGridWidth", () => {
       expect(fitsChartGridWidth({ gridColumn: 7, colSpan: 2 })).toBe(false);
       expect(fitsChartGridWidth({ gridColumn: 4, colSpan: 4 })).toBe(true);
     });
+  });
+});
+
+describe("reflowSingleColumnStack", () => {
+  const card = (gridRow: number, colSpan = 4) => ({ gridColumn: 0, gridRow, colSpan, rowSpan: 3 });
+
+  it("lays a left-edge stack of half-width cards out two per row", () => {
+    const placed = reflowSingleColumnStack([card(0), card(3), card(6)]);
+    expect(placed.map((c) => [c.gridColumn, c.gridRow])).toEqual([
+      [0, 0],
+      [4, 0],
+      [0, 3],
+    ]);
+  });
+
+  it("leaves a layout with any card off the left edge alone", () => {
+    const cards = [card(0), { ...card(3), gridColumn: 2 }];
+    expect(reflowSingleColumnStack(cards)).toBe(cards);
+  });
+
+  it("leaves a stack with a full-width card alone", () => {
+    const cards = [card(0), card(3, 8)];
+    expect(reflowSingleColumnStack(cards)).toBe(cards);
   });
 });

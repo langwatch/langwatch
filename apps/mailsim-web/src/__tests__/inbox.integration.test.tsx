@@ -38,6 +38,7 @@ const inbox = {
   smtpAddr: "127.0.0.1:5581",
   baseUrl: "https://mail.feature-one.langwatch.localhost:1355",
   persistent: true,
+  address: "dev@feature-one.mail.langwatch.localhost",
 };
 
 const json = ({ body, status = 200 }: { body: unknown; status?: number }) =>
@@ -108,6 +109,15 @@ describe("the browser inbox", () => {
           .getByRole("link", { name: /You are invited/u })
           .getAttribute("aria-current"),
       ).toBe("page");
+    });
+
+    /** @scenario "The console shows the stack's own inbox address" */
+    it("shows the address haven assigned this stack", async () => {
+      fakeSink();
+      renderInbox();
+
+      expect(await screen.findByText("dev@feature-one.mail.langwatch.localhost")).toBeTruthy();
+      expect(screen.getByText("This stack's address")).toBeTruthy();
     });
 
     /** @scenario "The inbox is served in the browser at the stack's mail hostname" */

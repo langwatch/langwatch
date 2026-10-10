@@ -131,3 +131,12 @@ Feature: Analytics timeseries service
       Given a datapoint step shorter than a day
       When the comparison window is taken, including for a window handed over end first
       Then it walks back a whole day rather than failing on a fraction of one
+
+  Rule: Analytics counts the same traces the Trace Explorer lists
+
+    @integration
+    Scenario: Langy's own turns are left out of every Analytics read
+      Given a project whose traces include turns with origin "langy"
+      When the Analytics page reads for a window
+      Then every read excludes the origin "langy"
+      And the Traces total equals the Trace Explorer count for the same window

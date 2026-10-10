@@ -13,6 +13,7 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { SettingList } from "@langwatch/design-system/settings-card";
 import { useState } from "react";
 import { GitHub } from "react-feather";
 
@@ -61,7 +62,12 @@ export function GithubCard({ organizationId }: { organizationId: string }) {
   const showInstallations = configured && installations.length > 0;
 
   return (
-    <Card.Root id="github" data-testid="github-connection-card">
+    <Card.Root
+      bg="bg.card"
+      borderColor="border.card"
+      id="github"
+      data-testid="github-connection-card"
+    >
       <Card.Body>
         <VStack align="stretch" gap={3}>
           <HStack gap={2}>
@@ -98,20 +104,22 @@ export function GithubCard({ organizationId }: { organizationId: string }) {
           )}
           {showInstallations && (
             <VStack align="stretch" gap={3}>
-              {installations.map((installation) => (
-                <GithubInstallationRow
-                  key={installation.installationId}
-                  installation={installation}
-                  disconnecting={
-                    disconnect.isPending && disconnectingId === installation.installationId
-                  }
-                  uninstallStarted={uninstallStartedFor === installation.installationId}
-                  onDisconnect={(installationId) => {
-                    setDisconnectingId(installationId);
-                    disconnect.mutate({ organizationId, installationId });
-                  }}
-                />
-              ))}
+              <SettingList>
+                {installations.map((installation) => (
+                  <GithubInstallationRow
+                    key={installation.installationId}
+                    installation={installation}
+                    disconnecting={
+                      disconnect.isPending && disconnectingId === installation.installationId
+                    }
+                    uninstallStarted={uninstallStartedFor === installation.installationId}
+                    onDisconnect={(installationId) => {
+                      setDisconnectingId(installationId);
+                      disconnect.mutate({ organizationId, installationId });
+                    }}
+                  />
+                ))}
+              </SettingList>
               <Button
                 variant="outline"
                 size="sm"

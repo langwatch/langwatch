@@ -6,7 +6,7 @@
 
 import { useUiAddress } from "@langwatch/browser-host/address";
 import {
-  useUiCapabilities,
+  useUiHostServices,
   useUiDeployment,
   useUiRpc,
   useUiScope,
@@ -42,7 +42,7 @@ import {
   toNavigationOrganizations,
   type NavigationGraphRead,
 } from "./navigation-host-graph";
-import type { UiRootCapabilities } from "./ui-root-capabilities";
+import type { UiRootHostServices } from "./ui-root-host-services";
 import { useUiShellFailure } from "./ui-shell-failure";
 
 /** The gradient the palette's own Langy mark paints with. */
@@ -50,11 +50,11 @@ const COMMAND_BAR_LANGY_GRADIENT_ID = "command-bar-langy-mark-gradient";
 
 /** The shell's host class over navigation's port class, built once per loaded port. */
 const browserHostClasses = new WeakMap<
-  UiRootCapabilities["navigationHost"]["NavigationHost"],
+  UiRootHostServices["navigationHost"]["NavigationHost"],
   ReturnType<typeof browserNavigationHosts>
 >();
 
-function browserNavigationHostOf(port: UiRootCapabilities["navigationHost"]["NavigationHost"]) {
+function browserNavigationHostOf(port: UiRootHostServices["navigationHost"]["NavigationHost"]) {
   const known = browserHostClasses.get(port);
   if (known) return known;
   const built = browserNavigationHosts(port);
@@ -68,7 +68,7 @@ function rememberScope({
   remember,
 }: {
   write: NavigationScopeWrite;
-  remember: UiRootCapabilities["scope"]["rememberUiScopeSelection"];
+  remember: UiRootHostServices["scope"]["rememberUiScopeSelection"];
 }): void {
   remember({
     writes: [
@@ -100,21 +100,21 @@ function setGraphicsQualityFromMenu(value: string): void {
 export function UiNavigationHost({
   children,
   commandBar = false,
-  capabilities,
+  rootHostServices,
   process,
 }: {
   children: ReactNode;
   /** The process owner's slice, handed down by the chrome. */
   process: ProcessWebConfig;
   /** Auth's session and organization's scope, loaded before the shell rendered. */
-  capabilities: UiRootCapabilities;
+  rootHostServices: UiRootHostServices;
   /**
    * Whether this mount carries the search palette — a singleton (one
    * document, one Cmd+K), so only the chrome layout route asks for it.
    */
   commandBar?: boolean;
 }) {
-  const { host, failure } = useNavigationHostReading({ commandBar, capabilities, process });
+  const { host, failure } = useNavigationHostReading({ commandBar, rootHostServices, process });
 
   if (failure.departing) return <LoadingScreen />;
   if (failure.copy) {
@@ -126,8 +126,8 @@ export function UiNavigationHost({
     );
   }
 
-  const { NavigationHostProvider } = capabilities.navigationHost;
-  const { CommandBarProvider } = capabilities.commandBar;
+  const { NavigationHostProvider } = rootHostServices.navigationHost;
+  const { CommandBarProvider } = rootHostServices.commandBar;
   return (
     <NavigationHostProvider value={host}>
       {commandBar ? <CommandBarProvider>{children}</CommandBarProvider> : children}
@@ -137,9 +137,9 @@ export function UiNavigationHost({
 
 function useNavigationHostReading({
   commandBar,
-  capabilities: {
+  rootHostServices: {
     session: auth,
-    scope: scopeCapability,
+    scope: scopeHostService,
     organizationFacts,
     navigationHost,
     commandBar: palette,
@@ -149,19 +149,19 @@ function useNavigationHostReading({
   process,
 }: {
   commandBar: boolean;
-  capabilities: UiRootCapabilities;
+  rootHostServices: UiRootHostServices;
   process: ProcessWebConfig;
 }) {
-  const { session, navigation, documentTitle, route } = useUiCapabilities();
+  const { session, navigation, documentTitle, route } = useUiHostServices();
   const activeScope = useUiScope().activeScope();
-  const memory = scopeCapability.useUiScopeMemory();
+  const memory = scopeHostService.useUiScopeMemory();
   const facts = organizationFacts.useUiOrganizationFacts();
-  const routeReading = scopeCapability.useUiRouteReading();
+  const routeReading = scopeHostService.useUiRouteReading();
   const address = useUiAddress();
   const rpc = useUiRpc();
   const { openDrawer } = useDrawer();
 
-  const organizations = scopeCapability.useUiOrganizations({
+  const organizations = scopeHostService.useUiOrganizations({
     transport: rpc,
     isDemo: false,
     enabled: true,
@@ -186,8 +186,10 @@ function useNavigationHostReading({
   );
   const organizationRole = useMemo(
     () =>
-      scopeCapability.organizationRoleOf(read.find((one) => one.id === activeScope.organizationId)),
-    [read, activeScope.organizationId, scopeCapability],
+      scopeHostService.organizationRoleOf(
+        read.find((one) => one.id === activeScope.organizationId),
+      ),
+    [read, activeScope.organizationId, scopeHostService],
   );
   const team = useMemo(
     () => teamHoldingProject(graph, activeScope.projectId),
@@ -209,9 +211,9 @@ function useNavigationHostReading({
         organization,
         userId: currentUser?.id,
         organizationRole,
-        teamRules: scopeCapability,
+        teamRules: scopeHostService,
       }),
-    [organization, currentUser?.id, organizationRole, scopeCapability],
+    [organization, currentUser?.id, organizationRole, scopeHostService],
   );
 
   const uiDeployment = useUiDeployment();
@@ -273,14 +275,14 @@ function useNavigationHostReading({
   const routePattern = routePatternOf(pathname, route.reading().params);
 
   // The header carries ops's impersonation banner whenever the session says so
-  // (specs/auth/impersonation-banner.feature). Presence is offered only on the
+  // (specs/auth/impersonation-banner.feature), else nothing. Presence is offered only on the
   // surface that broadcasts it, its switches off the graph already read.
   const graphicsQualityOverride = useGraphicsQualityOverrideStore();
   const accountMenu = useMemo<NavigationAccountMenu>(() => {
     const ImpersonationBanner = impersonationBanner.default;
     const headerBanner = currentUser?.impersonator ? (
       <ImpersonationBanner user={currentUser} />
-    ) : null;
+    ) : undefined;
     const graphicsQuality = {
       value: graphicsQualityOverride,
       label: GRAPHICS_QUALITY_LABELS[graphicsQualityOverride],
@@ -339,7 +341,9 @@ function useNavigationHostReading({
           pathname,
           search,
           projectParam: routeReading.projectParam,
-          projectSlugFromAddress: scopeCapability.projectSlugAddressedBy(routeReading.projectParam),
+          projectSlugFromAddress: scopeHostService.projectSlugAddressedBy(
+            routeReading.projectParam,
+          ),
           catchAllPath: routeReading.pathname.replace(/^\/@project\/?/, ""),
           routePattern,
           deployment,
@@ -362,7 +366,7 @@ function useNavigationHostReading({
           replace: (to) => navigation.replace(to),
           back: () => navigation.back(),
           rememberScope: (write: NavigationScopeWrite) =>
-            rememberScope({ write, remember: scopeCapability.rememberUiScopeSelection }),
+            rememberScope({ write, remember: scopeHostService.rememberUiScopeSelection }),
           signOut: () => void auth.signOutUi(),
           setDocumentTitle,
           openDrawer: openDrawerByName,
@@ -392,7 +396,7 @@ function useNavigationHostReading({
       accountMenu,
       navigation,
       auth,
-      scopeCapability,
+      scopeHostService,
       setDocumentTitle,
       openDrawerByName,
       openDrawerByToken,

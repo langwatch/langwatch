@@ -96,7 +96,7 @@ async function deliverSpendSteps({
     const webhooks = runtime.service(WebhookApi);
     const { endpoint } = await webhooks.create({
       organizationId: ORGANIZATION_ID,
-      url: "https://10.0.0.1/hooks/spend",
+      url: "https://example.com/hooks/spend",
       enabledEvents: ["gateway.request.completed"],
       maxBatchDelayMs: 0,
     });
@@ -119,6 +119,7 @@ async function deliverSpendSteps({
       tenantId: PROJECT_ID,
       aggregateId: requestId,
       occurredAt: Date.now(),
+      createdAt: Date.now(),
       ...arrival,
     });
 

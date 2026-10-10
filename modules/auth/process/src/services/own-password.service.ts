@@ -1,6 +1,7 @@
 /**
- * The password doors (D-A1U-4): auth decides whether a password may be written, user stores it,
- * then auth ends every other session. Spec: modules/auth/specs/account-lifecycle.feature.
+ * The password doors (D-A1U-4): auth decides whether a password may be written, Better Auth's own
+ * account storage stores it, then auth ends every other session.
+ * Spec: modules/auth/specs/account-lifecycle.feature.
  */
 import type { AuthApi } from "@langwatch/auth-contract";
 import { ValidationError } from "@langwatch/handled-error";
@@ -21,14 +22,29 @@ import {
   UserPasswordIncorrectError,
   UserPasswordNotSetError,
 } from "@langwatch/user-contract";
-import { hash } from "bcrypt";
 
 import { changeTargetsBrokeredPassword } from "../rules/password-change-target.rules.ts";
 
-type PasswordWrites = Pick<
-  UserApi,
-  "findById" | "hasPassword" | "setFirstPassword" | "rotatePassword"
->;
+type PasswordReads = Pick<UserApi, "findById" | "hasPassword">;
+
+/**
+ * Better Auth's own account storage: its adapter routes a user moved onto the identity branch to
+ * `AccountCredential`, where sign-in reads (ADR-116), and mirrors the legacy `Account` row.
+ */
+export interface CredentialAccounts {
+  /** The local password account, with its hash; null where the person holds none. */
+  findCredential(input: {
+    userId: string;
+  }): Promise<{ id: string; passwordHash: string | null } | null>;
+  /** Every sign-in account this person holds, by id. */
+  listAccountIds(input: { userId: string }): Promise<string[]>;
+  writePassword(input: { accountId: string; passwordHash: string }): Promise<void>;
+  /** A new local password account, for somebody who holds none. */
+  linkPassword(input: { userId: string; passwordHash: string }): Promise<void>;
+  deleteAccount(input: { accountId: string }): Promise<void>;
+  hashPassword(input: { password: string }): Promise<string>;
+  passwordMatches(input: { password: string; hash: string }): Promise<boolean>;
+}
 type PasswordDoors = Pick<
   AuthApi,
   | "resolveAuthProvider"
@@ -39,26 +55,32 @@ type PasswordDoors = Pick<
 >;
 
 const PASSWORD_BUDGET = { windowSeconds: 60 * 15, max: 5 } as const;
-/** The stored format Better Auth's hasher and user's UserPasswordService both write. */
-const PASSWORD_HASH_COST = 10;
 
 export class OwnPasswordService {
-  private constructor(
-    private readonly users: PasswordWrites,
-    private readonly auth: PasswordDoors,
-    private readonly issuesOwnPasswords: () => boolean,
-  ) {}
+  private readonly users: PasswordReads;
+  private readonly credentials: CredentialAccounts;
+  private readonly auth: PasswordDoors;
+  private readonly issuesOwnPasswords: () => boolean;
 
-  static create({
-    users,
-    auth,
-    issuesOwnPasswords,
-  }: {
-    users: PasswordWrites;
+  private constructor(deps: {
+    users: PasswordReads;
+    credentials: CredentialAccounts;
+    auth: PasswordDoors;
+    issuesOwnPasswords: () => boolean;
+  }) {
+    this.users = deps.users;
+    this.credentials = deps.credentials;
+    this.auth = deps.auth;
+    this.issuesOwnPasswords = deps.issuesOwnPasswords;
+  }
+
+  static create(deps: {
+    users: PasswordReads;
+    credentials: CredentialAccounts;
     auth: PasswordDoors;
     issuesOwnPasswords: () => boolean;
   }): OwnPasswordService {
-    return new OwnPasswordService(users, auth, issuesOwnPasswords);
+    return new OwnPasswordService(deps);
   }
 
   /** Fills an empty credential slot. Never while impersonating: the account is the subject's. */
@@ -85,12 +107,17 @@ export class OwnPasswordService {
 
     await this.#meter(`user.setPassword:${input.userId}`);
 
-    const result = await this.users.setFirstPassword({
-      id: input.userId,
-      passwordHash: await hash(input.password, PASSWORD_HASH_COST),
-    });
+    const credential = await this.credentials.findCredential({ userId: input.userId });
 
-    if (result === "already_set") throw new UserPasswordAlreadySetError();
+    if (credential?.passwordHash) throw new UserPasswordAlreadySetError();
+
+    const passwordHash = await this.credentials.hashPassword({ password: input.password });
+
+    if (credential) {
+      await this.credentials.writePassword({ accountId: credential.id, passwordHash });
+    } else {
+      await this.credentials.linkPassword({ userId: input.userId, passwordHash });
+    }
 
     await this.#endOtherSessions(input);
   }
@@ -118,15 +145,21 @@ export class OwnPasswordService {
       return;
     }
 
-    // Verify-and-replace as ONE call to user, so the stored hash never reaches auth.
-    const rotation = await this.users.rotatePassword({
-      userId: input.userId,
-      currentPassword: input.currentPassword,
-      newPassword: input.newPassword,
+    const credential = await this.credentials.findCredential({ userId: input.userId });
+
+    if (!credential?.passwordHash) throw new UserPasswordNotSetError();
+
+    const proven = await this.credentials.passwordMatches({
+      password: input.currentPassword,
+      hash: credential.passwordHash,
     });
 
-    if (rotation === "no_password") throw new UserPasswordNotSetError();
-    if (rotation === "wrong_password") throw new UserPasswordIncorrectError();
+    if (!proven) throw new UserPasswordIncorrectError();
+
+    await this.credentials.writePassword({
+      accountId: credential.id,
+      passwordHash: await this.credentials.hashPassword({ password: input.newPassword }),
+    });
 
     await this.#endOtherSessions(input);
   }

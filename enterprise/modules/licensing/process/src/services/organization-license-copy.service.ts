@@ -2,13 +2,22 @@ import type {
   OrganizationLicensePair,
   OrganizationLicenseRepository,
 } from "../repositories/organization-license.repository.ts";
-import { sameLicense } from "../rules/license-columns.rules.ts";
+import { isOrganizationNewer, sameLicense } from "../rules/license-columns.rules.ts";
 
 type LicenseRows = Pick<OrganizationLicenseRepository, "findLicensePairs" | "overwriteLicenses">;
 
-/** A missing or differing row is stale; an organization with neither licence nor row is not. */
-const isStale = ({ columns, own }: OrganizationLicensePair) =>
-  own === null ? columns.licenseKey !== null : !sameLicense({ a: own, b: columns });
+/**
+ * A missing row is stale, and so is a differing one organization's columns were written after;
+ * an organization with neither licence nor row is not.
+ */
+const isStale = ({ columns, columnsUpdatedAt, own, ownUpdatedAt }: OrganizationLicensePair) =>
+  own === null
+    ? columns.licenseKey !== null
+    : !sameLicense({ a: own, b: columns }) &&
+      isOrganizationNewer({
+        organizationUpdatedAt: columnsUpdatedAt,
+        licenseUpdatedAt: ownUpdatedAt,
+      });
 
 /** Where a run stopped and what it did; saved as the step's checkpoint after each batch. */
 type OrganizationLicenseCopyReport = Readonly<{
@@ -20,9 +29,9 @@ type OrganizationLicenseCopyReport = Readonly<{
 const DEFAULT_BATCH_SIZE = 500;
 
 /**
- * Brings licensing's rows level with organization's columns while dual-write
- * lasts (round 37 D6, R42): a missing or differing row is overwritten, a row
- * written since the read is kept, and a dry run writes nothing.
+ * Levels licensing's rows with organization's columns while dual-write lasts (round 37 D6, R42):
+ * a missing row is copied, a differing one overwritten only where organization's are newer (Alex,
+ * 2026-10-09), a write on either side since the read is kept, and a dry run writes nothing.
  */
 export class OrganizationLicenseCopyService {
   static create(

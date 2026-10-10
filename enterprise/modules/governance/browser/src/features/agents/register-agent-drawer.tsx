@@ -1,6 +1,5 @@
 import { useDrawer } from "@langwatch/browser-host/drawer";
-import { RenderCode } from "@langwatch/browser-host/markdown";
-import { useColorMode } from "@langwatch/design-system/color-mode";
+import { CodePreview } from "@langwatch/design-system/code-preview";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { Text, VStack } from "@langwatch/design-system/primitives";
 
@@ -26,7 +25,6 @@ connectAgent(
 );`;
 
 export function RegisterAgentDrawer({ open = true }: { open?: boolean }) {
-  const { colorMode } = useColorMode();
   const { closeDrawer } = useDrawer();
 
   return (
@@ -57,21 +55,13 @@ export function RegisterAgentDrawer({ open = true }: { open?: boolean }) {
               <Text textStyle="sm" fontWeight="semibold">
                 Python
               </Text>
-              <RenderCode
-                code={PYTHON_SNIPPET}
-                language="python"
-                colorMode={colorMode === "dark" ? "dark" : "light"}
-              />
+              <CodePreview code={PYTHON_SNIPPET} language="python" />
             </VStack>
             <VStack align="stretch" gap={2}>
               <Text textStyle="sm" fontWeight="semibold">
                 TypeScript
               </Text>
-              <RenderCode
-                code={TYPESCRIPT_SNIPPET}
-                language="typescript"
-                colorMode={colorMode === "dark" ? "dark" : "light"}
-              />
+              <CodePreview code={TYPESCRIPT_SNIPPET} language="typescript" />
             </VStack>
             <Text textStyle="sm" color="fg.muted">
               The process needs a LangWatch API key in its environment. Nothing listens on your side

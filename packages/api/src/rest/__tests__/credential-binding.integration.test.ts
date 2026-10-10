@@ -2,6 +2,7 @@ import { moduleApi } from "@langwatch/module";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
+import { authorizationPort } from "../../__tests__/api-double.ts";
 import { anyAuthenticated, publicRoute } from "../../access/access.ts";
 import type { RestIdentity } from "../../hosting/api-door.ts";
 import { MANAGEMENT_API_VERSION } from "../addressing.ts";
@@ -31,12 +32,12 @@ function host(browser?: RestIdentity) {
       project: closed,
       organization: closed,
       api_key: closed,
-      scim_token: closed,
       instance_admin: closed,
       browser: browser ?? closed,
     },
     bearers: () => closed,
     audit: { record: async () => {} },
+    authz: authorizationPort.forRequest(),
   });
 }
 const app = () => ({ read: () => ({ ok: true }) });
@@ -50,7 +51,7 @@ describe("module credential bindings", () => {
       ["second", "second-secret"],
     ] as const) {
       server.mount(family(namespace, `/internal/${namespace}`).router(), app, {
-        facts: [
+        middlewareBindings: [
           bindRestCredential("internal_secret", () =>
             BearerIdentity.create({ name: namespace, token }),
           ),
@@ -87,7 +88,7 @@ describe("module credential bindings", () => {
 
     expect(() =>
       host().mount(family("duplicate", "/internal/duplicate").router(), app, {
-        facts: [binding, binding],
+        middlewareBindings: [binding, binding],
       }),
     ).toThrow("binds internal_secret more than once");
   });
@@ -189,6 +190,7 @@ describe("permission targets in declared headers", () => {
         header: "x-project-id",
       })
       .withOutput(z.object({ ok: z.boolean() }))
+      .withoutAudit("test route")
       .handle(({ app }, headers) => {
         seen.push(headers["x-project-id"]);
 

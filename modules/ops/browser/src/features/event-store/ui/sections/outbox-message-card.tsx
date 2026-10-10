@@ -58,7 +58,7 @@ function MessageHeaderRow({
       </Text>
       <StatusBadge status={message.status} />
       {message.attempts > 0 && (
-        <Text textStyle="xs" color="orange.500" fontFamily="mono">
+        <Text textStyle="xs" color="orange.fg" fontFamily="mono">
           {message.attempts} attempts
         </Text>
       )}

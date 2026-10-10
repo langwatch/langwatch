@@ -1,3 +1,4 @@
+import { skipTenantCheck } from "@langwatch/prisma-client";
 import type { ActivationCode, Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 import { fromDate, toDate, type Instant } from "@langwatch/time";
 
@@ -65,8 +66,11 @@ export class PrismaActivationCodeRepository implements ActivationCodeRepository 
     // The whole decision, as one statement: exactly one concurrent post finds a
     // row to update, and everybody else is told the code is already redeemed.
     const updated = await this.prisma.$executeRaw`
-      -- @tenancy: a code is addressed by its own primary key. The row names the
-      -- organization it was minted for rather than belonging to one.
+      ${skipTenantCheck({
+        // A code is addressed by its own primary key. The row names the organization it was minted
+        // for rather than belonging to one.
+        SKIP_TENANT_CHECK: true,
+      })}
       UPDATE "ActivationCode"
          SET "redeemedAt" = ${toDate(at)},
              "redeemedByInstanceId" = ${instanceId},
@@ -82,7 +86,10 @@ export class PrismaActivationCodeRepository implements ActivationCodeRepository 
 
   async recordReusableRedemption({ id, instanceId, at }: ActivationClaim): Promise<boolean> {
     const updated = await this.prisma.$executeRaw`
-      -- @tenancy: addressed by primary key; the row names its organization.
+      ${skipTenantCheck({
+        // Addressed by primary key; the row names its organization.
+        SKIP_TENANT_CHECK: true,
+      })}
       UPDATE "ActivationCode"
          SET "redeemedAt" = ${toDate(at)},
              "redeemedByInstanceId" = ${instanceId},
@@ -110,7 +117,10 @@ export class PrismaActivationCodeRepository implements ActivationCodeRepository 
     // Conditional on the claim still being this install's: a reusable code
     // another install has since redeemed keeps that redemption.
     await this.prisma.$executeRaw`
-      -- @tenancy: addressed by primary key; the row names its organization.
+      ${skipTenantCheck({
+        // Addressed by primary key; the row names its organization.
+        SKIP_TENANT_CHECK: true,
+      })}
       UPDATE "ActivationCode"
          SET "redeemedAt" = NULL,
              "redeemedByInstanceId" = NULL,

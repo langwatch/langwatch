@@ -107,6 +107,7 @@ function toView(row: MemoryWebhookEndpointRow): WebhookEndpointView {
     maxBatchSize: row.maxBatchSize,
     maxBatchDelayMs: row.maxBatchDelayMs,
     maxInFlight: row.maxInFlight,
+    allowSelfSignedCertificate: row.allowSelfSignedCertificate ?? false,
     createdAt: toDate(row.createdAt),
     updatedAt: toDate(row.updatedAt),
   };
@@ -218,9 +219,25 @@ export class MemoryWebhookEndpointRepository implements WebhookEndpointRepositor
     maxBatchSize?: number;
     maxBatchDelayMs?: number;
     maxInFlight?: number;
+    allowSelfSignedCertificate?: boolean;
     signatureScheme?: WebhookSignatureScheme;
     sharedSecret?: string;
+    idempotencyKey?: string;
   }): Promise<{ endpoint: WebhookEndpointView; secret: string }> {
+    const repeated = this.#database
+      .endpoints()
+      .find(
+        (row) =>
+          params.idempotencyKey !== undefined &&
+          row.organizationId === params.organizationId &&
+          row.idempotencyKey === params.idempotencyKey,
+      );
+    if (repeated) {
+      return {
+        endpoint: toView(repeated),
+        secret: this.#options.secrets.decrypt(repeated.secretEncrypted),
+      };
+    }
     const destinationKind = params.destinationKind ?? "http";
     const destination = storedDestination(params, this.#options.secrets);
     const secret = params.sharedSecret ?? newSecret();
@@ -241,9 +258,11 @@ export class MemoryWebhookEndpointRepository implements WebhookEndpointRepositor
       lastSuccessAt: null,
       lastFailureAt: null,
       signatureScheme: params.signatureScheme ?? null,
+      idempotencyKey: params.idempotencyKey ?? null,
       maxBatchSize: params.signatureScheme !== undefined ? 1 : (params.maxBatchSize ?? 100),
       maxBatchDelayMs: params.maxBatchDelayMs ?? 250,
       maxInFlight: params.maxInFlight ?? 4,
+      allowSelfSignedCertificate: params.allowSelfSignedCertificate ?? false,
       archivedAt: null,
       createdAt: now,
       updatedAt: now,
@@ -280,6 +299,7 @@ export class MemoryWebhookEndpointRepository implements WebhookEndpointRepositor
     maxBatchSize?: number;
     maxBatchDelayMs?: number;
     maxInFlight?: number;
+    allowSelfSignedCertificate?: boolean;
   }): Promise<WebhookEndpointView> {
     const endpoint = this.#live(params);
     const sqsUpdate =
@@ -306,6 +326,9 @@ export class MemoryWebhookEndpointRepository implements WebhookEndpointRepositor
         : {}),
       ...(params.maxBatchDelayMs !== undefined ? { maxBatchDelayMs: params.maxBatchDelayMs } : {}),
       ...(params.maxInFlight !== undefined ? { maxInFlight: params.maxInFlight } : {}),
+      ...(params.allowSelfSignedCertificate !== undefined
+        ? { allowSelfSignedCertificate: params.allowSelfSignedCertificate }
+        : {}),
       updatedAt: nowInstant(),
     };
 
@@ -372,6 +395,7 @@ export class MemoryWebhookEndpointRepository implements WebhookEndpointRepositor
       ...endpoint,
       archivedAt: nowInstant(),
       status: "DISABLED",
+      idempotencyKey: null,
       updatedAt: nowInstant(),
     });
   }
@@ -430,6 +454,7 @@ export class MemoryWebhookEndpointRepository implements WebhookEndpointRepositor
     return httpDestinationConfig({
       url: endpoint.url ?? "",
       signatureScheme: endpoint.signatureScheme,
+      allowSelfSignedCertificate: endpoint.allowSelfSignedCertificate ?? false,
     });
   }
 

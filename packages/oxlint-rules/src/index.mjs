@@ -7,6 +7,7 @@ import {
 } from "./classify.mjs";
 import { defineRule, renderMessage, renderTemplate } from "./define-rule.mjs";
 import { accessEscapeKindRule } from "./rules/access-escape-kind.rule.mjs";
+import { authzMembersRequiredRule } from "./rules/authz-members-required.rule.mjs";
 import { bannedTestModelNamesRule } from "./rules/banned-test-model-names.rule.mjs";
 import { bannedVerbPrefixRule } from "./rules/banned-verb-prefix.rule.mjs";
 import { browserStoreContainmentRule } from "./rules/browser-store-containment.rule.mjs";
@@ -19,6 +20,7 @@ import {
   isCommentScannedPath,
 } from "./rules/comment-block-size.rule.mjs";
 import { conditionShapeRule } from "./rules/condition-shape.rule.mjs";
+import { contractSchemaNamedRule } from "./rules/contract-schema-named.rule.mjs";
 import { conditionalTypeDepthRule } from "./rules/conditional-type-depth.rule.mjs";
 import { effectDerivesStateRule } from "./rules/effect-derives-state.rule.mjs";
 import { emDashInCopyRule } from "./rules/em-dash-in-copy.rule.mjs";
@@ -65,6 +67,8 @@ import { serviceDoesNotOpenAChannelRule } from "./rules/service-does-not-open-a-
 import { serviceLoadsItsOwnConfigRule } from "./rules/service-loads-its-own-config.rule.mjs";
 import { sharedSetupIsAHookRule } from "./rules/shared-setup-is-a-hook.rule.mjs";
 import { signatureMirrorRule } from "./rules/signature-mirror.rule.mjs";
+import { skipTenantCheckReasonRule } from "./rules/skip-tenant-check-reason.rule.mjs";
+import { sliceReaderIsAHookRule } from "./rules/slice-reader-is-a-hook.rule.mjs";
 import { standInCastRule } from "./rules/stand-in-cast.rule.mjs";
 import { storeContainmentRule } from "./rules/store-containment.rule.mjs";
 import { suppressionStatesWhyRuleFor } from "./rules/suppression-states-why.rule.mjs";
@@ -92,6 +96,7 @@ const HOUSE_RULES = [
   transportDeclaresRule,
   clickhouseNoVersionOrderLimitRule,
   clickhouseTenantIdRule,
+  skipTenantCheckReasonRule,
   noFormWatchInChildRule,
   noTautologicalAssertionRule,
   requireFetchTimeoutRule,
@@ -106,6 +111,7 @@ const HOUSE_RULES = [
   cognitiveComplexityRule,
   commentBlockSizeRule,
   conditionShapeRule,
+  contractSchemaNamedRule,
   conditionalTypeDepthRule,
   emDashInCopyRule,
   environmentBoundariesRule,
@@ -123,7 +129,9 @@ const HOUSE_RULES = [
   noBootHookOutsideGuardRule,
   noHandRolledPlanGateRule,
   noHonoHttpExceptionRule,
+  sliceReaderIsAHookRule,
   accessEscapeKindRule,
+  authzMembersRequiredRule,
   noAmbientContextRule,
   requestDeliveryFromAnIntentRule,
   noInlineDynamicImportRule,
@@ -177,6 +185,7 @@ export {
   transportDeclaresRule,
   clickhouseNoVersionOrderLimitRule,
   clickhouseTenantIdRule,
+  skipTenantCheckReasonRule,
   noFormWatchInChildRule,
   noTautologicalAssertionRule,
   requireFetchTimeoutRule,
@@ -203,6 +212,7 @@ export {
   cognitiveComplexityRule,
   commentBlockSizeRule,
   conditionShapeRule,
+  contractSchemaNamedRule,
   conditionalTypeDepthRule,
   emDashInCopyRule,
   environmentBoundariesRule,
@@ -220,7 +230,9 @@ export {
   noBootHookOutsideGuardRule,
   noHandRolledPlanGateRule,
   noHonoHttpExceptionRule,
+  sliceReaderIsAHookRule,
   accessEscapeKindRule,
+  authzMembersRequiredRule,
   noAmbientContextRule,
   requestDeliveryFromAnIntentRule,
   noInlineDynamicImportRule,

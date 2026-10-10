@@ -132,6 +132,11 @@ Feature: Slack connections
       And the other project's connection is unchanged and still project-scoped
 
     @unit
+    Scenario: A legacy webhook URL that is not a Slack incoming webhook is refused before anything is stored
+      When an automation is saved with a webhook URL outside hooks.slack.com as a legacy secret
+      Then the save is refused naming the slackWebhook field and no connection is created
+
+    @unit
     Scenario: A legacy secret this project can already use reuses that connection
       Given the organization has an organization connection holding a bot token
       When an automation in this project is saved with that bot token as a legacy secret
@@ -236,6 +241,13 @@ Feature: Slack connections
       Given a cursor that names no claim position
       When a page of claims is read from it
       Then the read fails and no claim is returned
+
+    @unit
+    Scenario: A claim page reads every organisation's claims through the tenancy guard
+      Given claims in two organisations
+      When the claimant's release sweep reads a page of claims
+      Then the tenancy guard admits the one read, declared as a sweep of every organisation
+      And each claim is returned with its connection, its project and its claimant
 
   Rule: Delivery resolves through the automation's connection
 
@@ -429,3 +441,12 @@ Feature: Slack connections
       When the Slack connection migration runs for the organization
       Then each connection is used by the automations that deliver through it
       And running it again changes nothing
+
+  Rule: A bot token is checked at the configured Slack Web API
+
+    @unit
+    Scenario: A bot token is checked against the configured Slack Web API
+      Given a process whose Slack API base names a stand-in
+      When a bot connection's token is checked
+      Then auth.test is asked of the stand-in, never of slack.com
+      And the workspace the stand-in answers names the connection

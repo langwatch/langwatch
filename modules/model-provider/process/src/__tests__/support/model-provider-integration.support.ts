@@ -106,6 +106,7 @@ export function createPrismaProjects(prisma: PrismaClient): ProjectApi {
           organizationId: row.team.organizationId,
           isPersonal: row.isPersonal,
           ownerUserId: row.ownerUserId,
+          kind: row.kind,
         }));
       },
     },
@@ -250,6 +251,10 @@ export class TestModelProviderCatalog extends ModelProviderCatalog {
   ): Promise<ModelProviderCredentialVerdict> {
     this.testConnectionCalls.push({ provider, customKeys });
     return Promise.resolve(this.verdict);
+  }
+
+  assertEndpointAllowed(): Promise<void> {
+    return Promise.resolve();
   }
 
   pickExecutionValue(input: {

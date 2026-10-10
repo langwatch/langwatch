@@ -8,9 +8,10 @@ import {
   useTimeFormatStore,
 } from "../../../../features/explorer/behavior/time-format.store.ts";
 import { addColumnColumnDef } from "./add-column-header.tsx";
-import { getTraceColumnDef } from "./columns.ts";
+import { getTraceColumnDef, memberProjectColumnDef } from "./columns.ts";
 import { buildEvalColumnDef, evalColumnLabel } from "./eval-columns.ts";
 import { makeEvalCellDef } from "./registry/cells/trace/eval-result-cell.tsx";
+import { ProjectCell } from "./registry/cells/trace/project-cell.tsx";
 import { type Registry, traceRegistry } from "./registry/index.ts";
 import type { CellDef } from "./registry/types.ts";
 import { traceSelectColumnDef } from "./select-column.tsx";
@@ -31,15 +32,20 @@ interface TraceLensColumns {
 }
 
 function buildColumnDefs({
+  showMemberProject = false,
   logicalColumnIds,
   evaluatorNames,
   timeFormat,
 }: {
+  showMemberProject?: boolean;
   logicalColumnIds: string[];
   evaluatorNames: Map<string, string>;
   timeFormat: Parameters<typeof timeColumnSizing>[0];
 }): ColumnDef<TraceListItem, unknown>[] {
-  const defs: ColumnDef<TraceListItem, unknown>[] = [traceSelectColumnDef];
+  const defs: ColumnDef<TraceListItem, unknown>[] = [
+    traceSelectColumnDef,
+    ...(showMemberProject ? [memberProjectColumnDef] : []),
+  ];
 
   for (const id of logicalColumnIds) {
     const parsed = parseEvalColumnId(id);
@@ -82,9 +88,12 @@ function buildColumnDefs({
 export function useTraceLensColumns({
   logicalColumnIds,
   evaluatorNames = EMPTY_NAMES,
+  showMemberProject = false,
 }: {
   logicalColumnIds: string[];
   evaluatorNames?: Map<string, string>;
+  /** On an aggregate project (ADR-177), the member project column goes first, after select. */
+  showMemberProject?: boolean;
 }): TraceLensColumns {
   // The Time column's value format (relative ↔ ISO) is a personal display
   // preference, not a per-lens column width — so its sizing isn't baked
@@ -93,29 +102,30 @@ export function useTraceLensColumns({
   // columnSizingStore) still wins for the rendered width.
   const timeFormat = useTimeFormatStore((s) => s.format);
   const columns = useMemo(
-    () => buildColumnDefs({ logicalColumnIds, evaluatorNames, timeFormat }),
-    [logicalColumnIds, evaluatorNames, timeFormat],
+    () => buildColumnDefs({ logicalColumnIds, evaluatorNames, timeFormat, showMemberProject }),
+    [logicalColumnIds, evaluatorNames, timeFormat, showMemberProject],
   );
 
   // Cell renderers for the active eval columns, merged onto the static trace registry.
   const registry = useMemo<Registry<TraceListItem>>(() => {
-    const evalCells: Record<string, CellDef<TraceListItem>> = {};
+    const extraCells: Record<string, CellDef<TraceListItem>> = {};
     for (const id of logicalColumnIds) {
       const parsed = parseEvalColumnId(id);
       if (parsed) {
-        evalCells[id] = makeEvalCellDef({
+        extraCells[id] = makeEvalCellDef({
           id,
           evaluatorKey: parsed.evaluatorKey,
           field: parsed.field,
         });
       }
     }
-    if (Object.keys(evalCells).length === 0) return traceRegistry;
+    if (showMemberProject) extraCells[ProjectCell.id] = ProjectCell;
+    if (Object.keys(extraCells).length === 0) return traceRegistry;
     return {
       ...traceRegistry,
-      cells: { ...traceRegistry.cells, ...evalCells },
+      cells: { ...traceRegistry.cells, ...extraCells },
     };
-  }, [logicalColumnIds]);
+  }, [logicalColumnIds, showMemberProject]);
 
   const minWidth = useMemo(() => {
     /**

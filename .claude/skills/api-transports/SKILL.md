@@ -1,6 +1,6 @@
 ---
 name: api-transports
-description: "Declare a REST route, a tRPC procedure or an SSE/subscription stream on a module: defineRestRouter, defineTrpcRouter, defineTrpcContract, .withInput/.withOutput/.withPermission/.withDocs, /api/<x> paths (/v1 optional), framework-owned validation (malformed_request 400 vs validation_error 422), throwing a HandledError, why a handler returns a plain value, invalidatedBy read hints and fromProjection cursor reads. Use when someone says 'add a route', 'add an endpoint', 'add a procedure', 'new tRPC query', 'REST handler', 'OpenAPI docs for a route', 'withDocs', 'validate the body', 'return a 404', 'streaming endpoint', 'subscription', 'read hint', 'why is my read stale', or opens a *.rest.ts / *.trpc.ts file."
+description: "Declare a REST route, a tRPC procedure or an SSE/subscription stream on a module: defineRestRouter, defineTrpcRouter, defineTrpcContract, .withInput/.withOutput/.withPermission/.withDocs, /api/<x> paths (/v1 optional), framework-owned validation (malformed_request 400 vs validation_error 422), throwing a HandledError, why a handler returns a plain value, invalidatedBy read hints and fromProjection cursor reads. Use when someone says 'add a route', 'add an endpoint', 'add a procedure', 'new tRPC query', 'REST handler', 'OpenAPI docs for a route', 'withDocs', 'upgrade_in_progress', 'validate the body', 'return a 404', 'streaming endpoint', 'subscription', 'read hint', 'why is my read stale', or opens a *.rest.ts / *.trpc.ts file."
 user-invocable: true
 ---
 
@@ -39,6 +39,10 @@ anything; the process mounts every installed module's declarations.
 6. **Every wire schema imports from the module's own contract.** No schema declared in the transport file.
 7. **Docs live on the route.** `.withDocs({ tags, description, errors? })` in the same `*.rest.ts` file.
    Never a `*-openapi.rules.ts`. An extra status or non-JSON body goes through `documentedResponses()`.
+   7a. **Every route serves while the installation upgrades; nothing is declared** (NO-HOLDS, Alex
+   2026-10-09). A query the Postgres schema is not ready for answers the handled
+   `upgrade_in_progress` (503, Retry-After) on REST, tRPC and SSE alike, mapped once in
+   `promoteStoreFailure` (`packages/api/src/errors.ts`); never catch it per route (`upgrade` skill).
 8. **Paths are `/api/<x>`; `/api/v1/<x>` also answers.** Dated and `latest` versions exist but stay
    hidden (ADR `packages/api/adrs/004-public-rest-v1-and-date-negotiation.md`). A path parameter is named
    for what it identifies (`:triggerId`, never `:id`), except a route main already publishes.
@@ -54,7 +58,7 @@ anything; the process mounts every installed module's declarations.
    permission (`.withPermission("triggers:view")`), never a credential source. The caller arrives as
    `actor`/`scope`; no handler reads headers or looks the key's owner up.
    The door asks the permission before the handler runs. Never declare
-   `.withAccess(anyAuthenticated(...))` and then ask a permission in a middleware fact, the handler or
+   `.withAccess(anyAuthenticated(...))` and then ask a permission in a middleware context, the handler or
    the `*Api`: that is a bypass. `{ at: "route", param }` asks at the scope the path names; on the
    `api_key` door `{ at: "grants" }` passes a key naming no project on any scope it is granted at, and
    `{ at: "organization" }` asks at the organization. If none fits, extend `packages/api` and the
@@ -72,6 +76,18 @@ anything; the process mounts every installed module's declarations.
    Alex 2026-10-05; `modules/instant-eval/process/src/transport/instant-eval.trpc.ts`). The door resolves
    the organization; never write an audit row by hand.
 10. **A query never returns a credential.** Secrets come back only from a mutation.
+11. **What a route needs beyond its input is middleware context its own module provides** (record §8,
+    Alex 2026-10-10). Declare it `defineMiddlewareContext("name", schema)`, name it on the route with
+    `.withMiddlewareContext(name)` (the handler gets the parsed value after its arguments), and supply
+    every one in the module installer: `.provideMiddlewareContext({ name: (request, { app, dependencies })
+   => value })`. A missing key, an extra key or a value of the wrong type does not compile, and a module
+    whose routes need context it never provides does not publish. No process supplies it: a value several
+    modules need is a shared helper (`projectRequestContext: projectRequestContextOf`). `.withHeaders(...)`
+    values bind themselves. A tRPC procedure uses the same `.withMiddlewareContext(x)`; its mount binds it
+    with `bindTrpcMiddlewareContext(x, (ctx) => value)` or `bindTrpcHeader`. Anything else a module binds by
+    hand (tRPC, websocket, the API door) goes in `.provideMiddlewareBindings(() => [...])`, type-checked the
+    same way. Need the browser session the door resolved? `.withMiddlewareContext(browserSessionContext)`,
+    provided by `browserSession: browserSessionOfRequest`; never verify the cookie again.
 
 ## Worked example: one contract, one tRPC binding, one REST route
 

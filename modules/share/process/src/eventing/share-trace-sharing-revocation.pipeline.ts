@@ -54,7 +54,11 @@ export function buildShareTraceSharingRevocationPipeline({
             ttlMs: 60_000,
           },
         },
-        handle: ({ projectId }) => shares.revokeAllTraceShares(projectId),
+        // An absent choice predates it and means revoke; false keeps the links paused.
+        handle: async ({ projectId, revokeExistingLinks }) => {
+          if (revokeExistingLinks === false) return;
+          await shares.revokeAllTraceShares(projectId);
+        },
       })
       // The fact names the organization's projects as read when the setting was saved.
       .withPeerSubscriber("shareOrganizationTraceSharingDisabled", {

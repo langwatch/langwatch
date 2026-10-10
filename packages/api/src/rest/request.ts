@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 
 import { HandledError, remediation } from "@langwatch/handled-error";
-import { defineRestMiddleware, type RestTransportMiddleware } from "@langwatch/module";
+import { defineMiddlewareContext, type MiddlewareContext } from "@langwatch/module";
 import {
   classifyClient,
   createLogger,
@@ -937,32 +937,27 @@ function runAfterSSECompletion({
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Declared middleware facts: what a route asks the process for beyond its own
-// input, resolved once at the composition root.
+// Declared middleware context: what a route asks its module for beyond its own
+// input, supplied by the module's `.provideMiddlewareContext`.
 // ─────────────────────────────────────────────────────────────────────────────
 
 // The declaration itself lives on the browser-safe half; this re-export keeps
-// the server's one import site unchanged. See contract/rest-middleware.ts.
-export { defineRestMiddleware, type RestTransportMiddleware };
+// the server's one import site unchanged. See contract/middleware-context.ts.
+export { defineMiddlewareContext, type MiddlewareContext };
 
-export interface RestTransportMiddlewareBinding {
-  readonly middleware: RestTransportMiddleware;
-  resolve(context: Context): unknown;
+/** One context's value, by name; the route's own declaration parses it. */
+export interface MiddlewareContextBinding<Name extends string = string, Value = unknown> {
+  readonly middlewareContext: Name;
+  /** `input` is the validated input, handed only to a context declared `source: "input"`. */
+  resolve(request: Request, input?: unknown): Value | Promise<Value>;
 }
 
-/** A composition root binds request access; handlers receive only the parsed result. */
-export function bindRestMiddleware<Schema extends z.ZodType>(
-  middleware: RestTransportMiddleware<Schema>,
-  resolve: (context: Context) => z.input<Schema> | Promise<z.input<Schema>>,
-): RestTransportMiddlewareBinding {
-  return { middleware, resolve };
-}
-
-export function bindRestHeader<Schema extends z.ZodType>(
-  middleware: RestTransportMiddleware<Schema>,
-  header: string,
-): RestTransportMiddlewareBinding {
-  return { middleware, resolve: (context) => context.req.header(header) ?? null };
+/** Pairs a declared context with how its value is read off the request; both stay typed. */
+export function bindMiddlewareContext<const Name extends string, Schema extends z.ZodType>(
+  middlewareContext: MiddlewareContext<Name, Schema>,
+  resolve: (request: Request, input?: unknown) => z.input<Schema> | Promise<z.input<Schema>>,
+): MiddlewareContextBinding<Name, z.input<Schema>> {
+  return { middlewareContext: middlewareContext.name, resolve };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

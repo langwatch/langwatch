@@ -2,14 +2,16 @@ import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { traceQueryTranslation } from "../../../services/__tests__/fixtures/trace-query-services.fixtures.ts";
+import { ownProof } from "../../../__tests__/support/authorization-proofs.fixture.ts";
 /**
  * @vitest-environment node
  * @integration
  * Verifies that filters encounter stale trace versions before version dedup collapses them.
  */
 import { FACET_REGISTRY } from "../../../features/facet/repositories/clickhouse/clickhouse.trace-facet-registry.mapper.ts";
+import { traceQueryTranslation } from "../../../services/__tests__/fixtures/trace-query-services.fixtures.ts";
 import { TraceListClickHouseRepository } from "../trace-list.repository.ts";
+import { authorizedClickHouseFor } from "./support/authorized-clickhouse.support.ts";
 import {
   startMigratedTraceClickHouse,
   testClickHouseConfigured,
@@ -91,7 +93,6 @@ describe.skipIf(!clickHouseConfigured)(
     const filterFor = (queryText: string) => {
       const compiled = traceQueryTranslation.translateFilter({
         queryText,
-        tenantId: versionTenant,
         timeRange,
       });
       if (!compiled) throw new Error(`"${queryText}" compiled to no filter`);
@@ -100,7 +101,7 @@ describe.skipIf(!clickHouseConfigured)(
 
     const listWith = (queryText: string) =>
       repo.listAll({
-        tenantId: versionTenant,
+        authorization: ownProof({ projectId: versionTenant }),
         timeRange,
         sort: { column: "OccurredAt", direction: "desc" },
         limit: 50,
@@ -111,7 +112,7 @@ describe.skipIf(!clickHouseConfigured)(
     beforeAll(async () => {
       if (!clickHouseConfigured) return;
       ch = await startMigratedTraceClickHouse();
-      repo = TraceListClickHouseRepository.create(async () => ch);
+      repo = TraceListClickHouseRepository.create({ clickhouse: authorizedClickHouseFor(ch) });
 
       // Two versions of one trace, written as two parts so no merge collapses
       // them: the older one was never annotated, the newer one carries the
@@ -170,7 +171,7 @@ describe.skipIf(!clickHouseConfigured)(
       /** @scenario "A filter reads only the latest version of each trace" */
       it("counts the trace exactly once, in the bucket its newest version is in", async () => {
         const counts = await repo.findCategoricalFacet({
-          tenantId: versionTenant,
+          authorization: ownProof({ projectId: versionTenant }),
           timeRange,
           table: "trace_summaries",
           timeColumn: "OccurredAt",
@@ -185,7 +186,7 @@ describe.skipIf(!clickHouseConfigured)(
       /** @scenario "A filter reads only the latest version of each trace" */
       it("counts nothing for the bucket only its older version is in", async () => {
         const counts = await repo.findCategoricalFacet({
-          tenantId: versionTenant,
+          authorization: ownProof({ projectId: versionTenant }),
           timeRange,
           table: "trace_summaries",
           timeColumn: "OccurredAt",

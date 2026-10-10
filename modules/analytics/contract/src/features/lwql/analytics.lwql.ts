@@ -1,4 +1,5 @@
 import { authzPermissionSchema, type AuthzPermission } from "@langwatch/authorization";
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import type { LangWatchQLTimeWindow } from "./analytics.lwql-time-window.ts";
@@ -8,16 +9,18 @@ import type {
 } from "./langwatch-ql-app-functions.ts";
 
 /** One column in a LangWatchQL result. */
-export const langWatchQLColumnSchema = z
+const langWatchQLColumnSchemaDefinition = z
   .object({
     name: z.string(),
     type: z.string(),
   })
   .strict();
+export interface LangWatchQLColumnSchema extends Named<typeof langWatchQLColumnSchemaDefinition> {}
+export const langWatchQLColumnSchema: LangWatchQLColumnSchema = langWatchQLColumnSchemaDefinition;
 export type LangWatchQLColumn = z.infer<typeof langWatchQLColumnSchema>;
 
 /** Query cost and returned-row accounting from the backend. */
-export const langWatchQLStatisticsSchema = z
+const langWatchQLStatisticsSchemaDefinition = z
   .object({
     elapsedMs: z.number(),
     rowsRead: z.number(),
@@ -25,6 +28,11 @@ export const langWatchQLStatisticsSchema = z
     rowsReturned: z.number(),
   })
   .strict();
+export interface LangWatchQLStatisticsSchema extends Named<
+  typeof langWatchQLStatisticsSchemaDefinition
+> {}
+export const langWatchQLStatisticsSchema: LangWatchQLStatisticsSchema =
+  langWatchQLStatisticsSchemaDefinition;
 export type LangWatchQLStatistics = z.infer<typeof langWatchQLStatisticsSchema>;
 
 export const LWQL_DIAGNOSTIC_CODES = [
@@ -42,17 +50,22 @@ export const langWatchQLDiagnosticCodeSchema = z.enum(LWQL_DIAGNOSTIC_CODES);
 export type LangWatchQLDiagnosticCode = z.infer<typeof langWatchQLDiagnosticCodeSchema>;
 
 /** A non-fatal note attached to a completed result. */
-export const langWatchQLDiagnosticSchema = z
+const langWatchQLDiagnosticSchemaDefinition = z
   .object({
     code: langWatchQLDiagnosticCodeSchema,
     message: z.string(),
     meta: z.record(z.string(), z.unknown()).optional(),
   })
   .strict();
+export interface LangWatchQLDiagnosticSchema extends Named<
+  typeof langWatchQLDiagnosticSchemaDefinition
+> {}
+export const langWatchQLDiagnosticSchema: LangWatchQLDiagnosticSchema =
+  langWatchQLDiagnosticSchemaDefinition;
 export type LangWatchQLDiagnostic = z.infer<typeof langWatchQLDiagnosticSchema>;
 
 /** The complete result envelope returned by the query transport. */
-export const langWatchQLQueryResultSchema = z
+const langWatchQLQueryResultSchemaDefinition = z
   .object({
     columns: z.array(langWatchQLColumnSchema).readonly(),
     rows: z.array(z.record(z.string(), z.unknown())).readonly(),
@@ -64,19 +77,26 @@ export const langWatchQLQueryResultSchema = z
     coarsenedFromSeconds: z.number().optional(),
   })
   .strict();
+export interface LangWatchQLQueryResultSchema extends Named<
+  typeof langWatchQLQueryResultSchemaDefinition
+> {}
+export const langWatchQLQueryResultSchema: LangWatchQLQueryResultSchema =
+  langWatchQLQueryResultSchemaDefinition;
 export type LangWatchQLQueryResult = z.infer<typeof langWatchQLQueryResultSchema>;
 
 /**
  * A gate the schema publishes: captured content, a registry permission, or `costs`, which is
  * published beside `cost:view` so a reader of main's schema keeps its meaning.
  */
-export const langWatchQLGateSchema = z.union([
+const langWatchQLGateSchemaDefinition = z.union([
   z.enum(["input", "output", "costs"]),
   authzPermissionSchema,
 ]);
+export interface LangWatchQLGateSchema extends Named<typeof langWatchQLGateSchemaDefinition> {}
+export const langWatchQLGateSchema: LangWatchQLGateSchema = langWatchQLGateSchemaDefinition;
 export type LangWatchQLGate = z.infer<typeof langWatchQLGateSchema>;
 
-export const langWatchQLSchemaColumnSchema = z
+const langWatchQLSchemaColumnSchemaDefinition = z
   .object({
     name: z.string(),
     type: z.string(),
@@ -86,9 +106,14 @@ export const langWatchQLSchemaColumnSchema = z
     available: z.boolean(),
   })
   .strict();
+export interface LangWatchQLSchemaColumnSchema extends Named<
+  typeof langWatchQLSchemaColumnSchemaDefinition
+> {}
+export const langWatchQLSchemaColumnSchema: LangWatchQLSchemaColumnSchema =
+  langWatchQLSchemaColumnSchemaDefinition;
 export type LangWatchQLSchemaColumn = z.infer<typeof langWatchQLSchemaColumnSchema>;
 
-export const langWatchQLSchemaDatasetSchema = z
+const langWatchQLSchemaDatasetSchemaDefinition = z
   .object({
     name: z.string(),
     description: z.string(),
@@ -105,10 +130,15 @@ export const langWatchQLSchemaDatasetSchema = z
     exampleSql: z.string(),
   })
   .strict();
+export interface LangWatchQLSchemaDatasetSchema extends Named<
+  typeof langWatchQLSchemaDatasetSchemaDefinition
+> {}
+export const langWatchQLSchemaDatasetSchema: LangWatchQLSchemaDatasetSchema =
+  langWatchQLSchemaDatasetSchemaDefinition;
 export type LangWatchQLSchemaDataset = z.infer<typeof langWatchQLSchemaDatasetSchema>;
 
 /** One app function as the schema endpoint publishes it. */
-export const langWatchQLSchemaAppFunctionSchema = z
+const langWatchQLSchemaAppFunctionSchemaDefinition = z
   .object({
     name: z.string(),
     /** `conversation_bounded(thread_key, max_tokens, until_trace_id)`. */
@@ -133,9 +163,14 @@ export const langWatchQLSchemaAppFunctionSchema = z
     exampleSql: z.string(),
   })
   .strict();
+export interface LangWatchQLSchemaAppFunctionSchema extends Named<
+  typeof langWatchQLSchemaAppFunctionSchemaDefinition
+> {}
+export const langWatchQLSchemaAppFunctionSchema: LangWatchQLSchemaAppFunctionSchema =
+  langWatchQLSchemaAppFunctionSchemaDefinition;
 export type LangWatchQLSchemaAppFunction = z.infer<typeof langWatchQLSchemaAppFunctionSchema>;
 
-export const langWatchQLSchema = z
+const langWatchQLSchemaDefinition = z
   .object({
     database: z.string(),
     /** Every function name a query may call, equal to the validator's allowlist. */
@@ -145,6 +180,9 @@ export const langWatchQLSchema = z
     appFunctions: z.array(langWatchQLSchemaAppFunctionSchema).readonly(),
   })
   .strict();
+/** Named apart from the `LangWatchQLSchema` data type below, which it infers. */
+export interface LangWatchQLZodSchema extends Named<typeof langWatchQLSchemaDefinition> {}
+export const langWatchQLSchema: LangWatchQLZodSchema = langWatchQLSchemaDefinition;
 export type LangWatchQLSchema = z.infer<typeof langWatchQLSchema>;
 
 const MIN_UTC_YEAR = 0;
@@ -248,7 +286,7 @@ const passKeyColumnsSchema = z.array(langWatchQLPassKeyColumnSchema).readonly();
  * one and never writes the wrapper's SQL.
  * @see modules/instant-eval/specs/instant-eval-pipeline.feature
  */
-export const langWatchQLPassSchema = z.discriminatedUnion("kind", [
+const langWatchQLPassSchemaDefinition = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("probe") }).strict(),
   z.object({ kind: z.literal("count"), limit: passRowCountSchema }).strict(),
   z
@@ -269,6 +307,8 @@ export const langWatchQLPassSchema = z.discriminatedUnion("kind", [
     .strict(),
   z.object({ kind: z.literal("page"), traceIds: z.array(z.string()).readonly() }).strict(),
 ]);
+export interface LangWatchQLPassSchema extends Named<typeof langWatchQLPassSchemaDefinition> {}
+export const langWatchQLPassSchema: LangWatchQLPassSchema = langWatchQLPassSchemaDefinition;
 export type LangWatchQLPass = z.infer<typeof langWatchQLPassSchema>;
 
 /** A statement re-validated by the full policy, then run inside the wrapper its pass names. */
@@ -362,7 +402,7 @@ export type LangWatchQLUnavailableReason = z.infer<typeof langWatchQLUnavailable
  * only cares whether the surface is on keeps reading `available` and nothing
  * else.
  */
-export const langWatchQLAvailabilitySchema = z
+const langWatchQLAvailabilitySchemaDefinition = z
   .object({
     /** What the navigation entry and the page gate on. */
     available: z.boolean(),
@@ -370,4 +410,9 @@ export const langWatchQLAvailabilitySchema = z
     reason: langWatchQLUnavailableReasonSchema.optional(),
   })
   .strict();
+export interface LangWatchQLAvailabilitySchema extends Named<
+  typeof langWatchQLAvailabilitySchemaDefinition
+> {}
+export const langWatchQLAvailabilitySchema: LangWatchQLAvailabilitySchema =
+  langWatchQLAvailabilitySchemaDefinition;
 export type LangWatchQLAvailability = z.infer<typeof langWatchQLAvailabilitySchema>;

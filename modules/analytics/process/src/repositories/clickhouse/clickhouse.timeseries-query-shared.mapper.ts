@@ -159,7 +159,7 @@ export function appendMetadataValueFilterClauses({
   }
 }
 
-/** The columns of a deduped slim read: `OccurredAt` plus every `<alias>.<Column>` the expressions mention, minus the dedup keys. */
+/** The columns of a deduped slim read: `OccurredAt` plus each `<alias>.<Column>` mentioned. */
 export function referencedAliasColumns({
   alias,
   expressions,

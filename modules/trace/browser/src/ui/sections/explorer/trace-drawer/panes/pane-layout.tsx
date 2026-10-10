@@ -216,7 +216,7 @@ export function PaneLayout({
         minHeight={0}
         minWidth={0}
         direction="column"
-        bg={{ base: "bg.surface", _dark: "bg.panel" }}
+        bg={{ base: "bg.card", _dark: "bg.panel" }}
       >
         {vizDetailGroup}
       </Flex>
@@ -229,7 +229,7 @@ export function PaneLayout({
       minHeight={0}
       minWidth={0}
       direction="column"
-      bg={{ base: "bg.surface", _dark: "bg.panel" }}
+      bg={{ base: "bg.card", _dark: "bg.panel" }}
     >
       <Box ref={ctxBodyGroupRef} style={{ flex: 1, minHeight: 0, minWidth: 0, display: "flex" }}>
         <PanelGroup
@@ -291,7 +291,7 @@ function PaneResizeBar({ orientation }: { orientation: DrawerLayout }) {
       // `drag` / `inactive`) on the parent handle div — gives the
       // user the same "this is grabbable" affordance as the waterfall
       // chart.
-      bg={{ base: "gray.200", _dark: "border.muted" }}
+      bg={{ base: "bg.emphasized", _dark: "border.muted" }}
       transition="background 100ms ease"
       css={{
         "[data-resize-handle-state='hover'] &, [data-resize-handle-state='drag'] &": {
@@ -634,7 +634,7 @@ function VizDetailGroup({
       // No edge border here — the visible 1px separator lives in PaneResizeBar so the
       // hover-to-blue affordance can paint over the entire separator without being
       // obscured by an underlying panel border.
-      bg={{ base: "bg.surface", _dark: "bg.panel" }}
+      bg={{ base: "bg.card", _dark: "bg.panel" }}
     >
       <IsolatedErrorBoundary
         scope="Couldn't render visualisation"

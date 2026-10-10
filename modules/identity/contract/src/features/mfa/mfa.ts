@@ -1,4 +1,5 @@
 import { ledgerActorSchema } from "@langwatch/authorization";
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import { userTenantedCommandSchema } from "../../facts.ts";
@@ -44,15 +45,20 @@ export type MfaMethod = z.infer<typeof mfaMethodSchema>;
 export const mfaDisableViaSchema = z.enum(["password+totp", "org-admin"]);
 export type MfaDisableVia = z.infer<typeof mfaDisableViaSchema>;
 
-export const mfaEnrolledPayloadSchema = z.object({
+const mfaEnrolledPayloadSchemaDefinition = z.object({
   enrollmentId: z.string().min(1),
   userId: z.string().min(1),
   /** The method, and nothing else about it: no secret, no issuer, no URI. */
   method: mfaMethodSchema,
   actor: ledgerActorSchema,
 });
+export interface MfaEnrolledPayloadSchema extends Named<
+  typeof mfaEnrolledPayloadSchemaDefinition
+> {}
+export const mfaEnrolledPayloadSchema: MfaEnrolledPayloadSchema =
+  mfaEnrolledPayloadSchemaDefinition;
 
-export const mfaConfirmedPayloadSchema = z.object({
+const mfaConfirmedPayloadSchemaDefinition = z.object({
   enrollmentId: z.string().min(1),
   /** How many backup codes were issued alongside the confirmation. A COUNT,
    *  so "how many are left" subtracts the consumed positions without any
@@ -60,45 +66,75 @@ export const mfaConfirmedPayloadSchema = z.object({
   backupCodeCount: z.number().int().nonnegative(),
   actor: ledgerActorSchema,
 });
+export interface MfaConfirmedPayloadSchema extends Named<
+  typeof mfaConfirmedPayloadSchemaDefinition
+> {}
+export const mfaConfirmedPayloadSchema: MfaConfirmedPayloadSchema =
+  mfaConfirmedPayloadSchemaDefinition;
 
-export const mfaEnrollmentExpiredPayloadSchema = z.object({
+const mfaEnrollmentExpiredPayloadSchemaDefinition = z.object({
   enrollmentId: z.string().min(1),
 });
+export interface MfaEnrollmentExpiredPayloadSchema extends Named<
+  typeof mfaEnrollmentExpiredPayloadSchemaDefinition
+> {}
+export const mfaEnrollmentExpiredPayloadSchema: MfaEnrollmentExpiredPayloadSchema =
+  mfaEnrollmentExpiredPayloadSchemaDefinition;
 
-export const mfaDisabledPayloadSchema = z.object({
+const mfaDisabledPayloadSchemaDefinition = z.object({
   enrollmentId: z.string().min(1),
   via: mfaDisableViaSchema,
   actor: ledgerActorSchema,
 });
+export interface MfaDisabledPayloadSchema extends Named<
+  typeof mfaDisabledPayloadSchemaDefinition
+> {}
+export const mfaDisabledPayloadSchema: MfaDisabledPayloadSchema =
+  mfaDisabledPayloadSchemaDefinition;
 
-export const backupCodeConsumedPayloadSchema = z.object({
+const backupCodeConsumedPayloadSchemaDefinition = z.object({
   enrollmentId: z.string().min(1),
   /** WHICH code was spent, by position. Never the code. */
   codeIndex: z.number().int().nonnegative(),
 });
+export interface BackupCodeConsumedPayloadSchema extends Named<
+  typeof backupCodeConsumedPayloadSchemaDefinition
+> {}
+export const backupCodeConsumedPayloadSchema: BackupCodeConsumedPayloadSchema =
+  backupCodeConsumedPayloadSchemaDefinition;
 
 /**
  * A fresh set replaced whatever was left. The plugin overwrites its own
  * column on its own, but consumed POSITIONS live only here — without this
  * fact they would carry over and make "how many are left" a lie.
  */
-export const backupCodesRegeneratedPayloadSchema = z.object({
+const backupCodesRegeneratedPayloadSchemaDefinition = z.object({
   enrollmentId: z.string().min(1),
   backupCodeCount: z.number().int().nonnegative(),
   actor: ledgerActorSchema,
 });
+export interface BackupCodesRegeneratedPayloadSchema extends Named<
+  typeof backupCodesRegeneratedPayloadSchemaDefinition
+> {}
+export const backupCodesRegeneratedPayloadSchema: BackupCodesRegeneratedPayloadSchema =
+  backupCodesRegeneratedPayloadSchemaDefinition;
 
 /**
  * Evidence of a failure, and none of it is the value that was entered. The
  * count is the plugin's own `failedVerificationCount` as it stood after the
  * attempt — lockout is the plugin's to enforce, and this is the log of it.
  */
-export const mfaVerificationFailedPayloadSchema = z.object({
+const mfaVerificationFailedPayloadSchemaDefinition = z.object({
   enrollmentId: z.string().min(1),
   failedCount: z.number().int().nonnegative(),
 });
+export interface MfaVerificationFailedPayloadSchema extends Named<
+  typeof mfaVerificationFailedPayloadSchemaDefinition
+> {}
+export const mfaVerificationFailedPayloadSchema: MfaVerificationFailedPayloadSchema =
+  mfaVerificationFailedPayloadSchemaDefinition;
 
-export const mfaFactInputSchema = z.discriminatedUnion("type", [
+const mfaFactInputSchemaDefinition = z.discriminatedUnion("type", [
   z.object({
     type: z.literal(MFA_ENROLLED_EVENT_TYPE),
     data: mfaEnrolledPayloadSchema,
@@ -128,6 +164,8 @@ export const mfaFactInputSchema = z.discriminatedUnion("type", [
     data: mfaVerificationFailedPayloadSchema,
   }),
 ]);
+export interface MfaFactInputSchema extends Named<typeof mfaFactInputSchemaDefinition> {}
+export const mfaFactInputSchema: MfaFactInputSchema = mfaFactInputSchemaDefinition;
 export type MfaFactInput = z.infer<typeof mfaFactInputSchema>;
 
 /** A fact with its business time — what the reducer folds. */
@@ -287,29 +325,44 @@ export const MFA_COMMAND_TYPES = [
 ] as const;
 export type MfaCommandType = (typeof MFA_COMMAND_TYPES)[number];
 
-export const enrollMfaCommandDataSchema = userTenantedCommandSchema({
+const enrollMfaCommandDataSchemaDefinition = userTenantedCommandSchema({
   enrollmentId: z.string().min(1),
   method: mfaMethodSchema,
   occurredAtMs: z.number().int().nonnegative(),
   actor: ledgerActorSchema,
 });
+export interface EnrollMfaCommandDataSchema extends Named<
+  typeof enrollMfaCommandDataSchemaDefinition
+> {}
+export const enrollMfaCommandDataSchema: EnrollMfaCommandDataSchema =
+  enrollMfaCommandDataSchemaDefinition;
 export type EnrollMfaCommandData = z.infer<typeof enrollMfaCommandDataSchema>;
 
-export const confirmMfaCommandDataSchema = userTenantedCommandSchema({
+const confirmMfaCommandDataSchemaDefinition = userTenantedCommandSchema({
   enrollmentId: z.string().min(1),
   backupCodeCount: z.number().int().nonnegative(),
   occurredAtMs: z.number().int().nonnegative(),
   actor: ledgerActorSchema,
 });
+export interface ConfirmMfaCommandDataSchema extends Named<
+  typeof confirmMfaCommandDataSchemaDefinition
+> {}
+export const confirmMfaCommandDataSchema: ConfirmMfaCommandDataSchema =
+  confirmMfaCommandDataSchemaDefinition;
 export type ConfirmMfaCommandData = z.infer<typeof confirmMfaCommandDataSchema>;
 
-export const expireMfaEnrollmentCommandDataSchema = userTenantedCommandSchema({
+const expireMfaEnrollmentCommandDataSchemaDefinition = userTenantedCommandSchema({
   enrollmentId: z.string().min(1),
   occurredAtMs: z.number().int().nonnegative(),
 });
+export interface ExpireMfaEnrollmentCommandDataSchema extends Named<
+  typeof expireMfaEnrollmentCommandDataSchemaDefinition
+> {}
+export const expireMfaEnrollmentCommandDataSchema: ExpireMfaEnrollmentCommandDataSchema =
+  expireMfaEnrollmentCommandDataSchemaDefinition;
 export type ExpireMfaEnrollmentCommandData = z.infer<typeof expireMfaEnrollmentCommandDataSchema>;
 
-export const disableMfaCommandDataSchema = userTenantedCommandSchema({
+const disableMfaCommandDataSchemaDefinition = userTenantedCommandSchema({
   via: mfaDisableViaSchema,
   /**
    * Organizations requiring a second factor, as the caller resolved them.
@@ -319,28 +372,48 @@ export const disableMfaCommandDataSchema = userTenantedCommandSchema({
   occurredAtMs: z.number().int().nonnegative(),
   actor: ledgerActorSchema,
 });
+export interface DisableMfaCommandDataSchema extends Named<
+  typeof disableMfaCommandDataSchemaDefinition
+> {}
+export const disableMfaCommandDataSchema: DisableMfaCommandDataSchema =
+  disableMfaCommandDataSchemaDefinition;
 export type DisableMfaCommandData = z.infer<typeof disableMfaCommandDataSchema>;
 
-export const consumeBackupCodeCommandDataSchema = userTenantedCommandSchema({
+const consumeBackupCodeCommandDataSchemaDefinition = userTenantedCommandSchema({
   codeIndex: z.number().int().nonnegative(),
   occurredAtMs: z.number().int().nonnegative(),
 });
+export interface ConsumeBackupCodeCommandDataSchema extends Named<
+  typeof consumeBackupCodeCommandDataSchemaDefinition
+> {}
+export const consumeBackupCodeCommandDataSchema: ConsumeBackupCodeCommandDataSchema =
+  consumeBackupCodeCommandDataSchemaDefinition;
 export type ConsumeBackupCodeCommandData = z.infer<typeof consumeBackupCodeCommandDataSchema>;
 
-export const regenerateBackupCodesCommandDataSchema = userTenantedCommandSchema({
+const regenerateBackupCodesCommandDataSchemaDefinition = userTenantedCommandSchema({
   backupCodeCount: z.number().int().positive(),
   occurredAtMs: z.number().int().nonnegative(),
   actor: ledgerActorSchema,
 });
+export interface RegenerateBackupCodesCommandDataSchema extends Named<
+  typeof regenerateBackupCodesCommandDataSchemaDefinition
+> {}
+export const regenerateBackupCodesCommandDataSchema: RegenerateBackupCodesCommandDataSchema =
+  regenerateBackupCodesCommandDataSchemaDefinition;
 export type RegenerateBackupCodesCommandData = z.infer<
   typeof regenerateBackupCodesCommandDataSchema
 >;
 
-export const recordMfaVerificationFailureCommandDataSchema = userTenantedCommandSchema({
+const recordMfaVerificationFailureCommandDataSchemaDefinition = userTenantedCommandSchema({
   /** The plugin's own count after the attempt. */
   failedCount: z.number().int().nonnegative(),
   occurredAtMs: z.number().int().nonnegative(),
 });
+export interface RecordMfaVerificationFailureCommandDataSchema extends Named<
+  typeof recordMfaVerificationFailureCommandDataSchemaDefinition
+> {}
+export const recordMfaVerificationFailureCommandDataSchema: RecordMfaVerificationFailureCommandDataSchema =
+  recordMfaVerificationFailureCommandDataSchemaDefinition;
 export type RecordMfaVerificationFailureCommandData = z.infer<
   typeof recordMfaVerificationFailureCommandDataSchema
 >;

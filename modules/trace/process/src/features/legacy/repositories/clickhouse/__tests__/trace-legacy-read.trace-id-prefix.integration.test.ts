@@ -6,13 +6,11 @@ import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { TraceCanonicalisationService } from "#features/derivation/services/trace-canonicalisation.service";
-
-import { TraceLegacyReadClickHouseRepository } from "../trace-legacy-read.repository.ts";
 import {
   startMigratedTraceClickHouse,
   testClickHouseConfigured,
 } from "../../../../../repositories/clickhouse/__tests__/support/clickhouse-endpoint.support.ts";
+import { TraceLegacyReadClickHouseRepository } from "../trace-legacy-read.repository.ts";
 
 const clickHouseConfigured = testClickHouseConfigured();
 
@@ -81,7 +79,6 @@ describe.skipIf(!clickHouseConfigured)(
       ch = await startMigratedTraceClickHouse();
       service = TraceLegacyReadClickHouseRepository.create({
         resolveClickHouseClient: async () => ch,
-        traceCanonicalisation: TraceCanonicalisationService.create(),
       });
     }, 60_000);
 

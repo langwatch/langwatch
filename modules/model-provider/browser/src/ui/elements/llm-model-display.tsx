@@ -80,7 +80,7 @@ export function LLMModelDisplay({
   });
 
   const disabledColor = isDisabled ? "fg.muted" : undefined;
-  const labelColor = isProviderMissing ? "red.600" : disabledColor;
+  const labelColor = isProviderMissing ? "red.fg" : disabledColor;
 
   const stack = (
     <HStack align="center" gap={2} {...props}>
@@ -110,7 +110,7 @@ export function LLMModelDisplay({
         )}
       </VStack>
       {isProviderMissing && (
-        <HStack gap={1} color="red.600" flexShrink={0}>
+        <HStack gap={1} color="red.fg" flexShrink={0}>
           <AlertTriangle size={14} aria-hidden />
           <Text fontSize="xs" fontWeight="medium" textTransform="uppercase" letterSpacing="wide">
             Update needed

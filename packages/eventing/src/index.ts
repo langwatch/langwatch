@@ -78,6 +78,7 @@ export {
 } from "./pipeline/eventingModule.ts";
 export {
   type OpenPipelineDefinition,
+  pipelineRetentionOf,
   type SealedPipelineDefinition,
   sealPipelineDefinition,
 } from "./pipeline/sealedPipeline.ts";
@@ -154,6 +155,7 @@ export type {
   EventStoreReadContext,
 } from "./stores/eventStore.types.ts";
 export {
+  type AggregateEventsReadInput,
   EVENT_READ_WINDOW_MS,
   EventLogReadSeat,
   eventReadWindow,
@@ -204,6 +206,7 @@ export * from "./process-manager/index.ts";
 export * from "./process-manager/failureDiagnostic.ts";
 export * from "./process-manager/metrics.ts";
 export * from "./process-manager/processRuntime.ts";
+export { HANDOFF_PROCESS_NAME } from "./services/handoff/failedHandoff.ts";
 export * from "./projections/abstractFoldProjection.ts";
 export * from "./projections/foldProjectionExecutor.ts";
 export * from "./projections/foldCache/foldCacheEntry.ts";
@@ -226,6 +229,7 @@ export * from "./replay/replayProjections.ts";
 export * from "./replay/projectionLaneReplay.ts";
 export * from "./replay/types.ts";
 export * from "./services/errorHandling.ts";
+export { type FoldReadAuthorizer, foldReadPurpose } from "./projections/foldReadPurpose.ts";
 export * from "./stores/eventStoreUtils.ts";
 export * from "./stores/abstractEventStore.ts";
 export * from "./stores/eventStoreProducerOnly.ts";

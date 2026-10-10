@@ -81,6 +81,13 @@ type OTel struct {
 	// so a stale endpoint inherited from a shell cannot leave a lane posting
 	// metrics into a socket that accepts them and never answers.
 	MetricsEnabled string `env:"METRICS_ENABLED"`
+	// MetricsExporter is OTEL_METRICS_EXPORTER. Only its `prometheus` entry is
+	// read today: it opens the pull door (ADR-175 point 3).
+	MetricsExporter string `env:"METRICS_EXPORTER"`
+	// PrometheusHost / PrometheusPort are OTEL_EXPORTER_PROMETHEUS_HOST and
+	// _PORT: the pull door's own listener. Empty host is every interface.
+	PrometheusHost string `env:"EXPORTER_PROMETHEUS_HOST"`
+	PrometheusPort int    `env:"EXPORTER_PROMETHEUS_PORT"`
 
 	// OTLPEndpoint / OTLPHeaders / SampleRatio are the DEPRECATED
 	// LangWatch-only names (OTEL_OTLP_ENDPOINT, OTEL_OTLP_HEADERS,
@@ -533,4 +540,27 @@ func parseHeaders(raw string) map[string]string {
 		return nil
 	}
 	return headers
+}
+
+// DefaultPrometheusPort is the pull door's port when
+// OTEL_EXPORTER_PROMETHEUS_PORT is unset, the OTel spec default.
+const DefaultPrometheusPort = 9464
+
+// PrometheusPullAddr is the pull door's listen address, or "" when
+// OTEL_METRICS_EXPORTER does not list `prometheus` or the SDK is disabled.
+func (o *OTel) PrometheusPullAddr() string {
+	if o.SDKDisabled {
+		return ""
+	}
+	for _, exporter := range strings.Split(o.MetricsExporter, ",") {
+		if strings.TrimSpace(exporter) != "prometheus" {
+			continue
+		}
+		port := o.PrometheusPort
+		if port == 0 {
+			port = DefaultPrometheusPort
+		}
+		return net.JoinHostPort(o.PrometheusHost, strconv.Itoa(port))
+	}
+	return ""
 }

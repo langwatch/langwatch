@@ -5,7 +5,7 @@
 import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
 import { OpsApi, opsOperatorsTrpc } from "@langwatch/ops-contract";
 
-import { opsOperatorFact } from "#transport/ops-operator.trpc";
+import { opsOperatorContext } from "#transport/ops-operator.trpc";
 
 export const opsOperatorsTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsOperatorsTrpc> =
   defineTrpcRouter(OpsApi, opsOperatorsTrpc)
@@ -14,14 +14,14 @@ export const opsOperatorsTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof ops
     .handle(({ app }) => app.listPlatformOperators())
 
     .procedure("grantPlatformOperator")
-    .withFacts(opsOperatorFact)
+    .withMiddlewareContext(opsOperatorContext)
     .withPermission("ops:manage", { at: "platform" })
     .handle(({ app, input }, operator) =>
       app.grantPlatformOperator({ email: input.email, operator }),
     )
 
     .procedure("revokePlatformOperator")
-    .withFacts(opsOperatorFact)
+    .withMiddlewareContext(opsOperatorContext)
     .withPermission("ops:manage", { at: "platform" })
     .handle(async ({ app, input }, operator) => {
       await app.revokePlatformOperator({ grantId: input.grantId, operator });

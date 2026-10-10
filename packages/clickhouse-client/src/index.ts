@@ -23,6 +23,11 @@ export type {
   QueryResult,
 } from "./query.ts";
 export type { ClickHouseQueryClientOptions } from "./client.ts";
+export {
+  CLICKHOUSE_COLUMNS_QUERY,
+  CLICKHOUSE_COLUMNS_REFRESH_MS,
+  ClickHouseColumns,
+} from "./present-columns.ts";
 export { ClickHouseQueryClient } from "./client.ts";
 export {
   ClickHouseConfigService,
@@ -80,7 +85,6 @@ export type {
   ClickHouseStatementOperation,
   ClickHouseVendorClient,
   ClickHouseVendorClientOptions,
-  UnscopedStatementDeclaration,
 } from "./managed-client.ts";
 export type { RoutableStatementClient } from "./routingDriver.ts";
 export { routingDriver } from "./routingDriver.ts";
@@ -129,7 +133,11 @@ export {
   parseRoutingTable,
   UnknownTenantError,
 } from "./tenancy.ts";
-export type { TenantGuardOptions, TenantScopeViolation } from "./tenantGuard.ts";
+export type {
+  SkippedTenantCheck,
+  TenantGuardOptions,
+  TenantScopeViolation,
+} from "./tenantGuard.ts";
 export {
   StatementReporter,
   type StatementLogSink,
@@ -197,3 +205,25 @@ export type {
   WindowedReadMetrics,
   WindowedReadOutcome,
 } from "./windowedRead.ts";
+export type {
+  ClickHouseClientResolver,
+  ReadResource,
+  StatementScopeViolation,
+} from "./authorized-reads.ts";
+export type { TenantScopeTimeColumn } from "@langwatch/clickhouse-markers";
+export { tenantScope, tenantSet } from "@langwatch/clickhouse-markers";
+export {
+  AuthorizedClickHouse,
+  expandFragment,
+  expandStatement,
+  fenceExpression,
+  fenceFor,
+  HAND_WRITTEN_TENANT_PREDICATE,
+  ownProjectIdOf,
+  PROOF_BEARING_PERMISSIONS,
+  singleTenantOf,
+  StatementScopeError,
+  TenantReaderClientUnavailableError,
+  TenantScopedReader,
+  tenantScopeKey,
+} from "./authorized-reads.ts";

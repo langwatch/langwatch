@@ -1,4 +1,5 @@
 import { useUiDeployment } from "@langwatch/browser-host/capabilities";
+import { SnippetPreview } from "@langwatch/design-system/code-preview";
 import {
   API_KEY_PLACEHOLDER,
   PersonalAccessTokenBanner,
@@ -17,7 +18,6 @@ import {
 import { TabButton } from "../../elements/onboarding/shared/tab-button.tsx";
 import { showErrorToast } from "../errors/index.ts";
 import { useActiveProject } from "./active-project-context.tsx";
-import { CodePreview } from "./observability/code-preview.tsx";
 
 const MotionVStack = motion.create(VStack);
 
@@ -242,7 +242,7 @@ export function ViaMcpClientScreen(): React.ReactElement {
           />
         ) : null}
 
-        <CodePreview
+        <SnippetPreview
           code={configJson}
           filename="mcp.json"
           codeLanguage="json"

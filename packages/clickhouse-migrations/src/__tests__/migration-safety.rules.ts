@@ -4,6 +4,15 @@
  * its own fix, the way a lint message does. ADR-155.
  */
 
+/** The rules that keep reads fast through the upgrade (Alex, 2026-10-09), above the floor. */
+export const GRACEFUL_RULES: ReadonlySet<string> = new Set([
+  "untracked-mutation",
+  "unknown-background-step",
+  "modify-order-by",
+  "optimize-final",
+  "materialized-view-populate",
+]);
+
 /** One refusal: what is wrong, and what to write instead. */
 export interface MigrationFinding {
   readonly migration: string;
@@ -317,15 +326,121 @@ function viewFindings(liveUp: string): Finding[] {
   return [...recreated, ...modified];
 }
 
+/** Each statement of the up half with the comment text that sits above it. */
+function statementsWithNotes(up: string): { statement: string; notes: string }[] {
+  const live = maskComments(up);
+  let from = 0;
+  return live.split(";").flatMap((part) => {
+    const start = from;
+    from += part.length + 1;
+    const statement = part.trim();
+    if (statement.length === 0) return [];
+    return [{ statement, notes: up.slice(start, start + part.indexOf(statement)) }];
+  });
+}
+
+const MUTATION =
+  /^ALTER\s+TABLE\s+(\S+)(?:\s+ON\s+CLUSTER\s+\S+)?\s+(UPDATE|DELETE|MATERIALIZE\s+(?:COLUMN|INDEX|PROJECTION|STATISTICS|TTL)|MODIFY\s+TTL)\b|^DELETE\s+FROM\s+(\S+)/i;
+const BACKGROUND_STEP_NOTE = /--[ \t]*background step:[ \t]*([\w:-]+)/i;
+
+const MUTATION_FIX =
+  "a mutation rewrites parts of the whole table while the api reads it, and every later ALTER " +
+  "on the table queues behind it. Move it to a background step in the table's owner that " +
+  "starts it and waits on system.mutations (trace:track-updated-at-index-materialisation is " +
+  "the shape), and put `-- background step: <id>` above the statement. A new value for old " +
+  "rows is a DEFAULT read at query time; MODIFY TTL needs SETTINGS materialize_ttl_after_modify = 0.";
+
+function mutationFindings({ up, steps }: { up: string; steps: ReadonlySet<string> }): Finding[] {
+  return statementsWithNotes(up).flatMap(({ statement, notes }): Finding[] => {
+    const match = MUTATION.exec(statement);
+    if (!match) return [];
+    const kind = (match[2] ?? "DELETE").toUpperCase().replace(/\s+/g, " ");
+    if (kind === "MODIFY TTL" && /\bmaterialize_ttl_after_modify\s*=\s*0\b/i.test(statement)) {
+      return [];
+    }
+    const table = match[1] ?? match[3]!;
+    const step = BACKGROUND_STEP_NOTE.exec(notes)?.[1];
+    if (step === undefined) {
+      return [
+        {
+          rule: "untracked-mutation",
+          problem: `runs ${kind} on ${table} at deploy`,
+          fix: MUTATION_FIX,
+        },
+      ];
+    }
+    if (steps.has(step)) return [];
+    return [
+      {
+        rule: "unknown-background-step",
+        problem: `runs ${kind} on ${table} under a note naming ${step}, which is no step`,
+        fix:
+          "name the id of the defineMigrationStep that tracks the mutation, as it appears in " +
+          "packages/upgrade/releases/image/code-steps.json (pnpm generate:code-steps).",
+      },
+    ];
+  });
+}
+
+const REBUILD_FIX =
+  "it runs inside goose and blocks the upgrade for as long as the table is large, while " +
+  "reads compete with it. ";
+
+function blockingRewriteFindings(liveUp: string): Finding[] {
+  return statementsIn(liveUp).flatMap((statement): Finding[] => {
+    const order = /^ALTER\s+TABLE\s+(\S+).*\bMODIFY\s+ORDER\s+BY\b/is.exec(statement);
+    if (order) {
+      return [
+        {
+          rule: "modify-order-by",
+          problem: `changes the sort key of ${order[1]}`,
+          fix:
+            "a sort key change is a new table: create it beside the old one with the new ORDER " +
+            "BY, fill it with a background step, switch the readers, then retire the old table " +
+            "under the removal rule.",
+        },
+      ];
+    }
+    const optimize = /^OPTIMIZE\s+TABLE\s+(\S+).*\bFINAL\b/is.exec(statement);
+    if (optimize) {
+      return [
+        {
+          rule: "optimize-final",
+          problem: `runs OPTIMIZE ... FINAL on ${optimize[1]}`,
+          fix:
+            `${REBUILD_FIX}Leave merges to the server and read deduplicated rows with argMax ` +
+            "(or FINAL in the query); a one-off compaction is an operator task, not a migration.",
+        },
+      ];
+    }
+    const populate =
+      /^CREATE\s+MATERIALIZED\s+VIEW\s+(?:IF\s+NOT\s+EXISTS\s+)?(\S+).*\bPOPULATE\b/is.exec(
+        statement,
+      );
+    if (!populate) return [];
+    return [
+      {
+        rule: "materialized-view-populate",
+        problem: `creates materialized view ${populate[1]} with POPULATE`,
+        fix:
+          `${REBUILD_FIX}POPULATE also loses the rows inserted while it runs. Create the view ` +
+          "TO a target table without POPULATE and fill the history with a background step.",
+      },
+    ];
+  });
+}
+
 /**
  * Every rule the ClickHouse scanner applies to one goose migration file. `floor` is the LTS
- * floor release: a retirement note must name a release at or below it.
+ * floor release: a retirement note must name a release at or below it. `steps` are the
+ * code-step ids a `-- background step:` note may name.
  */
 export function scanClickHouseMigration({
   name,
   sql,
   floor,
-}: MigrationSource & { floor: string }): MigrationFinding[] {
+  steps = new Set(),
+}: MigrationSource & { floor: string; steps?: ReadonlySet<string> }): MigrationFinding[] {
   const { up, down } = gooseHalves(sql);
   const liveUp = maskComments(up);
   return [
@@ -336,6 +451,8 @@ export function scanClickHouseMigration({
     ...downFindings(down),
     ...ifExistsFindings(liveUp),
     ...viewFindings(liveUp),
+    ...mutationFindings({ up, steps }),
+    ...blockingRewriteFindings(liveUp),
   ].map((finding) => ({ migration: name, ...finding }));
 }
 

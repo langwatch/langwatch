@@ -359,7 +359,7 @@ test.describe("browser product journey", () => {
     await page.getByRole("textbox", { name: "Name and Icon" }).fill(WORKFLOW_NAME);
     await page.getByRole("button", { name: /^create workflow$/i }).click();
     // A new workflow opens in the studio, on its own id.
-    await expect(page).toHaveURL(/\/studio\/workflow_.+/, { timeout: 60000 });
+    await expect(page).toHaveURL(/\/studio\/([a-z]+_)?workflow_.+/, { timeout: 60000 });
 
     await visit(`/${projectSlug}/prompts`);
     const newPrompt = page.getByRole("button", { name: /new prompt|create first prompt/i }).first();

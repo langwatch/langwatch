@@ -3,6 +3,7 @@ import {
   defineEventingModule,
   definePipeline,
   type EventingSetup,
+  type RetentionPolicyResolver,
 } from "@langwatch/eventing";
 
 import type { TraceModule } from "../app/trace.app.ts";
@@ -17,14 +18,15 @@ import {
   traceReceivedEventSchema,
 } from "./trace-project-milestones.events.ts";
 
-function milestoneCommands() {
-  return definePipeline({
+function milestoneCommands(retention?: RetentionPolicyResolver) {
+  const pipeline = definePipeline({
     name: TRACE_PROJECT_MILESTONES_PIPELINE_NAME,
     aggregate: defineAggregate({ type: TRACE_PROJECT_AGGREGATE_TYPE }),
   })
     .withEvents([firstTraceRecordedEventSchema, traceReceivedEventSchema])
     .withCommand("recordFirstTrace", RecordFirstTraceCommand)
     .withCommand("recordTraceReceived", RecordTraceReceivedCommand);
+  return retention === undefined ? pipeline : pipeline.withRetention(retention);
 }
 
 export type TraceProjectMilestonesDefinition = ReturnType<
@@ -32,8 +34,10 @@ export type TraceProjectMilestonesDefinition = ReturnType<
 >;
 
 /** trace_project_milestones records; peers (nurturing) react to its events from their side (§9). */
-export function buildTraceProjectMilestonesPipeline(): TraceProjectMilestonesDefinition {
-  return milestoneCommands().build();
+export function buildTraceProjectMilestonesPipeline(
+  retention?: RetentionPolicyResolver,
+): TraceProjectMilestonesDefinition {
+  return milestoneCommands(retention).build();
 }
 
 export const traceProjectMilestonesEventing = defineEventingModule({

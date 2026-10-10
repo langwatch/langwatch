@@ -1,7 +1,7 @@
 /** OpsHostApi test harness. fakeOpsHost records port writes; renderWithOpsHost owns
  * query state (overlays open from ?key=). Same shape as gateway-web. */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemTestProvider } from "@langwatch/design-system/testing";
 import { render, type RenderResult } from "@testing-library/react";
 import { useMemo, useState, type ReactElement, type ReactNode } from "react";
 
@@ -22,6 +22,8 @@ export type OpsHostRecording = {
   navigations: string[];
   queries: { next: OpsQuery; replace: boolean }[];
   successes: OpsSuccessNotice[];
+  warnings: OpsSuccessNotice[];
+  infos: OpsSuccessNotice[];
   failures: OpsFailureNotice[];
 };
 
@@ -37,6 +39,8 @@ export type FakeOpsHostOptions = {
   hasOpsAccess?: boolean;
   sharedInstall?: boolean;
   cloudOps?: boolean;
+  /** Defaults to `cloudOps`: the page shows wherever cloud ops is on. */
+  offersFeatureFlags?: boolean;
   /** Whether the reader may see instance and Cloud admin, which is strictly narrower. */
   isOpsAdmin?: boolean;
   project?: OpsProject | null;
@@ -52,7 +56,14 @@ export class FakeOpsHost extends OpsHostApi {
   static create(options: FakeOpsHostOptions = {}): FakeOpsHost {
     return new FakeOpsHost({
       options,
-      recording: { navigations: [], queries: [], successes: [], failures: [] },
+      recording: {
+        navigations: [],
+        queries: [],
+        successes: [],
+        warnings: [],
+        infos: [],
+        failures: [],
+      },
       query: options.query ?? {},
     });
   }
@@ -120,6 +131,10 @@ export class FakeOpsHost extends OpsHostApi {
     return this.options.cloudOps ?? false;
   }
 
+  offersFeatureFlags(): boolean {
+    return this.options.offersFeatureFlags ?? this.cloudOps();
+  }
+
   project(): OpsProject | undefined {
     const configured = this.options.project;
     if (configured === void 0) return FAKE_OPS_PROJECT;
@@ -145,6 +160,14 @@ export class FakeOpsHost extends OpsHostApi {
 
   succeeded(notice: OpsSuccessNotice): void {
     this.recording.successes.push(notice);
+  }
+
+  warned(notice: OpsSuccessNotice): void {
+    this.recording.warnings.push(notice);
+  }
+
+  informed(notice: OpsSuccessNotice): void {
+    this.recording.infos.push(notice);
   }
 
   failed(failure: OpsFailureNotice): void {
@@ -201,9 +224,9 @@ export function renderWithOpsHost(
 ): OpsRenderResult {
   const mounted = host ?? fakeOpsHost();
   const wrap = (child: ReactElement) => (
-    <ChakraProvider value={defaultSystem}>
+    <DesignSystemTestProvider>
       <OpsHostHarness host={mounted}>{child}</OpsHostHarness>
-    </ChakraProvider>
+    </DesignSystemTestProvider>
   );
   const result = render(wrap(element));
   return {

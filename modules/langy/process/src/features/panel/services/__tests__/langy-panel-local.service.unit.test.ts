@@ -106,6 +106,7 @@ function service({
         organizationId: "org_1",
         isPersonal: false,
         ownerUserId: null,
+        kind: "application",
       }),
     }),
     baseHost: "https://app.test",

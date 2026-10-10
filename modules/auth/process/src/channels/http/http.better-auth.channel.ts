@@ -39,6 +39,10 @@ import { twoFactor } from "better-auth/plugins/two-factor";
 import type { BetterAuthHooksRepository } from "../../repositories/better-auth-hooks.repository.ts";
 import { findRegisteredRefusals } from "../../rules/better-auth-error-code.rules.ts";
 import {
+  ID_TOKEN_MAX_AGE_SECONDS,
+  SIGN_IN_CLOCK_TOLERANCE_SECONDS,
+} from "../../rules/sign-in-clock.rules.ts";
+import {
   findSubmittedAddresses,
   isLockoutCountedPath,
 } from "../../rules/sign-in-identifier-hash.rules.ts";
@@ -68,8 +72,12 @@ import {
   passkeySignUpRegistration,
   type SignUpVerification,
 } from "./http.passkey-sign-up.channel.ts";
-import { PasswordResetSessionChannel } from "./http.password-reset-session.channel.ts";
+import {
+  PasswordResetSessionChannel,
+  replaceLiveResetLink,
+} from "./http.password-reset-session.channel.ts";
 import { resilientGenericOAuth } from "./http.resilient-generic-oauth.channel.ts";
+import { samlOwnOriginRepost } from "./http.saml-own-origin-repost.channel.ts";
 import { SessionCallbackEvidenceChannel } from "./http.session-callback-evidence.channel.ts";
 import {
   runSignInRouterShadow,
@@ -657,6 +665,7 @@ export const createAuthOptions = ({
             verification: { ...verification, expiresAt: fromDate(verification.expiresAt) },
             context,
           });
+          await replaceLiveResetLink({ verification, storage: context?.context.adapter });
           return undefined;
         },
       },
@@ -750,6 +759,8 @@ function genericOAuthPlugins(
  * specs/identity/sso-saml-idp-initiated.feature
  */
 export const ssoSamlOptions: NonNullable<SSOOptions["saml"]> = {
+  // samlify and the plugin read this allowance in milliseconds.
+  clockSkew: SIGN_IN_CLOCK_TOLERANCE_SECONDS * 1_000,
   // Pinned: the per-connection opt-in lives inside this check; off would admit every connection.
   enableInResponseToValidation: true,
   resolveIdpInitiatedLanding: ({ relayState, samlConfig, appOrigin }) => {
@@ -792,6 +803,11 @@ function ssoPlugin({
      *  provider gets one; where they land is the arrival policy's business. */
     disableImplicitSignUp: false,
     saml: ssoSamlOptions,
+    // Seconds, as jose reads them; `maxTokenAge` is what makes jose refuse an `iat` in the future.
+    oidc: {
+      clockTolerance: SIGN_IN_CLOCK_TOLERANCE_SECONDS,
+      maxTokenAge: ID_TOKEN_MAX_AGE_SECONDS,
+    },
     resolveUser: async (input, context) => {
       const resolution = await resolveSsoUser({ assertions, input, context });
       // The exact account admitted here is the one the session it mints is attributed to.
@@ -938,6 +954,16 @@ type BetterAuthTransportOptions = Readonly<{
   mintClaims: Pick<IdentityApi, "claimsForMint">;
 }>;
 
+/** Each plugin the instance may mount; named so the options type stays short in emit. */
+type TransportPlugin =
+  | typeof samlOwnOriginRepost
+  | ReturnType<typeof twoFactor>
+  | ReturnType<typeof passkey>
+  | ReturnType<typeof sso>
+  | ReturnType<typeof signUpConfirmationPlugin>;
+
+type TransportOptions = ReturnType<typeof createAuthOptions> & { plugins: TransportPlugin[] };
+
 /** The options the deployment's ONE Better Auth instance is built from. */
 const transportOptions = ({
   announcements,
@@ -970,7 +996,9 @@ const transportOptions = ({
   idTokenIssuerRefusals,
   mintClaims,
   callbackEvidence,
-}: BetterAuthTransportOptions & { callbackEvidence: SessionCallbackEvidenceChannel }) => {
+}: BetterAuthTransportOptions & {
+  callbackEvidence: SessionCallbackEvidenceChannel;
+}): TransportOptions => {
   const passwordResetSession = PasswordResetSessionChannel.create();
   const authOptions = createAuthOptions({
     repo: database,
@@ -1002,6 +1030,7 @@ const transportOptions = ({
   return {
     ...authOptions,
     plugins: [
+      samlOwnOriginRepost,
       ...genericOAuthPlugins(deployment),
       ...(deployment.mfaEnrollmentOpen ? [twoFactorPlugin()] : []),
       ...(deployment.passkeysEnabled
@@ -1039,7 +1068,7 @@ const transportOptions = ({
   } satisfies BetterAuthOptions;
 };
 
-export type BetterAuthTransport = Auth<ReturnType<typeof transportOptions>>;
+export type BetterAuthTransport = Auth<TransportOptions>;
 
 /** Builds the deployment's ONE Better Auth instance; each request it handles opens its
  *  own callback-evidence slot, so a session is attributed only to its own callback. */

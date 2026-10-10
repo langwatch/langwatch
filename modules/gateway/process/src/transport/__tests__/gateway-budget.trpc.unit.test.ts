@@ -147,6 +147,7 @@ async function callerFor(budgets: GatewayBudget[], debits: GatewayBudgetDebitRow
               organizationId: ORG_ID,
               isPersonal: false,
               ownerUserId: null,
+              kind: "application",
             })),
       }),
       evaluators: peer("evaluators"),
@@ -165,6 +166,7 @@ async function callerFor(budgets: GatewayBudget[], debits: GatewayBudgetDebitRow
       traces: peer("traces"),
       oneTimeReveals: peer("oneTimeReveals"),
       apiKeys: peer("apiKeys"),
+      licensing: peer("licensing"),
     },
     repositories,
     config: {

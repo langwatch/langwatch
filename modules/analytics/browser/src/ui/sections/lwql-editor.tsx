@@ -11,6 +11,7 @@ import type { editor } from "monaco-editor";
 import { lazy, Suspense, useId, useState } from "react";
 
 import { registerLwqlLanguage } from "../../behavior/lwql-monaco.ts";
+import { useEditorValueSync } from "../../behavior/use-editor-value-sync.ts";
 import { useLwqlModelSync, type LwqlMountedEditor } from "../../behavior/use-lwql-model-sync.ts";
 import type { LwqlParameter } from "../../model/lwql-language/lwql-completion.ts";
 import type { LwqlEditorMarker } from "../../model/lwql-language/lwql-marker.ts";
@@ -59,6 +60,7 @@ export function LwqlEditor({
   const modelPath = `inmemory://lwql/${useId().replaceAll(":", "")}.lwql`;
 
   useLwqlModelSync({ mounted, schema, parameters, markers, value });
+  useEditorValueSync({ editor: mounted?.editor, value });
 
   const handleMount: OnMount = (mountedEditor, monaco) =>
     setMounted({ editor: mountedEditor, monaco });
@@ -77,7 +79,7 @@ export function LwqlEditor({
             height="100%"
             path={modelPath}
             language={LWQL_LANGUAGE_ID}
-            value={value}
+            defaultValue={value}
             theme={colorMode === "dark" ? "vs-dark" : "vs"}
             onChange={(next: string | undefined) => onChange(next ?? "")}
             beforeMount={registerLwqlLanguage}

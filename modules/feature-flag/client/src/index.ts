@@ -1,4 +1,3 @@
-export { CLIENT_FLAG_STALE_TIME_MS, featureFlagClient } from "./feature-flag-client.ts";
 export {
   applyFeatureFlagOverridesFromSearch,
   clearAllFeatureFlagOverrides,
@@ -7,4 +6,9 @@ export {
   readFeatureFlagOverrides,
   useFeatureFlagOverrides,
 } from "./feature-flag-overrides.ts";
-export { type UseFeatureFlagResult, useFeatureFlag } from "./use-feature-flag.ts";
+export {
+  CLIENT_FLAG_STALE_TIME_MS,
+  featureFlagClient,
+  type UseFeatureFlagResult,
+  useFeatureFlag,
+} from "./use-feature-flag.ts";

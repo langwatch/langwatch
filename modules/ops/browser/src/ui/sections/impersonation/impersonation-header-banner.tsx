@@ -1,4 +1,4 @@
-import { useUiCapabilities } from "@langwatch/browser-host/capabilities";
+import { useUiHostServices } from "@langwatch/browser-host/capabilities";
 
 import { hardRedirect } from "../../../behavior/hard-redirect.ts";
 import { adminClient } from "../../../features/admin/behavior/admin-client.ts";
@@ -9,7 +9,7 @@ export const ADMIN_PANEL_PATH = "/ops/users";
 
 /** The banner ops lends to the shell header; Stop ends the impersonation itself. */
 export function ImpersonationHeaderBanner({ user }: Pick<ImpersonationBannerProps, "user">) {
-  const { feedback } = useUiCapabilities();
+  const { feedback } = useUiHostServices();
   const stop = async () => {
     try {
       await adminClient.stopImpersonation();

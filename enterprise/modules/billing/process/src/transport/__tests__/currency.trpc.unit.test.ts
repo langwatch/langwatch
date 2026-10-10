@@ -3,7 +3,7 @@
  * The `currency.*` surface: that the answer comes from the request's headers
  * rather than the input, and that the input stays as permissive as ever.
  */
-import { bindTrpcFact, createTrpcRuntime } from "@langwatch/api/trpc";
+import { bindTrpcMiddlewareContext, createTrpcRuntime } from "@langwatch/api/trpc";
 import { Currency } from "@langwatch/enterprise-billing-contract";
 import { NotFoundError } from "@langwatch/handled-error";
 import { trpcTestMembers } from "@langwatch/test-harness/trpc-members";
@@ -11,7 +11,7 @@ import { initTRPC } from "@trpc/server";
 import { describe, expect, it } from "vitest";
 
 import { CurrencyService } from "../../services/currency.service.ts";
-import { currencyRequestHeadersFact, currencyTrpcTransport } from "../currency.trpc.ts";
+import { currencyRequestHeadersContext, currencyTrpcTransport } from "../currency.trpc.ts";
 import type { BillingTrpcTestContext } from "./billing.trpc.harness.ts";
 
 const trpc = initTRPC.context<BillingTrpcTestContext>().create();
@@ -25,7 +25,9 @@ const router = createTrpcRuntime<BillingTrpcTestContext>({
   members: trpcTestMembers<BillingTrpcTestContext>(),
 }).mount(currencyTrpcTransport, () => ({ detectCurrency: (request) => currency.detect(request) }), {
   // The headers are the PROCESS's to read, off the transport it authenticated.
-  facts: [bindTrpcFact(currencyRequestHeadersFact, (ctx) => ctx.headers ?? null)],
+  middlewareContext: [
+    bindTrpcMiddlewareContext(currencyRequestHeadersContext, (ctx) => ctx.headers ?? null),
+  ],
 });
 
 function callerFor(headers: BillingTrpcTestContext["headers"]) {
@@ -121,7 +123,11 @@ describe("given a deployment that serves no currency detection", () => {
         });
       },
     }),
-    { facts: [bindTrpcFact(currencyRequestHeadersFact, (ctx) => ctx.headers ?? null)] },
+    {
+      middlewareContext: [
+        bindTrpcMiddlewareContext(currencyRequestHeadersContext, (ctx) => ctx.headers ?? null),
+      ],
+    },
   );
 
   it("answers not found, as main's absent procedure did, rather than a server error", async () => {

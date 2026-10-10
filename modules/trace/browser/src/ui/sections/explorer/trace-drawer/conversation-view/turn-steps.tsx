@@ -16,8 +16,8 @@ import type { SpanDetail } from "@langwatch/trace-contract";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { memo, useMemo, useState } from "react";
 
+import { useTraceQueryArgs } from "../../../../../behavior/explorer/use-trace-query-args.ts";
 import { useSpansFullRead } from "../../../../../behavior/reads/use-trace-detail-reads.ts";
-import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project.ts";
 
 const LLM_REQUEST_SPAN = "claude_code.llm_request";
 const TOOL_SPAN = "claude_code.tool";
@@ -55,13 +55,14 @@ export const TurnSteps = memo(function TurnSteps({
   spanCount,
 }: TurnStepsProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const { project } = useOrganizationTeamProject();
-  const projectId = project?.id ?? "";
+  // A conversation's turns belong to the member the drawer is on.
+  const { projectId, tenantId } = useTraceQueryArgs();
 
   const query = useSpansFullRead({
     projectId,
     traceId,
     occurredAtMs,
+    tenantId,
     enabled: isOpen && projectId !== "",
   });
 

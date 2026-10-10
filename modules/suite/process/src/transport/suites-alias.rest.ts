@@ -10,7 +10,8 @@ import {
   defineRestRouter,
   documentedResponses,
   MANAGEMENT_API_VERSION,
-  projectRestFacts,
+  projectRequestContext,
+  type RestDoorCredential,
   type RestTransportDeclaration,
 } from "@langwatch/api/rest";
 import { ValidationError } from "@langwatch/handled-error";
@@ -40,7 +41,7 @@ import {
 } from "@langwatch/suite-contract";
 import { z } from "zod";
 
-import { suiteRunOriginFact, toRunItemsWire } from "../rules/suite-wire-v1.rules.ts";
+import { suiteRunOrigin, toRunItemsWire } from "../rules/suite-wire-v1.rules.ts";
 
 const logger = createLogger("langwatch:api:suites");
 
@@ -401,7 +402,11 @@ async function archiveSuite(params: {
 export function createSuitesAliasRest(): Readonly<{
   protocol: "rest";
   namespace: string;
-  router: () => RestTransportDeclaration<SuiteApi>;
+  router: () => RestTransportDeclaration<
+    SuiteApi,
+    RestDoorCredential,
+    typeof projectRequestContext | typeof suiteRunOrigin
+  >;
 }> {
   return (
     defineRestRouter(SuiteApi)
@@ -418,7 +423,7 @@ export function createSuitesAliasRest(): Readonly<{
         description:
           "List all non-archived suites for the project. By default only custom run plans are returned; pass kind=folder for test suites.",
       })
-      .withMiddleware(projectRestFacts)
+      .withMiddlewareContext(projectRequestContext)
       .handle(({ app, input: query, scope }, project) =>
         listSuites({
           app,
@@ -437,7 +442,7 @@ export function createSuitesAliasRest(): Readonly<{
         description: "Get a suite (run plan) by its ID.",
         responses: notFound,
       })
-      .withMiddleware(projectRestFacts)
+      .withMiddlewareContext(projectRequestContext)
       .handle(({ app, input: params, scope }, project) =>
         getSuite({
           app,
@@ -453,10 +458,11 @@ export function createSuitesAliasRest(): Readonly<{
       .post("/", "postApiSuites")
       .withInput(createSuiteInputSchema)
       .withPermission("scenarios:create")
+      .withAudit("suites.create")
       .withOutput(suiteResponseWithPlatformUrlSchema)
       .withStatus(201)
       .withDocs({ description: "Create a new suite (run plan)." })
-      .withMiddleware(projectRestFacts)
+      .withMiddlewareContext(projectRequestContext)
       .handle(({ app, input: body, scope }, project) =>
         createSuite({
           app,
@@ -472,9 +478,10 @@ export function createSuitesAliasRest(): Readonly<{
       .withParams(suiteAliasIdParamsSchema)
       .withInput(updateSuiteInputSchema)
       .withPermission("scenarios:update")
+      .withAudit("suites.update")
       .withOutput(suiteResponseWithPlatformUrlSchema)
       .withDocs({ description: "Update a suite (run plan).", responses: notFound })
-      .withMiddleware(projectRestFacts)
+      .withMiddlewareContext(projectRequestContext)
       .handle(({ app, input: body, scope }, project) =>
         updateSuite({
           app,
@@ -490,10 +497,11 @@ export function createSuitesAliasRest(): Readonly<{
       .withParams(suiteAliasIdParamsSchema)
       .withInput(duplicateSuiteBodySchema)
       .withPermission("scenarios:create")
+      .withAudit("suites.duplicate")
       .withOutput(suiteResponseWithPlatformUrlSchema)
       .withStatus(201)
       .withDocs({ description: "Duplicate a suite (run plan).", responses: notFound })
-      .withMiddleware(projectRestFacts)
+      .withMiddlewareContext(projectRequestContext)
       .handle(({ app, input: params, scope }, project) =>
         duplicateSuite({
           app,
@@ -510,13 +518,14 @@ export function createSuitesAliasRest(): Readonly<{
       .withParams(suiteAliasIdParamsSchema)
       .withInput(runSuiteInputSchema)
       .withPermission("scenarios:create")
+      .withoutAudit("run, not a change")
       .withOutput(suiteRunResultSchema)
       .withDocs({
         description:
           "Trigger a suite run. Schedules scenario executions for all active scenarios x targets x repeatCount. When the id names a test suite, the targets, the repeat count and the models are read from the body.",
         responses: notFound,
       })
-      .withMiddleware(projectRestFacts, suiteRunOriginFact)
+      .withMiddlewareContext(projectRequestContext, suiteRunOrigin)
       .handle(({ app, input: body, scope }, project, origin) =>
         runSuite({
           app,
@@ -533,6 +542,7 @@ export function createSuitesAliasRest(): Readonly<{
       .delete("/:id", "deleteApiSuitesById")
       .withParams(suiteAliasIdParamsSchema)
       .withPermission("scenarios:manage")
+      .withAudit("suites.archive")
       .withOutput(archivedSuiteSchema)
       .withDocs({
         description:

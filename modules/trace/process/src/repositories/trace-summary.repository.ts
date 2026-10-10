@@ -1,6 +1,7 @@
 // biome-ignore-all lint/suspicious/noEmptyBlockStatements: Null*
 // repositories implement the interface as intentional no-ops.
 
+import type { Authorization } from "@langwatch/authorization";
 import type { TraceSummaryData } from "@langwatch/trace-contract";
 
 export interface FindByTraceIdOptions {
@@ -19,6 +20,18 @@ export interface FindByTraceIdOptions {
   window?: { fromMs: number; toMs: number };
 }
 
+/** A single-trace summary read; the proof fences the tenants it may see (ADR-177). */
+export type FindByTraceIdParams = {
+  authorization: Authorization;
+  traceId: string;
+} & FindByTraceIdOptions;
+
+/**
+ * A summary with the tenant it was read from. A proof may span an aggregate's
+ * members and two may hold the same trace id, so the row says whose it is.
+ */
+export type TraceSummaryRead = TraceSummaryData & { tenantId: string };
+
 export abstract class TraceSummaryRepository {
   abstract upsert(data: TraceSummaryData, tenantId: string, retentionDays: number): Promise<void>;
   abstract upsertBatch?(
@@ -28,8 +41,10 @@ export abstract class TraceSummaryRepository {
       retentionDays: number;
     }[],
   ): Promise<void>;
-  abstract findByTraceId(
-    trace: { tenantId: string; traceId: string },
-    options?: FindByTraceIdOptions,
-  ): Promise<TraceSummaryData | null>;
+  abstract findByTraceId(params: FindByTraceIdParams): Promise<TraceSummaryRead | null>;
+  /** The tenants holding a trace, of those the proof reads, ordered by tenant id. */
+  abstract findTenantIdsByTraceId(params: {
+    authorization: Authorization;
+    traceId: string;
+  }): Promise<string[]>;
 }

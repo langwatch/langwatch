@@ -17,7 +17,7 @@ import (
 )
 
 // HeavyRun describes one gated run. Shell is the caller's original command
-// line, passed through untouched — `haven run` runs it under a shell rather
+// line, passed through untouched — `haven machine run` runs it under a shell rather
 // than re-parsing it, because the gate handed it over as one escaped argument
 // precisely so nothing would be re-split.
 type HeavyRun struct {
@@ -70,7 +70,7 @@ func (o *Orchestrator) RunHeavy(ctx context.Context, r HeavyRun) error {
 	// train the reader to ignore the line that matters.
 	//
 	// STDERR, not stdout: the wrapped command owns stdout, and a caller piping
-	// `haven run --sh 'oxlint ... --format=json'` must get its JSON and nothing
+	// `haven machine run --sh 'oxlint ... --format=json'` must get its JSON and nothing
 	// else. The reader still sees these lines either way.
 	if queued {
 		fmt.Fprintf(os.Stderr, "haven: waited %s for a heavy slot\n", waited.Round(time.Second))

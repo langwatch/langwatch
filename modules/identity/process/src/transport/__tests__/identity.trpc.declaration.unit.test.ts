@@ -23,6 +23,7 @@ describe("the identity tRPC surface", () => {
         myTestArrival: "query",
         myIdentifiers: "query",
         myMethodsLastUsed: "query",
+        mySignInGovernance: "query",
         addEmailIdentifier: "mutation",
         resendIdentifierConfirmation: "mutation",
         removeIdentifier: "mutation",

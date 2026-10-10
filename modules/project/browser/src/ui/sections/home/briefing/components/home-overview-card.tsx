@@ -110,7 +110,7 @@ export function HomeOverviewCard({
                 width: "6px",
                 height: "6px",
                 borderRadius: "9999px",
-                background: "#ED8926",
+                background: "var(--chakra-colors-accent-solid)",
               }}
             />
           ) : null}
@@ -231,9 +231,9 @@ function OverviewCell({ cell }: { cell: StatusCell }) {
               ? {
                   scale: [1, 1.045, 1],
                   textShadow: [
-                    "0 0 0px rgba(237, 137, 38, 0)",
-                    "0 0 16px rgba(237, 137, 38, 0.55)",
-                    "0 0 0px rgba(237, 137, 38, 0)",
+                    "0 0 0px transparent",
+                    "0 0 16px color-mix(in srgb, var(--chakra-colors-accent-solid) 55%, transparent)",
+                    "0 0 0px transparent",
                   ],
                 }
               : undefined

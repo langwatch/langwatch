@@ -122,6 +122,7 @@ async function walkKeyset({
   sql,
   parameters,
   timeWindow,
+  projectId,
   limit,
   onPage,
 }: {
@@ -129,6 +130,7 @@ async function walkKeyset({
   sql: string;
   parameters: Record<string, ParameterValue>;
   timeWindow?: { start: string; end: string };
+  projectId?: string;
   limit?: number;
   onPage: (page: QueryRunResult, rows: readonly QueryRow[]) => void;
 }): Promise<{ pages: number; rows: number }> {
@@ -148,6 +150,7 @@ async function walkKeyset({
       sql,
       parameters: { ...parameters, ...cursor },
       ...(timeWindow ? { timeWindow } : {}),
+      ...(projectId === undefined ? {} : { projectId }),
     });
     pages += 1;
     if (page.rows.length === 0) break;
@@ -173,6 +176,7 @@ async function runKeysetWalk({
   statement,
   parameters,
   timeWindow,
+  projectId,
   limit,
   format,
   output,
@@ -181,6 +185,7 @@ async function runKeysetWalk({
   statement: string;
   parameters: Record<string, ParameterValue>;
   timeWindow?: { start: string; end: string };
+  projectId?: string;
   limit?: number;
   format: QueryOutputFormat;
   output?: string;
@@ -194,6 +199,7 @@ async function runKeysetWalk({
       sql: statement,
       parameters,
       timeWindow,
+      projectId,
       limit,
       onPage: (page, rows) => {
         columns = page.columns;
@@ -221,6 +227,7 @@ async function runSinglePage({
   statement,
   parameters,
   timeWindow,
+  projectId,
   limit,
   format,
   output,
@@ -229,6 +236,7 @@ async function runSinglePage({
   statement: string;
   parameters: Record<string, ParameterValue>;
   timeWindow?: { start: string; end: string };
+  projectId?: string;
   limit?: number;
   format: QueryOutputFormat;
   output?: string;
@@ -240,6 +248,7 @@ async function runSinglePage({
       sql: statement,
       ...(Object.keys(parameters).length > 0 ? { parameters } : {}),
       ...(timeWindow ? { timeWindow } : {}),
+      ...(projectId === undefined ? {} : { projectId }),
     });
   } catch (error) {
     failSpinner({ spinner, error, action: "run statement" });
@@ -296,8 +305,15 @@ export const runQueryCommand = async (
     ...(options.out === undefined ? {} : { output: options.out }),
   };
 
-  await resolveCredentials({ project: options.project });
-  const common = { ...resolved, service: new QueryApiService() };
+  // Only an explicit `--project` narrows the run: the personal project the
+  // credential falls back to is not a project the user asked to read alone.
+  const credentials = await resolveCredentials({ project: options.project });
+  const projectId = options.project === undefined ? undefined : credentials.projectId;
+  const common = {
+    ...resolved,
+    ...(projectId === undefined ? {} : { projectId }),
+    service: new QueryApiService(),
+  };
 
   return pageByKeyset ? runKeysetWalk(common) : runSinglePage(common);
 };

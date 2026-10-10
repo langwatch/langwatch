@@ -325,7 +325,7 @@ function AllConfigsView({
                   </Menu.Item>
                   <Menu.Item
                     value="delete"
-                    color="red"
+                    color="red.fg"
                     onClick={(event) => {
                       event.stopPropagation();
                       onDelete(config);

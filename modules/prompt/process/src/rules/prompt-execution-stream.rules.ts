@@ -3,11 +3,41 @@
  * delta arithmetic and run-is-over decision test without a socket: the
  * transport owns the framing, this owns the reading.
  */
-import type { PlaygroundStreamEvent } from "@langwatch/prompt-contract";
+import {
+  parseLLMError,
+  type LLMErrorType,
+  type ParsedLLMError,
+  type PlaygroundStreamEvent,
+} from "@langwatch/prompt-contract";
 import type { StudioServerEvent } from "@langwatch/workflow-contract";
 
 import { PROMPT_NODE_ID } from "./prompt-execution-event.rules.ts";
 import { extractStreamableOutput, type OutputConfig } from "./prompt-output-format.rules.ts";
+
+/** An engine failure that kept the HTTP status the model provider answered with. */
+export function engineRunError(message: string, upstreamStatus?: number): Error {
+  return Object.assign(new Error(message), { upstreamStatus });
+}
+
+const TYPE_BY_STATUS: Record<number, LLMErrorType> = {
+  400: "bad_request",
+  401: "auth",
+  403: "auth",
+  404: "not_found",
+  429: "rate_limit",
+};
+
+/** The failure class the user sees: the provider's status when kept, else the message text. */
+export function llmErrorOf(error: unknown): ParsedLLMError {
+  const message = error instanceof Error ? error.message : String(error);
+  const parsed = parseLLMError(message);
+  const status =
+    error instanceof Error && "upstreamStatus" in error && typeof error.upstreamStatus === "number"
+      ? error.upstreamStatus
+      : undefined;
+  const type = status === undefined ? undefined : TYPE_BY_STATUS[status];
+  return parsed.type === "unknown" && type ? { type, message } : parsed;
+}
 
 /**
  * The new text since the last chunk sent. The engine reports the field's
@@ -47,7 +77,7 @@ export function handleEngineEvent({
   send: (event: PlaygroundStreamEvent) => void;
 }): { sent: string; done: boolean } {
   if (serverEvent.type === "error") {
-    throw new Error(serverEvent.payload?.message ?? "An error occurred");
+    throw engineRunError(serverEvent.payload?.message ?? "An error occurred");
   }
 
   if (serverEvent.type === "done") return { sent: sentSoFar, done: true };
@@ -69,7 +99,7 @@ export function handleEngineEvent({
   });
   if (delta.text) send({ type: "delta", content: delta.text });
 
-  if (state.error) throw new Error(state.error);
+  if (state.error) throw engineRunError(state.error, state.upstream_status);
 
   return {
     sent: delta.total,

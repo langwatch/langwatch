@@ -36,12 +36,17 @@ export function getTokenType(token: string): ApiKeyTokenType {
     : "legacyProjectKey";
 }
 
-export const apiKeyTokenResolutionInputSchema = z
+const apiKeyTokenResolutionInputSchemaDefinition = z
   .object({
     token: z.string().min(1),
     projectId: z.string().min(1).nullable().optional(),
   })
   .strict();
+export interface ApiKeyTokenResolutionInputSchema extends Named<
+  typeof apiKeyTokenResolutionInputSchemaDefinition
+> {}
+export const apiKeyTokenResolutionInputSchema: ApiKeyTokenResolutionInputSchema =
+  apiKeyTokenResolutionInputSchemaDefinition;
 export type ApiKeyTokenResolutionInput = z.infer<typeof apiKeyTokenResolutionInputSchema>;
 
 /**
@@ -53,7 +58,7 @@ const resolvedApiKeyProjectShape = {
   project: projectIdentitySchema,
 };
 
-export const resolvedApiKeyTokenSchema = z.discriminatedUnion("type", [
+const resolvedApiKeyTokenSchemaDefinition = z.discriminatedUnion("type", [
   z
     .object({
       type: z.literal("legacyProjectKey"),
@@ -75,16 +80,26 @@ export const resolvedApiKeyTokenSchema = z.discriminatedUnion("type", [
     })
     .strict(),
 ]);
+export interface ResolvedApiKeyTokenSchema extends Named<
+  typeof resolvedApiKeyTokenSchemaDefinition
+> {}
+export const resolvedApiKeyTokenSchema: ResolvedApiKeyTokenSchema =
+  resolvedApiKeyTokenSchemaDefinition;
 export type ResolvedApiKeyCredential = z.infer<typeof resolvedApiKeyTokenSchema>;
 
-export const organizationApiKeyResolutionInputSchema = z
+const organizationApiKeyResolutionInputSchemaDefinition = z
   .object({ token: z.string().min(1) })
   .strict();
+export interface OrganizationApiKeyResolutionInputSchema extends Named<
+  typeof organizationApiKeyResolutionInputSchemaDefinition
+> {}
+export const organizationApiKeyResolutionInputSchema: OrganizationApiKeyResolutionInputSchema =
+  organizationApiKeyResolutionInputSchemaDefinition;
 export type OrganizationApiKeyResolutionInput = z.infer<
   typeof organizationApiKeyResolutionInputSchema
 >;
 
-export const organizationApiKeyResolutionSchema = z.discriminatedUnion("ok", [
+const organizationApiKeyResolutionSchemaDefinition = z.discriminatedUnion("ok", [
   z
     .object({
       ok: z.literal(true),
@@ -105,10 +120,16 @@ export const organizationApiKeyResolutionSchema = z.discriminatedUnion("ok", [
     })
     .strict(),
 ]);
+export interface OrganizationApiKeyResolutionSchema extends Named<
+  typeof organizationApiKeyResolutionSchemaDefinition
+> {}
+export const organizationApiKeyResolutionSchema: OrganizationApiKeyResolutionSchema =
+  organizationApiKeyResolutionSchemaDefinition;
 export type OrganizationApiKeyResolution = z.infer<typeof organizationApiKeyResolutionSchema>;
 export type ResolvedOrganizationApiKeyToken = Extract<
   OrganizationApiKeyResolution,
   { ok: true }
 >["resolved"];
+import type { Named } from "@langwatch/module";
 import { projectIdentitySchema } from "@langwatch/project-contract";
 import { z } from "zod";

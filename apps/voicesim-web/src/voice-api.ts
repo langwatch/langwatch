@@ -1,4 +1,4 @@
-import { simFetch } from "@langwatch/sim-console";
+import { SimFetchError, simFetch } from "@langwatch/sim-console";
 import { z } from "zod";
 
 /** Go encodes an empty slice as null; the console reads both as an empty list. */
@@ -52,3 +52,13 @@ export const fetchStatus = () => simFetch({ path: "/_sim/api/status", schema: st
 
 export const fetchCalls = async () =>
   (await simFetch({ path: "/_sim/api/calls", schema: callsSchema })).calls;
+
+/** Forgets every call; voicesim answers 204. */
+export const clearCalls = async () => {
+  const response = await fetch("/_sim/api/calls", { method: "DELETE" });
+  if (response.ok) return;
+  throw new SimFetchError({
+    status: response.status,
+    message: `Clearing the calls failed (${response.status}).`,
+  });
+};

@@ -17,7 +17,6 @@ export interface TranslationContext {
   paramCounter: number;
   nodeCount: number;
   params: Record<string, unknown>;
-  tenantId: string;
   timeRange: { from: number; to: number };
   /**
    * The Instant Eval runs the caller registered for its `eval` chips, already

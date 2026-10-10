@@ -6,13 +6,13 @@ The server half of [scim](../README.md). SCIM provisioning: directory connection
 
 ## Installation
 
-`defineProcessModule("scim").withRepositories(scimRepositories).withApi(ScimModule).withTransports(scimTokenRest, scimTokenTrpcTransport, scimReconciliationTrpcTransport, scimOversightTrpcTransport, scimProtocolRest, scimWebhookRest).withTransportFacts(…).withEventing(scimEventing).withEventing(scimDirectoryEventing).withEventing(scimSyncEventing).withEventing(scimCostCenterEventing).withEventing(scimSsoConnectionEventing).withMigrations(…)`, `src/scim.module.ts:35`.
+`defineProcessModule("scim").withRepositories(scimRepositories).withChannels(scimChannels).withApi(ScimModule).withTransports(scimTokenRest, scimTokenTrpcTransport, scimReconciliationTrpcTransport, scimOversightTrpcTransport, scimProtocolRest, scimWebhookRest).provideMiddlewareContext(…).withDoors(…).withEventing(scimEventing).withEventing(scimDirectoryEventing).withEventing(scimSyncEventing).withEventing(scimCostCenterEventing).withEventing(scimSsoConnectionEventing).withMigrations(…)`, `src/scim.module.ts:33`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
 ## Module API (`ScimApi`)
 
-Peers call these through the token, declared at `../contract/src/scim.api.ts:70`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/scim.api.ts:72`; nothing else in this package is public.
 
 #### `listTokens`
 
@@ -99,7 +99,7 @@ recordTokenAudit(entry: ScimTokenAuditEntry): void;
 The tenant behind a SCIM bearer, or the protocol's own refusal.
 
 ```typescript
-authenticateDirectory(input: { authorization: string | null; /** What the provider asked for, so an attributable refusal can be filed * against the connection it was meant for (ADR-126). A door that does * not supply them refuses exactly as before and records nothing. */ method?: string | undefined; path?: string | undefined; }): Promise<ScimDirectoryScope>;
+authenticateDirectory(input: { /** The bearer the framework pulled off the request, null when none was presented. */ bearer: string | null; /** What the provider asked for, so an attributable refusal can be filed * against the connection it was meant for (ADR-126). A door that does * not supply them refuses exactly as before and records nothing. */ method?: string | undefined; path?: string | undefined; }): Promise<ScimDirectoryScope>;
 ```
 
 #### `verifyToken`
@@ -140,6 +140,14 @@ What one connection's directory did, newest first, in words (ADR-126). Scanned i
 
 ```typescript
 findDirectoryActivity(input: ScimConnectionRequestsInput): Promise<ScimDirectoryActivityEntry[]>;
+```
+
+#### `findDirectoryMembers`
+
+Which of these members this organization's directories created (port of main's `directoryProvisioned`); built from the organization's own connections.
+
+```typescript
+findDirectoryMembers(input: ScimDirectoryMembersInput): Promise<ScimDirectoryMember[]>;
 ```
 
 #### `listOversightSyncs`
@@ -254,7 +262,7 @@ receiveDirectoryDelivery(delivery: { body: string; signature: string | null; aut
 
 |             |                                           |
 | ----------- | ----------------------------------------- |
-| Declared at | `src/transport/scim-protocol.rest.ts:428` |
+| Declared at | `src/transport/scim-protocol.rest.ts:449` |
 | Base URL    | `/api/scim/v2`                            |
 | Addressing  | v1-in-path                                |
 | Credential  | scim_token                                |
@@ -263,12 +271,12 @@ receiveDirectoryDelivery(delivery: { body: string; signature: string | null; aut
 
 Get the SCIM service provider configuration
 
-Public: SCIM discovery metadata is served without a credential so identity providers can negotiate capabilities before a token exists. Declared at `src/transport/scim-protocol.rest.ts:436`.
+Public: SCIM discovery metadata is served without a credential so identity providers can negotiate capabilities before a token exists. Declared at `src/transport/scim-protocol.rest.ts:457`.
 
 Answers at `/api/scim/v2/ServiceProviderConfig`.
 
 ```typescript
-// Response: inline, src/transport/scim-protocol.rest.ts:438
+// Response: inline, src/transport/scim-protocol.rest.ts:459
 type Response = unknown;
 ```
 
@@ -276,12 +284,12 @@ type Response = unknown;
 
 List the SCIM resource types
 
-Public: SCIM discovery metadata is served without a credential so identity providers can negotiate capabilities before a token exists. Declared at `src/transport/scim-protocol.rest.ts:453`.
+Public: SCIM discovery metadata is served without a credential so identity providers can negotiate capabilities before a token exists. Declared at `src/transport/scim-protocol.rest.ts:474`.
 
 Answers at `/api/scim/v2/ResourceTypes`.
 
 ```typescript
-// Response: inline, src/transport/scim-protocol.rest.ts:455
+// Response: inline, src/transport/scim-protocol.rest.ts:476
 type Response = unknown;
 ```
 
@@ -289,12 +297,12 @@ type Response = unknown;
 
 List the SCIM resource schemas
 
-Public: SCIM discovery metadata is served without a credential so identity providers can negotiate capabilities before a token exists. Declared at `src/transport/scim-protocol.rest.ts:470`.
+Public: SCIM discovery metadata is served without a credential so identity providers can negotiate capabilities before a token exists. Declared at `src/transport/scim-protocol.rest.ts:491`.
 
 Answers at `/api/scim/v2/Schemas`.
 
 ```typescript
-// Response: inline, src/transport/scim-protocol.rest.ts:472
+// Response: inline, src/transport/scim-protocol.rest.ts:493
 type Response = unknown;
 ```
 
@@ -302,18 +310,18 @@ type Response = unknown;
 
 List provisioned users
 
-Authenticated: a SCIM token carries no RBAC permission: the organization it was minted for, and whether that organization still holds the plan, are the whole of what the door decides. Declared at `src/transport/scim-protocol.rest.ts:489`.
+Authenticated: a SCIM token carries no RBAC permission: the organization it was minted for, and whether that organization still holds the plan, are the whole of what the door decides. Declared at `src/transport/scim-protocol.rest.ts:510`.
 
 Answers at `/api/scim/v2/Users`.
 
 ```typescript
-// Query: listQuery, src/transport/scim-protocol.rest.ts:173
+// Query: listQuery, src/transport/scim-protocol.rest.ts:194
 interface Query {
   filter?: string;
   startIndex?: number;
   count?: number;
 }
-// Response: inline, src/transport/scim-protocol.rest.ts:493
+// Response: inline, src/transport/scim-protocol.rest.ts:514
 type Response = unknown;
 ```
 
@@ -321,13 +329,13 @@ type Response = unknown;
 
 Provision a user
 
-Authenticated: a SCIM token carries no RBAC permission: the organization it was minted for, and whether that organization still holds the plan, are the whole of what the door decides. Declared at `src/transport/scim-protocol.rest.ts:521`.
+Authenticated: a SCIM token carries no RBAC permission: the organization it was minted for, and whether that organization still holds the plan, are the whole of what the door decides. Declared at `src/transport/scim-protocol.rest.ts:542`.
 
 Answers at `/api/scim/v2/Users`.
 
 ```typescript
-// Rawbody: "text" (inline, src/transport/scim-protocol.rest.ts:522)
-// Response: inline, src/transport/scim-protocol.rest.ts:525
+// Rawbody: "text" (inline, src/transport/scim-protocol.rest.ts:543)
+// Response: inline, src/transport/scim-protocol.rest.ts:546
 type Response = unknown;
 ```
 
@@ -335,16 +343,16 @@ type Response = unknown;
 
 Get a provisioned user
 
-Authenticated: a SCIM token carries no RBAC permission: the organization it was minted for, and whether that organization still holds the plan, are the whole of what the door decides. Declared at `src/transport/scim-protocol.rest.ts:558`.
+Authenticated: a SCIM token carries no RBAC permission: the organization it was minted for, and whether that organization still holds the plan, are the whole of what the door decides. Declared at `src/transport/scim-protocol.rest.ts:579`.
 
 Answers at `/api/scim/v2/Users/:id`.
 
 ```typescript
-// Params: idParams, src/transport/scim-protocol.rest.ts:137
+// Params: idParams, src/transport/scim-protocol.rest.ts:158
 interface Params {
   id: string;
 }
-// Response: inline, src/transport/scim-protocol.rest.ts:562
+// Response: inline, src/transport/scim-protocol.rest.ts:583
 type Response = unknown;
 ```
 
@@ -352,14 +360,14 @@ type Response = unknown;
 
 Replace a provisioned user
 
-Authenticated: a SCIM token carries no RBAC permission: the organization it was minted for, and whether that organization still holds the plan, are the whole of what the door decides. Declared at `src/transport/scim-protocol.rest.ts:577`.
+Authenticated: a SCIM token carries no RBAC permission: the organization it was minted for, and whether that organization still holds the plan, are the whole of what the door decides. Declared at `src/transport/scim-protocol.rest.ts:598`.
 
 Answers at `/api/scim/v2/Users/:id`.
 
 ```typescript
-type Params = z.infer<typeof idParams>; // src/transport/scim-protocol.rest.ts:137
-// Rawbody: "text" (inline, src/transport/scim-protocol.rest.ts:579)
-// Response: inline, src/transport/scim-protocol.rest.ts:582
+type Params = z.infer<typeof idParams>; // src/transport/scim-protocol.rest.ts:158
+// Rawbody: "text" (inline, src/transport/scim-protocol.rest.ts:600)
+// Response: inline, src/transport/scim-protocol.rest.ts:603
 type Response = unknown;
 ```
 
@@ -367,14 +375,14 @@ type Response = unknown;
 
 Update a provisioned user
 
-Authenticated: a SCIM token carries no RBAC permission: the organization it was minted for, and whether that organization still holds the plan, are the whole of what the door decides. Declared at `src/transport/scim-protocol.rest.ts:606`.
+Authenticated: a SCIM token carries no RBAC permission: the organization it was minted for, and whether that organization still holds the plan, are the whole of what the door decides. Declared at `src/transport/scim-protocol.rest.ts:627`.
 
 Answers at `/api/scim/v2/Users/:id`.
 
 ```typescript
-type Params = z.infer<typeof idParams>; // src/transport/scim-protocol.rest.ts:137
-// Rawbody: "text" (inline, src/transport/scim-protocol.rest.ts:608)
-// Response: inline, src/transport/scim-protocol.rest.ts:611
+type Params = z.infer<typeof idParams>; // src/transport/scim-protocol.rest.ts:158
+// Rawbody: "text" (inline, src/transport/scim-protocol.rest.ts:629)
+// Response: inline, src/transport/scim-protocol.rest.ts:632
 type Response = unknown;
 ```
 
@@ -382,13 +390,13 @@ type Response = unknown;
 
 Deprovision a user
 
-Authenticated: a SCIM token carries no RBAC permission: the organization it was minted for, and whether that organization still holds the plan, are the whole of what the door decides. Declared at `src/transport/scim-protocol.rest.ts:635`.
+Authenticated: a SCIM token carries no RBAC permission: the organization it was minted for, and whether that organization still holds the plan, are the whole of what the door decides. Declared at `src/transport/scim-protocol.rest.ts:656`.
 
 Answers at `/api/scim/v2/Users/:id`.
 
 ```typescript
-type Params = z.infer<typeof idParams>; // src/transport/scim-protocol.rest.ts:137
-// Response: inline, src/transport/scim-protocol.rest.ts:639
+type Params = z.infer<typeof idParams>; // src/transport/scim-protocol.rest.ts:158
+// Response: inline, src/transport/scim-protocol.rest.ts:660
 type Response = unknown;
 ```
 
@@ -396,19 +404,19 @@ type Response = unknown;
 
 List provisioned groups
 
-Authenticated: a SCIM token carries no RBAC permission: the organization it was minted for, and whether that organization still holds the plan, are the whole of what the door decides. Declared at `src/transport/scim-protocol.rest.ts:658`.
+Authenticated: a SCIM token carries no RBAC permission: the organization it was minted for, and whether that organization still holds the plan, are the whole of what the door decides. Declared at `src/transport/scim-protocol.rest.ts:679`.
 
 Answers at `/api/scim/v2/Groups`.
 
 ```typescript
-// Query: groupListQuery, src/transport/scim-protocol.rest.ts:197
+// Query: groupListQuery, src/transport/scim-protocol.rest.ts:218
 interface Query {
   filter?: string;
   startIndex?: number;
   count?: number;
   excludedAttributes?: string;
 }
-// Response: inline, src/transport/scim-protocol.rest.ts:662
+// Response: inline, src/transport/scim-protocol.rest.ts:683
 type Response = unknown;
 ```
 
@@ -416,13 +424,13 @@ type Response = unknown;
 
 Provision a group
 
-Authenticated: a SCIM token carries no RBAC permission: the organization it was minted for, and whether that organization still holds the plan, are the whole of what the door decides. Declared at `src/transport/scim-protocol.rest.ts:691`.
+Authenticated: a SCIM token carries no RBAC permission: the organization it was minted for, and whether that organization still holds the plan, are the whole of what the door decides. Declared at `src/transport/scim-protocol.rest.ts:712`.
 
 Answers at `/api/scim/v2/Groups`.
 
 ```typescript
-// Rawbody: "text" (inline, src/transport/scim-protocol.rest.ts:692)
-// Response: inline, src/transport/scim-protocol.rest.ts:695
+// Rawbody: "text" (inline, src/transport/scim-protocol.rest.ts:713)
+// Response: inline, src/transport/scim-protocol.rest.ts:716
 type Response = unknown;
 ```
 
@@ -430,17 +438,17 @@ type Response = unknown;
 
 Get a provisioned group
 
-Authenticated: a SCIM token carries no RBAC permission: the organization it was minted for, and whether that organization still holds the plan, are the whole of what the door decides. Declared at `src/transport/scim-protocol.rest.ts:733`.
+Authenticated: a SCIM token carries no RBAC permission: the organization it was minted for, and whether that organization still holds the plan, are the whole of what the door decides. Declared at `src/transport/scim-protocol.rest.ts:754`.
 
 Answers at `/api/scim/v2/Groups/:id`.
 
 ```typescript
-type Params = z.infer<typeof idParams>; // src/transport/scim-protocol.rest.ts:137
-// Query: excludedAttributesQuery, src/transport/scim-protocol.rest.ts:191
+type Params = z.infer<typeof idParams>; // src/transport/scim-protocol.rest.ts:158
+// Query: excludedAttributesQuery, src/transport/scim-protocol.rest.ts:212
 interface Query {
   excludedAttributes?: string;
 }
-// Response: inline, src/transport/scim-protocol.rest.ts:738
+// Response: inline, src/transport/scim-protocol.rest.ts:759
 type Response = unknown;
 ```
 
@@ -448,14 +456,14 @@ type Response = unknown;
 
 Replace a provisioned group
 
-Authenticated: a SCIM token carries no RBAC permission: the organization it was minted for, and whether that organization still holds the plan, are the whole of what the door decides. Declared at `src/transport/scim-protocol.rest.ts:761`.
+Authenticated: a SCIM token carries no RBAC permission: the organization it was minted for, and whether that organization still holds the plan, are the whole of what the door decides. Declared at `src/transport/scim-protocol.rest.ts:782`.
 
 Answers at `/api/scim/v2/Groups/:id`.
 
 ```typescript
-type Params = z.infer<typeof idParams>; // src/transport/scim-protocol.rest.ts:137
-// Rawbody: "text" (inline, src/transport/scim-protocol.rest.ts:763)
-// Response: inline, src/transport/scim-protocol.rest.ts:766
+type Params = z.infer<typeof idParams>; // src/transport/scim-protocol.rest.ts:158
+// Rawbody: "text" (inline, src/transport/scim-protocol.rest.ts:784)
+// Response: inline, src/transport/scim-protocol.rest.ts:787
 type Response = unknown;
 ```
 
@@ -463,14 +471,14 @@ type Response = unknown;
 
 Update a provisioned group
 
-Authenticated: a SCIM token carries no RBAC permission: the organization it was minted for, and whether that organization still holds the plan, are the whole of what the door decides. Declared at `src/transport/scim-protocol.rest.ts:790`.
+Authenticated: a SCIM token carries no RBAC permission: the organization it was minted for, and whether that organization still holds the plan, are the whole of what the door decides. Declared at `src/transport/scim-protocol.rest.ts:811`.
 
 Answers at `/api/scim/v2/Groups/:id`.
 
 ```typescript
-type Params = z.infer<typeof idParams>; // src/transport/scim-protocol.rest.ts:137
-// Rawbody: "text" (inline, src/transport/scim-protocol.rest.ts:792)
-// Response: inline, src/transport/scim-protocol.rest.ts:795
+type Params = z.infer<typeof idParams>; // src/transport/scim-protocol.rest.ts:158
+// Rawbody: "text" (inline, src/transport/scim-protocol.rest.ts:813)
+// Response: inline, src/transport/scim-protocol.rest.ts:816
 type Response = unknown;
 ```
 
@@ -478,13 +486,13 @@ type Response = unknown;
 
 Deprovision a group
 
-Authenticated: a SCIM token carries no RBAC permission: the organization it was minted for, and whether that organization still holds the plan, are the whole of what the door decides. Declared at `src/transport/scim-protocol.rest.ts:819`.
+Authenticated: a SCIM token carries no RBAC permission: the organization it was minted for, and whether that organization still holds the plan, are the whole of what the door decides. Declared at `src/transport/scim-protocol.rest.ts:840`.
 
 Answers at `/api/scim/v2/Groups/:id`.
 
 ```typescript
-type Params = z.infer<typeof idParams>; // src/transport/scim-protocol.rest.ts:137
-// Response: inline, src/transport/scim-protocol.rest.ts:823
+type Params = z.infer<typeof idParams>; // src/transport/scim-protocol.rest.ts:158
+// Response: inline, src/transport/scim-protocol.rest.ts:844
 type Response = unknown;
 ```
 
@@ -565,7 +573,7 @@ interface Response {
 
 |             |                                         |
 | ----------- | --------------------------------------- |
-| Declared at | `src/transport/scim-webhook.rest.ts:50` |
+| Declared at | `src/transport/scim-webhook.rest.ts:45` |
 | Base URL    | none: each route's path is its address  |
 | Addressing  | literal                                 |
 | Credential  | project                                 |
@@ -574,13 +582,13 @@ interface Response {
 
 Receive an Auth0 SCIM log-stream delivery
 
-Public: the provider signs every delivery with the deployment secret and the route verifies it over the raw bytes, then reads the tenant off the SCIM token presented; no API credential opens this door. Declared at `src/transport/scim-webhook.rest.ts:55`.
+Public: the provider signs every delivery with the deployment secret and the route verifies it over the raw bytes, then reads the tenant off the SCIM token presented; no API credential opens this door. Declared at `src/transport/scim-webhook.rest.ts:50`.
 
 Answers at `/api/webhooks/auth0-scim`.
 
 ```typescript
-// Rawbody: "text" (inline, src/transport/scim-webhook.rest.ts:58)
-// Response: inline, src/transport/scim-webhook.rest.ts:69
+// Rawbody: "text" (inline, src/transport/scim-webhook.rest.ts:53)
+// Response: inline, src/transport/scim-webhook.rest.ts:64
 type Response = unknown;
 ```
 
@@ -599,23 +607,23 @@ Contract `../contract/src/scim-oversight.trpc.ts:18`, router `src/transport/scim
 
 ```typescript
 // scimOversight.getAll
-// Input: listOversightSyncsInputSchema, ../contract/src/scim-oversight.ts:60
+// Input: listOversightSyncsInputSchema, ../contract/src/scim-oversight.ts:59
 interface Input {
   page?: number;
   pageSize?: number;
   search?: string;
 }
-type Output = z.infer<typeof oversightSyncListSchema>; // ../contract/src/scim-oversight.ts:43
+type Output = z.infer<typeof oversightSyncListSchema>; // ../contract/src/scim-oversight.ts:42
 
 // scimOversight.getById
-// Input: oversightConnectionInputSchema, ../contract/src/scim-oversight.ts:67
+// Input: oversightConnectionInputSchema, ../contract/src/scim-oversight.ts:66
 interface Input {
   connectionId: string;
 }
 // Output: oversightSyncSchema.nullable() (inline, ../contract/src/scim-oversight.trpc.ts:25)
 
 // scimOversight.directoryIdentities
-type Input = z.infer<typeof oversightConnectionInputSchema>; // ../contract/src/scim-oversight.ts:67
+type Input = z.infer<typeof oversightConnectionInputSchema>; // ../contract/src/scim-oversight.ts:66
 // Output: inline, ../contract/src/scim-oversight.trpc.ts:29
 type Output = {
   connectionId: string;
@@ -626,12 +634,12 @@ type Output = {
 }[];
 
 // scimOversight.redriveRetiredApply
-// Input: redriveRetiredApplyInputSchema, ../contract/src/scim-oversight.ts:70
+// Input: redriveRetiredApplyInputSchema, ../contract/src/scim-oversight.ts:69
 interface Input {
   connectionId: string;
   retiredAtMs: number;
 }
-// Output: redriveRetiredApplyResultSchema, ../contract/src/scim-oversight.ts:77
+// Output: redriveRetiredApplyResultSchema, ../contract/src/scim-oversight.ts:76
 interface Output {
   applied: boolean;
 }
@@ -639,22 +647,23 @@ interface Output {
 
 ### `scimReconciliation`
 
-Contract `../contract/src/scim-reconciliation.trpc.ts:20`, router `src/transport/scim-reconciliation.trpc.ts:20`.
+Contract `../contract/src/scim-reconciliation.trpc.ts:22`, router `src/transport/scim-reconciliation.trpc.ts:20`.
 
-| Procedure                        | Kind  | Gate                                                             | Input                               | Output                             |
-| -------------------------------- | ----- | ---------------------------------------------------------------- | ----------------------------------- | ---------------------------------- |
-| `scimReconciliation.getAll`      | query | Permission `sso:view`; Entitlement `enterprise` (feature `SCIM`) | `scimReconciliationScopeSchema`     | `organizationReconciliationSchema` |
-| `scimReconciliation.getActivity` | query | Permission `sso:view`; Entitlement `enterprise` (feature `SCIM`) | `scimConnectionRequestsInputSchema` | inline                             |
-| `scimReconciliation.getRequests` | query | Permission `sso:view`                                            | `scimConnectionRequestsInputSchema` | inline                             |
-| `scimReconciliation.getById`     | query | Permission `sso:view`; Entitlement `enterprise` (feature `SCIM`) | `scimConnectionRequestsInputSchema` | inline                             |
+| Procedure                             | Kind  | Gate                                                             | Input                               | Output                             |
+| ------------------------------------- | ----- | ---------------------------------------------------------------- | ----------------------------------- | ---------------------------------- |
+| `scimReconciliation.getAll`           | query | Permission `sso:view`; Entitlement `enterprise` (feature `SCIM`) | `scimReconciliationScopeSchema`     | `organizationReconciliationSchema` |
+| `scimReconciliation.getActivity`      | query | Permission `sso:view`; Entitlement `enterprise` (feature `SCIM`) | `scimConnectionRequestsInputSchema` | inline                             |
+| `scimReconciliation.getRequests`      | query | Permission `sso:view`                                            | `scimConnectionRequestsInputSchema` | inline                             |
+| `scimReconciliation.getById`          | query | Permission `sso:view`; Entitlement `enterprise` (feature `SCIM`) | `scimConnectionRequestsInputSchema` | inline                             |
+| `scimReconciliation.directoryMembers` | query | Permission `organization:manage`                                 | `scimDirectoryMembersInputSchema`   | inline                             |
 
 ```typescript
 // scimReconciliation.getAll
-// Input: scimReconciliationScopeSchema, ../contract/src/scim-reconciliation.ts:99
+// Input: scimReconciliationScopeSchema, ../contract/src/scim-reconciliation.ts:98
 interface Input {
   organizationId: string;
 }
-type Output = z.infer<typeof organizationReconciliationSchema>; // ../contract/src/scim-reconciliation.ts:69
+type Output = z.infer<typeof organizationReconciliationSchema>; // ../contract/src/scim-reconciliation.ts:68
 
 // scimReconciliation.getActivity
 // Input: scimConnectionRequestsInputSchema, ../contract/src/scim-request-log.ts:73
@@ -662,7 +671,7 @@ interface Input {
   organizationId: string;
   connectionId: string;
 }
-// Output: inline, ../contract/src/scim-reconciliation.trpc.ts:35
+// Output: inline, ../contract/src/scim-reconciliation.trpc.ts:37
 type Output = {
   eventId: string;
   summary: string;
@@ -672,11 +681,23 @@ type Output = {
 
 // scimReconciliation.getRequests
 type Input = z.infer<typeof scimConnectionRequestsInputSchema>; // ../contract/src/scim-request-log.ts:73
-// Output: scimRequestEntrySchema.array() (inline, ../contract/src/scim-reconciliation.trpc.ts:45)
+// Output: scimRequestEntrySchema.array() (inline, ../contract/src/scim-reconciliation.trpc.ts:47)
 
 // scimReconciliation.getById
 type Input = z.infer<typeof scimConnectionRequestsInputSchema>; // ../contract/src/scim-request-log.ts:73
-// Output: connectionReconciliationSchema.nullable() (inline, ../contract/src/scim-reconciliation.trpc.ts:49)
+// Output: connectionReconciliationSchema.nullable() (inline, ../contract/src/scim-reconciliation.trpc.ts:51)
+
+// scimReconciliation.directoryMembers
+// Input: scimDirectoryMembersInputSchema, ../contract/src/scim-reconciliation.ts:104
+interface Input {
+  organizationId: string;
+  userIds: string[];
+}
+// Output: inline, ../contract/src/scim-reconciliation.trpc.ts:55
+type Output = {
+  userId: string;
+  providerId: string | null;
+}[];
 ```
 
 ### `scimToken`
@@ -798,10 +819,10 @@ Declared at `src/eventing/scim.pipeline.ts:39`.
 
 | Kind   | Leaf                  | Environment variable          | Declared at                               |
 | ------ | --------------------- | ----------------------------- | ----------------------------------------- |
-| secret | `auth0WebhookSecret`  | `AUTH0_SCIM_WEBHOOK_SECRET`   | `../contract/src/scim.config.ts:13`       |
+| secret | `auth0WebhookSecret`  | `AUTH0_SCIM_WEBHOOK_SECRET`   | `../contract/src/scim.config.ts:14`       |
 | secret | `tokenPepper`         | `CREDENTIALS_SECRET`          | `../contract/src/scim-token-pepper.ts:10` |
 | secret | `tokenPepperFallback` | `NEXTAUTH_SECRET`             | `../contract/src/scim-token-pepper.ts:11` |
 | secret | `tokenPepperPrevious` | `CREDENTIALS_SECRET_PREVIOUS` | `../contract/src/scim-token-pepper.ts:13` |
-| config | `provenOffboarding`   | `SCIM_V2_GRANTS`              | `../contract/src/scim.config.ts:6`        |
+| config | `provenOffboarding`   | `SCIM_V2_GRANTS`              | `../contract/src/scim.config.ts:7`        |
 
 <!-- readme:generated:end -->

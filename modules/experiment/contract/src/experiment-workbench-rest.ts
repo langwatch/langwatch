@@ -3,13 +3,16 @@
  * published it.
  */
 
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import { experimentRunCompletenessSchema } from "./experiment-run.ts";
 import type { WorkbenchCredential } from "./experiment.api.ts";
 import type { EvaluationV3Event } from "./workbench/execution/types.ts";
 
-export const runIdParamsSchema = z.object({ runId: z.string().min(1) });
+const runIdParamsSchemaDefinition = z.object({ runId: z.string().min(1) });
+export interface RunIdParamsSchema extends Named<typeof runIdParamsSchemaDefinition> {}
+export const runIdParamsSchema: RunIdParamsSchema = runIdParamsSchemaDefinition;
 
 /** A positive integer as main published it; anything else reads as absent, never a refusal. */
 export const lenientPositiveIntSchema = z.coerce
@@ -28,48 +31,71 @@ const pathVersionSchema = z.preprocess((raw) => {
   return Number.isInteger(version) && version > 0 ? version : 0;
 }, z.number().int().nonnegative());
 
-export const slugVersionParamsSchema = z.object({
+const slugVersionParamsSchemaDefinition = z.object({
   slug: z.string().min(1),
   version: pathVersionSchema.describe(
     "The version to restore, as listed by `GET /api/experiments/{slug}/versions`",
   ),
 });
+export interface SlugVersionParamsSchema extends Named<typeof slugVersionParamsSchemaDefinition> {}
+export const slugVersionParamsSchema: SlugVersionParamsSchema = slugVersionParamsSchemaDefinition;
 
 /** `/api/evaluations/v3`'s slug segment: `:slug`'s position, named for what it identifies. */
-export const evaluationSlugParamsSchema = z.object({
+const evaluationSlugParamsSchemaDefinition = z.object({
   evaluationSlug: z.string().min(1).describe("The experiment's slug, or its id"),
 });
+export interface EvaluationSlugParamsSchema extends Named<
+  typeof evaluationSlugParamsSchemaDefinition
+> {}
+export const evaluationSlugParamsSchema: EvaluationSlugParamsSchema =
+  evaluationSlugParamsSchemaDefinition;
 
-export const evaluationSlugVersionParamsSchema = z.object({
+const evaluationSlugVersionParamsSchemaDefinition = z.object({
   evaluationSlug: z.string().min(1),
   version: pathVersionSchema,
 });
+export interface EvaluationSlugVersionParamsSchema extends Named<
+  typeof evaluationSlugVersionParamsSchemaDefinition
+> {}
+export const evaluationSlugVersionParamsSchema: EvaluationSlugVersionParamsSchema =
+  evaluationSlugVersionParamsSchemaDefinition;
 
 /** A bad page number falls back rather than refusing; a missing slug 400s in the handler. */
-export const listRunsQuerySchema = z.object({
+const listRunsQuerySchemaDefinition = z.object({
   experimentSlug: z.string().optional().describe("Slug of the experiment whose runs you want"),
   page: lenientPositiveIntSchema.describe("1-based page number"),
   pageSize: lenientPositiveIntSchema.describe("Runs per page, capped at 200"),
 });
+export interface ListRunsQuerySchema extends Named<typeof listRunsQuerySchemaDefinition> {}
+export const listRunsQuerySchema: ListRunsQuerySchema = listRunsQuerySchemaDefinition;
 
-export const runResultsQuerySchema = z.object({
+const runResultsQuerySchemaDefinition = z.object({
   experimentSlug: z
     .string()
     .optional()
     .describe("Owning experiment. Required once the run has aged out of the status cache."),
 });
+export interface RunResultsQuerySchema extends Named<typeof runResultsQuerySchemaDefinition> {}
+export const runResultsQuerySchema: RunResultsQuerySchema = runResultsQuerySchemaDefinition;
 
-export const workbenchStateQuerySchema = z.object({
+const workbenchStateQuerySchemaDefinition = z.object({
   fields: z
     .string()
     .optional()
     .describe("Set to `version` to answer with the version and timestamp only"),
 });
+export interface WorkbenchStateQuerySchema extends Named<
+  typeof workbenchStateQuerySchemaDefinition
+> {}
+export const workbenchStateQuerySchema: WorkbenchStateQuerySchema =
+  workbenchStateQuerySchemaDefinition;
 
-export const listVersionsQuerySchema = z.object({
+const listVersionsQuerySchemaDefinition = z.object({
   limit: lenientPositiveIntSchema.describe("Versions per page, capped at 100"),
   cursor: lenientPositiveIntSchema.describe("The `nextCursor` of the previous page"),
 });
+export interface ListVersionsQuerySchema extends Named<typeof listVersionsQuerySchemaDefinition> {}
+export const listVersionsQuerySchema: ListVersionsQuerySchema = listVersionsQuerySchemaDefinition;
 
 /** Run lifecycle as the poll endpoint reports it. */
 export const runStatusSchema = z.enum(["pending", "running", "completed", "failed", "stopped"]);
@@ -85,7 +111,7 @@ const paginationSchema = z.object({
  * What the REST boundary sends when a route throws a `HandledError`. `error` carries the
  * stable code; branch on it and render customer-facing copy from your own registry (ADR-045).
  */
-export const handledErrorEnvelopeSchema = z
+const handledErrorEnvelopeSchemaDefinition = z
   .object({
     error: z.string().describe("Stable failure code; branch on this"),
     message: z.string().optional(),
@@ -99,18 +125,28 @@ export const handledErrorEnvelopeSchema = z
     docsUrl: z.string().optional(),
   })
   .passthrough();
+export interface HandledErrorEnvelopeSchema extends Named<
+  typeof handledErrorEnvelopeSchemaDefinition
+> {}
+export const handledErrorEnvelopeSchema: HandledErrorEnvelopeSchema =
+  handledErrorEnvelopeSchemaDefinition;
 
 /**
  * The 409 a workbench write answers with when someone else saved first.
  * `StaleWorkbenchStateError`'s `currentVersion` arrives as a sibling of
  * `error` (the REST boundary spreads `meta` flat) — reloading is the remedy.
  */
-export const staleWorkbenchStateErrorSchema = handledErrorEnvelopeSchema.safeExtend({
+const staleWorkbenchStateErrorSchemaDefinition = handledErrorEnvelopeSchema.safeExtend({
   currentVersion: z
     .number()
     .int()
     .describe("The stored version now. Read the setup again at this one."),
 });
+export interface StaleWorkbenchStateErrorSchema extends Named<
+  typeof staleWorkbenchStateErrorSchemaDefinition
+> {}
+export const staleWorkbenchStateErrorSchema: StaleWorkbenchStateErrorSchema =
+  staleWorkbenchStateErrorSchemaDefinition;
 
 /**
  * A failure we could name, serialized for clients to branch on (ADR-045). Nested form on runs
@@ -137,12 +173,14 @@ const handledErrorSchema = z.object({
   reasons: z.array(z.unknown()).optional(),
 });
 
-export const startRunResponseSchema = z.object({
+const startRunResponseSchemaDefinition = z.object({
   runId: z.string().describe("Identifier to poll this run with"),
   status: z.literal("running"),
   total: z.number().describe("Number of cells this run will execute"),
   runUrl: z.string().optional().describe("Link to the run in the LangWatch app"),
 });
+export interface StartRunResponseSchema extends Named<typeof startRunResponseSchemaDefinition> {}
+export const startRunResponseSchema: StartRunResponseSchema = startRunResponseSchemaDefinition;
 
 const evaluationSummarySchema = z.object({
   name: z.string(),
@@ -189,23 +227,27 @@ const runListEntrySchema = z.object({
 });
 
 /** The flat refusal main published on the run doors: one sentence, no code. */
-export const runRefusalSchema = z.object({
+const runRefusalSchemaDefinition = z.object({
   error: z.string().describe("What was wrong with the request, as a sentence"),
 });
+export interface RunRefusalSchema extends Named<typeof runRefusalSchemaDefinition> {}
+export const runRefusalSchema: RunRefusalSchema = runRefusalSchemaDefinition;
 
-export const listRunsResponseSchema = z.object({
+const listRunsResponseSchemaDefinition = z.object({
   experimentId: z.string(),
   experimentSlug: z.string(),
   runs: z.array(runListEntrySchema),
   pagination: paginationSchema,
 });
+export interface ListRunsResponseSchema extends Named<typeof listRunsResponseSchemaDefinition> {}
+export const listRunsResponseSchema: ListRunsResponseSchema = listRunsResponseSchemaDefinition;
 
 /**
  * What a completed run tallied, as the poll endpoint reports it: the engine's
  * `ExecutionSummary` plus the per-target/evaluator breakdown a CI job prints.
  * The Redis run-state object, NOT the ClickHouse aggregate in {@link runAggregateSummarySchema}.
  */
-export const executionSummarySchema = z.object({
+const executionSummarySchemaDefinition = z.object({
   runId: z.string(),
   totalCells: z.number().describe("Cells the run set out to execute"),
   completedCells: z.number(),
@@ -250,13 +292,15 @@ export const executionSummarySchema = z.object({
   totalCost: z.number().optional(),
   runUrl: z.string().optional().describe("Link to the run in the LangWatch app"),
 });
+export interface ExecutionSummarySchema extends Named<typeof executionSummarySchemaDefinition> {}
+export const executionSummarySchema: ExecutionSummarySchema = executionSummarySchemaDefinition;
 
 /**
  * The poll response. Which fields are present depends on `status`: a run
  * still going carries progress only; a finished one adds `finishedAt` and
  * either a `summary` or the failure's stable `error` code.
  */
-export const runStatusResponseSchema = z.object({
+const runStatusResponseSchemaDefinition = z.object({
   runId: z.string(),
   status: runStatusSchema,
   progress: z.number().describe("Cells finished so far"),
@@ -281,6 +325,8 @@ export const runStatusResponseSchema = z.object({
     .optional()
     .describe("Trace id for failures that carry no code, to quote in support"),
 });
+export interface RunStatusResponseSchema extends Named<typeof runStatusResponseSchemaDefinition> {}
+export const runStatusResponseSchema: RunStatusResponseSchema = runStatusResponseSchemaDefinition;
 
 const datasetEntrySchema = z.object({
   index: z.number(),
@@ -331,7 +377,7 @@ const runTargetSchema = z.object({
     .optional(),
 });
 
-export const runResultsResponseSchema = z.object({
+const runResultsResponseSchemaDefinition = z.object({
   experimentId: z.string(),
   runId: z.string(),
   projectId: z.string(),
@@ -352,6 +398,11 @@ export const runResultsResponseSchema = z.object({
     "What is stored against what the run reported. Results are stored after they are reported, so a read can hold part of a run: `complete` is false until the run has ended and every reported row and evaluation is stored. `expected` is null when the run reported no counts",
   ),
 });
+export interface RunResultsResponseSchema extends Named<
+  typeof runResultsResponseSchemaDefinition
+> {}
+export const runResultsResponseSchema: RunResultsResponseSchema =
+  runResultsResponseSchemaDefinition;
 
 // ── workbench state and version history ─────────────────────────────────────
 
@@ -359,13 +410,15 @@ export const runResultsResponseSchema = z.object({
  * The workbench setup as the API carries it. Deliberately open to avoid duplicating the
  * canonical shape; the contract is: read, edit, send back whole.
  */
-export const workbenchStateSchema = z
+const workbenchStateSchemaDefinition = z
   .record(z.string(), z.unknown())
   .describe(
     "The experiment setup: datasets, targets and evaluators. Read it, change it, send it back whole.",
   );
+export interface WorkbenchStateSchema extends Named<typeof workbenchStateSchemaDefinition> {}
+export const workbenchStateSchema: WorkbenchStateSchema = workbenchStateSchemaDefinition;
 
-export const createExperimentBodySchema = z.object({
+const createExperimentBodySchemaDefinition = z.object({
   name: z
     .string()
     .min(1)
@@ -375,14 +428,24 @@ export const createExperimentBodySchema = z.object({
     .optional()
     .describe("Setup to start from. Omit for a blank workbench with one inline dataset."),
 });
+export interface CreateExperimentBodySchema extends Named<
+  typeof createExperimentBodySchemaDefinition
+> {}
+export const createExperimentBodySchema: CreateExperimentBodySchema =
+  createExperimentBodySchemaDefinition;
 
-export const createExperimentResponseSchema = z.object({
+const createExperimentResponseSchemaDefinition = z.object({
   id: z.string().describe("Identifier of the created experiment"),
   slug: z.string().describe("Slug to address the experiment by"),
   version: z.number().describe("Version of the saved setup, starting at 1"),
 });
+export interface CreateExperimentResponseSchema extends Named<
+  typeof createExperimentResponseSchemaDefinition
+> {}
+export const createExperimentResponseSchema: CreateExperimentResponseSchema =
+  createExperimentResponseSchemaDefinition;
 
-export const workbenchStateResponseSchema = z.object({
+const workbenchStateResponseSchemaDefinition = z.object({
   id: z.string(),
   slug: z.string(),
   name: z.string().nullable(),
@@ -390,22 +453,37 @@ export const workbenchStateResponseSchema = z.object({
   version: z.number().int().describe("Send this back as expectedVersion to save safely"),
   updatedAt: z.string().describe("ISO 8601 timestamp of the last save"),
 });
+export interface WorkbenchStateResponseSchema extends Named<
+  typeof workbenchStateResponseSchemaDefinition
+> {}
+export const workbenchStateResponseSchema: WorkbenchStateResponseSchema =
+  workbenchStateResponseSchemaDefinition;
 
 /** What `?fields=version` answers: the staleness probe without the setup. */
-export const workbenchVersionProbeResponseSchema = z.object({
+const workbenchVersionProbeResponseSchemaDefinition = z.object({
   id: z.string(),
   slug: z.string(),
   version: z.number().int(),
   updatedAt: z.string().describe("ISO 8601 timestamp of the last save"),
 });
+export interface WorkbenchVersionProbeResponseSchema extends Named<
+  typeof workbenchVersionProbeResponseSchemaDefinition
+> {}
+export const workbenchVersionProbeResponseSchema: WorkbenchVersionProbeResponseSchema =
+  workbenchVersionProbeResponseSchemaDefinition;
 
 /** The read's one answer: `?fields=version` leaves out the name and the setup. */
-export const workbenchStateAnswerSchema = workbenchStateResponseSchema.partial({
+const workbenchStateAnswerSchemaDefinition = workbenchStateResponseSchema.partial({
   name: true,
   state: true,
 });
+export interface WorkbenchStateAnswerSchema extends Named<
+  typeof workbenchStateAnswerSchemaDefinition
+> {}
+export const workbenchStateAnswerSchema: WorkbenchStateAnswerSchema =
+  workbenchStateAnswerSchemaDefinition;
 
-export const saveWorkbenchStateBodySchema = z.object({
+const saveWorkbenchStateBodySchemaDefinition = z.object({
   state: workbenchStateSchema.describe("The full setup to save"),
   expectedVersion: z
     .number()
@@ -416,10 +494,20 @@ export const saveWorkbenchStateBodySchema = z.object({
     ),
   commitMessage: z.string().optional().describe("Names this version in the history list"),
 });
+export interface SaveWorkbenchStateBodySchema extends Named<
+  typeof saveWorkbenchStateBodySchemaDefinition
+> {}
+export const saveWorkbenchStateBodySchema: SaveWorkbenchStateBodySchema =
+  saveWorkbenchStateBodySchemaDefinition;
 
-export const saveWorkbenchStateResponseSchema = z.object({
+const saveWorkbenchStateResponseSchemaDefinition = z.object({
   version: z.number().int().describe("The version the save produced"),
 });
+export interface SaveWorkbenchStateResponseSchema extends Named<
+  typeof saveWorkbenchStateResponseSchemaDefinition
+> {}
+export const saveWorkbenchStateResponseSchema: SaveWorkbenchStateResponseSchema =
+  saveWorkbenchStateResponseSchemaDefinition;
 
 const workbenchVersionSchema = z.object({
   version: z
@@ -448,7 +536,7 @@ const workbenchVersionSchema = z.object({
     ),
 });
 
-export const listWorkbenchVersionsResponseSchema = z.object({
+const listWorkbenchVersionsResponseSchemaDefinition = z.object({
   versions: z.array(workbenchVersionSchema).describe("Newest first, by `counterVersion`"),
   nextCursor: z
     .number()
@@ -456,29 +544,49 @@ export const listWorkbenchVersionsResponseSchema = z.object({
     .nullable()
     .describe("Pass as `cursor` to read the next page, null on the last one"),
 });
+export interface ListWorkbenchVersionsResponseSchema extends Named<
+  typeof listWorkbenchVersionsResponseSchemaDefinition
+> {}
+export const listWorkbenchVersionsResponseSchema: ListWorkbenchVersionsResponseSchema =
+  listWorkbenchVersionsResponseSchemaDefinition;
 
 /** A restore takes no body: the version travels in the path. */
-export const restoreWorkbenchVersionBodySchema = z.object({});
+const restoreWorkbenchVersionBodySchemaDefinition = z.object({});
+export interface RestoreWorkbenchVersionBodySchema extends Named<
+  typeof restoreWorkbenchVersionBodySchemaDefinition
+> {}
+export const restoreWorkbenchVersionBodySchema: RestoreWorkbenchVersionBodySchema =
+  restoreWorkbenchVersionBodySchemaDefinition;
 
-export const restoreWorkbenchVersionResponseSchema = z.object({
+const restoreWorkbenchVersionResponseSchemaDefinition = z.object({
   version: z
     .number()
     .describe(
       "The new version the restore wrote. History is never rewritten, so the restored version is still in the list.",
     ),
 });
+export interface RestoreWorkbenchVersionResponseSchema extends Named<
+  typeof restoreWorkbenchVersionResponseSchemaDefinition
+> {}
+export const restoreWorkbenchVersionResponseSchema: RestoreWorkbenchVersionResponseSchema =
+  restoreWorkbenchVersionResponseSchemaDefinition;
 
-export const experimentInitResponseSchema = z.object({
+const experimentInitResponseSchemaDefinition = z.object({
   slug: z.string().describe("Slug of the experiment, created or existing"),
   path: z.string().describe("Path to the experiment in the LangWatch app"),
 });
+export interface ExperimentInitResponseSchema extends Named<
+  typeof experimentInitResponseSchemaDefinition
+> {}
+export const experimentInitResponseSchema: ExperimentInitResponseSchema =
+  experimentInitResponseSchemaDefinition;
 
 /**
  * The two 400s the create call answers with, hand-rolled rather than raised
  * as handled errors: a body that is not JSON answers `message`, one that
  * parses but fails the schema answers `error` with the validation sentence.
  */
-export const experimentInitBadRequestSchema = z.union([
+const experimentInitBadRequestSchemaDefinition = z.union([
   z.object({
     message: z.string().describe("Set when the body was not valid JSON"),
   }),
@@ -490,12 +598,17 @@ export const experimentInitBadRequestSchema = z.union([
       ),
   }),
 ]);
+export interface ExperimentInitBadRequestSchema extends Named<
+  typeof experimentInitBadRequestSchemaDefinition
+> {}
+export const experimentInitBadRequestSchema: ExperimentInitBadRequestSchema =
+  experimentInitBadRequestSchemaDefinition;
 
 /**
  * What a refused create call sends. Two 403 refusals: API key permission denied or plan
  * experiment limit. `error` code distinguishes them; limit case carries counts.
  */
-export const experimentInitForbiddenSchema = handledErrorEnvelopeSchema.safeExtend({
+const experimentInitForbiddenSchemaDefinition = handledErrorEnvelopeSchema.safeExtend({
   limitType: z
     .string()
     .optional()
@@ -503,6 +616,11 @@ export const experimentInitForbiddenSchema = handledErrorEnvelopeSchema.safeExte
   current: z.number().optional().describe("Experiments already in use"),
   max: z.number().optional().describe("What the plan allows"),
 });
+export interface ExperimentInitForbiddenSchema extends Named<
+  typeof experimentInitForbiddenSchemaDefinition
+> {}
+export const experimentInitForbiddenSchema: ExperimentInitForbiddenSchema =
+  experimentInitForbiddenSchemaDefinition;
 
 /** A run whose progress the caller follows as it happens. */
 export type WorkbenchRunStream = Readonly<{

@@ -1,11 +1,11 @@
 /**
  * Model Provider's answer to the port its screens declare: every method
- * projects a `@langwatch/browser-host` capability. `availableScopes` reads
+ * projects a `@langwatch/browser-host` host service. `availableScopes` reads
  * the caller's reach from `organization.getScopeGraph`, as main did. §10.1.
  */
 
 import {
-  useUiCapabilities,
+  useUiHostServices,
   useUiScope,
   type UiFeedback,
   type UiRoute,
@@ -73,7 +73,7 @@ function openDrawerAddress({
   route.setQuery(next);
 }
 
-class CapabilityModelProviderHost extends ModelProviderHostApi {
+class HostServiceModelProviderHost extends ModelProviderHostApi {
   private readonly hostScope: ModelProviderHostScope;
   private readonly scopeHost: UiScopeHost | undefined;
   private readonly session: UiSession;
@@ -146,6 +146,14 @@ class CapabilityModelProviderHost extends ModelProviderHostApi {
     this.feedback.succeeded(notice);
   }
 
+  warned(notice: ModelProviderSuccessNotice): void {
+    this.feedback.warned(notice);
+  }
+
+  informed(notice: ModelProviderSuccessNotice): void {
+    this.feedback.informed(notice);
+  }
+
   failed(failure: ModelProviderFailureNotice): void {
     this.feedback.failed(failure);
   }
@@ -169,7 +177,7 @@ class CapabilityModelProviderHost extends ModelProviderHostApi {
  * is what `mounts.load` resolves.
  */
 export default function ModelProviderHostMount({ children }: { children?: ReactNode }) {
-  const { session, route, feedback } = useUiCapabilities();
+  const { session, route, feedback } = useUiHostServices();
   const { organizationId, projectId } = useUiScope().activeScope();
   const scopeHost = useUiScope().scopeHost();
 
@@ -191,7 +199,7 @@ export default function ModelProviderHostMount({ children }: { children?: ReactN
 
   const host = useMemo(
     () =>
-      new CapabilityModelProviderHost({
+      new HostServiceModelProviderHost({
         hostScope,
         scopeHost,
         session,

@@ -26,12 +26,13 @@ type LocalEntry = { row: FeatureFlagRow | null; expiresAt: number };
 
 /**
  * Two-tier read of one operator row: per-process map, then shared cache,
- * then the repository. A repository failure degrades to "no row" (logged),
- * so an unhealthy database resolves flags to registry defaults, not a caller failure.
+ * then the repository. A repository failure degrades to "no row" (logged once), and the
+ * repository rests for the local window, so a schema still upgrading is not polled per read.
  */
 export class CachedFeatureFlagRowService extends FeatureFlagRowStore {
   private readonly logger = createLogger("langwatch:feature-flag-store");
   private readonly local = new Map<string, LocalEntry>();
+  private unreadableUntil = 0;
 
   private constructor(
     private readonly repository: FeatureFlagRepository,
@@ -63,12 +64,14 @@ export class CachedFeatureFlagRowService extends FeatureFlagRowStore {
       return cached.row;
     }
 
+    if (now < this.unreadableUntil) return null;
     try {
       const row = await this.repository.findByKey(key);
       await this.cache.set(key, { row });
       this.writeLocal(key, row, now);
       return row;
     } catch (error) {
+      this.unreadableUntil = now + LOCAL_TTL_MS;
       this.logger.warn(
         { key, error: error instanceof Error ? error.message : error },
         "feature flag store read failed, falling back to registry default",
@@ -80,6 +83,7 @@ export class CachedFeatureFlagRowService extends FeatureFlagRowStore {
   async invalidate(key: string): Promise<void> {
     await this.cache.delete(key);
     this.local.delete(key);
+    this.unreadableUntil = 0;
   }
 
   private writeLocal(key: string, row: FeatureFlagRow | null, now: number): void {

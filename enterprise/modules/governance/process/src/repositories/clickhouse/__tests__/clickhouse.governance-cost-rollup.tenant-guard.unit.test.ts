@@ -72,7 +72,7 @@ describe("ClickHouseGovernanceCostRollupRepository under the tenant guard", () =
       expect(executed).toHaveLength(1);
       expect(executed[0]?.tenantId).toBe("project-a");
       expect(executed[0]?.params?.tenantid).toBe("project-a");
-      expect(executed[0]?.unscoped).toBeUndefined();
+      expect(executed[0]?.SKIP_TENANT_CHECK).toBeUndefined();
     });
   });
 });

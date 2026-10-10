@@ -76,6 +76,7 @@ const service = VirtualKeyAuthorizationService.create({
       organizationId: "org_1",
       isPersonal: false,
       ownerUserId: null,
+      kind: "application",
     }),
     listIdsByOrganization: async () => [],
   }),

@@ -407,10 +407,12 @@ export class ModelProviderCommandService {
       storedCredentialsUnreadable: Boolean(storedCredentialsAreUnreadable),
     });
 
-    return this.options.credentialPolicy.merge({
+    const merged = this.options.credentialPolicy.merge({
       incoming: normalized,
       stored: existing?.customKeys ?? null,
     });
+    await this.options.catalog.assertEndpointAllowed(input.provider, merged);
+    return merged;
   }
 
   private headersForWrite(

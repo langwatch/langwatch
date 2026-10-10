@@ -12,7 +12,9 @@ export const InboxDetails = ({ inbox }: { inbox: Inbox }) => (
         { label: "Stack", value: inbox.stack === "" ? "Standalone MailSim" : inbox.stack },
         { label: "SMTP listener", value: inbox.smtpAddr },
         { label: "Inbox", value: inbox.baseUrl },
-        { label: "Try an address", value: EXAMPLE_ADDRESS },
+        inbox.address === ""
+          ? { label: "Try an address", value: EXAMPLE_ADDRESS }
+          : { label: "This stack's address", value: inbox.address },
         {
           label: "Storage",
           mono: false,

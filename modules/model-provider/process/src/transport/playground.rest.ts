@@ -16,6 +16,7 @@ export const playgroundRest = defineRestRouter(ModelProviderApi)
   .withCredential("browser")
 
   .post("/api/playground", "runPlaygroundCompletion")
+  .withoutAudit("run, not a change")
   .withInput(playgroundRestBodySchema)
   .withHeaders(playgroundRestHeadersSchema)
   .withPermission("playground:view", {
@@ -27,9 +28,9 @@ export const playgroundRest = defineRestRouter(ModelProviderApi)
     produces: ["text/plain", "application/json"],
     because: "The AI SDK owns the text stream and provider refusal response body.",
   })
-  .handle(async ({ app, input, response }, headers) => {
+  .handle(async ({ app, input, response, target }, headers) => {
     const { body, ...answer } = await app.runPlaygroundCompletion({
-      projectId: headers["x-project-id"] ?? "",
+      projectId: target?.tier === "project" ? target.id : "",
       model: headers["x-model"] ?? "",
       systemPrompt: headers["x-system-prompt"] ?? null,
       messages: input.messages,

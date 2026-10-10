@@ -3,6 +3,7 @@
 import type { Instant } from "@langwatch/time";
 
 import type { BillingCheckpoint } from "../billing-checkpoint.repository.ts";
+import type { BillingContractBudgetRecord } from "../billing-contract-budget.repository.ts";
 import type {
   ConnectedBillingAccountRecord,
   ConnectedCreditGrantRecord,
@@ -18,7 +19,6 @@ export type MemoryBillingOrganization = {
   stripeCustomerId: string | null;
   pricingModel: string | null;
   currency: string | null;
-  license: string | null;
   /** An operator marked this organization a connected self-hosted customer. */
   selfHostedCustomer: boolean;
   teamIds: string[];
@@ -60,6 +60,16 @@ type MemoryBillingSpendRow = {
   occurredAtMs: number;
 };
 
+/** One debit in gateway's shared budget ledger, at its latest status. */
+type MemoryBillingBudgetLedgerRow = {
+  tenantId: string;
+  budgetId: string;
+  scopeId: string;
+  status: string;
+  amountNanoUsd: number;
+  occurredAtMs: number;
+};
+
 /**
  * One store behind the billing memory tier, the way one Postgres schema serves
  * the Prisma tier: a subscription written through `subscriptions` is what the
@@ -84,6 +94,9 @@ export class MemoryBillingStore {
   /** Project's rows and gateway's ledger, as their shares show them to billing. */
   readonly projects: MemoryBillingProject[] = [];
   readonly gatewaySpend: MemoryBillingSpendRow[] = [];
+  /** Gateway's contract budgets, keyed by organization, and its budget ledger, through its shares. */
+  readonly contractBudgets = new Map<string, BillingContractBudgetRecord>();
+  readonly budgetLedger: MemoryBillingBudgetLedgerRow[] = [];
   spendSourceAvailable = true;
 
   static create(): MemoryBillingStore {

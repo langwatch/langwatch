@@ -37,23 +37,26 @@ export class SavedViewService {
 
   /**
    * Every view a member sees: the project's own plus their personal ones,
-   * auto-seeded with the origin defaults on first access.
+   * auto-seeded with the origin defaults on first access unless the project
+   * takes no writes (an aggregate, ADR-177): then it returns what exists.
    */
   async getAll({
     projectId,
     userId,
     kind,
+    acceptsWrites,
   }: {
     projectId: string;
     userId?: string;
     kind?: string;
+    acceptsWrites: boolean;
   }): Promise<SavedViewRecord[]> {
     // Only seed origin-bucket defaults for the legacy kind. The traces v2 lens
     // system seeds its built-in lenses client-side from code, so seeding on
     // first access here would double-populate the tab strip.
     const isLegacyKind = !kind || kind === "v1-traces-filter";
 
-    if (isLegacyKind) {
+    if (isLegacyKind && acceptsWrites) {
       const count = await this.#repository.count({ projectId, userId, kind });
       if (count === 0) {
         await this.#seedViews({ projectId });

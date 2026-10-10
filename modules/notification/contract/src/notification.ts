@@ -1,4 +1,4 @@
-import { defineTrpcContract } from "@langwatch/module";
+import { defineTrpcContract, type Named } from "@langwatch/module";
 import { z } from "zod";
 
 import { webPushPublicKeySchema, webPushSubscriptionInputSchema } from "./web-push.ts";
@@ -14,9 +14,14 @@ const jsonValueSchema: z.ZodType<unknown> = z.lazy(() =>
   ]),
 );
 
-export const notificationMetadataSchema = z.record(z.string(), jsonValueSchema);
+const notificationMetadataSchemaDefinition = z.record(z.string(), jsonValueSchema);
+export interface NotificationMetadataSchema extends Named<
+  typeof notificationMetadataSchemaDefinition
+> {}
+export const notificationMetadataSchema: NotificationMetadataSchema =
+  notificationMetadataSchemaDefinition;
 
-export const notificationSchema = z
+const notificationSchemaDefinition = z
   .object({
     id: z.string().min(1),
     organizationId: z.string().nullable(),
@@ -27,10 +32,12 @@ export const notificationSchema = z
     sentAt: z.date(),
   })
   .strict();
+export interface NotificationSchema extends Named<typeof notificationSchemaDefinition> {}
+export const notificationSchema: NotificationSchema = notificationSchemaDefinition;
 
 export type Notification = z.infer<typeof notificationSchema>;
 
-export const createNotificationCommandSchema = z
+const createNotificationCommandSchemaDefinition = z
   .object({
     organizationId: z.string().min(1),
     projectId: z.string().nullable().optional(),
@@ -38,20 +45,30 @@ export const createNotificationCommandSchema = z
     sentAt: z.date(),
   })
   .strict();
+export interface CreateNotificationCommandSchema extends Named<
+  typeof createNotificationCommandSchemaDefinition
+> {}
+export const createNotificationCommandSchema: CreateNotificationCommandSchema =
+  createNotificationCommandSchemaDefinition;
 
 export type CreateNotificationCommand = z.infer<typeof createNotificationCommandSchema>;
 
-export const notificationRecentQuerySchema = z
+const notificationRecentQuerySchemaDefinition = z
   .object({
     organizationId: z.string().min(1),
     since: z.date(),
   })
   .strict();
+export interface NotificationRecentQuerySchema extends Named<
+  typeof notificationRecentQuerySchemaDefinition
+> {}
+export const notificationRecentQuerySchema: NotificationRecentQuerySchema =
+  notificationRecentQuerySchemaDefinition;
 
 export type NotificationRecentQuery = z.infer<typeof notificationRecentQuerySchema>;
 
 /** How mail leaves this install, as the checkup reads it (specs/self-hosting/checkup.feature). */
-export const mailDeliveryViewSchema = z
+const mailDeliveryViewSchemaDefinition = z
   .object({
     /** The gateway this deployment sends through; absent where none is configured. */
     provider: z.string().optional(),
@@ -63,20 +80,24 @@ export const mailDeliveryViewSchema = z
     misconfigured: z.boolean(),
   })
   .strict();
+export interface MailDeliveryViewSchema extends Named<typeof mailDeliveryViewSchemaDefinition> {}
+export const mailDeliveryViewSchema: MailDeliveryViewSchema = mailDeliveryViewSchemaDefinition;
 
 export type MailDeliveryView = z.infer<typeof mailDeliveryViewSchema>;
 
 /** A file carried with a message, such as a licence key. */
-export const emailAttachmentSchema = z
+const emailAttachmentSchemaDefinition = z
   .object({ filename: z.string().min(1), content: z.string(), contentType: z.string().min(1) })
   .strict();
+export interface EmailAttachmentSchema extends Named<typeof emailAttachmentSchemaDefinition> {}
+export const emailAttachmentSchema: EmailAttachmentSchema = emailAttachmentSchemaDefinition;
 
 /**
  * One transactional message, already rendered. Notification writes the envelope: `to` is the
  * visible recipient, `undisclosedRecipients` go out unseen, `unsubscribe` becomes the RFC 8058
  * one-click pair, and `replyless` hides every recipient behind `no-reply+<tag>@<sender domain>`.
  */
-export const sendEmailCommandSchema = z
+const sendEmailCommandSchemaDefinition = z
   .object({
     to: z.union([z.string().min(1), z.array(z.string().min(1))]),
     subject: z.string(),
@@ -93,6 +114,8 @@ export const sendEmailCommandSchema = z
     idempotencyKey: z.string().min(1).optional(),
   })
   .strict();
+export interface SendEmailCommandSchema extends Named<typeof sendEmailCommandSchemaDefinition> {}
+export const sendEmailCommandSchema: SendEmailCommandSchema = sendEmailCommandSchemaDefinition;
 
 export type SendEmailCommand = z.infer<typeof sendEmailCommandSchema>;
 

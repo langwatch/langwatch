@@ -414,6 +414,11 @@ export class MemoryOrganizationRepository extends OrganizationRepository {
     organization.licenseLastValidatedAt = null;
   }
 
+  async findLicensingLicenseKeys(input: { organizationId: string }): Promise<string[]> {
+    const licenseKey = this.memory.licensingLicenseKeys.get(input.organizationId);
+    return licenseKey ? [licenseKey] : [];
+  }
+
   async findFirstAdministratorEmail(organizationId: string): Promise<string | null> {
     const [first] = this.memory.organizationUsers
       .filter(
@@ -521,9 +526,10 @@ export class MemoryOrganizationRepository extends OrganizationRepository {
     });
   }
 
-  // shortcut: memory rows carry no project kind, so no governance project is excluded here.
+  // shortcut: memory rows carry no project kind, so `hiddenKinds` excludes nothing here.
   async findProjects(input: {
     organizationId: string;
+    hiddenKinds: readonly string[];
     teamId?: string;
     limit?: number;
   }): Promise<OrganizationTeamProject[]> {

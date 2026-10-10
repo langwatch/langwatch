@@ -15,8 +15,9 @@ const costIdSelect = { id: true } as const;
 
 const prismaJsonInputSchema = z.custom<Prisma.InputJsonValue>((value) => value !== null);
 
+/** An absent field (`trace_id` outside a trace) is dropped, as the JSON column stores it. */
 function jsonInput(value: Record<string, unknown>): Prisma.InputJsonValue {
-  return prismaJsonInputSchema.parse(z.json().parse(value));
+  return prismaJsonInputSchema.parse(z.json().parse(JSON.parse(JSON.stringify(value))));
 }
 
 export class PrismaEvaluationCostRepository

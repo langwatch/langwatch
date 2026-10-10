@@ -1,3 +1,4 @@
+import { Checkbox } from "@langwatch/design-system/checkbox";
 import {
   Field,
   HStack,
@@ -30,28 +31,27 @@ export function LicenseTermsFields({
     <VStack align="start" gap={3} width="full">
       <Field.Root>
         <Field.Label>Hosted services included</Field.Label>
-        <HStack gap={4}>
+        <HStack gap={4} wrap="wrap">
           {SERVICES.map((service) => (
-            <label key={service} style={{ fontSize: "0.875rem" }}>
-              <input
-                type="checkbox"
-                checked={form.services.includes(service)}
-                onChange={(event) =>
-                  set({
-                    key: "services",
-                    value: event.target.checked
-                      ? [...form.services, service]
-                      : form.services.filter((s) => s !== service),
-                  })
-                }
-              />{" "}
+            <Checkbox
+              key={service}
+              checked={form.services.includes(service)}
+              onChange={(event) =>
+                set({
+                  key: "services",
+                  value: event.target.checked
+                    ? [...form.services, service]
+                    : form.services.filter((s) => s !== service),
+                })
+              }
+            >
               {SERVICE_LABELS[service]}
-            </label>
+            </Checkbox>
           ))}
         </HStack>
         <Field.HelperText>Switching a service on does not reissue the license.</Field.HelperText>
       </Field.Root>
-      <SimpleGrid columns={2} gap={3} width="full">
+      <SimpleGrid columns={{ base: 1, md: 2 }} gap={3} width="full">
         <Field.Root>
           <Field.Label>Seat rate per year</Field.Label>
           <HStack>

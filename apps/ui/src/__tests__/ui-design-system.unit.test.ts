@@ -1,9 +1,9 @@
 import { createDesignSystem } from "@langwatch/design-system/system";
 import { describe, expect, it } from "vitest";
 
-import { composeUiDesignSystem, loadUiRootCapabilities } from "../shell/ui-root-capabilities";
+import { composeUiDesignSystem, loadUiRootHostServices } from "../shell/ui-root-host-services";
 
-const uiDesignSystem = composeUiDesignSystem(await loadUiRootCapabilities());
+const uiDesignSystem = composeUiDesignSystem(await loadUiRootHostServices());
 
 /**
  * A module shipping semantic tokens must be named in the composition or they

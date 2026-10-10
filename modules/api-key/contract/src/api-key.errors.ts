@@ -169,3 +169,21 @@ export class CliKeySelectionInvalidError extends HandledError {
     this.name = "CliKeySelectionInvalidError";
   }
 }
+
+/**
+ * An API key was presented for an aggregate project (ADR-177 decision 7). An
+ * aggregate owns no credential; 403 rather than 401, because the key may well
+ * be real and it is the project that accepts none.
+ */
+export class AggregateProjectHasNoCredentialError extends HandledError {
+  declare readonly code: "aggregate_project_has_no_credential";
+
+  constructor(options: { meta?: Record<string, unknown> } = {}) {
+    super(
+      "aggregate_project_has_no_credential",
+      "This project reads traces from other projects and accepts no API key. Send traces to one of its member projects instead.",
+      { httpStatus: 403, meta: options.meta },
+    );
+    this.name = "AggregateProjectHasNoCredentialError";
+  }
+}

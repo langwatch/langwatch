@@ -1,10 +1,9 @@
 /**
- * Which section an operator lands on first: a product rollout is the daily
- * reason to open this page, and a kill switch is the exception, so Product
- * leads.
+ * @vitest-environment jsdom
+ * Product rollouts lead the operator catalogue.
  */
 import { DesignSystemProvider } from "@langwatch/design-system/provider";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -65,8 +64,8 @@ describe("given an operator opens the feature flags page", () => {
   it("shows the Product section before the System section", () => {
     renderView();
 
-    const product = screen.getByText("Product");
-    const system = screen.getByText("System");
+    const product = screen.getByRole("heading", { name: "Product" });
+    const system = screen.getByRole("heading", { name: "System" });
 
     // DOCUMENT_POSITION_FOLLOWING: `system` comes after `product` in the
     // document, which is the reading order on the page.
@@ -87,5 +86,26 @@ describe("given an operator opens the feature flags page", () => {
     renderView({ ...CATALOGUE, flags });
 
     expect(screen.getByText(/^26\/08\/2026 \d{2}:\d{2}:\d{2}$/)).toBeTruthy();
+  });
+});
+
+describe("given an operator searches the catalogue", () => {
+  it("finds a flag by its explanation and restores the catalogue when cleared", () => {
+    renderView();
+    const search = screen.getByRole("searchbox", { name: "Search feature flags" });
+    fireEvent.change(search, { target: { value: "halts" } });
+    expect(screen.getByText("ops_es_trace_processing_killswitch")).toBeTruthy();
+    expect(screen.queryByText("release_ui_comparison_leaderboard_enabled")).toBeNull();
+    fireEvent.change(search, { target: { value: "" } });
+    expect(screen.getByText("release_ui_comparison_leaderboard_enabled")).toBeTruthy();
+  });
+
+  it("shows empty states when neither scope matches", () => {
+    renderView();
+    fireEvent.change(screen.getByRole("searchbox", { name: "Search feature flags" }), {
+      target: { value: "unregistered flag" },
+    });
+    expect(screen.getAllByText("No matching flags")).toHaveLength(2);
+    expect(screen.queryByRole("table")).toBeNull();
   });
 });

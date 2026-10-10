@@ -42,3 +42,10 @@ Feature: The scope graph is the caller's organizations, narrowed
     And a project the caller can see is renamed
     When the caller asks again
     Then the graph carries the new name
+
+  @integration
+  Scenario: The sign-in page sends no authenticated query
+    Given the organization host is mounted above the sign-in page
+    And nobody is signed in
+    When the sign-in page renders
+    Then the browser does not ask for the scope graph

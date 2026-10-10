@@ -173,8 +173,8 @@ vi.mock("../../../../../behavior/langy-api.ts", async () => {
   };
 });
 
-import { UiCapabilityContextProvider } from "@langwatch/browser-host/capabilities";
-import { createUiCapabilitiesFromHost } from "@langwatch/browser-host/testing";
+import { UiHostServicesContextProvider } from "@langwatch/browser-host/capabilities";
+import { createUiHostServicesFromHost } from "@langwatch/browser-host/testing";
 
 import { useLangyStore } from "../../../../../behavior/langy.store.ts";
 import {
@@ -208,6 +208,9 @@ class FakeLangyHost extends LangyHostApi {
   currentUser() {
     return { id: "user-1", email: "staff@langwatch.ai" };
   }
+  hasOrganizationPermission() {
+    return false;
+  }
   hasPermission() {
     return true;
   }
@@ -234,11 +237,11 @@ const host = new FakeLangyHost();
 
 const Wrapper = ({ children }: { children: ReactNode }) => (
   <DesignSystemProvider forcedTheme="light">
-    <UiCapabilityContextProvider value={createUiCapabilitiesFromHost(host)}>
+    <UiHostServicesContextProvider value={createUiHostServicesFromHost(host)}>
       <LangyHostProvider value={host}>
         <LangyProvider>{children}</LangyProvider>
       </LangyHostProvider>
-    </UiCapabilityContextProvider>
+    </UiHostServicesContextProvider>
   </DesignSystemProvider>
 );
 

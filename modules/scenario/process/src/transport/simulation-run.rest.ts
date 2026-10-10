@@ -1,8 +1,9 @@
 import {
   defineRestRouter,
   MANAGEMENT_API_VERSION,
-  projectRestFacts,
+  projectRequestContext,
   resolver,
+  type RestDoorCredential,
   type RestTransportDeclaration,
 } from "@langwatch/api/rest";
 /**
@@ -26,15 +27,6 @@ import { toBatchSummaryResponse } from "../rules/simulation-batch-summary.rules.
 
 const logger = createLogger("langwatch:api:simulation-runs");
 
-/**
- * Platform's own address for ONE simulation run (opens in scenarioRunDetail drawer).
- * Type kept for createScenarioRunPlatformUrlBuilder (app.platformUrl resolves directly).
- */
-export type ScenarioRunPlatformUrlBuilder = (args: {
-  projectSlug: string;
-  scenarioRunId: string;
-}) => string;
-
 const notFoundResponse = {
   404: {
     description: "Not found",
@@ -49,7 +41,11 @@ const notFoundResponse = {
 export function createSimulationRunsRest(): Readonly<{
   protocol: "rest";
   namespace: string;
-  router: () => RestTransportDeclaration<ScenarioApi>;
+  router: () => RestTransportDeclaration<
+    ScenarioApi,
+    RestDoorCredential,
+    typeof projectRequestContext
+  >;
 }> {
   return defineRestRouter(ScenarioApi)
     .withNamespace("simulation-runs")
@@ -63,7 +59,7 @@ export function createSimulationRunsRest(): Readonly<{
       description:
         "List simulation runs, optionally filtered by scenarioSetId or batchRunId. Set-level and unfiltered listings trim each run to its first few messages and report the trim as `messagesTruncated`; pass `include=messages` to read whole conversations, which caps the page at 20 runs, ending on a batch boundary. A batch-scoped listing always carries whole conversations.",
     })
-    .withMiddleware(projectRestFacts)
+    .withMiddlewareContext(projectRequestContext)
     .handle(({ app, input, scope }, project) => {
       const { scenarioSetId, batchRunId } = input;
       logger.info({ projectId: scope.id, scenarioSetId, batchRunId }, "Listing simulation runs");
@@ -82,7 +78,7 @@ export function createSimulationRunsRest(): Readonly<{
       description: "Get a single simulation run by its ID",
       responses: notFoundResponse,
     })
-    .withMiddleware(projectRestFacts)
+    .withMiddlewareContext(projectRequestContext)
     .handle(({ app, input, scope }, project) => {
       const projectId = scope.id;
       logger.info({ projectId, scenarioRunId: input.scenarioRunId }, "Getting simulation run");

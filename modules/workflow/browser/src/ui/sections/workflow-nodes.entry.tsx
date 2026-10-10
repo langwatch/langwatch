@@ -1,8 +1,8 @@
 import { HStack, Text } from "@langwatch/design-system/primitives";
 import type { Component, Entry } from "@langwatch/workflow-contract";
 import type { Node, NodeProps } from "@xyflow/react";
+import { Database } from "lucide-react";
 import { forwardRef, type Ref } from "react";
-import { Database } from "react-feather";
 
 import { useWorkflowNodeHost } from "../elements/workflow-node.host.tsx";
 import { ComponentNode, NodeSectionTitle } from "./workflow-nodes.tsx";

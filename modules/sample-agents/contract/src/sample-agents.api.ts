@@ -1,5 +1,5 @@
 import { HandledError } from "@langwatch/handled-error";
-import { moduleApi } from "@langwatch/module";
+import { moduleApi, type Named } from "@langwatch/module";
 import { z } from "zod";
 
 /** The demo agents a caller runs to see its own project fill with traces. */
@@ -10,22 +10,28 @@ export interface SampleAgentsApi {
 export const SampleAgentsApi = moduleApi<SampleAgentsApi>()("sample-agents");
 
 /** Main's door read no body; a bodiless call arrives as this empty object. */
-export const hotelBotRequestSchema = z.object({});
+const hotelBotRequestSchemaDefinition = z.object({});
+export interface HotelBotRequestSchema extends Named<typeof hotelBotRequestSchemaDefinition> {}
+export const hotelBotRequestSchema: HotelBotRequestSchema = hotelBotRequestSchemaDefinition;
 
-/** The caller's project key, forwarded unread to the collector, which authenticates it. */
-export const hotelBotHeadersSchema = z.object({
-  "x-auth-token": z.string().optional(),
+/** The project the API-key door verified, and the key that started the run, which caps it. */
+const hotelBotRunInputSchemaDefinition = z.object({
+  projectId: z.string(),
+  startedByApiKeyId: z.string().nullable(),
+  startedByUserId: z.string().nullable(),
 });
-
-export const hotelBotRunInputSchema = z.object({ authToken: z.string().optional() });
+export interface HotelBotRunInputSchema extends Named<typeof hotelBotRunInputSchemaDefinition> {}
+export const hotelBotRunInputSchema: HotelBotRunInputSchema = hotelBotRunInputSchemaDefinition;
 
 export type HotelBotRunInput = z.infer<typeof hotelBotRunInputSchema>;
 
 /** Main's answer: the restaurant conversation also returns the assistant's reply. */
-export const hotelBotReplySchema = z.object({
+const hotelBotReplySchemaDefinition = z.object({
   message: z.literal("Sent to LangWatch"),
   ragResponse: z.string().nullable().optional(),
 });
+export interface HotelBotReplySchema extends Named<typeof hotelBotReplySchemaDefinition> {}
+export const hotelBotReplySchema: HotelBotReplySchema = hotelBotReplySchemaDefinition;
 
 export type HotelBotReply = z.infer<typeof hotelBotReplySchema>;
 

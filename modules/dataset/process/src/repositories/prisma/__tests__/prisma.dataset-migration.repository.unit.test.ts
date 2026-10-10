@@ -270,7 +270,7 @@ describe("PrismaDatasetMigrationRepository", () => {
     expect(subject.storage.writeChunks).not.toHaveBeenCalled();
   });
 
-  it("tallies every durable outcome and continues after a failure", async () => {
+  it("tallies every durable outcome, continues after a failure and reports the run incomplete", async () => {
     const subject = fixture({
       candidatePages: [["dataset_1", "dataset_2", "dataset_3", "dataset_4"], []],
       recordPages: [[], []],
@@ -288,7 +288,7 @@ describe("PrismaDatasetMigrationRepository", () => {
       .mockResolvedValueOnce(fingerprintRow({ count: 0, maxUpdatedAt: null }));
 
     await expect(subject.migration.run()).resolves.toEqual({
-      status: "completed",
+      status: "incomplete",
       summary: {
         migrated: 1,
         wouldMigrate: 0,

@@ -24,6 +24,8 @@ export interface ShareApi {
   createShare(input: CreateShareInput): Promise<ShareLink>;
   revokeById(input: RevokeShareInput): Promise<void>;
   unshare(input: ShareResourceInput): Promise<void>;
+  /** How many trace links the project holds, asked before sharing is switched off. */
+  countTraceShares(input: ShareProjectScope): Promise<number>;
   revokeAllTraceShares(projectId: string): Promise<void>;
   pinTrace(input: PinTraceInput): Promise<PinnedTrace>;
   unpinTrace(input: TracePinInput): Promise<void>;

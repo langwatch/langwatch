@@ -22,7 +22,7 @@ function guardedRepository() {
         sql: input.query,
         params: input.query_params,
         ...(input.tenantIds ? { tenantIds: input.tenantIds } : {}),
-        ...(input.unscoped ? { unscoped: input.unscoped } : {}),
+        SKIP_TENANT_CHECK: input.SKIP_TENANT_CHECK,
       });
       statements.push(input);
       return { json: async () => [] };
@@ -64,7 +64,7 @@ describe("ClickHouseGatewaySpendEventsRepository across an organisation's projec
       for (const statement of statements) {
         expect(statement.tenantIds).toEqual(PROJECTS);
         expect(statement.query).toContain("TenantId IN (");
-        expect(statement.unscoped).toBeUndefined();
+        expect(statement.SKIP_TENANT_CHECK).toBeUndefined();
       }
     });
   });

@@ -2,6 +2,7 @@ import { contentAttrKeys } from "@langwatch/coding-agent-contract";
 import { capPayloadString } from "@langwatch/span-normalisation";
 import type { TraceCanonicalisationService, Span, SpanSummaryRow } from "@langwatch/trace-contract";
 
+import { DERIVED_ATTRS } from "../../../rules/trace-log-content-derivation.rules.ts";
 import { type ClaudeContentLog, type ClaudeSpanRef } from "./claude-code-message-index.rules.ts";
 /**
  * Read-time Claude Code log-to-span content enrichment. Real `llm_request` spans carry tokens but
@@ -26,7 +27,6 @@ import {
   findSpanToolUseId,
 } from "./claude-code-span-keys.rules.ts";
 import { type ClaudeToolLog, type ClaudeToolSpanRef } from "./claude-code-tool-enrichment.rules.ts";
-import { DERIVED_ATTRS } from "../../../rules/trace-log-content-derivation.rules.ts";
 
 /**
  * The trace-log read this join issues for itself, and the row it answers with. Taken off the trace

@@ -1,3 +1,5 @@
+import type { OrganizationMemberSeats } from "@langwatch/organization-contract";
+
 /**
  * An organization's seats as they are counted for a licence and a plan: the full
  * and the lite members holding one, live invitations included. Disabled
@@ -10,4 +12,6 @@ export abstract class OrganizationSeatRepository {
   abstract getMembersLiteCount(organizationId: string): Promise<number>;
   /** Members holding a Developer seat (ADR-171): counted, never capped. */
   abstract getMembersDeveloperCount(organizationId: string): Promise<number>;
+  /** All three in one read, for a check that asks after both pools at once. */
+  abstract countMemberSeats(organizationId: string): Promise<OrganizationMemberSeats>;
 }

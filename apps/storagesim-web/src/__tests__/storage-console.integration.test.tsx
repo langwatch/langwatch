@@ -18,8 +18,13 @@ const json = ({ body, status = 200 }: { body: unknown; status?: number }) =>
 
 /** The sim's API as the console calls it; `stored` is what the bucket holds. */
 const fakeSim = ({ stored }: { stored: (typeof one)[] }) => {
-  const fetch = vi.fn(async (input: string) => {
+  const fetch = vi.fn(async (input: string, init?: RequestInit) => {
     const url = new URL(input, "http://storage.test");
+    if (init?.method === "DELETE" || init?.method === "POST") return json({ body: {} });
+    if (url.pathname === "/_sim/api/presign") {
+      const signed = "http://storage.test/uploads/a/one.txt?X-Amz-Signature=abc";
+      return json({ body: { url: signed, method: "GET", expiresAt: "2026-10-09T11:00:00Z" } });
+    }
     if (url.pathname === "/_sim/api/buckets") {
       const size = stored.reduce((sum, object) => sum + object.size, 0);
       return json({
@@ -86,6 +91,34 @@ describe("the storagesim console", () => {
     expect(download.getAttribute("href")).toContain(
       "/_sim/api/object/raw?bucket=uploads&key=a%2Fone.txt&download=1",
     );
+  });
+
+  /** @scenario "The console deletes, clears, seeds and presigns from its screens" */
+  it("deletes, clears, seeds and presigns through the control routes", async () => {
+    const fetch = fakeSim({ stored: [one] });
+    const calls = () => fetch.mock.calls.map(([path, init]) => `${init?.method ?? "GET"} ${path}`);
+    render(<StorageConsole />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Add demo objects" }));
+    await waitFor(() => expect(calls()).toContain("POST /_sim/api/seed"));
+
+    window.location.hash = "objects";
+    fireEvent(window, new HashChangeEvent("hashchange"));
+    fireEvent.click(await screen.findByText("a/one.txt"));
+    fireEvent.click(await screen.findByRole("button", { name: "Presign GET" }));
+    expect(
+      await screen.findByText("http://storage.test/uploads/a/one.txt?X-Amz-Signature=abc"),
+    ).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Delete object" }));
+    await waitFor(() =>
+      expect(calls()).toContain("DELETE /_sim/api/object?bucket=uploads&key=a%2Fone.txt"),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Clear all" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Delete objects" }));
+    await waitFor(() => expect(calls()).toContain("DELETE /_sim/api/objects?"));
   });
 
   it("says so when nothing has been stored", async () => {

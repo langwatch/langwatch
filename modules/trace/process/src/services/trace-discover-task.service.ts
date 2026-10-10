@@ -15,9 +15,9 @@ import type {
   RangeFacetDef,
 } from "#features/facet/rules/trace-facet-registry.rules";
 
+import type { TraceFacetDescriptorService } from "../features/facet/services/trace-facet-descriptor.service.ts";
 import type { TraceFilterWhere } from "../rules/trace-filter-hidden-origins.rules.ts";
 import type { DiscoverParams } from "../rules/trace-list-cache-key.rules.ts";
-import type { TraceFacetDescriptorService } from "../features/facet/services/trace-facet-descriptor.service.ts";
 
 /** Top values fetched per categorical facet during discovery. */
 const DISCOVER_TOP_N = 50;
@@ -89,7 +89,7 @@ export class TraceDiscoverTaskService {
         `batch:${slotKey}`,
         this.repository
           .findBatchedFacets({
-            tenantId: params.tenantId,
+            authorization: params.authorization,
             timeRange: params.timeRange,
             table: slot.table,
             timeColumn: this.facets.timeColumns[slot.table],
@@ -171,7 +171,7 @@ export class TraceDiscoverTaskService {
           `discrete:${def.key}`,
           this.repository
             .findDiscreteValues({
-              tenantId: params.tenantId,
+              authorization: params.authorization,
               timeRange: params.timeRange,
               table: def.table,
               timeColumn: this.facets.timeColumns[def.table],

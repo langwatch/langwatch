@@ -110,7 +110,10 @@ function f1({ roster, steps, headImage }) {
   if (!Array.isArray(roster) || !Array.isArray(steps)) {
     return missing("F-1", title, ["ledger-roster.json", "ledger-steps.json"]);
   }
-  const head = roster.filter((row) => !headImage || row.image === headImage);
+  const tagged = roster.filter((row) => !headImage || row.image === headImage);
+  // An unstamped rehearsal build reports its release version, not the docker tag; old images
+  // write no roster.
+  const head = tagged.length > 0 ? tagged : roster;
   const empty = head.filter((row) => !Array.isArray(row.steps) || row.steps.length === 0);
   const waiting = NOWG_STEP_IDS.filter((id) => {
     const row = steps.find((step) => step.id === id);
@@ -456,10 +459,24 @@ function products({ productSeeds, productReadback }) {
       id,
       title,
       verdict: read.found ? VERDICT.notReproduced : VERDICT.reproduced,
-      detail: read.found ? "read back" : `missing on head${read.error ? `: ${read.error}` : ""}`,
+      detail: `${read.found ? "read back" : "missing on head"}${read.created === undefined ? "" : ` (${read.foundCount} of ${read.created})`}${read.error ? `: ${read.error}` : ""}`,
       evidence: ["product-seeds.json", "product-readback.json"],
     };
   });
+}
+
+/** Every span the old api accepted is stored by the time head settles. */
+function spans({ spanCounts }) {
+  const title = "Every span accepted through the old api is stored after the upgrade";
+  if (!spanCounts) return missing("SPANS", title, ["spans.json"]);
+  const lost = spanCounts.stored < spanCounts.sent;
+  return {
+    id: "SPANS",
+    title,
+    verdict: lost ? VERDICT.reproduced : VERDICT.notReproduced,
+    detail: `${spanCounts.stored} of ${spanCounts.sent} accepted spans stored`,
+    evidence: ["spans.json", "ingest.log"],
+  };
 }
 
 /** Every finding the rehearsal reports, in plan order. */
@@ -478,6 +495,7 @@ export function evaluate(evidence) {
     noop(evidence),
     scale(evidence),
     events(evidence),
+    spans(evidence),
     ...products(evidence),
   ];
 }
@@ -543,6 +561,7 @@ function readEvidence({ dir }) {
     eventParse: json("event-parse.json"),
     productSeeds: json("product-seeds.json"),
     productReadback: json("product-readback.json"),
+    spanCounts: json("spans.json"),
   };
 }
 

@@ -24,12 +24,14 @@ export type McpApprovalOutcome =
   | Readonly<{ kind: "challenge-missing" }>
   | Readonly<{ kind: "challenge-method-unsupported" }>
   | Readonly<{ kind: "denied" }>
+  | Readonly<{ kind: "aggregate-project-has-no-credential"; message: string; code: string }>
   | Readonly<{ kind: "unavailable" }>;
 
 /** The body every refusal carries, in the OAuth shape the consent page reads. */
 type RefusalBody = Readonly<{
   error: string;
   error_description?: string;
+  code?: string;
   redirect?: string;
 }>;
 
@@ -47,6 +49,8 @@ type ApprovalRefusal = Readonly<{
   error: string;
   /** Null for a refusal raised before the redirect URI was verified. */
   description: string | null;
+  /** The registered handled-error code, where the refusal has one. */
+  code?: string;
 }>;
 
 /**
@@ -84,7 +88,10 @@ const APPROVAL_REFUSALS = {
     error: "server_error",
     description: "Authorization is temporarily unavailable",
   },
-} as const satisfies Record<Exclude<McpApprovalOutcome["kind"], "approved">, ApprovalRefusal>;
+} as const satisfies Record<
+  Exclude<McpApprovalOutcome["kind"], "approved" | "aggregate-project-has-no-credential">,
+  ApprovalRefusal
+>;
 
 /** The posted document's known fields, or nothing where the body was not a JSON object. */
 export function parsePostedApproval(raw: string): PostedApprovalFields | undefined {
@@ -132,7 +139,10 @@ export function buildAuthorizeAnswer({
     };
   }
 
-  const refusal: ApprovalRefusal = APPROVAL_REFUSALS[outcome.kind];
+  const refusal: ApprovalRefusal =
+    outcome.kind === "aggregate-project-has-no-credential"
+      ? { status: 403, error: "access_denied", description: outcome.message, code: outcome.code }
+      : APPROVAL_REFUSALS[outcome.kind];
   if (refusal.description === null) {
     return { status: refusal.status, body: { error: refusal.error } };
   }
@@ -141,6 +151,7 @@ export function buildAuthorizeAnswer({
     body: {
       error: refusal.error,
       error_description: refusal.description,
+      ...(refusal.code === undefined ? {} : { code: refusal.code }),
       redirect: redirectWith(redirectUri, {
         error: refusal.error,
         error_description: refusal.description,

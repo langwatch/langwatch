@@ -1,4 +1,5 @@
 import { AnalyticsApi, type LangWatchQLRunCaller } from "@langwatch/analytics-contract";
+import type { Actor } from "@langwatch/authorization";
 import { AuthzApi } from "@langwatch/authz-contract";
 import { EntitlementApi, isEnterpriseTier } from "@langwatch/entitlement-contract";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
@@ -101,6 +102,7 @@ import {
   type InstantEvalSpendPeers,
 } from "../services/instant-eval-spend.service.ts";
 import { InstantEvalStatementService } from "../services/instant-eval-statement.service.ts";
+import { InstantEvalTraceProofService } from "../services/instant-eval-trace-proof.service.ts";
 import type { InstantEvalBrowserApi } from "../transport/instant-eval.trpc.ts";
 
 /** The project's organization and team, which every judgement's spend is billed against. */
@@ -303,7 +305,11 @@ export class InstantEvalModule implements InstantEvalApiContract, InstantEvalBro
       classifications,
       searchClassifications: InstantEvalClassifySearchService.create({
         classifications,
-        peers: { isReleased: (input) => access.isReleased(input), traces },
+        peers: {
+          isReleased: (input) => access.isReleased(input),
+          traces,
+          proofs: InstantEvalTraceProofService.create({ authz: setup.dependencies.authz }),
+        },
       }),
       reads,
       runs: InstantEvalRunService.create({
@@ -327,6 +333,7 @@ export class InstantEvalModule implements InstantEvalApiContract, InstantEvalBro
             textSource,
           }),
           budget,
+          proofs: InstantEvalTraceProofService.create({ authz: setup.dependencies.authz }),
         },
         peers: {
           compileFilter: (input) => traces.compileLangWatchQLTraceFilter(input),
@@ -685,7 +692,9 @@ export class InstantEvalModule implements InstantEvalApiContract, InstantEvalBro
     return this.reads.findRunProgress(input);
   }
 
-  classifySearch(input: ExplorerSearchClassificationInput): Promise<ExplorerSearchClassification> {
+  classifySearch(
+    input: ExplorerSearchClassificationInput & { actor: Actor },
+  ): Promise<ExplorerSearchClassification> {
     return this.searchClassifications.classifySearch(input);
   }
 

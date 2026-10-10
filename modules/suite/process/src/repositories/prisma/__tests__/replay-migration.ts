@@ -1,22 +1,20 @@
+import { readdirSync, readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
 /**
  * Reads a shipped migration back, so a test runs the SQL that shipped instead of a copy of
  * it.
  */
-import { readdirSync, readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { skipTenantCheck } from "@langwatch/prisma-client";
 
 const MIGRATIONS_DIR = join(
   dirname(fileURLToPath(import.meta.url)),
   "../../../../../../../packages/prisma-client/prisma/migrations",
 );
 
-/**
- * A migration runs before the Prisma client and its multitenancy middleware
- * exist, and it works on every project at once. The guard on raw queries has
- * to be told that, and this is the comment it reads.
- */
-const TENANCY_OPTOUT = "-- @tenancy: a data migration, which runs over every project by design\n";
+// A data migration runs before the tenancy guard exists and works on every project at once.
+const TENANCY_OPTOUT = `${skipTenantCheck({ SKIP_TENANT_CHECK: true }).sql}\n`;
 
 /** Names a pre-`20260828120001` statement uses, and their names today. */
 const VOCABULARY_RENAMES: [RegExp, string][] = [

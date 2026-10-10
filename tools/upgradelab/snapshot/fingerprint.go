@@ -58,15 +58,32 @@ func diffTable(name string, a, b *TableFingerprint) []string {
 	return nil
 }
 
-// FoldRows fingerprints rows client-side (Redis keys, fakes); servers fold with their own hash.
+// RowFolder folds rows one at a time into a TableFingerprint (order independent).
+type RowFolder struct {
+	count int64
+	xor   uint64
+}
+
+// Add folds one row.
+func (folder *RowFolder) Add(row []string) {
+	hash := fnv.New64a()
+	_, _ = hash.Write([]byte(strings.Join(row, "\x1f")))
+	folder.xor ^= hash.Sum64()
+	folder.count++
+}
+
+// Fingerprint is the fold of every row added.
+func (folder *RowFolder) Fingerprint() TableFingerprint {
+	return TableFingerprint{Count: folder.count, Hash: formatHash(folder.xor)}
+}
+
+// FoldRows fingerprints rows client-side (fakes); servers fold with their own hash.
 func FoldRows(rows [][]string) TableFingerprint {
-	var xor uint64
+	var folder RowFolder
 	for _, row := range rows {
-		hash := fnv.New64a()
-		_, _ = hash.Write([]byte(strings.Join(row, "\x1f")))
-		xor ^= hash.Sum64()
+		folder.Add(row)
 	}
-	return TableFingerprint{Count: int64(len(rows)), Hash: formatHash(xor)}
+	return folder.Fingerprint()
 }
 
 func formatHash(value uint64) string { return fmt.Sprintf("%016x", value) }

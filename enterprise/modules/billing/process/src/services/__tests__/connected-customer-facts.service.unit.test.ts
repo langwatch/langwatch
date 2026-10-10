@@ -35,6 +35,9 @@ function facts(
   return ConnectedCustomerFactsService.create({
     licensing: createApiFixture<ConnectedCustomerPeers["licensing"]>(peers.licensing ?? {}),
     gateway: createApiFixture<ConnectedCustomerPeers["gateway"]>(peers.gateway ?? {}),
+    contractBudgets: createApiFixture<ConnectedCustomerPeers["contractBudgets"]>(
+      peers.contractBudgets ?? {},
+    ),
     organizations: createApiFixture<ConnectedCustomerPeers["organizations"]>(
       peers.organizations ?? {},
     ),
@@ -81,42 +84,75 @@ describe("ConnectedCustomerFactsService", () => {
   });
 
   describe("when the commit drawn down is read", () => {
-    it("reads the contract budget's spend in cents off the managed key", async () => {
+    /** @scenario "The commit drawdown reads the contract budget without calling the hosted route" */
+    it("sums the contract budget's bucket since its window opened, in cents", async () => {
+      const asked: unknown[] = [];
       const service = facts({
-        licensing: {
-          getConnectedSeats: seatsWith("vk-managed"),
-          getHostedUsage: async () => ({
-            services: [],
-            spend_available: true,
-            read_at: "2026-09-01T00:00:00Z",
-            contract: null,
-            budgets: [
-              {
-                id: "budget-1",
-                scope: "organization",
-                window: "total",
-                on_breach: "block" as const,
-                cap_usd: 500,
-                spent_usd: 123.456,
-                remaining_usd: 376.544,
-                period_started_at: "2026-01-01T00:00:00Z",
-                is_contract: true,
-              },
-            ],
-          }),
+        contractBudgets: {
+          findContractBudget: async () => [
+            {
+              id: "budget-1",
+              scopeId: ACME,
+              providerKey: null,
+              limitUsdCents: 500_00,
+              currentPeriodStartedAt: AUGUST,
+            },
+          ],
         },
+        gateway: {
+          isSpendSourceAvailable: () => true,
+          sumBudgetSpendNanoUsd: async (input) => {
+            asked.push(input);
+            return 123_456_000_000;
+          },
+        },
+        projects: { findProjectIds: async () => ["project-a"] },
       });
 
       await expect(service.getCommitDrawdown(ACME)).resolves.toEqual({
         kind: "read",
         usdCents: 123_46,
       });
+      expect(asked).toEqual([
+        {
+          tenantIds: ["project-a"],
+          budgetId: "budget-1",
+          bucketScopeId: ACME,
+          fromMs: AUGUST.epochMilliseconds,
+        },
+      ]);
     });
 
-    /** @scenario "The billing contact receives a monthly usage statement" */
-    it("answers unavailable rather than zero when no call has resolved a managed key", async () => {
+    it("answers unavailable rather than zero when the budget ledger cannot be read", async () => {
       const service = facts({
-        licensing: { getConnectedSeats: seatsWith(null), getContractTerms: terms },
+        contractBudgets: {
+          findContractBudget: async () => [
+            {
+              id: "budget-1",
+              scopeId: ACME,
+              providerKey: null,
+              limitUsdCents: 500_00,
+              currentPeriodStartedAt: AUGUST,
+            },
+          ],
+        },
+        gateway: {
+          isSpendSourceAvailable: () => true,
+          sumBudgetSpendNanoUsd: async () => {
+            throw new Error("clickhouse down");
+          },
+        },
+        projects: { findProjectIds: async () => ["project-a"] },
+      });
+
+      await expect(service.getCommitDrawdown(ACME)).resolves.toEqual({ kind: "unavailable" });
+    });
+
+    /** @scenario "The commit drawdown is unavailable before a contract budget exists" */
+    it("answers unavailable rather than zero when no contract budget is synced", async () => {
+      const service = facts({
+        contractBudgets: { findContractBudget: async () => [] },
+        licensing: { getContractTerms: terms },
       });
 
       await expect(service.getCommitDrawdown(ACME)).resolves.toEqual({ kind: "unavailable" });

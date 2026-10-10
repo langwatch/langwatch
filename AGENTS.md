@@ -54,7 +54,7 @@ architecture linter.
   it returns `null` or `undefined`. Do not name methods `try*` or `require*`.
   Add a method only for a real caller.
 - REST and tRPC use inline `@langwatch/api` handlers with parsed input and
-  explicit app/actor/scope facts. Parsed middleware facts are typed trailing
+  explicit app/actor/scope. Parsed middleware context values are typed trailing
   arguments, never merged into input; no raw request, response or headers.
   Return a schema-compatible JSON object, array or void. Special protocols need
   framework integrations. Output mismatches log safe validation details and

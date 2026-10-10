@@ -20,8 +20,7 @@ export const STACK_DEPTH = 3;
 const instance: CreateToasterReturn = createToaster({
   placement: "bottom",
   pauseOnPageIdle: true,
-  // Sonner's stack: cards overlap until the pointer or focus enters, then fan
-  // out, and every timer holds while they are fanned.
+  // Cards overlap until the pointer or focus enters, then list; timers hold meanwhile.
   overlap: true,
   gap: 12,
 });
@@ -42,24 +41,38 @@ export const toaster: Omit<CreateToasterReturn, "create"> & {
     }),
 };
 
+/** Status glyphs remain distinct even when the status colour cannot be perceived. */
 const STATUS = {
-  error: { fg: "red.fg", action: "orange.fg", filled: true },
-  warning: { fg: "yellow.fg", action: "orange.fg", filled: true },
-  success: { fg: "green.fg", action: "green.fg", filled: true },
-  info: { fg: "fg.muted", action: "orange.fg", filled: false },
-  loading: { fg: "fg.muted", action: "orange.fg", filled: false },
+  error: { fg: "red.fg" },
+  warning: { fg: "orange.fg" },
+  success: { fg: "green.fg" },
+  info: { fg: "blue.fg" },
+  loading: { fg: "fg.muted" },
 } as const;
 
 type ToastStatus = keyof typeof STATUS;
 const statusOf = (type: string | undefined): ToastStatus =>
   type && type in STATUS ? (type as ToastStatus) : "info";
-const onPanelOnly = (status: ToastStatus, color: string) =>
-  STATUS[status].filled ? { _light: "inherit", _dark: color } : color;
 
-export const toastActionColor = (type: string | undefined) => {
-  const status = statusOf(type);
-  return onPanelOnly(status, STATUS[status].action);
-};
+/** The action is a small button on the title line in the toast's own foreground. */
+export const toastActionStyle = {
+  color: "inherit",
+  opacity: 0.92,
+  height: "5",
+  paddingInline: "2.5",
+  borderRadius: "md",
+  borderWidth: "1px",
+  borderColor: "var(--toast-border-color, var(--chakra-colors-border-muted))",
+  bg: "var(--toast-trigger-bg)",
+  fontSize: "12px",
+  fontWeight: "560",
+  lineHeight: "1",
+  "&:hover": {
+    opacity: 1,
+    bg: "color-mix(in srgb, var(--toast-trigger-bg), currentColor 12%)",
+  },
+  "&:focus-visible": { outline: "2px solid currentColor", outlineOffset: "1px" },
+} as const;
 
 function StatusGlyph({ status }: { status: ToastStatus }) {
   const props = { size: 15, "aria-hidden": true } as const;
@@ -72,75 +85,11 @@ function StatusGlyph({ status }: { status: ToastStatus }) {
 
 function StatusIcon({ status }: { status: ToastStatus }) {
   return (
-    <Box
-      color={onPanelOnly(status, STATUS[status].fg)}
-      display="flex"
-      alignItems="center"
-      height="5"
-      flexShrink={0}
-    >
+    <Box color={STATUS[status].fg} display="flex" alignItems="center" height="5" flexShrink={0}>
       <StatusGlyph status={status} />
     </Box>
   );
 }
-
-/** A toast's lifetime drawn as a bar that drains, holding whenever its timer does. */
-function LifetimeBar({ lifetime }: { lifetime: number }) {
-  return (
-    <Box
-      data-toast-lifetime=""
-      aria-hidden
-      position="absolute"
-      insetInline="3.5"
-      bottom="1"
-      height="2px"
-      borderRadius="full"
-      bg="currentColor"
-      opacity={0.3}
-      transformOrigin="left"
-      pointerEvents="none"
-      css={{
-        "--toast-lifetime": `${lifetime}ms`,
-        animationName: "toast-drain",
-        animationDuration: "var(--toast-lifetime)",
-        animationTimingFunction: "linear",
-        animationFillMode: "forwards",
-        "[data-paused] &": { animationPlayState: "paused" },
-        _motionReduce: { display: "none" },
-      }}
-    />
-  );
-}
-
-/** How many toasts wait behind the collapsed stack, on the peeking cards above the front one. */
-function MoreChip({ count }: { count: number }) {
-  return (
-    <Box
-      data-toast-more=""
-      aria-hidden
-      position="absolute"
-      bottom="100%"
-      marginBottom="1"
-      insetInlineEnd="10"
-      paddingX="2"
-      borderRadius="full"
-      borderWidth="1px"
-      borderColor="border.muted"
-      bg="bg.panel"
-      color="fg.muted"
-      textStyle="xs"
-      fontWeight="medium"
-      boxShadow="sm"
-      css={{ "[data-stack] &": { display: "none" } }}
-    >
-      +{count} more
-    </Box>
-  );
-}
-
-/** A persistent or loading toast has no lifetime to draw. */
-const lifetimeOf = ({ type, duration }: { type?: string; duration?: number }) =>
-  type !== "loading" && duration !== undefined && Number.isFinite(duration) ? duration : null;
 
 export function Toaster({
   renderMeta,
@@ -152,29 +101,23 @@ export function Toaster({
       <ChakraToaster toaster={toaster} insetInline={{ mdDown: "4" }}>
         {(toast) => {
           const status = statusOf(toast.type);
-          const stack = toaster.getVisibleToasts();
-          const hidden = stack.length - STACK_DEPTH;
-          const lifetime = lifetimeOf({ type: toast.type, duration: toast.duration });
           return (
             <Toast.Root width={{ md: "sm" }} role={status === "error" ? "alert" : undefined}>
-              {hidden > 0 && stack[0]?.id === toast.id && <MoreChip count={hidden} />}
               <StatusIcon status={status} />
-              <Stack gap="0.5" flex="1" maxWidth="100%">
+              <Stack gap="0.5" flex="1" minWidth={0} maxWidth="100%">
                 {toast.title && <Toast.Title>{toast.title}</Toast.Title>}
-                {toast.description && <Toast.Description>{toast.description}</Toast.Description>}
-                {renderMeta?.(toast.meta)}
-                {toast.action && (
-                  <Toast.ActionTrigger
-                    marginTop="2"
-                    alignSelf="flex-start"
-                    fontSize="12px"
-                    fontWeight="560"
-                    css={{ color: toastActionColor(toast.type) }}
-                  >
-                    {toast.action.label}
-                  </Toast.ActionTrigger>
+                {toast.description && (
+                  <Toast.Description color="inherit" opacity={1}>
+                    {toast.description}
+                  </Toast.Description>
                 )}
+                {renderMeta?.(toast.meta)}
               </Stack>
+              {toast.action && (
+                <Toast.ActionTrigger alignSelf="flex-start" flexShrink={0} css={toastActionStyle}>
+                  {toast.action.label}
+                </Toast.ActionTrigger>
+              )}
               <Toast.CloseTrigger
                 position="static"
                 alignSelf="flex-start"
@@ -182,7 +125,6 @@ export function Toaster({
                 padding={0}
                 flexShrink={0}
               />
-              {lifetime !== null && <LifetimeBar lifetime={lifetime} />}
             </Toast.Root>
           );
         }}

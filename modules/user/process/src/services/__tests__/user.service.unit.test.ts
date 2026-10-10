@@ -1,10 +1,5 @@
 import type { AuthApi } from "@langwatch/auth-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
-import type {
-  EnsuredPersonalWorkspace,
-  OrganizationApi,
-  PersonalWorkspace,
-} from "@langwatch/organization-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { fromDate, toDate, type Instant } from "@langwatch/time";
 import { USER_AVATAR_MAX_BYTES, type UserFullProfile } from "@langwatch/user-contract";
@@ -36,19 +31,6 @@ function lifecyclePeers() {
   };
 }
 
-const PERSONAL_WORKSPACE: PersonalWorkspace = {
-  team: { id: "team-1", name: "Personal", slug: "personal", createdAtMs: 0 },
-  project: { id: "project-1", name: "Personal", slug: "personal", apiKey: "key-1", createdAtMs: 0 },
-};
-const ENSURED_WORKSPACE: EnsuredPersonalWorkspace = {
-  kind: "ready",
-  workspace: PERSONAL_WORKSPACE,
-};
-const PENDING_WORKSPACE: EnsuredPersonalWorkspace = {
-  kind: "pending",
-  team: PERSONAL_WORKSPACE.team,
-};
-
 const user: UserFullProfile = {
   id: "user-1",
   name: "Ada",
@@ -74,6 +56,7 @@ class StubRepository implements UserRepository {
   hasAccountOnDomain = vi.fn(async () => false);
   hasAnyAccount = vi.fn(async () => true);
   findCreatedPage = vi.fn(async () => []);
+  findStandingPage = vi.fn(async () => []);
   findProfiles = vi.fn(async () => [user]);
   findById = vi.fn(async (): Promise<UserFullProfile | null> => user);
   findByEmail = vi.fn(async (): Promise<UserFullProfile[]> => [user]);
@@ -93,6 +76,7 @@ class StubRepository implements UserRepository {
     hasPasskey: false,
     twoStepEnabled: false,
     dismissedAt: null,
+    accountCreatedAt: new Date(0),
   }));
   setPasskeyNudgeDismissedAt = vi.fn(async () => undefined);
   findJoinOfferDismissedDomains = vi.fn(async (): Promise<string[]> => ["acme.com"]);
@@ -134,17 +118,15 @@ const PNG =
 
 function createService({
   auth = createApiFixture<AuthApi>({}),
-  ensured = ENSURED_WORKSPACE,
-}: { auth?: AuthApi; ensured?: EnsuredPersonalWorkspace } = {}) {
+  personalProjectId = "project-1",
+}: { auth?: AuthApi; personalProjectId?: string | null } = {}) {
   const repository = new StubRepository();
   const avatarStorage = new StubAvatarStorage();
-  const organizations = createApiFixture<OrganizationApi>({
-    ensurePersonalWorkspace: async () => ensured,
-  });
+  const personalProjects = { findPersonalProjectId: async () => personalProjectId };
   return {
     service: UserService.create({
       repository,
-      organizations,
+      personalProjects,
       auth,
       avatarStorage,
       credentialIssuer: ISSUER,
@@ -233,6 +215,7 @@ describe("UserService", () => {
       hasPasskey: false,
       twoStepEnabled: false,
       dismissedAt: null,
+      accountCreatedAt: new Date(0),
     });
     await service.dismissPasskeyNudge({ id: "user-1" });
 
@@ -333,7 +316,7 @@ describe("UserService", () => {
 
   /** @scenario "Uploading an avatar while the personal project is still being created" */
   it("refuses an avatar as retryable while the personal project is pending, storing nothing", async () => {
-    const { service, repository, avatarStorage } = createService({ ensured: PENDING_WORKSPACE });
+    const { service, repository, avatarStorage } = createService({ personalProjectId: null });
     await expect(
       service.setAvatar({ userId: "user-1", organizationId: "org-1", imageDataUrl: PNG }),
     ).rejects.toMatchObject({
@@ -403,13 +386,11 @@ describe("given a user whose photo came from their identity provider", () => {
       }));
     }
     const repository = new StatefulRepository();
-    const organizations = createApiFixture<OrganizationApi>({
-      ensurePersonalWorkspace: async () => ENSURED_WORKSPACE,
-    });
+    const personalProjects = { findPersonalProjectId: async () => "project-1" };
     return {
       service: UserService.create({
         repository,
-        organizations,
+        personalProjects,
         auth: createApiFixture<AuthApi>({}),
         avatarStorage: new StubAvatarStorage(),
         credentialIssuer: ISSUER,
@@ -647,7 +628,7 @@ describe("the lifecycle facts' clock", () => {
     });
     const service = UserService.create({
       repository,
-      organizations: createApiFixture<OrganizationApi>({}),
+      personalProjects: { findPersonalProjectId: async () => null },
       auth: createApiFixture<AuthApi>({}),
       avatarStorage: new StubAvatarStorage(),
       credentialIssuer: ISSUER,

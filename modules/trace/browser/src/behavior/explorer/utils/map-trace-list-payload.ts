@@ -1,23 +1,20 @@
 import type { TraceEvalResult, TraceListItem } from "../types/trace.ts";
 import { NO_TRACE_EVENTS } from "../types/trace.ts";
 
-interface TraceListPayload {
-  items: unknown[];
-  evaluations?: Record<string, TraceEvalResult[]> | null;
-}
-
 /**
- * Normalize the raw `traces.list` payload into `TraceListItem` rows: attach each
- * trace's evaluations and default the optional spanCount field.
+ * Normalize the raw `traces.list` payload into `TraceListItem` rows: narrow each row's
+ * evaluations to what a cell renders and default the optional counts. Evaluations are matched
+ * by project and trace id on the server, so an aggregate's same-id rows never share them.
  */
-export function mapTraceListPayload(data: TraceListPayload | undefined): TraceListItem[] {
+export function mapTraceListPayload(
+  data: { items: Omit<TraceListItem, "events">[] } | undefined,
+): TraceListItem[] {
   if (!data) return [];
-  const evalMap = (data.evaluations ?? {}) as Record<string, TraceEvalResult[]>;
-  return (data.items as TraceListItem[]).map((item) => ({
+  return data.items.map((item) => ({
     ...item,
     spanCount: item.spanCount ?? 0,
     sizeBytes: item.sizeBytes ?? 0,
-    evaluations: (evalMap[item.traceId] ?? []).map((e) => ({
+    evaluations: (item.evaluations ?? []).map((e): TraceEvalResult => ({
       evaluatorId: e.evaluatorId,
       evaluatorName: e.evaluatorName,
       status: e.status,
@@ -25,6 +22,6 @@ export function mapTraceListPayload(data: TraceListPayload | undefined): TraceLi
       passed: e.passed,
       label: e.label,
     })),
-    events: item.events ?? NO_TRACE_EVENTS,
+    events: NO_TRACE_EVENTS,
   }));
 }

@@ -1,4 +1,11 @@
-import { Button, KeyValue, Panel, Stack } from "@langwatch/design-system-internal";
+import {
+  Button,
+  ConfirmButton,
+  Inline,
+  KeyValue,
+  Panel,
+  Stack,
+} from "@langwatch/design-system-internal";
 import { SimCode, SimEmpty, SimRefusal, SimTime, useSimPoll } from "@langwatch/sim-console";
 import { useEffect, useState } from "react";
 
@@ -39,17 +46,52 @@ const Preview = ({ object }: { object: StoredObject }) => {
   );
 };
 
-export const ObjectDetail = ({ object }: { object: StoredObject }) => {
+/** Mints a presigned GET for the object on demand, as the product's SDK would. */
+const usePresigned = ({ object }: { object: StoredObject }) => {
+  const [url, setUrl] = useState("");
+  const [refusal, setRefusal] = useState("");
+  useEffect(() => {
+    setUrl("");
+    setRefusal("");
+  }, [object]);
+  const mint = () => {
+    storageApi
+      .presign(object)
+      .then((answer) => setUrl(answer.url))
+      .catch((caught: unknown) => setRefusal(caught instanceof Error ? caught.message : "Refused"));
+  };
+  return { url, refusal, mint };
+};
+
+export const ObjectDetail = ({
+  object,
+  onDelete,
+}: {
+  object: StoredObject;
+  onDelete: () => void;
+}) => {
   const { data, error } = useSimPoll({ fetch: () => storageApi.detail(object), everyMs: 5_000 });
+  const presigned = usePresigned({ object });
   const headers = Object.entries(data?.headers ?? {}).toSorted(([a], [b]) => a.localeCompare(b));
   return (
     <Stack gap={4}>
       <Panel
         title={object.key}
         actions={
-          <Button size="sm" href={storageApi.rawPath({ ...object, download: true })}>
-            Download
-          </Button>
+          <Inline gap={2}>
+            <Button size="sm" onClick={presigned.mint}>
+              Presign GET
+            </Button>
+            <Button size="sm" href={storageApi.rawPath({ ...object, download: true })}>
+              Download
+            </Button>
+            <ConfirmButton
+              size="sm"
+              label="Delete"
+              confirmLabel="Delete object"
+              onConfirm={onDelete}
+            />
+          </Inline>
         }
       >
         <KeyValue
@@ -64,6 +106,12 @@ export const ObjectDetail = ({ object }: { object: StoredObject }) => {
         />
       </Panel>
       {error ? <SimRefusal message={error.message} /> : null}
+      {presigned.refusal === "" ? null : <SimRefusal message={presigned.refusal} />}
+      {presigned.url === "" ? null : (
+        <Panel title="Presigned GET" meta="valid for an hour">
+          <KeyValue items={[{ label: "URL", value: presigned.url }]} />
+        </Panel>
+      )}
       <Panel title="Preview">
         <Preview object={object} />
       </Panel>

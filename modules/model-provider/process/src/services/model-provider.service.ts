@@ -118,6 +118,16 @@ export class ModelProviderService {
       catalog: options.catalog,
       scopes,
     });
+    this.query = ModelProviderQueryService.create({
+      repository: options.repository,
+      scopes,
+      credentialPolicy: options.credentialPolicy,
+      catalog: options.catalog,
+    });
+    this.execution = ModelProviderExecutionService.create({
+      query: this.query,
+      catalog: options.catalog,
+    });
     this.commands = ModelProviderCommandService.create({
       repository: options.repository,
       defaults: options.defaults,
@@ -128,7 +138,7 @@ export class ModelProviderService {
         channel: options.connectionPing,
         codexChannel: options.codexGatewayPing,
         secrets: options.secrets,
-        modelProviders: this,
+        execution: this.execution,
       }),
       writeAuthorization,
       onboardingDefaults: ModelProviderOnboardingDefaultsService.create({
@@ -160,20 +170,10 @@ export class ModelProviderService {
       ids: options.ids,
       scopes,
     });
-    this.query = ModelProviderQueryService.create({
-      repository: options.repository,
-      scopes,
-      credentialPolicy: options.credentialPolicy,
-      catalog: options.catalog,
-    });
     this.codex = ModelProviderCodexService.create({
       repository: options.repository,
       query: this.query,
       tokenRefresher: options.codexTokenRefresher,
-    });
-    this.execution = ModelProviderExecutionService.create({
-      query: this.query,
-      catalog: options.catalog,
     });
   }
 

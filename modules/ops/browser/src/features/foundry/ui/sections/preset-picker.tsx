@@ -123,8 +123,8 @@ export function PresetPicker() {
 
   return (
     <Box position="relative">
-      <Button size="xs" variant="outline" onClick={() => setIsOpen(!isOpen)}>
-        Load Preset <ChevronDown size={12} />
+      <Button size="sm" variant="outline" onClick={() => setIsOpen(!isOpen)}>
+        Load preset <ChevronDown size={12} />
       </Button>
       {isOpen && (
         <>
@@ -146,7 +146,7 @@ export function PresetPicker() {
           >
             <Flex px={2} py={1.5}>
               <Button
-                size="xs"
+                size="sm"
                 variant="outline"
                 colorPalette="purple"
                 w="full"

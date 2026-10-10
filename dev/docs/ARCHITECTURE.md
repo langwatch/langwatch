@@ -9,17 +9,18 @@ it. On conflict between sections, the more specific wins.
 
 ## 1. The product
 
-Four Node processes and three Go services:
+Four Node processes, one composite of two of them, and three Go services:
 
-| Process               | Package                   | What it is                                      |
-| --------------------- | ------------------------- | ----------------------------------------------- |
-| `apps/ui`             | `@langwatch/ui`           | The browser application (Vite SPA)              |
-| `apps/api`            | `@langwatch/platform-api` | tRPC + REST + SSE, serves the browser bundle    |
-| `apps/worker`         | `@langwatch/worker`       | Queues, schedulers, projections, subscribers    |
-| `apps/tasks`          | `@langwatch/tasks`        | One-shot migrations and backfills               |
-| `services/aigateway`  | Go                        | Virtual-key data plane (Bifrost fan-out)        |
-| `services/nlpgo`      | Go                        | Optimization-studio executions and evaluators   |
-| `services/langyagent` | Go                        | Langy conversation manager (pi harness workers) |
+| Process               | Package                   | What it is                                                     |
+| --------------------- | ------------------------- | -------------------------------------------------------------- |
+| `apps/ui`             | `@langwatch/ui`           | The browser application (Vite SPA)                             |
+| `apps/api`            | `@langwatch/platform-api` | tRPC + REST + SSE, serves the browser bundle                   |
+| `apps/worker`         | `@langwatch/worker`       | Queues, schedulers, projections, subscribers                   |
+| `apps/tasks`          | `@langwatch/tasks`        | One-shot migrations and backfills                              |
+| `apps/backend`        | `@langwatch/backend`      | api + worker in one process: what `npx @langwatch/server` runs |
+| `services/aigateway`  | Go                        | Virtual-key data plane (Bifrost fan-out)                       |
+| `services/nlpgo`      | Go                        | Optimization-studio executions and evaluators                  |
+| `services/langyagent` | Go                        | Langy conversation manager (pi harness workers)                |
 
 **Applications hold no product code.** The product lives in modules. An
 application is a `main.ts` and a `config.ts`; everything it used to carry —
@@ -34,6 +35,14 @@ browser halves in `src/browser-modules.generated.ts`, written by
 `pnpm generate:modules` from `modules/catalogue.json` and never edited by hand. Each app depends only
 on the half it runs, so no declared edge reaches a browser package from a process app. The
 `installed-*` packages are deleted.
+
+**`apps/backend` is the one composite application (Alex, 2026-10-10).** It runs the api and the worker
+in one Node process through their own start seams (`startApi`, `startWorker`); the seam that boots both
+and drains the worker, then the api (`startBackend`, `drainBackend`), is lifecycle framework in
+`packages/process` (`@langwatch/process/backend-host`), which the dev host (`tools/dev-runtime`, §19)
+runs under its reload. `npx @langwatch/server` runs its `main.ts`, one `runBackend` call, where a
+worker that refuses boot is fatal. Images and the Helm chart still run each app's own `main.ts`. Only it
+and the private dev host may import both start seams (policy `application-boundaries`, ADR-168).
 
 `apps/scenario-child` is the one exception: a standalone program the scenario
 module spawns per run, which owns its own logic (adapters, turn execution) and
@@ -56,7 +65,7 @@ importing nothing from `modules/` ([ADR-160](adr/160-internal-consoles-are-go-se
 **The same code runs everywhere.** One `main.ts` per app, byte-identical
 across laptop, CI and production. Application logic is shared and the parsed
 environment differs; hosting differs too: locally one process and one shared module
-runner and event loop can host ui, api and worker (§19), so a combined boot proves no
+runner and event loop host api and worker (§19), so a combined boot proves no
 multi-process lifecycle or singleton isolation (Alex, 2026-10-01). There
 is no dev-only branch anywhere in an app, because an app has nowhere to put
 one.
@@ -84,7 +93,7 @@ eventing, so a contract keys a map by an event table without naming it (Alex, 20
 
 - **`@langwatch/module`** — the light core, and ONLY what a contract needs:
   the `moduleApi` token factory, module ids, UI tokens and
-  release-flag tokens (§10.1; Alex, 2026-10-01), and the contract declarations (`defineTrpcContract`, `defineRestMiddleware`). Zod-only,
+  release-flag tokens (§10.1; Alex, 2026-10-01), and the contract declarations (`defineTrpcContract`, `defineMiddlewareContext`). Zod-only,
   framework-free, browser-safe, near-zero weight. Every contract depends on
   it; it depends on nothing but zod. The heavy declaration vocabulary is NOT
   here — it lives in the runtime that consumes it, so nothing backend-shaped
@@ -167,7 +176,14 @@ cannot be reached through its options, and the upstream change is proposed at th
 is `patches/<name>@<version>.patch`, a diff against the published files as `pnpm patch-commit` writes it,
 registered under `patchedDependencies` in `pnpm-workspace.yaml` for one exact version; an upgrade re-cuts
 or drops it. Each patch has one owning module and a test there that runs the patched path. First:
-`@better-auth/sso@1.7.1`, per-connection IdP-initiated SAML, owned by auth.
+`@better-auth/sso@1.7.1`, per-connection IdP-initiated SAML, owned by auth. Second:
+`@better-auth/core@1.7.1`, a clock tolerance on deployment-wide OIDC ID-token verification, owned by auth.
+
+**Build stamp** (Alex, 2026-10-09). `isReleaseBuild` in `packages/config/src/release-build.ts` is a
+committed `false`; the release image build sets it `true` in its builder stage (`infra/docker/Dockerfile`,
+build arg `LANGWATCH_RELEASE_BUILD`, default `true`) and `dev/scripts/pack-npm.sh` sets it on the npx
+staged copy. Runtime env cannot change it, only a rebuild can. A release build verifies licences
+against the embedded LangWatch key only and logs once, by name, that the public-key override is ignored.
 
 ---
 
@@ -321,7 +337,8 @@ document, is the authority on filenames):
 - `transport/` — declarations only (§8).
 - `rules/` — pure functions and constants; no clock, no I/O. Value types (data
   bags and the pure functions over them) live here too, not as `*Service`
-  classes and not in a new slot (Alex, 2026-09-28).
+  classes and not in a new slot (Alex, 2026-09-28). Building SQL text with no I/O is a pure
+  decision and may live in `rules/` (Alex 2026-10-10 TRACE-QUERY-SQL).
 - Ids: a new record's id is a KSUID with its resource prefix; ids minted before (nanoid, uuid) keep
   their format and stay accepted, since clients hold them as opaque strings (Alex, 2026-09-27).
   The prefix is the owning subject's name without hyphens: `slackintegration` (Alex, 2026-09-30).
@@ -591,12 +608,14 @@ services**, not capabilities (§16). Enforcement is prose for now; a lint rule f
 converted (no availability logic in `*.config.ts` projections; off states use the shared notice).
 
 **Ops and Cloud admin are split by audience** (Alex, 2026-09-29). **Ops** (`/ops/**`) is for every
-instance operator, self-hosted included: the dashboard, event sourcing, the foundry, flags,
+instance operator, self-hosted included: the dashboard, event sourcing, the foundry,
 migrations, and instance administration (users, organizations, projects, SSO connections,
 identity lookup, directory sync). **Cloud admin** (`/ops/cloud/**`) is LangWatch's own company
 tooling (subscriptions, licences, self-hosted instances, bug reports): the ops gate plus ops's own
 cloud-ops capability, invisible and refused elsewhere. `/ops/backoffice/**` redirects; "backoffice" is
 a deleted name (§15).
+Feature Flags show only with cloud ops: flags are the cloud's gradual-rollout switch and self-hosted
+gets features by release; the env override still applies everywhere (Alex, 2026-10-09).
 The capability is ops's, from its own config and secrets, never `isSaas`: ops config asks for cloud
 ops (`LANGWATCH_CLOUD_OPS`), and ops's secrets hold the licence private key, which must match the
 release's built-in public key. Asked for without a matching key refuses boot (Alex, 2026-09-29).
@@ -618,7 +637,7 @@ Framework classes implement hosting. **The container** (`server.container(role)`
 modules, opens the stores and boots. Nothing more (Alex, 2026-10-01): it holds no members, answers
 no supply and takes no `.provide` or `withMember`. Authentication policy stays in the API runtime. auth
 binds the one API door (sessions, key credentials, plan gate, audit sinks) from
-the peers it already holds, in its own transport facts; the process opens it
+the peers it already holds, in its own middleware bindings; the process opens it
 before its hosts and builds both over it. A process with no door, or two,
 refuses boot by name, and `@langwatch/process` names no module contract but ops (its
 admin edge). This keeps transport machinery out of `main.ts` without making
@@ -691,7 +710,8 @@ a process that does not select `.rest()`, `.trpc()` or `.browserBundle()` neithe
 that surface. A module whose transport needs a surface the process did not select still installs, and
 that transport is skipped, not refused (Alex, 2026-10-05; §4 says this here only). Deployment is unchanged
 for now: locally one server runs rest, trpc, ui and the worker; in production one pod runs api, trpc
-and ui, and another the worker.
+and ui, and another the worker. `npx @langwatch/server` runs `apps/backend`, the api and the worker in
+one Node process (Alex, 2026-10-10).
 
 **The HTTP boundary is API versus browser bundle.** The host knows two
 paths, `/api` and `/`. The API package owns the fixed tRPC prefix
@@ -791,6 +811,11 @@ dependency; `main.ts` never touches lifecycle:
   phase.
 - Eventing consumers (role worker) register drain-first — which makes "the
   worker drains before the api's graph closes under it" a structural fact.
+  The consumers service's stop calls `EventingHost.stopConsumers()`, so
+  in-flight batches finish before feature Apis close (Alex, 2026-10-09).
+- An api process calls `server.expectApplication()` before it opens liveness:
+  until its routes mount, a product path answers 503 with `Retry-After`, never
+  an empty 404 (Alex, 2026-10-09).
 - Module services start in dependency order; teardown registers in reverse.
 
 |                    | knows about                                                 |
@@ -812,13 +837,16 @@ base security headers) and sends `/api/**` through to the api package.
 OTel export variant can sit beside it without any main changing shape).
 **Telemetry initializes immediately after the config parse** (ruled
 2026-09-18): one named call, `initializeTelemetry(process.observability)`,
-wires traces, logs and metrics from config alone — no `instrumentation.node`
-preload file, and anything requiring preload is out of scope by design.
+wires traces, logs and metrics from config alone. The one exception is library patching
+(OTEL-PRELOAD, Alex, round 57): the image start command preloads
+`--import @langwatch/observability/register`, which patches aws-sdk and openai by default (ioredis
+opt-in) under `OTEL_NODE_ENABLED_INSTRUMENTATIONS` / `OTEL_NODE_DISABLED_INSTRUMENTATIONS`, and
+records into the provider that call registers. No other preload.
 **Metrics are pushed and may also be pulled** (ADR-175): every process pushes over OTLP when
 `OTEL_EXPORTER_OTLP_ENDPOINT` is set (`OTEL_METRICS_EXPORTER=none` turns it off). A Prometheus
 `/metrics` door is off by default; `OTEL_METRICS_EXPORTER=otlp,prometheus` adds a pull reader to the
 same provider and serves it on its own port (`OTEL_EXPORTER_PROMETHEUS_PORT`, default 9464), never
-the public one, behind `METRICS_API_KEY`; production with no key leaves it unmounted.
+the public one, behind `METRICS_API_KEY`; with no key it is unmounted in every environment.
 **Telemetry is recorded, never passed** (Alex, 2026-09-23): any package or module records counters,
 histograms and gauges through `@langwatch/observability`'s instruments directly — no `*Api` operation,
 channel or member carries a metric. Telemetry is write-only: a decision the app makes at runtime (an
@@ -1124,6 +1152,8 @@ A module never re-derives them from `process.env`.
 `databaseTarget` and `prisma` and builds its connection bundle there. Its
 passwords stay the module's own `static readonly secrets`. No password means
 LangWatchQL answers "unavailable" and every query is refused (ADR-159).
+Boot convergence never throws; the upgrade's `langwatchql` reconciler converges with `failOnError`, so a refused
+provisioning fails the run (Alex, 2026-10-09).
 Data-privacy's directory is another: its repository registry builds it over
 `prisma`.
 
@@ -1160,7 +1190,14 @@ there — nothing else to configure. **The preflight is part of start()**
 (approved 2026-09-18): the moment the chain exists, every required handle
 declared anywhere in the module array is checked answerable — env set, or
 key present in the vault — and a miss fails the boot immediately, naming
-every missing key at once, values never held. **Global concerns declare the
+every missing key at once. **1Password is best effort** (Alex, 2026-10-09):
+one cheap probe per boot (`op whoami --account <acct>`); a failed probe (no
+`op`, locked, signed out, timed out) logs one warning naming why and 1Password
+sits out that boot, so optional handles stay unset and a required one fails
+with the ordinary missing-key refusal. After a good probe the preflight reads
+every single handle env and `.env` leave unanswered in parallel (capped, each
+read timed out), and a field absent from the item is an ordinary miss.
+**Global concerns declare the
 same way at their framework owner** — logging and telemetry are
 everyone-sends-to-one-place concerns, so `@langwatch/process` and
 observability packages declare their config slices and secret handles
@@ -1171,9 +1208,11 @@ telemetry initializes. The app builds only the READER — a fluent adapter chain
 .withOnePassword(...))` — installed on the Server preamble AFTER
 `withConfig`, so config can feed secrets (the 1Password vault key is a
 config fact); the builder is never imported and chains directly. **The
-chain is a lookup order, not a store**: it holds no values, pre-fetches
-nothing, enumerates no vault — each declared handle is fetched singly, at
-its owner's construction site, and handed straight to its closure. `boot()`
+chain is a lookup order, not a store**: it enumerates no vault, and env and
+`.env` hold no values — each declared handle is fetched singly, at its
+owner's construction site, and handed straight to its closure. The one
+exception is 1Password's parallel preflight answers, held only until the
+resolver seals and then dropped. `boot()`
 scopes the resolver per module: a `create()` can resolve only the handles
 its own module declared, each resolve validates against the handle's
 schema and hands the value to a closure —
@@ -1353,41 +1392,138 @@ the tier the value states: opened stores state `live`, `memoryStores()` states `
 repositories whose tier nobody stated refuses boot by name (Alex, 2026-10-05). Production and dev open
 live stores; a test or dev harness hands `memoryStores()` directly and never touches env.
 
-**Migrations are not the api's job.** They run through `pnpm task upgrade` (apps/api
-`start:prepare:db`: upgrade alone; the system-migrations pass is not part of api start), before serve, from every entry
-point (ADR-173). On a self-hosted install the new image's api runs that same `upgrade` itself,
-under the runner's lease, whenever the ledger is behind it, behind the holding page; the worker
-never does (Alex, 2026-10-09, UPGRADE-FIXES). A background step names the background steps
-it runs after by their step values (`after: [step]`, STEP-AFTER); the worker waits on them, the
-upgrade inlines them before a contract, and an unknown id or a cycle refuses the plan. Prisma migrations
-live with the schema; ClickHouse migrations are goose SQL files. A serving
-process holding DDL locks is how deploys die. Because they run before any module boots, apps/tasks'
-migration-runner files (`src/*migrat*.ts`) may name process packages (Alex, 2026-09-27), and
-so may `lwql-provision.ts` and `lwql-render-access-config.ts`: LangWatchQL provisioning reads
-both schemas under the same migration lock, before serve, and the access-config render runs from
-env alone in its Helm job (Alex, 2026-09-28).
-SQL migrations stay central, and each is attributed to the owner of the table it touches; a check
-refuses a migration touching two owners' tables (Alex, 2026-10-06, round 7, D3).
+**Migrations are not the api's job.** The worker runs every upgrade step under the runner's lease:
+at boot, while the ledger is behind its image, its gate runs `pnpm task upgrade` (the tasks app's
+runner, in its own process), waits while another runner holds the lease, takes no job until the
+ledger is current, and after a failed run waits for a Retry that returns the step to `pending`
+(Alex, 2026-10-09, UPGRADE-IN-WORKER, superseding UPGRADE-FIXES' "the worker never does"). `pnpm
+task upgrade` stays a runner under the same lease for development, CI and an operator (apps/api
+`start:prepare:db`: upgrade alone; no system-migrations pass); the root `prisma:migrate` and
+`clickhouse:migrate` scripts are aliases of it, so no script applies schema outside the ledger
+(Alex, 2026-10-09); the Helm pre-roll Job renders only
+with `serializeUpgrades`, and the compose `migrate` service is gone. The api never runs a step,
+and it is up from boot (Alex, 2026-10-09, API-UP-DURING-UPGRADE: "anything important can get stuck
+on the queue for a few mins while upgrades happen, that's fine. Worker can be down, but api must be
+up"); dev starts it beside the worker, never after it. **No holds** (Alex, 2026-10-09, NO-HOLDS):
+while the ledger is behind, the api serves every REST, tRPC and SSE route at once and reports not
+ready until it is current. ClickHouse reads are defensive: a repository reading a column a pending
+ClickHouse step adds selects it through `ClickHouseColumns` (`@langwatch/clickhouse-client`), a
+per-target column list refreshed every 30 s, which answers the column's typed default until the
+column exists. A Postgres query the schema is not ready for (Prisma P2021/P2022, SQLSTATE
+42P01/42703) fails and says retry: `promoteStoreFailure` in `packages/api` maps it, once for every
+transport, to the handled `upgrade_in_progress` (503, Retry-After 10 s on REST, the same code over
+tRPC and SSE), and the browser's query client keeps retrying it with backoff. Ingestion is
+unaffected: it only enqueues for the worker, and a blocking step never touches a sign-in or ingest
+table. Cloud's rolling deploys keep the old pods serving through expand steps, since a new pod is
+not ready until the ledger is current. A failed step of either store shows on Ops > Upgrades with
+Retry; only a failed first install, which nobody can sign in to follow, opens the api's token
+console. A blocking step never touches a table the sign-in or ingest doors read or write
+(auth, user, organization, authz, identity, api-key, project, evaluation, evaluator,
+model-provider, monitor, experiment, governance); `lint:architecture` refuses one that does
+(UIW-1..11). A blocking data step touches only tables created in its own release; anything older
+ships as a background step (Alex, 2026-10-09). A background step names the background steps it runs after by their step
+values (`after: [step]`, STEP-AFTER); the worker waits on them, the upgrade inlines them before a
+contract, and an unknown id or a cycle refuses the plan. A fact old images never recorded is
+recorded by its owner's background data step with `needsOldWritersGone`; `project:record-created-facts`
+runs after `instant-eval:copy-judge-spend` (ADR-174 decision 17). Prisma migrations live with the schema;
+ClickHouse migrations are goose SQL files. A serving process holding DDL locks is how deploys die.
+A goose file that starts a background mutation (`MATERIALIZE INDEX`) is tracked by a background step in
+the table owner that waits on `system.mutations` and fails on its fail reason, so the ledger shows it
+(`trace:track-updated-at-index-materialisation`, Alex, 2026-10-09); the goose file names that step in a
+`-- background step: <id>` note above the statement. Migrations are graceful because the api serves
+through them (Alex, 2026-10-09): the runner sets `lock_timeout` 2 s with a bounded retry, and the
+migration-safety scanners refuse a Postgres `UPDATE`/`DELETE` on an existing table, a volatile
+`DEFAULT` on an added column, two `ALTER`s on one existing table and a longer `lock_timeout`, and a
+ClickHouse mutation without that note, `MODIFY TTL` that materialises, `MODIFY ORDER BY`,
+`OPTIMIZE ... FINAL` and `POPULATE`; the note excuses only a mutation, never the last three. Migrations
+in the newest `langwatch@v*` tag, read from git, are history and never rewritten; a clone without the
+tags fails the guards rather than passing (Alex, 2026-10-09).
+**No stuck states** (Alex, 2026-10-10, STUCK-STATES; `specs/upgrade/upgrade-stuck-states-*.feature`):
+
+- Once the gate admits (the ledger is current), a schema-not-ready error is a 500 that logs "schema and
+  ledger disagree", never `upgrade_in_progress`. That 503 is only for an api the gate has not admitted.
+- A tenant step settles done only when every eligible tenant holds a finished row. A pass that claimed
+  nothing, Redis down included, leaves it pending.
+- A background step run has a 15-minute deadline. When it passes, the run aborts and keeps its
+  checkpoint, the step goes back to pending, and the sweep moves on; Ops shows the expiry.
+- A failed upgrade run with no failed step row backs off exponentially from 10 s to 5 minutes, and its
+  log says it is retrying and why.
+- Legacy `pnpm task` runs and `upgrade` never overlap. Both take the one timed upgrade lease, and each
+  refuses while the other holds it. Legacy tasks are to fold into upgrade steps, in a later drive.
+  Because they run before any module boots, apps/tasks' migration-runner files (`src/*migrat*.ts`) may
+  name process packages (Alex, 2026-09-27), and so may `lwql-provision.ts` and
+  `lwql-render-access-config.ts`: LangWatchQL provisioning reads both schemas under the same upgrade
+  lease, before serve, and the access-config render runs from env alone in its Helm job (Alex,
+  2026-09-28). SQL migrations stay central, and each is attributed to the owner of the table it
+  touches; a check refuses a migration touching two owners' tables (Alex, 2026-10-06, round 7, D3). A
+  migration main has released keeps main's bytes even when it touches two owners: installs hold its
+  checksum, so a later idempotent migration carries the split instead, and the check names it as
+  released history (Alex, 2026-10-09). A registered step is re-run only by the app, Retry step on Ops > Upgrades,
+  under the lease and the old-writer gate; no module task runs a step's code directly (Alex, 2026-10-09).
+  Operator-started jobs (re-sealing credentials after a `CREDENTIALS_SECRET` rotation, moving object
+  storage to another provider) are not release steps: they stay named tasks an operator starts, safe to
+  run again, outside the ledger (Alex, 2026-10-09). Main's virtual-key config backfill is deleted, not
+  ported: its strip migration shipped in 3.19.0, below the 3.20.1 floor (Alex, 2026-10-09). Each serving
+  process's roster row records `credentialKeyFingerprint` of every credential key it accepts, never the
+  key, and `credentials-reseal` refuses to apply while any live row lacks the current or the previous
+  key (Alex, 2026-10-09). Governance's anomaly destination migration passes a migration-only `idempotencyKey` on
+  `CreateWebhookEndpointCommand`, unique per organization by a Postgres index, so a re-run or a
+  concurrent create answers the endpoint already made (Alex, 2026-10-09, D2).
 
 **In-place system migrations belong to their subject; the framework runs, ops reads and requests**
 (Alex, 2026-10-06, round 14, Q-U8 and UP-3, amending "the runner belongs to ops"). The upgrade run
 registers every declared step in the ledger, background steps run on the worker under their declaring
-module, and ops builds the upgrade and event-upcast readers over its own Postgres handle. Identity,
-authz and automation each answer the migrations they own through their `*Api` (`registeredMigrations()`, with
-identity's user-rooted `userMigrations()` beside it), and ops composes the migrations page,
-enrolment, the targeted run and the pass over its own `SystemMigration*` tables and Redis lease,
-never importing a peer's process package. The api serves the page and awaits a targeted run
+module, a background step may name the release it must finish by (`finishBy`, kept on its ledger row for
+the reader; Alex, 2026-10-09, STEP-FINISHBY), and ops builds the upgrade and event-upcast readers over its own Postgres handle. A tenant migration is a `kind: "tenant"` step its owner declares with `.withMigrations`: it
+migrates one tenant at a time (`migrateTenant`), names its axis (`tenants`: organization, project or
+user) and carries its pacing flat on the declaration (`title`, `requiresOperatorConfirmation`,
+`runsAutomaticallyOnSelfHosted`, `enrolledAutomatically`), which no other kind accepts. Every tenant
+step's per-tenant state lives in one framework-owned table beside the ledger,
+`_langwatch_upgrade_tenant_state` (Alex, 2026-10-09, UPGRADE-S6). The process hands ops the collected
+tenant steps as a framework input, as it hands a migration binder its `replayer`; the api builds tenant
+steps only, for ops' targeted run, and ops builds the state repository in its own registry. Worker boot
+accepts a tenant step and the background runner skips it; its ledger row is `done` when a pass leaves no
+tenant held or parked and reopens when one appears (Alex, 2026-10-09, S6-WIRE). A finished upgrade run asks ops for one
+system-migrations pass, so tenant steps settle at upgrade rather than at the hourly re-drive (Alex,
+2026-10-09, UPG-008 D2). A step that must read every tenant reads through its owner's repository with
+raw SQL that interpolates `skipTenantCheck({ SKIP_TENANT_CHECK: true })` under a comment giving the reason, as the trigger claim does (Alex, 2026-10-09, UPG-008 D1; the flag replaced the `-- @tenancy:` comment, Alex, 2026-10-10). Stored-object's ClickHouse import is a `project` tenant step with
+`needsOldWritersGone` in place of a writer-drain proof; its legacy reads stay (Alex, 2026-10-09). Ops keeps the pass for
+now, fed that one list, paging tenant ids through the framework's `TenantSource`, and composes the
+migrations page, enrolment, the targeted run and the pass over its Redis lease, never importing a peer's
+process package. Until their owners move, identity, authz and automation still answer
+`registeredMigrations()` (identity's `userMigrations()` beside it) over ops' `SystemMigration*` tables;
+before an owner moves, its `finalized` and `rolled_back` rows are copied, never moved, into the
+framework table by a one-time expand step. The api serves the page and awaits a targeted run
 in-request, as main did; passes run on a worker (§9); apps/tasks keeps the startup convergence
 (Alex, 2026-09-28). Automation's Slack connection migration is one such pass per organization, with
 no manual task (Alex, 2026-09-30).
 
 **Upgrades run on deploy** (ADR-173, which carries every ruling of rounds 8 to 17). One ledger keyed by
 step id (and target) serves cloud and self-hosted, and presence says when old writers are gone. A
-serving process stops serving once its last good presence write is older than the 60 s stale bound; a
-rollback is detected from presence, an older image's live row after the last run reopening
+failing presence write never takes an admitted process out of service; a presence row not refreshed
+within the 10 min stale bound stops counting as live (Alex, 2026-10-09). A rollback is detected from presence, an older image's live row after the last run reopening
 level-triggered background steps (Alex, 2026-10-06, round 9). The runner writes the run's phases into
 its run report and raises a read hint the api relays, so the Upgrades page refreshes on it and never
-polls (Alex, 2026-10-06, rounds 8 and 9).
+polls (Alex, 2026-10-06, rounds 8 and 9). A background step that rewrites a row live writers also save
+writes compare-and-set on the row's `updatedAt`, so a save made during the pass keeps its newer value (Alex, 2026-10-09).
+While licensing's licence rows and organization's columns are both written, the newer `updatedAt` wins
+both the copy and the reads, organization's columns only where `Organization.updatedAt` is later than
+the row's; an unrelated organization update inside the mirror lag makes stale columns look newer, and
+host clocks differ, which is the accepted ceiling (Alex, 2026-10-09).
+A step that moves a stored value to a new shape annotates the old shape (an inline anomaly webhook
+destination gains an optional `endpointId`) so a rolled-back image still reads it, and a contract step
+after the floor rewrites it to the new shape (Alex, 2026-10-09, D1-A).
+An image is the newest stamped release (`packages/upgrade/releases/`) only when it ships no step
+beyond the stamped ones; otherwise it names itself "unreleased", and its unstamped steps show under
+the Unreleased row (Alex, 2026-10-10, IMAGE-IDENTITY).
+
+**A contract step never drops unarchived data** (Alex, 2026-10-09, ARCHIVE-OR-FAIL). Archive-or-fail
+lives in `packages/upgrade`: a contract's SQL names each table it retires with `-- archive: <table>`
+beside its `-- contract: retired in <release>` note, and before any schema apply the runner copies each
+such table still ahead into `_retired_<table>_<release>` and checks the copy holds the source's rows,
+or marks the contract step failed and applies nothing. A re-run copies only a stale archive; `upgrade
+plan` reports what would be archived. Only Postgres contracts archive so far; a goose contract that
+asks fails. Every Postgres contract carries `-- archive: <table>` or `-- archive: none (<reason>)`; the migration-safety guard refuses one without (`contract-without-archive-note`).
 
 **An LTS is an upgrade stop, never a maintained line** (Alex, 2026-10-09, LTS-SCHEDULE). An LTS is
 named every April and October; the first is 3.20.1 (2026-10-06), the next April 2027. Only the
@@ -1492,13 +1628,18 @@ declaration of the env family in its own config.
 **Routing is folded into the `clickhouse` member** (Alex, 2026-09-28): the member routes every
 statement by its tenant's organization itself, so a module hands the member its statement and
 never writes a routed-client adapter (ops' replay and event-explorer adapters are deleted). A
-statement spanning every tenant names none (`tenantId: ""`) with a written `unscoped` reason, and
+statement spanning every tenant names none (`tenantId: ""`) and sets `SKIP_TENANT_CHECK: true` under a comment giving the reason
+(Alex, 2026-10-10: the guard is required, every skip is counted and logged, `langwatch/skip-tenant-check-reason` refuses a flag without a real reason), and
 the member reads it on the shared server, where main's `"default"` fallback read. A read across one
 organization's projects (a gateway budget's ledger) declares its **tenant set** (`tenantIds`) instead:
 the tenant guard accepts `TenantId IN (...)` only when the list binds exactly that set, the request's
 `tenantId` among them, with no `OR` disjoining it; the member's router resolves every tenant through
 the tenant directory it already routes by and refuses a set spanning organizations. One statement,
-answered on that organization's server, never an `unscoped` reason (Alex, 2026-09-29). Eventing's replay
+answered on that organization's server, never a skipped tenant check (Alex, 2026-09-29). The list may
+also be one `Array(String)` parameter holding exactly that set, as the proof fence binds it, and an `OR`
+bracketed beneath that set does not weaken it (M8487-GUARD-ARRAY, Alex, 2026-10-09); an `OR` in a
+subquery beneath the set, and a `NOT` in front of any tenant predicate, are refused (GUARD-FOLLOWUPS,
+Alex, 2026-10-09). Eventing's replay
 reads through the member's own surface (`query`, `stream`, `command`); `stream` yields a large read
 batch by batch under the tenant guard and the route, holding no slot and never retried.
 
@@ -1520,6 +1661,7 @@ tables, and declares its own LWQL catalogue entries for the event-table views, w
 composes (Alex, 2026-10-06, round 4, Q205). One stored event's payload (trace's offloaded fields) is
 read through a narrow single-event read seat beside the producer-only store, within main's 2-day
 window; the producer-only rule stands for everything else (Alex, 2026-10-06, round 3, Q209).
+2026-10-10: identity reads one aggregate's history through the read seat; WEB-9103.
 
 **A ClickHouse table has one owner, and others read it through that owner** (Alex, 2026-10-06,
 round 3, Q207). A plain read of another module's table is a query operation on its owner's `*Api`
@@ -1588,7 +1730,10 @@ operations never take a platform scope (Alex, 2026-10-01).
 Only ops and identity grant or revoke; listing takes no caller, and user reads it to refuse deactivating the last active operator. The
 seed runs once behind a marker, never again because the live list is empty. Authz learns who is
 deactivated or erased from user's and identity's facts into its own table, never from the User table
-(Alex, 2026-10-01). The page reaches them through three OpsApi pass-throughs (`listPlatformOperators`,
+(Alex, 2026-10-01). A standing change an old image made without its fact is repaired by user's
+`user:record-standing-facts` step: each deactivated account re-stated at its stored stamp, and each
+active account its own log still holds deactivated recorded reactivated at the run's start
+(Alex, 2026-10-09). The page reaches them through three OpsApi pass-throughs (`listPlatformOperators`,
 `grantPlatformOperator`, `revokePlatformOperator`) gated `ops:manage`; the seed does not latch while the
 install has no users (Alex, 2026-10-01).
 **Billing staff read with `ops:view`, write with `ops:manage`** (Alex, 2026-10-01): the connected-billing
@@ -1619,6 +1764,9 @@ office deactivates only through user, so it keeps no picked date (Alex, 2026-10-
   API operation, and **return a plain value or throw**. No `c.json`, no
   `JSON.parse`, no manual status branches, no error envelopes, no
   `RestErrorHandler` — banned outright.
+  A route that declares its permission target (`.withPermission(perm, { at })`) also hands the
+  handler `target`, the scope the door authorised, as `.withResponse` hands it `response`
+  (DOOR-TARGET, Alex, 2026-10-09).
 - Every wire schema imports from the module's own contract. The one
   sanctioned exception: the `moduleApi<X>()` app-port interface a door
   declares for its own implementation.
@@ -1661,11 +1809,35 @@ office deactivates only through user, so it keeps no picked date (Alex, 2026-10-
 - A REST request is authenticated before its body is capped, parsed or validated: a missing or invalid credential
   answers 401/403, never 422 or 413. A door that signs over the body reads the capped raw bytes first. Which project
   the caller acts on is resolved after, from the parsed input (Alex, 2026-09-30).
+- A permission is asked where its scope location says: `{ at: "route" }`, `{ at: "header" }`, or
+  `{ at: "body"; param; schema; field? }` for a raw text JSON body, which the door's runtime parses and validates
+  against `schema` after the credential (400, then 422), then asks at the project its field names (merge #8487).
+- **Authorization fails closed** (Alex, 2026-10-09): a missing member, proof or decision refuses; a wrapper that
+  rebuilds an access object must fail to compile when the object gains a member. Every `Authorize` member is
+  required, a wrapper returns `Required<...>`, and what a type cannot express refuses at boot or at the request,
+  then by a lint rule. The aggregate admin gate (ADR-177 decision 5) applies wherever a door decides at a project,
+  a REST route's own scope included. Both runtimes require the authorization port (a REST family without one does
+  not compile and is refused at mount); `langwatch/authz-members-required` refuses an optional question on the
+  access and api-door types.
 - The exception is a hidden family, whose 404 comes before the credential or the body: `instance_admin` with no key
   set or on SaaS, and `/api/admin/*` for a caller who is not an admin (as main, 2026-09-30).
 - REST runs in three steps: the credential and identity checks that read no body (the door, and a public route's
-  credential facts), then the body is parsed and validated, then any authorisation that reads the parsed input.
-  A fact that reads the input is declared `source: "input"` and resolves after the validators (Alex, 2026-09-30).
+  middleware context read off the credential), then the body is parsed and validated, then any authorisation that
+  reads the parsed input. Context that reads the input is declared `source: "input"` and resolves after the
+  validators, handed the validated input (Alex, 2026-09-30).
+- **What a route needs beyond its input is middleware context, supplied by its own module** (Alex, 2026-10-10).
+  `defineMiddlewareContext(name, schema)` declares it, the route names it with `.withMiddlewareContext(x)`, and the
+  module installer supplies every name its routes ask for with `.provideMiddlewareContext({ name: (request,
+{ app, dependencies }) => value })`. A missing or extra key or a mistyped value does not compile, a module whose
+  routes need context it never provides does not publish, and the mount still refuses an unprovided name. No
+  process supplies a module's context; a value several modules need is a shared helper (`projectRequestContextOf`
+  in `@langwatch/api/rest`). `.withHeaders(...)` values bind themselves.
+- **tRPC and hand-bound values speak the same vocabulary** (Alex, 2026-10-10). A procedure names a declared
+  context with `.withMiddlewareContext(x)`; its mount binds it with `bindTrpcMiddlewareContext` or
+  `bindTrpcHeader`, and the host binds `browserSessionContext` and `callerAddressContext`. Bindings a module
+  writes by hand (tRPC, websocket, the API door) go in `.provideMiddlewareBindings(() => [...])`; a REST context
+  bound there counts as provided and a mistyped value does not compile. A REST route that needs the browser
+  session reads the door's (`browserSessionContext`, supplied by `browserSessionOfRequest`), never re-verifies it.
 - `GET /api/checkup` keeps the branch's `organization:view` guard; main answers any project key. The drift is
   accepted, since the checkup reads organisation-wide state (Alex, 2026-09-30).
 - REST authenticates with API keys only and tRPC with the session (Alex, 2026-09-30); `/api/files` and
@@ -1678,11 +1850,15 @@ office deactivates only through user, so it keeps no picked date (Alex, 2026-10-
 - No key, token or secret is minted while the actor carries an impersonator (Alex, 2026-10-01). An endpoint that mints
   declares `.mintsCredential(permission)` and the tRPC and REST runtime refuses it before the handler; a service
   guard per door stays for callers that are not a transport. Door names are the typed snake_case union `api_key`,
-  `scim_token`, `internal_secret`, `instance_admin`, `session_key`, `cli_token`.
+  `scim_token`, `internal_secret`, `instance_admin`, `session_key`, `cli_token`, `otlp_ingest` (an OTLP exporter's
+  key, bound by trace; verified before the body and handed over as `session`, Alex 2026-10-10 W02-DOOR-SHAPE), `licence_token` (a
+  connect-host bearer, bound by licensing: a licence token on sync, an activation code looked up unclaimed on
+  activate, which `redeemActivationCode` claims; Alex 2026-10-10 W02-ACTIVATE-DOOR).
+- A module-bound door is `defineRestDoor(credential, { needs, identify })` typed by `DoorContract`; the framework hands it `{ bearer, request }`, a module binds `.withDoors({...})` keyed exactly by its routes' module-bound credentials, and a route naming a credential nobody bound refuses the boot (Alex 2026-10-10 TYPED-DOORS, W02-DOOR-BEARER).
 - The CLI token door hands a handler `session` beside `actor` (Alex, 2026-10-01): the route declares
   `.withCredential("cli_token", { session: schema })`, the framework parses it (a mismatch answers 401) and types
   the handler by `z.output`. The actor carries authz vocabulary only; logs redact `session.tokenKey` at a fixed path.
-- A legacy project key still authenticates but is never returned or displayed: no read, no rotation, no handout.
+- A legacy project key still authenticates but is never returned or displayed: no read, no rotation, no handout. Keys created on main keep main's access and new projects get no legacy key (Alex, 2026-10-09): a legacy project key or an ownerless API key reads its own project's traces on an own-only proof the door mints as the internal actor `api.rest.ownerless-project-key`; an unattended run key on a proof-bearing route answers 403.
   It migrates to an `ApiKey` row, hashed and valid until revoked, listed masked and revoke-only under a
   replace-by-deadline banner. The CLI and MCP mint a fresh key instead, a CLI login replacing that device's previous
   one, and a new project gets no customer-facing project key (Alex, 2026-09-30). No engine and no internal caller
@@ -1707,6 +1883,9 @@ office deactivates only through user, so it keeps no picked date (Alex, 2026-10-
 - `publicRoute`/raw results only for genuinely non-JSON protocols
   (OAuth device flow, MCP streams, webhook raw bodies) and the documented
   `*-legacy.rest.ts` family, each carrying a one-line reason.
+- `optionalCredential({ reason, refused: "anonymous" })` answers a credential the door refuses as none: the
+  door's `identify` runs, a refusal hands no actor and no scope, and any other failure is logged and answered
+  as anonymous too (the bug-report intake, Alex 2026-10-10 W02-BUG-INTAKE, W02-INTAKE-OUTAGE).
 - A branch living in a handler moves into the module as an `*Api` operation carrying that logic
   unchanged; such a one-to-one move is approved in advance. An operation that adds behaviour or a new
   shape is still asked for (Alex, 2026-09-24). `ScenarioApi.launchRun` is such a port, one-to-one with
@@ -1736,8 +1915,8 @@ office deactivates only through user, so it keeps no picked date (Alex, 2026-10-
   everything beneath it, and `open(app)` run once at mount returning `{ handle({ request, response }),
 close() }`. The api's `serve()` answers a claimed request ahead of every route, as main's listener did;
   `close` runs at shutdown, before the stores close (Alex, 2026-09-27).
-- The API door is bound once, by auth, with `bindApiDoor` in its `withTransportFacts`; the container
-  hands installed facts to the surface factory, which opens it ahead of REST and tRPC. None or two
+- The API door is bound once, by auth, with `bindApiDoor` in its `provideMiddlewareBindings`; the container
+  hands installed bindings to the surface factory, which opens it ahead of REST and tRPC. None or two
   binders refuse boot by name (`MissingApiDoorError`, `DuplicateApiDoorError`) (Alex, 2026-10-01).
 - The **process** mounts declarations; `boot()` opens the hosts. A module
   never mounts anything.
@@ -1787,6 +1966,17 @@ sync-all-openapi` regenerates all four, and the `openapi-clients` CI job fails o
   existing peer, so there is no auth -> project edge (coordinator, members wave 3, 2026-10-05). A sink
   without `organizationOf` refuses the declaration at mount, naming the procedure. Spec:
   `packages/api/specs/trpc-framework.feature`.
+- **E11, every REST write says whether it is audited** (Alex, 2026-10-10): a POST, PUT, PATCH or
+  DELETE route declares `.withAudit("<action>")` or `.withoutAudit("<reason>")`, and the declaration refuses
+  a write route with neither. The action is the tRPC path the same write audits under where one exists
+  (`prompts.update`), so one filter and one phrase cover both doors; the existing `management.*` actions
+  keep their names. Exempt are ingestion (OTLP, collector, RUM, scenario events, batch logs, DSPy
+  steps), reads sent as a POST, runs (workflow run, prompt execute, playground, instant eval, agent
+  test) and other services' webhooks (Stripe, Slack, ElevenLabs). Sign-in, OAuth, device flow and SCIM
+  writes are audited. A REST row takes its organization and project from the declared scope, and carries
+  the client address and user agent as a tRPC row does. A call made with an API key is audited: a
+  service key's row names the key (`apikey:<id>`) and the page shows its name and who created it; a
+  personal key's row names its person with the key beside it (Alex, 2026-10-10).
 - `POST /api/demo/hotel_bot` is for LangWatch staff only (platform operators) (Alex, 2026-10-05): it moves onto
   the platform-operator door tier (E4) when that lands; until then the route refuses every caller, since
   nothing in the product calls it.
@@ -1877,7 +2067,7 @@ acyclic; event causation may loop (a request and its completion) and idempotency
 seat-raised event and sends its own invoicing command; `LicensingApi.findSeatChanges` and the minute
 poll go (Alex, 2026-09-29).
 A module reading its own event-sourced state writes optimistically or tolerates eventual consistency
-with a pending answer, never a reverse read; identity's history and proposals are read through the
+with a pending answer, never a reverse read; identity's history and proposals and SCIM's sync activity are read through the
 eventing member's surface (Alex, 2026-09-29).
 Enterprise `nurturing` shows the subscriber rule (Alex, 2026-09-29): nurturing's own subscribers listen to
 each owner's events, which carry ids and the non-personal, point-in-time facts; no owner knows nurturing and
@@ -1920,6 +2110,8 @@ replay apply it, so consumers and type filters see only the current type; `drain
 jobNames?, removeAfter }` routes jobs a previous release queued under the former pipeline's keys into the current
 lanes for one release. Each upcast is an `event-upcast` background step in the upgrade ledger, and
 `EventUpcastReader` answers the stored events it still covers (`packages/eventing/specs/event-upcast.feature`).
+The eventing member builds it over the raw event log, the booted process answers it as `upcastReader()`, and every
+`pnpm task upgrade` run records each upcast's step (Alex, 2026-10-09).
 An upcast's step id is `upcast:<pipeline>:<stored type>`; its optional rewrite copies corrected events into
 `event_log`, and a renamed aggregate's originals are deleted only by a contract step at the LTS floor; a
 lint names any drain older than one release (`langwatch/upcast-drain-window`, against `removeAfter`); a fresh install plans upcast steps by their mode (Alex,
@@ -1972,6 +2164,24 @@ A pipeline whose projections write tenant rows declares each tenant's retention 
 The eventing member is built before any module, so it holds no late-bound resolver; a pipeline
 declaring none leaves each store to stamp the platform default.
 Spec: `packages/eventing/specs/pipeline-retention.feature`.
+**Only customer telemetry expires** (Alex, 2026-10-09). The default retention applies to customer
+telemetry alone: traces, evaluations, experiments, scenarios, logs and metrics, meaning span content,
+model inputs and outputs, gateway requests, Langy conversations, coding-agent sessions and topic
+clusters. Per-trace and per-run facts age with them: later-trace milestones, evaluation-lifecycle
+completions, Instant Eval runs, pulled-usage readings, webhook spend deliveries and ingestion-pull
+runs and listings. Their configuration and once-only facts are kept by event type (first trace, a
+manual evaluation run, an ingestion source configured or disabled, a report schedule), as are
+Instant Eval judge spend, annotations, governance budget crossings and aggregate-read audits. Every
+other event (lifecycle, configuration, billing, authz, identity) is stamped 0 days and kept forever.
+The worker's event store asks each expiring row's own pipeline's `.withRetention` resolver for the
+tenant's days for its class, else the platform default, as main's policy cache did (Alex,
+2026-10-09); the worker container's boot requires the classifier. The event-log
+classification is opt-out:
+data-retention's `RETENTION_CLASS_BY_AGGREGATE_TYPE` names each aggregate type's class, an unlisted
+aggregate type is kept forever, and the worker's installation test refuses a registered aggregate
+type missing from it, so a telemetry pipeline must name its category. Rows stamped before the ruling
+are re-stamped by data-retention's background step `data-retention:keep-control-plane-events-forever`
+through eventing's retention operation. Spec: `specs/data-retention/ingestion-stamping.feature`.
 
 A module may host several pipelines: it calls `.withEventing(...)` once per
 pipeline, each a `defineEventingModule` declaration over the same app and
@@ -2546,6 +2756,8 @@ invented:
   and its own scenarios, not a side effect of a file move. **The knot is untied as its own specced
   change** (Alex, 2026-10-05): permission reads move to the session capability, public shared pages
   get an explicit no-session host, and then the 506 call sites migrate.
+  A host's scope loading means the scope alone: the scope host answers no permission, and a screen
+  that gates on a grant waits for its own host's loading flag over the session (Alex, 2026-10-09).
 
 - **State defaults to server state**: react-query over the derived tRPC
   client is the normal answer, so cross-module client state is rare and ruled
@@ -2671,6 +2883,21 @@ like any peer's, the enterprise owner refuses per organization, and a core calle
 entitlement before calling. There are no slots: a core screen renders the enterprise module's lent component directly, and
 the shell's upgrade modal (`globalUpgradeModal`) is licensing's declared mount (Alex, 2026-09-29).
 
+**Hosted Connect is the `connect` module** (Alex, 2026-10-09, C3a). `enterprise/modules/connect`
+serves the three `/api/internal/gateway/connect/*` routes (paths unchanged; `internal` is an unowned
+prefix) behind the gateway's `internal_secret` door, and owns the contract budget's cap, sync and reset,
+written only through `GatewayApi`; it owns no table. The install end of Connect stays in licensing. Connect
+resolves a hosted caller through `LicensingApi.findManagedKeyLicense` and reads terms through
+`getContractTerms`. Nothing depends on connect: billing would close connect -> gateway -> organization ->
+billing, so connect syncs on licensing's `contract_terms_changed` and resets on billing's
+`connected_term_renewed` / `connected_customer_onboarded` facts (the cap is not a precondition of the
+billing call), and billing reads the contract `GatewayBudget` through a declared share plus its ClickHouse
+spend share. `connect.errors.ts` stays in licensing-contract.
+The connect upstream reaches gateway as licensing's `connect_upstream_set` / `connect_upstream_cleared` facts
+naming only the organization; on set, gateway pulls `{ baseUrl, token, instanceId }` from
+`LicensingApi.findConnectUpstream` and seals the token itself; licensing alone derives the token, including the
+instance-wide `LANGWATCH_LICENSE_KEY` fallback (Alex, 2026-10-10, PC-G2-CONNECT-TOKEN; supersedes C3b D2).
+
 **Seat limits are organization's to answer** (Alex, 2026-09-28).
 `licenseEnforcement.checkLimit`, `checkAllLimits` and `reportLimitBlocked`
 keep their wire path, but the contract and transport are organization's: it
@@ -2679,6 +2906,11 @@ owns the membership rows a seat counts and already reads the plan through
 peer), so its members refused every call and `checkLimit` answered 500.
 A seat limit reached is organization's event; billing learns it through §9's subscriber, which lives
 in billing on organization's events (Alex, 2026-09-28; placement Alex, 2026-09-29).
+
+**A Lite seat holds Lite permissions however a grant arrives** (Alex, 2026-10-09). A Lite Member
+seat holds at most a Lite Member's permissions through any grant, a direct custom role included;
+it holds an organization-wide Viewer grant however it was admitted; and a member's access listing
+marks each grant the seat narrows as `cappedBySeat`.
 
 **Usage warnings: entitlement decides, billing only sends** (Alex, 2026-09-29; usage merged into
 entitlement, Alex, 2026-10-06). Entitlement owns all counting (§3): it takes billing's billable-events
@@ -2906,6 +3138,18 @@ the rest `@langwatch/process`), `@langwatch/process-server`, `@langwatch/ui-kern
 `@langwatch/installed-server-modules` and `@langwatch/installed-web-modules`, `packages/audit-log-null`,
 `defineServerModule` / `defineWebModule`, `serverModules` / `webModules`, `<id>Server`,
 `openProcessStores`, `<f>.server.ts` stems, `<X>App` module classes and `.withApp(...)`.
+· REST middleware facts (Alex, 2026-10-10; §8): `defineRestMiddleware` and `RestTransportMiddleware` (now
+`defineMiddlewareContext` and `MiddlewareContext`), `.withMiddleware(...)` on a REST route (now
+`.withMiddlewareContext(...)`), `bindRestMiddleware`, `bindRestHeader` and `RestTransportMiddlewareBinding` in a
+module (now keys of `.provideMiddlewareContext({ ... })`), `projectRestFacts` (now `projectRequestContext`), and
+a REST context value bound in `withTransportFacts` or by the process.
+· "Facts" for transport values (Alex, 2026-10-10; §8): `defineTrpcFact` and `TrpcFact` (now
+`defineMiddlewareContext` and `MiddlewareContext`), `.withFacts(...)` (now `.withMiddlewareContext(...)`),
+`bindTrpcFact` and `TrpcFactBinding` (now `bindTrpcMiddlewareContext`, `TrpcMiddlewareContextBinding`),
+`withTransportFacts`, `TransportFactBinding` and `BoundTransportFacts` (now `provideMiddlewareBindings`,
+`MiddlewareBinding`, `BoundMiddlewareBindings`), a host or runtime mount's `{ facts }` (now `middlewareBindings`, or
+`middlewareContext` on a tRPC mount), a websocket protocol's `facts:` (now `middlewareContext:`), `<x>Fact`
+constants (now `<x>Context`), and ops' `adminAuthSession` (the door's `browserSessionContext`).
 
 ---
 
@@ -3065,8 +3309,8 @@ a function of datastore state that no input declaration describes.
 
 The root scripts are unchanged. `test`, `typecheck`, `lint` and `build` keep
 the filter sets CI, haven and this documentation already invoke; Nx is
-available beside them as `test:all`, `test:affected`, `typecheck:all`,
-`typecheck:affected`, `build:affected`, `lint:changed` and `graph`. Repointing
+available beside them as `test:all`, `test:affected`,
+`build:affected`, `lint:changed` and `graph`. Repointing
 the root scripts at Nx is a separate decision — the current root `test` covers
 `packages/`, `modules/` and the enterprise packages and deliberately excludes
 the applications, the SDK and the e2e suites, so the two are not the same set.
@@ -3079,9 +3323,11 @@ pushed directly to the branch; the first goal is the branch's CI green, and the 
 and the bypass guard rules (§8) come after. At most six lanes run at once, their owned paths checked
 disjoint at every spawn, and never two lanes in one module. From the main merge
 (`dev/docs/plans/main-merge-2026-10-05.md`), the developer seat (#8373) is ported now, the server half on
-Opus and the browser half on Sonnet. The webhook deploy drain is an approved operational step: before the
-last old worker stops, confirm the two deleted gateway delivery lanes have nothing queued; afterwards
-re-send blocked spend through the replay route, and governance is re-requested by hand.
+Opus and the browser half on Sonnet. The two retired gateway delivery lanes,
+`gateway_spend_processing:subscriber:pm:webhookDelivery` and
+`governance_events_processing:subscriber:pm:governanceEventsDelivery`, drain through `.withLaneAliases`
+on the webhook delivery pipeline until 3.21.0, so the new worker delivers what an old one queued; there
+is no manual drain (Alex, 2026-10-09, superseding the 2026-10-05 runbook).
 
 ## 19. The dev runtime and the sims
 

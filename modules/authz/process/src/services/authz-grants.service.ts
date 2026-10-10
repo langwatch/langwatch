@@ -6,7 +6,6 @@
 import type { Actor } from "@langwatch/authorization";
 import {
   AuthzGrantsService as AuthzGrantsServiceContract,
-  DuplicateGrantError,
   GrantValidationError,
   type GrantEventSource,
   type AuthzAttachGrantInput,
@@ -62,7 +61,6 @@ import {
   SCOPE_TYPE_FOR_REF,
   grantLedgerActor,
   grantWriteRow,
-  knownWriteFailure,
 } from "../rules/grant-write.rules.ts";
 import { AuthzDirectoryGrantsService } from "./authz-directory-grants.service.ts";
 import { AuthzGrantGuardsService } from "./authz-grant-guards.service.ts";
@@ -71,6 +69,10 @@ import {
   AuthzGrantWriterService,
   type AuthzGrantWriterPermissions,
 } from "./authz-grant-writer.service.ts";
+import {
+  AuthzMemberOffboardedNoticeService,
+  type AuthzMemberOffboardedNotice,
+} from "./authz-member-offboarded-notice.service.ts";
 import { AuthzOffboardingService } from "./authz-offboarding.service.ts";
 
 /**
@@ -87,6 +89,8 @@ type AuthzGrantsServiceOptions = {
   bindings: AuthzManagedGrantRepository;
   /** The permission side's reads the writer's guards need (escalation, limit, last admin). */
   permissions: AuthzGrantWriterPermissions;
+  /** Absent where nothing offboards; an unconnected notice refuses loudly when one does. */
+  offboarded?: AuthzMemberOffboardedNotice;
 };
 
 type AuthzAttachGrantRequest = Omit<AuthzAttachGrantInput, "actor" | "where"> & {
@@ -120,7 +124,10 @@ export class AuthzGrantsService extends AuthzGrantsServiceContract {
         writer: bindingWriter,
         permissions: options.permissions,
       }),
-      offboarding: AuthzOffboardingService.create(options.repository),
+      offboarding: AuthzOffboardingService.create({
+        repository: options.repository,
+        offboarded: options.offboarded ?? AuthzMemberOffboardedNoticeService.create(),
+      }),
       guards: AuthzGrantGuardsService.create({ repository: options.repository }),
     });
   }
@@ -195,7 +202,7 @@ export class AuthzGrantsService extends AuthzGrantsServiceContract {
         source,
       });
     } catch (error) {
-      this.rethrowKnownWriteFailure(error, {
+      AuthzGrantGuardsService.rethrowKnownWriteFailure(error, {
         scopeType: where.type,
         scopeId: where.id,
       });
@@ -222,7 +229,7 @@ export class AuthzGrantsService extends AuthzGrantsServiceContract {
     } catch (error) {
       // A role change can collide with a sibling binding the principal
       // already holds at the same scope - same knowable failure as attach.
-      this.rethrowKnownWriteFailure(error, { bindingId });
+      AuthzGrantGuardsService.rethrowKnownWriteFailure(error, { bindingId });
     }
 
     await this.options.epoch.bump({ organizationId });
@@ -239,7 +246,7 @@ export class AuthzGrantsService extends AuthzGrantsServiceContract {
         actor: grantLedgerActor(actor),
       });
     } catch (error) {
-      this.rethrowKnownWriteFailure(error, { bindingId });
+      AuthzGrantGuardsService.rethrowKnownWriteFailure(error, { bindingId });
     }
 
     await this.options.epoch.bump({ organizationId });
@@ -297,7 +304,7 @@ export class AuthzGrantsService extends AuthzGrantsServiceContract {
         actor: grantLedgerActor(actor),
       });
     } catch (error) {
-      this.rethrowKnownWriteFailure(error, {
+      AuthzGrantGuardsService.rethrowKnownWriteFailure(error, {
         scopeType: to.type,
         scopeId: to.id,
       });
@@ -365,6 +372,18 @@ export class AuthzGrantsService extends AuthzGrantsServiceContract {
   async revokeResourceGrants(args: AuthzRevokeResourceGrantsInput): Promise<void> {
     return this.options.ledger.revokeResourceGrants(args);
   }
+
+  findLiveSharedProjectGrants: AuthzCompatibilityLedger["findLiveSharedProjectGrants"] = (args) =>
+    this.options.ledger.findLiveSharedProjectGrants(args);
+
+  attachSharedProjectGrant: AuthzCompatibilityLedger["attachSharedProjectGrant"] = (args) =>
+    this.options.ledger.attachSharedProjectGrant(args);
+
+  awaitSharedProjectGrants: AuthzCompatibilityLedger["awaitSharedProjectGrants"] = (args) =>
+    this.options.ledger.awaitSharedProjectGrants(args);
+
+  revokeSharedProjectGrants: AuthzCompatibilityLedger["revokeSharedProjectGrants"] = (args) =>
+    this.options.ledger.revokeSharedProjectGrants(args);
 
   async changeBindingRole({ caller, ...args }: AuthzChangeBindingRoleInput): Promise<void> {
     await this.bindingWriter.assertRoleChangeWithinCaller({ ...args, caller });
@@ -444,27 +463,6 @@ export class AuthzGrantsService extends AuthzGrantsServiceContract {
 
   private nowMs(): number {
     return nowInstant().epochMilliseconds;
-  }
-
-  private rethrowKnownWriteFailure(
-    error: unknown,
-    { bindingId, ...meta }: { bindingId?: string } & Record<string, unknown>,
-  ): never {
-    const failure = knownWriteFailure(error);
-    const errorMeta = { ...meta };
-    if (bindingId) {
-      errorMeta.bindingId = bindingId;
-    }
-
-    if (failure === "duplicate") {
-      throw new DuplicateGrantError(errorMeta);
-    }
-
-    if (failure === "not_found") {
-      throw AuthzGrantGuardsService.bindingNotFound(errorMeta);
-    }
-
-    throw error;
   }
 
   private principalWhere(who: GrantPrincipal): BindingPrincipalWhere {

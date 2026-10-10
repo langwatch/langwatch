@@ -23,7 +23,6 @@ import {
   userApiSetAvatarInputSchema,
   userApiSetLastHomePathInputSchema,
   userApiSetNotificationPreferenceInputSchema,
-  userApiUnlinkAccountInputSchema,
   userApiUpdateNameInputSchema,
   userApiUserInputSchema,
 } from "./user.schemas.ts";
@@ -82,10 +81,6 @@ export const userTrpc = defineTrpcContract("user")
   .query("getLinkedAccounts")
   .withInput(userApiEmptyInputSchema)
   .withOutput(userApiLinkedAccountsSchema)
-
-  .mutation("unlinkAccount")
-  .withInput(userApiUnlinkAccountInputSchema)
-  .withOutput(userApiSuccessSchema)
 
   .query("secureAccountNudge")
   .withInput(userApiEmptyInputSchema)

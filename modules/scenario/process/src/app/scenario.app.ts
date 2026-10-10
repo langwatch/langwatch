@@ -193,7 +193,7 @@ const SCENARIO_KSUID_RESOURCE = "scenario";
 const SCENARIO_TEST_SUITE_KSUID_RESOURCE = "suite";
 
 /** What the process composes this feature's application from. */
-export interface ScenarioAppDependencies {
+interface ScenarioAppDependencies {
   agentTesting: AgentTestService;
   /** One HTTP agent call from its editor, run by the workflow engine and traced. */
   httpAgentTesting: HttpAgentTestService;
@@ -294,8 +294,8 @@ export class ScenarioModule implements ScenarioApi {
         ),
     );
     const nlpInternal = await secrets.into(ScenarioModule.secrets.nlpInternal, (secret) => secret);
-    // Resolved here, in the worker only, before any child spawns (Alex, 2026-09-28).
-    const voice = await VoicePublicUrlService.create().resolveForRole({
+    // Worker only, before any voice child spawns (Alex, 2026-09-28); the first voice run opens it.
+    const voice = VoicePublicUrlService.create().forRole({
       role: setup.role,
       configuredUrl: setup.config.voicePublicBaseUrl,
       tunnelEnabled: isVoiceTunnelEnabled(setup.config),
@@ -352,7 +352,7 @@ export class ScenarioModule implements ScenarioApi {
     });
 
     const childHost = {
-      voicePublicUrl: voice.publicUrl,
+      voicePublicUrl: voice.acquire,
       nlpServiceUrl,
       nlpInternalSecret: nlpInternal,
       isSaas: setup.config.isSaas,
@@ -1251,7 +1251,7 @@ export interface ScenarioChildBootstrap {
   start(input: {
     jobData: ExecutionJobData;
     environment: ScenarioChildEnvironment;
-  }): ScenarioChildExecutionSession;
+  }): Promise<ScenarioChildExecutionSession>;
 }
 
 export interface ScenarioClock {

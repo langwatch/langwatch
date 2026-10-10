@@ -3,8 +3,12 @@
  * `OrganizationModule.create` composes the lifecycle pipeline over the memory registry.
  * @see enterprise/modules/licensing/specs/licensing.feature
  */
+import { createHash } from "node:crypto";
+
 import {
   CONNECT_SERVICE_SWITCHED_EVENT_TYPE,
+  LICENSE_CLEARED_EVENT_TYPE,
+  LICENSE_STORED_EVENT_TYPE,
   LICENSE_SYNC_FINISHED_EVENT_TYPE,
   LICENSING_CUSTOMER_AGGREGATE_TYPE,
   LICENSING_CUSTOMER_EVENT_VERSION,
@@ -20,6 +24,7 @@ import { OrganizationModule } from "../organization.app.ts";
 import { organizationModuleSetup } from "./support/organization-module-setup.ts";
 
 const ORGANIZATION_ID = "organization_2abcConnectFacts";
+const sha256Hex = (value: string) => createHash("sha256").update(value).digest("hex");
 const LANDED_AT = Date.UTC(2026, 9, 9, 12);
 const FAILED_AT = Date.UTC(2026, 9, 10, 12);
 
@@ -32,7 +37,7 @@ async function application() {
   );
   const deliver = deliveryTo(app);
   await deliver({ type: SELF_HOSTED_CUSTOMER_LICENSED_EVENT_TYPE, data: { name: "Initech" } });
-  return { deliver, row: () => memory.organizations.get(ORGANIZATION_ID) };
+  return { deliver, memory, row: () => memory.organizations.get(ORGANIZATION_ID) };
 }
 
 function deliveryTo(app: OrganizationModule) {
@@ -110,6 +115,53 @@ describe("organization applying licensing's Connect facts", () => {
       });
       expect(row()?.connectLastSyncAt?.epochMilliseconds).toBe(LANDED_AT);
       expect(row()?.connectLastSyncError).toBe("license_sync_failed");
+    });
+  });
+
+  describe("when licensing records a stored licence and then clears it", () => {
+    /** @scenario "Organization mirrors the licence licensing stored and clears it when licensing does" */
+    it("writes the key and its dates onto its columns, then clears them", async () => {
+      const { deliver, memory, row } = await application();
+      memory.licensingLicenseKeys.set(ORGANIZATION_ID, "key");
+
+      await deliver({
+        type: LICENSE_STORED_EVENT_TYPE,
+        data: {
+          licenseKeyFingerprint: sha256Hex("key"),
+          expiresAt: FAILED_AT,
+          validatedAt: LANDED_AT,
+        },
+      });
+      expect(row()?.license).toBe("key");
+      expect(row()?.licenseExpiresAt?.epochMilliseconds).toBe(FAILED_AT);
+      expect(row()?.licenseLastValidatedAt?.epochMilliseconds).toBe(LANDED_AT);
+
+      await deliver({ type: LICENSE_CLEARED_EVENT_TYPE, data: {}, occurredAt: FAILED_AT });
+      expect(row()?.license ?? null).toBeNull();
+      expect(row()?.licenseExpiresAt ?? null).toBeNull();
+    });
+
+    it("keeps its columns when licensing's row no longer holds the fingerprinted key", async () => {
+      const { deliver, memory, row } = await application();
+      memory.licensingLicenseKeys.set(ORGANIZATION_ID, "newer-key");
+
+      await deliver({
+        type: LICENSE_STORED_EVENT_TYPE,
+        data: { licenseKeyFingerprint: sha256Hex("key"), expiresAt: FAILED_AT, validatedAt: null },
+      });
+      expect(row()?.license ?? null).toBeNull();
+    });
+
+    it("drops a licence fact for an organisation that is gone", async () => {
+      const { deliver } = await application();
+
+      await expect(
+        deliver({
+          type: LICENSE_CLEARED_EVENT_TYPE,
+          data: {},
+          organizationId: "organization_gone",
+        }),
+      ).resolves.toBeUndefined();
     });
   });
 

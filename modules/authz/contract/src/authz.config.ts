@@ -1,5 +1,6 @@
 import { Config, type ConfigOf } from "@langwatch/config";
 import { defineBrowserConfig } from "@langwatch/config/public-app-config";
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 /**
@@ -31,9 +32,11 @@ export const authzServerConfig = Config.define((c) => ({
 
 export type AuthzServerConfig = ConfigOf<typeof authzServerConfig>;
 
-export const authzWebConfigSchema = z.strictObject({
+const authzWebConfigSchemaDefinition = z.strictObject({
   demoProjectSlug: z.string().min(1).optional(),
 });
+export interface AuthzWebConfigSchema extends Named<typeof authzWebConfigSchemaDefinition> {}
+export const authzWebConfigSchema: AuthzWebConfigSchema = authzWebConfigSchemaDefinition;
 
 export type AuthzWebConfig = z.infer<typeof authzWebConfigSchema>;
 

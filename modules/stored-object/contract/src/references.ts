@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import { storedObjectDeliveryAudienceSchema } from "./audiences.ts";
@@ -18,7 +19,7 @@ import {
  * A durable feature-owned reference. It intentionally carries presentation
  * facts and an audience, but never a provider or service delivery URL.
  */
-export const storedObjectReferenceSchema = z
+const storedObjectReferenceSchemaDefinition = z
   .object({
     projectId: storedObjectProjectIdSchema,
     id: storedObjectIdSchema,
@@ -29,12 +30,17 @@ export const storedObjectReferenceSchema = z
     audience: storedObjectDeliveryAudienceSchema,
   })
   .strict();
+export interface StoredObjectReferenceSchema extends Named<
+  typeof storedObjectReferenceSchemaDefinition
+> {}
+export const storedObjectReferenceSchema: StoredObjectReferenceSchema =
+  storedObjectReferenceSchemaDefinition;
 export type StoredObjectReference = z.infer<typeof storedObjectReferenceSchema>;
 
 export const storedObjectDeliveryMethodSchema = z.enum(["GET", "HEAD"]);
 export type StoredObjectDeliveryMethod = z.infer<typeof storedObjectDeliveryMethodSchema>;
 
-export const storedObjectDeliveryCapabilitySchema = z
+const storedObjectDeliveryCapabilitySchemaDefinition = z
   .object({
     url: z.string().url(),
     expiresAt: storedObjectTimestampSchema,
@@ -43,12 +49,22 @@ export const storedObjectDeliveryCapabilitySchema = z
     generation: storedObjectGenerationSchema,
   })
   .strict();
+export interface StoredObjectDeliveryCapabilitySchema extends Named<
+  typeof storedObjectDeliveryCapabilitySchemaDefinition
+> {}
+export const storedObjectDeliveryCapabilitySchema: StoredObjectDeliveryCapabilitySchema =
+  storedObjectDeliveryCapabilitySchemaDefinition;
 export type StoredObjectDeliveryCapability = z.infer<typeof storedObjectDeliveryCapabilitySchema>;
 
-export const resolvedStoredObjectSchema = z
+const resolvedStoredObjectSchemaDefinition = z
   .object({
     reference: storedObjectReferenceSchema,
     capability: storedObjectDeliveryCapabilitySchema,
   })
   .strict();
+export interface ResolvedStoredObjectSchema extends Named<
+  typeof resolvedStoredObjectSchemaDefinition
+> {}
+export const resolvedStoredObjectSchema: ResolvedStoredObjectSchema =
+  resolvedStoredObjectSchemaDefinition;
 export type ResolvedStoredObject = z.infer<typeof resolvedStoredObjectSchema>;

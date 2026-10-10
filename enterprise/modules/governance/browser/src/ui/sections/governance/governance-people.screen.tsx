@@ -31,7 +31,7 @@ import {
   Users,
   UserX,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { api, type RouterOutputs } from "../../../behavior/governance-api.ts";
 import { useGovernanceToaster, useShowErrorToast } from "../../../behavior/governance-feedback.ts";
@@ -370,32 +370,21 @@ function usePeopleTableRows({
   sampleActive: boolean;
   reads: ReturnType<typeof usePeopleReads>;
 }) {
-  return useMemo(
-    () =>
-      sampleActive
-        ? samplePeopleRows()
-        : mergePeopleRows({
-            spend: reads.spend.data ?? [],
-            discovered: reads.people.data ?? [],
-            departmentForActor: (actor) =>
-              departmentNameForActor({
-                actor,
-                assignments: reads.assignments.data,
-                departments: reads.departments.data,
-              }),
-            memberNameForActor: (actor) =>
-              reads.assignments.data?.users.find(
-                (user) => user.email === actor || user.id === actor,
-              )?.name ?? null,
+  return sampleActive
+    ? samplePeopleRows()
+    : mergePeopleRows({
+        spend: reads.spend.data ?? [],
+        discovered: reads.people.data ?? [],
+        departmentForActor: (actor) =>
+          departmentNameForActor({
+            actor,
+            assignments: reads.assignments.data,
+            departments: reads.departments.data,
           }),
-    [
-      sampleActive,
-      reads.spend.data,
-      reads.people.data,
-      reads.assignments.data,
-      reads.departments.data,
-    ],
-  );
+        memberNameForActor: (actor) =>
+          reads.assignments.data?.users.find((user) => user.email === actor || user.id === actor)
+            ?.name ?? null,
+      });
 }
 
 /**
@@ -549,6 +538,8 @@ function PeopleTabsSection({
 
   return (
     <Tabs.Root
+      colorPalette="accent"
+      size="sm"
       value={tab}
       onValueChange={({ value }) => onSelectTab(value)}
       variant="line"
@@ -594,18 +585,10 @@ function PeopleTabsSection({
 function PeopleTabsList({ summary }: { summary: PeopleSummary }) {
   return (
     <Tabs.List>
-      <Tabs.Trigger
-        value="people"
-        color="fg.muted"
-        _selected={{ color: "fg", fontWeight: "semibold" }}
-      >
+      <Tabs.Trigger value="people">
         <GovernanceTabLabel label="People" count={summary.people} />
       </Tabs.Trigger>
-      <Tabs.Trigger
-        value="departments"
-        color="fg.muted"
-        _selected={{ color: "fg", fontWeight: "semibold" }}
-      >
+      <Tabs.Trigger value="departments">
         <GovernanceTabLabel label="Departments" count={summary.departments} />
       </Tabs.Trigger>
     </Tabs.List>
@@ -1154,7 +1137,7 @@ function AssignmentLink({
         _hover={{ backgroundColor: "bg.muted" }}
       >
         <VStack align="start" gap={0}>
-          <Text fontSize="sm" fontWeight="medium" color="blue.600">
+          <Text fontSize="sm" fontWeight="medium" color="blue.fg">
             {title}
           </Text>
           <Text fontSize="xs" color="fg.muted" maxW="2xl">
@@ -1368,7 +1351,7 @@ function DepartmentRow({
               <Menu.Item value="rename" onClick={onRename}>
                 <Pencil size={14} /> Rename
               </Menu.Item>
-              <Menu.Item value="archive" color="red.500" onClick={onArchive}>
+              <Menu.Item value="archive" color="red.fg" onClick={onArchive}>
                 <Archive size={14} /> Archive
               </Menu.Item>
             </Menu.Content>

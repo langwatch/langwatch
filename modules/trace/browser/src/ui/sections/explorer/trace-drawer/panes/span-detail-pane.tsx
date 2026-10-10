@@ -51,9 +51,9 @@ export const SpanDetailPane = memo(function SpanDetailPane({
       // ancestor.
       overflow="hidden"
       style={{ height: "100%" }}
-      bg={{ base: "bg.surface", _dark: "bg.panel" }}
+      bg={"bg.card"}
     >
-      <Box flexShrink={0} bg={{ base: "bg.surface", _dark: "bg.panel" }}>
+      <Box flexShrink={0} bg={"bg.card"}>
         <IsolatedErrorBoundary scope="Couldn't render span tabs" resetKeys={[trace.traceId]}>
           <SpanTabBar
             spanTree={spans}

@@ -11,13 +11,21 @@ import { describe, expect, it, vi } from "vitest";
 
 import { GrantsFake } from "../../__tests__/support/grants-fake.ts";
 import { HeldConnectionsFake } from "../../__tests__/support/held-connections-fake.ts";
-import { OrganizationAdministrationFake } from "../../__tests__/support/organization-administration-fake.ts";
+import {
+  MembersFake,
+  OrganizationAdministrationFake,
+} from "../../__tests__/support/organization-administration-fake.ts";
 import { scimRepositoryFixture } from "../../__tests__/support/scim-repository-fixture.ts";
 import { MemoryScimRepository } from "../../repositories/memory/memory.scim.repository.ts";
 import type { ScimRepository } from "../../repositories/scim.repository.ts";
 import type { ScimUserProvisioning } from "../scim-provisioning.service.ts";
 import { ScimService } from "../scim.service.ts";
 import { QuietScimSyncLifecycle } from "./support/quiet-scim-sync-lifecycle.ts";
+
+/** Every seat free, so these tests admit full members (seat-limit-at-provisioning.feature). */
+const openSeats = {
+  countMemberSeats: async () => ({ fullMembers: 0, liteMembers: 0, developers: 0 }),
+};
 
 class RecordingScimSyncLifecycle extends QuietScimSyncLifecycle {
   tokenIssued = vi.fn(async () => undefined);
@@ -48,6 +56,7 @@ function service(
   entitlements: Pick<EntitlementApi, "getActivePlan">,
 ): ScimService {
   return ScimService.create({
+    members: new MembersFake(),
     connections: HeldConnectionsFake.of(),
     prisma: repository,
     writer: new GrantsFake(),
@@ -64,6 +73,7 @@ function service(
     lifecycle,
     provenOffboarding: false,
     tokenPepper: "scim-test-pepper",
+    seats: openSeats,
   });
 }
 

@@ -4,12 +4,13 @@
  * transport bridges them into the chunk stream `useChat` reads.
  */
 
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import { cliResultDigestSchema } from "./cards/digest.ts";
 import { cliToolResultSchema } from "./cards/tool-result.ts";
 
-export const langyStreamEntrySchema = z.discriminatedUnion("type", [
+const langyStreamEntrySchemaDefinition = z.discriminatedUnion("type", [
   z.object({ type: z.literal("delta"), text: z.string() }),
   z.object({ type: z.literal("reasoning"), text: z.string() }),
   z.object({ type: z.literal("status"), status: z.string() }),
@@ -115,5 +116,7 @@ export const langyStreamEntrySchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("end") }),
   z.object({ type: z.literal("error"), error: z.string() }),
 ]);
+export interface LangyStreamEntrySchema extends Named<typeof langyStreamEntrySchemaDefinition> {}
+export const langyStreamEntrySchema: LangyStreamEntrySchema = langyStreamEntrySchemaDefinition;
 
 export type LangyStreamEntry = z.infer<typeof langyStreamEntrySchema>;

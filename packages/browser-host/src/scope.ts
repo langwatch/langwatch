@@ -1,5 +1,5 @@
 /**
- * Where the reader is standing, as a capability of its own: scope answers a
+ * Where the reader is standing, as a host service of its own: scope answers a
  * different question from "who is here" and settles on its own schedule.
  */
 

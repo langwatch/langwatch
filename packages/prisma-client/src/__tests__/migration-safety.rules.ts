@@ -8,12 +8,24 @@
 export const FLOOR_AND_LOCK_RULES: ReadonlySet<string> = new Set([
   "new-foreign-key",
   "retirement-note-above-floor",
+  "contract-without-archive-note",
   "set-not-null-on-populated-column",
   "enum-recreated",
   "unique-or-validated-constraint-on-existing-table",
   "plain-index-on-existing-table",
   "alter-column-type",
 ]);
+
+/** The rules that keep the api serving through the upgrade (Alex, 2026-10-09), above the floor. */
+export const GRACEFUL_RULES: ReadonlySet<string> = new Set([
+  "inline-dml-on-existing-table",
+  "volatile-default-on-existing-table",
+  "several-alters-on-one-table",
+  "lock-timeout-above-ceiling",
+]);
+
+/** The runner's lock_timeout; a migration never waits longer for a lock. */
+export const LOCK_TIMEOUT_CEILING_MS = 2_000;
 
 /** One refusal: what is wrong, and what to write instead. */
 export interface MigrationFinding {
@@ -36,6 +48,13 @@ const RETIREMENT_FIX =
   "`-- contract: retired in <release>` above the statement, naming the release that stopped " +
   "using it; if it has not, ship that code first — a rollback to the previous image must " +
   "still find its schema.";
+
+const ARCHIVE_NOTE = /^[ \t]*--[ \t]*archive:[ \t]*(?:none[ \t]*\(.+\)|(?!none\b)\S+)/im;
+
+const ARCHIVE_FIX =
+  "add `-- archive: <table>` naming each table the contract archives (archive-or-fail copies " +
+  "it into _retired_<table>_<release> before the drop), or `-- archive: none (<reason>)` " +
+  "when the dropped data has no value, for example an empty or derived column.";
 
 const RENAME_FIX =
   "never rename in place: add the new name, backfill it, write both (or read both), switch " +
@@ -148,7 +167,18 @@ function dropFindings({
   floor: string;
 }): Finding[] {
   const pattern = /\bDROP\s+(COLUMN|TABLE|TYPE)\s+(?:IF\s+EXISTS\s+)?"?([\w.]+)"?/gi;
-  return [...live.matchAll(pattern)].flatMap((match): Finding[] => {
+  const first = [...live.matchAll(pattern)].find((match) => match[1]!.toUpperCase() !== "TYPE");
+  const unarchived: Finding[] =
+    first && !ARCHIVE_NOTE.test(sql)
+      ? [
+          {
+            rule: "contract-without-archive-note",
+            problem: `drops ${first[1]!.toLowerCase()} ${first[2]} with no archive note`,
+            fix: ARCHIVE_FIX,
+          },
+        ]
+      : [];
+  const retirements = [...live.matchAll(pattern)].flatMap((match): Finding[] => {
     const what = `${match[1]!.toLowerCase()} ${match[2]}`;
     if (!retiredBefore(sql, match.index)) {
       return [
@@ -177,6 +207,7 @@ function dropFindings({
       },
     ];
   });
+  return [...retirements, ...unarchived];
 }
 
 function notNullFindings(live: string): Finding[] {
@@ -360,6 +391,103 @@ function renameFindings(live: string): Finding[] {
   return [...columns, ...tables];
 }
 
+const DML = new RegExp(
+  `(?<!\\bDO\\s+)\\bUPDATE\\s+(?:ONLY\\s+)?(${IDENT})\\s+(?:AS\\s+)?(?:\\w+\\s+)?SET\\b|\\bDELETE\\s+FROM\\s+(?:ONLY\\s+)?(${IDENT})`,
+  "gi",
+);
+
+function inlineDmlFindings({ live, created }: Scoped): Finding[] {
+  return [...live.matchAll(DML)].flatMap((match): Finding[] => {
+    const table = bareName(match[1] ?? match[2]!);
+    if (created.has(table)) return [];
+    return [
+      {
+        rule: "inline-dml-on-existing-table",
+        problem: `${match[1] ? "updates" : "deletes from"} existing table ${table} inside the migration`,
+        fix:
+          "an UPDATE or DELETE locks every row it touches until it finishes, so the api's " +
+          "writes to those rows wait for the whole statement. Ship the change as a background step " +
+          "(defineMigrationStep, mode background) that works in batches with a checkpoint; " +
+          "the migration-data-step skill shows the shape.",
+      },
+    ];
+  });
+}
+
+const VOLATILE_DEFAULT =
+  /\bDEFAULT\s+\(?\s*(gen_random_uuid|uuid_generate_v\w+|random|clock_timestamp|timeofday|nextval)\s*\(/i;
+
+function volatileDefaultFindings({ live, created }: Scoped): Finding[] {
+  return statementsOf(live).flatMap(({ text }) => {
+    const table = alteredTable(text);
+    if (!table || created.has(table)) return [];
+    return text
+      .split(/\bADD\s+COLUMN\s+(?:IF\s+NOT\s+EXISTS\s+)?/i)
+      .slice(1)
+      .flatMap((column): Finding[] => {
+        const name = /^"?(\w+)"?/.exec(column)?.[1] ?? "a column";
+        const volatile =
+          VOLATILE_DEFAULT.exec(column)?.[1] ??
+          /^"?\w+"?\s+((?:SMALL|BIG)?SERIAL)\b/i.exec(column)?.[1];
+        if (!volatile) return [];
+        return [
+          {
+            rule: "volatile-default-on-existing-table",
+            problem: `adds ${table}.${name} with a volatile default (${volatile})`,
+            fix:
+              "a volatile default is computed per row, so Postgres rewrites the whole table under " +
+              "ACCESS EXCLUSIVE and every live read waits. Add the column nullable (or with a " +
+              "constant default), fill it with a background data step, and let the application " +
+              "set it on insert. now() and CURRENT_TIMESTAMP are stable, not volatile, and are fine.",
+          },
+        ];
+      });
+  });
+}
+
+function severalAltersFindings({ live, created }: Scoped): Finding[] {
+  const counts = new Map<string, number>();
+  for (const { text } of statementsOf(live)) {
+    const table = alteredTable(text);
+    if (table && !created.has(table)) counts.set(table, (counts.get(table) ?? 0) + 1);
+  }
+  return [...counts]
+    .filter(([, count]) => count > 1)
+    .map(([table, count]) => ({
+      rule: "several-alters-on-one-table",
+      problem: `alters existing table ${table} in ${count} statements`,
+      fix:
+        "each ALTER TABLE queues for ACCESS EXCLUSIVE and every live read on the table queues " +
+        "behind each wait in turn; one statement waits once. Write one ALTER TABLE with its " +
+        "actions separated by commas, or ship the others in later migrations.",
+    }));
+}
+
+const LOCK_TIMEOUT =
+  /\b(?:SET\s+(?:LOCAL\s+|SESSION\s+)?lock_timeout\s*(?:=|TO)\s*|set_config\s*\(\s*'lock_timeout'\s*,\s*)'?(\d+)\s*(ms|s|min|h)?'?/gi;
+const UNIT_MS: Record<string, number> = { ms: 1, s: 1_000, min: 60_000, h: 3_600_000 };
+
+function lockTimeoutFindings(live: string): Finding[] {
+  return [...live.matchAll(LOCK_TIMEOUT)].flatMap((match): Finding[] => {
+    const ms = Number(match[1]) * UNIT_MS[(match[2] ?? "ms").toLowerCase()]!;
+    if (ms > 0 && ms <= LOCK_TIMEOUT_CEILING_MS) return [];
+    return [
+      {
+        rule: "lock-timeout-above-ceiling",
+        problem:
+          ms === 0
+            ? "turns lock_timeout off"
+            : `sets lock_timeout to ${ms} ms, above the ${LOCK_TIMEOUT_CEILING_MS} ms ceiling`,
+        fix:
+          `the runner sets lock_timeout ${LOCK_TIMEOUT_CEILING_MS} ms and retries a migration a ` +
+          "lock cancelled; a longer wait queues every live read behind the lock the migration " +
+          "waits for. Remove the SET; if one lock cannot be had in time, split the migration so " +
+          "each one takes a single lock.",
+      },
+    ];
+  });
+}
+
 /**
  * Every rule the Postgres scanner applies to one migration folder's SQL. `floor` is the
  * LTS floor release: a retirement note must name a release at or below it.
@@ -380,6 +508,10 @@ export function scanPostgresMigration({
     ...indexAndConstraintFindings({ sql, live, created }),
     ...foreignKeyFindings(live),
     ...renameFindings(live),
+    ...inlineDmlFindings({ live, created }),
+    ...volatileDefaultFindings({ live, created }),
+    ...severalAltersFindings({ live, created }),
+    ...lockTimeoutFindings(live),
   ].map((finding) => ({ migration: name, ...finding }));
 }
 

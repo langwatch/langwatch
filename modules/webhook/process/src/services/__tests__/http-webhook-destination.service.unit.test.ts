@@ -14,7 +14,12 @@ const egress = createApiFixture<WebhookEgressService>({ send: mockedSend });
 const URL_UNDER_TEST = "https://receiver.example.com/webhooks/langwatch";
 
 const destination = () =>
-  HttpWebhookDestinationService.create({ url: URL_UNDER_TEST, egress, allowInsecureLocal: false });
+  HttpWebhookDestinationService.create({
+    url: URL_UNDER_TEST,
+    egress,
+    allowInsecureLocal: false,
+    allowSelfSignedCertificate: false,
+  });
 
 function request(overrides: Partial<WebhookDispatchRequest> = {}): WebhookDispatchRequest {
   return {
@@ -41,6 +46,22 @@ function receiverAnswers(status: number, retryAfterMs?: number) {
 describe("HttpWebhookDestinationService", () => {
   afterEach(() => {
     vi.clearAllMocks();
+  });
+
+  describe("given an endpoint that opted in to a self-signed certificate", () => {
+    /** @scenario "A self-hosted endpoint verifies the receiver's certificate unless it opted out" */
+    it("hands the opt-in to the sender with the send", async () => {
+      receiverAnswers(200);
+      await HttpWebhookDestinationService.create({
+        url: URL_UNDER_TEST,
+        egress,
+        allowInsecureLocal: false,
+        allowSelfSignedCertificate: true,
+      }).send(request());
+      expect(mockedSend).toHaveBeenCalledWith(
+        expect.objectContaining({ allowSelfSignedCertificate: true }),
+      );
+    });
   });
 
   describe("given a receiver answer", () => {

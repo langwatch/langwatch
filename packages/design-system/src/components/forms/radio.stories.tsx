@@ -4,7 +4,14 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { Radio, RadioGroup } from "./radio.tsx";
 
 const meta = {
-  title: "Primitives/Radio",
+  title: "Inputs and forms/Radio",
+  parameters: {
+    usage: {
+      use: "One choice out of two to five options that should all stay visible.",
+      avoid:
+        "Six or more options, or options loaded from data: use Select. Switching a view: use Segmented control.",
+    },
+  },
   component: RadioGroup,
   tags: ["autodocs"],
   args: { defaultValue: "member" },

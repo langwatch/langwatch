@@ -6,17 +6,17 @@ like a slow boot are covered by the `haven` skill's `troubleshooting.md`.
 
 ## Processes
 
-| Process               | Package                   | What it is                                            |
-| --------------------- | ------------------------- | ----------------------------------------------------- |
-| `apps/ui`             | `@langwatch/ui`           | The browser application (Vite SPA, :5560)             |
-| `apps/api`            | `@langwatch/platform-api` | tRPC + REST + SSE, serves the browser bundle (:6560)  |
-| `apps/worker`         | `@langwatch/worker`       | Queues, schedulers, projections, subscribers          |
-| `apps/tasks`          | `@langwatch/tasks`        | `pnpm task upgrade` and one-shot tasks, before serve  |
-| `apps/server`         | `@langwatch/server`       | The `npx @langwatch/server` CLI                       |
-| `services/aigateway`  | Go                        | Virtual-key data plane (:5563)                        |
-| `services/nlpgo`      | Go                        | Optimization-studio executions and evaluators (:5561) |
-| `services/langyagent` | Go                        | Langy conversation manager (PORT+4)                   |
-| `services/langevals`  | Python                    | Evaluators                                            |
+| Process               | Package                   | What it is                                                                                  |
+| --------------------- | ------------------------- | ------------------------------------------------------------------------------------------- |
+| `apps/ui`             | `@langwatch/ui`           | The browser application (Vite-built SPA the api serves; Vite dev server only under `--hmr`) |
+| `apps/api`            | `@langwatch/platform-api` | tRPC + REST + SSE, serves the browser bundle (:6560; :5560 under `pnpm dev`)                |
+| `apps/worker`         | `@langwatch/worker`       | Queues, schedulers, projections, subscribers                                                |
+| `apps/tasks`          | `@langwatch/tasks`        | `pnpm task upgrade` and one-shot tasks, before serve                                        |
+| `apps/server`         | `@langwatch/server`       | The `npx @langwatch/server` CLI                                                             |
+| `services/aigateway`  | Go                        | Virtual-key data plane (:5563)                                                              |
+| `services/nlpgo`      | Go                        | Optimization-studio executions and evaluators (:5561)                                       |
+| `services/langyagent` | Go                        | Langy conversation manager (PORT+4)                                                         |
+| `services/langevals`  | Python                    | Evaluators                                                                                  |
 
 ui, api and worker always run together. A stack missing one serves pages and
 quietly processes no jobs, which looks healthy until a job was expected to run.
@@ -29,10 +29,63 @@ every process it starts, and `eval "$(haven env)"` puts the same set in your
 shell.
 
 Credential-carrying variables are classified once in `packages/secrets`
-(ADR-132). Each app resolves them through an ordered chain (env/.env, then
-1Password when `LANGWATCH_SECRETS_VAULT` is set, then a refusal by name) before
+(ADR-132). Each app resolves them through an ordered chain (env, `.env`, then
+1Password when `LANGWATCH_OP_ACCOUNT` is set, then a refusal by name) before
 its Zod parse. Never read `.env` to find a value and never print one:
 `haven env` masks every classified key (`--reveal` for the shell form).
+
+### Credentials haven makes up
+
+A haven stack needs no real credential. haven makes up `NEXTAUTH_SECRET`,
+`CREDENTIALS_SECRET`, `LANGWATCH_INSTANCE_ADMIN_API_KEY` and
+`HAVEN_SEED_SCIM_TOKEN` per stack, keeps them in its own state (never the
+checkout), and rotates them only on `haven down --destroy`; one you set in `.env` wins.
+The seeded admin login, slugs and access tokens are fixed. `haven db seed` ends by
+printing all of them, masked (`--reveal` shows the values, `--json` gives one
+object); `haven env --reveal` has the same credentials.
+
+`haven browser login --as <admin|email>` signs in to this stack's own app through the normal email
+sign-in with the credentials above and writes a Playwright storage-state file (mode 600) without printing the password; it refuses any app that is not `*.localhost`.
+`haven browser open|snap|shot|eval|close --lane <name> --as <who>` drives one shared
+headless shell per stack with a signed-in context per lane, for agent testers: see the
+`haven` skill.
+
+Stripe is paymentsim on every local and CI stack: `haven up` runs it and points
+billing at it unless `.env` or the shell sets `STRIPE_SECRET_KEY`,
+`STRIPE_WEBHOOK_SECRET` or `STRIPE_API_BASE`, in which case your keys are used.
+`haven up` prints which (`Stripe: paymentsim` or `Stripe: your key from .env`).
+
+### Keeping a credential in 1Password
+
+Addressing is convention plus one key (ARCHITECTURE.md §6): vault `Private`,
+item `LangWatch`, one field per secret named exactly its `Secret.load` id
+(`STRIPE_SECRET_KEY`), read with `op read` through the desktop app's CLI
+integration. There is no `op://` reference in `.env`: a value there is used
+literally.
+
+1. `op account list`; the URL's subdomain is your account shorthand.
+2. Add the field (empty), then paste the value in the 1Password app, never on a
+   command line. `op item edit` if `LangWatch` already exists in `Private`:
+   ```bash
+   op item create --account <shorthand> --vault Private --category "Secure Note" \
+     --title LangWatch 'STRIPE_SECRET_KEY[password]=' 'STRIPE_WEBHOOK_SECRET[password]='
+   ```
+3. In `.env`: delete the moved lines (env and `.env` answer first, so a line
+   left behind wins) and set `LANGWATCH_OP_ACCOUNT="<shorthand>"`.
+4. `haven down && haven up` (a restart keeps the old env), then
+   `haven env --agent | grep -E 'STRIPE|LANGWATCH_OP'` shows only the account.
+
+Under haven, a Stripe pair kept only in 1Password is not used: haven sees no
+Stripe key in env or `.env`, injects paymentsim's pair, and env answers first.
+Keep your own Stripe test keys in `.env` to use them.
+
+With the account set, each boot probes once with `op whoami`, then reads every
+handle missing from env and `.env` in parallel. 1Password is best effort: when
+`op` is missing, locked, signed out or times out, the boot logs one
+`[secrets] 1Password skipped` warning with the reason and carries on without
+it, so optional secrets stay unset and a missing required one fails by name.
+Unlock 1Password and restart to pick the values up. Production refuses the
+account by name.
 
 ## haven (thuishaven)
 
@@ -44,10 +97,10 @@ there is no `/etc/hosts`, no sudo and no port collision between worktrees.
 
 ```bash
 make haven up          # start this worktree's stack (bootstraps portless on first run)
-make haven install     # go install so plain `haven …` works, then check prerequisites
+make haven self install     # go install so plain `haven …` works, then check prerequisites
 make haven status      # every stack, service health, shared servers
 haven up +langy        # add a service to this stack, sticky (likewise -gateway, -nlp, -langy)
-haven logs nlp -t      # tail one service's logs from any terminal
+haven logs nlp -f      # tail one service's logs from any terminal
 ```
 
 haven supervises two Node lanes, `ui` and `api`, beside one `go` lane holding the
@@ -128,7 +181,7 @@ adds a sample call; `VOICESIM_MAX_CALLS` and `VOICESIM_MAX_EVENTS_PER_CALL` cap 
 `observability.langwatch.localhost` proxies local Grafana;
 `telemetry.langwatch.localhost` fans OTLP out to every running stack. When
 driving haven as an agent, add `--agent` (or `HAVEN_AGENT=1`);
-`haven status --json` is machine-readable. Full reference:
+`haven status --json <fields>` is machine-readable (bare `--json` lists the fields). Full reference:
 `tools/thuishaven/README.md`.
 
 `haven up` also installs `haven gate` as a PreToolUse hook in the worktree's
@@ -154,30 +207,41 @@ test databases; dev data untouched). `CI=1` forces testcontainers; never set it
 locally. Only `make observability` and the sandboxed langy tiers still want a
 container, and both are opt-in.
 
+The app pins every Postgres session to `TimeZone=UTC`, whatever the server's own zone. In
+`psql` the server zone still applies (brew's is often `Europe/London`): compare
+`timestamptz` values with `now()` there, and rows written before the pin may still read
+one offset early.
+
 ## Plain `pnpm dev`
 
-Without haven, every port derives from `PORT` (default 5560): ui on `PORT`, api
-on `PORT+1000`, worker metrics on `PORT-2561`, gateway on `PORT+3`, nlp on
-:5561, langy on `PORT+4`. If the ports are held, `dev/scripts/check-ports.sh`
-refuses and prints two ready-to-paste options (a free slot via
-`PORT=5570 pnpm dev`, or a port-scoped kill). Paste one; don't hunt processes by
-hand. `dev/scripts/kill-dev-tree.sh` already does it correctly.
+`pnpm dev` matches `haven up`: it builds the UI once (the cached Nx target
+`@langwatch/ui:build:local`, copied to `apps/ui/dist/client.dev`) and the `backend`
+lane serves it on `PORT` (default 5560), with no Vite. `pnpm dev:hmr` matches
+`haven up --hmr`: Vite runs as its own `ui` lane on `PORT` and proxies `/api` to the
+backend on `PORT+1000`. Vite runs in no other shape (ADR-168, amendment 2026-10-10).
+Worker metrics sit on `PORT-2561`, the gateway on `PORT+3`, nlp on :5561, langy on
+`PORT+4`. If the ports are held, `dev/scripts/check-ports.sh` refuses and prints two
+ready-to-paste options (a free slot via `PORT=5570 pnpm dev`, or a port-scoped kill).
+Paste one; don't hunt processes by hand. `dev/scripts/kill-dev-tree.sh` already does
+it correctly.
 
-Locally there are two Node processes: the `api` lane runs the api and the worker
-in one process. It is a launcher, not a process role: each still resolves its
-own secrets, config and graph; boot is worker then api, and shutdown drains the
-worker first. Production runs three Node deployments.
+The `backend` lane is api and worker in one Node process. It is a launcher, not a
+process role: each still resolves its own secrets, config and graph; the api and
+worker boot together (the api answers while the worker upgrades), and shutdown
+drains the worker first. Production runs three Node deployments.
 
-| Script                                   | What runs                                                                                |
-| ---------------------------------------- | ---------------------------------------------------------------------------------------- |
-| `pnpm dev`                               | ui + backend + go (+ langy when selected)                                                |
-| `pnpm dev:ui` / `dev:backend` / `dev:go` | one lane alone                                                                           |
-| `pnpm dev:one`                           | ui + api + worker in one Node process (see "One process" below)                          |
-| `pnpm dev:api` + `pnpm dev:worker`       | the production process shape; use when a blocked worker job must not read as API latency |
+| Script                             | What runs                                                                                |
+| ---------------------------------- | ---------------------------------------------------------------------------------------- |
+| `pnpm dev`                         | UI built once, then backend (api + worker, serving it) + go (+ langy when selected)      |
+| `pnpm dev:hmr`                     | the same, but a Vite `ui` lane serves the UI with HMR instead of the build               |
+| `pnpm dev:backend` / `dev:go`      | one lane alone                                                                           |
+| `pnpm dev:api` + `pnpm dev:worker` | the production process shape; use when a blocked worker job must not read as API latency |
 
-Both Node lanes restart on change, debounced by
-`LANGWATCH_DEV_WATCH_DEBOUNCE_MS` (default 2000 ms); the Go lane restarts through
-`air` on successful builds only. The Go services auto-start when the toolchain is
+The backend reloads on change, debounced by `LANGWATCH_DEV_WATCH_DEBOUNCE_MS`
+(default 2000 ms, never more than `LANGWATCH_DEV_WATCH_MAX_WAIT_MS`, 30 s, after
+the first change), one reload at a time; the Go lane restarts through
+`air` on successful builds only. A browser edit under `pnpm dev` needs a restart
+(or `pnpm dev:hmr`). The Go services auto-start when the toolchain is
 on PATH and reuse an existing listener from another worktree. Opt out per
 service with `LANGWATCH_SKIP_AIGATEWAY=1`, `LANGWATCH_SKIP_NLP=1` or
 `LANGWATCH_SKIP_LANGY=1` (plain `pnpm dev` only; under haven use
@@ -186,18 +250,76 @@ or `make service-watch svc=nlpgo`. The gateway needs the "AI GATEWAY" block
 from `.env.example`; langyagent writes its own `.env` block on first run and
 needs the worker binary (`pnpm --filter @langwatch/langyworker build:binary`).
 
-### One process (trial, ADR-168 B1)
+### The backend host (ADR-168)
 
-`LANGWATCH_DEV_ONE_PROCESS=1` (plain `pnpm dev`, or `haven up -f` with it
-exported or in `.env`) replaces the ui and backend lanes with one `app` lane:
-`tools/dev-runtime` hosts the UI's Vite server (`apps/ui/vite.config.ts`,
-unchanged, still proxying `/api`) and loads the api and worker through a Vite
-module runner. `pnpm dev:one` runs that process alone. Ports are unchanged.
+`tools/dev-runtime` loads the api and worker through a Vite module runner and
+re-links them in process on a change; it hosts no UI. A host that recycles itself
+exits 75 and the `dev` script's loop (or haven's lane) starts a fresh one. Under
+haven a still or `--watch` stack runs it as the `app` lane, serving the built UI;
+an `--hmr` stack runs it as the `api` lane beside a `ui` lane (`@langwatch/ui dev`).
+`LANGWATCH_DEV_ONE_PROCESS=0` (`haven up -f` with it exported or in `.env`) now only
+splits the simulators out of the `go` lane into a `sims` lane;
+`LANGWATCH_GO_ONE_PROCESS` is a deprecated alias, warned once and refused when it
+disagrees. The Go lane is watched under `haven up --watch` or `--hmr` (`haven go-watch`
+rebuilds and swaps the child); `LANGWATCH_GO_WATCH=0` keeps it off.
+
+**Stack modes.** One switch, never saved: each `haven up` uses only the flags passed, and
+switching needs no `--force` (ADR-064 amendment 2026-10-10 b). `haven status` names the mode.
+
+| command            | what serves `app.<slug>`                                          | after an edit                                                                        |
+| ------------------ | ----------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| `haven up` (still) | the api serves `apps/ui/dist/client`, no Vite, built once at `up` | nothing reloads; `haven reload [app\|api\|worker\|ui]` applies changes on demand     |
+| `haven up --watch` | the same, plus a `ui` lane, `haven ui-watch`                      | one UI build that exits, swapped in, open pages reload once idle; Node and Go reload |
+| `haven up --hmr`   | a `ui` lane: Vite 8 `bundledDev`, bundles rebuilt in memory       | HMR updates the page in place; Node and Go reload                                    |
+
+Commits and cherry-picks would reload the backend under anyone using the stack, so the default
+is still: `LANGWATCH_DEV_WATCH=0` in the Node lane and no Go rebuilds. `haven reload
+[app|api|worker]` re-links the backend in place (SIGUSR2; the UI and sessions stay up) and
+returns when the host logs `backend reload finished`. A changed env still needs `haven up -f`.
+`--ui=...` and `--watch=false` are retired and exit 64. Outside haven, `pnpm dev` is
+the still shape with a reloading backend and `pnpm dev:hmr` the `--hmr` one.
+
+**Still and watch.** The api serves `apps/ui/dist/client` the way production does, at the same
+`app.<slug>` URL, so sessions, cookies and routes are unchanged. There is no HMR. Both build at
+`up`; `haven reload ui` rebuilds beside the served bundle, swaps it in and returns once the swap
+is done. A `--watch` stack also runs a `ui` lane (`haven ui-watch`) that polls the browser source
+(`apps/ui`, `modules`, `enterprise/modules`, `packages`; tests and `process/` halves ignored) and,
+once edits settle (`LANGWATCH_UI_WATCH_DEBOUNCE_MS`, default 5 s quiet,
+`LANGWATCH_UI_WATCH_MAX_WAIT_MS`, default 60 s), runs one build that exits and swaps the bundle in
+(`haven logs ui` shows each duration; a failed build keeps the last good one). Every build is the
+cached Nx target `@langwatch/ui:build:local` (output `apps/ui/dist/client.local`, no gzip size
+report): a tree another worktree already built restores from the shared cache in seconds. A lock
+file (`dist/client.lock`) lets one build at a time use that output; the result moves to a
+per-build staging dir and is renamed over `dist/client`.
+
+**Open pages across a swap.** Each swap carries the previous build's hashed chunks forward, so a
+page opened before it never 404s on a lazy chunk; a chunk superseded more than 24 h ago is
+dropped at the next swap, and stack start drops every chunk the served build does not list
+(`dist/client/.build-assets`). On a `--watch` stack the api's port marks each page
+(`<meta name="haven-ui-watch">`); a marked page polls the served index and, when its entry chunk
+changed, reloads once nobody has touched it for 60 s (or at once when the tab is hidden). A stale
+chunk (a route or a `vite:preloadError`) waits the same way there; everywhere else, production
+included, it reloads at once and nothing polls. The idle time is the `haven-reload-idle-ms` key
+in the page's local storage. `haven reload app` still reloads the backend. Use a still stack for test
+drives and shared headless browsers: measured on `/governance`, a signed-in page costs about
+400 MB of browser RSS instead of 710 MB, with a quarter of the requests.
+
+Measured 2026-10-10 on a 10-core, 64 GB Mac under heavy load (load average 40 to 86), one `.tsx` edit:
+
+| mode      | edit to new bundle                                                        | RSS at rest                    | peak RSS                |
+| --------- | ------------------------------------------------------------------------- | ------------------------------ | ----------------------- |
+| still     | none (`haven reload ui`: a 21.5 to 25 s build, seconds from the Nx cache) | 0                              | 4.5 GB during a build   |
+| `--watch` | 33.5 s (about 12 s to notice and settle, then a 21.5 s build)             | about 35 MB (`haven ui-watch`) | 4.7 GB during the build |
+| `--hmr`   | not measured: the run was stopped                                         | about 5.5 GB                   | 5.6 GB                  |
+
+On `--watch`, add up to 5 s for the open page to see the swap, then the idle wait. A kept-warm
+`vite build --watch` was measured and dropped: an 18.8 s rebuild for 3.4 GB held at rest.
 
 A backend edit that touches a loaded file re-links only what it reaches, then
 drains the old generation (worker, then api) and boots the new one; the browser
 keeps its HMR socket. A change that does not link leaves the old generation
-serving; a failed boot waits for the next change. Each generation logs one
+serving; a failed boot waits for the next change. An edit that lands during a
+boot, the first one included, is answered by one follow-up reload. Each generation logs one
 `backend ready` line with its number, changed files, `drainMs`, `readyMs` and
 `rssMiB`. Under haven, `haven logs ui|api|worker` read the `app` capture;
 `haven restart ui` or `api` restarts the whole process.
@@ -224,8 +346,8 @@ pnpm --filter @langwatch/tasks task upgrade status     # what the ledger says
 pnpm --filter @langwatch/tasks task upgrade plan       # what an upgrade would apply
 ```
 
-`pnpm prisma:migrate` and `pnpm clickhouse:migrate` still exist but bypass the ledger, so the gate
-keeps refusing until `upgrade` records them. ClickHouse is required: a stack without it refuses to
+`pnpm prisma:migrate` and `pnpm clickhouse:migrate` are aliases of `pnpm task upgrade`: each runs
+the whole upgrade (Postgres and every ClickHouse target) through the ledger. ClickHouse is required: a stack without it refuses to
 serve. Live api and worker suites run `upgrade` once per test process on the test stores
 (`specs/upgrade/live-test-fixtures.feature`). Writing a migration: the `migration` skill.
 
@@ -253,3 +375,5 @@ See `dev/docs/best_practices/local-observability.md`. With the stack down,
 
 Locally built binaries land only in `.bin/<name>/<name>` (git- and
 Docker-ignored). Release pipelines pass their own `--outfile`.
+
+haven starts the Colima VM only when a selected lane runs in a container (container ClickHouse or observability, sandboxed Langy, `haven pr --throwaway`). When it starts the VM it records that in its home (`colima-<profile>.json`), and `haven down` or the daemon stops it once no stack needs a container and none is running; `haven status` then adds "stopped by haven". A VM you started yourself is never stopped.

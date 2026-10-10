@@ -1,3 +1,5 @@
+import { reloadingWriteOptions } from "@langwatch/browser-host/errors";
+import { isAggregateProjectKind } from "@langwatch/project-contract";
 import { useEffect, useRef } from "react";
 
 import { useViewStore } from "../../../behavior/explorer.store.ts";
@@ -69,13 +71,59 @@ function decodeLenses(
 }
 
 /**
- * Wires the lens viewStore to the server-side SavedView table. Call once at the top of
- * TracesPage. The hook:
+ * The lens writes the bridge mirrors to the server; each reloads the strip once settled.
+ * A refused create is taken back via `discardRefusedLens`: an empty list reloaded as
+ * empty keeps its reference, so the hydrate effect would not re-run.
+ */
+function useLensWriteMutations(projectId: string | undefined) {
+  const utils = api.useUtils();
+  const discardRefusedLens = useViewStore((s) => s.discardRefusedLens);
+  // New lens id -> the lens to return to if the server refuses it.
+  const fallbackLensIdsRef = useRef(new Map<string, string>());
+  const reloadLenses = () => {
+    if (projectId) {
+      void utils.savedViews.getAll.invalidate({ projectId, kind: KIND });
+    }
+  };
+  const lensWriteOptions = (fallbackTitle: string) =>
+    reloadingWriteOptions({ fallbackTitle, reload: reloadLenses });
+  const createOptions = lensWriteOptions("Couldn't save the lens");
+
+  const createMutation = api.savedViews.create.useMutation({
+    onSuccess: createOptions.onSuccess,
+    onError: (error, { id: lensId }) => {
+      const fallbackLensId = lensId && fallbackLensIdsRef.current.get(lensId);
+      if (lensId && fallbackLensId) {
+        discardRefusedLens({ lensId, fallbackLensId });
+      }
+      createOptions.onError(error);
+    },
+    onSettled: (_data, _error, { id: lensId }) => {
+      if (lensId) fallbackLensIdsRef.current.delete(lensId);
+    },
+  });
+
+  return {
+    createLens: (
+      input: Parameters<typeof createMutation.mutate>[0] & { id: string },
+      fallbackLensId: string,
+    ) => {
+      fallbackLensIdsRef.current.set(input.id, fallbackLensId);
+      createMutation.mutate(input);
+    },
+    renameMutation: api.savedViews.rename.useMutation(lensWriteOptions("Couldn't rename the lens")),
+    deleteMutation: api.savedViews.delete.useMutation(lensWriteOptions("Couldn't delete the lens")),
+  };
+}
+
+/**
+ * Wires the lens viewStore to the server-side SavedView table; call once at the top of
+ * TracesPage. Hydrates the user lenses and registers a sync bridge that mirrors lens
+ * writes to the server and tells the store when the project (an aggregate) takes none.
  */
 export function useLensSync(): void {
   const { project } = useOrganizationTeamProject();
   const projectId = project?.id;
-  const utils = api.useUtils();
 
   const lensesQuery = api.savedViews.getAll.useQuery(
     { projectId: projectId ?? "", kind: KIND },
@@ -84,29 +132,18 @@ export function useLensSync(): void {
     },
   );
 
-  const invalidateLenses = () => {
-    if (projectId) {
-      void utils.savedViews.getAll.invalidate({ projectId, kind: KIND });
-    }
-  };
-
-  const createMutation = api.savedViews.create.useMutation({
-    onSuccess: invalidateLenses,
-  });
-  const renameMutation = api.savedViews.rename.useMutation({
-    onSuccess: invalidateLenses,
-  });
-  const deleteMutation = api.savedViews.delete.useMutation({
-    onSuccess: invalidateLenses,
-  });
+  const { createLens, renameMutation, deleteMutation } = useLensWriteMutations(projectId);
 
   // Refs so the bridge closures stay stable across renders — `set...Bridge`
   // is called once on mount, but the mutate functions identity changes
   // every render, which would otherwise force us to re-register.
   const projectIdRef = useRef(projectId);
   projectIdRef.current = projectId;
-  const createRef = useRef(createMutation.mutate);
-  createRef.current = createMutation.mutate;
+  const canSaveLenses = !isAggregateProjectKind(project?.kind);
+  const canSaveLensesRef = useRef(canSaveLenses);
+  canSaveLensesRef.current = canSaveLenses;
+  const createRef = useRef(createLens);
+  createRef.current = createLens;
   const renameRef = useRef(renameMutation.mutate);
   renameRef.current = renameMutation.mutate;
   const deleteRef = useRef(deleteMutation.mutate);
@@ -117,21 +154,25 @@ export function useLensSync(): void {
   // to the server without each call site knowing about tRPC.
   useEffect(() => {
     setLensSyncBridge({
-      create: (lens) => {
+      acceptsWrites: () => canSaveLensesRef.current,
+      create: (lens, { fallbackLensId }) => {
         const pid = projectIdRef.current;
         if (!pid) return;
-        createRef.current({
-          projectId: pid,
-          // Client-generated id keeps the locally-active lens valid
-          // through the server refetch — without it, the server would
-          // mint a new nanoid and `setUserLenses` would orphan the
-          // local active id.
-          id: lens.id,
-          name: lens.name,
-          filters: encode(lens),
-          kind: KIND,
-          scope: "project",
-        });
+        createRef.current(
+          {
+            projectId: pid,
+            // Client-generated id keeps the locally-active lens valid
+            // through the server refetch — without it, the server would
+            // mint a new nanoid and `setUserLenses` would orphan the
+            // local active id.
+            id: lens.id,
+            name: lens.name,
+            filters: encode(lens),
+            kind: KIND,
+            scope: "project",
+          },
+          fallbackLensId,
+        );
       },
       rename: (lensId, name) => {
         const pid = projectIdRef.current;

@@ -45,6 +45,14 @@ Feature: Test agent with one scripted run
       And no scenario row is read
 
     @unit
+    Scenario: The worker prefetches a queued test run without a scenario row
+      Given a queued run with the agent test scenario id of an HTTP agent
+      When the worker prepares it
+      Then it reads the project and the agent, never a scenario row
+      And the child starts with the run's key
+      And an agent that is gone fails the run on the agent, not on a missing scenario
+
+    @unit
     Scenario: A child job with a script parses without model params
       Given a child job payload that carries a script and no model params
       When the child parses it

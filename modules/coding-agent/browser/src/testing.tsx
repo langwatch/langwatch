@@ -20,6 +20,8 @@ export type CodingAgentHostRecording = {
   navigations: string[];
   queries: { next: CodingAgentQuery; replace: boolean }[];
   successes: CodingAgentNotice[];
+  warnings: CodingAgentNotice[];
+  infos: CodingAgentNotice[];
   failures: CodingAgentFailure[];
 };
 
@@ -36,7 +38,14 @@ export class FakeCodingAgentActivityHost extends CodingAgentActivityHost {
   static create(options: FakeCodingAgentHostOptions = {}): FakeCodingAgentActivityHost {
     return new FakeCodingAgentActivityHost({
       options,
-      recording: { navigations: [], queries: [], successes: [], failures: [] },
+      recording: {
+        navigations: [],
+        queries: [],
+        successes: [],
+        warnings: [],
+        infos: [],
+        failures: [],
+      },
       query: options.query ?? {},
     });
   }
@@ -110,6 +119,14 @@ export class FakeCodingAgentActivityHost extends CodingAgentActivityHost {
 
   succeeded(notice: CodingAgentNotice): void {
     this.recording.successes.push(notice);
+  }
+
+  warned(notice: CodingAgentNotice): void {
+    this.recording.warnings.push(notice);
+  }
+
+  informed(notice: CodingAgentNotice): void {
+    this.recording.infos.push(notice);
   }
 
   failed(failure: CodingAgentFailure): void {

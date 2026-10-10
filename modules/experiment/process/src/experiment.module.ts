@@ -1,7 +1,7 @@
 import {
-  bindRestMiddleware,
   credentialPrincipalOfToken,
   projectCredentialOfRequest,
+  projectRequestContextOf,
 } from "@langwatch/api/rest";
 import type {
   ExperimentApi,
@@ -24,10 +24,10 @@ import {
   experimentV3LegacyRest,
   experimentWorkbenchRunLegacyRest,
 } from "./transport/experiment-v3-legacy.rest.ts";
-import { experimentV3Rest, experimentWorkbenchCredential } from "./transport/experiment-v3.rest.ts";
+import { experimentV3Rest } from "./transport/experiment-v3.rest.ts";
 import { experimentWorkbenchRunRest } from "./transport/experiment-workbench-run.rest.ts";
 import { experimentWorkflowEvaluationRest } from "./transport/experiment-workflow-evaluation.rest.ts";
-import { experimentRest, experimentRestCredential } from "./transport/experiment.rest.ts";
+import { experimentRest } from "./transport/experiment.rest.ts";
 import { experimentTrpcTransport } from "./transport/experiment.trpc.ts";
 
 export const experimentProcessModule: PublishedProcessModule<
@@ -61,15 +61,15 @@ export const experimentProcessModule: PublishedProcessModule<
   // This family answers behind the project door, so re-resolving the key here
   // would ask a second question that could answer differently from the door
   // that admitted the request.
-  .withTransportFacts(() => [
-    bindRestMiddleware(experimentRestCredential, (context) =>
-      credentialPrincipalOfToken(projectCredentialOfRequest(context.req.raw)),
-    ),
+  .provideMiddlewareContext({
+    projectRequestContext: projectRequestContextOf,
+    experimentRestCredential: (request) =>
+      credentialPrincipalOfToken(projectCredentialOfRequest(request)),
     // The workbench family reads the key's PERSON, not the whole principal: a
     // legacy project key stands for nobody, and an api key stands for the
     // person it was issued to.
-    bindRestMiddleware(experimentWorkbenchCredential, (context): WorkbenchCredential => {
-      const credential = projectCredentialOfRequest(context.req.raw);
+    experimentWorkbenchCredential: (request): WorkbenchCredential => {
+      const credential = projectCredentialOfRequest(request);
       if (credential.type === "legacyProjectKey") return { kind: "legacyProjectKey" };
       if (credential.type === "cliAccessToken") {
         return { kind: "cliAccessToken", userId: credential.userId };
@@ -82,7 +82,7 @@ export const experimentProcessModule: PublishedProcessModule<
           ? {}
           : { isLangySessionKey: credential.isLangySessionKey }),
       };
-    }),
-  ])
+    },
+  })
   .withEventing(experimentRunProcessingEventing)
   .withEventing(experimentLifecycleEventing);

@@ -1,10 +1,12 @@
+import { Page } from "@langwatch/design-system-internal";
 import { useCallback, useEffect, useState } from "react";
 
 import { getJson } from "../shared/api.ts";
-import { hubSchema } from "../shared/contract.ts";
+import { hubSchema, type HubStack } from "../shared/contract.ts";
+import { HavenTopBar } from "../shared/haven-top-bar.tsx";
+import { LogsBrowser, type LogsBrowserProps } from "../shared/logs-browser.tsx";
 import { logsPath, type Route } from "../shared/route.ts";
 import { usePoll } from "../shared/use-poll.ts";
-import { LogsPage } from "./logs-page.tsx";
 import { Overview } from "./overview.tsx";
 import { SettingsPage } from "./settings-page.tsx";
 
@@ -12,6 +14,23 @@ export type HubRoute = Extract<Route, { kind: "hub" }>;
 export type Navigate = (input: { path: string; replace?: boolean }) => void;
 
 const POLL_MS = 3000;
+
+type LogsPageProps = LogsBrowserProps & {
+  stacks: string[];
+  /** The machine's stacks, for the top bar's consoles. */
+  hubStacks?: HubStack[];
+};
+
+const LogsPage = ({ hubStacks, ...browser }: LogsPageProps) => (
+  <Page
+    width="full"
+    nav={<HavenTopBar current="logs" hubHref="/" stacks={hubStacks} />}
+    title="Logs"
+    subtitle="Captured output of every stack on this machine."
+  >
+    <LogsBrowser {...browser} />
+  </Page>
+);
 
 const isTyping = ({ element }: { element: Element | null }) =>
   element instanceof HTMLInputElement ||

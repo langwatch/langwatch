@@ -1,3 +1,4 @@
+import { DetailDrawerHeader } from "@langwatch/design-system/detail-drawer-header";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { Button } from "@langwatch/design-system/primitives";
 
@@ -17,9 +18,9 @@ export function UpgradeStepDrawer({ stepId, onClose }: { stepId: string; onClose
   const { retryStep, retryingStepId } = useRetryUpgradeStep();
   return (
     <Drawer.Root open={true} placement="end" size="lg" onOpenChange={() => onClose()}>
-      <Drawer.Content bg="bg">
+      <Drawer.Content>
         <Drawer.Header>
-          <Drawer.Title>Upgrade step</Drawer.Title>
+          <DetailDrawerHeader kind="Upgrade step" title={stepId} />
         </Drawer.Header>
         <Drawer.Body>
           <UpgradeReadState read={step} failedTitle="The step could not load">

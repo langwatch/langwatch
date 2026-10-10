@@ -39,7 +39,7 @@ None on the server. Product memory (the last product visited per organization) i
 
 ## Runtime and registration
 
-`defineBrowserModule("navigation")` is installed by the shell; `sidebarCapability` lends the
+`defineBrowserModule("navigation")` is installed by the shell; `sidebarHostService` lends the
 sidebar to the products that mount one. The layers run `model/` (pure rules), `behavior/`
 (hooks and the host), `ui/` (elements, blocks, sections).
 

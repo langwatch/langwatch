@@ -8,6 +8,7 @@ import {
   type DataPrivacyPiiRedactionLevel,
   type DataPrivacyPolicy,
   type DataPrivacyScope,
+  type PrivacyPolicyRequestMemo,
   type ResolvedDataPrivacy,
 } from "@langwatch/data-privacy-contract";
 import { overBroadSecretPatternProbe } from "@langwatch/redaction";
@@ -82,6 +83,13 @@ export class DataPrivacyService {
 
   getResolvedForProject(input: { projectId: string }): Promise<ResolvedDataPrivacy> {
     return this.resolution.getResolvedForProject(input);
+  }
+
+  getResolvedForProjects(input: {
+    projectIds: readonly string[];
+    memo?: PrivacyPolicyRequestMemo;
+  }): Promise<ResolvedDataPrivacy> {
+    return this.resolution.getResolvedForProjects(input);
   }
 
   listOrganizationRules(input: { organizationId: string }): Promise<DataPrivacyPolicy[]> {

@@ -8,6 +8,7 @@ import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
+import { authorizeDefaults } from "../../__tests__/api-double.ts";
 import { publicRoute } from "../../access/index.ts";
 import { SessionReader } from "../../hosting/session-reader.ts";
 import { ClientAddress } from "../../policy/client-address.ts";
@@ -40,7 +41,12 @@ function served() {
 
   const trpc = TrpcHost.create({
     sessions: SessionReader.unverified(),
-    authz: { getDecision: refuse, getProjectAnyDecision: refuse, checkScopeLineage: refuse },
+    authz: {
+      ...authorizeDefaults,
+      getDecision: refuse,
+      getProjectAnyDecision: refuse,
+      checkScopeLineage: refuse,
+    },
     throttle: {
       limiter: {
         check: async (key) => {

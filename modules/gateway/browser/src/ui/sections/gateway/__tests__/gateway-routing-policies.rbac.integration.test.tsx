@@ -107,8 +107,8 @@ describe("routing policies page access", () => {
       };
       renderPage(["organization:view", "routingPolicies:view"]);
 
-      expect(screen.getByText("You don't have permission to do this")).toBeInTheDocument();
-      expect(screen.getByText(/grant you "routingPolicies:view"/)).toBeInTheDocument();
+      expect(screen.getByText("You don't have access to this panel")).toBeInTheDocument();
+      expect(screen.getByText(/Missing permission: routingPolicies:view/)).toBeInTheDocument();
       expect(screen.queryByText("Couldn't load routing policies")).not.toBeInTheDocument();
       expect(screen.queryByText("House default")).not.toBeInTheDocument();
       expect(screen.queryByText(/You can read the policies/)).not.toBeInTheDocument();

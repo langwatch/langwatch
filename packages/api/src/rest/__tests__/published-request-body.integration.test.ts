@@ -3,6 +3,7 @@ import { generateSpecs } from "hono-openapi";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
+import { authorizationPort } from "../../__tests__/api-double.ts";
 import { createErrorHandler } from "../../errors.ts";
 import type { RestIdentity } from "../../hosting/api-door.ts";
 import { defineRestRouter } from "../declaration.ts";
@@ -26,6 +27,7 @@ const widgets = defineRestRouter(WidgetApi)
   .withInput(z.object({}))
   .withPermission("organization:manage")
   .withOutput(z.object({ ok: z.boolean() }))
+  .withoutAudit("test route")
   .handle(async ({ app, input }) => app.act(input))
 
   .post("/:id/pause", "pauseWidget")
@@ -33,12 +35,14 @@ const widgets = defineRestRouter(WidgetApi)
   .withInput(z.object({ reason: z.string().optional() }))
   .withPermission("organization:manage")
   .withOutput(z.object({ ok: z.boolean() }))
+  .withoutAudit("test route")
   .handle(async ({ app, input }) => app.act(input))
 
   .post("/", "createWidget")
   .withInput(z.object({ name: z.string() }))
   .withPermission("organization:manage")
   .withOutput(z.object({ ok: z.boolean() }))
+  .withoutAudit("test route")
   .handle(async ({ app, input }) => app.act(input))
   .build();
 
@@ -52,7 +56,10 @@ const organizationDoor: RestIdentity = {
 type PublishedBody = Readonly<{ required?: boolean }> | undefined;
 
 async function publishedBodies(): Promise<Record<string, PublishedBody>> {
-  const app = createRestRuntime({ identity: organizationDoor }).mount(widgets.router(), {
+  const app = createRestRuntime({
+    authorization: authorizationPort,
+    identity: organizationDoor,
+  }).mount(widgets.router(), {
     app: () => application,
     credential: "organization",
     onError: createErrorHandler(),

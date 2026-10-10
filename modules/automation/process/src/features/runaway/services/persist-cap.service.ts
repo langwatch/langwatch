@@ -23,9 +23,9 @@ const capCache = new Map<string, { value: number; expiresAt: number }>();
  * cap. The tier sets live in `@langwatch/plans`, the one table every tier
  * test reads.
  */
-export type PersistCapConfig = AutomationPersistCapConfig;
+type PersistCapConfig = AutomationPersistCapConfig;
 
-export interface PersistCapDependencies {
+interface PersistCapDependencies {
   projects: ProjectApi;
   planProvider: EntitlementApi;
   config: PersistCapConfig;
@@ -33,7 +33,7 @@ export interface PersistCapDependencies {
   slots: AutomationPersistCapRepository;
 }
 
-export type ConsumePersistCapSlotInput = {
+type ConsumePersistCapSlotInput = {
   projectId: string;
   triggerId: string;
   now: Instant;
@@ -46,7 +46,7 @@ export type ConsumePersistCapSlotInput = {
   dedupKey: string;
 };
 
-export type ReadPersistCapCountsInput = {
+type ReadPersistCapCountsInput = {
   projectId: string;
   triggerIds: readonly string[];
   now: Instant;
@@ -152,5 +152,3 @@ export class AutomationPersistCapService {
     return config.paid;
   }
 }
-
-export type PersistCapDecision = AutomationPersistCapDecision;

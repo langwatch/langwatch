@@ -25,7 +25,7 @@ vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
 }));
 
 vi.mock("../../../../model/scenario-host.ts", () => ({
-  useScenarioHost: () => ({ hasPermission: () => state.permitted }),
+  useScenarioHost: () => ({ hasPermission: () => state.permitted, isLoading: () => false }),
 }));
 
 vi.mock("../../agent-testing/agent-testing-page.tsx", () => ({
@@ -59,7 +59,7 @@ describe("the Agent Testing route", () => {
       renderWithDesignSystem(<AgentTestingRoute />);
 
       expect(screen.queryByTestId("agent-testing-page")).toBeNull();
-      expect(screen.getByText("Access Restricted")).toBeInTheDocument();
+      expect(screen.getByText(/You don't have access to/)).toBeInTheDocument();
     });
   });
 

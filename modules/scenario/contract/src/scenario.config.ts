@@ -5,6 +5,7 @@ import {
   Config,
   isSaas,
   langwatchDefaultModel,
+  logSettings,
   nlpCodeBlockTimeoutSeconds,
   nlpServiceUrl,
   nodeEnvironment,
@@ -138,6 +139,8 @@ export const scenarioConfig = Config.define((c) => ({
     nodeCompileCache: c.env("NODE_COMPILE_CACHE", passthrough),
     corepackEnableDownloadPrompt: c.env("COREPACK_ENABLE_DOWNLOAD_PROMPT", passthrough),
     nodeExtraCaCerts: c.env("NODE_EXTRA_CA_CERTS", passthrough),
+    /** Level and format only (TEL-CHILD-ENV): never an endpoint, header or credential. */
+    logSettings,
   },
 }));
 

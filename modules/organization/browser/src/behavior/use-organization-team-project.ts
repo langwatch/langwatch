@@ -9,8 +9,6 @@ import {
 export type OrganizationTeamProjectReading = {
   organization: OrganizationReading | undefined;
   project: OrganizationProjectReading | undefined;
-  hasPermission: (permission: string) => boolean;
-  hasOrgPermission: (permission: string) => boolean;
 };
 
 export function useOrganizationTeamProject(_options?: {
@@ -20,7 +18,5 @@ export function useOrganizationTeamProject(_options?: {
   return {
     organization: host.organization(),
     project: host.activeProject(),
-    hasPermission: (permission) => host.hasPermission(permission),
-    hasOrgPermission: (permission) => host.hasOrganizationPermission(permission),
   };
 }

@@ -3,7 +3,7 @@
  * takes and what it answers. A personal view reaches only its owner.
  * Spec: modules/dashboard/specs/saved-views.feature.
  */
-import { defineTrpcContract } from "@langwatch/module";
+import { defineTrpcContract, type Named } from "@langwatch/module";
 import { z } from "zod";
 
 import {
@@ -24,7 +24,7 @@ const projectScopeSchema = z.object({
 
 const viewScopeSchema = z.object({ projectId: z.string(), viewId: z.string() });
 
-export const savedViewCreateInputSchema = z.object({
+const savedViewCreateInputSchemaDefinition = z.object({
   ...projectScopeSchema.shape,
   name: savedViewNameSchema,
   // `unknown` rather than the stored JSON union: this is the shape the filter
@@ -39,6 +39,11 @@ export const savedViewCreateInputSchema = z.object({
   // roundtrip completes. The application still generates one if omitted.
   id: z.string().min(1).max(128).optional(),
 });
+export interface SavedViewCreateInputSchema extends Named<
+  typeof savedViewCreateInputSchemaDefinition
+> {}
+export const savedViewCreateInputSchema: SavedViewCreateInputSchema =
+  savedViewCreateInputSchemaDefinition;
 
 export const savedViewTrpc = defineTrpcContract("savedViews")
   /** Auto-seeds the origin defaults the first time a project asks. */

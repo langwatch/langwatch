@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 /**
  * What `POST /api/workflows/:id/evaluate` takes and answers, as workflow
  * published it before experiment served the door.
@@ -5,18 +6,28 @@
 import { z } from "zod";
 
 /** The workflow the evaluate door runs. */
-export const experimentWorkflowEvaluateParamsSchema = z.object({ id: z.string().min(1) });
+const experimentWorkflowEvaluateParamsSchemaDefinition = z.object({ id: z.string().min(1) });
+export interface ExperimentWorkflowEvaluateParamsSchema extends Named<
+  typeof experimentWorkflowEvaluateParamsSchemaDefinition
+> {}
+export const experimentWorkflowEvaluateParamsSchema: ExperimentWorkflowEvaluateParamsSchema =
+  experimentWorkflowEvaluateParamsSchemaDefinition;
 
 /** One evaluation run started, in the snake-cased names the workflow evaluate door publishes. */
-export const experimentWorkflowEvaluationStartedSchema = z.object({
+const experimentWorkflowEvaluationStartedSchemaDefinition = z.object({
   run_id: z.string(),
   run_url: z.string(),
   workflow_version_id: z.string(),
   version: z.string(),
 });
+export interface ExperimentWorkflowEvaluationStartedSchema extends Named<
+  typeof experimentWorkflowEvaluationStartedSchemaDefinition
+> {}
+export const experimentWorkflowEvaluationStartedSchema: ExperimentWorkflowEvaluationStartedSchema =
+  experimentWorkflowEvaluationStartedSchemaDefinition;
 
 /** What a caller may ask an evaluation run to cover. */
-export const experimentWorkflowEvaluateSchema = z
+const experimentWorkflowEvaluateSchemaDefinition = z
   .object({
     version_id: z
       .string()
@@ -43,3 +54,8 @@ export const experimentWorkflowEvaluateSchema = z
     message: "Pass either data or a dataset_id, not both",
     path: ["data"],
   });
+export interface ExperimentWorkflowEvaluateSchema extends Named<
+  typeof experimentWorkflowEvaluateSchemaDefinition
+> {}
+export const experimentWorkflowEvaluateSchema: ExperimentWorkflowEvaluateSchema =
+  experimentWorkflowEvaluateSchemaDefinition;

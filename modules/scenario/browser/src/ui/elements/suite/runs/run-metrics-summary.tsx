@@ -9,9 +9,9 @@ import { formatCost, formatLatency } from "../../../../model/suite/formatters.ts
 import type { RunGroupSummary } from "../../../../model/suite/run-history-transforms.ts";
 
 function getPassRateGradientColor(passRate: number | null): string {
-  if (passRate === null) return "gray.400";
-  if (passRate <= 50) return "orange.500";
-  return "green.500";
+  if (passRate === null) return "fg.subtle";
+  if (passRate <= 50) return "orange.fg";
+  return "green.fg";
 }
 
 function PassRateCircle({ passRate }: { passRate: number | null }) {
@@ -115,7 +115,7 @@ function TooltipContent({ summary }: { summary: RunGroupSummary }) {
           <Text fontWeight="medium">
             {summary.completedCount}/{summary.totalCount}
             {detail && (
-              <Text as="span" color="red.300" marginLeft={1}>
+              <Text as="span" color="red.fg" marginLeft={1}>
                 {detail}
               </Text>
             )}

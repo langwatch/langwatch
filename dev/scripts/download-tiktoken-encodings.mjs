@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
  * Downloads every tiktoken encoding file into <target-dir> for TIKTOKENS_PATH,
- * each checked against a pinned SHA-256. Run from an app that depends on
- * tiktoken (apps/worker): `node ../../dev/scripts/download-tiktoken-encodings.mjs <dir>`.
+ * each checked against a pinned SHA-256. Run from a package that depends on tiktoken
+ * (modules/trace/process): `node ../../../dev/scripts/download-tiktoken-encodings.mjs <dir>`.
  */
 
 import { createHash } from "node:crypto";

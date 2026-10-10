@@ -90,7 +90,9 @@ describe("a process whose module boot is held", () => {
       const { held, release } = gate();
       const { port, server } = await processOver(() => held);
       try {
-        const booting = server.container("worker").boot();
+        const booting = server
+          .container("worker")
+          .boot({ classifyEventLogRetention: () => "traces" });
 
         expect(await eventually(() => statusOf(port, "/healthz"))).toBe(200);
         expect(await statusOf(port, "/readyz")).toBe(503);
@@ -112,15 +114,17 @@ describe("a process whose module boot is held", () => {
 describe("a process whose module boot fails", () => {
   describe("when the kubelet asks /readyz after the failure", () => {
     /** @scenario "A failed boot never turns ready" */
-    it("answers 503 while /healthz still answers 200", async () => {
+    it("never answers ready, and releases the health door", async () => {
       const { port, server } = await processOver(() =>
         Promise.reject(new Error("module boot failed")),
       );
       try {
-        await expect(server.container("worker").boot()).rejects.toThrow("module boot failed");
+        await expect(
+          server.container("worker").boot({ classifyEventLogRetention: () => "traces" }),
+        ).rejects.toThrow("module boot failed");
 
-        expect(await statusOf(port, "/readyz")).toBe(503);
-        expect(await statusOf(port, "/healthz")).toBe(200);
+        await expect(statusOf(port, "/readyz")).rejects.toThrow("fetch failed");
+        await expect(statusOf(port, "/healthz")).rejects.toThrow("fetch failed");
       } finally {
         await server.close();
       }

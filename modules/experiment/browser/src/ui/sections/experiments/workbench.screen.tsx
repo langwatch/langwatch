@@ -1,3 +1,4 @@
+import { useUiSupportChat } from "@langwatch/browser-host/capabilities";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { useRouter } from "@langwatch/browser-host/use-router";
 import { PageLayout } from "@langwatch/design-system/page-layout";
@@ -20,12 +21,11 @@ import {
 } from "../../../behavior/experiments-v3/use-workbench-proposal-handlers.ts";
 import { useWorkbenchUiActionHandlers } from "../../../behavior/experiments-v3/use-workbench-ui-action-handlers.ts";
 import { useWorkbenchUpdateListener } from "../../../behavior/experiments-v3/use-workbench-update-listener.ts";
-import { assertCrispChatHidden } from "../../../behavior/workflow/crisp-bubble-policy.ts";
 import { type ProposalHandlers } from "../../../model/langy/langy-proposal-handlers.ts";
 import { AutosaveStatus } from "../../../ui/elements/experiments-v3/autosave-status.tsx";
 import { EditableHeading } from "../../../ui/elements/experiments-v3/editable-heading.tsx";
 import { WorkbenchRowsCutBanner } from "../../../ui/elements/experiments-v3/workbench-rows-cut-banner.tsx";
-import { WorkbenchStaleBanner } from "../../../ui/elements/experiments-v3/workbench-stale-banner.tsx";
+import { WorkbenchStaleStatus } from "../../../ui/elements/experiments-v3/workbench-stale-status.tsx";
 import { EvaluationsV3Table } from "../../../ui/sections/experiments-v3/evaluations-v3-table.tsx";
 import { HistoryButton } from "../../../ui/sections/experiments-v3/history-button.tsx";
 import { PromptTemplateFieldsProvider } from "../../../ui/sections/experiments-v3/prompt-template-fields-provider.tsx";
@@ -160,12 +160,13 @@ export default function ExperimentsWorkbenchPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // The Crisp bubble policy keeps the support bubble hidden app-wide unless
+  // The support chat keeps its bubble hidden app-wide unless
   // deliberately opened; re-assert on entering the workbench so it can never
   // sit on top of the drawer buttons even if Crisp booted mid-navigation.
+  const supportChat = useUiSupportChat();
   useEffect(() => {
-    assertCrispChatHidden();
-  }, []);
+    supportChat?.hide();
+  }, [supportChat]);
 
   // The active saved dataset, when the page holds fewer of its rows than it has.
   const activeRowsCut = datasets.find((dataset) => dataset.id === activeDatasetId)?.savedRecordsCut;
@@ -208,12 +209,20 @@ export default function ExperimentsWorkbenchPage() {
             <EditableHeading value={name} onSave={setName} isLoading={isLoadingExperiment} />
             <Spacer />
             <HStack gap={2}>
-              <AutosaveStatus
-                evaluationState={autosaveStatus.evaluation}
-                datasetState={autosaveStatus.dataset}
-                evaluationError={autosaveStatus.evaluationError}
-                datasetError={autosaveStatus.datasetError}
-              />
+              {staleWorkbench ? (
+                <WorkbenchStaleStatus
+                  actorLabel={staleWorkbench.actorLabel}
+                  isDirty={isDirty}
+                  onReload={reloadStaleWorkbench}
+                />
+              ) : (
+                <AutosaveStatus
+                  evaluationState={autosaveStatus.evaluation}
+                  datasetState={autosaveStatus.dataset}
+                  evaluationError={autosaveStatus.evaluationError}
+                  datasetError={autosaveStatus.datasetError}
+                />
+              )}
               <UndoRedo />
               <TableSettingsMenu disabled={isLoadingExperiment} />
               <HistoryButton disabled={isLoadingExperiment} />
@@ -221,13 +230,6 @@ export default function ExperimentsWorkbenchPage() {
               <RunEvaluationButton disabled={isLoadingExperiment || isLoadingDatasets} />
             </HStack>
           </HStack>
-
-          {staleWorkbench && (
-            <WorkbenchStaleBanner
-              actorLabel={staleWorkbench.actorLabel}
-              onReload={reloadStaleWorkbench}
-            />
-          )}
 
           {activeRowsCut && <WorkbenchRowsCutBanner cut={activeRowsCut} />}
 

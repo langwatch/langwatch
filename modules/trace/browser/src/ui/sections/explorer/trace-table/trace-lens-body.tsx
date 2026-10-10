@@ -1,4 +1,5 @@
 import { Box } from "@langwatch/design-system/primitives";
+import { isAggregateProjectKind } from "@langwatch/project-contract";
 import {
   type ColumnSizingState,
   getCoreRowModel,
@@ -14,6 +15,7 @@ import { useCallback, useMemo } from "react";
 import { useFilterStore, useViewStore } from "../../../../behavior/explorer.store.ts";
 import type { TraceListItem } from "../../../../behavior/explorer/types/trace.ts";
 import { traceContextChip } from "../../../../behavior/langy/langy-context-chips.ts";
+import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import { type LensConfig } from "../../../../behavior/view.slice.ts";
 import {
   getColumnSizingKey,
@@ -21,14 +23,20 @@ import {
 } from "../../../../features/explorer/behavior/column-sizing.store.ts";
 import { useEvaluatorOptions } from "../../../../features/instant-eval/behavior/use-evaluator-options.ts";
 import { ADD_COLUMN_ID } from "./add-column-header.tsx";
+import { MEMBER_PROJECT_COLUMN_ID } from "./columns.ts";
 import { SELECT_COLUMN_ID } from "./registry/cells/select-cells.tsx";
 import { RegistryRow } from "./registry/index.ts";
 
 /**
- * Module-level singleton so `pinnedColumnIds` stays referentially stable, else SortableContext
- * treats it as changed every render and re-mounts the header row.
+ * Module-level singleton so `pinnedColumnIds` stays referentially stable (else SortableContext
+ * re-mounts the header row). Holds the synthetic columns: row select, an aggregate's member
+ * project column (ADR-177) and the trailing "+" add-column; none drag-reorders or sorts.
  */
-const NON_REORDERABLE_COLUMN_IDS = new Set([SELECT_COLUMN_ID, ADD_COLUMN_ID]);
+const NON_REORDERABLE_COLUMN_IDS = new Set([
+  SELECT_COLUMN_ID,
+  MEMBER_PROJECT_COLUMN_ID,
+  ADD_COLUMN_ID,
+]);
 
 import { VirtualSpacer } from "../../../blocks/explorer/trace-table/virtual-spacer.tsx";
 import type { TraceTableMeta } from "./select-column.tsx";
@@ -77,9 +85,12 @@ export const TraceLensBody: React.FC<TraceLensBodyProps> = ({
     [isLoading, pageSize, traces],
   );
   const { nameByKey: evaluatorNames } = useEvaluatorOptions();
+  const { project } = useOrganizationTeamProject();
+  const showMemberProject = isAggregateProjectKind(project?.kind);
   const { columns, registry, minWidth } = useTraceLensColumns({
     logicalColumnIds: lens.columns,
     evaluatorNames,
+    showMemberProject,
   });
   const { selectedTraceId, focusedIndex, expandedTraceId, toggleTrace, togglePeek, handleKeyDown } =
     useTraceLensKeyboard({ traces });
@@ -128,8 +139,13 @@ export const TraceLensBody: React.FC<TraceLensBodyProps> = ({
 
   // Surface `columnOrder` as explicit Tanstack state.
   const columnOrderState = useMemo<string[]>(
-    () => [SELECT_COLUMN_ID, ...lens.columns, ADD_COLUMN_ID],
-    [lens.columns],
+    () => [
+      SELECT_COLUMN_ID,
+      ...(showMemberProject ? [MEMBER_PROJECT_COLUMN_ID] : []),
+      ...lens.columns,
+      ADD_COLUMN_ID,
+    ],
+    [lens.columns, showMemberProject],
   );
 
   // The header cells only see the table, and a placeholder row is

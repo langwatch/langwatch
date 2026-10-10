@@ -22,6 +22,7 @@ const mockFetch = vi.fn();
 const egress: ModelProviderEgress = {
   fetch: (...args: unknown[]) => mockFetch(...args),
   isRedirectRefusal: (error: unknown) => error instanceof RedirectRefusedError,
+  assertDestination: async () => {},
 };
 
 const validateProviderApiKey = (provider: string, customKeys: Record<string, string>) =>

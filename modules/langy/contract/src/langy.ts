@@ -1,4 +1,5 @@
 import { HandledError } from "@langwatch/handled-error";
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 export const LANGY_FEATURE_ID = "langy" as const;
@@ -14,17 +15,32 @@ export const langyEgressHostSchema = z
   .max(253)
   .regex(/^(\*\.)?([a-zA-Z0-9-]+\.)*[a-zA-Z0-9-]+\.?$/u);
 
-export const langyEgressAllowlistSchema = z.array(langyEgressHostSchema);
+const langyEgressAllowlistSchemaDefinition = z.array(langyEgressHostSchema);
+export interface LangyEgressAllowlistSchema extends Named<
+  typeof langyEgressAllowlistSchemaDefinition
+> {}
+export const langyEgressAllowlistSchema: LangyEgressAllowlistSchema =
+  langyEgressAllowlistSchemaDefinition;
 export type LangyEgressAllowlist = z.infer<typeof langyEgressAllowlistSchema>;
-export const langyEgressProjectInputSchema = z.object({ projectId: z.string().min(1) }).strict();
+const langyEgressProjectInputSchemaDefinition = z.object({ projectId: z.string().min(1) }).strict();
+export interface LangyEgressProjectInputSchema extends Named<
+  typeof langyEgressProjectInputSchemaDefinition
+> {}
+export const langyEgressProjectInputSchema: LangyEgressProjectInputSchema =
+  langyEgressProjectInputSchemaDefinition;
 export type LangyEgressProjectInput = z.infer<typeof langyEgressProjectInputSchema>;
-export const langySetEgressInputSchema = langyEgressProjectInputSchema
+const langySetEgressInputSchemaDefinition = langyEgressProjectInputSchema
   .safeExtend({ allowlist: langyEgressAllowlistSchema })
   .strict();
+export interface LangySetEgressInputSchema extends Named<
+  typeof langySetEgressInputSchemaDefinition
+> {}
+export const langySetEgressInputSchema: LangySetEgressInputSchema =
+  langySetEgressInputSchemaDefinition;
 export type LangySetEgressInput = z.infer<typeof langySetEgressInputSchema>;
 export const langyConversationMessageRoleSchema = z.enum(["user", "assistant", "system", "tool"]);
 
-export const langyMessageSchema = z
+const langyMessageSchemaDefinition = z
   .object({
     id: langyMessageIdSchema,
     conversationId: langyConversationIdSchema,
@@ -33,9 +49,11 @@ export const langyMessageSchema = z
     createdAt: z.number().int().nonnegative(),
   })
   .strict();
+export interface LangyMessageSchema extends Named<typeof langyMessageSchemaDefinition> {}
+export const langyMessageSchema: LangyMessageSchema = langyMessageSchemaDefinition;
 export type LangyMessage = z.infer<typeof langyMessageSchema>;
 
-export const langyConversationSchema = z
+const langyConversationSchemaDefinition = z
   .object({
     id: langyConversationIdSchema,
     projectId: z.string().min(1),
@@ -50,18 +68,25 @@ export const langyConversationSchema = z
     lastActivityAt: z.number().int().nonnegative(),
   })
   .strict();
+export interface LangyConversationSchema extends Named<typeof langyConversationSchemaDefinition> {}
+export const langyConversationSchema: LangyConversationSchema = langyConversationSchemaDefinition;
 export type LangyConversation = z.infer<typeof langyConversationSchema>;
 
-export const langyCreateConversationInputSchema = z
+const langyCreateConversationInputSchemaDefinition = z
   .object({
     projectId: z.string().min(1),
     userId: z.string().min(1),
     conversationId: langyConversationIdSchema.optional(),
   })
   .strict();
+export interface LangyCreateConversationInputSchema extends Named<
+  typeof langyCreateConversationInputSchemaDefinition
+> {}
+export const langyCreateConversationInputSchema: LangyCreateConversationInputSchema =
+  langyCreateConversationInputSchemaDefinition;
 export type LangyCreateConversationInput = z.infer<typeof langyCreateConversationInputSchema>;
 
-export const langyConversationListInputSchema = z
+const langyConversationListInputSchemaDefinition = z
   .object({
     projectId: z.string().min(1),
     userId: z.string().min(1),
@@ -70,17 +95,27 @@ export const langyConversationListInputSchema = z
     query: z.string().max(200).optional(),
   })
   .strict();
+export interface LangyConversationListInputSchema extends Named<
+  typeof langyConversationListInputSchemaDefinition
+> {}
+export const langyConversationListInputSchema: LangyConversationListInputSchema =
+  langyConversationListInputSchemaDefinition;
 export type LangyConversationListInput = z.input<typeof langyConversationListInputSchema>;
-export const langyConversationInputSchema = z
+const langyConversationInputSchemaDefinition = z
   .object({
     projectId: z.string().min(1),
     userId: z.string().min(1),
     conversationId: langyConversationIdSchema,
   })
   .strict();
+export interface LangyConversationInputSchema extends Named<
+  typeof langyConversationInputSchemaDefinition
+> {}
+export const langyConversationInputSchema: LangyConversationInputSchema =
+  langyConversationInputSchemaDefinition;
 export type LangyConversationInput = z.infer<typeof langyConversationInputSchema>;
 
-export const langyTurnInputSchema = langyConversationInputSchema
+const langyTurnInputSchemaDefinition = langyConversationInputSchema
   .safeExtend({
     turnId: langyTurnIdSchema,
     idempotencyKey: z.string().min(1).max(256),
@@ -88,18 +123,27 @@ export const langyTurnInputSchema = langyConversationInputSchema
     model: z.string().min(1).optional(),
   })
   .strict();
+export interface LangyTurnInputSchema extends Named<typeof langyTurnInputSchemaDefinition> {}
+export const langyTurnInputSchema: LangyTurnInputSchema = langyTurnInputSchemaDefinition;
 export type LangyTurnInput = z.infer<typeof langyTurnInputSchema>;
-export const langyMessageInputSchema = langyConversationInputSchema
+const langyMessageInputSchemaDefinition = langyConversationInputSchema
   .safeExtend({ messageId: langyMessageIdSchema })
   .strict();
+export interface LangyMessageInputSchema extends Named<typeof langyMessageInputSchemaDefinition> {}
+export const langyMessageInputSchema: LangyMessageInputSchema = langyMessageInputSchemaDefinition;
 export type LangyMessageInput = z.infer<typeof langyMessageInputSchema>;
 
-export const langyStopTurnInputSchema = langyConversationInputSchema
+const langyStopTurnInputSchemaDefinition = langyConversationInputSchema
   .safeExtend({ turnId: langyTurnIdSchema })
   .strict();
+export interface LangyStopTurnInputSchema extends Named<
+  typeof langyStopTurnInputSchemaDefinition
+> {}
+export const langyStopTurnInputSchema: LangyStopTurnInputSchema =
+  langyStopTurnInputSchemaDefinition;
 export type LangyStopTurnInput = z.infer<typeof langyStopTurnInputSchema>;
 
-export const langyCredentialInputSchema = z
+const langyCredentialInputSchemaDefinition = z
   .object({
     projectId: z.string().min(1),
     userId: z.string().min(1),
@@ -108,8 +152,13 @@ export const langyCredentialInputSchema = z
     turnId: langyTurnIdSchema.optional(),
   })
   .strict();
+export interface LangyCredentialInputSchema extends Named<
+  typeof langyCredentialInputSchemaDefinition
+> {}
+export const langyCredentialInputSchema: LangyCredentialInputSchema =
+  langyCredentialInputSchemaDefinition;
 export type LangyCredentialInput = z.infer<typeof langyCredentialInputSchema>;
-export const langyRelayFrameSchema = z
+const langyRelayFrameSchemaDefinition = z
   .object({
     conversationId: langyConversationIdSchema,
     turnId: langyTurnIdSchema,
@@ -118,6 +167,8 @@ export const langyRelayFrameSchema = z
     sequence: z.number().int().nonnegative().optional(),
   })
   .strict();
+export interface LangyRelayFrameSchema extends Named<typeof langyRelayFrameSchemaDefinition> {}
+export const langyRelayFrameSchema: LangyRelayFrameSchema = langyRelayFrameSchemaDefinition;
 export type LangyRelayFrame = z.infer<typeof langyRelayFrameSchema>;
 
 export type LangyCredential = {
@@ -151,7 +202,7 @@ export const extractLangyTextFromParts = (parts: unknown): string => {
 };
 
 /** Credentials injected into a Langy worker for one turn. */
-export const langyWorkerCredentialsSchema = z
+const langyWorkerCredentialsSchemaDefinition = z
   .object({
     langwatchApiKey: z.string().min(1).optional(),
     langwatchApiKeyId: z.string().min(1).optional(),
@@ -168,6 +219,11 @@ export const langyWorkerCredentialsSchema = z
     disabledSkillIds: z.array(z.string().min(1)).optional(),
   })
   .strict();
+export interface LangyWorkerCredentialsSchema extends Named<
+  typeof langyWorkerCredentialsSchemaDefinition
+> {}
+export const langyWorkerCredentialsSchema: LangyWorkerCredentialsSchema =
+  langyWorkerCredentialsSchemaDefinition;
 export type LangyWorkerCredentials = z.infer<typeof langyWorkerCredentialsSchema>;
 export type LangyCredentials = LangyWorkerCredentials;
 export type LangyConversationPage = {

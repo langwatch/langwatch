@@ -3,6 +3,7 @@ import { Skeleton, Text, VStack } from "@langwatch/design-system/primitives";
 
 import { CodingAgentSessionsTable } from "../../../behavior/lent-coding-agent-tables.tsx";
 import { usePersonalContext } from "../../../behavior/use-personal-context.ts";
+import { PERSONAL_WORKSPACE_WAIT_HINT } from "../../../behavior/use-personal-workspace-wait.ts";
 import { PersonalWorkspaceLayout } from "../personal-workspace-layout.tsx";
 
 /**
@@ -11,8 +12,13 @@ import { PersonalWorkspaceLayout } from "../personal-workspace-layout.tsx";
  * its own reads. Spec: specs/coding-agent/sessions-screen.feature.
  */
 export function PersonalSessionsScreen() {
-  const { ready, isPersonalProjectResolved, personalProjectId, personalProjectSlug } =
-    usePersonalContext();
+  const {
+    ready,
+    isPersonalProjectResolved,
+    isWorkspacePending,
+    personalProjectId,
+    personalProjectSlug,
+  } = usePersonalContext();
 
   const isWorkspaceResolved = ready && isPersonalProjectResolved;
 
@@ -38,6 +44,11 @@ export function PersonalSessionsScreen() {
             "no sessions" in that window states a fact that is not known to be
             true. */}
           {!isWorkspaceResolved && <Skeleton height="180px" borderRadius="md" />}
+          {isWorkspacePending && (
+            <Text fontSize="sm" color="fg.muted">
+              {PERSONAL_WORKSPACE_WAIT_HINT}
+            </Text>
+          )}
           {isWorkspaceResolved && personalProjectId ? (
             <CodingAgentSessionsTable
               projectId={personalProjectId}

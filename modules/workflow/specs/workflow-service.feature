@@ -310,6 +310,19 @@ Feature: Workflow service boundary
     Then the app receives that session's user rather than nobody
 
   @unit
+  Scenario: The Studio event door asks workflows:manage at the project the event names
+    Given an editor with a browser session
+    When it posts a Studio event for a project it may not manage
+    Then it is refused 403 at the door and the app is not reached
+    And a malformed event is refused 400 and an event naming no project 422, before any permission is asked
+
+  @unit
+  Scenario: The Studio event door refuses an event posted to an aggregate project
+    Given an editor who may manage workflows on an aggregate project
+    When it posts a Studio event for that project
+    Then it is refused 403 aggregate_project_is_read_only and no run starts
+
+  @unit
   Scenario: A run fills a saved HTTP agent's blank credentials from the agent
     Given a graph has a node that runs a saved HTTP agent with its credentials blank
     When Workflow enriches a Studio event for the project

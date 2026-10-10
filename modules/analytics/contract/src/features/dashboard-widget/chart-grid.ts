@@ -5,6 +5,7 @@
  * @see specs/analytics/chart-grid-resize.feature
  */
 
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 /** How many columns wide the grid is. A card's `colSpan` is 1..this. */
@@ -50,7 +51,7 @@ export interface ChartGridPlacement {
  * One card's placement as a request may carry it. Every router that writes
  * the grid validates against this, so the bounds live in exactly one place.
  */
-export const chartGridPlacementSchema = z.object({
+const chartGridPlacementSchemaDefinition = z.object({
   gridColumn: z
     .number()
     .int()
@@ -60,6 +61,11 @@ export const chartGridPlacementSchema = z.object({
   colSpan: z.number().int().min(1).max(CHART_GRID_COLUMNS),
   rowSpan: z.number().int().min(1).max(CHART_GRID_MAX_ROW_SPAN),
 });
+export interface ChartGridPlacementSchema extends Named<
+  typeof chartGridPlacementSchemaDefinition
+> {}
+export const chartGridPlacementSchema: ChartGridPlacementSchema =
+  chartGridPlacementSchemaDefinition;
 
 /** True when a column/span pair stays inside the grid's right edge. */
 export const fitsChartGridWidth = ({

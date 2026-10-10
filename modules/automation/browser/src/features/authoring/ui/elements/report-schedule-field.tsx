@@ -1,3 +1,4 @@
+import { CronSchedule } from "@langwatch/design-system/cron-schedule";
 import {
   Field,
   HStack,
@@ -87,7 +88,7 @@ export function ReportScheduleField({
   // still editable rather than clobbered by the defaults.
   const [advanced, setAdvanced] = useState(() => partsFromCron(cron) === null);
 
-  const parts = useMemo(() => partsFromCron(cron) ?? DEFAULT_PARTS, [cron]);
+  const parts = partsFromCron(cron) ?? DEFAULT_PARTS;
 
   const zones = useMemo(() => supportedTimezones(), []);
   const groups = useMemo(() => groupTimezones(zones), [zones]);
@@ -241,9 +242,34 @@ export function ReportScheduleField({
         </NativeSelect.Root>
       </Field.Root>
 
-      <Text textStyle="sm" color="fg.muted">
-        {advanced ? describeCron(cron, timezone) : summarizeSchedule(parts, timezone)}
-      </Text>
+      <ScheduleSummary
+        advanced={advanced}
+        valid={cronError === null}
+        cron={cron}
+        timezone={timezone}
+        parts={parts}
+      />
     </VStack>
+  );
+}
+
+function ScheduleSummary({
+  advanced,
+  valid,
+  cron,
+  timezone,
+  parts,
+}: {
+  advanced: boolean;
+  valid: boolean;
+  cron: string;
+  timezone: string;
+  parts: ScheduleParts;
+}) {
+  if (advanced && valid) return <CronSchedule cron={cron} timezone={timezone} />;
+  return (
+    <Text textStyle="sm" color="fg.muted">
+      {advanced ? describeCron(cron, timezone) : summarizeSchedule(parts, timezone)}
+    </Text>
   );
 }

@@ -5,6 +5,7 @@ import { Eye } from "lucide-react";
 import type React from "react";
 import { type ReactNode, useState } from "react";
 
+import { memberTenantOf, traceDrawerParams } from "../../../model/trace-drawer-params.ts";
 import { TracePeekSummary } from "../trace-peek-summary.tsx";
 
 export interface TracePreviewHoverCardProps {
@@ -15,6 +16,11 @@ export interface TracePreviewHoverCardProps {
    * partition-pruning hint.
    */
   occurredAtMs?: number;
+  /**
+   * The project that owns the trace, from the surrounding row. On an aggregate
+   * it is a member (ADR-177 block F): the peek and the drawer read that member.
+   */
+  ownerProjectId?: string;
   /**
    * Defaults to "bottom-start" — sits below the trigger and aligns to
    * its leading edge. Override when the trigger is on the far right of
@@ -32,9 +38,9 @@ export const TracePreviewHoverCard: React.FC<TracePreviewHoverCardProps> = ({
   traceId,
   children,
   occurredAtMs,
+  ownerProjectId,
   placement = "bottom-start",
 }) => {
-  const { project } = useOrganizationTeamProject();
   const [hasHovered, setHasHovered] = useState(false);
   const [open, setOpen] = useState(false);
 
@@ -59,11 +65,11 @@ export const TracePreviewHoverCard: React.FC<TracePreviewHoverCardProps> = ({
             background="bg.panel"
             boxShadow="lg"
           >
-            {hasHovered && project && (
-              <TracePeekSummary
-                projectId={project.id}
+            {hasHovered && (
+              <MemberPeekSummary
                 traceId={traceId}
                 occurredAtMs={occurredAtMs}
+                ownerProjectId={ownerProjectId}
               />
             )}
           </HoverCard.Content>
@@ -73,6 +79,24 @@ export const TracePreviewHoverCard: React.FC<TracePreviewHoverCardProps> = ({
   );
 };
 
+/** The peek summary, read from the member that owns the trace on an aggregate. */
+function MemberPeekSummary({
+  traceId,
+  occurredAtMs,
+  ownerProjectId,
+}: Omit<TracePreviewHoverCardProps, "children" | "placement">) {
+  const { project } = useOrganizationTeamProject();
+  if (!project) return null;
+  return (
+    <TracePeekSummary
+      projectId={project.id}
+      traceId={traceId}
+      occurredAtMs={occurredAtMs}
+      tenantId={memberTenantOf({ ownerProjectId, projectId: project.id })}
+    />
+  );
+}
+
 export interface TraceIdPeekProps {
   traceId: string;
   /**
@@ -81,13 +105,43 @@ export interface TraceIdPeekProps {
    * See {@link TracePreviewHoverCardProps.occurredAtMs}.
    */
   occurredAtMs?: number;
+  /**
+   * The project that owns the trace, from the surrounding row. On an aggregate
+   * it is a member (ADR-177 block F): the peek and the drawer read that member.
+   */
+  ownerProjectId?: string;
 }
 
 /**
  * Standalone eye-icon trigger that opens the trace drawer on click and shows the same
  * hover-peek popover as `<TracePreviewHoverCard>`.
  */
-export const TraceIdPeek: React.FC<TraceIdPeekProps> = ({ traceId, occurredAtMs }) => {
+export const TraceIdPeek: React.FC<TraceIdPeekProps> = (props) =>
+  // Only a row naming the trace's owner can be on a member, so only it resolves
+  // the current project; every other row skips that per-row read.
+  props.ownerProjectId === undefined ? (
+    <TraceIdPeekButton {...props} tenantId={null} />
+  ) : (
+    <MemberTraceIdPeek {...props} ownerProjectId={props.ownerProjectId} />
+  );
+
+/** A row that names the trace's owner: the drawer opens on that member. */
+function MemberTraceIdPeek(props: TraceIdPeekProps & { ownerProjectId: string }) {
+  const { project } = useOrganizationTeamProject();
+  return (
+    <TraceIdPeekButton
+      {...props}
+      tenantId={memberTenantOf({ ownerProjectId: props.ownerProjectId, projectId: project?.id })}
+    />
+  );
+}
+
+function TraceIdPeekButton({
+  traceId,
+  occurredAtMs,
+  ownerProjectId,
+  tenantId,
+}: TraceIdPeekProps & { tenantId: string | null }) {
   const { openDrawer } = useDrawer();
 
   const handleOpenDrawer = (e: React.MouseEvent) => {
@@ -95,14 +149,15 @@ export const TraceIdPeek: React.FC<TraceIdPeekProps> = ({ traceId, occurredAtMs 
     // Forward the timestamp as the drawer's `t` partition hint so the
     // opened drawer's per-trace reads prune partitions instead of
     // walking every weekly partition by id.
-    openDrawer("traceV2Details", {
-      traceId,
-      ...(occurredAtMs !== undefined ? { t: String(occurredAtMs) } : {}),
-    });
+    openDrawer("traceV2Details", traceDrawerParams({ traceId, occurredAtMs, tenantId }));
   };
 
   return (
-    <TracePreviewHoverCard traceId={traceId} occurredAtMs={occurredAtMs}>
+    <TracePreviewHoverCard
+      traceId={traceId}
+      occurredAtMs={occurredAtMs}
+      ownerProjectId={ownerProjectId}
+    >
       <Box
         as="button"
         onClick={handleOpenDrawer}
@@ -123,4 +178,4 @@ export const TraceIdPeek: React.FC<TraceIdPeekProps> = ({ traceId, occurredAtMs 
       </Box>
     </TracePreviewHoverCard>
   );
-};
+}

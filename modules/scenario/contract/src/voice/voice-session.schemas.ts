@@ -1,25 +1,36 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import { VOICE_TRANSPORTS } from "./voice-transport.ts";
 
 /** Main's `POST /api/voice/session` body: mint a signed-URL session. */
-export const voiceSessionMintInputSchema = z.object({
+const voiceSessionMintInputSchemaDefinition = z.object({
   projectId: z.string().min(1),
   transport: z.enum(VOICE_TRANSPORTS),
   /** The vendor agent id from the form; a saved row's own id always wins. */
   agentId: z.string().trim().min(1).max(128),
   agentRowId: z.string().min(1).optional(),
 });
+export interface VoiceSessionMintInputSchema extends Named<
+  typeof voiceSessionMintInputSchemaDefinition
+> {}
+export const voiceSessionMintInputSchema: VoiceSessionMintInputSchema =
+  voiceSessionMintInputSchemaDefinition;
 export type VoiceSessionMintInput = z.input<typeof voiceSessionMintInputSchema>;
 
-export const voiceTranscriptTurnSchema = z.object({
+const voiceTranscriptTurnSchemaDefinition = z.object({
   role: z.enum(["caller", "agent"]),
   text: z.string(),
 });
+export interface VoiceTranscriptTurnSchema extends Named<
+  typeof voiceTranscriptTurnSchemaDefinition
+> {}
+export const voiceTranscriptTurnSchema: VoiceTranscriptTurnSchema =
+  voiceTranscriptTurnSchemaDefinition;
 export type VoiceTranscriptTurn = z.infer<typeof voiceTranscriptTurnSchema>;
 
 /** Main's `POST /api/voice/session/:sessionId/finish` body: ingest the finished call. */
-export const voiceSessionFinishInputSchema = z.object({
+const voiceSessionFinishInputSchemaDefinition = z.object({
   projectId: z.string().min(1),
   /** The signed token from mint, carrying the project, transport and agent the finish trusts. */
   sessionToken: z.string().min(1),
@@ -32,21 +43,36 @@ export const voiceSessionFinishInputSchema = z.object({
   /** Set for a "Call it myself" run: the scenario the call is scored under (AC23). */
   scenarioId: z.string().trim().min(1).optional(),
 });
+export interface VoiceSessionFinishInputSchema extends Named<
+  typeof voiceSessionFinishInputSchemaDefinition
+> {}
+export const voiceSessionFinishInputSchema: VoiceSessionFinishInputSchema =
+  voiceSessionFinishInputSchemaDefinition;
 export type VoiceSessionFinishInput = z.input<typeof voiceSessionFinishInputSchema>;
 /** Main's finish path names the session; the signed token in the body is what is trusted. */
-export const voiceSessionFinishParamsSchema = z.object({ sessionId: z.string().min(1) });
+const voiceSessionFinishParamsSchemaDefinition = z.object({ sessionId: z.string().min(1) });
+export interface VoiceSessionFinishParamsSchema extends Named<
+  typeof voiceSessionFinishParamsSchemaDefinition
+> {}
+export const voiceSessionFinishParamsSchema: VoiceSessionFinishParamsSchema =
+  voiceSessionFinishParamsSchemaDefinition;
 
 /** Main's mint response: the signed URL to connect with, and the token finish carries back. */
-export const voiceSessionMintResultSchema = z.object({
+const voiceSessionMintResultSchemaDefinition = z.object({
   transport: z.enum(VOICE_TRANSPORTS),
   sessionToken: z.string(),
   maxDurationSeconds: z.number(),
   connect: z.object({ signedUrl: z.string() }),
 });
+export interface VoiceSessionMintResultSchema extends Named<
+  typeof voiceSessionMintResultSchemaDefinition
+> {}
+export const voiceSessionMintResultSchema: VoiceSessionMintResultSchema =
+  voiceSessionMintResultSchemaDefinition;
 export type VoiceSessionMintResult = z.infer<typeof voiceSessionMintResultSchema>;
 
 /** Main's finish response: the run written, where its turns came from and its recording. */
-export const voiceSessionFinishResultSchema = z.object({
+const voiceSessionFinishResultSchemaDefinition = z.object({
   runId: z.string(),
   agentId: z.string(),
   source: z.enum(["provider", "browser"]),
@@ -55,6 +81,11 @@ export const voiceSessionFinishResultSchema = z.object({
   audioUrl: z.string().optional(),
   scenarioSetId: z.string().optional(),
 });
+export interface VoiceSessionFinishResultSchema extends Named<
+  typeof voiceSessionFinishResultSchemaDefinition
+> {}
+export const voiceSessionFinishResultSchema: VoiceSessionFinishResultSchema =
+  voiceSessionFinishResultSchemaDefinition;
 export type VoiceSessionFinishResult = z.infer<typeof voiceSessionFinishResultSchema>;
 
 /** Who asks: every voice door authorizes the caller itself, as main's handlers did. */
@@ -66,10 +97,20 @@ export type VoiceSessionFinishRequest = z.output<typeof voiceSessionFinishInputS
 };
 
 /** Main's `GET /api/voice/session/:conversationId/audio`: the recording, streamed server-side. */
-export const voiceSessionAudioParamsSchema = z.object({
+const voiceSessionAudioParamsSchemaDefinition = z.object({
   conversationId: z.string().min(1).max(200),
 });
-export const voiceSessionAudioQuerySchema = z.object({ projectId: z.string().min(1) });
+export interface VoiceSessionAudioParamsSchema extends Named<
+  typeof voiceSessionAudioParamsSchemaDefinition
+> {}
+export const voiceSessionAudioParamsSchema: VoiceSessionAudioParamsSchema =
+  voiceSessionAudioParamsSchemaDefinition;
+const voiceSessionAudioQuerySchemaDefinition = z.object({ projectId: z.string().min(1) });
+export interface VoiceSessionAudioQuerySchema extends Named<
+  typeof voiceSessionAudioQuerySchemaDefinition
+> {}
+export const voiceSessionAudioQuerySchema: VoiceSessionAudioQuerySchema =
+  voiceSessionAudioQuerySchemaDefinition;
 export type VoiceSessionAudioRequest = {
   projectId: string;
   conversationId: string;
@@ -77,9 +118,14 @@ export type VoiceSessionAudioRequest = {
   signal?: AbortSignal;
 };
 /** Main's `GET /api/voice/run/:scenarioRunId/audio`: a headless run's whole-call recording. */
-export const voiceRunAudioParamsSchema = z.object({
+const voiceRunAudioParamsSchemaDefinition = z.object({
   scenarioRunId: z.string().min(1).max(200),
 });
+export interface VoiceRunAudioParamsSchema extends Named<
+  typeof voiceRunAudioParamsSchemaDefinition
+> {}
+export const voiceRunAudioParamsSchema: VoiceRunAudioParamsSchema =
+  voiceRunAudioParamsSchemaDefinition;
 export type VoiceRunAudioRequest = {
   projectId: string;
   scenarioRunId: string;

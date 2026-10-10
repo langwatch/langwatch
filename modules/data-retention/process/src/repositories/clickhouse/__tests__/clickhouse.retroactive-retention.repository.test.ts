@@ -91,13 +91,13 @@ describe("ClickHouseRetroactiveRetentionRepository", () => {
     expect(commands.some((command) => command.sql.includes("TraceId"))).toBe(false);
     expect(commands.some((command) => command.sql.includes("'project-1'"))).toBe(false);
 
-    // event_log carries every category's rows plus a durable security slice,
-    // so its own command additionally excludes indefinite rows and the other
-    // finite categories' aggregates. No other table's rows need that filter.
+    // event_log carries every category's rows plus rows kept forever, so its own
+    // command names only this category's aggregates, never an unlisted one.
     const eventLogCommand = required(
       commands.find((candidate) => candidate.sql.includes("ALTER TABLE event_log")),
     );
-    expect(eventLogCommand.sql).toContain("AggregateType NOT IN");
+    expect(eventLogCommand.sql).toContain("AggregateType IN ('coding_agent_session'");
+    expect(eventLogCommand.sql).not.toContain("AggregateType NOT IN");
     expect(eventLogCommand.sql).toContain("langwatch:event-log-retention-category:traces");
     expect(
       commands
@@ -337,9 +337,26 @@ describe("ClickHouseRetroactiveRetentionRepository", () => {
     ]);
     const query = required(queries[0]);
     expect(query.params).toEqual({
-      tenantFilterNeedle: "WHERE TenantId = 'weird\\'\\\\id'",
+      tenantFilterNeedle: "TenantId = 'weird\\'\\\\id'",
     });
     expect(query.sql).not.toContain("weird'\\id");
+  });
+
+  /** @scenario "Retention settings show in-flight rewrites as ClickHouse reports them" */
+  it("reads parts_to_do as a number when ClickHouse sends the Int64 as a string (WEB-1004)", async () => {
+    const { repository } = createRepository([
+      {
+        mutationId: "mut-1",
+        table: "stored_spans",
+        isDone: 0,
+        partsToDo: "7",
+        createTime: "2026-01-01T00:00:00",
+      },
+    ]);
+
+    const progress = await repository.findMutationProgress({ projectId: "project-1" });
+
+    expect(progress).toMatchObject([{ mutationId: "mut-1", partsToDo: 7, isDone: false }]);
   });
 
   it("parameterizes mutation cancellation and scopes it to the tenant", async () => {
@@ -351,7 +368,7 @@ describe("ClickHouseRetroactiveRetentionRepository", () => {
     expect(command.sql).toContain("mutation_id = {mutationId:String}");
     expect(command.params).toEqual({
       mutationId: "mut-xyz",
-      tenantFilterNeedle: "WHERE TenantId = 'project-1'",
+      tenantFilterNeedle: "TenantId = 'project-1'",
     });
     expect(command.sql).not.toContain("'mut-xyz'");
   });

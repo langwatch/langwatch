@@ -1,17 +1,18 @@
 import { ProjectMissingCredentialsError } from "@langwatch/api";
 /**
  * The automation REST families over a process's own door, as a test supplies
- * one: a project API key that resolves to `project_1`, and the facts a
+ * one: a project API key that resolves to `project_1`, and the middleware context a
  * project-scoped family reads beyond its input.
  */
 import {
-  bindRestMiddleware,
+  bindMiddlewareContext,
   canonicalErrorResponse,
   createRestRuntime,
-  projectRestFacts,
+  projectRequestContext,
   type MountableRestApp,
 } from "@langwatch/api/rest";
 import type { AutomationApi } from "@langwatch/automation-contract";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 
 import { createAutomationRest } from "../automation.rest.ts";
 import { slackAutomationRest } from "../slack-trigger.rest.ts";
@@ -26,6 +27,8 @@ const defaultPlatformUrl = ({ projectSlug, path }: { projectSlug: string; path: 
 
 function runtime() {
   return createRestRuntime({
+    audit: { record: () => {} },
+    authorization: restTestAuthorization(),
     identity: {
       authenticate: () => ({
         actor: { type: "user", id: "user_owner" },
@@ -35,8 +38,8 @@ function runtime() {
   });
 }
 
-const projectFacts = () => [
-  bindRestMiddleware(projectRestFacts, () => ({
+const projectContext = () => [
+  bindMiddlewareContext(projectRequestContext, () => ({
     projectSlug: TEST_PROJECT.slug,
     viewerUserId: "user_owner",
     actorId: "user_owner",
@@ -80,7 +83,7 @@ export function mountAutomationRest(app: Partial<AutomationApi>) {
       app: () => withDefaults,
       credential: "project",
       onError: canonicalErrorResponse,
-      facts: projectFacts(),
+      middlewareContext: projectContext(),
     }),
   );
 }
@@ -99,6 +102,8 @@ export function mountSlackAutomationRest(app: Partial<AutomationApi>) {
 /** `/api/trigger/slack` for a caller the credential chain refuses: no handler is ever reached. */
 export function mountSlackAutomationRestForUnauthenticatedCaller(app: Partial<AutomationApi>) {
   const refusing = createRestRuntime({
+    audit: { record: () => {} },
+    authorization: restTestAuthorization(),
     identity: {
       authenticate: () => {
         throw new ProjectMissingCredentialsError();
@@ -125,7 +130,7 @@ export function mountUnsubscribeRest(
       app: () => app as AutomationApi,
       credential: "public",
       onError: canonicalErrorResponse,
-      facts: [bindRestMiddleware(unsubscribeCallerAddress, () => callerAddress)],
+      middlewareContext: [bindMiddlewareContext(unsubscribeCallerAddress, () => callerAddress)],
     }),
   );
 }

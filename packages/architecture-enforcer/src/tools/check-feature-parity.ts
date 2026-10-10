@@ -145,6 +145,8 @@ const DEFAULT_TEST_ROOTS: string[] = [
   // The fuzz browser runner (@langwatch/fuzz-runner): its vision judge's
   // scenarios are proved by its vitest suite and by nothing else.
   "tools/fuzz/runner/src",
+  // The seed runner's tests bind specs/setup/seedgen-runner.feature.
+  "tools/seedgen/runner/src",
   // The contributor-only backend launcher (tools/dev-runtime): the API and the
   // worker in one local process. Its boot order and its shutdown ordering —
   // drain the worker, then close the API listener — are asserted by its own
@@ -232,15 +234,21 @@ const DEFAULT_GO_TEST_ROOTS: string[] = [
   // security headers, the browser inbox — specs/setup/mail-sink.feature) are
   // satisfied by Go tests and by nothing else.
   "services/mailsim",
-  // The other simulators haven runs (LLM, storage, analytics, voice) and the
-  // diff and fuzz suites: their specs/setup scenarios bind only from Go tests.
+  // The other simulators haven runs (LLM, storage, analytics, voice, outbound,
+  // telemetry) and the diff and fuzz suites: their specs/setup scenarios bind
+  // only from Go tests.
   "services/llmsim",
   "services/storagesim",
   "services/analyticssim",
   "services/voicesim",
+  "services/outboundsim",
+  "services/paymentsim",
+  "services/telemetrysim",
+  "services/lambdasim",
   "tools/diffsuite",
   "tools/fuzz",
   "tools/workerrun",
+  "tools/seedgen",
   // The Go SDK. Its span-attribute scenarios (typed input/output envelopes,
   // binary content parts, metadata hoisting, data capture) are satisfied by Go
   // tests and by nothing else, so without this root those scenarios could only
@@ -329,7 +337,6 @@ const LEGACY_UNBOUND: string[] = [
   "specs/langy/langy-followup-suggestions.feature",
   "specs/langy/langy-frontend-realtime.feature",
   "specs/langy/langy-github-prs.feature",
-  "specs/langy/langy-plan-progress.feature",
   "specs/langy/langy-projection-independent-reactions.feature",
 ];
 
@@ -348,7 +355,6 @@ const LEGACY_INERT: string[] = [
   // would bind them (packages/architecture-enforcer's unspecced-core report),
   // every scenario @unimplemented on purpose. Remove each entry with its
   // first real binding.
-  "modules/authz/specs/offboarding.feature",
   "modules/scenario/specs/simulation-run.feature",
   "specs/agents/create-workflow-agent.feature",
   "specs/agents/workflow-agent-editor.feature",
@@ -384,7 +390,6 @@ const LEGACY_INERT: string[] = [
   "specs/ai-gateway/governance/routing-policy-scope-cascade.feature",
   "specs/ai-gateway/governance/self-hosted-setup.feature",
   "specs/ai-gateway/governance/template-cross-bind-guard.feature",
-  "specs/ai-gateway/governance/template-ottl-authoring.feature",
   "specs/ai-gateway/governance/template-ottl-principal-guard.feature",
   "specs/ai-gateway/governance/vk-config-bundle.feature",
   "specs/ai-gateway/governance/vk-personal-scope.feature",
@@ -526,9 +531,6 @@ const LEGACY_INERT: string[] = [
   "specs/licensing/enforcement-hono-api.feature",
   "specs/licensing/license-lifecycle-e2e.feature",
   "specs/licensing/license-status-ui.feature",
-  // Every scenario is parked @unimplemented: the free-plan scenario-set cap this file
-  // describes has no enforcement code on this branch.
-  "specs/licensing/sdk-scenario-set-limit.feature",
   "specs/licensing/usage-page-navigation.feature",
   "specs/mcp-server/analytics-tool.feature",
   "specs/mcp-server/api-key-tools.feature",
@@ -563,7 +565,6 @@ const LEGACY_INERT: string[] = [
   "specs/nlp-go/tracing-parity.feature",
   "specs/npx-installer/01-bootstrap.feature",
   "specs/npx-installer/02-predeps.feature",
-  "specs/npx-installer/03-services.feature",
   "specs/npx-installer/04-validation.feature",
   "specs/npx-installer/05-publish.feature",
   "specs/npx-installer/06-langy.feature",
@@ -620,8 +621,6 @@ const LEGACY_INERT: string[] = [
   "specs/skills/prompt-compiler.feature",
   "specs/studio/nlpgo-true-root-span-without-traceparent.feature",
   "specs/suites/simulations-performance.feature",
-  "modules/topic/specs/run-history.feature",
-  "modules/topic/specs/topics-source-of-truth.feature",
   "specs/trace-drawer/attribute-table.feature",
   "specs/trace-drawer/eval-chips-in-header.feature",
   "specs/trace-drawer/playground-affordance.feature",
@@ -815,6 +814,10 @@ const LEGACY_PARTIAL: string[] = [
   "specs/model-providers/scope-and-multi-instance.feature",
   "specs/monitors/online-evaluator-loop-prevention.feature",
   "specs/navigation/shared-section-navigation-layout.feature",
+  // Reason: left LEGACY_INERT when npx ran api and worker as one apps/backend
+  // process and nlpgo with the ai-gateway as one Go process (Alex, 2026-10-10);
+  // those four scenarios are enforced. The older orchestration ones stay untagged.
+  "specs/npx-installer/03-services.feature",
   "specs/npx-installer/07-lean-install.feature",
   // Reason: arrived partially tagged when #7932 added three @unit metric
   // scenarios and retired its LEGACY_INERT entry. The eight untagged ones

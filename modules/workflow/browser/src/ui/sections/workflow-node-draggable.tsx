@@ -8,10 +8,10 @@ import {
   type NodeWithOptionalPosition,
 } from "@langwatch/workflow-contract";
 import { type Node, useReactFlow } from "@xyflow/react";
-import { useCallback, useEffect } from "react";
+import { GripVertical as LuGripVertical } from "lucide-react";
+import { useEffect } from "react";
 import { useDrag } from "react-dnd";
 import { getEmptyImage } from "react-dnd-html5-backend";
-import { LuGripVertical } from "react-icons/lu";
 
 import { useWorkflowStore } from "../../behavior/use-workflow-store.ts";
 import { updateCodeClassName } from "../../behavior/workflow-store.ts";
@@ -39,7 +39,7 @@ export const NodeDraggable = (props: {
     nodes: state.nodes,
   }));
 
-  const createNewNode = useCallback(() => {
+  const createNewNode = () => {
     const { name: newName, id: newId } = findLowestAvailableName(
       nodes.map((node) => node.id),
       props.component.name ?? "Component",
@@ -65,7 +65,7 @@ export const NodeDraggable = (props: {
     };
 
     return newNode;
-  }, [nodes, props.component, props.type, props.behave_as]);
+  };
 
   const { screenToFlowPosition } = useReactFlow();
 

@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 /**
  * What `/api/dashboards` and `/api/graphs` answer with: no `projectId` (the
  * credential names the project) and a `platformUrl` the reader opens.
@@ -14,17 +15,27 @@ import { graphSchema } from "./graph.ts";
  */
 
 /** `getAll`: each dashboard, with the card count the grid renders. */
-export const dashboardTrpcSummarySchema = z
+const dashboardTrpcSummarySchemaDefinition = z
   .object({
     ...dashboardSchema.shape,
     _count: z.object({ graphs: z.number().int().nonnegative() }).strict(),
   })
   .strict();
+export interface DashboardTrpcSummarySchema extends Named<
+  typeof dashboardTrpcSummarySchemaDefinition
+> {}
+export const dashboardTrpcSummarySchema: DashboardTrpcSummarySchema =
+  dashboardTrpcSummarySchemaDefinition;
 
 /** `getById`: one dashboard with its graphs, in grid order. */
-export const dashboardTrpcDetailSchema = z
+const dashboardTrpcDetailSchemaDefinition = z
   .object({ ...dashboardSchema.shape, graphs: z.array(graphSchema) })
   .strict();
+export interface DashboardTrpcDetailSchema extends Named<
+  typeof dashboardTrpcDetailSchemaDefinition
+> {}
+export const dashboardTrpcDetailSchema: DashboardTrpcDetailSchema =
+  dashboardTrpcDetailSchemaDefinition;
 
 /** `create` / `rename` / `delete` / `getOrCreateFirst`: the raw stored row. */
 export const dashboardTrpcRowSchema = dashboardSchema;
@@ -42,37 +53,62 @@ const dashboardWireBaseSchema = z.object({
 });
 
 /** One row of the list, which also reports how many graphs the dashboard holds. */
-export const dashboardListItemResponseSchema = z.object({
+const dashboardListItemResponseSchemaDefinition = z.object({
   ...dashboardWireBaseSchema.shape,
   graphCount: z.number().int().nonnegative(),
 });
+export interface DashboardListItemResponseSchema extends Named<
+  typeof dashboardListItemResponseSchemaDefinition
+> {}
+export const dashboardListItemResponseSchema: DashboardListItemResponseSchema =
+  dashboardListItemResponseSchemaDefinition;
 
-export const dashboardListResponseSchema = z.object({
+const dashboardListResponseSchemaDefinition = z.object({
   data: z.array(dashboardListItemResponseSchema),
 });
+export interface DashboardListResponseSchema extends Named<
+  typeof dashboardListResponseSchemaDefinition
+> {}
+export const dashboardListResponseSchema: DashboardListResponseSchema =
+  dashboardListResponseSchemaDefinition;
 
 /** A dashboard as a create or a rename answers it. */
 export const dashboardResponseSchema = dashboardWireBaseSchema;
 
 /** A dashboard read on its own, which carries its graphs in grid order. */
-export const dashboardDetailResponseSchema = z.object({
+const dashboardDetailResponseSchemaDefinition = z.object({
   ...dashboardWireBaseSchema.shape,
   graphs: z.array(graphSchema),
 });
+export interface DashboardDetailResponseSchema extends Named<
+  typeof dashboardDetailResponseSchemaDefinition
+> {}
+export const dashboardDetailResponseSchema: DashboardDetailResponseSchema =
+  dashboardDetailResponseSchemaDefinition;
 
 /** A delete names only what it removed. */
-export const dashboardDeletedResponseSchema = z.object({
+const dashboardDeletedResponseSchemaDefinition = z.object({
   id: dashboardIdSchema,
   name: dashboardNameSchema,
 });
+export interface DashboardDeletedResponseSchema extends Named<
+  typeof dashboardDeletedResponseSchemaDefinition
+> {}
+export const dashboardDeletedResponseSchema: DashboardDeletedResponseSchema =
+  dashboardDeletedResponseSchemaDefinition;
 
-export const dashboardReorderResponseSchema = z.object({ success: z.literal(true) });
+const dashboardReorderResponseSchemaDefinition = z.object({ success: z.literal(true) });
+export interface DashboardReorderResponseSchema extends Named<
+  typeof dashboardReorderResponseSchemaDefinition
+> {}
+export const dashboardReorderResponseSchema: DashboardReorderResponseSchema =
+  dashboardReorderResponseSchemaDefinition;
 
 /**
  * One custom graph as `/api/graphs` answers it: no `projectId`, and the two
  * timestamps as ISO strings rather than dates.
  */
-export const graphRestResponseSchema = z.object({
+const graphRestResponseSchemaDefinition = z.object({
   id: z.string(),
   name: z.string(),
   graph: z.record(z.string(), z.unknown()),
@@ -85,10 +121,22 @@ export const graphRestResponseSchema = z.object({
   createdAt: z.string(),
   updatedAt: z.string(),
 });
+export interface GraphRestResponseSchema extends Named<typeof graphRestResponseSchemaDefinition> {}
+export const graphRestResponseSchema: GraphRestResponseSchema = graphRestResponseSchemaDefinition;
 
-export const graphListRestResponseSchema = z.array(graphRestResponseSchema);
+const graphListRestResponseSchemaDefinition = z.array(graphRestResponseSchema);
+export interface GraphListRestResponseSchema extends Named<
+  typeof graphListRestResponseSchemaDefinition
+> {}
+export const graphListRestResponseSchema: GraphListRestResponseSchema =
+  graphListRestResponseSchemaDefinition;
 
-export const graphDeletedResponseSchema = z.object({
+const graphDeletedResponseSchemaDefinition = z.object({
   id: z.string(),
   deleted: z.boolean(),
 });
+export interface GraphDeletedResponseSchema extends Named<
+  typeof graphDeletedResponseSchemaDefinition
+> {}
+export const graphDeletedResponseSchema: GraphDeletedResponseSchema =
+  graphDeletedResponseSchemaDefinition;

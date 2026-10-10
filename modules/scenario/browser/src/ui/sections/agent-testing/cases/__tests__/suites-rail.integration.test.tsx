@@ -129,7 +129,7 @@ async function openSuiteMenu(suiteName: string) {
 function railEntries(): string[] {
   const rail = screen.getByTestId("agent-testing-suite-rail");
   return within(rail)
-    .getAllByRole("button")
+    .getAllByRole("link")
     .map((element) => element.getAttribute("data-testid"))
     .filter((id): id is string => !!id?.startsWith("suite-rail-item-"));
 }
@@ -200,7 +200,7 @@ describe("the test suites rail", () => {
       externalSets: [{ setId: "nightly-ci", lastRunTimestamp: 1 }],
     });
 
-    expect(screen.getByText("Test Suites")).toBeInTheDocument();
+    expect(screen.getByText("Agent Testing")).toBeInTheDocument();
     expect(screen.getByText("From Code")).toBeInTheDocument();
     expect(railEntries()).toEqual([
       "suite-rail-item-Refunds",
@@ -225,7 +225,7 @@ describe("the test suites rail", () => {
     expect(screen.queryByTestId("suite-rail-item-All scenarios")).not.toBeInTheDocument();
     expect(screen.queryByText("All scenarios")).not.toBeInTheDocument();
     // The headings are plain labels: their destination is gone.
-    expect(screen.getByText("Test Suites").tagName).not.toBe("BUTTON");
+    expect(screen.getByText("Agent Testing").tagName).not.toBe("BUTTON");
     expect(screen.getByText("From Code").tagName).not.toBe("BUTTON");
   });
 
@@ -285,7 +285,7 @@ describe("the test suites rail", () => {
     renderRail();
 
     const select = screen.getByTestId("suite-rail-item-Refunds");
-    expect(select.tagName).toBe("BUTTON");
+    expect(select.tagName).toBe("A");
     const menu = screen.getByLabelText("Actions for Refunds");
     expect(menu.tagName).toBe("BUTTON");
     // A control inside a control takes the keypress meant for the inner one.
@@ -471,7 +471,7 @@ describe("the test suites rail", () => {
     });
 
     view.rerender(<SuiteRail {...props} suites={suites} selectedSuiteId="suite_1" />);
-    expect(screen.getByTestId("suite-rail-item-Refunds")).toHaveAttribute("aria-current", "true");
+    expect(screen.getByTestId("suite-rail-item-Refunds")).toHaveAttribute("aria-current", "page");
     expect(screen.getByTestId("suite-rail-item-Checkout")).not.toHaveAttribute("aria-current");
   });
 
@@ -483,7 +483,7 @@ describe("the test suites rail", () => {
       selectedSuiteId: "suite_default",
     });
 
-    expect(screen.getByTestId("suite-rail-item-Default")).toHaveAttribute("aria-current", "true");
+    expect(screen.getByTestId("suite-rail-item-Default")).toHaveAttribute("aria-current", "page");
   });
 
   /** @scenario "Choosing an external set opens its results" */

@@ -1,4 +1,6 @@
 import type { WireOf } from "@langwatch/api/web";
+import { FormattedDate } from "@langwatch/design-system/formatted-date";
+import { InlineCode } from "@langwatch/design-system/inline-code";
 import {
   Box,
   Button,
@@ -8,13 +10,13 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { SummaryList, SummaryListItem } from "@langwatch/design-system/summary-list";
 import type {
   ProcessInstanceDetail as StoredProcessInstanceDetail,
   ProcessOutboxMessageView as StoredProcessOutboxMessageView,
 } from "@langwatch/ops-contract";
 import { nowInstant } from "@langwatch/time";
 
-import { formatTimeAgo } from "../../../../model/ops-formatters.ts";
 import { PinnedAwareJsonView } from "../../../../ui/elements/ops-pinned-json-view.tsx";
 
 /** The detail as the browser receives it: a key holding `undefined` is absent. */
@@ -29,44 +31,31 @@ import { OutboxMessageCard } from "./outbox-message-card.tsx";
 
 const NO_PINNED_KEYS: ReadonlySet<string> = new Set();
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <VStack align="start" gap={0}>
-      <Text textStyle="xs" color="fg.muted">
-        {label}
-      </Text>
-      {children}
-    </VStack>
-  );
-}
-
 function InstanceStatusRow({ detail, now }: { detail: ProcessInstanceDetail; now: number }) {
   const wakeOverdue = detail.nextWakeAt !== null && detail.nextWakeAt < now;
   return (
-    <HStack gap={4} flexWrap="wrap">
-      <Field label="Revision">
+    <SummaryList>
+      <SummaryListItem label="Revision">
         <Text textStyle="sm" fontFamily="mono">
           {detail.revision}
         </Text>
-      </Field>
-      <Field label="Next wake">
+      </SummaryListItem>
+      <SummaryListItem label="Next wake">
         <Text
           textStyle="sm"
-          color={wakeOverdue ? "orange.500" : undefined}
+          color={wakeOverdue ? "fg.warning" : void 0}
           fontWeight={wakeOverdue ? "medium" : undefined}
         >
           {describeNextWake(detail.nextWakeAt, now)}
         </Text>
-      </Field>
-      <Field label="Updated">
-        <Text textStyle="sm">{formatTimeAgo(detail.updatedAt, now)}</Text>
-      </Field>
-      <Field label="Project">
-        <Text textStyle="xs" fontFamily="mono">
-          {detail.ref.projectId}
-        </Text>
-      </Field>
-    </HStack>
+      </SummaryListItem>
+      <SummaryListItem label="Updated">
+        <FormattedDate value={detail.updatedAt} display="relative" />
+      </SummaryListItem>
+      <SummaryListItem label="Project">
+        <InlineCode>{detail.ref.projectId}</InlineCode>
+      </SummaryListItem>
+    </SummaryList>
   );
 }
 

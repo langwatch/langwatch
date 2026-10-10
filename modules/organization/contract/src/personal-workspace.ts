@@ -1,7 +1,8 @@
 import { HandledError, NotFoundError } from "@langwatch/handled-error";
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
-export const personalWorkspaceInputSchema = z
+const personalWorkspaceInputSchemaDefinition = z
   .object({
     userId: z.string().min(1),
     organizationId: z.string().min(1),
@@ -9,17 +10,27 @@ export const personalWorkspaceInputSchema = z
     displayEmail: z.string().nullable().optional(),
   })
   .strict();
+export interface PersonalWorkspaceInputSchema extends Named<
+  typeof personalWorkspaceInputSchemaDefinition
+> {}
+export const personalWorkspaceInputSchema: PersonalWorkspaceInputSchema =
+  personalWorkspaceInputSchemaDefinition;
 export type PersonalWorkspaceInput = z.infer<typeof personalWorkspaceInputSchema>;
 
-export const findPersonalWorkspaceInputSchema = z
+const findPersonalWorkspaceInputSchemaDefinition = z
   .object({
     userId: z.string().min(1),
     organizationId: z.string().min(1),
   })
   .strict();
+export interface FindPersonalWorkspaceInputSchema extends Named<
+  typeof findPersonalWorkspaceInputSchemaDefinition
+> {}
+export const findPersonalWorkspaceInputSchema: FindPersonalWorkspaceInputSchema =
+  findPersonalWorkspaceInputSchemaDefinition;
 export type FindPersonalWorkspaceInput = z.infer<typeof findPersonalWorkspaceInputSchema>;
 
-export const personalWorkspaceSchema = z
+const personalWorkspaceSchemaDefinition = z
   .object({
     team: z
       .object({
@@ -40,10 +51,12 @@ export const personalWorkspaceSchema = z
       .strict(),
   })
   .strict();
+export interface PersonalWorkspaceSchema extends Named<typeof personalWorkspaceSchemaDefinition> {}
+export const personalWorkspaceSchema: PersonalWorkspaceSchema = personalWorkspaceSchemaDefinition;
 export type PersonalWorkspace = z.infer<typeof personalWorkspaceSchema>;
 
 /** Pending until project has created the personal project; wait on `lw.project.created` for it. */
-export const ensuredPersonalWorkspaceSchema = z.discriminatedUnion("kind", [
+const ensuredPersonalWorkspaceSchemaDefinition = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("ready"), workspace: personalWorkspaceSchema }).strict(),
   z
     .object({
@@ -52,6 +65,11 @@ export const ensuredPersonalWorkspaceSchema = z.discriminatedUnion("kind", [
     })
     .strict(),
 ]);
+export interface EnsuredPersonalWorkspaceSchema extends Named<
+  typeof ensuredPersonalWorkspaceSchemaDefinition
+> {}
+export const ensuredPersonalWorkspaceSchema: EnsuredPersonalWorkspaceSchema =
+  ensuredPersonalWorkspaceSchemaDefinition;
 export type EnsuredPersonalWorkspace = z.infer<typeof ensuredPersonalWorkspaceSchema>;
 
 /** A mutation that needs the personal project refuses while project is still creating it. */
@@ -71,7 +89,7 @@ export const PERSONAL_FEATURES = ["evaluations", "datasets", "annotations", "aut
 export const personalFeatureSchema = z.enum(PERSONAL_FEATURES);
 export type PersonalFeature = z.infer<typeof personalFeatureSchema>;
 
-export const personalFeaturesSchema = z
+const personalFeaturesSchemaDefinition = z
   .object({
     evaluations: z.boolean(),
     datasets: z.boolean(),
@@ -79,14 +97,21 @@ export const personalFeaturesSchema = z
     automations: z.boolean(),
   })
   .strict();
+export interface PersonalFeaturesSchema extends Named<typeof personalFeaturesSchemaDefinition> {}
+export const personalFeaturesSchema: PersonalFeaturesSchema = personalFeaturesSchemaDefinition;
 export type PersonalFeatures = z.infer<typeof personalFeaturesSchema>;
 
-export const personalWorkspaceFeaturesInputSchema = z
+const personalWorkspaceFeaturesInputSchemaDefinition = z
   .object({
     projectId: z.string().min(1),
     callerUserId: z.string().min(1),
   })
   .strict();
+export interface PersonalWorkspaceFeaturesInputSchema extends Named<
+  typeof personalWorkspaceFeaturesInputSchemaDefinition
+> {}
+export const personalWorkspaceFeaturesInputSchema: PersonalWorkspaceFeaturesInputSchema =
+  personalWorkspaceFeaturesInputSchemaDefinition;
 export type PersonalWorkspaceFeaturesInput = z.infer<typeof personalWorkspaceFeaturesInputSchema>;
 
 export function personalFeatureEnabled(stored: unknown, feature: PersonalFeature): boolean {
@@ -128,13 +153,18 @@ export const PERSONAL_WORKSPACE_PROVISIONED_EVENT_TYPE =
   "lw.organization.personal_workspace_provisioned" as const;
 
 /** Ids only: the tenant is the organization, and a peer reads the project through `ProjectApi`. */
-export const personalWorkspaceProvisionedEventDataSchema = z.object({
+const personalWorkspaceProvisionedEventDataSchemaDefinition = z.object({
   tenantId: z.string().min(1),
   organizationId: z.string().min(1),
   userId: z.string().min(1),
   projectId: z.string().min(1),
   occurredAt: z.number().int().nonnegative(),
 });
+export interface PersonalWorkspaceProvisionedEventDataSchema extends Named<
+  typeof personalWorkspaceProvisionedEventDataSchemaDefinition
+> {}
+export const personalWorkspaceProvisionedEventDataSchema: PersonalWorkspaceProvisionedEventDataSchema =
+  personalWorkspaceProvisionedEventDataSchemaDefinition;
 export type PersonalWorkspaceProvisionedEventData = z.infer<
   typeof personalWorkspaceProvisionedEventDataSchema
 >;
@@ -145,7 +175,7 @@ export type PersonalWorkspaceProvisionedEventData = z.infer<
  */
 export const PERSONAL_TEAM_CREATED_EVENT_TYPE = "lw.organization.personal_team_created" as const;
 
-export const personalTeamCreatedEventDataSchema = z.object({
+const personalTeamCreatedEventDataSchemaDefinition = z.object({
   tenantId: z.string().min(1),
   organizationId: z.string().min(1),
   userId: z.string().min(1),
@@ -154,19 +184,29 @@ export const personalTeamCreatedEventDataSchema = z.object({
   projectSlug: z.string().min(1),
   occurredAt: z.number().int().nonnegative(),
 });
+export interface PersonalTeamCreatedEventDataSchema extends Named<
+  typeof personalTeamCreatedEventDataSchemaDefinition
+> {}
+export const personalTeamCreatedEventDataSchema: PersonalTeamCreatedEventDataSchema =
+  personalTeamCreatedEventDataSchemaDefinition;
 export type PersonalTeamCreatedEventData = z.infer<typeof personalTeamCreatedEventDataSchema>;
 
 /** A removed member's personal teams were archived; project archives their personal projects. */
 export const PERSONAL_WORKSPACE_ARCHIVED_EVENT_TYPE =
   "lw.organization.personal_workspace_archived" as const;
 
-export const personalWorkspaceArchivedEventDataSchema = z.object({
+const personalWorkspaceArchivedEventDataSchemaDefinition = z.object({
   tenantId: z.string().min(1),
   organizationId: z.string().min(1),
   userId: z.string().min(1),
   teamIds: z.array(z.string().min(1)).min(1),
   occurredAt: z.number().int().nonnegative(),
 });
+export interface PersonalWorkspaceArchivedEventDataSchema extends Named<
+  typeof personalWorkspaceArchivedEventDataSchemaDefinition
+> {}
+export const personalWorkspaceArchivedEventDataSchema: PersonalWorkspaceArchivedEventDataSchema =
+  personalWorkspaceArchivedEventDataSchemaDefinition;
 export type PersonalWorkspaceArchivedEventData = z.infer<
   typeof personalWorkspaceArchivedEventDataSchema
 >;
@@ -175,13 +215,18 @@ export type PersonalWorkspaceArchivedEventData = z.infer<
 export const PERSONAL_WORKSPACE_REVIVED_EVENT_TYPE =
   "lw.organization.personal_workspace_revived" as const;
 
-export const personalWorkspaceRevivedEventDataSchema = z.object({
+const personalWorkspaceRevivedEventDataSchemaDefinition = z.object({
   tenantId: z.string().min(1),
   organizationId: z.string().min(1),
   userId: z.string().min(1),
   teamId: z.string().min(1),
   occurredAt: z.number().int().nonnegative(),
 });
+export interface PersonalWorkspaceRevivedEventDataSchema extends Named<
+  typeof personalWorkspaceRevivedEventDataSchemaDefinition
+> {}
+export const personalWorkspaceRevivedEventDataSchema: PersonalWorkspaceRevivedEventDataSchema =
+  personalWorkspaceRevivedEventDataSchemaDefinition;
 export type PersonalWorkspaceRevivedEventData = z.infer<
   typeof personalWorkspaceRevivedEventDataSchema
 >;
@@ -190,7 +235,7 @@ export type PersonalWorkspaceRevivedEventData = z.infer<
 export const PERSONAL_WORKSPACE_FEATURES_CHANGED_EVENT_TYPE =
   "lw.organization.personal_workspace_features_changed" as const;
 
-export const personalWorkspaceFeaturesChangedEventDataSchema = z.object({
+const personalWorkspaceFeaturesChangedEventDataSchemaDefinition = z.object({
   tenantId: z.string().min(1),
   organizationId: z.string().min(1).nullable(),
   userId: z.string().min(1),
@@ -198,6 +243,11 @@ export const personalWorkspaceFeaturesChangedEventDataSchema = z.object({
   features: personalFeaturesSchema,
   occurredAt: z.number().int().nonnegative(),
 });
+export interface PersonalWorkspaceFeaturesChangedEventDataSchema extends Named<
+  typeof personalWorkspaceFeaturesChangedEventDataSchemaDefinition
+> {}
+export const personalWorkspaceFeaturesChangedEventDataSchema: PersonalWorkspaceFeaturesChangedEventDataSchema =
+  personalWorkspaceFeaturesChangedEventDataSchemaDefinition;
 export type PersonalWorkspaceFeaturesChangedEventData = z.infer<
   typeof personalWorkspaceFeaturesChangedEventDataSchema
 >;

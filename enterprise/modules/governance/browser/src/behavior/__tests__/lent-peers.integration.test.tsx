@@ -1,11 +1,11 @@
 // @vitest-environment jsdom
 /** Governance draws peers' lent surfaces by token: specs/governance-lent-by-token.feature. */
 import {
-  UiCapabilityContextProvider,
-  type UiCapabilities,
+  UiHostServicesContextProvider,
+  type UiHostServices,
 } from "@langwatch/browser-host/capabilities";
 import { uiDeclarations, type UiDeclarations } from "@langwatch/browser-host/declarations";
-import { createUiCapabilitiesFromHost } from "@langwatch/browser-host/testing";
+import { createUiHostServicesFromHost } from "@langwatch/browser-host/testing";
 import { ModelSelectorToken } from "@langwatch/model-provider-client";
 import { GuidedOnboardingOfferToken } from "@langwatch/onboarding-client";
 import { HeroAskFieldToken } from "@langwatch/project-client";
@@ -64,21 +64,21 @@ const peersLend = uiDeclarations([
 ]);
 
 function renderPeers({ declarations }: { declarations: UiDeclarations }) {
-  const capabilities: UiCapabilities = {
-    ...createUiCapabilitiesFromHost({
+  const capabilities: UiHostServices = {
+    ...createUiHostServicesFromHost({
       route: () => ({ params: {}, query: {} }),
       navigate: () => void 0,
     }),
     declarations,
   };
   return render(
-    <UiCapabilityContextProvider value={capabilities}>
+    <UiHostServicesContextProvider value={capabilities}>
       <div data-testid="screen">
         <GuidedOnboardingOffer space="governance" spaceInUse={false} />
         <ModelSelector model="gpt-5" options={["gpt-5", "gpt-5-mini"]} onChange={vi.fn()} />
         <HeroAskField placeholder="Ask about governance" />
       </div>
-    </UiCapabilityContextProvider>,
+    </UiHostServicesContextProvider>,
   );
 }
 

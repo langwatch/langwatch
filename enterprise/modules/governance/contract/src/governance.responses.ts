@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 /**
  * What a governance write answers when the write itself is the whole
  * answer — one flag, deliberately, so a screen refetches instead of trusting
@@ -5,7 +6,12 @@
  */
 import { z } from "zod";
 
-export const governanceWriteAcknowledgedSchema = z.object({ ok: z.boolean() }).strict();
+const governanceWriteAcknowledgedSchemaDefinition = z.object({ ok: z.boolean() }).strict();
+export interface GovernanceWriteAcknowledgedSchema extends Named<
+  typeof governanceWriteAcknowledgedSchemaDefinition
+> {}
+export const governanceWriteAcknowledgedSchema: GovernanceWriteAcknowledgedSchema =
+  governanceWriteAcknowledgedSchemaDefinition;
 export type GovernanceWriteAcknowledged = z.infer<typeof governanceWriteAcknowledgedSchema>;
 
 /**
@@ -13,7 +19,7 @@ export type GovernanceWriteAcknowledged = z.infer<typeof governanceWriteAcknowle
  * resolves it. Null — never a refusal — covers every miss, so the answer can
  * not be used to learn who exists.
  */
-export const governanceActorWorkspaceSchema = z
+const governanceActorWorkspaceSchemaDefinition = z
   .object({
     userId: z.string(),
     displayName: z.string(),
@@ -22,4 +28,9 @@ export const governanceActorWorkspaceSchema = z
     projectSlug: z.string(),
   })
   .strict();
+export interface GovernanceActorWorkspaceSchema extends Named<
+  typeof governanceActorWorkspaceSchemaDefinition
+> {}
+export const governanceActorWorkspaceSchema: GovernanceActorWorkspaceSchema =
+  governanceActorWorkspaceSchemaDefinition;
 export type GovernanceActorWorkspace = z.infer<typeof governanceActorWorkspaceSchema>;

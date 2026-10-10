@@ -3,9 +3,10 @@ import {
   ProjectMissingCredentialsError,
   type RateLimiter,
 } from "@langwatch/api";
-import type { ApiKeyApi } from "@langwatch/api-key-contract";
+import { AggregateProjectHasNoCredentialError, type ApiKeyApi } from "@langwatch/api-key-contract";
 import { AuthValidateRateLimitedError } from "@langwatch/auth-contract";
 import { resolveRequestBound } from "@langwatch/plans";
+import { isAggregateProjectKind } from "@langwatch/project-contract";
 
 import { callerKeyOf } from "../rules/auth-caller-key.rules.ts";
 
@@ -36,6 +37,10 @@ export class ProjectAuthTokenService {
     await this.countCall(callerKeyOf(input.forwardedFor));
     const resolved = await this.deps.apiKeys.findResolvedToken({ token: input.token });
     if (!resolved) throw new ProjectInvalidCredentialsError();
+    // ADR-177 decision 7: an SDK is never told an aggregate's stored key is good to send with.
+    if (isAggregateProjectKind(resolved.project.kind)) {
+      throw new AggregateProjectHasNoCredentialError({ meta: { projectId: resolved.project.id } });
+    }
 
     return { projectSlug: resolved.project.slug };
   }

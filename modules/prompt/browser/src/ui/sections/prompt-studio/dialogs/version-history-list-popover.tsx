@@ -124,7 +124,7 @@ function VersionAuthor({ author }: { author?: VersionHistoryItemData["author"] }
         <Avatar.Root
           size="2xs"
           backgroundColor="orange.solid"
-          color="white"
+          color="accent.contrast"
           width="16px"
           height="16px"
         >

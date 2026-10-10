@@ -4,7 +4,13 @@ import { LuFilter } from "react-icons/lu";
 import { Chip } from "./chip.tsx";
 
 const meta = {
-  title: "Components/Chip",
+  title: "Data display/Chip",
+  parameters: {
+    usage: {
+      use: "A small uppercase prefix before a value, such as a type or an environment.",
+      avoid: "A status: Badge with a status palette. A removable filter: use Filter chips.",
+    },
+  },
   component: Chip,
   tags: ["autodocs"],
   args: { label: "Model", value: "gpt-5-mini" },

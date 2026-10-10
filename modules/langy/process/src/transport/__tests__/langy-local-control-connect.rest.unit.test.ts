@@ -1,11 +1,6 @@
 /** The long-poll connect family answers main's relay bodies, byte for byte (ADR-129, §8). */
 import { INSTANCE_TOKEN_HEADER } from "@langwatch/agent-contract";
-import {
-  BearerIdentity,
-  bindRestCredential,
-  RestHost,
-  SessionKeyIdentity,
-} from "@langwatch/api/rest";
+import { BearerIdentity, bindRestCredential, RestHost } from "@langwatch/api/rest";
 import {
   type LangyApi,
   type LangyControlRegistered,
@@ -16,15 +11,25 @@ import {
   LOCAL_CONTROL_PROTOCOL_VERSION,
 } from "@langwatch/langy-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it, vi } from "vitest";
 
 import {
   langyLocalControlConnectDatedRests,
   langyLocalControlConnectRest,
+  localControlSessionKeyDoor,
 } from "../langy-local-control-connect.rest.ts";
 
 const LIVE_KEY = "sk-lw-session-live";
 const HOLDER = { type: "user", id: "user-1" } as const;
+const CREDENTIAL = {
+  apiKeyId: "key-1",
+  projectId: "project-1",
+  projectSlug: "project-one",
+  userId: "user-1",
+  conversationId: "conversation-1",
+  requestId: "request-1",
+};
 
 const REGISTER_FRAME = {
   protocol: LOCAL_CONTROL_PROTOCOL_VERSION,
@@ -64,7 +69,7 @@ function family(router = langyLocalControlConnectRest, mount = "") {
     verifyLocalControlSessionKey: vi.fn<LangyApi["verifyLocalControlSessionKey"]>(async (key) => {
       const refusal = KEY_REFUSALS[key.token];
       if (refusal) throw refusal();
-      return { actor: HOLDER, projectId: "project-1" };
+      return { actor: HOLDER, ...CREDENTIAL };
     }),
     registerLocalControlSession: vi.fn<LangyApi["registerLocalControlSession"]>(
       async () => REGISTERED,
@@ -81,23 +86,21 @@ function family(router = langyLocalControlConnectRest, mount = "") {
   const app = createApiFixture<LangyApi>(ops);
   const closed = BearerIdentity.create({ name: "unconfigured", token: void 0 });
   const host = RestHost.create({
+    authz: restTestAuthorization().forRequest(),
     identities: {
       project: closed,
       organization: closed,
       api_key: closed,
-      scim_token: closed,
       instance_admin: closed,
       browser: closed,
     },
     bearers: () => closed,
     audit: { record: async () => {} },
   });
-  const door = SessionKeyIdentity.create({
-    instanceTokenHeader: INSTANCE_TOKEN_HEADER,
-    verify: (presented) => app.verifyLocalControlSessionKey(presented),
-  });
   host.mount(router.router(), () => app, {
-    facts: [bindRestCredential("session_key", () => door)],
+    middlewareBindings: [
+      bindRestCredential("session_key", () => localControlSessionKeyDoor.open(app)),
+    ],
   });
   const request = (path: string, init: RequestInit = {}) =>
     host.app.request(`http://api.test/api/v1/langy/control${mount}/connect${path}`, init);
@@ -128,7 +131,7 @@ describe("registering a folder over long-poll", () => {
       expect(api.ops.registerLocalControlSession).toHaveBeenCalledWith({
         actor: HOLDER,
         projectId: "project-1",
-        authorization: `Bearer ${LIVE_KEY}`,
+        credential: CREDENTIAL,
         frame: REGISTER_FRAME,
       });
     });
@@ -149,7 +152,7 @@ describe("registering a folder over long-poll", () => {
         instanceToken: null,
       });
       expect(api.ops.registerLocalControlSession).toHaveBeenCalledWith(
-        expect.objectContaining({ authorization }),
+        expect.objectContaining({ credential: CREDENTIAL }),
       );
     });
   });

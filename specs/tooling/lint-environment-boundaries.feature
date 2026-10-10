@@ -38,6 +38,12 @@ Feature: The environment-boundaries lint rule
     Then it reports nothing
 
   @unit
+  Scenario: The telemetry preload may read process.env
+    Given packages/observability/src/register.ts reads its instrumentation variables
+    When the environment-boundaries rule runs over it
+    Then it reports nothing
+
+  @unit
   Scenario: A test file may read process.env
     Given a strict feature service test module that reads process.env directly
     When the environment-boundaries rule runs over it

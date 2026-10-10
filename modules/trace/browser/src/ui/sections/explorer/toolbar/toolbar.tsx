@@ -1,5 +1,6 @@
 import { Box, Button, Flex, Icon, IconButton } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import { isAggregateProjectKind } from "@langwatch/project-contract";
 import { Bookmark, Compass, Download, Map, Tent } from "lucide-react";
 import type React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -8,6 +9,7 @@ import { useFilterStore, useViewStore } from "../../../../behavior/explorer.stor
 import { useOnboardingStore } from "../../../../behavior/explorer/onboarding/store/onboarding-store.ts";
 import { useProjectHasTraces } from "../../../../behavior/explorer/use-project-has-traces.ts";
 import { useDismissTraceDrawer } from "../../../../behavior/trace-drawer.ts";
+import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import { TRACE_EXPLORER_SPOTLIGHTS } from "../../../../model/explorer/onboarding/spotlights/spotlights.ts";
 import { LensNamePopover } from "../../../elements/explorer/toolbar/lens-name-popover.tsx";
 import { useIsNewAccount } from "../hooks/use-is-new-account.ts";
@@ -28,6 +30,27 @@ import { TimeRangePicker } from "./time-range-picker.tsx";
 // the filters sidebar is wide.
 const TOOLBAR_LABELS_MIN_WIDTH = 800;
 const TOOLBAR_CHEVRONS_MIN_WIDTH = 620;
+// Room the optional controls take, so the thresholds hold when they are on the bar.
+const SAMPLE_TOGGLE_WIDTH = 120;
+const TOUR_LABEL_WIDTH = 100;
+
+function toolbarCompactness({
+  width,
+  hasSampleToggle,
+  hasTourLabel,
+}: {
+  width: number;
+  hasSampleToggle: boolean;
+  hasTourLabel: boolean;
+}): { labelsCompact: boolean; chevronsCompact: boolean } {
+  if (width <= 0) return { labelsCompact: false, chevronsCompact: false };
+  const optional =
+    (hasSampleToggle ? SAMPLE_TOGGLE_WIDTH : 0) + (hasTourLabel ? TOUR_LABEL_WIDTH : 0);
+  return {
+    labelsCompact: width < TOOLBAR_LABELS_MIN_WIDTH + optional,
+    chevronsCompact: width < TOOLBAR_CHEVRONS_MIN_WIDTH + optional,
+  };
+}
 
 interface ToolbarProps {
   onExportAll?: () => void;
@@ -167,6 +190,8 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onExportAll, hideSampleDataAct
   // that silently fails to filter on load. The button comes back the
   // moment the error is resolved.
   const hasParseError = useFilterStore((s) => Boolean(s.parseError));
+  const { project } = useOrganizationTeamProject();
+  const canSaveLenses = !isAggregateProjectKind(project?.kind);
 
   // Measure the toolbar's own width so controls can collapse when space runs
   // out (narrow window OR a wide filters sidebar — viewport breakpoints miss
@@ -183,8 +208,11 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onExportAll, hideSampleDataAct
     observer.observe(el);
     return () => observer.disconnect();
   }, []);
-  const labelsCompact = toolbarWidth > 0 && toolbarWidth < TOOLBAR_LABELS_MIN_WIDTH;
-  const chevronsCompact = toolbarWidth > 0 && toolbarWidth < TOOLBAR_CHEVRONS_MIN_WIDTH;
+  const { labelsCompact, chevronsCompact } = toolbarCompactness({
+    width: toolbarWidth,
+    hasSampleToggle: !hideSampleDataAction && showSampleDataToggle,
+    hasTourLabel: isNewAccount,
+  });
 
   return (
     <Flex
@@ -211,8 +239,9 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onExportAll, hideSampleDataAct
             onClick={handleSamplePreviewToggle}
             aria-label={showSamplePreview ? "Hide sample data" : "See sample data"}
             aria-pressed={showSamplePreview}
+            flexShrink={0}
           >
-            <Icon boxSize={3.5} color={{ base: "orange.500", _dark: "orange.fg" }}>
+            <Icon boxSize={3.5} color={{ base: "orange.fg", _dark: "orange.fg" }}>
               {showSamplePreview ? <Tent /> : <Compass />}
             </Icon>
             {showSamplePreview ? "Hide sample data" : "See sample data"}
@@ -221,7 +250,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onExportAll, hideSampleDataAct
       )}
       <LensTabs />
       <Flex marginLeft="auto" gap={1.5} align="center" flexShrink={0}>
-        {activeLensIsDraft && !hasParseError && (
+        {canSaveLenses && activeLensIsDraft && !hasParseError && (
           <LensNamePopover
             defaultName={`${activeLensName} (copy)`}
             onSubmit={(name) => createLens(name)}

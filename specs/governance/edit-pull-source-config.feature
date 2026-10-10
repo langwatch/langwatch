@@ -150,6 +150,12 @@ Feature: Edit the configuration of a pull-mode ingestion source
       And the form still explains that the source type is immutable
 
     @integration
+    Scenario: A custom HTTP pull source is not pointed at a rotate control it does not have
+      When the admin opens the edit form for a custom HTTP pull source
+      Then the form does not mention rotating the secret
+      And the form still explains that the source type is immutable
+
+    @integration
     Scenario: A push-mode source is told both are immutable
       Given a push-mode ingestion source
       When the admin opens the edit form for that source

@@ -16,6 +16,7 @@ import {
 import type { Protections } from "@langwatch/trace-contract";
 import { beforeEach, describe, expect, it } from "vitest";
 
+import { ownProof } from "../../__tests__/support/authorization-proofs.fixture.ts";
 import type { TraceLogRecordReadRow } from "../../app/trace.app.ts";
 import { TraceTranscriptReadService } from "../../features/read/services/trace-transcript-read.service.ts";
 import {
@@ -165,6 +166,7 @@ describe("transcript captured-content matrix for an API-key caller", () => {
       reads: app,
       ports,
       projectId: PROJECT_ID,
+      authorization: ownProof({ projectId: PROJECT_ID }),
       traceId: TRACE_ID,
       occurredAtMs: NOW,
       protections: apiKeyProtections(),

@@ -57,7 +57,7 @@ export function RunDrawerLoadingBody() {
       width="full"
       height="full"
       overflow="hidden"
-      bg={{ base: "bg.surface", _dark: "bg.panel" }}
+      bg={"bg.card"}
       data-testid="run-drawer-loading"
     >
       <Drawer.CloseTrigger />

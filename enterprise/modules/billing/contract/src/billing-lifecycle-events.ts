@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import { z } from "zod";
 
@@ -21,17 +22,22 @@ export const SEAT_CHECKOUTS_ABANDONED_EVENT_TYPE = "lw.billing.seat_checkouts_ab
 export const BILLING_LIFECYCLE_EVENT_VERSION = "2026-09-30" as const;
 
 /** An organization gained or lost its subscription, with the members who carry the fact. */
-export const subscriptionChangedEventDataSchema = z.object({
+const subscriptionChangedEventDataSchemaDefinition = z.object({
   tenantId: z.string().min(1),
   occurredAt: z.number().int().nonnegative(),
   organizationId: z.string().min(1),
   memberUserIds: z.array(z.string().min(1)),
   hasSubscription: z.boolean(),
 });
+export interface SubscriptionChangedEventDataSchema extends Named<
+  typeof subscriptionChangedEventDataSchemaDefinition
+> {}
+export const subscriptionChangedEventDataSchema: SubscriptionChangedEventDataSchema =
+  subscriptionChangedEventDataSchemaDefinition;
 export type SubscriptionChangedEventData = z.infer<typeof subscriptionChangedEventDataSchema>;
 
 /** A subscription that was not active became active on a plan; a renewal records none. */
-export const subscriptionStartedEventDataSchema = z.object({
+const subscriptionStartedEventDataSchemaDefinition = z.object({
   tenantId: z.string().min(1),
   occurredAt: z.number().int().nonnegative(),
   organizationId: z.string().min(1),
@@ -39,10 +45,15 @@ export const subscriptionStartedEventDataSchema = z.object({
   plan: z.string().min(1),
   memberUserIds: z.array(z.string().min(1)),
 });
+export interface SubscriptionStartedEventDataSchema extends Named<
+  typeof subscriptionStartedEventDataSchemaDefinition
+> {}
+export const subscriptionStartedEventDataSchema: SubscriptionStartedEventDataSchema =
+  subscriptionStartedEventDataSchemaDefinition;
 export type SubscriptionStartedEventData = z.infer<typeof subscriptionStartedEventDataSchema>;
 
 /** A Stripe checkout for an organization's subscription completed. */
-export const checkoutCompletedEventDataSchema = z.object({
+const checkoutCompletedEventDataSchemaDefinition = z.object({
   tenantId: z.string().min(1),
   occurredAt: z.number().int().nonnegative(),
   organizationId: z.string().min(1),
@@ -50,6 +61,11 @@ export const checkoutCompletedEventDataSchema = z.object({
   /** ISO instant the checkout session was created. */
   checkoutCreatedAt: z.string().min(1),
 });
+export interface CheckoutCompletedEventDataSchema extends Named<
+  typeof checkoutCompletedEventDataSchemaDefinition
+> {}
+export const checkoutCompletedEventDataSchema: CheckoutCompletedEventDataSchema =
+  checkoutCompletedEventDataSchemaDefinition;
 export type CheckoutCompletedEventData = z.infer<typeof checkoutCompletedEventDataSchema>;
 
 /**
@@ -57,20 +73,25 @@ export type CheckoutCompletedEventData = z.infer<typeof checkoutCompletedEventDa
  * fact is stamped after the write that changed the answer committed; a catch-up fact is stamped
  * when it read billing. Folders keep the newest stamp, and a real fact wins a tie.
  */
-export const usageBillingChangedEventDataSchema = z.object({
+const usageBillingChangedEventDataSchemaDefinition = z.object({
   tenantId: z.string().min(1),
   occurredAt: z.number().int().nonnegative(),
   organizationId: z.string().min(1),
   usageBilled: z.boolean(),
   fromCatchUp: z.boolean(),
 });
+export interface UsageBillingChangedEventDataSchema extends Named<
+  typeof usageBillingChangedEventDataSchemaDefinition
+> {}
+export const usageBillingChangedEventDataSchema: UsageBillingChangedEventDataSchema =
+  usageBillingChangedEventDataSchemaDefinition;
 export type UsageBillingChangedEventData = z.infer<typeof usageBillingChangedEventDataSchema>;
 
 /**
  * A platform operator's billing command, recorded after it ran; audit-log writes the row from its
  * side (round 37 D3; organization-audit.events.ts shape). Spec: modules/audit-log/specs/audit-log.feature
  */
-export const billingAuditRecordedEventDataSchema = z.object({
+const billingAuditRecordedEventDataSchemaDefinition = z.object({
   /** The organization the command targeted, or the platform tenant for an invoice. */
   tenantId: z.string().min(1),
   occurredAt: z.number().int().nonnegative(),
@@ -83,6 +104,11 @@ export const billingAuditRecordedEventDataSchema = z.object({
   targetKind: z.string().min(1),
   targetId: z.string().min(1),
 });
+export interface BillingAuditRecordedEventDataSchema extends Named<
+  typeof billingAuditRecordedEventDataSchemaDefinition
+> {}
+export const billingAuditRecordedEventDataSchema: BillingAuditRecordedEventDataSchema =
+  billingAuditRecordedEventDataSchemaDefinition;
 export type BillingAuditRecordedEventData = z.infer<typeof billingAuditRecordedEventDataSchema>;
 
 /**
@@ -97,38 +123,63 @@ const organizationRowFactSchema = z.object({
 });
 
 /** Billing sent the organization's plan-limit alert at `sentAt` (epoch ms). */
-export const planLimitAlertSentEventDataSchema = z.object({
+const planLimitAlertSentEventDataSchemaDefinition = z.object({
   ...organizationRowFactSchema.shape,
   sentAt: z.number().int().nonnegative(),
 });
+export interface PlanLimitAlertSentEventDataSchema extends Named<
+  typeof planLimitAlertSentEventDataSchemaDefinition
+> {}
+export const planLimitAlertSentEventDataSchema: PlanLimitAlertSentEventDataSchema =
+  planLimitAlertSentEventDataSchemaDefinition;
 export type PlanLimitAlertSentEventData = z.infer<typeof planLimitAlertSentEventDataSchema>;
 
 /** A completed checkout chose the currency the organization is billed in. */
-export const checkoutCurrencySelectedEventDataSchema = z.object({
+const checkoutCurrencySelectedEventDataSchemaDefinition = z.object({
   ...organizationRowFactSchema.shape,
   currency: currencySchema,
 });
+export interface CheckoutCurrencySelectedEventDataSchema extends Named<
+  typeof checkoutCurrencySelectedEventDataSchemaDefinition
+> {}
+export const checkoutCurrencySelectedEventDataSchema: CheckoutCurrencySelectedEventDataSchema =
+  checkoutCurrencySelectedEventDataSchemaDefinition;
 export type CheckoutCurrencySelectedEventData = z.infer<
   typeof checkoutCurrencySelectedEventDataSchema
 >;
 
 /** The organization is now billed on `pricingModel`. */
-export const pricingModelChangedEventDataSchema = z.object({
+const pricingModelChangedEventDataSchemaDefinition = z.object({
   ...organizationRowFactSchema.shape,
   pricingModel: billingPricingModelSchema,
 });
+export interface PricingModelChangedEventDataSchema extends Named<
+  typeof pricingModelChangedEventDataSchemaDefinition
+> {}
+export const pricingModelChangedEventDataSchema: PricingModelChangedEventDataSchema =
+  pricingModelChangedEventDataSchemaDefinition;
 export type PricingModelChangedEventData = z.infer<typeof pricingModelChangedEventDataSchema>;
 
 /** A seat checkout was paid: the invitations held for billing's subscription row open. */
-export const seatCheckoutPaidEventDataSchema = z.object({
+const seatCheckoutPaidEventDataSchemaDefinition = z.object({
   ...organizationRowFactSchema.shape,
   subscriptionId: z.string().min(1),
 });
+export interface SeatCheckoutPaidEventDataSchema extends Named<
+  typeof seatCheckoutPaidEventDataSchemaDefinition
+> {}
+export const seatCheckoutPaidEventDataSchema: SeatCheckoutPaidEventDataSchema =
+  seatCheckoutPaidEventDataSchemaDefinition;
 export type SeatCheckoutPaidEventData = z.infer<typeof seatCheckoutPaidEventDataSchema>;
 
 /** Seat checkouts were abandoned: the invitations held for those subscription rows close. */
-export const seatCheckoutsAbandonedEventDataSchema = z.object({
+const seatCheckoutsAbandonedEventDataSchemaDefinition = z.object({
   ...organizationRowFactSchema.shape,
   subscriptionIds: z.array(z.string().min(1)).min(1),
 });
+export interface SeatCheckoutsAbandonedEventDataSchema extends Named<
+  typeof seatCheckoutsAbandonedEventDataSchemaDefinition
+> {}
+export const seatCheckoutsAbandonedEventDataSchema: SeatCheckoutsAbandonedEventDataSchema =
+  seatCheckoutsAbandonedEventDataSchemaDefinition;
 export type SeatCheckoutsAbandonedEventData = z.infer<typeof seatCheckoutsAbandonedEventDataSchema>;

@@ -103,6 +103,7 @@ describe.skipIf(!databaseUrl)("AdminWorkspaceViewAuditService", () => {
     DefaultGovernanceAdminWorkspaceViewAuditService.create({
       auditLog,
       teams,
+      targets: projects,
       projects,
       events: new SpyOcsf(),
     });

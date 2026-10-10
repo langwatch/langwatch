@@ -1,3 +1,5 @@
+import type { ServingRosterEntry } from "@langwatch/upgrade";
+import type { Deprecation } from "@langwatch/upgrade/manifest";
 import {
   createUpgradeReader,
   describeStepStatus,
@@ -5,12 +7,14 @@ import {
   type ListStepsFilter,
   type UpgradeImage,
   type UpgradeReader,
+  type UpgradePreview,
   type UpgradeReleasePage,
   type UpgradeRunDetail,
   type UpgradeRunPage,
   type UpgradeStatus,
   type UpgradeStepDetail,
   type UpgradeStepPage,
+  type UpgradeTargetSummary,
 } from "@langwatch/upgrade/reader";
 
 import type { UpgradeLedgerRepository } from "../upgrade-ledger.repository.ts";
@@ -20,15 +24,20 @@ export class MemoryUpgradeLedgerRepository implements UpgradeLedgerRepository {
   /** The steps a retry reopened, read back as pending. */
   private readonly reopened = new Set<string>();
 
-  private constructor(private readonly reader: UpgradeReader) {}
+  private constructor(
+    private readonly reader: UpgradeReader,
+    private readonly deprecations: Deprecation[],
+  ) {}
 
   /** A test may hand a reader of its own, so a page reads a ledger with releases and runs. */
   static create({
     steps = [],
     reader,
+    deprecations = [],
   }: {
     steps?: UpgradeImage["steps"];
     reader?: UpgradeReader;
+    deprecations?: Deprecation[];
   } = {}): MemoryUpgradeLedgerRepository {
     return new MemoryUpgradeLedgerRepository(
       reader ??
@@ -37,11 +46,16 @@ export class MemoryUpgradeLedgerRepository implements UpgradeLedgerRepository {
           image: { release: "unreleased", steps },
           floor: null,
         }),
+      deprecations,
     );
   }
 
   findStatus(): Promise<UpgradeStatus> {
     return this.reader.status();
+  }
+
+  findDeprecations(): Deprecation[] {
+    return this.deprecations;
   }
 
   findSteps(filter?: ListStepsFilter): Promise<UpgradeStepPage> {
@@ -71,11 +85,24 @@ export class MemoryUpgradeLedgerRepository implements UpgradeLedgerRepository {
     return this.reader.getRun(input);
   }
 
+  findPreview(input: { to: string }): Promise<UpgradePreview> {
+    return this.reader.preview(input);
+  }
+
+  findTargets(): Promise<UpgradeTargetSummary[]> {
+    return this.reader.listTargets();
+  }
+
   /** Checks and records with no await between them, so concurrent retries reopen it once. */
   async reopenFailedStep({ id }: { id: string }): Promise<boolean> {
     const { status } = await this.getStep({ id });
     if (status !== "failed" || this.reopened.has(id)) return false;
     this.reopened.add(id);
     return true;
+  }
+
+  /** No process heartbeats into a database that holds no ledger. */
+  async findLiveRoster(): Promise<ServingRosterEntry[]> {
+    return [];
   }
 }

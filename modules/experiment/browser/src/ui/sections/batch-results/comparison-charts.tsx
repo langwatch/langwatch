@@ -940,13 +940,13 @@ function MetricsDropdown({
                     border="1px solid"
                     borderColor="border.emphasized"
                     borderRadius="sm"
-                    bg={visibleMetrics.has(metric.id) ? "blue.500" : "transparent"}
+                    bg={visibleMetrics.has(metric.id) ? "blue.solid" : "transparent"}
                     display="flex"
                     alignItems="center"
                     justifyContent="center"
                   >
                     {visibleMetrics.has(metric.id) && (
-                      <Text color="white" fontSize="xs" fontWeight="bold">
+                      <Text color="blue.contrast" fontSize="xs" fontWeight="bold">
                         ✓
                       </Text>
                     )}

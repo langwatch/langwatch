@@ -10,10 +10,11 @@ export const spansTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof spansTrp
   defineTrpcRouter(TraceApi, spansTrpc)
     .procedure("getAllForTrace")
     .withPermission("traces:view")
-    .handle(async ({ app, input, actor }) => {
+    .handle(async ({ app, input, actor, authorization }) => {
       const protections = await app.resolveViewerProtections({
         projectId: input.projectId,
         userId: actor.id,
+        authorization,
       });
 
       return app.readOrderedSpansForTrace({
@@ -25,12 +26,22 @@ export const spansTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof spansTrp
 
     .procedure("getForPromptStudio")
     .withPermission("traces:view")
-    .handle(async ({ app, input, actor }) =>
+    .handle(async ({ app, input, actor, authorization }) =>
       promptStudioSpanSchema.parse(
         await app.getPromptStudioSpan({
           projectId: input.projectId,
           spanId: input.spanId,
           viewerUserId: actor.id,
+          ...(input.traceId === undefined
+            ? {}
+            : {
+                trace: {
+                  authorization,
+                  traceId: input.traceId,
+                  ...(input.tenantId === undefined ? {} : { tenantId: input.tenantId }),
+                  ...(input.occurredAtMs === undefined ? {} : { occurredAtMs: input.occurredAtMs }),
+                },
+              }),
         }),
       ),
     )

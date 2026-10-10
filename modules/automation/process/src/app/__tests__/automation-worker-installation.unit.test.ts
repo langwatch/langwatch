@@ -1,7 +1,3 @@
-/**
- * @vitest-environment node
- * The automation module installed on the worker role: the pipeline it hosts, over memory.
- */
 import type { AnalyticsApi } from "@langwatch/analytics-contract";
 import type { AnnotationApi } from "@langwatch/annotation-contract";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
@@ -11,6 +7,11 @@ import {
   type AutomationServerConfig,
   type CreateTriggerCommand,
 } from "@langwatch/automation-contract";
+/**
+ * @vitest-environment node
+ * The automation module installed on the worker role: the pipeline it hosts, over memory.
+ */
+import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { type DatasetApi, InvalidColumnError } from "@langwatch/dataset-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { EvaluationApi } from "@langwatch/evaluation-contract";
@@ -47,6 +48,9 @@ const CONFIG: AutomationServerConfig = {
   persistDailyCapPaid: 500,
   persistDailyCapEnterprise: 5_000,
   publicBaseUrl: "https://app.langwatch.test",
+  slackApiBase: "https://slack.com/api",
+  slackWebhookBase: "https://hooks.slack.com",
+  allowInsecureLocalUrls: false,
 };
 
 function eventingFor(role: "api" | "worker"): EventSourcing {
@@ -106,6 +110,7 @@ function automationLogLines(): unknown[] {
 
 function peers(installed: Installed = {}) {
   return {
+    "data-retention": createApiFixture<DataRetentionApi>({}),
     analytics: createApiFixture<AnalyticsApi>(),
     monitor: createApiFixture<MonitorApi>(),
     evaluator: createApiFixture<EvaluatorApi>(),

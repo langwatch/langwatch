@@ -1,7 +1,7 @@
 /** Re-bind app singletons through host port; call shapes preserved, presentation
  * registry deferred. */
 
-import { useCallback, useMemo } from "react";
+import { useCallback } from "react";
 
 import { useOpsHost } from "../model/ops-host.ts";
 
@@ -16,28 +16,30 @@ export type OpsToast = {
 
 export type OpsToaster = { create: (toast: OpsToast) => void };
 
+/** Routes one toast to the host by its type: error, warning, info, else success. */
+function raise({ host, toast }: { host: ReturnType<typeof useOpsHost>; toast: OpsToast }): void {
+  if (toast.type === "error") {
+    host.failed({
+      error: void 0,
+      fallbackTitle: toast.title,
+      ...(toast.description ? { description: toast.description } : {}),
+      ...(toast.id ? { id: toast.id } : {}),
+    });
+    return;
+  }
+  const notice = {
+    title: toast.title,
+    ...(toast.description ? { description: toast.description } : {}),
+    ...(toast.id ? { id: toast.id } : {}),
+  };
+  if (toast.type === "warning") host.warned(notice);
+  else if (toast.type === "info") host.informed(notice);
+  else host.succeeded(notice);
+}
+
 export function useOpsToaster(): OpsToaster {
   const host = useOpsHost();
-  return useMemo(
-    () => ({
-      create: (toast: OpsToast) => {
-        if (toast.type === "error") {
-          host.failed({
-            error: void 0,
-            fallbackTitle: toast.title,
-            ...(toast.id ? { id: toast.id } : {}),
-          });
-          return;
-        }
-        host.succeeded({
-          title: toast.title,
-          ...(toast.description ? { description: toast.description } : {}),
-          ...(toast.id ? { id: toast.id } : {}),
-        });
-      },
-    }),
-    [host],
-  );
+  return { create: (toast: OpsToast) => raise({ host, toast }) };
 }
 
 export type OpsErrorToastOptions = {

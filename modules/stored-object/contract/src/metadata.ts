@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import { storedObjectDeliveryAudienceSchema } from "./audiences.ts";
@@ -74,13 +75,18 @@ export function createStoredObjectByteLengthSchema(maximumBytes: number): z.ZodN
 export const storedObjectTimestampSchema = z.string().datetime({ offset: true });
 export type StoredObjectTimestamp = z.infer<typeof storedObjectTimestampSchema>;
 
-export const storedObjectProvenanceSchema = z
+const storedObjectProvenanceSchemaDefinition = z
   .object({
     purpose: z.string().min(1).max(127),
     ownerKind: z.string().min(1).max(127),
     ownerId: z.string().min(1).max(255),
   })
   .strict();
+export interface StoredObjectProvenanceSchema extends Named<
+  typeof storedObjectProvenanceSchemaDefinition
+> {}
+export const storedObjectProvenanceSchema: StoredObjectProvenanceSchema =
+  storedObjectProvenanceSchemaDefinition;
 export type StoredObjectProvenance = z.infer<typeof storedObjectProvenanceSchema>;
 
 export const storedObjectLifecycleStatusSchema = z.enum([
@@ -104,7 +110,7 @@ export type StoredObjectWriteOperationStatus = z.infer<
   typeof storedObjectWriteOperationStatusSchema
 >;
 
-export const storedObjectMetadataSchema = z
+const storedObjectMetadataSchemaDefinition = z
   .object({
     projectId: storedObjectProjectIdSchema,
     id: storedObjectIdSchema,
@@ -122,9 +128,14 @@ export const storedObjectMetadataSchema = z
     deletedAt: storedObjectTimestampSchema.optional(),
   })
   .strict();
+export interface StoredObjectMetadataSchema extends Named<
+  typeof storedObjectMetadataSchemaDefinition
+> {}
+export const storedObjectMetadataSchema: StoredObjectMetadataSchema =
+  storedObjectMetadataSchemaDefinition;
 export type StoredObjectMetadata = z.infer<typeof storedObjectMetadataSchema>;
 
-export const storedObjectWriteOperationSchema = z
+const storedObjectWriteOperationSchemaDefinition = z
   .object({
     projectId: storedObjectProjectIdSchema,
     operationId: storedObjectOperationIdSchema,
@@ -135,9 +146,14 @@ export const storedObjectWriteOperationSchema = z
     completedAt: storedObjectTimestampSchema.optional(),
   })
   .strict();
+export interface StoredObjectWriteOperationSchema extends Named<
+  typeof storedObjectWriteOperationSchemaDefinition
+> {}
+export const storedObjectWriteOperationSchema: StoredObjectWriteOperationSchema =
+  storedObjectWriteOperationSchemaDefinition;
 export type StoredObjectWriteOperation = z.infer<typeof storedObjectWriteOperationSchema>;
 
-export const storedObjectStorageUsageSchema = z
+const storedObjectStorageUsageSchemaDefinition = z
   .object({
     projectId: storedObjectProjectIdSchema,
     activeObjectCount: z.number().int().nonnegative().safe(),
@@ -145,4 +161,9 @@ export const storedObjectStorageUsageSchema = z
     purpose: z.string().min(1).max(127).optional(),
   })
   .strict();
+export interface StoredObjectStorageUsageSchema extends Named<
+  typeof storedObjectStorageUsageSchemaDefinition
+> {}
+export const storedObjectStorageUsageSchema: StoredObjectStorageUsageSchema =
+  storedObjectStorageUsageSchemaDefinition;
 export type StoredObjectStorageUsage = z.infer<typeof storedObjectStorageUsageSchema>;

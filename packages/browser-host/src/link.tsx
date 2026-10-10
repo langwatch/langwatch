@@ -1,13 +1,13 @@
 /**
  * The one in-app link: a real anchor whose plain click routes in place through
- * the navigation capability (§10), so the document never reloads.
+ * the navigation host service (§10), so the document never reloads.
  * Spec: specs/ui/in-app-links.feature
  */
 
 import { Link as ChakraLink } from "@langwatch/design-system/primitives";
 import type { ComponentProps, MouseEvent } from "react";
 
-import { useOptionalUiCapabilities } from "./capabilities.ts";
+import { useOptionalUiHostServices } from "./capabilities.ts";
 
 type LinkProps = {
   href: string | undefined;
@@ -40,7 +40,7 @@ function isBrowserClick(event: MouseEvent<HTMLAnchorElement>): boolean {
 }
 
 export const Link = ({ href, isExternal, children, onClick, ...props }: LinkProps) => {
-  const capabilities = useOptionalUiCapabilities();
+  const hostServices = useOptionalUiHostServices();
 
   if (isExternal) {
     return (
@@ -55,9 +55,9 @@ export const Link = ({ href, isExternal, children, onClick, ...props }: LinkProp
       href={href ?? ""}
       onClick={(event: MouseEvent<HTMLAnchorElement>) => {
         onClick?.(event);
-        if (isBrowserClick(event) || !isInAppHref(href) || !capabilities) return;
+        if (isBrowserClick(event) || !isInAppHref(href) || !hostServices) return;
         event.preventDefault();
-        capabilities.navigation.navigate(href);
+        hostServices.navigation.navigate(href);
       }}
       {...props}
     >

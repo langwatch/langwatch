@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 /**
@@ -5,7 +6,7 @@ import { z } from "zod";
  * Sent by the evaluationTrigger subscriber — one per monitor.
  * Does preconditions, sampling, execution, ES write, and emits events.
  */
-export const executeEvaluationCommandDataSchema = z.object({
+const executeEvaluationCommandDataSchemaDefinition = z.object({
   tenantId: z.string(),
   traceId: z.string(),
   evaluationId: z.string(),
@@ -14,6 +15,8 @@ export const executeEvaluationCommandDataSchema = z.object({
   evaluatorName: z.string().optional(),
   isGuardrail: z.boolean().optional(),
   occurredAt: z.number(),
+  // The evaluated trace's last span end: the reported event's business time; absent, occurredAt
+  spanEndedAt: z.number().optional(),
   // Thread debouncing: when > 0, traces in the same thread share one dedup key
   threadIdleTimeout: z.number().optional(),
   // Trace metadata passed from evaluationTrigger subscriber
@@ -34,6 +37,11 @@ export const executeEvaluationCommandDataSchema = z.object({
   computedInput: z.string().nullable().optional(),
   computedOutput: z.string().nullable().optional(),
 });
+export interface ExecuteEvaluationCommandDataSchema extends Named<
+  typeof executeEvaluationCommandDataSchemaDefinition
+> {}
+export const executeEvaluationCommandDataSchema: ExecuteEvaluationCommandDataSchema =
+  executeEvaluationCommandDataSchemaDefinition;
 
 export type ExecuteEvaluationCommandData = z.infer<typeof executeEvaluationCommandDataSchema>;
 
@@ -63,7 +71,7 @@ export type StartEvaluationCommandData = z.infer<typeof startEvaluationCommandDa
  * Command data for completing an evaluation.
  * Emitted when evaluation execution finishes (API handler path).
  */
-export const completeEvaluationCommandDataSchema = z.object({
+const completeEvaluationCommandDataSchemaDefinition = z.object({
   tenantId: z.string(),
   evaluationId: z.string(),
   status: z.enum(["processed", "error", "skipped"]),
@@ -77,6 +85,11 @@ export const completeEvaluationCommandDataSchema = z.object({
   costId: z.string().nullable().optional(),
   occurredAt: z.number(),
 });
+export interface CompleteEvaluationCommandDataSchema extends Named<
+  typeof completeEvaluationCommandDataSchemaDefinition
+> {}
+export const completeEvaluationCommandDataSchema: CompleteEvaluationCommandDataSchema =
+  completeEvaluationCommandDataSchemaDefinition;
 
 export type CompleteEvaluationCommandData = z.infer<typeof completeEvaluationCommandDataSchema>;
 
@@ -85,7 +98,7 @@ export type CompleteEvaluationCommandData = z.infer<typeof completeEvaluationCom
  * Combines start + complete fields so a single command emits both events,
  * avoiding ClickHouse replica lag between two separate commands.
  */
-export const reportEvaluationCommandDataSchema = z.object({
+const reportEvaluationCommandDataSchemaDefinition = z.object({
   tenantId: z.string(),
   evaluationId: z.string(),
   evaluatorId: z.string(),
@@ -104,5 +117,10 @@ export const reportEvaluationCommandDataSchema = z.object({
   costId: z.string().nullable().optional(),
   occurredAt: z.number(),
 });
+export interface ReportEvaluationCommandDataSchema extends Named<
+  typeof reportEvaluationCommandDataSchemaDefinition
+> {}
+export const reportEvaluationCommandDataSchema: ReportEvaluationCommandDataSchema =
+  reportEvaluationCommandDataSchemaDefinition;
 
 export type ReportEvaluationCommandData = z.infer<typeof reportEvaluationCommandDataSchema>;

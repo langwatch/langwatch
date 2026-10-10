@@ -11,6 +11,7 @@ import {
   type ConfigOf,
 } from "@langwatch/config";
 import { defineBrowserConfig } from "@langwatch/config/public-app-config";
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import type { GatewayCacheRuleResource } from "./gateway-cache-rule.ts";
@@ -119,9 +120,11 @@ export type GatewayDeploymentAddresses = Readonly<{
 }>;
 
 /** The browser only learns where the gateway answers, never a secret. */
-export const gatewayWebConfigSchema = z.strictObject({
+const gatewayWebConfigSchemaDefinition = z.strictObject({
   gatewayBaseUrl: z.string().min(1),
 });
+export interface GatewayWebConfigSchema extends Named<typeof gatewayWebConfigSchemaDefinition> {}
+export const gatewayWebConfigSchema: GatewayWebConfigSchema = gatewayWebConfigSchemaDefinition;
 
 export type GatewayWebConfig = z.infer<typeof gatewayWebConfigSchema>;
 

@@ -249,6 +249,7 @@ function LangyLauncher({ isOpen, onOpen }: { isOpen: boolean; onOpen: () => void
         ref={orbRef}
         type="button"
         className="langy-root"
+        data-langy-orb=""
         onClick={() => {
           // Fire the bloom while the orb is still mounted (reads its rect), then
           // open — the bloom outlives the unmount on its own.
@@ -272,19 +273,21 @@ function LangyLauncher({ isOpen, onOpen }: { isOpen: boolean; onOpen: () => void
         borderRadius="full"
         display="grid"
         placeItems="center"
-        background="bg.surface"
+        background="bg.card"
         borderWidth="1px"
         borderStyle="solid"
         borderColor="border.emphasized"
-        boxShadow="0 1px 2px rgba(20,20,23,0.08), 0 8px 24px rgba(20,20,23,0.14)"
+        boxShadow="0 1px 2px color-mix(in srgb, var(--chakra-colors-bg-scrim) 8%, transparent), 0 8px 24px color-mix(in srgb, var(--chakra-colors-bg-scrim) 14%, transparent)"
         _dark={{
-          boxShadow: "0 1px 2px rgba(0,0,0,0.5), 0 10px 30px rgba(0,0,0,0.55)",
+          boxShadow:
+            "0 1px 2px color-mix(in srgb, var(--chakra-colors-bg-scrim) 50%, transparent), 0 10px 30px color-mix(in srgb, var(--chakra-colors-bg-scrim) 55%, transparent)",
         }}
         cursor="pointer"
         transition="box-shadow 160ms ease, border-color 160ms ease"
         _hover={{
           borderColor: "orange.emphasized",
-          boxShadow: "0 2px 4px rgba(20,20,23,0.10), 0 12px 32px rgba(20,20,23,0.18)",
+          boxShadow:
+            "0 2px 4px color-mix(in srgb, var(--chakra-colors-bg-scrim) 10%, transparent), 0 12px 32px color-mix(in srgb, var(--chakra-colors-bg-scrim) 18%, transparent)",
         }}
       >
         {/* Warm proximity glow — bleeds out around the orb toward the cursor.
@@ -713,7 +716,6 @@ function LangyPanel({
                   closePanel();
                 }}
                 // Beside a drawer, the drawer owns the only close affordance on screen.
-                hideClose={placement.isDrawerCompanion}
                 historyOpen={historyOpen}
                 onToggleHistory={() => setHistoryOpen((open) => !open)}
                 devMode={inspector.devMode}
@@ -839,7 +841,6 @@ function PanelHeader({
   workspaceChip,
   onNewChat,
   onClose,
-  hideClose,
   historyOpen,
   onToggleHistory,
   devMode: _devMode,
@@ -852,8 +853,6 @@ function PanelHeader({
   workspaceChip?: ReactNode;
   onNewChat: () => void;
   onClose: () => void;
-  /** Hide the Minimise control (drawer companion: the drawer owns the only X). */
-  hideClose: boolean;
   /** The recents list has taken over the panel body. */
   historyOpen: boolean;
   onToggleHistory: () => void;
@@ -959,42 +958,33 @@ function PanelHeader({
 
           <LangyOverflowMenu devDrawerOpen={devDrawerOpen} onToggleDevDrawer={onToggleDevDrawer} />
 
-          {/* Hidden beside a drawer, whose own X is the single close. Says "minimise" since the
-              panel stays mounted and just sinks to a header sliver. */}
-          {hideClose ? null : (
-            <>
-              <Box
-                width="1px"
-                alignSelf="stretch"
-                marginY="4px"
-                marginX="3px"
-                background="border"
-              />
+          {/* Says "minimise" since the panel stays mounted and sinks to a header sliver. */}
+          <>
+            <Box width="1px" alignSelf="stretch" marginY="4px" marginX="3px" background="border" />
 
-              <Tooltip
-                content={
-                  <HStack gap={2}>
-                    <Text>Minimise</Text>
-                    <HStack gap={1}>
-                      <Kbd>⌘</Kbd>
-                      <Kbd>I</Kbd>
-                    </HStack>
+            <Tooltip
+              content={
+                <HStack gap={2}>
+                  <Text>Minimise</Text>
+                  <HStack gap={1}>
+                    <Kbd>⌘</Kbd>
+                    <Kbd>I</Kbd>
                   </HStack>
-                }
-                positioning={{ placement: "bottom" }}
+                </HStack>
+              }
+              positioning={{ placement: "bottom" }}
+            >
+              <IconButton
+                size="xs"
+                variant="ghost"
+                aria-label="Minimise Langy"
+                color="fg.muted"
+                onClick={onClose}
               >
-                <IconButton
-                  size="xs"
-                  variant="ghost"
-                  aria-label="Minimise Langy"
-                  color="fg.muted"
-                  onClick={onClose}
-                >
-                  <Minus size={15} />
-                </IconButton>
-              </Tooltip>
-            </>
-          )}
+                <Minus size={15} />
+              </IconButton>
+            </Tooltip>
+          </>
         </HStack>
       </HStack>
       <Separator />

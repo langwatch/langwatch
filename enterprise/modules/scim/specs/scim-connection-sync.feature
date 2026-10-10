@@ -162,7 +162,7 @@ Feature: Directory sync per connection - one token, one connection, and a deprov
 
   @integration @regression
   Scenario: Repeating an inactive creation does not restore a departed person's access
-    Given a directory deactivated a person, who stays a member holding nothing
+    Given a directory deactivated a person and their membership was removed
     When it submits that person for creation with active false again
     Then the same directory resource remains inactive
     And no membership, role binding or department assignment is restored
@@ -347,7 +347,7 @@ Feature: Directory sync per connection - one token, one connection, and a deprov
     Given a deployment still writing membership the previous way
     When the directory pushes somebody inactive
     Then their grants are revoked and the revocation is recorded
-    And they stay a member holding nothing, rather than being deleted
+    And their organization membership is removed
 
   # Needs Postgres: the collector answering nothing for them after a
   # reactivating push. `reinstateSignIn` covers the sign-in half at unit
@@ -520,7 +520,7 @@ Feature: Directory sync per connection - one token, one connection, and a deprov
 
   @integration
   Scenario: A directory adopts a member who already had an account
-    Given somebody already has an account but no membership in "acme"
+    Given somebody already has an account on a domain "acme" proved, but no membership in "acme"
     When "okta-primary" pushes them
     Then their existing account gains the membership
     And no second account is created for the same address

@@ -31,7 +31,7 @@ export function ReplayHistorySection({
         paddingTop={3}
         paddingBottom={2}
         cursor="pointer"
-        _hover={{ color: "orange.500" }}
+        _hover={{ color: "orange.fg" }}
         transition="color 0.1s"
         onClick={onOpenReplay}
       >

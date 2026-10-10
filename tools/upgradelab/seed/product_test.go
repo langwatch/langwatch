@@ -36,6 +36,7 @@ func newOldApp() *oldApp {
 		"workflow.getAll":          []any{map[string]string{"name": "rehearsal workflow " + testLabel}, map[string]string{"name": "someone else's"}},
 		"slackIntegration.list":    []any{map[string]string{"name": "rehearsal slack " + testLabel}},
 		"dashboards.getAll":        []any{map[string]string{"name": "rehearsal report " + testLabel}},
+		"scenarios.create":         map[string]string{"id": "scenario_1"},
 		"suites.getAll":            []any{map[string]string{"name": "rehearsal suite " + testLabel}},
 	}}
 }
@@ -83,7 +84,7 @@ func TestSeedCreatesEachKindThroughTheOldDoors(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := []string{"/api/auth/sign-in/email", "onboarding.initializeOrganization", "organization.getAll", "project.getProjectAPIKey", "/api/collector",
-		"dataPrivacy.setForScope", "dataRetention.setForScope", "annotation.create", "workflow.create", "slackIntegration.create", "dashboards.create", "suites.create"}
+		"dataPrivacy.setForScope", "dataRetention.setForScope", "annotation.create", "workflow.create", "slackIntegration.create", "dashboards.create", "scenarios.create", "suites.create"}
 	if got := app.called(); !slices.Equal(got, want) {
 		t.Fatalf("calls\n got %v\nwant %v", got, want)
 	}

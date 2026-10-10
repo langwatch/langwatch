@@ -6,26 +6,31 @@ Feature: Grafana deep links from errors and ops screens
   Grafana is configured by GRAFANA_BASE_URL, with GRAFANA_TEMPO_DATASOURCE_UID
   and GRAFANA_LOKI_DATASOURCE_UID overriding the LGTM bundle's datasource uids.
 
+  @unit
   Scenario: A configured Grafana gives a handled error a trace link
     Given GRAFANA_BASE_URL names a Grafana
     When a handled error with a trace id is serialised
     Then it carries a traceUrl opening that trace in Tempo
 
+  @unit
   Scenario: With no Grafana configured an error carries no link and nothing fails
     Given GRAFANA_BASE_URL is unset
     When a handled error with a trace id is serialised
     Then it carries no traceUrl
 
+  @unit
   Scenario: A malformed Grafana base URL yields no link rather than a second error
     Given GRAFANA_BASE_URL is a bare host with no scheme
     When a handled error with a trace id is serialised
     Then it carries no traceUrl and serialising does not throw
 
+  @unit
   Scenario: Ops screens are handed the link config only when a Grafana is configured
     Given the ops screens ask for the Grafana link config
     Then they receive the base URL and datasource uids when GRAFANA_BASE_URL is set
     And they receive nothing when it is unset, so no link is rendered
 
+  @unit
   Scenario: Every process role reads the Grafana settings from its observability config
     Given GRAFANA_BASE_URL and GRAFANA_TEMPO_DATASOURCE_UID name a Grafana
     When an api or worker process parses its configuration

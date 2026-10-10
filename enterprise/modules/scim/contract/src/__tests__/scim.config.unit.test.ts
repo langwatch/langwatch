@@ -9,8 +9,8 @@ const read = (environment: Record<string, string | undefined>) =>
 describe("scim server configuration", () => {
   describe("given a deployment wires no directory", () => {
     /** @scenario "A feature's defaults are the values a deployment already runs on" */
-    it("keeps the proven offboarding path off", () => {
-      expect(read({})).toEqual({ provenOffboarding: false });
+    it("runs the proven offboarding path by default", () => {
+      expect(read({})).toEqual({ provenOffboarding: true });
     });
   });
 

@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 /**
@@ -14,7 +15,9 @@ const scalarFactSchema = z.union([z.string(), z.number(), z.boolean()]);
  * `CODING_AGENT_CONTRIBUTION_KEYS`. Preserving the raw names keeps the fold's
  * derivation identical across signals.
  */
-export const contributionFactsSchema = z.record(z.string(), scalarFactSchema);
+const contributionFactsSchemaDefinition = z.record(z.string(), scalarFactSchema);
+export interface ContributionFactsSchema extends Named<typeof contributionFactsSchemaDefinition> {}
+export const contributionFactsSchema: ContributionFactsSchema = contributionFactsSchemaDefinition;
 export type ContributionFacts = z.infer<typeof contributionFactsSchema>;
 
 /**
@@ -55,7 +58,7 @@ const workingContextStampSchema = {
  * Facts off one coding-agent SPAN: structure, timing, tokens, finish reason.
  * The span itself stays in span storage — `traceId`/`spanId` reach it.
  */
-export const spanFactsContributionSchema = z.object({
+const spanFactsContributionSchemaDefinition = z.object({
   ...contributionBaseSchema.shape,
   traceId: z.string().min(1),
   spanId: z.string().min(1),
@@ -74,13 +77,18 @@ export const spanFactsContributionSchema = z.object({
   scopeName: z.string().nullable(),
   ...workingContextStampSchema,
 });
+export interface SpanFactsContributionSchema extends Named<
+  typeof spanFactsContributionSchemaDefinition
+> {}
+export const spanFactsContributionSchema: SpanFactsContributionSchema =
+  spanFactsContributionSchemaDefinition;
 export type SpanFactsContribution = z.infer<typeof spanFactsContributionSchema>;
 
 /**
  * Facts off one coding-agent LOG record: the facts with no span — the denied
  * tool, the failed-and-retried call, the authoritative cost, the compaction.
  */
-export const logFactsContributionSchema = z.object({
+const logFactsContributionSchemaDefinition = z.object({
   ...contributionBaseSchema.shape,
   /** The canonical record's content hash — reaches the stored row. */
   recordId: z.string().min(1),
@@ -95,6 +103,11 @@ export const logFactsContributionSchema = z.object({
   facts: contributionFactsSchema,
   ...workingContextStampSchema,
 });
+export interface LogFactsContributionSchema extends Named<
+  typeof logFactsContributionSchemaDefinition
+> {}
+export const logFactsContributionSchema: LogFactsContributionSchema =
+  logFactsContributionSchemaDefinition;
 export type LogFactsContribution = z.infer<typeof logFactsContributionSchema>;
 
 /**
@@ -102,7 +115,7 @@ export type LogFactsContribution = z.infer<typeof logFactsContributionSchema>;
  * is the series' total as of `asOfUnixMs`, never a delta; re-delivery
  * replaces (last-write-wins), never adds — the rule that makes replay safe.
  */
-export const metricFactsContributionSchema = z.object({
+const metricFactsContributionSchemaDefinition = z.object({
   ...contributionBaseSchema.shape,
   /** The canonical metric pipeline's series identity hash. */
   seriesId: z.string().min(1),
@@ -121,4 +134,9 @@ export const metricFactsContributionSchema = z.object({
   /** Wall-clock of the newest point folded in — the LWW version. */
   asOfUnixMs: z.number(),
 });
+export interface MetricFactsContributionSchema extends Named<
+  typeof metricFactsContributionSchemaDefinition
+> {}
+export const metricFactsContributionSchema: MetricFactsContributionSchema =
+  metricFactsContributionSchemaDefinition;
 export type MetricFactsContribution = z.infer<typeof metricFactsContributionSchema>;

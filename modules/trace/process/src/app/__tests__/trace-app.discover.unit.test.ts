@@ -5,11 +5,13 @@
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
+import { ownProof } from "../../__tests__/support/authorization-proofs.fixture.ts";
 import type { TracesListReader } from "../trace.app.ts";
 import { createTraceAppHarness } from "./support/trace-app.harness.ts";
 
 const PROJECT_ID = "project-1";
 const TIME_RANGE = { from: 1_000, to: 2_000, live: true };
+const PROOF = ownProof({ projectId: PROJECT_ID });
 const FACET = {
   key: "status",
   kind: "categorical" as const,
@@ -37,9 +39,13 @@ describe("TraceModule.readDiscoverForQuery", () => {
       const { app, getDiscover, getFacets } = harness();
 
       await expect(
-        app.readDiscoverForQuery({ projectId: PROJECT_ID, timeRange: TIME_RANGE }),
+        app.readDiscoverForQuery({
+          projectId: PROJECT_ID,
+          timeRange: TIME_RANGE,
+          authorization: PROOF,
+        }),
       ).resolves.toEqual({ facets: [FACET], pending: true });
-      expect(getDiscover).toHaveBeenCalledWith({ tenantId: PROJECT_ID, timeRange: TIME_RANGE });
+      expect(getDiscover).toHaveBeenCalledWith({ authorization: PROOF, timeRange: TIME_RANGE });
       expect(getFacets).not.toHaveBeenCalled();
     });
   });
@@ -49,10 +55,15 @@ describe("TraceModule.readDiscoverForQuery", () => {
       const { app, getDiscover, getFacets } = harness();
 
       await expect(
-        app.readDiscoverForQuery({ projectId: PROJECT_ID, timeRange: TIME_RANGE, query: "" }),
+        app.readDiscoverForQuery({
+          projectId: PROJECT_ID,
+          timeRange: TIME_RANGE,
+          query: "",
+          authorization: PROOF,
+        }),
       ).resolves.toEqual({ facets: [FACET], pending: false });
       expect(getFacets).toHaveBeenCalledWith(
-        expect.objectContaining({ tenantId: PROJECT_ID, timeRange: TIME_RANGE }),
+        expect.objectContaining({ authorization: PROOF, timeRange: TIME_RANGE }),
       );
       expect(getDiscover).not.toHaveBeenCalled();
     });
@@ -68,10 +79,11 @@ describe("TraceModule.readDiscoverForQuery", () => {
           projectId: PROJECT_ID,
           timeRange: TIME_RANGE,
           query: "status:error",
+          authorization: PROOF,
         }),
       ).resolves.toEqual({ facets: [FACET], pending: false });
       expect(getFacets).toHaveBeenCalledWith(
-        expect.objectContaining({ tenantId: PROJECT_ID, timeRange: TIME_RANGE }),
+        expect.objectContaining({ authorization: PROOF, timeRange: TIME_RANGE }),
       );
       expect(getDiscover).not.toHaveBeenCalled();
     });

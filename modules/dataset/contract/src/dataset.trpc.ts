@@ -4,7 +4,7 @@
  * declared here; the browser reads the same names and schemas as types.
  */
 
-import { defineTrpcContract } from "@langwatch/module";
+import { defineTrpcContract, type Named } from "@langwatch/module";
 import { z } from "zod";
 
 import { datasetLimitsSchema } from "./dataset-limits.ts";
@@ -20,6 +20,7 @@ import {
   datasetApiValidateNameInputSchema,
 } from "./dataset.schemas.ts";
 import {
+  DATASET_NORMALIZATION_SETTLED_EVENT_TYPE,
   appendStoredObjectToDatasetInputSchema,
   createDatasetAttachmentUploadInputSchema,
   datasetAttachmentUploadSchema,
@@ -34,7 +35,9 @@ import {
 } from "./dataset.ts";
 
 /** What an archive or its undo answers. */
-export const datasetDeletedSchema = z.object({ success: z.literal(true) }).strict();
+const datasetDeletedSchemaDefinition = z.object({ success: z.literal(true) }).strict();
+export interface DatasetDeletedSchema extends Named<typeof datasetDeletedSchemaDefinition> {}
+export const datasetDeletedSchema: DatasetDeletedSchema = datasetDeletedSchemaDefinition;
 
 export const datasetTrpc = defineTrpcContract("dataset")
   /** Creates a dataset, or replaces an existing one's columns and entries. */
@@ -53,12 +56,12 @@ export const datasetTrpc = defineTrpcContract("dataset")
   .withOutput(datasetNameResultSchema)
 
   /** Every dataset in the project, for the list and picker surfaces. */
-  .query("getAll")
+  .query("getAll", { invalidatedBy: [DATASET_NORMALIZATION_SETTLED_EVENT_TYPE] })
   .withInput(datasetApiProjectInputSchema)
   .withOutput(z.array(datasetSummaryWireSchema))
 
   /** One dataset by id or slug; an archived or missing one reads as null. */
-  .query("getById")
+  .query("getById", { invalidatedBy: [DATASET_NORMALIZATION_SETTLED_EVENT_TYPE] })
   .withInput(datasetApiDatasetInputSchema)
   .withOutput(datasetWireSchema.nullable())
 

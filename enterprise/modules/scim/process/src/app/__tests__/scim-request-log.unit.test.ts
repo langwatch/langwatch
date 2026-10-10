@@ -101,7 +101,7 @@ describe("the SCIM request log", () => {
 
     await expect(
       app.authenticateDirectory({
-        authorization: "Bearer scim-token",
+        bearer: "scim-token",
         method: "POST",
         path: "/api/scim/v2/Users",
       }),
@@ -126,7 +126,7 @@ describe("the SCIM request log", () => {
 
     await expect(
       app.authenticateDirectory({
-        authorization: "Bearer nobodys-token",
+        bearer: "nobodys-token",
         method: "POST",
         path: "/api/scim/v2/Users",
       }),

@@ -33,6 +33,7 @@ function aRequest(overrides: Partial<JoinRequestAggregateState>): JoinRequestAgg
     resolvedByType: null,
     resolvedById: null,
     withdrawalCause: null,
+    connectionId: null,
     ...overrides,
   };
 }

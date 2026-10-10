@@ -7,7 +7,13 @@ const LONG =
   "You are a careful assistant. Answer only from the retrieved context and say so plainly when the context does not cover the question.";
 
 const meta = {
-  title: "Components/Overflown text",
+  title: "Data display/Overflown text",
+  parameters: {
+    usage: {
+      use: "A single line that may be cut off; the whole text shows on hover only when it is.",
+      avoid: "Prose: let it wrap.",
+    },
+  },
   component: OverflownTextWithTooltip,
   tags: ["autodocs"],
   args: { children: LONG },

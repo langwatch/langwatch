@@ -30,7 +30,7 @@ Opened from lists the other modules (and `ui`, the app) whose browser source nam
 
 ## Calls
 
-- Client packages (package.json): `@langwatch/annotation-client`, `@langwatch/api-key-client`, `@langwatch/dataset-client`, `@langwatch/evaluator-client`, `@langwatch/onboarding-client`, `@langwatch/prompt-client`, `@langwatch/scenario-client`, `@langwatch/trace-client`.
+- Client packages (package.json): `@langwatch/annotation-client`, `@langwatch/api-key-client`, `@langwatch/dataset-client`, `@langwatch/evaluator-client`, `@langwatch/feature-flag-client`, `@langwatch/onboarding-client`, `@langwatch/prompt-client`, `@langwatch/scenario-client`, `@langwatch/trace-client`.
 - Lends: `AgentActionsMenuToken`, `EvaluatorTracesMappingToken`, `ConversationThreadToken`, `TracePreviewHoverCardToken`, `RenderInputOutputToken`, `TraceIdPeekToken`, `SetupWithAgentButtonToken`, `AnnotationQueueConversationToken`, `TraceEditButtonToken`.
 - Host APIs it requires: `TraceHostApi`.
 - Capabilities: `presenceMenuItem`.

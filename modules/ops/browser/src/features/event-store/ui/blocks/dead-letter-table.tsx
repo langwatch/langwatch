@@ -1,3 +1,4 @@
+import { ListTable } from "@langwatch/design-system/list-table";
 import { Card, Table } from "@langwatch/design-system/primitives";
 
 import type {
@@ -31,9 +32,15 @@ export function DeadLettersTable({
   renderAttemptHistory?: DeadLetterAttemptHistoryRenderer;
 }) {
   return (
-    <Card.Root>
+    <Card.Root borderColor="border.muted" boxShadow="none">
       <Card.Body padding={0}>
-        <Table.Root size="sm" variant="line">
+        <ListTable
+          density="compact"
+          columnRules={false}
+          containerProps={{ overflowX: "auto" }}
+          size="sm"
+          variant="line"
+        >
           <Table.Header>
             <Table.Row>
               <Table.ColumnHeader>Process</Table.ColumnHeader>
@@ -61,7 +68,7 @@ export function DeadLettersTable({
               />
             ))}
           </Table.Body>
-        </Table.Root>
+        </ListTable>
       </Card.Body>
     </Card.Root>
   );

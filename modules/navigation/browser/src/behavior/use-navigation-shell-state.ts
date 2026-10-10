@@ -4,6 +4,7 @@
  */
 
 import { useBreakpointValue } from "@langwatch/design-system/primitives";
+import { FrontendFlags, type FrontendFeatureFlag } from "@langwatch/feature-flag-contract";
 import type { NavigationProject, NavigationUser } from "@langwatch/navigation-contract";
 
 import { belongsToNoOrganization } from "../model/belongs-to-no-organization.ts";
@@ -15,6 +16,7 @@ import {
   type ProjectNavItem,
 } from "../model/project-nav-items.ts";
 import {
+  isSwitchedOffProductAt,
   resolveShellRoute,
   type SeatRefusal,
   type ShellRoute,
@@ -74,6 +76,13 @@ export function useNavigationShellState({
 
   const hasUnresolvedProjectParam = host.projectParam() !== void 0 && !host.isLoading() && !project;
   if (hasUnresolvedProjectParam) {
+    return { status: "not-found" };
+  }
+  const isFlagOff = (flag: FrontendFeatureFlag) => {
+    const reading = host.featureFlag(FrontendFlags[flag]);
+    return !reading.isLoading && !reading.enabled;
+  };
+  if (isSwitchedOffProductAt({ pathname, isFlagOff })) {
     return { status: "not-found" };
   }
 

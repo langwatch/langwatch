@@ -797,6 +797,8 @@ export interface IdentityApi {
   claimsForMint(input: SessionClaimsMintInput): Promise<SessionClaims>;
   /** When each sign-in method last minted a session, read from the user's sessions. */
   getMethodsLastUsed(input: { userId: string }): Promise<MethodsLastUsed>;
+  /** Whether an organization's single sign-on governs this person's own sign-in. */
+  isSignInGovernedBySso(input: { userId: string }): Promise<boolean>;
   /** Where an address signs in; `breakGlass` asks for the rate-limited local door (ADR-117). */
   routeSignIn(
     input: Readonly<{ identifier: string | null; breakGlass: boolean }>,

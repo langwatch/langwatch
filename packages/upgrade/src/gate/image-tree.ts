@@ -2,7 +2,7 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import type { ManifestStep } from "../manifest/manifest.ts";
+import type { ManifestStep, ReleaseManifest } from "../manifest/manifest.ts";
 import {
   gooseStepId,
   prismaStepId,
@@ -57,6 +57,23 @@ export function imageGateSteps({
   };
 }
 
+/**
+ * The release this image is (IMAGE-IDENTITY): the newest stamped manifest only when the tree
+ * ships no step beyond the stamped ones, else null, "unreleased".
+ * Spec: specs/upgrade/release-manifests.feature.
+ */
+export function imageRelease({
+  manifests,
+  tree,
+}: {
+  manifests: readonly ReleaseManifest[];
+  tree: ReleaseTreeSteps;
+}): string | null {
+  const stamped = new Set(manifests.flatMap((manifest) => manifest.steps.map(({ id }) => id)));
+  const unstamped = [...treeStepIds({ tree })].some((id) => !stamped.has(id));
+  return unstamped ? null : (manifests.at(-1)?.release ?? null);
+}
+
 /** Every Prisma folder and goose file this image ships, as steps (ids per blitz plan 5.3). */
 export function imageSteps({
   release,
@@ -81,6 +98,35 @@ const CONTRACT_NOTE = /--[ \t]*contract:[ \t]*retired in[ \t]+\S+/i;
 /** A contract's `-- after: <step id>`: a background step that runs before it (STEP-AFTER-2). */
 const AFTER_NOTE = /^[ \t]*--[ \t]*after:[ \t]*(\S+)/gim;
 
+/** A contract's `-- archive: <table>`: a table it drops, archived first (Alex, 2026-10-09). */
+const ARCHIVE_NOTE = /^[ \t]*--[ \t]*archive:[ \t]*(?!none\b)(\S+)/gim;
+
+/** Each schema step whose SQL carries `-- contract: retired in <release>`, with that SQL. */
+function readContractSql({
+  directories,
+  tree,
+}: {
+  directories: { prisma: string; goose: string };
+  tree: ReleaseTreeSteps;
+}): Map<string, string> {
+  const contracts = new Map<string, string>();
+  const read = ({ id, path }: { id: string | null; path: string }) => {
+    if (!id || !existsSync(path)) return;
+    const sql = readFileSync(path, "utf8");
+    if (CONTRACT_NOTE.test(sql)) contracts.set(id, sql);
+  };
+  for (const folder of tree.prismaFolders) {
+    read({ id: prismaStepId({ folder }), path: join(directories.prisma, folder, "migration.sql") });
+  }
+  for (const file of tree.gooseFiles) {
+    read({ id: gooseStepId({ file }), path: join(directories.goose, file) });
+  }
+  return contracts;
+}
+
+const notesOf = ({ sql, note }: { sql: string; note: RegExp }) =>
+  [...sql.matchAll(note)].flatMap((match) => match[1] ?? []);
+
 /**
  * The schema steps whose SQL carries `-- contract: retired in <release>`, the destructive ones,
  * each with the background step ids its `-- after:` notes name.
@@ -92,21 +138,22 @@ export function imageContractSteps({
   directories?: { prisma: string; goose: string };
   tree?: ReleaseTreeSteps;
 } = {}): Map<string, string[]> {
-  const contracts = new Map<string, string[]>();
-  const read = ({ id, path }: { id: string | null; path: string }) => {
-    if (!id || !existsSync(path)) return;
-    const sql = readFileSync(path, "utf8");
-    if (!CONTRACT_NOTE.test(sql)) return;
-    contracts.set(
-      id,
-      [...sql.matchAll(AFTER_NOTE)].flatMap((note) => note[1] ?? []),
-    );
-  };
-  for (const folder of tree.prismaFolders) {
-    read({ id: prismaStepId({ folder }), path: join(directories.prisma, folder, "migration.sql") });
+  const contracts = readContractSql({ directories, tree });
+  return new Map([...contracts].map(([id, sql]) => [id, notesOf({ sql, note: AFTER_NOTE })]));
+}
+
+/** The contract steps that archive, each with the tables its `-- archive:` notes name. */
+export function imageContractArchives({
+  directories = IMAGE_MIGRATION_DIRECTORIES,
+  tree = readImageTree({ directories }),
+}: {
+  directories?: { prisma: string; goose: string };
+  tree?: ReleaseTreeSteps;
+} = {}): Map<string, string[]> {
+  const archives = new Map<string, string[]>();
+  for (const [id, sql] of readContractSql({ directories, tree })) {
+    const tables = notesOf({ sql, note: ARCHIVE_NOTE });
+    if (tables.length > 0) archives.set(id, tables);
   }
-  for (const file of tree.gooseFiles) {
-    read({ id: gooseStepId({ file }), path: join(directories.goose, file) });
-  }
-  return contracts;
+  return archives;
 }

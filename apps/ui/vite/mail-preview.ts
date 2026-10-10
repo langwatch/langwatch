@@ -4,6 +4,7 @@ import { createServer, type Plugin } from "vite";
 
 import {
   DEV_TOOLS_IDLE_ENV,
+  devToolPort,
   idleBoundMs,
   startDormantTool,
   type DormantToolOptions,
@@ -22,14 +23,18 @@ const REPO_ROOT = path.resolve(import.meta.dirname, "../../..");
 const PREVIEW_CONFIG = path.join(REPO_ROOT, "packages/mail/preview/vite.config.ts");
 
 export function mailPreview(options: { appPort: number }): Plugin {
-  const port = Number(process.env.LANGWATCH_MAIL_PREVIEW_PORT ?? options.appPort + 6);
-
   return {
     name: "langwatch-mail-preview",
     apply: "serve",
-    configureServer(server) {
+    async configureServer(server) {
       const { logger } = server.config;
       if (process.env.LANGWATCH_SKIP_MAIL_PREVIEW === "1") return;
+      const port = await devToolPort({
+        explicit: process.env.LANGWATCH_MAIL_PREVIEW_PORT,
+        appPort: options.appPort,
+        offset: 6,
+        env: process.env,
+      });
       const tool = startDormantTool(
         mailPreviewTool({ port, env: process.env, log: (line) => logger.info(`  ${line}`) }),
       );

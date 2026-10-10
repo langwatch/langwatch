@@ -83,20 +83,21 @@ describe("trace", () => {
     });
   });
 
-  describe("given a statement declared unscoped", () => {
+  describe("given a statement that sets SKIP_TENANT_CHECK", () => {
     describe("when the span is recorded", () => {
-      it("records the stated reason so exemptions can be audited", async () => {
+      it("records the skip so exemptions can be audited", async () => {
         const { tracer, attributes } = recordingTracer();
 
         await new QueryTracer({ tracer }).trace({
           request: {
             ...request,
-            unscoped: { reason: "operational part-count check" },
+            // An operational part-count check reads system tables, which no tenant owns.
+            SKIP_TENANT_CHECK: true,
           },
           task: async () => ({ rows: [] }),
         });
 
-        expect(attributes[SPAN_ATTRIBUTES.unscopedReason]).toBe("operational part-count check");
+        expect(attributes[SPAN_ATTRIBUTES.skipTenantCheck]).toBe(true);
       });
     });
   });

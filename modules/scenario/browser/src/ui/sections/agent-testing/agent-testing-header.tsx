@@ -5,12 +5,14 @@ import { PageLayout } from "@langwatch/design-system/page-layout";
  * @see specs/features/agent-testing/page-structure.feature
  */
 import { Box, Grid, GridItem, HStack, Tabs, Text } from "@langwatch/design-system/primitives";
+import { SectionNavigationHeader } from "@langwatch/design-system/section-navigation-frame";
 
 import type { AgentTestingTab } from "../../../behavior/agent-testing/use-agent-testing-routing.ts";
 import type { OpenPlanTitle } from "../../../behavior/agent-testing/use-agent-testing-store.ts";
 import { FG_MUTED } from "../../../model/agent-testing/shared/design.ts";
 
 export type AgentTestingHeaderProps = {
+  title?: string;
   tab: AgentTestingTab;
   onTabChange: (tab: AgentTestingTab) => void;
   /** How many scenarios the project holds, beside the Scenarios tab. */
@@ -40,6 +42,7 @@ function TabCount({ value }: { value?: number }) {
 }
 
 export function AgentTestingHeader({
+  title = "Default",
   tab,
   onTabChange,
   casesCount,
@@ -47,14 +50,20 @@ export function AgentTestingHeader({
   openPlan,
 }: AgentTestingHeaderProps) {
   return (
-    <PageLayout.Header>
+    <SectionNavigationHeader>
       {/* The middle column takes the width of the tabs, so the tabs sit in the
           centre of the page and not in the centre of what is left of it. The
           right column stays empty and balances the title on the left. Every
           page title in the product is the same size, so the header carries no
           padding or alignment override of its own: the defaults set by
           PageLayout.Header rule. */}
-      <Grid width="full" height="full" templateColumns="1fr auto 1fr" alignItems="center" gap={4}>
+      <Grid
+        width="full"
+        alignSelf="stretch"
+        templateColumns="1fr auto 1fr"
+        alignItems="center"
+        gap={4}
+      >
         <GridItem minWidth={0}>
           {/* The title stays on one line and gives space back with an
               ellipsis; the note beside it reads in full, since it is the
@@ -66,7 +75,7 @@ export function AgentTestingHeader({
               title={openPlan?.name}
               data-testid="agent-testing-title"
             >
-              {openPlan?.name ?? "Agent Testing"}
+              {openPlan?.name ?? (tab === "results" ? "Results" : title)}
             </PageLayout.Heading>
             {openPlan ? (
               <Text
@@ -102,7 +111,7 @@ export function AgentTestingHeader({
 
         <GridItem />
       </Grid>
-    </PageLayout.Header>
+    </SectionNavigationHeader>
   );
 }
 

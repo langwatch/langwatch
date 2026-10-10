@@ -1,10 +1,10 @@
 /**
  * Prompt's answer to the port its screen declares: every method projects a
- * `@langwatch/browser-host` capability; organization lends `copyTargets`. §10.1.
+ * `@langwatch/browser-host` host service; organization lends `copyTargets`. §10.1.
  */
 
 import {
-  useUiCapabilities,
+  useUiHostServices,
   useUiCopyTargets,
   useUiScope,
   type UiCopyTargets,
@@ -65,7 +65,7 @@ function sweepDeviceWideTabs(): void {
 /** The API always mounts the execution door the Conversation tab posts to. */
 const PLAYGROUND_CHAT_AVAILABILITY: PromptPlaygroundChatAvailability = { available: true };
 
-class CapabilityPromptHost extends PromptHostApi {
+class HostServicePromptHost extends PromptHostApi {
   private readonly hostScope: PromptHostScope;
   private readonly session: UiSession;
   private readonly lent: UiCopyTargets;
@@ -176,7 +176,7 @@ class CapabilityPromptHost extends PromptHostApi {
  * is what `mounts.load` resolves.
  */
 export default function PromptHostMount({ children }: { children?: ReactNode }) {
-  const { session, navigation, route, feedback } = useUiCapabilities();
+  const { session, navigation, route, feedback } = useUiHostServices();
   const lent = useUiCopyTargets();
   const { organizationId, projectId } = useUiScope().activeScope();
   const scopeHost: UiScopeHost | undefined = useUiScope().scopeHost();
@@ -187,13 +187,14 @@ export default function PromptHostMount({ children }: { children?: ReactNode }) 
       teamId: scopeHost?.team()?.id,
       projectId: projectId ?? undefined,
       projectSlug: scopeHost?.project()?.slug,
+      projectKind: scopeHost?.project()?.kind,
     }),
     [organizationId, projectId, scopeHost],
   );
 
   const host = useMemo(
     () =>
-      new CapabilityPromptHost({ hostScope, session, lent, navigation, uiRoute: route, feedback }),
+      new HostServicePromptHost({ hostScope, session, lent, navigation, uiRoute: route, feedback }),
     [hostScope, session, lent, navigation, route, feedback],
   );
 

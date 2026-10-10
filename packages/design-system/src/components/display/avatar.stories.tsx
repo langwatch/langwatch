@@ -4,7 +4,13 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { Avatar } from "./avatar.tsx";
 
 const meta = {
-  title: "Primitives/Avatar",
+  title: "Data display/Avatar",
+  parameters: {
+    usage: {
+      use: "A person or organization: their picture, or emoji-safe initials.",
+      avoid: "Who else is here right now: use Presence.",
+    },
+  },
   component: Avatar.Root,
   tags: ["autodocs"],
   args: { colorPalette: "orange" },

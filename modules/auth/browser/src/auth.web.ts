@@ -19,6 +19,7 @@ export const authWeb = defineBrowserModule("auth")
     ...(auth.authProvider ? { authProvider: auth.authProvider } : {}),
     passkeysEnabled: auth.passkeys,
     emailPasswordEnabled: auth.emailPasswordEnabled,
+    federatedProviders: auth.federatedProviders,
     signUpMode: auth.signUpMode,
   }))
   .withScreens({

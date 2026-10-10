@@ -126,7 +126,7 @@ func TestDoorsAssembleTheEnvironment(t *testing.T) {
 func TestDoorErrorsNeverCarryASecret(t *testing.T) {
 	runner := &fakeRunner{}
 	doors, plan := newTestDoors(t, "hybrid", runner)
-	_, password := seedAccount(1)
+	_, password := SeedAccount(1)
 	values := append(slices.Collect(maps.Values(doors.env.Secrets)), password)
 	runner.err = fmt.Errorf("psql: exit status 3: ERROR near %s", strings.Join(values, " "))
 	err := doors.Run(context.Background(), plan, stepNamed(plan, "product-seeds"))

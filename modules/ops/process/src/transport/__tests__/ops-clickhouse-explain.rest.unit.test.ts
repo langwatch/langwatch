@@ -4,6 +4,7 @@
  * @vitest-environment node
  */
 import { bindRestCredential, BearerIdentity, RestHost } from "@langwatch/api/rest";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it } from "vitest";
 
 import { createOpsTestApp } from "../../app/__tests__/ops.fixture.ts";
@@ -17,11 +18,11 @@ function mountApp(configured: string | null = SECRET) {
   const { app } = createOpsTestApp({ members: { findOpsApiKey: () => configured } });
   const closed = BearerIdentity.create({ name: "unbound", token: void 0 });
   const host = RestHost.create({
+    authz: restTestAuthorization().forRequest(),
     identities: {
       project: closed,
       organization: closed,
       api_key: closed,
-      scim_token: closed,
       instance_admin: closed,
       browser: closed,
     },
@@ -30,7 +31,7 @@ function mountApp(configured: string | null = SECRET) {
   });
 
   host.mount(opsClickHouseExplainRest.router(), () => app, {
-    facts: [bindRestCredential("internal_secret", () => app.operatorDoor)],
+    middlewareBindings: [bindRestCredential("internal_secret", () => app.operatorDoor)],
   });
 
   return host.app;

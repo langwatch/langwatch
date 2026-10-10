@@ -103,6 +103,8 @@ export interface PeerSubscriberEnqueueOptions<Data extends z.ZodType> {
  */
 export interface PeerSubscriberContext extends EventSubscriberContext {
   occurredAt: number;
+  /** When the owner appended the event (processing time), beside occurredAt's business time. */
+  createdAt: number;
   eventId: string;
   idempotencyKey?: string;
 }

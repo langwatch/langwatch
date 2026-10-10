@@ -16,6 +16,7 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { createGovernanceTestConnection } from "../app/__tests__/governance-database.fixture.ts";
+import { MemoryOttlTransformChannel } from "../channels/memory/memory.ottl-transform.channel.ts";
 import { MemoryProviderAccountChannel } from "../channels/memory/memory.provider-account.channel.ts";
 import { PullDestinationService } from "../features/ingestion-pull/services/pull-destination.service.ts";
 import {
@@ -80,6 +81,7 @@ describe.skipIf(!databaseUrl)("IngestionSourceService token-at-rest", () => {
       destinations: PullDestinationService.create(),
       providerAccounts: MemoryProviderAccountChannel.create(),
       diagnostics: new NoopDiagnostics(),
+      ottl: MemoryOttlTransformChannel.create(),
     });
 
   beforeAll(async () => {

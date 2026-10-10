@@ -154,6 +154,7 @@ export class VoiceSessionService {
       wholeCallAudio: WholeCallAudioService.infrastructureFrom({
         simulations: input.simulations,
         traces: peers.traces,
+        authz: peers.authz,
       }),
       auditLog: peers.auditLog,
       twilioCredentials: {

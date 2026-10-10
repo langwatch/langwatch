@@ -1,10 +1,4 @@
 import { moduleApi } from "@langwatch/module";
-import type {
-  EnsuredPersonalWorkspace,
-  FindPersonalWorkspaceInput,
-  PersonalWorkspace,
-  PersonalWorkspaceInput,
-} from "@langwatch/organization-contract";
 
 import type { MeProject, UserAvatarRestParams } from "./user-rest.schemas.ts";
 import type { UserBudgetIncreaseRequested, UserHomePagePickerState } from "./user.responses.ts";
@@ -133,8 +127,6 @@ export interface UserApi {
   removeAvatar(input: RemoveUserAvatarInput): Promise<void>;
   /** A signed URL for an uploaded avatar; anything that is not one is refused as not found. */
   getAvatarUrl(input: UserAvatarRestParams): Promise<UserAvatarUrl>;
-  ensurePersonalWorkspace(input: PersonalWorkspaceInput): Promise<EnsuredPersonalWorkspace>;
-  findPersonalWorkspace(input: FindPersonalWorkspaceInput): Promise<PersonalWorkspace | null>;
   findLastHomePath(input: UserIdInput): Promise<string | null>;
   setLastHomePath(input: SetUserHomePathInput): Promise<void>;
 

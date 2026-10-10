@@ -4,6 +4,7 @@
  * "we could not tell" is never drawn as "it works".
  */
 
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import { usageReportPreviewSchema } from "./checkup-usage-report.ts";
@@ -134,7 +135,7 @@ export const CHECKUP_DOCS = {
  * an install admin reads them; an organization caller reads the outcome alone
  * (modules/ops/specs/checkup-audience.feature).
  */
-export const checkVerdictSchema = z.discriminatedUnion("outcome", [
+const checkVerdictSchemaDefinition = z.discriminatedUnion("outcome", [
   z.object({ outcome: z.literal("verified"), detail: z.string().optional() }),
   z.object({
     outcome: z.literal("refused"),
@@ -153,33 +154,49 @@ export const checkVerdictSchema = z.discriminatedUnion("outcome", [
     docsPath: z.string().optional(),
   }),
 ]);
+export interface CheckVerdictSchema extends Named<typeof checkVerdictSchemaDefinition> {}
+export const checkVerdictSchema: CheckVerdictSchema = checkVerdictSchemaDefinition;
 export type CheckVerdict = z.infer<typeof checkVerdictSchema>;
 
-export const checkRowSchema = z.object({
+const checkRowSchemaDefinition = z.object({
   id: checkIdSchema,
   name: z.string(),
   group: z.enum(CHECK_GROUPS),
   cost: z.enum(CHECK_COSTS),
   verdict: checkVerdictSchema,
 });
+export interface CheckRowSchema extends Named<typeof checkRowSchemaDefinition> {}
+export const checkRowSchema: CheckRowSchema = checkRowSchemaDefinition;
 export type CheckRow = z.infer<typeof checkRowSchema>;
 
-export const checkupResultSchema = z.object({
+const checkupResultSchemaDefinition = z.object({
   ranAt: z.string(),
   rows: z.array(checkRowSchema),
 });
+export interface CheckupResultSchema extends Named<typeof checkupResultSchemaDefinition> {}
+export const checkupResultSchema: CheckupResultSchema = checkupResultSchemaDefinition;
 export type CheckupResult = z.infer<typeof checkupResultSchema>;
 
 /** What an explicit run may be given. The scenario canary needs a run plan to launch. */
-export const explicitCheckInputSchema = z.object({
+const explicitCheckInputSchemaDefinition = z.object({
   checks: z.array(checkIdSchema).optional(),
   scenarioRunPlanId: z.string().min(1).max(200).optional(),
 });
+export interface ExplicitCheckInputSchema extends Named<
+  typeof explicitCheckInputSchemaDefinition
+> {}
+export const explicitCheckInputSchema: ExplicitCheckInputSchema =
+  explicitCheckInputSchemaDefinition;
 export type ExplicitCheckInput = z.infer<typeof explicitCheckInputSchema>;
 
 /** The free checks and the usage report preview, as the REST checkup answers them. */
-export const projectCheckupReportSchema = z.object({
+const projectCheckupReportSchemaDefinition = z.object({
   ...checkupResultSchema.shape,
   usageReport: usageReportPreviewSchema,
 });
+export interface ProjectCheckupReportSchema extends Named<
+  typeof projectCheckupReportSchemaDefinition
+> {}
+export const projectCheckupReportSchema: ProjectCheckupReportSchema =
+  projectCheckupReportSchemaDefinition;
 export type ProjectCheckupReport = z.infer<typeof projectCheckupReportSchema>;

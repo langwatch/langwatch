@@ -5,7 +5,7 @@
  */
 import {
   baseResponses,
-  defineRestMiddleware,
+  defineMiddlewareContext,
   defineRestRouter,
   MANAGEMENT_API_VERSION,
 } from "@langwatch/api/rest";
@@ -17,7 +17,7 @@ import {
 } from "@langwatch/enterprise-governance-contract";
 
 /** The credential the mounting process resolved, whole rather than in pieces. */
-export const mePersonalCredential = defineRestMiddleware(
+export const mePersonalCredential = defineMiddlewareContext(
   "mePersonalCredential",
   mePersonalCredentialSchema,
 );
@@ -34,7 +34,7 @@ export const meUsageRest = defineRestRouter(GovernanceRestApi)
   })
   .withQuery(meUsageQuerySchema)
   .withPermission("project:view")
-  .withMiddleware(mePersonalCredential)
+  .withMiddlewareContext(mePersonalCredential)
   .withOutput(meUsageResponseSchema)
   .withDocs({
     description:

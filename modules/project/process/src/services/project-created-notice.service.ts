@@ -2,6 +2,8 @@ import type { EventingCommandSender } from "@langwatch/eventing";
 import { nowInstant } from "@langwatch/time";
 
 import type {
+  RecordProjectAggregateRuleChangedCommandData,
+  RecordProjectRevivedCommandData,
   RecordProjectArchivedCommandData,
   RecordProjectMovedCommandData,
   RecordProjectCreatedCommandData,
@@ -32,6 +34,11 @@ export type ProjectLifecycleSenders = Readonly<{
     EventingCommandSender<RecordProjectTraceSharingDisabledCommandData>,
     "send"
   >;
+  recordProjectAggregateRuleChanged: Pick<
+    EventingCommandSender<RecordProjectAggregateRuleChangedCommandData>,
+    "send"
+  >;
+  recordProjectRevived: Pick<EventingCommandSender<RecordProjectRevivedCommandData>, "send">;
 }>;
 
 type NoticeLogger = Readonly<{
@@ -161,7 +168,12 @@ export class ProjectCreatedNoticeService {
 
   /** Throws: share revokes the project's links only from this fact, so a lost one must surface. */
   async traceSharingDisabled(
-    input: Readonly<{ projectId: string; organizationId: string; disabledByUserId: string }>,
+    input: Readonly<{
+      projectId: string;
+      organizationId: string;
+      disabledByUserId: string;
+      revokeExistingLinks?: boolean | undefined;
+    }>,
   ): Promise<void> {
     await this.#connected().recordProjectTraceSharingDisabled.send({
       tenantId: input.projectId,
@@ -205,6 +217,40 @@ export class ProjectCreatedNoticeService {
       this.dependencies.logger.error(
         { projectId: input.projectId, error },
         "recording the project archive failed; authz's held lineage ages out within a minute",
+      );
+    }
+  }
+
+  /** Best effort: the rule is saved, and governance's nightly sweep reconciles a missed record. */
+  async aggregateRuleChanged(
+    input: Readonly<{ projectId: string; organizationId: string; changedByUserId: string }>,
+  ): Promise<void> {
+    try {
+      await this.#connected().recordProjectAggregateRuleChanged.send({
+        tenantId: input.projectId,
+        occurredAt: nowInstant().epochMilliseconds,
+        ...input,
+      });
+    } catch (error) {
+      this.dependencies.logger.error(
+        { projectId: input.projectId, error },
+        "recording the aggregate rule change failed; governance's nightly sweep reconciles it",
+      );
+    }
+  }
+
+  /** Best effort: a redelivery revives nothing, so the nightly sweep is the retry. */
+  async revived(input: Readonly<{ projectId: string; organizationId: string }>): Promise<void> {
+    try {
+      await this.#connected().recordProjectRevived.send({
+        tenantId: input.projectId,
+        occurredAt: nowInstant().epochMilliseconds,
+        ...input,
+      });
+    } catch (error) {
+      this.dependencies.logger.error(
+        { projectId: input.projectId, error },
+        "recording the revived project failed; governance's nightly sweep reconciles it",
       );
     }
   }

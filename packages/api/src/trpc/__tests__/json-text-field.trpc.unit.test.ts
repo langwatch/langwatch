@@ -2,6 +2,7 @@ import { defineTrpcContract, moduleApi } from "@langwatch/module";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
+import { authorizeDefaults } from "../../__tests__/api-double.ts";
 import { jsonTextField } from "../../json-text-field.ts";
 import {
   createTrpcRuntime,
@@ -33,6 +34,7 @@ const members: TrpcRuntimeMembers<ChartContext> = {
   identity: { caller: (ctx) => ({ actor: { type: "user", id: ctx.actor.id } }) },
   authorization: {
     forRequest: () => ({
+      ...authorizeDefaults,
       getDecision: async () => ({ permitted: true, organizationRole: null }),
       getProjectAnyDecision: async () => ({ permitted: true, organizationRole: null }),
       checkScopeLineage: async () => ({ kind: "consistent" }),

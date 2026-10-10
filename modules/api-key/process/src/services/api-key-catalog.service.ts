@@ -12,6 +12,7 @@ import {
   type ApiKeyUser,
   isSystemApiKey,
 } from "@langwatch/api-key-contract";
+import { NON_DESTINATION_PROJECT_KINDS } from "@langwatch/project-contract";
 
 import type { ApiKeyRepository, StoredApiKey } from "../repositories/api-key.repository.ts";
 import { ApiKeyGrantsService } from "./api-key-grants.service.ts";
@@ -102,11 +103,10 @@ export class ApiKeyCatalogService {
       limit: 1000,
     });
 
-    return page.data.map((project) => ({
-      id: project.id,
-      name: project.name,
-      teamId: project.teamId,
-    }));
+    // Neither the governance project nor an aggregate receives traces through a key.
+    return page.data
+      .filter((project) => !NON_DESTINATION_PROJECT_KINDS.includes(project.kind))
+      .map((project) => ({ id: project.id, name: project.name, teamId: project.teamId }));
   }
 
   async getOrgTeams({ organizationId }: { organizationId: string }): Promise<ApiKeyTeam[]> {

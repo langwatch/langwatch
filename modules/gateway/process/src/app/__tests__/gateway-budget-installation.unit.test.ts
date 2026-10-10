@@ -1,5 +1,6 @@
 import { ApiKeyApi } from "@langwatch/api-key-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
+import { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import { EvaluationApi } from "@langwatch/evaluation-contract";
 import { EvaluatorApi } from "@langwatch/evaluator-contract";
 import { EventSourcing } from "@langwatch/eventing";
@@ -70,6 +71,7 @@ async function bootGateway() {
       testPeer({ token: TraceApi, instance: createApiFixture<TraceApi>() }),
       testPeer({ token: SecretApi, instance: createApiFixture<SecretApi>() }),
       testPeer({ token: ApiKeyApi, instance: createApiFixture<ApiKeyApi>() }),
+      testPeer({ token: LicensingApi, instance: createApiFixture<LicensingApi>() }),
     ],
     surface: () => ({
       hosts: { rest: recordingHost(rest), trpc: recordingHost(trpc) },

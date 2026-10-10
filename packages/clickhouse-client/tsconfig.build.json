@@ -24,6 +24,12 @@
   ],
   "references": [
     {
+      "path": "../authorization/tsconfig.build.json"
+    },
+    {
+      "path": "../clickhouse-markers/tsconfig.build.json"
+    },
+    {
       "path": "../limiter/tsconfig.build.json"
     },
     {

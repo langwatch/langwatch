@@ -43,13 +43,13 @@ function defaultConfigurationWindowStart(now = nowInstant().epochMilliseconds): 
  * What a configuration covers, with the hand-picked list inside the rule. The stored scope names no
  * scenarios, because a plan keeps its hand-picked list in its own `scenarioIds` column.
  */
-export type RunConfigurationScope = RunConfigurationEntryResponse["configuration"]["scope"];
+type RunConfigurationScope = RunConfigurationEntryResponse["configuration"]["scope"];
 
 /** Everything a picked entry puts back into the run dialog. */
-export type RunConfiguration = Omit<PlanConfig, "scope"> & { scope: RunConfigurationScope };
+type RunConfiguration = Omit<PlanConfig, "scope"> & { scope: RunConfigurationScope };
 
 /** One line of the Run name dropdown. */
-export interface RunConfigurationEntry {
+interface RunConfigurationEntry {
   /**
    * The configuration's identity, from the shared recipe in
    * `@langwatch/suite-contract`'s `plan-config.ts`. One key per configuration,

@@ -5,6 +5,8 @@
  * history read the page's own query calls, on a timer instead of a page load,
  * and only ever for the connection it was constructed with.
  */
+import type { SsoConnectionHistoryEntry } from "@langwatch/enterprise-sso-contract";
+
 import {
   historyActivityChanged,
   HISTORY_ACTIVITY_POLL_MS,
@@ -20,9 +22,7 @@ export interface SsoConnectionHistoryReads {
     organizationId: string;
     connectionId: string;
     limit?: number;
-  }): Promise<
-    readonly { eventId: string; occurredAtMs: number; summary: string; carriedOver: boolean }[]
-  >;
+  }): Promise<readonly SsoConnectionHistoryEntry[]>;
 }
 
 /** The one line the history signal ever writes: a poll that could not read. */

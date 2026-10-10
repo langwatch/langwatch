@@ -1,5 +1,6 @@
 import { type TransportPeers } from "@langwatch/api";
 import { type ApiDoor, bindApiDoor, type RestIdentity } from "@langwatch/api/hosting";
+import { testAuthorizeDefaults } from "@langwatch/test-harness/trpc-members";
 
 import { transportPeersOf } from "../../transport-peers.ts";
 
@@ -11,6 +12,7 @@ export function inertApiDoor(parts: Partial<ApiDoor> = {}): ApiDoor {
   return {
     sessions: () => Promise.resolve(null),
     authz: {
+      ...testAuthorizeDefaults,
       getDecision: refuse,
       getProjectAnyDecision: refuse,
       checkScopeLineage: refuse,
@@ -23,7 +25,7 @@ export function inertApiDoor(parts: Partial<ApiDoor> = {}): ApiDoor {
   };
 }
 
-/** The peers a booted api process hands its surface, auth's door among the bound facts. */
+/** The peers a booted api process hands its surface, auth's door among the middleware bindings. */
 export function peersWithDoor({
   resolve,
   door = inertApiDoor(),
@@ -31,5 +33,5 @@ export function peersWithDoor({
   resolve: Parameters<typeof transportPeersOf>[0];
   door?: ApiDoor;
 }): TransportPeers {
-  return transportPeersOf(resolve, [{ feature: "auth", facts: [bindApiDoor(door)] }]);
+  return transportPeersOf(resolve, [{ feature: "auth", middlewareBindings: [bindApiDoor(door)] }]);
 }

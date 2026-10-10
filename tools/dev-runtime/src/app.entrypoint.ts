@@ -11,8 +11,7 @@ void bootNodeExecutable(
   "langwatch-app",
   async () => {
     entry = await import("./app.entrypoint.main.ts");
-    // `--backend-only` is the split stack's api lane: api and worker, reloaded in-process.
-    await entry.bootApp({ withUi: !process.argv.includes("--backend-only") });
+    await entry.bootApp();
   },
   // A crash after boot drains the backend; one before the entry loaded has nothing to drain.
   { onFatal: () => (entry ? entry.stopAfterCrash() : process.exit(1)) },

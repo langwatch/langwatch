@@ -1,11 +1,11 @@
 /**
  * The two handoff screens' answer to their port, over `@langwatch/browser-host`
- * capabilities and this family's own `organization.getAll` query.
+ * host services and this family's own `organization.getAll` query.
  * ARCHITECTURE.md §10.1.
  */
 
 import { ApiKeyScopeViolationError } from "@langwatch/api-key-contract";
-import { useUiCapabilities, useUiScope } from "@langwatch/browser-host/capabilities";
+import { useUiHostServices, useUiScope } from "@langwatch/browser-host/capabilities";
 import { useLent } from "@langwatch/browser-host/lent";
 import { ProjectSwitcherToken } from "@langwatch/project-client";
 import type { ProjectSwitcherProps } from "@langwatch/project-contract";
@@ -36,7 +36,7 @@ function sessionStatusOf(hasActor: boolean, isSettled: boolean): AuthorizeSessio
   return isSettled ? "unauthenticated" : "loading";
 }
 
-class CapabilityAuthorizeHost extends AuthorizeHostApi {
+class HostServiceAuthorizeHost extends AuthorizeHostApi {
   constructor(
     private readonly deps: {
       scope: AuthorizeScope;
@@ -118,7 +118,7 @@ class CapabilityAuthorizeHost extends AuthorizeHostApi {
 }
 
 export default function AuthorizeHostMount({ children }: { children?: ReactNode }) {
-  const { session, feedback, navigation } = useUiCapabilities();
+  const { session, feedback, navigation } = useUiHostServices();
   const activeScope = useUiScope().activeScope();
   const location = useLocation();
   const graph = useApiKeyOrganizationGraph({
@@ -140,7 +140,7 @@ export default function AuthorizeHostMount({ children }: { children?: ReactNode 
 
   const host = useMemo(
     () =>
-      new CapabilityAuthorizeHost({
+      new HostServiceAuthorizeHost({
         scope: {
           projectId: activeScope.projectId ?? void 0,
           projectName: graph.activeProject?.project.name,

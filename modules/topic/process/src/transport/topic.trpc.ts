@@ -52,6 +52,7 @@ export const topicTrpcTransport: TrpcRouterDeclaration<TopicBrowserApi, typeof t
     )
 
     .procedure("triggerTopicClustering")
+    .refusedOnAggregate()
     .withPermission("project:update")
     .handle(({ app, input, actor }) =>
       app.triggerTopicClustering({ projectId: input.projectId, by: actor }),

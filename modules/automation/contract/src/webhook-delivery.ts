@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 export const WEBHOOK_DELIVERY_OUTCOMES = ["success", "retryable", "terminal", "pending"] as const;
@@ -5,14 +6,19 @@ export type WebhookDeliveryOutcome = (typeof WEBHOOK_DELIVERY_OUTCOMES)[number];
 
 export const webhookDeliveryOutcomeSchema = z.enum(WEBHOOK_DELIVERY_OUTCOMES);
 
-export const webhookFailureResponseSchema = z.object({
+const webhookFailureResponseSchemaDefinition = z.object({
   body: z.string().optional(),
   headers: z.record(z.string(), z.string()).optional(),
   retryAfterMs: z.number().optional(),
 });
+export interface WebhookFailureResponseSchema extends Named<
+  typeof webhookFailureResponseSchemaDefinition
+> {}
+export const webhookFailureResponseSchema: WebhookFailureResponseSchema =
+  webhookFailureResponseSchemaDefinition;
 export type WebhookFailureResponse = z.infer<typeof webhookFailureResponseSchema>;
 
-export const webhookDeliveryRowSchema = z.object({
+const webhookDeliveryRowSchemaDefinition = z.object({
   id: z.string(),
   triggerId: z.string(),
   dispatchId: z.string(),
@@ -23,6 +29,11 @@ export const webhookDeliveryRowSchema = z.object({
   outcome: webhookDeliveryOutcomeSchema,
   firedAt: z.date(),
 });
+export interface WebhookDeliveryRowSchema extends Named<
+  typeof webhookDeliveryRowSchemaDefinition
+> {}
+export const webhookDeliveryRowSchema: WebhookDeliveryRowSchema =
+  webhookDeliveryRowSchemaDefinition;
 export type WebhookDeliveryRow = z.infer<typeof webhookDeliveryRowSchema>;
 
 export type WebhookDeliveryInput = {

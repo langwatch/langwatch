@@ -1,4 +1,5 @@
 import type { AnalyticsApi } from "@langwatch/analytics-contract";
+import type { AuthzApi } from "@langwatch/authz-contract";
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 /**
  * @vitest-environment node
@@ -22,6 +23,7 @@ import type { TraceApi } from "@langwatch/trace-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it } from "vitest";
 
+import { ownProof } from "../../__tests__/support/authorization-proofs.fixture.ts";
 import { LiveEvaluationRepositories } from "../../repositories/live/live.evaluation.repositories.ts";
 import { EvaluationRetentionDaysService } from "../../services/evaluation-retention-days.service.ts";
 import { EVALUATION_TEST_CONFIG, installableEvaluation } from "./evaluation.fixture.ts";
@@ -77,6 +79,9 @@ describe("given a process that installs the evaluation module over its repositor
           dataset: createApiFixture<DatasetApi>(),
           "instant-eval-judge": createApiFixture<InstantEvalJudgeApi>(),
           analytics: createApiFixture<AnalyticsApi>(),
+          authz: createApiFixture<AuthzApi>({
+            authorizeInternal: async ({ projectId }) => ownProof({ projectId }),
+          }),
           project: createApiFixture<ProjectApi>(),
           "data-retention": createApiFixture<DataRetentionApi>({
             getPlatformDefaultRetentionDays: () => 30,
@@ -125,11 +130,14 @@ describe("given the live evaluation repositories over the process's ClickHouse m
       });
 
       await expect(
-        repositories.runs.findByTraceId({ tenantId: TENANT, traceId: TRACE }),
+        repositories.runs.findByTraceId({
+          authorization: ownProof({ projectId: TENANT }),
+          traceId: TRACE,
+        }),
       ).resolves.toEqual([]);
       await expect(
         repositories.runs.getByEvaluationId({
-          tenantId: TENANT,
+          authorization: ownProof({ projectId: TENANT }),
           evaluationId: "evaluation-1",
           retention: EvaluationRetentionDaysService.create(
             createApiFixture<DataRetentionApi>({
@@ -166,7 +174,7 @@ describe("given the live run read over a tenant's retention from data retention"
     const before = nowInstant().epochMilliseconds;
     await expect(
       repositories.runs.getByEvaluationId({
-        tenantId: TENANT,
+        authorization: ownProof({ projectId: TENANT }),
         evaluationId: "evaluation-1",
         retention: EvaluationRetentionDaysService.create(
           createApiFixture<DataRetentionApi>({

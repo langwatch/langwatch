@@ -10,6 +10,7 @@ import type {
   ModelProviderCredentialVerdict,
 } from "@langwatch/model-provider-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { mintTestAuthorization, testAuthorizeDefaults } from "@langwatch/test-harness/trpc-members";
 
 import { createModelProviderTestApp } from "../../app/__tests__/model-provider.fixture.ts";
 import type {
@@ -21,6 +22,7 @@ import type {
   CodexPollResult,
 } from "../../features/codex/services/codex-account.service.ts";
 import { ModelProviderCredentialProbe } from "../../features/credential-probe/services/http-model-provider-credential-probe.service.ts";
+import type { ModelCostPreviewSpanReader } from "../../features/model-cost/services/model-cost-preview.service.ts";
 import { MemoryModelProviderRepositories } from "../../repositories/memory/memory.model-provider.repositories.ts";
 import type { ModelProviderRepositories } from "../../repositories/model-provider.repositories.ts";
 
@@ -40,6 +42,7 @@ export function modelProviderTrpcTestMembers(
     identity: { caller: (ctx) => ({ actor: { type: "user", id: ctx.actor.id } }) },
     authorization: {
       forRequest: () => ({
+        ...testAuthorizeDefaults,
         getDecision: async ({ permission, scope }) => ({
           permitted: permits(permission, scope),
           organizationRole: null,
@@ -51,6 +54,7 @@ export function modelProviderTrpcTestMembers(
           organizationRole: null,
         }),
         checkScopeLineage: async () => ({ kind: "consistent" }),
+        authorization: mintTestAuthorization,
       }),
     },
     denials: {
@@ -96,6 +100,10 @@ export class RecordingCredentialProbe extends ModelProviderCredentialProbe {
 
     return Promise.resolve(this.verdict);
   }
+
+  assertEndpointAllowed(): Promise<void> {
+    return Promise.resolve();
+  }
 }
 
 const VERIFIED: ModelProviderCredentialVerdict = { outcome: "verified", valid: true };
@@ -129,7 +137,7 @@ export class StubCodexAccounts implements ModelProviderCodexDeviceFlow {
  */
 export function mountableModelProviderApp(options: {
   modelProviders?: Partial<ModelProviderApi>;
-  spans?: unknown;
+  spans?: ModelCostPreviewSpanReader;
   probe?: RecordingCredentialProbe;
   permits?: ModelProviderTestDecision;
   /** The device flow this suite decided, or none where it reaches no issuer. */
@@ -155,7 +163,7 @@ export function mountableModelProviderApp(options: {
     },
     infrastructure: {
       credentialProbe: probe,
-      spans: options.spans ?? {},
+      ...(options.spans ? { spans: options.spans } : {}),
       ...(options.codexAccounts ? { codexAccounts: options.codexAccounts } : {}),
     },
   });

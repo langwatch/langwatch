@@ -1,3 +1,4 @@
+import { timingSafeEqual } from "node:crypto";
 import http, { type IncomingMessage, type ServerResponse } from "node:http";
 
 import type { Logger } from "../logger.ts";
@@ -31,7 +32,7 @@ export function prometheusMetrics(options: PrometheusMetricsOptions = {}): {
     path: "/metrics",
     handle: async (request, response) => {
       const expected = options.token === undefined ? undefined : `Bearer ${options.token}`;
-      if (expected !== undefined && request.headers.authorization !== expected) {
+      if (expected !== undefined && !sameSecret(request.headers.authorization, expected)) {
         response.writeHead(401).end();
         return;
       }
@@ -76,6 +77,14 @@ export function prometheusPullListener({
         listener.closeAllConnections();
       }),
   };
+}
+
+/** Constant-time over equal lengths; a length mismatch refuses before comparing. */
+function sameSecret(given: string | undefined, expected: string): boolean {
+  if (given === undefined) return false;
+  const a = Buffer.from(given);
+  const b = Buffer.from(expected);
+  return a.length === b.length && timingSafeEqual(a, b);
 }
 
 async function emptyExposition(): Promise<PrometheusExposition> {

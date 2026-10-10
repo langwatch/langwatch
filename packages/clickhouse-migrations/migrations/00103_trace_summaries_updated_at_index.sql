@@ -10,6 +10,7 @@ ALTER TABLE ${CLICKHOUSE_DATABASE}.trace_summaries
 -- +goose StatementEnd
 
 -- Materialize the index for existing data (runs as background mutation, partition-by-partition)
+-- background step: trace:track-updated-at-index-materialisation
 -- +goose StatementBegin
 ALTER TABLE ${CLICKHOUSE_DATABASE}.trace_summaries
   MATERIALIZE INDEX idx_updated_at;

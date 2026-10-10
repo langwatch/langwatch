@@ -30,6 +30,7 @@
     "@clickhouse/client": "catalog:",
     "@langwatch/api": "workspace:*",
     "@langwatch/audit-log-contract": "workspace:*",
+    "@langwatch/authorization": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/clickhouse-client": "workspace:*",
     "@langwatch/coding-agent-contract": "workspace:*",
@@ -56,6 +57,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@langwatch/clickhouse-migrations": "workspace:*",
     "@langwatch/group-queue": "workspace:*",
     "@langwatch/metric-process": "workspace:*",
     "@langwatch/process-stores": "workspace:*",

@@ -18,7 +18,6 @@ import { TieredBlobStore } from "../tieredBlobStore.ts";
 import { InMemoryJobBlobStore, InMemoryObjectStore, mintTestUri } from "./blob-test-doubles.ts";
 
 describe("jobEnvelope", () => {
-
   describe("given a payload over the compression threshold", () => {
     const largePayload = {
       __pipelineName: "traces",

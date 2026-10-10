@@ -300,9 +300,11 @@ Feature: Internal feature flag system for system-level kill switches
            rule the operator believes is live
 
   Rule: Operators manage flags from the Ops Feature Flags page
+  # The page shows only where ops's cloud-ops capability is on (Alex, 2026-10-09).
 
     Scenario: Ops Feature Flags page lists every registered flag with its current resolved value
-      Given an operator with ops:view permission opens /ops/feature-flags
+      Given an install where ops's cloud-ops capability is on
+      And an operator with ops:view permission opens /ops/feature-flags
       Then the page lists every flag declared in the registry
       And each row shows the flag's scope, description, registry default,
           postgres value, and effective resolved value
@@ -323,6 +325,27 @@ Feature: Internal feature flag system for system-level kill switches
       Then the System section names env, this postgres store, and the registry
            default as the places a value comes from, in that order
       And it names no external flag service either
+
+    @unit
+    Scenario: Self-hosted installs do not offer the Feature Flags page
+      Given an operator on a self-hosted production install where ops's cloud-ops capability is off
+      Then the Ops menu has no Feature Flags entry
+      And /ops/feature-flags answers as an unknown page
+      But an environment override still sets a flag
+      And the flag procedures still answer an operator with ops permissions
+
+    @unit
+    Scenario: A developer's local stack offers the Feature Flags page
+      Given an operator on a development build where ops's cloud-ops capability is off
+      Then the Ops menu has a Feature Flags entry
+      And /ops/feature-flags shows the flags
+
+    @unit
+    Scenario: Cloud, self-hosted and local development are told apart
+      Given a build's mode and deployment
+      Then a development build reads as local, even when it runs SaaS-shaped
+      And a production SaaS build reads as cloud
+      And any other production build reads as self-hosted
 
     Scenario: Operator without ops:manage permission cannot toggle flags
       Given an operator with only ops:view permission opens the page
@@ -543,7 +566,7 @@ Feature: Internal feature flag system for system-level kill switches
 
     Scenario: Flipping a kill switch works the same self-hosted as on a shared install
       Given the installation is self-hosted
-      When an operator toggles a SYSTEM kill switch from the Ops UI
+      When an operator flips a SYSTEM kill switch through the flag procedures
       Then the change persists in postgres and every pod observes it, exactly
            as it would on a shared install
       And nothing in the chain reaches outside the install, because the

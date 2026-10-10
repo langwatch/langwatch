@@ -1,14 +1,15 @@
 import {
-  bindRestMiddleware,
+  bindMiddlewareContext,
   canonicalErrorResponse,
   createRestRuntime,
-  projectRestFacts,
+  projectRequestContext,
 } from "@langwatch/api/rest";
 /**
  * `GET /api/v1/traces/:traceId/transcript`: main's REST read of one trace's coding-agent
  * transcript.
  */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import {
   type TraceApi,
   TraceIdAmbiguousError,
@@ -29,6 +30,8 @@ const transcript = {
 function mount(readTraceTranscript: TraceApi["readTraceTranscript"]) {
   const stub = createApiFixture<TraceApi>({ readTraceTranscript });
   const runtime = createRestRuntime({
+    audit: { record: () => {} },
+    authorization: restTestAuthorization(),
     identity: {
       authenticate: () => ({
         actor: { type: "user" as const, id: "user-1" },
@@ -40,13 +43,13 @@ function mount(readTraceTranscript: TraceApi["readTraceTranscript"]) {
     app: () => stub,
     credential: "project",
     onError: canonicalErrorResponse,
-    facts: [
-      bindRestMiddleware(projectRestFacts, () => ({
+    middlewareContext: [
+      bindMiddlewareContext(projectRequestContext, () => ({
         projectSlug: "project-one",
         viewerUserId: null,
         actorId: "user-1",
       })),
-      bindRestMiddleware(tracesRestCredential, () => ({
+      bindMiddlewareContext(tracesRestCredential, () => ({
         principal: { type: "apiKey" as const, id: "key-1" },
       })),
     ],

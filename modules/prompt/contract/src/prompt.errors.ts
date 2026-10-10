@@ -1,11 +1,14 @@
 import { HandledError, NotFoundError, ValidationError } from "@langwatch/handled-error";
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import { ShorthandParseError } from "./prompt.shorthand.ts";
 
-export const promptProblemSchema = z
+const promptProblemSchemaDefinition = z
   .object({ code: z.string(), message: z.string(), details: z.unknown().optional() })
   .strict();
+export interface PromptProblemSchema extends Named<typeof promptProblemSchemaDefinition> {}
+export const promptProblemSchema: PromptProblemSchema = promptProblemSchemaDefinition;
 export type PromptProblem = z.infer<typeof promptProblemSchema>;
 
 export class PromptNotFoundError extends HandledError {

@@ -56,6 +56,32 @@ Feature: Local IdP simulator (idpsim)
     When a client completes the authorization code flow
     Then the ID token's subject carries the samlp| prefix Auth0 uses for brokered SAML connections
 
+  # --- Social sign-in ---------------------------------------------------
+
+  @unit
+  Scenario: Signing in with GitHub at the simulator round-trips a GitHub-shaped profile
+    Given a client sent through the tenant's GitHub authorize endpoint as a seeded user
+    When the client exchanges the code without asking for JSON
+    Then the token endpoint answers a form-encoded bearer access token, as GitHub does
+    And the user and user emails endpoints return the person with a numeric id and a primary verified address
+    And the tenant's activity records the GitHub authorize, token and profile reads
+
+  @unit
+  Scenario: Signing in with Google or Microsoft at the simulator returns a signed ID token in the provider's shape
+    Given a client sent through the tenant's Google or Microsoft authorize endpoint as a seeded user
+    When the client exchanges the code
+    Then the ID token verifies against the tenant's published keys
+    And a Google token carries a 21-digit subject under the tenant's Google issuer
+    And a Microsoft token carries the tenant's directory id under its Entra v2.0 issuer
+
+  @unit
+  Scenario: The social account picker links back into the provider and can be cancelled
+    When a client is sent through a social provider's authorize endpoint with no login hint
+    Then the account picker names the provider and links each person back into that provider's endpoint
+    When the person presses Cancel
+    Then the client is sent back access_denied with its state and no code
+    And the tenant's activity records the refusal
+
   # --- Registering an application ---------------------------------------
 
   @unit
@@ -301,7 +327,7 @@ Feature: Local IdP simulator (idpsim)
   @unit
   Scenario: The simulator runs alone without the app stack
     Given no LangWatch stack is running
-    When the developer runs `haven idp`
+    When the developer runs `haven simulator idp`
     Then only the simulator process starts — no app, API, workers or databases
     And it is routed at the machine-wide idp hostname while the proxy is available
 
@@ -330,7 +356,7 @@ Feature: Local IdP simulator (idpsim)
     Then only that tenant is marked, because it is the one being come back to
 
   # --- Faults: SAML tampers, clock skew, IdP-initiated, disabled users ---
-  # Driven through the control API and `haven idp`, never a page. Every
+  # Driven through the control API and `haven sim idp`, never a page. Every
   # fault is recorded in the tenant's activity.
 
   @unit
@@ -438,3 +464,94 @@ Feature: Local IdP simulator (idpsim)
     When the key is rotated and the previous key is dropped
     Then the old token finds no matching key in the tenant's JWKS
     And a malformed rotation body is refused as a bad request
+
+  # --- Console: directory and provider controls ---------------------------
+
+  @integration
+  Scenario: The console adds a person to a tenant's directory
+    Given a tenant's Users tab is open in the console
+    When the operator adds a person by email with a name and groups
+    Then the console asks the simulator to add that person to the tenant
+    And the directory is read again so the person appears
+
+  @integration
+  Scenario: The console disables and re-enables a person at the IdP
+    Given a tenant's Users tab lists an active person
+    When the operator disables that person
+    Then the console asks the simulator to mark the person inactive
+    And a refusal from the simulator is shown in its own words
+
+  @integration
+  Scenario: The console sends one SCIM event on demand
+    Given a tenant's Provisioning tab is open in the console
+    When the operator picks an event kind, a person and a PATCH style and sends it
+    Then the console asks the simulator to send exactly that SCIM event
+    And the status LangWatch answered with is shown
+
+  @integration
+  Scenario: The console sends an Auth0 SCIM webhook
+    Given a tenant's Provisioning tab is open in the console
+    When the operator sends an Auth0 deactivate event for a person to a stack with a secret
+    Then the console asks the simulator to sign and send that webhook
+    And the status the stack answered with is shown
+
+  @integration
+  Scenario: The console makes a tenant pose as a legacy provider and shows its env lines
+    Given a tenant's Setup tab is open in the console
+    When the operator picks Okta as the tenant's legacy provider
+    Then the console asks the simulator to pose as Okta
+    And it shows the issuer and the env lines that point a stack at the tenant
+
+  @unit
+  Scenario: The tenant page reads the keys, skew and armed break it signs with
+    Given a tenant whose key was rotated, whose clock is skewed and which has a SAML break armed
+    When the console reads the tenant
+    Then it answers both published key ids, current first, the skew in seconds and the armed break
+
+  @integration
+  Scenario: The console rotates a tenant's key, skews its clock and arms a broken response
+    Given a tenant's Signing tab is open in the console
+    When the operator rotates the key, applies a clock skew and arms a SAML expired break
+    Then the console asks the simulator for each through its control API
+    And it shows which key signs and which is still published
+
+  @integration
+  Scenario: The console signs an IdP-initiated SAML response ready to post to the ACS
+    Given a tenant's Signing tab is open in the console
+    When the operator asks for an unsolicited response to an ACS address
+    Then the console offers a form that posts the signed response and RelayState to that address
+
+  # --- Console and CLI: proofs on any domain, advanced SCIM events -------
+
+  @integration
+  Scenario: The console publishes and removes a TXT record on any domain
+    Given a tenant's Domain tab is open in the console
+    When the operator publishes two TXT values at a domain no tenant owns, then removes them
+    Then the console asks the simulator to set exactly those values at that name
+    And then asks it to remove the record
+
+  @integration
+  Scenario: The console serves and stops the well-known verification file for a domain
+    Given a tenant's Domain tab is open in the console
+    When the operator serves a token for a domain, then stops serving it
+    Then the console asks the simulator to serve that token as the domain's verification file
+    And then asks it to stop
+
+  @unit
+  Scenario: haven sim idp verification sets and clears the well-known verification file
+    When an agent runs `haven sim idp verification set` with a domain and a token
+    Then the simulator is asked to serve that token for the domain
+    And `haven sim idp verification clear` with the domain asks it to stop
+
+  @integration
+  Scenario: The console sends a SCIM event with ids, attributes and the enterprise extension
+    Given a tenant's Provisioning tab is open on a connected tenant
+    When the operator fills in the receiving side's id, attributes to set, inactive, no externalId and a department
+    Then the console sends those fields in the SCIM event request
+    And a line that is not key=value is refused before anything is sent
+
+  @integration
+  Scenario: The signing inputs follow the tenant after a reset
+    Given a tenant's Signing tab shows a typed clock skew and a chosen break
+    When the tenant is reset and read again
+    Then the skew input and the break select show the tenant's own values

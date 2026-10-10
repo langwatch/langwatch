@@ -11,7 +11,11 @@ import {
   opsUpgradeStepDetailSchema,
   opsUpgradeStepPageSchema,
 } from "@langwatch/ops-contract";
-import type { UpgradeRunDetail, UpgradeStepDetail } from "@langwatch/upgrade/reader";
+import type {
+  UpgradePreview,
+  UpgradeRunDetail,
+  UpgradeStepDetail,
+} from "@langwatch/upgrade/reader";
 import { describe, expect, it } from "vitest";
 
 import { MemoryUpgradeLedgerRepository } from "../../repositories/memory/memory.upgrade-ledger.repository.ts";
@@ -19,6 +23,12 @@ import { OpsUpgradeService } from "../ops-upgrade.service.ts";
 import { statusOf, stepOf } from "./support/upgrade-ledger.ts";
 
 const AT = "2026-10-06T10:00:00.000Z";
+const PLAN: Extract<UpgradePreview["plan"], { outcome: "planned" }> = {
+  outcome: "planned",
+  fresh: false,
+  releases: [],
+  notNeeded: [],
+};
 const STEP = stepOf({
   id: "clickhouse:00042",
   release: "3.23.0",
@@ -87,18 +97,56 @@ function service() {
         listRuns: async () => ({ items: [RUN_SUMMARY], cursor: "next" }),
         getRun: async () => RUN,
         preflight: async () => [],
+        preview: async () => ({ installed: null, plan: PLAN, preflight: [] }),
+        listTargets: async () => [],
       },
     }),
   });
 }
 
 describe("OpsUpgradeService", () => {
+  describe("given an image that ships a deprecation without a successor", () => {
+    it("adds the register to the status read, a missing successor as null", async () => {
+      const upgrades = OpsUpgradeService.create({
+        ledger: MemoryUpgradeLedgerRepository.create({
+          deprecations: [
+            {
+              id: "postgres:OldTable",
+              what: "Postgres table OldTable",
+              kind: "postgres-table",
+              deprecatedIn: null,
+              removedIn: null,
+              notice: "Nothing reads it.",
+            },
+          ],
+        }),
+      });
+
+      const { deprecations } = opsUpgradeStatusSchema.parse(await upgrades.getStatus());
+
+      expect(deprecations).toEqual([
+        {
+          id: "postgres:OldTable",
+          what: "Postgres table OldTable",
+          kind: "postgres-table",
+          deprecatedIn: null,
+          removedIn: null,
+          successor: null,
+          notice: "Nothing reads it.",
+        },
+      ]);
+    });
+  });
+
   describe("given a ledger with a release, a failed step and a running run", () => {
     /** @scenario "Upgrade reads answer the reader's shapes unchanged" */
     it("keeps every field the screens read, in ops' own shapes", async () => {
       const upgrades = service();
 
-      expect(opsUpgradeStatusSchema.parse(await upgrades.getStatus())).toEqual(STATUS);
+      expect(opsUpgradeStatusSchema.parse(await upgrades.getStatus())).toEqual({
+        ...STATUS,
+        deprecations: [],
+      });
       expect(opsUpgradeReleasePageSchema.parse(await upgrades.listReleases())).toEqual({
         items: [
           { release: "3.23.0", installed: true, image: true, stepCount: 1, counts: { done: 1 } },

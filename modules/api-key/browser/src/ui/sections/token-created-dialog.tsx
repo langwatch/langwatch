@@ -4,7 +4,9 @@
  * Spec: specs/api-keys/token-created-snippets.feature
  */
 
+import { type SnippetCopy, SnippetPreview } from "@langwatch/design-system/code-preview";
 import { Dialog } from "@langwatch/design-system/dialog";
+import { InlineCode } from "@langwatch/design-system/inline-code";
 import {
   Alert,
   Box,
@@ -24,7 +26,6 @@ import {
   formatEnvLines,
   maskApiKey,
 } from "../../model/api-key-snippets.ts";
-import { CodePreview } from "../blocks/code-preview.tsx";
 import { JsonHighlight } from "../blocks/json-highlight.tsx";
 import { InlineCopyButton } from "../elements/inline-copy-button.tsx";
 import { TabButton } from "../elements/tab-button.tsx";
@@ -119,6 +120,11 @@ export function TokenCreatedDialog({
   onClose: () => void;
 }) {
   const host = useApiKeyHost();
+  const copySnippet: SnippetCopy = ({ text, what }) =>
+    host.copyToClipboard({
+      text,
+      succeeded: { title: "Copied", description: `${what} copied to clipboard` },
+    });
   const [assistantKey, setAssistantKey] = useState<string>(CODE_ASSISTANTS[0]!.key);
   const [codeTab, setCodeTab] = useState<CodeTab>("env");
   const [selectedProjectId, setSelectedProjectId] = useState<string>(projectId ?? "");
@@ -159,7 +165,7 @@ export function TokenCreatedDialog({
   );
 
   // ── .env snippet ──────────────────────────────────────────────────────
-  // CodePreview owns masking: it substring-replaces `sensitiveValue` in the
+  // SnippetPreview owns masking: it substring-replaces `sensitiveValue` in the
   // rendered code, so only the real form is built here.
   const envUnmasked = useMemo(
     () =>
@@ -205,7 +211,7 @@ export function TokenCreatedDialog({
         if (!open) onClose();
       }}
     >
-      <Dialog.Content bg="bg">
+      <Dialog.Content>
         <Dialog.Header>
           <Dialog.Title>Token Created</Dialog.Title>
         </Dialog.Header>
@@ -279,7 +285,8 @@ export function TokenCreatedDialog({
 
               {/* .env — ini-highlighted */}
               {codeTab === "env" && newToken && (
-                <CodePreview
+                <SnippetPreview
+                  copy={copySnippet}
                   code={envUnmasked}
                   copyText={envUnmasked}
                   filename=".env"
@@ -293,9 +300,11 @@ export function TokenCreatedDialog({
               {codeTab === "bearer" && newToken && (
                 <VStack gap={1} align="stretch">
                   <Text fontSize="xs" color="fg.muted">
-                    Use the <code>Authorization</code> header plus <code>X-Project-Id</code>:
+                    Use the <InlineCode>Authorization</InlineCode> header plus{" "}
+                    <InlineCode>X-Project-Id</InlineCode>:
                   </Text>
-                  <CodePreview
+                  <SnippetPreview
+                    copy={copySnippet}
                     code={bearerUnmasked}
                     copyText={bearerUnmasked}
                     filename="HTTP headers"
@@ -314,10 +323,12 @@ export function TokenCreatedDialog({
               {codeTab === "basic" && (
                 <VStack gap={1} align="stretch">
                   <Text fontSize="xs" color="fg.muted">
-                    Encode the project ID and token as <code>base64(projectId:token)</code>:
+                    Encode the project ID and token as{" "}
+                    <InlineCode>base64(projectId:token)</InlineCode>:
                   </Text>
                   {basicUnmasked ? (
-                    <CodePreview
+                    <SnippetPreview
+                      copy={copySnippet}
                       code={basicUnmasked}
                       copyText={basicUnmasked}
                       filename="HTTP headers"
@@ -377,7 +388,8 @@ export function TokenCreatedDialog({
                   <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
                     Run in your terminal
                   </Text>
-                  <CodePreview
+                  <SnippetPreview
+                    copy={copySnippet}
                     code={assistantCommand}
                     copyText={assistantCommand}
                     filename="Terminal"

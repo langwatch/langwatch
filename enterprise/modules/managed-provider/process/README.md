@@ -6,7 +6,7 @@ The server half of [managed-provider](../README.md). Enterprise managed model pr
 
 ## Installation
 
-`defineProcessModule("managed-provider").withApi(ManagedProviderModule).build()`, `src/managed-provider.module.ts:10`.
+`defineProcessModule("managed-provider").withChannels(managedProviderChannels).withApi(ManagedProviderModule).build()`, `src/managed-provider.module.ts:11`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -46,6 +46,6 @@ None: managed-provider declares no pipeline, process manager, subscriber or task
 
 | Kind   | Leaf | Environment variable      | Declared at                          |
 | ------ | ---- | ------------------------- | ------------------------------------ |
-| secret | `–`  | `MANAGED_BEDROCK_CONFIGS` | `src/app/managed-provider.app.ts:19` |
+| secret | `–`  | `MANAGED_BEDROCK_CONFIGS` | `src/app/managed-provider.app.ts:24` |
 
 <!-- readme:generated:end -->

@@ -11,6 +11,7 @@ from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
     from ..models.get_api_agent_cache_by_name_response_401_meta import GetApiAgentCacheByNameResponse401Meta
+    from ..models.get_api_agent_cache_by_name_response_401_trace import GetApiAgentCacheByNameResponse401Trace
 
 
 T = TypeVar("T", bound="GetApiAgentCacheByNameResponse401")
@@ -27,6 +28,7 @@ class GetApiAgentCacheByNameResponse401:
         meta (GetApiAgentCacheByNameResponse401Meta | Unset):
         trace_id (str | Unset):
         span_id (str | Unset):
+        trace (GetApiAgentCacheByNameResponse401Trace | Unset):
         tips (list[str] | Unset):
         docs_url (str | Unset):
         fault (GetApiAgentCacheByNameResponse401Fault | Unset):
@@ -40,6 +42,7 @@ class GetApiAgentCacheByNameResponse401:
     meta: GetApiAgentCacheByNameResponse401Meta | Unset = UNSET
     trace_id: str | Unset = UNSET
     span_id: str | Unset = UNSET
+    trace: GetApiAgentCacheByNameResponse401Trace | Unset = UNSET
     tips: list[str] | Unset = UNSET
     docs_url: str | Unset = UNSET
     fault: GetApiAgentCacheByNameResponse401Fault | Unset = UNSET
@@ -62,6 +65,10 @@ class GetApiAgentCacheByNameResponse401:
         trace_id = self.trace_id
 
         span_id = self.span_id
+
+        trace: dict[str, Any] | Unset = UNSET
+        if not isinstance(self.trace, Unset):
+            trace = self.trace.to_dict()
 
         tips: list[str] | Unset = UNSET
         if not isinstance(self.tips, Unset):
@@ -93,6 +100,8 @@ class GetApiAgentCacheByNameResponse401:
             field_dict["trace_id"] = trace_id
         if span_id is not UNSET:
             field_dict["span_id"] = span_id
+        if trace is not UNSET:
+            field_dict["trace"] = trace
         if tips is not UNSET:
             field_dict["tips"] = tips
         if docs_url is not UNSET:
@@ -107,6 +116,7 @@ class GetApiAgentCacheByNameResponse401:
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         from ..models.get_api_agent_cache_by_name_response_401_meta import GetApiAgentCacheByNameResponse401Meta
+        from ..models.get_api_agent_cache_by_name_response_401_trace import GetApiAgentCacheByNameResponse401Trace
 
         d = dict(src_dict)
         type_ = d.pop("type")
@@ -127,6 +137,13 @@ class GetApiAgentCacheByNameResponse401:
         trace_id = d.pop("trace_id", UNSET)
 
         span_id = d.pop("span_id", UNSET)
+
+        _trace = d.pop("trace", UNSET)
+        trace: GetApiAgentCacheByNameResponse401Trace | Unset
+        if isinstance(_trace, Unset):
+            trace = UNSET
+        else:
+            trace = GetApiAgentCacheByNameResponse401Trace.from_dict(_trace)
 
         tips = cast(list[str], d.pop("tips", UNSET))
 
@@ -149,6 +166,7 @@ class GetApiAgentCacheByNameResponse401:
             meta=meta,
             trace_id=trace_id,
             span_id=span_id,
+            trace=trace,
             tips=tips,
             docs_url=docs_url,
             fault=fault,

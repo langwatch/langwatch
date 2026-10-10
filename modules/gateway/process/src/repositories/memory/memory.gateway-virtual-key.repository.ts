@@ -162,6 +162,7 @@ export class MemoryGatewayVirtualKeyRepository extends GatewayVirtualKeyReposito
       licenseTokenHash: null,
       licenseInstanceId: null,
       licenseExpiresAt: null,
+      licenseId: null,
     });
 
     return this.#joined(key);
@@ -271,6 +272,7 @@ export class MemoryGatewayVirtualKeyRepository extends GatewayVirtualKeyReposito
   async setLicenseFacts(input: {
     id: string;
     organizationId: string;
+    licenseId?: string;
     tokenHash: string;
     instanceId: string | null;
     expiresAt: Instant | null;
@@ -284,7 +286,27 @@ export class MemoryGatewayVirtualKeyRepository extends GatewayVirtualKeyReposito
       licenseTokenHash: input.tokenHash,
       licenseInstanceId: input.instanceId,
       licenseExpiresAt: input.expiresAt,
+      ...(input.licenseId ? { licenseId: input.licenseId } : {}),
     });
+  }
+
+  async findConnectKeyIdsForLicense(input: {
+    organizationId: string;
+    licenseId: string;
+  }): Promise<string[]> {
+    // Map order is insertion order, so the oldest key comes first.
+    return [...this.store.virtualKeys.values()]
+      .filter((key) => {
+        const licenseId = this.store.connectColumns.get(key.id)?.licenseId;
+        const named = licenseId === null && key.name === `Connect ${input.licenseId}`;
+        return (
+          key.organizationId === input.organizationId &&
+          key.purpose === "CONNECT" &&
+          key.status !== "REVOKED" &&
+          (licenseId === input.licenseId || named)
+        );
+      })
+      .map((key) => key.id);
   }
 
   async findByLicenseTokenHash(tokenHash: string): Promise<GatewayLicensedKey | null> {
@@ -360,6 +382,7 @@ export class MemoryGatewayVirtualKeyRepository extends GatewayVirtualKeyReposito
       licenseTokenHash: string | null;
       licenseInstanceId: string | null;
       licenseExpiresAt: Instant | null;
+      licenseId: string | null;
     }>,
   ): boolean {
     const key = this.store.virtualKeys.get(target.id);

@@ -1,4 +1,6 @@
 import { FilterChips } from "@langwatch/design-system/filter-chips";
+import { FormattedDate } from "@langwatch/design-system/formatted-date";
+import { ListTable } from "@langwatch/design-system/list-table";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import {
@@ -14,9 +16,9 @@ import {
 } from "@langwatch/design-system/primitives";
 import { Select } from "@langwatch/design-system/select";
 import { Tooltip as UITooltip } from "@langwatch/design-system/tooltip";
-import { toEpochMs, readableDate } from "@langwatch/time";
+import { toEpochMs } from "@langwatch/time";
 import { ReceiptText, X } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
 import { api, type RouterOutputs } from "../../../behavior/gateway-api.ts";
 import { useOrganizationTeamProject } from "../../../behavior/gateway-session.ts";
@@ -75,8 +77,8 @@ function resetsPaging<T>(set: (value: T) => void, reset: () => void) {
 /** The window the presets pick, as the epoch milliseconds the query takes. */
 function useWindowMs(days: number) {
   const { fromIso, toIso } = useRollingWindow(days);
-  const fromMs = useMemo(() => toEpochMs(fromIso), [fromIso]);
-  const toMs = useMemo(() => toEpochMs(toIso), [toIso]);
+  const fromMs = toEpochMs(fromIso);
+  const toMs = toEpochMs(toIso);
   return { fromMs, toMs };
 }
 
@@ -143,10 +145,10 @@ function useBillingEventsLedger(projectId: string) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dataUpdatedAt]);
 
-  const rows = useMemo(() => {
+  const rows = (() => {
     if (paging.pages.length === 0) return query.data?.rows ?? [];
     return paging.pages.flat();
-  }, [paging.pages, query.data]);
+  })();
 
   return {
     days,
@@ -182,18 +184,19 @@ function FilterInput({
   testId: string;
 }) {
   return (
-    <HStack gap={0}>
+    <HStack gap={1} flex="1 1 160px" minWidth={0}>
       <Input
         size="sm"
-        width="160px"
+        width="full"
         value={value}
         placeholder={placeholder}
+        aria-label={placeholder}
         data-testid={testId}
         onChange={(e) => onChange(e.target.value)}
       />
       {value && (
         <Button
-          size="xs"
+          size="sm"
           variant="ghost"
           aria-label={`Clear ${placeholder}`}
           onClick={() => onChange("")}
@@ -207,7 +210,7 @@ function FilterInput({
 
 function BillingEventFilters({ ledger }: { ledger: Ledger }) {
   return (
-    <HStack gap={2} flexWrap="wrap">
+    <HStack gap={2} flexWrap="wrap" width="full">
       <FilterInput
         value={ledger.virtualKey}
         onChange={ledger.setVirtualKey}
@@ -229,7 +232,7 @@ function BillingEventFilters({ ledger }: { ledger: Ledger }) {
       <Select.Root
         collection={statusCollection}
         size="sm"
-        width="140px"
+        width={{ base: "full", sm: "160px" }}
         value={[ledger.status]}
         onValueChange={({ value }) => ledger.setStatus((value[0] as StatusFilter) ?? "all")}
         data-testid="filter-status"
@@ -305,7 +308,9 @@ function BillingEventRow({
 }) {
   return (
     <Table.Row>
-      <Table.Cell whiteSpace="nowrap">{readableDate(row.occurredAt).toLocaleString()}</Table.Cell>
+      <Table.Cell whiteSpace="nowrap">
+        <FormattedDate value={row.occurredAt} display="auto" seconds={false} />
+      </Table.Cell>
       <Table.Cell>
         {row.traceId && projectSlug ? (
           <Link href={`/${projectSlug}/traces/${row.traceId}`} fontFamily="mono" fontSize="xs">
@@ -317,27 +322,41 @@ function BillingEventRow({
           </Text>
         )}
       </Table.Cell>
-      <Table.Cell>{spendKeyLabel({ row, virtualKeyName })}</Table.Cell>
-      <Table.Cell>{row.endUserId || ""}</Table.Cell>
       <Table.Cell>
-        <HStack gap={1}>
-          <Text fontSize="sm">{row.model}</Text>
+        <Text truncate title={spendKeyLabel({ row, virtualKeyName })}>
+          {spendKeyLabel({ row, virtualKeyName })}
+        </Text>
+      </Table.Cell>
+      <Table.Cell>
+        <Text truncate title={row.endUserId || ""}>
+          {row.endUserId || "—"}
+        </Text>
+      </Table.Cell>
+      <Table.Cell>
+        <VStack align="start" gap={1} minWidth={0}>
+          <Text fontSize="sm" truncate maxWidth="full" title={row.model}>
+            {row.model}
+          </Text>
           {row.providerKey && (
-            <Badge size="sm" colorPalette="gray">
+            <Badge size="sm" colorPalette="gray" maxWidth="full" title={row.providerKey}>
               {row.providerKey}
             </Badge>
           )}
-        </HStack>
+        </VStack>
       </Table.Cell>
       <Table.Cell whiteSpace="nowrap">
-        <UITooltip content="input / output / cache read / cache write / reasoning">
-          <Text fontSize="xs">{tokensSummary(row)}</Text>
+        <UITooltip
+          content={`${tokensSummary(row)} · input / output / cache read / cache write / reasoning`}
+        >
+          <Text fontSize="xs" truncate>
+            {tokensSummary(row)}
+          </Text>
         </UITooltip>
       </Table.Cell>
       <Table.Cell textAlign="right" whiteSpace="nowrap">
         {formatCost(row.costUsd)}
       </Table.Cell>
-      <Table.Cell>
+      <Table.Cell whiteSpace="nowrap">
         <SpendStatusBadge row={row} />
       </Table.Cell>
     </Table.Row>
@@ -354,18 +373,49 @@ function BillingEventsTable({
   projectSlug: string | undefined;
 }) {
   return (
-    <Card.Root width="full" overflowX="auto">
-      <Table.Root variant="line" size="sm" width="full" data-testid="billing-events-table">
+    <Card.Root variant="showcase" width="full" overflowX="auto">
+      <ListTable
+        containerProps={{
+          overflowX: "auto",
+          maxWidth: "full",
+          tabIndex: 0,
+          role: "region",
+          "aria-label": "Billing events table",
+        }}
+        variant="line"
+        size="sm"
+        width="full"
+        minWidth="960px"
+        tableLayout="fixed"
+        density="compact"
+        data-testid="billing-events-table"
+      >
         <Table.Header>
           <Table.Row>
-            <Table.ColumnHeader>Time</Table.ColumnHeader>
-            <Table.ColumnHeader>Request</Table.ColumnHeader>
-            <Table.ColumnHeader>Virtual key</Table.ColumnHeader>
-            <Table.ColumnHeader>End user</Table.ColumnHeader>
-            <Table.ColumnHeader>Model</Table.ColumnHeader>
-            <Table.ColumnHeader>Tokens</Table.ColumnHeader>
-            <Table.ColumnHeader textAlign="right">Cost</Table.ColumnHeader>
-            <Table.ColumnHeader>Status</Table.ColumnHeader>
+            <Table.ColumnHeader width="120px" whiteSpace="nowrap">
+              Time
+            </Table.ColumnHeader>
+            <Table.ColumnHeader width="110px" whiteSpace="nowrap">
+              Request
+            </Table.ColumnHeader>
+            <Table.ColumnHeader width="120px" whiteSpace="nowrap">
+              Virtual key
+            </Table.ColumnHeader>
+            <Table.ColumnHeader width="110px" whiteSpace="nowrap">
+              End user
+            </Table.ColumnHeader>
+            <Table.ColumnHeader width="180px" whiteSpace="nowrap">
+              Model
+            </Table.ColumnHeader>
+            <Table.ColumnHeader width="110px" whiteSpace="nowrap">
+              Tokens
+            </Table.ColumnHeader>
+            <Table.ColumnHeader width="105px" textAlign="right" whiteSpace="nowrap">
+              Cost
+            </Table.ColumnHeader>
+            <Table.ColumnHeader width="105px" whiteSpace="nowrap">
+              Status
+            </Table.ColumnHeader>
           </Table.Row>
         </Table.Header>
         <Table.Body>
@@ -378,7 +428,7 @@ function BillingEventsTable({
             />
           ))}
         </Table.Body>
-      </Table.Root>
+      </ListTable>
     </Card.Root>
   );
 }

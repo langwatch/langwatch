@@ -34,12 +34,11 @@ export function FilterChip({
     <Menu.Root>
       <Menu.Trigger asChild>
         <Button
-          size="xs"
+          size="sm"
           variant="outline"
-          borderRadius="full"
           paddingX={3}
           fontWeight="normal"
-          colorPalette="purple"
+          colorPalette="gray"
           disabled={disabled}
         >
           <HStack gap={1.5}>

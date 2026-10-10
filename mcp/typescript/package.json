@@ -36,6 +36,7 @@
   "scripts": {
     "start": "node --experimental-transform-types src/index.ts",
     "build": "tsup && node build.js",
+    "typecheck": "pnpm -w exec tsc -b mcp/typescript",
     "prepublish": "pnpm run build",
     "test": "vitest run",
     "test:integration": "vitest run --config vitest.integration.config.js",
@@ -52,7 +53,7 @@
     "@langwatch/egress": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/redaction": "workspace:*",
-    "@langwatch/scenario": "^0.4.6",
+    "@langwatch/scenario": "catalog:",
     "@opentelemetry/context-async-hooks": "catalog:",
     "@types/debug": "catalog:",
     "@types/express": "^5.0.6",

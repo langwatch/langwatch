@@ -41,7 +41,7 @@ export function AddParticipants({
   const selectedValues = annotators.map((annotator) => annotator.id);
 
   const userOptions = (users.data?.members ?? []).map((member) => ({
-    label: member.user.name ?? "",
+    label: member.user.name ?? member.user.email ?? "Unknown user",
     value: `user-${member.user.id}`,
   }));
 

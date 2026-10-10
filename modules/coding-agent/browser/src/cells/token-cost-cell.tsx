@@ -1,4 +1,5 @@
 import { formatCost } from "@langwatch/design-system/display-formatters";
+import { FormattedNumber } from "@langwatch/design-system/formatted-number";
 import { Text, VStack } from "@langwatch/design-system/primitives";
 import type React from "react";
 
@@ -18,7 +19,9 @@ export const TokenCostCell: React.FC<{
   return (
     <VStack align="stretch" gap={1}>
       <Text fontSize="sm" textAlign="end">
-        {formatCost(row.costUsd)}
+        <FormattedNumber value={row.costUsd} currency="USD">
+          {formatCost(row.costUsd)}
+        </FormattedNumber>
       </Text>
       <ComparisonBar value={row.costUsd} largest={largestCost} />
     </VStack>

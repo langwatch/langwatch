@@ -13,6 +13,8 @@ const COMPARISONS = new Set(["===", "!==", "==", "!="]);
 const WRAPPERS = new Set(["ChainExpression", "TSNonNullExpression"]);
 const FALLBACKS = new Set(["??", "||"]);
 const BODY_READERS = new Set(["json", "text", "parseBody", "formData", "arrayBuffer", "blob"]);
+// Hono's `c.req`, and the `Request` a middleware-context resolver is handed.
+const REQUESTS = new Set(["req", "request"]);
 const SCOPES = new Set([
   "ArrowFunctionExpression",
   "FunctionDeclaration",
@@ -101,7 +103,7 @@ function reportComparedAlias({ declarator, name, tools }) {
 function isRequestBodyRead(node) {
   const reader = node.type === "CallExpression" ? propertyName(node.callee) : undefined;
 
-  return BODY_READERS.has(reader) && lastName(node.callee.object) === "req";
+  return BODY_READERS.has(reader) && REQUESTS.has(lastName(node.callee.object));
 }
 
 /** A transport or `*.module.ts` source that reads the request's media type or body to decide

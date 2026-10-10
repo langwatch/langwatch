@@ -10,7 +10,7 @@ type ContainerNeedInputs struct {
 
 // ContainerNeeds names each selected container-only feature. None means the VM
 // is not needed, so nothing may start it and status reports it without probing.
-// haven play and isolated test runs start the VM themselves, on demand.
+// haven pr --throwaway and isolated test runs start the VM themselves, on demand.
 func ContainerNeeds(in ContainerNeedInputs) []string {
 	var needs []string
 	if in.ClickHouse == ClickHouseRuntimeContainer {

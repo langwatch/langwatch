@@ -190,7 +190,7 @@ describe("governance pages for a delegated viewer", () => {
       renderPage({ Page: GovernanceOverviewPage, permissions: DELEGATED_VIEWER });
 
       expect(screen.queryByText(/activityMonitor:view/)).toBeNull();
-      expect(screen.queryByText(/Ask an organization admin to grant you/)).toBeNull();
+      expect(screen.queryByText(/Your role doesn't include/)).toBeNull();
       expect(screen.getByRole("heading", { name: "AI Governance" })).toBeTruthy();
       expect(screen.getByText("Insights")).toBeTruthy();
       // No `ingestionSources:manage`, so the hero draws no add-source pill.
@@ -275,7 +275,7 @@ describe("governance pages for a delegated viewer", () => {
       expect(screen.getByText("Recent activity")).toBeTruthy();
       // The admin can add a source, so the admin is the one offered the pill.
       expect(screen.getByText("Add source")).toBeTruthy();
-      expect(screen.queryByText(/Ask an organization admin to grant you/)).toBeNull();
+      expect(screen.queryByText(/Your role doesn't include/)).toBeNull();
 
       // The panels moved to the pages that own them; the overview reads only the source list.
       expect(screen.queryByText("Recent anomalies")).toBeNull();
@@ -293,7 +293,7 @@ describe("governance pages for a delegated viewer", () => {
       });
 
       expect(screen.getByRole("button", { name: /Add department/ })).toBeTruthy();
-      expect(screen.queryByText(/Ask an organization admin to grant you/)).toBeNull();
+      expect(screen.queryByText(/Your role doesn't include/)).toBeNull();
     });
   });
 });

@@ -12,7 +12,7 @@ describe("PrismaDriverAdapterService", () => {
     ).toEqual({
       connectionString: "postgresql://user:pass@localhost:5432/db?schema=langwatch_db",
       schema: "langwatch_db",
-      options: '-c search_path="langwatch_db"',
+      options: '-c search_path="langwatch_db" -c TimeZone=UTC',
     });
   });
 
@@ -23,6 +23,7 @@ describe("PrismaDriverAdapterService", () => {
     ).toEqual({
       connectionString: "postgresql://localhost/db?connection_limit=7&pool_timeout=20",
       schema: undefined,
+      options: "-c TimeZone=UTC",
       max: 7,
       connectionTimeoutMillis: 20_000,
     });
@@ -36,7 +37,19 @@ describe("PrismaDriverAdapterService", () => {
     expect(service.poolConfig(databaseUrl)).toEqual({
       connectionString: databaseUrl,
       schema: undefined,
+      options: "-c TimeZone=UTC",
     });
+  });
+
+  /** @scenario "Every session is pinned to UTC so a written instant is stored as written" */
+  it.each([
+    ["postgresql://localhost/db", "-c TimeZone=UTC"],
+    [
+      "postgresql://localhost/db?schema=langwatch_db",
+      '-c search_path="langwatch_db" -c TimeZone=UTC',
+    ],
+  ])("pins the session time zone to UTC for %s", (databaseUrl, options) => {
+    expect(service.poolConfig(databaseUrl).options).toBe(options);
   });
 
   /** @scenario "A malformed DATABASE_URL defers failure to first use" */
@@ -44,6 +57,7 @@ describe("PrismaDriverAdapterService", () => {
     expect(service.poolConfig("not a url")).toEqual({
       connectionString: "not a url",
       schema: undefined,
+      options: "-c TimeZone=UTC",
     });
     expect(() => service.createOwnedAdapter("not a url")).not.toThrow();
   });

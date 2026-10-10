@@ -6,6 +6,7 @@
 import { SessionReader } from "@langwatch/api/hosting";
 import { composeTrpcRouters, defineTrpcRouter, TrpcHost } from "@langwatch/api/trpc";
 import { defineTrpcContract, moduleApi, schemaHashesOf } from "@langwatch/module";
+import { testAuthorizeDefaults } from "@langwatch/test-harness/trpc-members";
 import { beforeEach, describe, expect, it } from "vitest";
 import { z } from "zod";
 
@@ -47,6 +48,7 @@ describe("given a tRPC surface mounting a contract", () => {
     const trpc = TrpcHost.create({
       sessions: SessionReader.create({ verify: async () => ({ userId: "user_ada" }) }),
       authz: {
+        ...testAuthorizeDefaults,
         ...inertApiDoor().authz,
         checkScopeLineage: async () => ({ kind: "consistent" }),
       },

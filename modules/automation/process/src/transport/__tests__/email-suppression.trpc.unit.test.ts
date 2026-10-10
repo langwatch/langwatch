@@ -5,7 +5,11 @@
  * permissions.
  * @see specs/automations/unsubscribe-landing.feature
  */
-import { bindTrpcFact, callerAddressFact, createTrpcRuntime } from "@langwatch/api/trpc";
+import {
+  bindTrpcMiddlewareContext,
+  callerAddressContext,
+  createTrpcRuntime,
+} from "@langwatch/api/trpc";
 import type { AutomationApi } from "@langwatch/automation-contract";
 import { trpcTestMembers } from "@langwatch/test-harness/trpc-members";
 import { initTRPC } from "@trpc/server";
@@ -24,7 +28,9 @@ function mount(
     anonymousProcedure: trpc.procedure,
     members: trpcTestMembers<AutomationTrpcTestContext>({ permits: options.permits }),
   }).mount(emailSuppressionTrpcTransport, () => options.app as AutomationApi, {
-    facts: [bindTrpcFact(callerAddressFact, (ctx) => ctx.address ?? null)],
+    middlewareContext: [
+      bindTrpcMiddlewareContext(callerAddressContext, (ctx) => ctx.address ?? null),
+    ],
   });
 
   return {

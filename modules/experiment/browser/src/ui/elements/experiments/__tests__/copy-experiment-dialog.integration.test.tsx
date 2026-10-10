@@ -38,6 +38,8 @@ function publishWorkflowHost() {
       navigate: nothing,
       back: nothing,
       succeeded: nothing,
+      warned: nothing,
+      informed: nothing,
       failed: nothing,
     }),
   });

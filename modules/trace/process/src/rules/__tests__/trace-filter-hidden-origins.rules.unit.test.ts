@@ -88,7 +88,6 @@ describe("findHiddenOriginConditions", () => {
     it("keeps the filter whole and ANDs the exclusion after it", () => {
       const compiled = traceQueryTranslation.translateFilter({
         queryText: "status:error OR model:gpt-5-mini",
-        tenantId: "project_test",
         timeRange,
       });
       expect(compiled).not.toBeNull();

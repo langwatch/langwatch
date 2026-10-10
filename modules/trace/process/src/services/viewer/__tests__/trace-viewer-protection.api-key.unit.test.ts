@@ -32,6 +32,7 @@ const projectOne = {
   organizationId: "org-1",
   isPersonal: false,
   ownerUserId: null,
+  kind: "application",
 };
 
 function serviceWith(can: AuthzApi["can"]) {

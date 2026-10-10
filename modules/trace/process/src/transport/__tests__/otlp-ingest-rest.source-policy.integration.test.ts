@@ -9,12 +9,13 @@ import { PlanLimitExceededError } from "@langwatch/entitlement-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { LocalFeatureApis } from "@langwatch/process";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { TraceApi, type OtlpIngestCredential } from "@langwatch/trace-contract";
 import type { ErrorHandler } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { describe, expect, it, vi } from "vitest";
 
-import { otlpIngestRest } from "../otlp-ingest.rest.ts";
+import { otlpIngestDoor, otlpIngestRest } from "../otlp-ingest.rest.ts";
 
 const PROJECT = { id: "project-123", teamId: "team-1", organizationId: "organization-1" };
 
@@ -43,9 +44,11 @@ class SourceDisabledError extends HandledError {
 function ingestionSourceDeployment({
   sourcePolicy,
   usageLimit = async () => undefined,
+  ingestSourceType = "copilot_vscode",
 }: {
   sourcePolicy?: NonNullable<OtlpIngestCredential["identity"]["sourcePolicy"]>;
   usageLimit?: () => Promise<void>;
+  ingestSourceType?: OtlpIngestCredential["identity"]["ingestSourceType"];
 }) {
   const otlpTraces = vi.fn(async () => ({}));
   const credential: OtlpIngestCredential = {
@@ -53,7 +56,7 @@ function ingestionSourceDeployment({
     identity: {
       apiKeyId: "key_real",
       organizationId: PROJECT.organizationId,
-      ingestSourceType: "copilot_vscode",
+      ingestSourceType,
       ingestionTemplateId: null,
       ...(sourcePolicy ? { sourcePolicy } : {}),
     },
@@ -71,10 +74,14 @@ function ingestionSourceDeployment({
   );
   apis.ready();
   const family = createRestRuntime({
+    doors: {
+      otlp_ingest: otlpIngestDoor.open(apis.reference(TraceApi)),
+    },
+    authorization: restTestAuthorization(),
     identity: { authenticate: () => ({ authenticated: false }) as never },
   }).mount(otlpIngestRest.router(), {
     app: () => apis.reference(TraceApi),
-    credential: "public",
+    credential: "otlp_ingest",
     onError: renderRefusal,
   });
   const post = (body: string) =>
@@ -181,6 +188,21 @@ describe("given an organization whose month's count has reached its plan's allow
         activePlanName: "Free",
       });
       expect(otlpTraces).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe("given a project key and a valid export", () => {
+  /** @scenario "An in-process backfill admits spans older than the door's 31 days" */
+  it("hands the export on without a backfill reach, so the door keeps its 31 days", async () => {
+    const { post, otlpTraces } = ingestionSourceDeployment({ ingestSourceType: null });
+
+    const response = await post(validBody);
+
+    expect(response.status).toBe(200);
+    expect(otlpTraces).toHaveBeenCalledWith({
+      tenantId: PROJECT.id,
+      traceRequest: expect.anything(),
     });
   });
 });

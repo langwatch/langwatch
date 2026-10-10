@@ -14,6 +14,12 @@ describe("routeOf", () => {
     });
   });
 
+  it("reads a social provider's authorize page as the picker, naming the provider", () => {
+    expect(
+      routeOf({ pathname: "/t/1/social/github/login/oauth/authorize", search: "?client_id=c" }),
+    ).toEqual({ page: "sign-in", tenantId: 1, query: "client_id=c&social=github" });
+  });
+
   it("answers not-found for anything else", () => {
     expect(routeOf({ pathname: "/t/x/", search: "" })).toEqual({ page: "not-found" });
     expect(routeOf({ pathname: "/nothing", search: "" })).toEqual({ page: "not-found" });

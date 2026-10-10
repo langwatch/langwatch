@@ -183,7 +183,7 @@ ever touching the caller's key.
 What a handler is handed never changes: `{ app, input, actor, scope, signal }`,
 plus `target` on REST, which is the scope a route's own path named when its
 permission was checked there. No `ctx`, no request, no response, no framework
-type. The access step writes those facts onto the request context through
+type. The access step writes those values onto the request context through
 tRPC's own `next({ ctx })`, and a procedure that somehow reached its handler
 without them refuses by name.
 

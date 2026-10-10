@@ -30,6 +30,13 @@ Feature: Authentication reads are remembered briefly and never past a revocation
       When "kim" is signed in on another browser
       Then her session carries her own address, never his
 
+    @unit
+    Scenario: The browser's session poll shows a saved photo at once
+      Given "sam"'s details are remembered
+      When he saves a new profile photo and his browser polls the session
+      Then the poll carries the new photo
+      And his next request reads the remembered details as the new photo
+
   # An API key's check moved to modules/api-key/specs/auth-check-cache.feature (Alex, 2026-10-01).
 
   Rule: one request asks each authorization question once
@@ -45,3 +52,23 @@ Feature: Authentication reads are remembered briefly and never past a revocation
       Given one request was allowed
       When the permission is removed before the next request
       Then the next request is refused
+
+    @unit
+    Scenario: Shared decisions still mint the route's proof
+      Given a request whose procedure reads traces on one project
+      When it is served through the request's shared decisions
+      Then the handler receives the proof the host's authorization minted
+
+    @unit
+    Scenario: Shared decisions still refuse a non-admin on an aggregate project
+      Given a request whose procedure reads traces on one project
+      When a member who is not an admin opens an aggregate project
+      Then the project's kind is read
+      And the request is refused before the handler runs
+
+    @unit
+    Scenario: Shared decisions still refuse a write on an aggregate project
+      Given a request whose procedure writes on one project
+      When an admin writes on an aggregate project
+      Then the project's kind is read
+      And the write is refused as read only before the handler runs

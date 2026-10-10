@@ -115,6 +115,18 @@ func TestRtkIsOfferedWithoutBeingRequired(t *testing.T) {
 	}
 }
 
+// @scenario "Bun is offered so a fresh machine can run Langy"
+func TestBunIsRecommendedForLangy(t *testing.T) {
+	report := PlanPrereqs(presentExcept("bun"), nil, "darwin")
+	st := statusOf(t, report, "bun")
+	if st.State != PrereqMissing || st.Requirement != PrereqRecommended {
+		t.Errorf("bun = %v/%v, want missing and recommended", st.State, st.Requirement)
+	}
+	if cmd, _ := st.Candidates[0].InstallOn("darwin"); cmd != "brew install bun" {
+		t.Errorf("bun installs with %q, want brew install bun", cmd)
+	}
+}
+
 // @scenario "Everything present reports ready and installs nothing"
 func TestPlanReportsReadyWhenEverythingIsPresent(t *testing.T) {
 	report := PlanPrereqs(presentExcept(), nil, "darwin")
@@ -241,9 +253,8 @@ func TestMacOSOnlyEntriesAreNotApplicableElsewhere(t *testing.T) {
 // @scenario "A prerequisite haven cannot install itself is explained, not attempted"
 func TestHomebrewIsTheOnlyManualEntry(t *testing.T) {
 	for _, p := range Prereqs {
-		// The accept-queue setting needs sudo too, so haven prints it as well.
-		if p.Manual() != (p.Key == "brew" || p.Key == "somaxconn") {
-			t.Errorf("%s manual = %v; only Homebrew and the sudo sysctl are by hand", p.Key, p.Manual())
+		if p.Manual() != (p.Key == "brew") {
+			t.Errorf("%s manual = %v; only Homebrew is by hand", p.Key, p.Manual())
 		}
 	}
 	brew, _ := LookupPrereq("brew")

@@ -15,6 +15,8 @@ import {
   type SlackConnectionSecret,
   type SlackConnectionView,
   type SlackManagedConnection,
+  slackConfig,
+  type SlackServerConfig,
 } from "@langwatch/slack-contract";
 
 import type { SlackChannels } from "../channels/slack.channels.ts";
@@ -24,7 +26,7 @@ import { SlackConnectionService } from "../services/slack-connection.service.ts"
 
 type SlackSetup = FeatureSetup<
   typeof SlackModule.dependencies,
-  undefined,
+  SlackServerConfig,
   SlackRepositories,
   SlackChannels
 >;
@@ -37,6 +39,7 @@ export class SlackModule implements SlackApiContract {
     organizations: OrganizationApi,
     authorization: AuthzApi,
   };
+  static readonly config = slackConfig;
   static readonly secrets = {
     /** Main's fingerprint key: CREDENTIALS_SECRET, else NEXTAUTH_SECRET. */
     fingerprintKey: credentialsSecret,

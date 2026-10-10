@@ -1,4 +1,5 @@
 import { formatCost, formatTokens } from "@langwatch/design-system/display-formatters";
+import { FormattedNumber } from "@langwatch/design-system/formatted-number";
 import { Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import type React from "react";
 
@@ -22,10 +23,19 @@ const ModelRow: React.FC<{ model: ModelUsage; peak: number }> = ({ model, peak }
       {model.tokensKnown ? (
         <HStack gap={3} flexShrink={0}>
           <Text fontSize="sm" color="fg.muted">
-            {formatTokens(model.totalTokens)} tokens
+            <FormattedNumber value={model.totalTokens} unit="tokens">
+              {formatTokens(model.totalTokens)}
+            </FormattedNumber>{" "}
+            tokens
           </Text>
           <Text fontSize="sm" color="fg.muted">
-            {model.costUsd === null ? MISSING_VALUE : formatCost(model.costUsd)}
+            {model.costUsd === null ? (
+              MISSING_VALUE
+            ) : (
+              <FormattedNumber value={model.costUsd} currency="USD">
+                {formatCost(model.costUsd)}
+              </FormattedNumber>
+            )}
           </Text>
         </HStack>
       ) : null}

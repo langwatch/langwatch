@@ -92,15 +92,16 @@ function CapabilityCard({
       flex={1}
       borderRadius="xl"
       border="1px solid"
-      borderColor={{ base: "orange.200", _dark: "orange.800" }}
+      borderColor={{ base: "orange.emphasized", _dark: "orange.emphasized" }}
       bg="bg.panel/70"
       backdropFilter="blur(20px) saturate(1.3)"
-      boxShadow="0 1px 3px rgba(0,0,0,0.04)"
+      boxShadow="0 1px 3px color-mix(in srgb, var(--chakra-colors-bg-scrim) 4%, transparent)"
       transition="all 0.2s ease"
       cursor="pointer"
       _hover={{
         borderColor: "orange.emphasized",
-        boxShadow: "0 6px 28px rgba(237,137,38,0.06)",
+        boxShadow:
+          "0 6px 28px color-mix(in srgb, var(--chakra-colors-accent-solid) 6%, transparent)",
         transform: "translateY(-2px)",
         textDecoration: "none",
       }}
@@ -111,7 +112,7 @@ function CapabilityCard({
           p={2.5}
           borderRadius="xl"
           bg={accentChipBg}
-          color="orange.500"
+          color="orange.fg"
           display="flex"
           alignItems="center"
           justifyContent="center"

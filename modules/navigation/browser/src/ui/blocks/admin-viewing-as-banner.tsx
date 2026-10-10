@@ -1,14 +1,6 @@
-import {
-  Alert,
-  Box,
-  Button,
-  HStack,
-  IconButton,
-  Spacer,
-  Text,
-} from "@langwatch/design-system/primitives";
+import { Banner, BannerAction } from "@langwatch/design-system/banner";
 import { nowInstant } from "@langwatch/time";
-import { Eye, LogOut, X } from "lucide-react";
+import { Eye, LogOut } from "lucide-react";
 import { useState } from "react";
 
 import { NavigationLink } from "../elements/navigation-link.tsx";
@@ -43,10 +35,8 @@ function persistDismissed(workspaceLabel: string): void {
 }
 
 export function AdminViewingAsBanner({ workspaceLabel }: { workspaceLabel: string }) {
-  // Two visual states: full on first paint (the loud "this is not your
-  // data" alert), mini after 24h-dismiss (a small persistent chip). Never
-  // fully hidden — the governance team's bar is "always visible signal,
-  // even if compressed".
+  // Full on first paint, one quiet line for 24h after a dismiss; never hidden
+  // (the governance bar is "always visible signal, even if compressed").
   const [collapsed, setCollapsed] = useState(() => loadDismissed(workspaceLabel));
   const [labelFrom, setLabelFrom] = useState(workspaceLabel);
   if (labelFrom !== workspaceLabel) {
@@ -59,102 +49,34 @@ export function AdminViewingAsBanner({ workspaceLabel }: { workspaceLabel: strin
     setCollapsed(true);
   };
 
+  const exit = (
+    <BannerAction asChild aria-label="Exit and return to governance bird's-eye">
+      <NavigationLink href="/governance">
+        <LogOut size={12} />
+        Exit
+      </NavigationLink>
+    </BannerAction>
+  );
+  const auditLog = <NavigationLink href="/settings/audit-log">/settings/audit-log</NavigationLink>;
+
   if (collapsed) {
     return (
-      <Box
-        paddingX={3}
-        paddingY={1}
-        borderBottomWidth="1px"
-        borderColor="border.subtle"
-        bg="bg.subtle"
-        // Only the top-left corner curves — the banner sits at the
-        // very top of the inner page chrome and inherits that chrome's
-        // rounded top-left so the curve is continuous. All other
-        // corners are flush against the page edges.
-        borderRadius={0}
-        borderTopLeftRadius="xl"
-      >
-        <HStack gap={2} fontSize="xs" color="fg.muted">
-          <Eye size={12} />
-          <Text>
-            Viewing{" "}
-            <Text as="span" fontWeight="semibold" color="fg">
-              {workspaceLabel}
-            </Text>{" "}
-            as admin · audit-logged.
-          </Text>
-          <Spacer />
-          <NavigationLink href="/settings/audit-log" color="fg.subtle" _hover={{ color: "fg" }}>
-            audit log
-          </NavigationLink>
-          <Button
-            asChild
-            size="2xs"
-            variant="ghost"
-            aria-label="Exit and return to governance bird's-eye"
-          >
-            <NavigationLink href="/governance">
-              <LogOut size={11} />
-              Exit
-            </NavigationLink>
-          </Button>
-        </HStack>
-      </Box>
+      <Banner status="info" placement="top" icon={<Eye size={14} />} action={exit}>
+        Viewing {workspaceLabel} as admin. Each access is logged at {auditLog}.
+      </Banner>
     );
   }
 
-  const message = `Viewing ${workspaceLabel}'s personal workspace as org admin. This is not your data.`;
   return (
-    <Alert.Root
+    <Banner
       status="info"
-      variant="surface"
-      // Top-left only — matches the inner page chrome's rounded
-      // top-left corner so the banner continues that curve.
-      borderRadius={0}
-      borderTopLeftRadius="xl"
+      placement="top"
+      icon={<Eye size={16} />}
+      title={`Viewing ${workspaceLabel}'s personal workspace as org admin. This is not your data.`}
+      action={exit}
+      onDismiss={handleDismiss}
     >
-      <Alert.Indicator>
-        <Eye size={16} />
-      </Alert.Indicator>
-      <Alert.Content>
-        <HStack gap={2} flexWrap="wrap" alignItems="center" width="full">
-          <Text fontSize="sm" fontWeight="medium">
-            {message}
-          </Text>{" "}
-          <Text fontSize="xs" color="fg.muted">
-            Each access is logged at{" "}
-            <NavigationLink href="/settings/audit-log" color="blue.600">
-              /settings/audit-log
-            </NavigationLink>
-            .
-          </Text>
-          <Spacer />
-          <Button
-            asChild
-            size="xs"
-            variant="outline"
-            colorPalette="blue"
-            aria-label="Exit and return to governance bird's-eye"
-          >
-            <NavigationLink href="/governance">
-              <LogOut size={12} />
-              Exit
-            </NavigationLink>
-          </Button>
-          {/* Collapse to a compact one-line chip for 24h. The audit
-              trail still fires regardless; this is purely about not
-              eating 36px of chrome on every traces page once the
-              admin has read the warning the first time. */}
-          <IconButton
-            size="xs"
-            variant="ghost"
-            aria-label="Collapse banner (24h)"
-            onClick={handleDismiss}
-          >
-            <X size={12} />
-          </IconButton>
-        </HStack>
-      </Alert.Content>
-    </Alert.Root>
+      Each access is logged at {auditLog}.
+    </Banner>
   );
 }

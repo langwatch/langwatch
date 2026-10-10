@@ -5,7 +5,6 @@ export {
   type OperationsOnly,
   type DependencyIdentity,
   type DependencyToken,
-  NO_TOKENS,
   type ResolvedTokens,
   type TokenIdentity,
   type TokenMap,
@@ -33,9 +32,11 @@ export {
   type TrpcReadOptions,
 } from "./contract/trpc-contract.ts";
 
+export type { Named } from "./contract/named-schema.ts";
+
 export { SCHEMA_HASH_HEADER, schemaHashOf, schemaHashesOf } from "./contract/schema-hash.ts";
 
-export { defineRestMiddleware, type RestTransportMiddleware } from "./contract/rest-middleware.ts";
+export { defineMiddlewareContext, type MiddlewareContext } from "./contract/middleware-context.ts";
 
 export {
   uiTokens,

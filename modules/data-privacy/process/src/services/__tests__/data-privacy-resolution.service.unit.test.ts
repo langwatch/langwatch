@@ -1,9 +1,12 @@
+import { PLATFORM_DEFAULT_DATA_PRIVACY } from "@langwatch/data-privacy-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import {
   createDataPrivacyTestScopes,
   dataPrivacyTestGraph,
+  dataPrivacyTestPlacement,
 } from "../../app/__tests__/data-privacy.fixture.ts";
+import { MemoryDataPrivacyProjectScopeRepository } from "../../repositories/memory/memory.data-privacy-project-scope.repository.ts";
 import { MemoryDataPrivacyPolicyRepository } from "../../repositories/memory/memory.data-privacy.repository.ts";
 import { DataPrivacyProjectScopeService } from "../data-privacy-project-scope.service.ts";
 import { DataPrivacyResolutionService } from "../data-privacy-resolution.service.ts";
@@ -66,6 +69,36 @@ describe("DataPrivacyResolutionService", () => {
         const resolved = await built.getResolvedForProject({ projectId: "project-1" });
 
         expect(resolved.categories.input.disposition).toBe("drop");
+      });
+
+      /** @scenario "A project created on main with no rule row resolves main's platform default" */
+      it("resolves every main-created project without a rule row to the platform default", async () => {
+        const projects = [
+          dataPrivacyTestPlacement({ projectId: "team-project" }),
+          dataPrivacyTestPlacement({
+            projectId: "personal-project",
+            isPersonal: true,
+            departmentId: "risk",
+          }),
+          dataPrivacyTestPlacement({ projectId: "archived-project" }),
+          dataPrivacyTestPlacement({
+            projectId: "other-organization-project",
+            organizationId: "organization-2",
+            teamId: "team-2",
+          }),
+        ];
+        const built = DataPrivacyResolutionService.create({
+          repository: MemoryDataPrivacyPolicyRepository.create(),
+          scopes: DataPrivacyProjectScopeService.create({
+            repository: MemoryDataPrivacyProjectScopeRepository.create({ projects }),
+          }),
+        });
+
+        for (const { projectId } of projects) {
+          await expect(built.getResolvedForProject({ projectId })).resolves.toEqual(
+            PLATFORM_DEFAULT_DATA_PRIVACY,
+          );
+        }
       });
 
       /** @scenario "A second resolution inside the window reuses the first" */

@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 /**
  * The organization, team and project skeleton the browser resolves a scope against,
  * narrowed to the caller: `organization.getScopeGraph`. Credentials and
@@ -7,18 +8,21 @@ import { z } from "zod";
 
 import { organizationIntentSchema } from "./organization.ts";
 
-export const scopeGraphProjectSchema = z.object({
+const scopeGraphProjectSchemaDefinition = z.object({
   id: z.string(),
   slug: z.string(),
   name: z.string(),
+  kind: z.string(),
   userLinkTemplate: z.string().nullable(),
   presenceEnabled: z.boolean(),
   lastCodingAgentSessionAt: z.date().nullable(),
   lastCodingAgentPullRequestAt: z.date().nullable(),
 });
+export interface ScopeGraphProjectSchema extends Named<typeof scopeGraphProjectSchemaDefinition> {}
+export const scopeGraphProjectSchema: ScopeGraphProjectSchema = scopeGraphProjectSchemaDefinition;
 export type ScopeGraphProject = z.infer<typeof scopeGraphProjectSchema>;
 
-export const scopeGraphTeamSchema = z.object({
+const scopeGraphTeamSchemaDefinition = z.object({
   id: z.string(),
   slug: z.string(),
   name: z.string(),
@@ -30,9 +34,11 @@ export const scopeGraphTeamSchema = z.object({
   members: z.array(z.object({ userId: z.string() })),
   projects: z.array(scopeGraphProjectSchema),
 });
+export interface ScopeGraphTeamSchema extends Named<typeof scopeGraphTeamSchemaDefinition> {}
+export const scopeGraphTeamSchema: ScopeGraphTeamSchema = scopeGraphTeamSchemaDefinition;
 export type ScopeGraphTeam = z.infer<typeof scopeGraphTeamSchema>;
 
-export const scopeGraphOrganizationSchema = z.object({
+const scopeGraphOrganizationSchemaDefinition = z.object({
   id: z.string(),
   slug: z.string(),
   name: z.string(),
@@ -44,10 +50,22 @@ export const scopeGraphOrganizationSchema = z.object({
   members: z.array(z.object({ role: z.string() })),
   teams: z.array(scopeGraphTeamSchema),
 });
+export interface ScopeGraphOrganizationSchema extends Named<
+  typeof scopeGraphOrganizationSchemaDefinition
+> {}
+export const scopeGraphOrganizationSchema: ScopeGraphOrganizationSchema =
+  scopeGraphOrganizationSchemaDefinition;
 export type ScopeGraphOrganization = z.infer<typeof scopeGraphOrganizationSchema>;
 
 /** The read takes no arguments. */
-export const organizationApiScopeGraphInputSchema = z.object({});
+const organizationApiScopeGraphInputSchemaDefinition = z.object({});
+export interface OrganizationApiScopeGraphInputSchema extends Named<
+  typeof organizationApiScopeGraphInputSchemaDefinition
+> {}
+export const organizationApiScopeGraphInputSchema: OrganizationApiScopeGraphInputSchema =
+  organizationApiScopeGraphInputSchemaDefinition;
 
 /** What the handler returns. */
-export const scopeGraphSchema = z.array(scopeGraphOrganizationSchema);
+const scopeGraphSchemaDefinition = z.array(scopeGraphOrganizationSchema);
+export interface ScopeGraphSchema extends Named<typeof scopeGraphSchemaDefinition> {}
+export const scopeGraphSchema: ScopeGraphSchema = scopeGraphSchemaDefinition;

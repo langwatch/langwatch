@@ -10,7 +10,7 @@ import type { RestIdentity } from "@langwatch/api/hosting";
  */
 import {
   bindRestCredential,
-  bindRestMiddleware,
+  bindMiddlewareContext,
   RestHost,
   scimCredentialOfRequest,
 } from "@langwatch/api/rest";
@@ -23,10 +23,11 @@ import {
 } from "@langwatch/enterprise-scim-contract";
 import { ENTERPRISE_FEATURE_ERRORS } from "@langwatch/entitlement-contract";
 import type { OrganizationSsoConnection } from "@langwatch/identity-contract";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { generateSpecs } from "hono-openapi";
 import { describe, expect, it, vi } from "vitest";
 
-import { scimProtocolRest, scimRestCredential } from "../scim-protocol.rest.ts";
+import { scimProtocolRest, scimRestCredential, scimTokenDoor } from "../scim-protocol.rest.ts";
 import { ScimServiceFake, scimTestApp } from "./support/scim-app.fixture.ts";
 
 type PublishedSchema = Readonly<{
@@ -124,11 +125,11 @@ function mount(
   };
 
   const host = RestHost.create({
+    authz: restTestAuthorization().forRequest(),
     identities: {
       project: closed,
       organization: closed,
       api_key: closed,
-      scim_token: closed,
       instance_admin: closed,
       browser: closed,
     },
@@ -137,10 +138,10 @@ function mount(
   });
 
   host.mount(scimProtocolRest.router(), () => app, {
-    facts: [
-      bindRestCredential("scim_token", () => app.directoryDoor),
-      bindRestMiddleware(scimRestCredential, (c) => ({
-        connectionId: scimCredentialOfRequest(c.req.raw).connectionId,
+    middlewareBindings: [
+      bindRestCredential("scim_token", () => scimTokenDoor.open(app)),
+      bindMiddlewareContext(scimRestCredential, (request) => ({
+        connectionId: scimCredentialOfRequest(request).connectionId,
       })),
     ],
   });

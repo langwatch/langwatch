@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 
 export const VariableTypeIcon = ({ type, size = 16 }: { type: string; size?: number }) => {
-  const iconProps = { size, strokeWidth: 2.5, color: "var(--chakra-colors-gray-500)" };
+  const iconProps = { size, strokeWidth: 2.5, color: "var(--chakra-colors-fg-muted)" };
   switch (type) {
     case "str":
     case "string":

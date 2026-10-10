@@ -8,6 +8,7 @@ import (
 )
 
 func mailPlanChildren(t *testing.T, sel domain.Selection) []Child {
+	sel.Refresh = domain.RefreshHMR // the split lanes these tests name
 	t.Helper()
 	repo := t.TempDir()
 	o := &Orchestrator{cfg: Config{Home: t.TempDir(), SimulatorArgv: []string{"/bin/haven", "simulator"}}, proxy: stubProxy{}}
@@ -71,7 +72,7 @@ func TestMailSMTPEnvReachesBothNodeLanes(t *testing.T) {
 	st := domain.Stack{Slug: "test", Services: []domain.Service{
 		{Name: domain.MailService, Port: 45580, SMTPPort: 45581, URL: "https://mail.test.langwatch.localhost"},
 	}}
-	children := o.planChildren(st, PlanOptions{Selection: domain.DefaultSelection(), RepoRoot: repo}, repo)
+	children := o.planChildren(st, PlanOptions{Selection: domain.Selection{Refresh: domain.RefreshHMR, Mail: true}, RepoRoot: repo}, repo)
 	for _, name := range []string{"ui", APILane} {
 		child, ok := findChild(children, name)
 		if !ok {

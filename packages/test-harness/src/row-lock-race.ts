@@ -1,3 +1,4 @@
+import { skipTenantCheck } from "@langwatch/prisma-client";
 /**
  * Runs two writes on one Postgres row so the second parks on the first's row
  * lock and re-checks its WHERE clause against the row the first committed: the
@@ -27,7 +28,10 @@ async function updateIsWaitingOnALock({
   table: string;
 }): Promise<boolean> {
   const rows = await prisma.$queryRaw<{ waiting: bigint }[]>`
-    -- @tenancy: reads the server's own activity view, which holds no tenant data.
+    ${skipTenantCheck({
+      // Reads the server's own activity view, which holds no tenant data.
+      SKIP_TENANT_CHECK: true,
+    })}
     SELECT count(*) AS waiting
       FROM pg_stat_activity
      WHERE wait_event_type = 'Lock'

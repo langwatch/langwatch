@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 /** Parameters exposed by the custom-model configuration UI. */
@@ -19,7 +20,7 @@ export type SupportedParameter = (typeof supportedParameterValues)[number];
 export const multimodalInputValues = ["image", "file", "audio"] as const;
 export type MultimodalInput = (typeof multimodalInputValues)[number];
 
-export const customModelEntrySchema = z
+const customModelEntrySchemaDefinition = z
   .object({
     modelId: z.string().min(1),
     displayName: z.string().min(1),
@@ -29,12 +30,19 @@ export const customModelEntrySchema = z
     multimodalInputs: z.array(z.enum(multimodalInputValues)).optional(),
   })
   .strict();
+export interface CustomModelEntrySchema extends Named<typeof customModelEntrySchemaDefinition> {}
+export const customModelEntrySchema: CustomModelEntrySchema = customModelEntrySchemaDefinition;
 export type CustomModelEntry = z.infer<typeof customModelEntrySchema>;
 
-export const customModelUpdateInputSchema = z.union([
+const customModelUpdateInputSchemaDefinition = z.union([
   z.array(customModelEntrySchema),
   z.array(z.string()),
 ]);
+export interface CustomModelUpdateInputSchema extends Named<
+  typeof customModelUpdateInputSchemaDefinition
+> {}
+export const customModelUpdateInputSchema: CustomModelUpdateInputSchema =
+  customModelUpdateInputSchemaDefinition;
 export type CustomModelsInput = z.infer<typeof customModelUpdateInputSchema>;
 
 export function isLegacyCustomModels(value: unknown): value is string[] {

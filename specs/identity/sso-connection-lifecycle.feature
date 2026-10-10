@@ -98,6 +98,13 @@ Feature: SsoConnection - enterprise SSO becomes an aggregate with a guarded life
     And the event carries a client id reference, never a client secret
 
   @unit
+  Scenario: A registration whose command was never staged frees its slot
+    Given a register_connection command for "acme" whose guard claimed the registration slot
+    When committing the command fails before it reaches the queue
+    Then the slot is released
+    And "acme" can register a new connection on the next attempt
+
+  @unit
   Scenario: A claimed domain waits for ops approval
     Given a DRAFT connection for "acme"
     When "ana" claims the domain "acme.com"
@@ -448,6 +455,13 @@ Feature: SsoConnection - enterprise SSO becomes an aggregate with a guarded life
     When an administrator grants somebody a way back in
     Then the grant records who holds it apart from who granted it
     And the organization satisfies activation's break-glass precondition
+
+  @unit
+  Scenario: Granting a holder who already has a live way back in renews it
+    Given somebody holds a live way back in
+    When an administrator grants that same person a way back in again
+    Then the earlier grant is superseded by the new one
+    And the person holds one live way back in
 
   @unit
   Scenario: A way back in is never open-ended

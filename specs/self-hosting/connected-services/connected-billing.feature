@@ -29,6 +29,12 @@ Feature: Billing a connected self-hosted customer
     And bank transfer is offered on its invoices
 
   @unit
+  Scenario: Onboarding a connected customer records connected_customer_onboarded
+    When an operator onboards "ACME" with a term of one year and a commit of 1000 USD
+    Then billing records a connected_customer_onboarded fact for "ACME" naming the operator
+    And billing calls no licensing operation to sync the contract budget
+
+  @unit
   Scenario: Onboarding subscribes the customer to metered usage invoiced quarterly
     When an operator onboards "ACME"
     Then "ACME" has a subscription whose only item is metered hosted usage
@@ -114,6 +120,13 @@ Feature: Billing a connected self-hosted customer
     When an operator renews "ACME" for a second term with a commit of 2000 USD
     Then "ACME" still has one usage subscription
     And its budget is reset and set to 2000 USD for the new term
+
+  @unit
+  Scenario: Renewal records connected_term_renewed and the budget resets
+    Given "ACME" was onboarded for a first term
+    When an operator renews "ACME" for a second term
+    Then billing records a connected_term_renewed fact for "ACME" naming the operator
+    And billing calls no licensing operation to reset or sync the contract budget
 
   @unit
   Scenario: The renewal credit waits for the last usage invoice of the old term
@@ -273,6 +286,13 @@ Feature: Billing a connected self-hosted customer
     And the change is stored as not onboarded, so a later onboarding never invoices it
     And the Billing section tells the operator finance invoices the added seats by hand
 
+  @unit
+  Scenario: Seat changes recorded before they named their organization are filled in the background
+    Given seat changes stored before the organization column existed, naming only their billing account
+    When the background step billing:fill-seat-change-organizations runs
+    Then each names the organization its account belongs to, a batch at a time with a checkpoint
+    And a second run fills nothing, and a dry run writes nothing
+
   # ============================================================================
   # Monthly statement
   # ============================================================================
@@ -282,6 +302,19 @@ Feature: Billing a connected self-hosted customer
     Given "ACME" used hosted services during the month
     When the monthly statement runs
     Then the billing contact of "ACME" receives the spend for the month by service, the commit drawn down so far, the credit remaining and the seats licensed and reported
+
+  @unit
+  Scenario: The commit drawdown reads the contract budget without calling the hosted route
+    Given connect has synced the contract budget of "ACME" and its window opened on its last renewal
+    When the commit drawn down is read
+    Then it is the contract budget's successful debits since that window opened, as the gateway enforces them
+    And billing calls no licensing or hosted operation to read it
+
+  @unit
+  Scenario: The commit drawdown is unavailable before a contract budget exists
+    Given connect has not synced a contract budget for "ACME"
+    When the commit drawn down is read
+    Then it is unavailable rather than zero
 
   @unit
   Scenario: A month with no usage sends no statement

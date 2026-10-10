@@ -27,7 +27,7 @@ function sentBody(request: SentRequest | undefined): unknown {
 const TRACE = { trace_id: "trace_1", spans: [] };
 
 describe("HttpTraceCollectorChannel", () => {
-  /** @scenario "The collector channel posts to this deployment's collector with the caller's key" */
+  /** @scenario "The collector channel posts to this deployment's collector with the minted key" */
   it("posts the trace to the deployment's own collector with the caller's key", async () => {
     const { fetch, sent } = recordingFetch(200);
     const channel = HttpTraceCollectorChannel.create({

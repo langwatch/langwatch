@@ -8,10 +8,13 @@ import { createLogger } from "@langwatch/observability";
 import {
   MigrationDrainProofRequiresMigratedError,
   MigrationStateNotFoundError,
+  type OpsUpgradeListTenantsInput,
+  type OpsUpgradeTenantPage,
 } from "@langwatch/ops-contract";
 import {
   type MigrationPassSummary,
   SystemMigrationRecordNotFoundError,
+  TENANT_MIGRATION_STATUSES,
 } from "@langwatch/system-migrations";
 import { nowInstant } from "@langwatch/time";
 
@@ -27,6 +30,9 @@ import { SystemMigrationRollbackService } from "./system-migration-rollback.serv
 import { SystemMigrationRunService } from "./system-migration-run.service.ts";
 
 const logger = createLogger("langwatch:ops:system-migrations");
+
+/** How many tenant rows one `listTenants` page holds when the caller names no limit. */
+const TENANT_PAGE_LIMIT = 50;
 
 export class SystemMigrationsService {
   static create(deps: SystemMigrationsServiceDependencies): SystemMigrationsService {
@@ -101,6 +107,26 @@ export class SystemMigrationsService {
     );
   }
 
+  /** One page of tenant rows; the cursor is the next row's offset (ops page, small tables). */
+  async listTenants({
+    step,
+    state,
+    cursor,
+    limit = TENANT_PAGE_LIMIT,
+  }: OpsUpgradeListTenantsInput): Promise<OpsUpgradeTenantPage> {
+    const offset = Number.parseInt(cursor ?? "0", 10) || 0;
+    const rows = await this.deps.state.findRecordsByStatus({
+      migrationName: step,
+      statuses: state ? [state] : [...TENANT_MIGRATION_STATUSES],
+      limit: limit + 1,
+      offset,
+    });
+    return {
+      items: rows.slice(0, limit),
+      cursor: rows.length > limit ? String(offset + limit) : null,
+    };
+  }
+
   /** The enrollment listing for the ops page, audited because it carries enrollers' names. */
   async getEnrollments({ requestedBy }: { requestedBy: string }): Promise<{
     isSaaS: boolean;
@@ -161,16 +187,23 @@ export class SystemMigrationsService {
     await this.deps.requestPass({ actorUserId });
   }
 
+  /** Set once this process has completed a pass; until then every re-drive runs ungated. */
+  private passCompletedInProcess = false;
+
   /**
-   * One pass on the worker. An operator's kick always runs; the hourly re-drive first asks the
-   * stored state whether any tenant could still move, so a latched fleet is not swept.
+   * One pass on the worker. An operator's kick and a process's first re-drive always run, so a
+   * pass that died part-way is finished (Alex, 2026-10-09); later re-drives first ask the stored
+   * state whether any tenant could still move or be discovered, so a latched fleet is not swept.
    */
   async executePass({ redrive }: { redrive: boolean }): Promise<void> {
-    if (redrive && !(await this.deps.hasTenantAwaitingRedrive())) {
-      logger.debug("no parked or held tenant; skipping the system migration re-drive");
+    if (redrive && this.passCompletedInProcess && !(await this.deps.hasTenantAwaitingRedrive())) {
+      logger.debug(
+        "no parked, held or undiscovered tenant; skipping the system migration re-drive",
+      );
       return;
     }
     const summary = await this.deps.runPass({});
+    this.passCompletedInProcess = true;
     logger.info({ summary, redrive }, "system migration pass complete");
   }
 

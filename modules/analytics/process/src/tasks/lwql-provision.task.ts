@@ -19,7 +19,9 @@ import {
   type LwqlSelfProvisionRequest,
 } from "../features/provisioning/services/langwatch-ql-self-provisioning.service.ts";
 import { ClickHouseLangWatchQLProvisioningRepository } from "../repositories/clickhouse/clickhouse.langwatch-ql-provisioning.repository.ts";
+import type { LwqlProvisioningDatabase } from "../repositories/langwatch-ql-postgres.repository.ts";
 import type { LangWatchQLProvisioningRepository } from "../repositories/langwatch-ql-provisioning.repository.ts";
+import { PrismaLangWatchQLPostgresRepository } from "../repositories/prisma/prisma.langwatch-ql-postgres.repository.ts";
 import { clickHouseErrorSummary } from "../rules/langwatch-ql-config-store.rules.ts";
 import type { LangWatchQLNames } from "../services/langwatch-ql-access-model.service.ts";
 import { LangWatchQLSqlModeClusterGuardService } from "../services/langwatch-ql-sql-mode-cluster-guard.service.ts";
@@ -36,19 +38,8 @@ const LWQL_SELF_PROVISION_TXN_MAX_WAIT_MS = 30_000;
 
 const logger = createLogger("langwatch:task:lwql-provision");
 
-/**
- * Exactly the Postgres operations this task performs.
- */
-export type LwqlProvisioningDatabase = {
-  $executeRawUnsafe: (statement: string) => Promise<number>;
-  $transaction: <T>(
-    fn: (tx: { $executeRawUnsafe: (statement: string) => Promise<number> }) => Promise<T>,
-    options: { timeout: number; maxWait: number },
-  ) => Promise<T>;
-};
-
 /** The one project read the key-map backfill makes (PO-1). */
-export type LwqlProjectKeys = Pick<ProjectApi, "listLwqlKeys">;
+type LwqlProjectKeys = Pick<ProjectApi, "listLwqlKeys">;
 
 /** Every project's LangWatchQL key, read from the project module a page at a time. */
 async function allLwqlKeys({ projects }: { projects: LwqlProjectKeys }) {
@@ -84,9 +75,7 @@ async function runPostgresStatements({
   database: LwqlProvisioningDatabase;
   statements: string[];
 }): Promise<void> {
-  for (const statement of statements) {
-    await database.$executeRawUnsafe(lwqlProvisioning.withTenancyOptOut(statement));
-  }
+  await PrismaLangWatchQLPostgresRepository.create(database).runStatements(statements);
 }
 
 /** Tenants read per round of the backfill: each read is one tenant-scoped query. */
@@ -222,18 +211,12 @@ async function withSelfProvisionLock<T>({
   fn: () => Promise<T>;
 }): Promise<T> {
   assertPoolFitsSelfProvisionLock(connectionLimit);
-  return database.$transaction(
-    async (tx) => {
-      await tx.$executeRawUnsafe(
-        `-- @tenancy: global self-provision boot lock, no tenant scope\nSELECT pg_advisory_xact_lock(hashtextextended('${LWQL_SELF_PROVISION_LOCK_KEY}', 0))`,
-      );
-      await tx.$executeRawUnsafe(
-        "-- @tenancy: global self-provision boot lock session setting, no tenant scope\nSET LOCAL idle_in_transaction_session_timeout = 0",
-      );
-      return fn();
-    },
-    { timeout: LWQL_SELF_PROVISION_TXN_TIMEOUT_MS, maxWait: LWQL_SELF_PROVISION_TXN_MAX_WAIT_MS },
-  );
+  return PrismaLangWatchQLPostgresRepository.create(database).withAdvisoryLock({
+    key: LWQL_SELF_PROVISION_LOCK_KEY,
+    timeoutMs: LWQL_SELF_PROVISION_TXN_TIMEOUT_MS,
+    maxWaitMs: LWQL_SELF_PROVISION_TXN_MAX_WAIT_MS,
+    fn,
+  });
 }
 
 /** Inventory, app-function probe, SQL-mode guard, then the statements; the key map is a step's. */
@@ -291,13 +274,16 @@ export interface LwqlConvergencePlan {
 /**
  * Every configured boot converges the whole model, and never throws: a server refusing
  * the DDL degrades to a loud log and a fail-closed endpoint, not a crashloop (ADR-159).
+ * `failOnError` rethrows instead, so the upgrade run fails naming it (Alex, 2026-10-09).
  */
 export async function convergeLwqlAccessModel({
   database,
   plan,
+  failOnError = false,
 }: {
   database: LwqlProvisioningDatabase;
   plan: LwqlConvergencePlan;
+  failOnError?: boolean;
 }): Promise<void> {
   const { request, names, schema } = plan;
   try {
@@ -344,6 +330,7 @@ export async function convergeLwqlAccessModel({
       { error: clickHouseErrorSummary(error) },
       "lwql self-provisioning failed — continuing boot; LangWatchQL queries stay refused (fail-closed) until a later deploy converges",
     );
+    if (failOnError) throw error;
   }
 }
 
@@ -360,8 +347,10 @@ function connectionLimitFields(databaseUrl: string | undefined): { connectionLim
 async function runLwqlProvisioningTask({
   database,
   source,
+  failOnError,
 }: {
   database: LwqlProvisioningDatabase;
+  failOnError: boolean;
   /** The environment the launching process was configured with. */
   source: Record<string, string | undefined>;
 }): Promise<void> {
@@ -380,6 +369,7 @@ async function runLwqlProvisioningTask({
 
   await convergeLwqlAccessModel({
     database,
+    failOnError,
     plan: {
       request: selfProvision,
       names: lwqlProvisioning.names({ connection: selfProvision.connection }),
@@ -411,6 +401,7 @@ export class LwqlProvisionTask extends Task {
       database: () => LwqlProvisioningDatabase;
       source: Record<string, string | undefined>;
       skipped: boolean;
+      failOnError: boolean;
     },
   ) {
     super();
@@ -425,13 +416,16 @@ export class LwqlProvisionTask extends Task {
     database,
     source,
     skipped = false,
+    failOnError = false,
   }: {
     database: () => LwqlProvisioningDatabase;
     /** The environment the launching process was configured with. */
     source: Record<string, string | undefined>;
     skipped?: boolean;
+    /** The upgrade's reconciler fails its run on a refusal; boot keeps the default. */
+    failOnError?: boolean;
   }): LwqlProvisionTask {
-    return new LwqlProvisionTask({ database, source, skipped });
+    return new LwqlProvisionTask({ database, source, skipped, failOnError });
   }
 
   async run(_input: { args: readonly string[]; signal: AbortSignal }): Promise<void> {
@@ -442,6 +436,7 @@ export class LwqlProvisionTask extends Task {
     await runLwqlProvisioningTask({
       database: this.inputs.database(),
       source: this.inputs.source,
+      failOnError: this.inputs.failOnError,
     });
   }
 }

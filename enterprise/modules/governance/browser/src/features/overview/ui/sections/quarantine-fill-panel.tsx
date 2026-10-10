@@ -15,7 +15,7 @@ export function QuarantineFillAlert({ organizationId }: { organizationId: string
     <EnterpriseQuarantineFillAlert
       stats={data}
       reviewLink={
-        <Link href="/governance/inventory?tab=sources" fontSize="sm" color="orange.600">
+        <Link href="/governance/inventory?tab=sources" fontSize="sm" color="orange.fg">
           Review ingestion sources →
         </Link>
       }

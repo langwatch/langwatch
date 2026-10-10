@@ -22,13 +22,13 @@ export const OnboardingMeshBackground: React.FC<{
         contain: "layout paint",
         background: takeover
           ? [
-              "radial-gradient(ellipse 70% 55% at 30% 20%, rgba(255,232,204,0.9) 0%, transparent 70%)",
-              "radial-gradient(ellipse 60% 50% at 80% 80%, rgba(253,214,166,0.75) 0%, transparent 65%)",
-              "radial-gradient(ellipse 50% 40% at 70% 10%, rgba(237,137,38,0.10) 0%, transparent 60%)",
+              "radial-gradient(ellipse 70% 55% at 30% 20%, color-mix(in srgb, var(--chakra-colors-orange-subtle) 90%, transparent) 0%, transparent 70%)",
+              "radial-gradient(ellipse 60% 50% at 80% 80%, color-mix(in srgb, var(--chakra-colors-orange-muted) 75%, transparent) 0%, transparent 65%)",
+              "radial-gradient(ellipse 50% 40% at 70% 10%, color-mix(in srgb, var(--chakra-colors-accent-solid) 10%, transparent) 0%, transparent 60%)",
             ].join(", ")
           : [
-              "radial-gradient(ellipse 80% 50% at 50% -10%, rgba(237,137,38,0.06) 0%, transparent 70%)",
-              "radial-gradient(ellipse 60% 40% at 70% 100%, rgba(237,137,38,0.02) 0%, transparent 60%)",
+              "radial-gradient(ellipse 80% 50% at 50% -10%, color-mix(in srgb, var(--chakra-colors-accent-solid) 6%, transparent) 0%, transparent 70%)",
+              "radial-gradient(ellipse 60% 40% at 70% 100%, color-mix(in srgb, var(--chakra-colors-accent-solid) 2%, transparent) 0%, transparent 60%)",
             ].join(", "),
       }}
     />

@@ -34,9 +34,9 @@ vi.mock("../behavior/authz-api.ts", () => ({ authzApi: api }));
 
 // Isolation is off: reload so the screen binds this file's mock, not a sibling suite's.
 vi.resetModules();
-const { UiCapabilityContextProvider, UiSession } =
+const { UiHostServicesContextProvider, UiSession } =
   await import("@langwatch/browser-host/capabilities");
-const { createUiCapabilitiesFromHost } = await import("@langwatch/browser-host/testing");
+const { createUiHostServicesFromHost } = await import("@langwatch/browser-host/testing");
 const { renderWithDesignSystem } = await import("@langwatch/design-system/testing");
 const { installedModuleScreens } = await import("@langwatch/browser/module-screens");
 const { authzWeb } = await import("../authz.web.ts");
@@ -61,10 +61,6 @@ class Reader extends UiSession {
   isSettled(): boolean {
     return true;
   }
-
-  featureFlag(): boolean | undefined {
-    return true;
-  }
 }
 
 /** Opens the roles page the way the router does: the installed module's loader, then render. */
@@ -74,8 +70,8 @@ async function openRolesPage(grants: readonly string[]) {
   const { default: Page } = await load();
 
   return renderWithDesignSystem(
-    <UiCapabilityContextProvider
-      value={createUiCapabilitiesFromHost(
+    <UiHostServicesContextProvider
+      value={createUiHostServicesFromHost(
         { route: () => ({ params: {}, query: {} }), navigate: () => {} },
         new Reader(grants),
       )}
@@ -83,7 +79,7 @@ async function openRolesPage(grants: readonly string[]) {
       <AuthzHostProvider value={new FakeAuthzHost()}>
         <Page />
       </AuthzHostProvider>
-    </UiCapabilityContextProvider>,
+    </UiHostServicesContextProvider>,
   );
 }
 
@@ -94,7 +90,7 @@ describe("the Roles & access page", () => {
       await openRolesPage(["organization:manage", "organization:view"]);
 
       expect(await screen.findByText("Admin")).toBeInTheDocument();
-      expect(screen.queryByText("Access Restricted")).not.toBeInTheDocument();
+      expect(screen.queryByText(/You need access to/)).not.toBeInTheDocument();
       expect(authzWeb.installation.screens[ROLES_PAGE]).toMatchObject({
         path: "/settings/roles",
         within: "settings",
@@ -107,8 +103,8 @@ describe("the Roles & access page", () => {
     it("is refused, naming the grant the page needs, and the page stays in the settings chrome", async () => {
       await openRolesPage(["organization:view"]);
 
-      expect(await screen.findByText("Access Restricted")).toBeInTheDocument();
-      expect(screen.getByText("Missing permission: organization:manage")).toBeInTheDocument();
+      expect(await screen.findByText(/You need access to/)).toBeInTheDocument();
+      expect(screen.getByText("organization:manage")).toBeInTheDocument();
       expect(screen.queryByText("Admin")).not.toBeInTheDocument();
       expect(authzWeb.installation.screens[ROLES_PAGE]).toMatchObject({
         requires: "organization:manage",

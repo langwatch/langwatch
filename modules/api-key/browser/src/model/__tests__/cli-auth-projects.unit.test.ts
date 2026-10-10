@@ -311,4 +311,43 @@ describe("resolveCliAuthProjects", () => {
       });
     });
   });
+
+  describe("given a team holding an aggregate project beside an ordinary one", () => {
+    const teams = [
+      {
+        id: "t-acme",
+        name: "ACME",
+        projects: [
+          {
+            id: "p-shared",
+            name: "ACME Prod",
+            slug: "acme-prod",
+            isPersonal: false,
+            kind: "application",
+          },
+          {
+            id: "p-agg",
+            name: "Company view",
+            slug: "company-view",
+            isPersonal: false,
+            kind: "aggregate",
+          },
+        ],
+      },
+    ];
+
+    describe("when the CLI-auth project list is resolved", () => {
+      /** @scenario "The aggregate project is absent from every send-traces-here picker" */
+      it("leaves the aggregate out and defaults to the ordinary project", () => {
+        const { projects, defaultProjectId } = resolveCliAuthProjects({
+          teams,
+          currentUserId: JANE,
+          lastProjectSlug: "company-view",
+        });
+
+        expect(projects.map((p) => p.id)).toEqual(["p-shared"]);
+        expect(defaultProjectId).toBe("p-shared");
+      });
+    });
+  });
 });

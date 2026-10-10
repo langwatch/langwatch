@@ -3,7 +3,11 @@ import { join } from "node:path";
 
 import type { ArchitectureViolation, ClassifiedPackage, PackageManifest } from "../../types.ts";
 import { listFiles } from "../../workspace/layout.ts";
-import { featurePackageName, type WorkspaceSnapshot } from "../../workspace/snapshot.ts";
+import {
+  composesApplication,
+  featurePackageName,
+  type WorkspaceSnapshot,
+} from "../../workspace/snapshot.ts";
 
 function exportKeys(exportsValue: unknown): string[] {
   if (!exportsValue || typeof exportsValue !== "object" || Array.isArray(exportsValue)) {
@@ -13,7 +17,7 @@ function exportKeys(exportsValue: unknown): string[] {
   return Object.keys(exportsValue as Record<string, unknown>);
 }
 
-type WorkspaceCatalogs = {
+export type WorkspaceCatalogs = {
   readonly catalog: Readonly<Record<string, string>>;
   readonly catalogs: Readonly<Record<string, Readonly<Record<string, string>>>>;
 };
@@ -92,7 +96,7 @@ function parseWorkspaceCatalogs(text: string): WorkspaceCatalogs {
 
 const workspaceCatalogsByRoot = new Map<string, WorkspaceCatalogs>();
 
-function readWorkspaceCatalogs(root: string): WorkspaceCatalogs {
+export function readWorkspaceCatalogs(root: string): WorkspaceCatalogs {
   const cached = workspaceCatalogsByRoot.get(root);
   if (cached) return cached;
 
@@ -343,6 +347,8 @@ const applicationBoundaryCheck: DependencyCheck = (pkg, target, dependency) => {
   if (pkg.kind !== "application" || target.kind !== "application" || target === pkg) {
     return undefined;
   }
+
+  if (composesApplication({ importer: pkg, target })) return undefined;
 
   return {
     policy: "application-boundary",

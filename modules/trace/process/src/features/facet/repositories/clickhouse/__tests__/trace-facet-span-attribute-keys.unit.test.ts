@@ -1,3 +1,4 @@
+import { tenantScope } from "@langwatch/clickhouse-client";
 import { describe, expect, it } from "vitest";
 
 import { KEY_DISCOVERY_SETTINGS } from "../clickhouse.trace-facet-query.repository.ts";
@@ -5,7 +6,6 @@ import { FACET_REGISTRY } from "../clickhouse.trace-facet-registry.mapper.ts";
 import { SPAN_ATTRIBUTE_KEYS_FACET } from "../clickhouse.trace-facet-span-attribute-keys.repository.ts";
 
 const baseCtx = {
-  tenantId: "tenant-A",
   timeRange: { from: 1_700_000_000_000, to: 1_700_000_086_400_000 },
   limit: 50,
   offset: 0,
@@ -30,11 +30,12 @@ describe("traceFacetSpanAttributeKeysRepository.buildSpanAttributeKeysFacetQuery
   describe("when no prefix is supplied", () => {
     const query = SPAN_ATTRIBUTE_KEYS_FACET.queryBuilder(baseCtx);
 
-    it("filters by tenant first (multitenancy invariant)", () => {
-      // CLAUDE.md: every CH query MUST include `WHERE TenantId = ...` and
-      // it should be the first predicate. Bug here = cross-tenant leakage.
-      expect(query.sql).toMatch(/TenantId\s*=\s*\{tenantId:String\}/);
-      const idxTenant = query.sql.indexOf("TenantId");
+    it("carries the tenant marker first (multitenancy invariant)", () => {
+      // Every facet query carries the marker the authorized reader expands
+      // into the proof's fence, and it is the first predicate (ADR-144 block
+      // C). Bug here = cross-tenant leakage.
+      expect(query.sql).toContain(tenantScope("StartTime"));
+      const idxTenant = query.sql.indexOf(tenantScope("StartTime"));
       const idxStartTime = query.sql.indexOf("StartTime");
       expect(idxTenant).toBeGreaterThan(-1);
       expect(idxTenant).toBeLessThan(idxStartTime);
@@ -92,9 +93,8 @@ describe("traceFacetSpanAttributeKeysRepository.buildSpanAttributeKeysFacetQuery
       expect(query.params).not.toHaveProperty("prefix");
     });
 
-    it("binds tenantId, time range, limit, and offset", () => {
+    it("binds time range, limit, and offset, and leaves the tenant to the reader", () => {
       expect(query.params).toEqual({
-        tenantId: "tenant-A",
         timeFrom: 1_700_000_000_000,
         timeTo: 1_700_000_086_400_000,
         limit: 50,

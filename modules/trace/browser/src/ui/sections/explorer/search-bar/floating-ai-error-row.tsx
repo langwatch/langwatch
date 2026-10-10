@@ -35,7 +35,7 @@ export const FloatingAiErrorRow: React.FC<{ error: AiActionError }> = ({ error }
       borderRadius="md"
       paddingX={2}
       paddingY={1}
-      boxShadow="0 2px 6px rgba(0,0,0,0.1)"
+      boxShadow="0 2px 6px color-mix(in srgb, var(--chakra-colors-bg-scrim) 10%, transparent)"
       maxWidth="full"
       // The parent floating strip is click-transparent (it spans the whole
       // search-bar width); only this pill takes pointer events.

@@ -61,9 +61,6 @@ export type ResolvedTokens<Tokens extends TokenMap> = {
     : never;
 };
 
-/** An empty declaration, so a feature that needs nothing states nothing. */
-export const NO_TOKENS: Readonly<Record<never, never>> = Object.freeze({});
-
 /** The name a boot error prints for a token. */
 export function tokenName(token: TokenIdentity): string {
   return token.name.length > 0 ? token.name : "<anonymous token>";

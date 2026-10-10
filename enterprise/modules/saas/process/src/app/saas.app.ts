@@ -8,20 +8,16 @@ import {
   type SaasApi as SaasApiContract,
   type UsageReportReceipt,
 } from "@langwatch/enterprise-saas-contract";
+import type { EventingCommands } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import type { FeatureSetup } from "@langwatch/process";
 
-import type { SaasChannels } from "../channels/saas.channels.ts";
+import type { SaasUsageReportPipeline } from "../eventing/saas-usage-report.pipeline.ts";
 import type { SaasRepositories } from "../repositories/saas.repositories.ts";
 import { LangWatchCloudService } from "../services/langwatch-cloud.service.ts";
 import { UsageReportReceiverService } from "../services/usage-report-receiver.service.ts";
 
-type SaasSetup = FeatureSetup<
-  typeof SaasModule.dependencies,
-  SaasServerConfig,
-  SaasRepositories,
-  SaasChannels
->;
+type SaasSetup = FeatureSetup<typeof SaasModule.dependencies, SaasServerConfig, SaasRepositories>;
 
 export class SaasModule implements SaasApiContract {
   static readonly contract = SaasApi;
@@ -38,27 +34,23 @@ export class SaasModule implements SaasApiContract {
     this.#usageReports = usageReports;
   }
 
-  static create({
-    config,
-    dependencies,
-    repositories,
-    channels,
-    resources,
-  }: SaasSetup): SaasModule {
+  static create({ config, dependencies, repositories }: SaasSetup): SaasModule {
     const logger = createLogger("langwatch:saas");
-    const { analytics } = channels;
-    resources.own("LangWatch Cloud product-analytics client", () => analytics.close());
 
     return new SaasModule(
       UsageReportReceiverService.create({
         cloud: LangWatchCloudService.create({ isSaas: config.isSaas }),
         rateLimits: repositories.rateLimits,
         registry: dependencies.licensing,
-        analytics,
         logger,
         release: config,
       }),
     );
+  }
+
+  /** Binds the saas_usage_report pipeline's own senders. */
+  connectCommands(commands: EventingCommands<SaasUsageReportPipeline>): void {
+    this.#usageReports.connect(commands);
   }
 
   receiveUsageReport(input: IncomingUsageReportRequest): Promise<UsageReportReceipt> {

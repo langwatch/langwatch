@@ -1,5 +1,5 @@
 import { PageLayout } from "@langwatch/design-system/page-layout";
-import { Box, Center, Flex, HStack, Text, VStack } from "@langwatch/design-system/primitives";
+import { Box, Flex, HStack, Skeleton } from "@langwatch/design-system/primitives";
 import { RotateCcw } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -9,33 +9,6 @@ import { GenerateConversationDialog } from "../../../features/foundry/ui/section
 import { GenerateTraceDialog } from "../../../features/foundry/ui/sections/generate-trace-dialog.tsx";
 import { PlaygroundContent } from "../../../features/foundry/ui/sections/playground-content.tsx";
 import { PresetPicker } from "../../../features/foundry/ui/sections/preset-picker.tsx";
-
-const SPLASH_LINES = [
-  "Warming up the flux capacitor...",
-  "Calibrating span generators...",
-  "Untangling distributed traces...",
-  "Teaching spans about their parents...",
-  "Inflating token counts for drama...",
-  "Reticulating splines (the OTel ones)...",
-  "Asking the LLM to be patient...",
-];
-
-function Splash() {
-  const [line] = useState(() => SPLASH_LINES[Math.floor(Math.random() * SPLASH_LINES.length)]!);
-
-  return (
-    <Center h="full">
-      <VStack gap={3}>
-        <Text fontSize="lg" fontWeight="semibold" color="fg.default">
-          The Foundry
-        </Text>
-        <Text fontSize="sm" color="fg.muted" fontStyle="italic">
-          {line}
-        </Text>
-      </VStack>
-    </Center>
-  );
-}
 
 export default function OpsFoundryScreen() {
   const resetTrace = useTraceStore((s) => s.resetTrace);
@@ -47,10 +20,10 @@ export default function OpsFoundryScreen() {
 
   return (
     <FoundryTransport includeProjects>
-      <PageLayout.Header>
-        <Flex align="center" justify="space-between" w="full">
-          <PageLayout.Heading>The Foundry</PageLayout.Heading>
-          <HStack gap={2}>
+      <PageLayout.Header height="auto" minHeight="56px" paddingY={2}>
+        <Flex align="center" justify="space-between" gap={3} wrap="wrap" w="full">
+          <PageLayout.Heading>Foundry</PageLayout.Heading>
+          <HStack gap={2} wrap="wrap">
             <GenerateConversationDialog />
             <GenerateTraceDialog />
             <PresetPicker />
@@ -62,12 +35,22 @@ export default function OpsFoundryScreen() {
         </Flex>
       </PageLayout.Header>
       <Box
-        height="calc(100vh - 56px - 48px)"
+        height="calc(100dvh - 144px)"
+        minHeight="520px"
+        padding={4}
         w="full"
         overflow="hidden"
         borderTopLeftRadius="inherit"
       >
-        {mounted ? <PlaygroundContent /> : <Splash />}
+        <Box
+          height="full"
+          borderWidth="1px"
+          borderColor="border.muted"
+          borderRadius="lg"
+          overflow="hidden"
+        >
+          {mounted ? <PlaygroundContent /> : <Skeleton height="full" />}
+        </Box>
       </Box>
     </FoundryTransport>
   );

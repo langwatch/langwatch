@@ -3,7 +3,8 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { LangyMark, LangyMarkGradientDefs } from "./langy-mark.tsx";
 
 const meta = {
-  title: "Foundations/Langy mark",
+  title: "Brand/Langy mark",
+  parameters: { usage: { use: "Langy's mark, the logo in the brand gradient." } },
   component: LangyMark,
   tags: ["autodocs"],
   decorators: [

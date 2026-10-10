@@ -436,6 +436,62 @@ export class DatabaseBusyError extends HandledError {
   }
 }
 
+/**
+ * Prisma's codes for a table (P2021) or column (P2022) the schema doesn't have, and Postgres's
+ * SQLSTATEs for the same (42P01, 42703) when `pg` raises them raw.
+ */
+const SCHEMA_BEHIND_CODES: readonly unknown[] = ["P2021", "P2022", "42P01", "42703"];
+
+/** Whether the query named a table or column the schema does not have yet. */
+export function isSchemaBehind(error: unknown): boolean {
+  return error instanceof Error && "code" in error && SCHEMA_BEHIND_CODES.includes(error.code);
+}
+
+/** The code is ahead of the Postgres schema while the worker upgrades it (NO-HOLDS); retry soon. */
+export class UpgradeInProgressError extends HandledError {
+  declare readonly code: "upgrade_in_progress";
+
+  constructor() {
+    super("upgrade_in_progress", "LangWatch is upgrading. Retry shortly.", {
+      httpStatus: 503,
+      fault: "platform",
+      retryable: true,
+      meta: { retryAfterMs: 10_000 },
+    });
+
+    this.name = "UpgradeInProgressError";
+  }
+}
+
+/** A handled refusal's `meta.retryAfterMs` as `Retry-After` seconds; none without a wait. */
+export function retryAfterOf(error: unknown): string | undefined {
+  const waitMs = HandledError.isHandled(error) ? error.meta.retryAfterMs : undefined;
+  if (typeof waitMs !== "number" || !Number.isFinite(waitMs) || waitMs < 0) return undefined;
+
+  return String(Math.ceil(waitMs / 1000));
+}
+
+/** Whether this process's upgrade gate admitted it: the ledger is current for its image. */
+let ledgerCurrent = false;
+
+/** Process-global, so only the upgrade gate of the process that owns it calls it (STUCK-STATES). */
+export function setLedgerCurrent({ current }: { current: boolean }): void {
+  ledgerCurrent = current;
+}
+
+/**
+ * The one mapping of a store failure every boundary answers: busy pool, schema behind. Schema
+ * behind is `upgrade_in_progress` only before the gate admits; after, the ledger and the schema
+ * disagree, an unhandled 500 whose log names the table or column (STUCK-STATES).
+ */
+export function promoteStoreFailure<T>(raised: T): T | Error {
+  if (isDatabaseBusy(raised)) return new DatabaseBusyError();
+  if (!isSchemaBehind(raised)) return raised;
+  if (!ledgerCurrent) return new UpgradeInProgressError();
+  const detail = raised instanceof Error ? raised.message : String(raised);
+  return new Error(`schema and ledger disagree: ${detail}`, { cause: raised });
+}
+
 // ---------------------------------------------------------------------------
 // Hono onError handler
 // ---------------------------------------------------------------------------
@@ -450,7 +506,7 @@ export function createErrorHandler(): (err: Error, c: Context) => Response | Pro
     // Promote first so the response and the log agree on one error. Reporting
     // the raw ZodError would log it as unhandled, at `error`, against the 500
     // it no longer is.
-    const promoted = isDatabaseBusy(err) ? new DatabaseBusyError() : err;
+    const promoted = promoteStoreFailure(err);
     const effective = isZodLikeError(promoted) ? validationErrorFromZod(promoted) : promoted;
     const { status, body } = formatError({ err: effective });
 

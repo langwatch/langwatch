@@ -4,6 +4,7 @@ import type {
   NurturingSignal,
   NurturingSignalOf,
 } from "@langwatch/enterprise-nurturing-contract";
+import type { UsageReportReceivedEventData } from "@langwatch/enterprise-saas-contract";
 import type { GuidedOnboardingTurnFailedEventData } from "@langwatch/langy-contract";
 import { createLogger } from "@langwatch/observability";
 import { Temporal } from "@langwatch/time";
@@ -23,6 +24,7 @@ import {
   fireGuidedOnboardingPostHog,
   fireGuidedOnboardingProgress,
   fireGuidedTurnFailedPostHog,
+  postHogUuidFor,
 } from "../rules/nurturing-guided-onboarding-service.rules.ts";
 import {
   fireInviteAccepted,
@@ -114,6 +116,30 @@ export class NurturingDeliveryService {
     if (!(await this.deps.claims.claim(key, DELIVERED_WINDOW_SECONDS))) return;
     try {
       posthog.track(fireGuidedTurnFailedPostHog(data));
+    } catch (error) {
+      reportFailure(error);
+    }
+  }
+
+  /** A self-hosted install's usage report saas received: PostHog only, against the install id. */
+  async deliverUsageReport({
+    data,
+    eventId,
+  }: {
+    data: UsageReportReceivedEventData;
+    eventId: string;
+  }): Promise<void> {
+    const posthog = this.deps.posthog;
+    if (!posthog) return;
+    const key = `nurturing:usage_report_received:${eventId}`;
+    if (!(await this.deps.claims.claim(key, DELIVERED_WINDOW_SECONDS))) return;
+    try {
+      posthog.track({
+        userId: data.instanceId,
+        event: data.event,
+        properties: { ...data.properties, unknown_fields: data.unknownFields },
+        uuid: postHogUuidFor(`nurturing-usage-report:${eventId}`),
+      });
     } catch (error) {
       reportFailure(error);
     }

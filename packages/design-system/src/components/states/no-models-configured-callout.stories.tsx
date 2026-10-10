@@ -3,7 +3,8 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { NoModelsConfiguredCallout } from "./no-models-configured-callout.tsx";
 
 const meta = {
-  title: "Components/No models configured callout",
+  title: "Feedback/No models configured callout",
+  parameters: { usage: { use: "Wherever a model is needed and no provider is configured yet." } },
   component: NoModelsConfiguredCallout,
   tags: ["autodocs"],
 } satisfies Meta<typeof NoModelsConfiguredCallout>;

@@ -3,7 +3,6 @@ package apidiff
 import (
 	"cmp"
 	"context"
-	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -191,8 +190,8 @@ func havenClickHouseServer(ctx context.Context, dir string) string {
 	if err != nil {
 		return ""
 	}
-	overlay := map[string]string{}
-	if json.Unmarshal(out, &overlay) != nil {
+	overlay, err := havenrun.ParseEnv(out)
+	if err != nil {
 		return ""
 	}
 	return clickHouseServerOf(overlay["CLICKHOUSE_URL"])

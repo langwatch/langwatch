@@ -1,7 +1,7 @@
 import type { GrantScopeTier } from "@langwatch/authz-contract";
 import { PersonalWorkspaceNotManagedHereError } from "@langwatch/organization-contract";
 
-export interface PersonalTeamGrantScope {
+interface PersonalTeamGrantScope {
   scopeType: GrantScopeTier;
   scopeId: string;
 }

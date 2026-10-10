@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import { SchemaVersion, datasetColumnTypeSchema } from "./prompt.enums.ts";
@@ -31,7 +32,7 @@ export type LlmConfigInputType = (typeof LlmConfigInputTypes)[number];
 /** One declared output parameter type. */
 export type LlmConfigOutputType = (typeof LlmConfigOutputTypes)[number];
 
-export const nodeDatasetSchema = z.object({
+const nodeDatasetSchemaDefinition = z.object({
   id: z.string().optional(),
   name: z.string().optional(),
   inline: z
@@ -47,6 +48,8 @@ export const nodeDatasetSchema = z.object({
     })
     .optional(),
 });
+export interface NodeDatasetSchema extends Named<typeof nodeDatasetSchemaDefinition> {}
+export const nodeDatasetSchema: NodeDatasetSchema = nodeDatasetSchemaDefinition;
 
 /**
  * Schema for prompt configuration handles
@@ -64,26 +67,30 @@ export const handleSchema = z
  * Schema for LLM message objects
  * Defines the structure for conversation messages with role and content
  */
-export const messageSchema = z.object({
+const messageSchemaDefinition = z.object({
   role: z.enum(["user", "assistant", "system"]),
   content: nulFreeStringSchema,
 });
+export interface MessageSchema extends Named<typeof messageSchemaDefinition> {}
+export const messageSchema: MessageSchema = messageSchemaDefinition;
 
 /**
  * Schema for prompt configuration input parameters
  * Defines input fields that can be used in prompt templates
  */
-export const inputsSchema = z.object({
+const inputsSchemaDefinition = z.object({
   identifier: nulFreeStringSchema.min(1, "Identifier cannot be empty"),
   type: z.enum(LlmConfigInputTypes),
 });
+export interface InputsSchema extends Named<typeof inputsSchemaDefinition> {}
+export const inputsSchema: InputsSchema = inputsSchemaDefinition;
 
 /**
  * Schema for prompt configuration output parameters
  * Defines expected output structure and validation rules
  * Includes optional JSON schema for structured outputs
  */
-export const outputsSchema = z.object({
+const outputsSchemaDefinition = z.object({
   identifier: nulFreeStringSchema.min(1, "Identifier cannot be empty"),
   type: z.enum(LlmConfigOutputTypes),
   json_schema: z
@@ -93,16 +100,23 @@ export const outputsSchema = z.object({
     .passthrough()
     .optional(),
 });
+export interface OutputsSchema extends Named<typeof outputsSchemaDefinition> {}
+export const outputsSchema: OutputsSchema = outputsSchemaDefinition;
 
 /**
  * Schema for prompting technique configuration
  * Supports different prompting strategies like few-shot learning
  * Can include demonstration datasets for technique implementation
  */
-export const promptingTechniqueSchema = z.object({
+const promptingTechniqueSchemaDefinition = z.object({
   type: z.enum(["few_shot", "in_context", "chain_of_thought"]),
   demonstrations: nodeDatasetSchema.optional(),
 });
+export interface PromptingTechniqueSchema extends Named<
+  typeof promptingTechniqueSchemaDefinition
+> {}
+export const promptingTechniqueSchema: PromptingTechniqueSchema =
+  promptingTechniqueSchemaDefinition;
 
 /**
  * Schema for prompt configuration name
@@ -133,7 +147,7 @@ export const versionSchema = z.number().min(0, "Version must be greater than or 
  * Schema for response format specification
  * Used to define structured output formats for LLM responses
  */
-export const responseFormatSchema = z.object({
+const responseFormatSchemaDefinition = z.object({
   type: z.enum(["json_schema"]),
   json_schema: z
     .object({
@@ -142,6 +156,8 @@ export const responseFormatSchema = z.object({
     })
     .nullable(),
 });
+export interface ResponseFormatSchema extends Named<typeof responseFormatSchemaDefinition> {}
+export const responseFormatSchema: ResponseFormatSchema = responseFormatSchemaDefinition;
 
 /**
  * Schema for model name
@@ -188,18 +204,24 @@ const jsonValue: z.ZodType<unknown> = z.lazy(() =>
   ]),
 );
 
-export const runtimeParametersSchema = z.record(z.string(), jsonValue).default({});
+const runtimeParametersSchemaDefinition = z.record(z.string(), jsonValue).default({});
+export interface RuntimeParametersSchema extends Named<typeof runtimeParametersSchemaDefinition> {}
+export const runtimeParametersSchema: RuntimeParametersSchema = runtimeParametersSchemaDefinition;
 
 /**
  * Extended runtime input schema including a value for execution time.
  * Single Responsibility: Add value-carrying variant of inputs for runtime usage.
  */
-export const inputWithValueSchema = inputsSchema.safeExtend({
+const inputWithValueSchemaDefinition = inputsSchema.safeExtend({
   value: z.any().optional(),
 });
+export interface InputWithValueSchema extends Named<typeof inputWithValueSchemaDefinition> {}
+export const inputWithValueSchema: InputWithValueSchema = inputWithValueSchemaDefinition;
 
 /**
  * Array schema for variables passed at runtime to executions.
  * Single Responsibility: Validate the variables payload shape.
  */
-export const runtimeInputsSchema = z.array(inputWithValueSchema);
+const runtimeInputsSchemaDefinition = z.array(inputWithValueSchema);
+export interface RuntimeInputsSchema extends Named<typeof runtimeInputsSchemaDefinition> {}
+export const runtimeInputsSchema: RuntimeInputsSchema = runtimeInputsSchemaDefinition;

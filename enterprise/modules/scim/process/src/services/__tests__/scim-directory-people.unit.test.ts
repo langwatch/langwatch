@@ -24,6 +24,11 @@ import type { ScimUserProvisioning } from "../scim-provisioning.service.ts";
 import { ScimService } from "../scim.service.ts";
 import { QuietScimSyncLifecycle } from "./support/quiet-scim-sync-lifecycle.ts";
 
+/** Every seat free, so these tests admit full members (seat-limit-at-provisioning.feature). */
+const openSeats = {
+  countMemberSeats: async () => ({ fullMembers: 0, liteMembers: 0, developers: 0 }),
+};
+
 const ACME = "org_acme";
 const GLOBEX = "org_globex";
 const OKTA = "conn_okta_primary";
@@ -85,8 +90,19 @@ function world() {
       return store.users.get(created.id)!;
     }),
   } satisfies ScimUserProvisioning;
+  const connections = HeldConnectionsFake.of([OKTA, ENTRA]);
+  connections.hold({ connectionId: OKTA, verifiedDomains: ["acme.test"] });
   const service = ScimService.create({
-    connections: HeldConnectionsFake.of([OKTA, ENTRA]),
+    // Organization owns the membership row; a delete asks it to remove the member.
+    members: {
+      deleteMember: vi.fn(async ({ organizationId, userId }) => {
+        const at = store.memberships.findIndex(
+          (row) => row.organizationId === organizationId && row.userId === userId,
+        );
+        if (at !== -1) store.memberships.splice(at, 1);
+      }),
+    },
+    connections,
     prisma: store,
     writer,
     users,
@@ -96,6 +112,7 @@ function world() {
     lifecycle: new QuietScimSyncLifecycle(),
     provenOffboarding: false,
     tokenPepper: "scim-test-pepper",
+    seats: openSeats,
   });
 
   return {

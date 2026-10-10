@@ -80,7 +80,7 @@ export function GenerateTraceDialog() {
       positioning={{ placement: "bottom-end" }}
     >
       <PopoverTrigger asChild>
-        <Button size="xs" variant="outline">
+        <Button size="sm" variant="outline">
           <Sparkles size={14} />
           Generate
         </Button>
@@ -88,7 +88,7 @@ export function GenerateTraceDialog() {
       <PopoverContent width="340px">
         <PopoverBody p={4}>
           <Text fontSize="sm" fontWeight="semibold" color="fg.default" mb={3}>
-            Generate Trace
+            Generate trace
           </Text>
 
           <VStack gap={4} align="stretch">
@@ -117,7 +117,7 @@ export function GenerateTraceDialog() {
                 {[500, 1500, 2500, 3000].map((v) => (
                   <Button
                     key={v}
-                    size="xs"
+                    size="sm"
                     variant={targetSpanCount === v ? "solid" : "ghost"}
                     colorPalette={targetSpanCount === v ? "orange" : undefined}
                     onClick={() => setTargetSpanCount(v)}
@@ -139,7 +139,7 @@ export function GenerateTraceDialog() {
                 {DEPTH_PRESETS.map((preset, i) => (
                   <Button
                     key={preset.label}
-                    size="xs"
+                    size="sm"
                     variant={depthPreset === i ? "solid" : "outline"}
                     colorPalette={depthPreset === i ? "orange" : undefined}
                     onClick={() => setDepthPreset(i)}
@@ -195,7 +195,7 @@ export function GenerateTraceDialog() {
                 </Box>
                 <Switch
                   size="sm"
-                  colorPalette="orange"
+                  colorPalette="accent"
                   checked={includeEvents}
                   onCheckedChange={(d) => setIncludeEvents(d.checked)}
                 />
@@ -220,7 +220,7 @@ export function GenerateTraceDialog() {
                 </Box>
                 <Switch
                   size="sm"
-                  colorPalette="orange"
+                  colorPalette="accent"
                   checked={useRealPrompts}
                   onCheckedChange={(d) => setUseRealPrompts(d.checked)}
                   disabled={!selectedProjectId}
@@ -231,7 +231,7 @@ export function GenerateTraceDialog() {
             {/* Generate button */}
             <Button
               size="sm"
-              colorPalette="orange"
+              colorPalette="accent"
               onClick={handleGenerate}
               w="full"
               disabled={useRealPrompts && (promptsQuery.isLoading || !promptsQuery.prompts?.length)}

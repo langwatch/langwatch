@@ -155,7 +155,7 @@ export class PersonalVirtualKeyAccessService {
     throw new PermissionDeniedError({
       permission: "virtualKeys:viewOtherPersonal",
       scope: { type: "organization", id: input.organizationId },
-      denialReason: "no-binding",
+      denialReason: "no-grant",
     });
   }
 }

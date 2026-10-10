@@ -34,7 +34,7 @@ export function DashboardWidgetQueryResultView({ run }: DashboardWidgetQueryResu
     return (
       <Box
         fontSize="12px"
-        color="red.500"
+        color="red.fg"
         borderWidth="1px"
         borderColor="red.subtle"
         borderRadius="md"

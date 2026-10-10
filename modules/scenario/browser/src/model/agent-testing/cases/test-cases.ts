@@ -67,3 +67,16 @@ export function collectLabels(cases: TestCase[]): string[] {
   }
   return Array.from(labels).toSorted();
 }
+
+/** The scenarios the rail can reach: those filed in one of the suites it lists. */
+export function countCasesInSuites({
+  cases,
+  suiteIds,
+}: {
+  cases: { testSuiteId: string | null }[];
+  suiteIds: string[];
+}): number {
+  const reachable = new Set(suiteIds);
+  return cases.filter((testCase) => testCase.testSuiteId && reachable.has(testCase.testSuiteId))
+    .length;
+}

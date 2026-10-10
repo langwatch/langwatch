@@ -30,23 +30,12 @@ export function GroupByTabs({ grouping, onGroupingChange }: GroupByTabsProps) {
   );
 
   return (
-    <HStack gap={1.5}>
+    <HStack gap={1.5} flexWrap="wrap">
       <Text fontSize="12.5px" color={FG_MUTED} whiteSpace="nowrap">
         Group by:
       </Text>
       <SegmentedControl
         size="sm"
-        // Drawn to the toolbar's 32px, 12.5px and radius, with a quiet active
-        // segment: a filled panel with no second border inside the enclosure.
-        height="32px"
-        padding="2px"
-        borderRadius="lg"
-        css={{
-          "--segment-radius": "radii.md",
-          "& [data-part='item']": { height: "26px", paddingInline: "10px" },
-          "& [data-part='item-text']": { fontSize: "12.5px", fontWeight: "medium" },
-          "& [data-part='indicator']": { borderWidth: "0", boxShadow: "xs" },
-        }}
         value={grouping}
         items={items}
         aria-label="Group results by"

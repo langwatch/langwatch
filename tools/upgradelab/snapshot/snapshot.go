@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"iter"
 	"maps"
 	"os"
 	"path/filepath"
@@ -158,16 +159,26 @@ func clickHouseFingerprint(store ClickHouse) func(context.Context) (map[string]T
 
 func redisFingerprint(store Redis) func(context.Context) (map[string]TableFingerprint, error) {
 	return func(ctx context.Context) (map[string]TableFingerprint, error) {
-		keys, err := store.Keys(ctx)
+		var folder RowFolder
+		err := store.Scan(ctx, func(key RedisKey) error {
+			if !isVolatileRedisKey(key) {
+				folder.Add([]string{key.Key, key.Type, base64.StdEncoding.EncodeToString(key.Dump)})
+			}
+			return nil
+		})
 		if err != nil {
 			return nil, err
 		}
-		rows := make([][]string, 0, len(keys))
-		for _, key := range keys {
-			rows = append(rows, []string{key.Key, key.Type, base64.StdEncoding.EncodeToString(key.Dump)})
-		}
-		return map[string]TableFingerprint{"keys": FoldRows(rows)}, nil
+		return map[string]TableFingerprint{"keys": folder.Fingerprint()}, nil
 	}
+}
+
+// redisVolatileMargin: keys expiring sooner can vanish between restore and fingerprint.
+const redisVolatileMargin = 10 * 60 * 1000
+
+// isVolatileRedisKey is a key that can expire inside the comparison window; it is never hashed.
+func isVolatileRedisKey(key RedisKey) bool {
+	return key.PTTL >= 0 && key.PTTL <= redisVolatileMargin
 }
 
 // CaptureInput is a capture's directory, sources, producer-given manifest fields and scrub.
@@ -364,23 +375,32 @@ func exportTable(ctx context.Context, store ClickHouse, target tableFile) error 
 	return file.Close()
 }
 
-func captureRedis(ctx context.Context, store Redis, step captureStep) error {
-	keys, err := store.Keys(ctx)
+func captureRedis(ctx context.Context, store Redis, step captureStep) (err error) {
+	file, err := os.OpenFile(filepath.Join(step.dir, RedisFile), os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
 	if err != nil {
 		return err
 	}
-	var lines strings.Builder
-	for _, key := range keys {
+	defer func() { err = errors.Join(err, file.Close()) }()
+	writer, sizes := bufio.NewWriter(file), redisPrefixSizes{}
+	err = store.Scan(ctx, func(key RedisKey) error {
 		line, err := json.Marshal(key)
 		if err != nil {
 			return err
 		}
-		lines.Write(append(line, '\n'))
+		if _, err := writer.Write(append(line, '\n')); err != nil {
+			return err
+		}
 		step.visit(Cell{Table: "redis", Column: key.Key, Value: string(key.Dump)})
 		prefix, _, _ := strings.Cut(key.Key, ":")
 		step.manifest.RedisKeysByPrefix[prefix]++
+		sizes.add(key)
+		return nil
+	})
+	if err != nil {
+		return err
 	}
-	return os.WriteFile(filepath.Join(step.dir, RedisFile), []byte(lines.String()), 0o600)
+	step.manifest.RedisTopPrefixes = sizes.top(redisTopPrefixCount)
+	return writer.Flush()
 }
 
 // RestoreInput is a restore's snapshot directory and its empty, dedicated destinations.
@@ -464,11 +484,7 @@ func restorePostgres(ctx context.Context, store Postgres, source postgresSource)
 }
 
 func restoreRedis(ctx context.Context, store Redis, path string) error {
-	keys, err := readRedisKeys(path)
-	if err != nil {
-		return err
-	}
-	return store.Restore(ctx, keys)
+	return store.Restore(ctx, readRedisKeys(path))
 }
 
 func checkCoverage(dir string, stores Stores) error {
@@ -527,26 +543,37 @@ func importTable(ctx context.Context, store ClickHouse, source tableFile) error 
 		return err
 	}
 	defer file.Close()
+	if info, err := file.Stat(); err == nil && info.Size() == 0 {
+		return nil // an empty table was captured as an empty file
+	}
 	return store.Import(ctx, source.table, file)
 }
 
-func readRedisKeys(path string) ([]RedisKey, error) {
-	file, err := os.Open(path)
-	if err != nil {
-		return nil, err
-	}
-	defer file.Close()
-	var keys []RedisKey
-	scanner := bufio.NewScanner(file)
-	scanner.Buffer(make([]byte, 0, 1<<20), 1<<30)
-	for scanner.Scan() {
-		var key RedisKey
-		if err := json.Unmarshal(scanner.Bytes(), &key); err != nil {
-			return nil, fmt.Errorf("%s: %w", RedisFile, err)
+// readRedisKeys yields redis.jsonl line by line; one key's DUMP can be tens of MB.
+func readRedisKeys(path string) iter.Seq2[RedisKey, error] {
+	return func(yield func(RedisKey, error) bool) {
+		file, err := os.Open(path)
+		if err != nil {
+			yield(RedisKey{}, err)
+			return
 		}
-		keys = append(keys, key)
+		defer file.Close()
+		scanner := bufio.NewScanner(file)
+		scanner.Buffer(make([]byte, 0, 1<<20), 1<<30)
+		for scanner.Scan() {
+			var key RedisKey
+			if err := json.Unmarshal(scanner.Bytes(), &key); err != nil {
+				yield(RedisKey{}, fmt.Errorf("%s: %w", RedisFile, err))
+				return
+			}
+			if !yield(key, nil) {
+				return
+			}
+		}
+		if err := scanner.Err(); err != nil {
+			yield(RedisKey{}, err)
+		}
 	}
-	return keys, scanner.Err()
 }
 
 // Verify compares the stores against the manifest's fingerprint; empty means equal.

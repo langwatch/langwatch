@@ -42,6 +42,7 @@ async function serviceOver({
           organizationId: "org_01",
           isPersonal: false,
           ownerUserId: null,
+          kind: "application",
         },
       ],
       listTraceDestinations: async () => [],

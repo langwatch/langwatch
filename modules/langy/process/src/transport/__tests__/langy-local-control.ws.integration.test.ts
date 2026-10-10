@@ -8,6 +8,7 @@ import { createServer, type Server } from "node:http";
 
 import { WebSocketHost } from "@langwatch/api";
 import type { ApiKeyApi, ResolvedApiKeyCredential } from "@langwatch/api-key-contract";
+import { bindRestCredential } from "@langwatch/api/rest";
 import { HandledError } from "@langwatch/handled-error";
 import {
   LangyTurnInProgressError,
@@ -34,6 +35,7 @@ import { LangyLocalControlRuntimeService } from "../../features/local-control/se
 import { LocalControlSessionCoreService } from "../../features/local-control/services/langy-local-session.service.ts";
 import { LangyLocalPresenceRedisRepository } from "../../repositories/redis/redis.langy-local-presence.repository.ts";
 import { presenceKey } from "../../rules/langy-local-control-keys.rules.ts";
+import { localControlSessionKeyDoor } from "../langy-local-control-connect.rest.ts";
 import {
   CONTROL_CONNECT_PATH,
   createLangyLocalControlWebSocketProtocol,
@@ -133,6 +135,7 @@ const apiKeys = createApiFixture<ApiKeyApi>({
         organizationId,
         isPersonal: false,
         ownerUserId: null,
+        kind: "application",
       },
     };
   },
@@ -257,19 +260,26 @@ async function startPod(): Promise<Pod> {
     pingIntervalMs: 200,
     pongWaitMs: 150,
   });
-  const sockets = WebSocketHost.create();
-  sockets.mount(createLangyLocalControlWebSocketProtocol(), () =>
-    createApiFixture<LangyApi>({
-      acceptLocalControlConnection: (connection, credentials) =>
-        gateway.accept(connection, credentials),
-    }),
-  );
-  server.on("upgrade", (request, socket, head) => sockets.upgrade(request, socket, head));
   const longPoll = LocalControlLongPollService.create({
     core,
     holdMs: 300,
     pollIntervalMs: 25,
   });
+  const sessionKeyDoor = localControlSessionKeyDoor.open(
+    createApiFixture<LangyApi>({
+      verifyLocalControlSessionKey: (presented) => longPoll.verifySessionKey(presented),
+    }),
+  );
+  const sockets = WebSocketHost.create();
+  sockets.mount(
+    createLangyLocalControlWebSocketProtocol(),
+    () =>
+      createApiFixture<LangyApi>({
+        acceptLocalControlConnection: (connection, opened) => gateway.accept(connection, opened),
+      }),
+    { middlewareBindings: [bindRestCredential("session_key", () => sessionKeyDoor)] },
+  );
+  server.on("upgrade", (request, socket, head) => sockets.upgrade(request, socket, head));
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   const address = server.address();
   if (address === null || typeof address === "string") throw new Error("no port bound");
@@ -1121,9 +1131,13 @@ describe("given a network that blocks WebSockets", () => {
   /** @scenario "A local call travels to the CLI and its result comes back" */
   it("carries the same register, call and result over the long-poll routes", async () => {
     const key = await approvedSessionKey(podA);
-    const registered = await podA.longPoll.register({
-      authorization: `Bearer ${key}`,
+    const { actor: _actor, ...credential } = await podA.longPoll.verifySessionKey({
+      token: key,
       projectId,
+      instanceToken: null,
+    });
+    const registered = await podA.longPoll.register({
+      credential,
       frame: {
         protocol: LOCAL_CONTROL_PROTOCOL_VERSION,
         type: "register",

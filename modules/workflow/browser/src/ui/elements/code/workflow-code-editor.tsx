@@ -1,10 +1,10 @@
 import { useColorMode } from "@langwatch/design-system/color-mode";
 import { Box, HStack, Text } from "@langwatch/design-system/primitives";
+import { FileCode as LuFileCode, X as LuX } from "lucide-react";
 import type * as MonacoApi from "monaco-editor";
 import type { editor } from "monaco-editor";
 import { registerCompletion } from "monacopilot";
-import { lazy, type ReactNode, Suspense, useCallback, useEffect, useRef, useState } from "react";
-import { LuFileCode, LuX } from "react-icons/lu";
+import { lazy, type ReactNode, Suspense, useEffect, useRef, useState } from "react";
 
 import type {
   PythonField,
@@ -86,36 +86,37 @@ export function WorkflowCodeEditorModal({
 
   // Save = persist the buffer back to the parent and keep the modal open so
   // the user can keep editing. Mirrors a file editor's "save" — never closes.
-  const handleSave = useCallback(() => {
+  const handleSave = () => {
     setCode(localCode);
-  }, [localCode, setCode]);
+  };
 
   // Save & Close = save then dismiss. The deliberate stronger gesture
   // (Cmd+Enter, not Cmd+S) so muscle-memory ⌘S doesn't accidentally close.
-  const handleSaveAndClose = useCallback(() => {
+  const handleSaveAndClose = () => {
     setCode(localCode);
     onClose();
-  }, [localCode, setCode, onClose]);
+  };
 
-  const onClose_ = useCallback(() => {
+  const onClose_ = () => {
     if (localCode !== code && !window.confirm("Your changes will be lost. Are you sure?")) {
       return;
     }
     onClose();
-  }, [localCode, code, onClose]);
+  };
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Cmd/Ctrl+S → Save (don't close)
       if ((e.ctrlKey || e.metaKey) && e.key === "s") {
         e.preventDefault();
-        handleSave();
+        setCode(localCode);
         return;
       }
       // Cmd/Ctrl+Enter → Save & Close
       if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
         e.preventDefault();
-        handleSaveAndClose();
+        setCode(localCode);
+        onClose();
       }
     };
 
@@ -128,21 +129,18 @@ export function WorkflowCodeEditorModal({
     // source under `noImplicitReturns`, and an effect that returns on one branch
     // and not the other is exactly the shape that rule is looking for.
     return undefined;
-  }, [handleSave, handleSaveAndClose, open, localCode]);
+  }, [setCode, onClose, open, localCode]);
 
-  const insertAtCursor = useCallback((text: string) => {
+  const insertAtCursor = (text: string) => {
     const ed = editorRef.current;
     if (!ed) return;
     ed.focus();
     ed.trigger("keyboard", "type", { text });
-  }, []);
+  };
 
-  const handleInsertSecret = useCallback(
-    (secretName: string) => {
-      insertAtCursor(`secrets.${secretName}`);
-    },
-    [insertAtCursor],
-  );
+  const handleInsertSecret = (secretName: string) => {
+    insertAtCursor(`secrets.${secretName}`);
+  };
 
   const Modal = renderModal;
 
@@ -177,7 +175,7 @@ export function WorkflowCodeEditorModal({
               left: 0,
               right: 0,
               height: "2px",
-              bg: "blue.400",
+              bg: "blue.solid",
             }}
           >
             <LuFileCode size={14} />

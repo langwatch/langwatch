@@ -320,9 +320,9 @@ func recordKey(path, key string) {
 // downCheckStack destroys check's own stack and forgets its seed.
 func downCheckStack(ctx context.Context, root string, stderr io.Writer) error {
 	spec := commandSpec{name: havenrun.Command, args: havenrun.DestroyArgs(CheckSlug), dir: root, env: havenEnv(os.Environ(), CheckSlug)}
-	fmt.Fprintf(stderr, "check: haven destroy %s\n", CheckSlug)
+	fmt.Fprintf(stderr, "check: haven down --destroy --stack %s\n", CheckSlug)
 	if err := execRunner(ctx, spec, stderr); err != nil {
-		return fmt.Errorf("haven destroy %s: %w", CheckSlug, err)
+		return fmt.Errorf("haven down --destroy --stack %s: %w", CheckSlug, err)
 	}
 	for _, name := range []string{"seeded", "backend"} {
 		if err := os.Remove(filepath.Join(CheckDir(root), name)); err != nil && !errors.Is(err, os.ErrNotExist) {

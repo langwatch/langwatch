@@ -14,7 +14,7 @@ export { gatewayCacheRuleTrpcTransport } from "./transport/gateway-cache-rule.tr
 export { gatewayGuardrailTrpcTransport } from "./transport/gateway-guardrail.trpc.ts";
 export { gatewayUsageTrpcTransport } from "./transport/gateway-usage.trpc.ts";
 export { gatewaySpendEventTrpcTransport } from "./transport/gateway-spend-event.trpc.ts";
-export { gatewaySessionFact, virtualKeyTrpcTransport } from "./transport/virtual-key.trpc.ts";
+export { gatewaySessionContext, virtualKeyTrpcTransport } from "./transport/virtual-key.trpc.ts";
 export type {
   GatewayUsageProjects,
   GatewayUsageVirtualKeys,
@@ -134,18 +134,6 @@ export type { GatewayVirtualKeyCrypto } from "./features/virtual-key/services/vi
 export type { GatewaySpanIngestion } from "./features/realtime-session/services/gateway-realtime-settlement-span.service.ts";
 export type { GatewaySpendConfirmation } from "./features/realtime-session/services/gateway-realtime-session.service.ts";
 export type { GatewaySpendRating } from "./features/spend/services/model-catalog-gateway-spend-rating.service.ts";
-
-// The R3 config walk, main's `scripts/migrations/backfill-vk-config-to-rp.ts`.
-export {
-  backfillVirtualKeyConfig,
-  VirtualKeyConfigBackfillTask,
-  type LegacyVirtualKeyConfig,
-  type VirtualKeyConfigBackfillOutcome,
-} from "./tasks/virtual-key-config-backfill.task.ts";
-export type {
-  VirtualKeyRow,
-  VirtualKeyScopeRow,
-} from "./repositories/gateway-virtual-key-config-backfill.repository.ts";
 
 // The pre-migration gate report, main's `report-trace-destination-backfill.ts`.
 export {

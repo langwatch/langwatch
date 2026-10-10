@@ -3,6 +3,8 @@ export type DataRetentionProjectPlacement = Readonly<{
   projectId: string;
   organizationId: string;
   teamId: string;
+  /** Project's `kind`; absent reads as an application project. */
+  kind?: string | undefined;
 }>;
 
 /**

@@ -1,6 +1,6 @@
 /**
- * A lazily loaded component with a loading state of its own, narrowed
- * from `platform/app`'s `next-dynamic` shim. The Suspense boundary sits
+ * A lazily loaded component with a loading state of its own, built on
+ * React.lazy. The Suspense boundary sits
  * INSIDE on purpose: outside, a pending import blanks the whole page.
  */
 

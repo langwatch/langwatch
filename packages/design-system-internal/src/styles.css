@@ -330,11 +330,9 @@ a.ds-topbar-brand {
   text-decoration: none;
 }
 
-.ds-topbar-mark {
-  width: var(--space-2);
-  height: var(--space-2);
-  border-radius: var(--radius-full);
-  background: var(--brand);
+.ds-topbar-icon {
+  width: var(--space-6);
+  height: var(--space-6);
   flex-shrink: 0;
 }
 

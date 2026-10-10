@@ -449,6 +449,20 @@ describe("given the project still has a legacy key", () => {
   });
 });
 
+describe("given the project never had a legacy key", () => {
+  describe("when an organization admin opens the keys page", () => {
+    /** @scenario A project that never had a legacy key shows no banner */
+    it("reads the status as absent and shows no banner", () => {
+      state.members = [{ id: "user-1", name: "Dev", email: "dev@example.com" }];
+      state.legacyKey = { present: false };
+      renderWithApiKeyHost(<ApiKeysScreen />, new FakeApiKeyHost());
+
+      expect(screen.queryByTestId("legacy-project-key-banner")).toBeNull();
+      expect(screen.queryByRole("alert")).toBeNull();
+    });
+  });
+});
+
 describe("given a reader who is not an organization admin", () => {
   /** @scenario A member manages only their own keys */
   /** @scenario A member sees the page and not the write controls */

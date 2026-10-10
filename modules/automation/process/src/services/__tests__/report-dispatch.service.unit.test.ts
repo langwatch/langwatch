@@ -3,6 +3,8 @@ import type {
   AnalyticsTimeseriesResult,
 } from "@langwatch/analytics-contract";
 import { buildSeriesName } from "@langwatch/analytics-contract";
+import { sealAuthorization } from "@langwatch/authorization";
+import type { AuthzApi } from "@langwatch/authz-contract";
 import type {
   CustomGraph,
   ReportChart,
@@ -445,6 +447,7 @@ describe("the composed trace-query report", () => {
     it("reads the trace grid through TraceApi and sends its row", async () => {
       const item: TraceListItem = {
         traceId: "trace-a",
+        projectId: PROJECT.id,
         timestamp: SLOT.getTime(),
         name: "checkout",
         serviceName: "shop",
@@ -475,19 +478,32 @@ describe("the composed trace-query report", () => {
         ttft: null,
         traceName: "checkout",
         rootSpanType: null,
+        evaluations: [],
       };
       const filterWhere = { sql: "Status = {s:String}", params: { s: "error" } };
       const readTraceList = vi.fn<TraceApi["readTraceList"]>(async () => ({
         items: [item],
         totalHits: 1,
-        evaluations: {},
         nextCursor: null,
       }));
+      const reader = {
+        type: "internal",
+        codePath: "automation.report-trace-list",
+      } satisfies Parameters<AuthzApi["authorizeInternal"]>[0]["actor"];
+      const proof = sealAuthorization({
+        actor: reader,
+        principal: reader,
+        scope: { organizationId: "organization-1" },
+        grants: [{ projectId: PROJECT.id, permissions: ["traces:view"], via: [], kind: "own" }],
+        expiresAt: Date.now() + 5 * 60 * 1000,
+        purpose: { kind: "operator", entry: "ReportTraceListService.list" },
+      });
       const traceList = ReportTraceListService.create({
         traces: createApiFixture<TraceApi>({
           translateTraceFilter: () => filterWhere,
           readTraceList,
         }),
+        authz: createApiFixture<AuthzApi>({ authorizeInternal: async () => proof }),
         baseHost: BASE_HOST,
       });
       const listReportTraces: ReportDispatchDeps["listReportTraces"] = (input) =>
@@ -503,7 +519,7 @@ describe("the composed trace-query report", () => {
       ).dispatchScheduledReport(FIRE);
 
       expect(readTraceList).toHaveBeenCalledWith({
-        tenantId: PROJECT.id,
+        authorization: proof,
         timeRange: { from: SLOT.getTime() - 24 * 60 * 60 * 1000, to: SLOT.getTime() },
         sort: { columnId: "time", direction: "desc" },
         page: 1,

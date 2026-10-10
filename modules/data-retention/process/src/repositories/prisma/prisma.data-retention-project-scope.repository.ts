@@ -25,11 +25,16 @@ export class PrismaDataRetentionProjectScopeRepository implements DataRetentionP
   }): Promise<DataRetentionProjectPlacement | null> {
     const project = await this.prisma.project.findUnique({
       where: { id: projectId },
-      select: { teamId: true, team: { select: { organizationId: true } } },
+      select: { teamId: true, kind: true, team: { select: { organizationId: true } } },
     });
     if (!project?.team) return null;
 
-    return { projectId, organizationId: project.team.organizationId, teamId: project.teamId };
+    return {
+      projectId,
+      organizationId: project.team.organizationId,
+      teamId: project.teamId,
+      kind: project.kind,
+    };
   }
 
   async findTeamOrganizationId({ teamId }: { teamId: string }): Promise<string | null> {

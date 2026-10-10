@@ -1,18 +1,18 @@
 /**
  * Onboarding's answer to the port its screens declare: scope and the legacy
- * project key project a `@langwatch/browser-host` capability plus this
+ * project key project a `@langwatch/browser-host` host service plus this
  * family's own borrowed `organization.getAll` query. ARCHITECTURE.md §10.1.
  */
 
 import { useUiAddress } from "@langwatch/browser-host/address";
-import { useUiCapabilities, useUiScope } from "@langwatch/browser-host/capabilities";
+import { useUiHostServices, useUiScope } from "@langwatch/browser-host/capabilities";
 import type { ReleaseFlagToken } from "@langwatch/browser-host/declarations";
 import { useUiFlags } from "@langwatch/browser-host/feature-flag";
 import { useLent, useLentHooks } from "@langwatch/browser-host/lent";
 import { SampleChoiceToken } from "@langwatch/enterprise-governance-client";
 import { GuidedOnboardingToken, type LangyGuidedOnboarding } from "@langwatch/langy-client";
 import { SidebarToken } from "@langwatch/navigation-client";
-import { JoinOfferToken } from "@langwatch/organization-client";
+import { JoinInsteadToken, JoinOfferToken } from "@langwatch/organization-client";
 import { useMemo, type ReactNode } from "react";
 import { useLocation, useParams } from "react-router";
 
@@ -96,7 +96,7 @@ function sessionStatusOf(hasActor: boolean, isSettled: boolean): OnboardingSessi
   return isSettled ? "unauthenticated" : "loading";
 }
 
-class CapabilityOnboardingHost extends OnboardingHostApi {
+class HostServiceOnboardingHost extends OnboardingHostApi {
   constructor(
     private readonly deps: {
       scope: OnboardingScope;
@@ -206,7 +206,7 @@ class CapabilityOnboardingHost extends OnboardingHostApi {
 }
 
 export default function OnboardingHostMount({ children }: { children?: ReactNode }) {
-  const { session, route, feedback, navigation } = useUiCapabilities();
+  const { session, route, feedback, navigation } = useUiHostServices();
   const activeScope = useUiScope().activeScope();
   const location = useLocation();
   const asPath = useUiAddress();
@@ -219,9 +219,19 @@ export default function OnboardingHostMount({ children }: { children?: ReactNode
   const reading = route.reading();
   // `useLent` makes the component once per declaration set, so the offer is not remounted.
   const LentJoinOffer = useLent(JoinOfferToken);
+  const LentJoinInstead = useLent(JoinInsteadToken);
   const joinOffers = useMemo(
-    () => (LentJoinOffer ? [{ key: JoinOfferToken.owner, JoinOffer: LentJoinOffer }] : []),
-    [LentJoinOffer],
+    () =>
+      LentJoinOffer
+        ? [
+            {
+              key: JoinOfferToken.owner,
+              JoinOffer: LentJoinOffer,
+              ...(LentJoinInstead ? { JoinInstead: LentJoinInstead } : {}),
+            },
+          ]
+        : [],
+    [LentJoinOffer, LentJoinInstead],
   );
 
   const lentLangy = useLentHooks(GuidedOnboardingToken);
@@ -232,6 +242,7 @@ export default function OnboardingHostMount({ children }: { children?: ReactNode
 
   const governance = useLentHooks(SampleChoiceToken) ?? INERT_GOVERNANCE;
 
+  const scopeProjectKind = session.snapshot().scope.project?.kind;
   const scope: OnboardingScope = useMemo(
     () => ({
       organization: graph.organization,
@@ -241,16 +252,17 @@ export default function OnboardingHostMount({ children }: { children?: ReactNode
             id: graph.activeProject.project.id,
             name: graph.activeProject.project.name,
             slug: graph.activeProject.project.slug,
+            ...(scopeProjectKind !== void 0 ? { kind: scopeProjectKind } : {}),
           }
         : void 0,
       isLoading: graph.isLoading,
     }),
-    [graph],
+    [graph, scopeProjectKind],
   );
 
   const host = useMemo(
     () =>
-      new CapabilityOnboardingHost({
+      new HostServiceOnboardingHost({
         scope,
         actor: sessionActor
           ? { id: sessionActor.id, email: sessionActor.email ?? void 0, name: sessionActor.name }

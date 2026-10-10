@@ -1,11 +1,11 @@
 /**
  * Monitor's answer to the port its screen declares: every method projects a
- * `@langwatch/browser-host` capability, `copyTargets` included: organization
+ * `@langwatch/browser-host` host service, `copyTargets` included: organization
  * lends those. ARCHITECTURE.md §10.1.
  */
 
 import {
-  useUiCapabilities,
+  useUiHostServices,
   useUiCopyTargets,
   useUiScope,
   type UiCopyTargets,
@@ -27,7 +27,7 @@ import {
   type MonitorSuccessNotice,
 } from "../model/monitor-host.ts";
 
-class CapabilityMonitorHost extends MonitorHostApi {
+class HostServiceMonitorHost extends MonitorHostApi {
   private readonly hostScope: MonitorScope;
   private readonly session: UiSession;
   private readonly lent: UiCopyTargets;
@@ -114,7 +114,7 @@ class CapabilityMonitorHost extends MonitorHostApi {
  * is what `mounts.load` resolves.
  */
 export default function MonitorHostMount({ children }: { children?: ReactNode }) {
-  const { session, navigation, route, feedback } = useUiCapabilities();
+  const { session, navigation, route, feedback } = useUiHostServices();
   const lent = useUiCopyTargets();
   const scopeHost = useUiScope().scopeHost();
 
@@ -125,7 +125,14 @@ export default function MonitorHostMount({ children }: { children?: ReactNode })
 
   const host = useMemo(
     () =>
-      new CapabilityMonitorHost({ hostScope, session, lent, navigation, uiRoute: route, feedback }),
+      new HostServiceMonitorHost({
+        hostScope,
+        session,
+        lent,
+        navigation,
+        uiRoute: route,
+        feedback,
+      }),
     [hostScope, session, lent, navigation, route, feedback],
   );
 

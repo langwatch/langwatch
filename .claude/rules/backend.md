@@ -50,7 +50,7 @@ eventing); all of the below is lint-enforced.
   (`{ at: "route", param }`, and on the key door `{ at: "grants" }` or
   `{ at: "organization" }`). `anyAuthenticated`, `deferredScope` and
   `publicRoute` are for routes that ask no permission at all; none of them may
-  be followed by a permission check in a middleware fact, a handler or an
+  be followed by a permission check in a middleware context, a handler or an
   `*Api` operation. A case the declaration cannot express is a gap in
   `packages/api` and the door auth binds: extend those. What stays in a service
   is the part that needs the loaded row (the scopes a resource lives in).

@@ -5,7 +5,8 @@
  */
 
 import { PageLayout } from "@langwatch/design-system/page-layout";
-import { Text, VStack } from "@langwatch/design-system/primitives";
+import { Box, Text } from "@langwatch/design-system/primitives";
+import { SETTINGS_BAND_PADDING_Y } from "@langwatch/design-system/settings-section";
 
 import { BrowserSessionsSection } from "../browser-sessions-section.tsx";
 import { PersonalApiKeysSummary } from "../personal-api-keys-summary.tsx";
@@ -18,14 +19,16 @@ export default function ProfileScreen() {
       <PageLayout.Header>
         <PageLayout.Heading>Profile</PageLayout.Heading>
       </PageLayout.Header>
-      <VStack gap={6} width="full" align="start" paddingTop={4}>
-        <Text color="fg.muted">Who you are here, how you get in, and where you are signed in.</Text>
+      <Box paddingTop={4} width="full" maxWidth="820px">
+        <Text color="fg.muted" paddingBottom={SETTINGS_BAND_PADDING_Y}>
+          Who you are here, how you get in, and where you are signed in.
+        </Text>
 
         <ProfileDetailsSection />
         <SignInMethodsSummary />
         <BrowserSessionsSection />
         <PersonalApiKeysSummary />
-      </VStack>
+      </Box>
     </>
   );
 }

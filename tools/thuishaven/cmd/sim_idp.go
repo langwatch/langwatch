@@ -14,8 +14,8 @@ import (
 	"github.com/langwatch/langwatch/tools/thuishaven/cmd/viewer/sources"
 )
 
-// `haven idp <verb>` drives idpsim's control API, the same actions its console
-// offers. Bare `haven idp` still runs the standalone simulator (see runIdP).
+// `haven sim idp <verb>` drives idpsim's control API, the same actions its console
+// offers. Bare `haven simulator idp` runs the standalone simulator (see runIdP).
 
 // idpFlags are the idp noun's own flags; table.go adds --json and --stack.
 var idpFlags = []flagSpec{
@@ -70,7 +70,7 @@ type idpCall struct {
 	asJSON bool
 }
 
-// idpVerb is one `haven idp` action. min counts the arguments after the words.
+// idpVerb is one `haven sim idp` action. min counts the arguments after the words.
 type idpVerb struct {
 	usage string
 	min   int
@@ -81,36 +81,39 @@ const idpAppsAddUsage = "<tenant> --name <n> [--redirect <uri,...>] [--entity-id
 
 // idpVerbs maps a verb's words to its action.
 var idpVerbs = map[string]idpVerb{
-	"tenant show":       {"<tenant>", 1, idpTenantShow},
-	"apps add":          {idpAppsAddUsage, 1, idpAppsAdd},
-	"apps remove":       {"<tenant> <client-id>", 2, idpAppsRemove},
-	"populate":          {"<tenant> --users <n> [--groups <n>] [--domain <d>] [--seed <n>]", 1, idpPopulate},
-	"churn":             {"<tenant> [--join|--leave|--deactivate|--reactivate|--rename|--regroup <n>]", 1, idpChurn},
-	"user add":          {"<tenant> --email <e> [--given-name <n>] [--family-name <n>] [--groups <id,...>]", 1, idpUserAdd},
-	"dns add":           {"<domain> <txt-value>...", 2, idpDNSAdd},
-	"dns remove":        {"<domain>", 1, idpDNSRemove},
-	"activity":          {"<tenant>", 1, idpActivity},
-	"signin":            {"<tenant> [--user <u>] [--client <id> --redirect <uri>]", 1, idpSignIn},
-	"reset":             {"<tenant>", 1, idpReset},
-	"samlp":             {"<tenant> <on|off>", 2, idpSamlp},
-	"scim target set":   {"<tenant> --url <scim-base> --token-env <VAR>", 1, idpSCIMTargetSet},
-	"scim target clear": {"<tenant>", 1, idpSCIMTargetClear},
-	"scim push":         {"<tenant> [--target <url> --token-env <VAR>]", 1, idpSCIMPush},
-	"scim pull":         {"<tenant> [--target <url> --token-env <VAR>]", 1, idpSCIMPull},
-	"scim sync":         {"<tenant> [--mode deactivate|delete] [--with-groups] [--dry-run] [--concurrency <n>] [--target <url> --token-env <VAR>]", 1, idpSCIMSync},
-	"scim-event":        {"<tenant> <kind> [--style okta|entra] [--user <u>] [--group <g>] [--set k=v]... [--id <id>] [--member-id <id>] [--inactive] [--no-external-id] [--department|--cost-center|--manager <text>] [--target <url> --token-env <VAR>]", 2, idpSCIMEvent},
-	"legacy provider":   {"<tenant> <generic|auth0|okta|cognito|onelogin|azure|show>", 2, idpLegacyProvider},
-	"legacy env":        {"<tenant>", 1, idpLegacyEnv},
-	"tamper":            {"<tenant> <bad-signature|wrong-audience|expired|replayed-nonce|saml-bad-signature|saml-unsigned|saml-wrong-audience|saml-wrong-recipient|saml-expired|saml-not-yet-valid|saml-replayed-assertion|saml-wrong-in-response-to|none>", 2, idpTamper},
-	"skew":              {"<tenant> <seconds>", 2, idpSkew},
-	"rotate-key":        {"<tenant> [--drop-previous]", 1, idpRotateKey},
-	"user disable":      {"<tenant> <email>", 2, idpUserDisable},
-	"user enable":       {"<tenant> <email>", 2, idpUserEnable},
-	"saml unsolicited":  {"<tenant> --acs-url <url> --email <e> [--entity-id <id>] [--relay-state <s>]", 1, idpSAMLUnsolicited},
-	"auth0-webhook":     {"<tenant> --event create|deactivate --user <u> --target <stack-url> --secret-env <VAR> [--token-env <VAR>]", 1, idpAuth0Webhook},
+	"tenants":            {"", 0, idpTenants},
+	"tenant show":        {"<tenant>", 1, idpTenantShow},
+	"apps add":           {idpAppsAddUsage, 1, idpAppsAdd},
+	"apps remove":        {"<tenant> <client-id>", 2, idpAppsRemove},
+	"populate":           {"<tenant> --users <n> [--groups <n>] [--domain <d>] [--seed <n>]", 1, idpPopulate},
+	"churn":              {"<tenant> [--join|--leave|--deactivate|--reactivate|--rename|--regroup <n>]", 1, idpChurn},
+	"user add":           {"<tenant> --email <e> [--given-name <n>] [--family-name <n>] [--groups <id,...>]", 1, idpUserAdd},
+	"dns add":            {"<domain> <txt-value>...", 2, idpDNSAdd},
+	"dns remove":         {"<domain>", 1, idpDNSRemove},
+	"verification set":   {"<domain> <token>", 2, idpVerificationSet},
+	"verification clear": {"<domain>", 1, idpVerificationClear},
+	"activity":           {"<tenant>", 1, idpActivity},
+	"signin":             {"<tenant> [--user <u>] [--client <id> --redirect <uri>]", 1, idpSignIn},
+	"reset":              {"<tenant>", 1, idpReset},
+	"samlp":              {"<tenant> <on|off>", 2, idpSamlp},
+	"scim target set":    {"<tenant> --url <scim-base> --token-env <VAR>", 1, idpSCIMTargetSet},
+	"scim target clear":  {"<tenant>", 1, idpSCIMTargetClear},
+	"scim push":          {"<tenant> [--target <url> --token-env <VAR>]", 1, idpSCIMPush},
+	"scim pull":          {"<tenant> [--target <url> --token-env <VAR>]", 1, idpSCIMPull},
+	"scim sync":          {"<tenant> [--mode deactivate|delete] [--with-groups] [--dry-run] [--concurrency <n>] [--target <url> --token-env <VAR>]", 1, idpSCIMSync},
+	"scim-event":         {"<tenant> <kind> [--style okta|entra] [--user <u>] [--group <g>] [--set k=v]... [--id <id>] [--member-id <id>] [--inactive] [--no-external-id] [--department|--cost-center|--manager <text>] [--target <url> --token-env <VAR>]", 2, idpSCIMEvent},
+	"legacy provider":    {"<tenant> <generic|auth0|okta|cognito|onelogin|azure|show>", 2, idpLegacyProvider},
+	"legacy env":         {"<tenant>", 1, idpLegacyEnv},
+	"tamper":             {"<tenant> <bad-signature|wrong-audience|expired|replayed-nonce|saml-bad-signature|saml-unsigned|saml-wrong-audience|saml-wrong-recipient|saml-expired|saml-not-yet-valid|saml-replayed-assertion|saml-wrong-in-response-to|none>", 2, idpTamper},
+	"skew":               {"<tenant> <seconds>", 2, idpSkew},
+	"rotate-key":         {"<tenant> [--drop-previous]", 1, idpRotateKey},
+	"user disable":       {"<tenant> <email>", 2, idpUserDisable},
+	"user enable":        {"<tenant> <email>", 2, idpUserEnable},
+	"saml unsolicited":   {"<tenant> --acs-url <url> --email <e> [--entity-id <id>] [--relay-state <s>]", 1, idpSAMLUnsolicited},
+	"auth0-webhook":      {"<tenant> --event create|deactivate --user <u> --target <stack-url> --secret-env <VAR> [--token-env <VAR>]", 1, idpAuth0Webhook},
 }
 
-// runIdP is `haven idp`: a verb drives a running idpsim, no verb runs the standalone one.
+// runIdP is `haven sim idp <verb>` (a running idpsim) and the hidden `haven simulator idp` (the standalone one).
 func runIdP(ctx context.Context, d deps, inv invocation) error {
 	if len(inv.args) > 0 {
 		return runIdPVerb(d, inv)
@@ -135,10 +138,10 @@ func runIdP(ctx context.Context, d deps, inv invocation) error {
 func runIdPVerb(d deps, inv invocation) error {
 	verb, words, rest, ok := findIdPVerb(inv.args)
 	if !ok {
-		return fmt.Errorf("unknown `haven idp` verb %q\n%s", strings.Join(inv.args, " "), idpUsage())
+		return fmt.Errorf("unknown `haven sim idp` verb %q\n%s", strings.Join(inv.args, " "), idpUsage())
 	}
 	if len(rest) < verb.min {
-		return fmt.Errorf("usage: haven idp %s %s", words, verb.usage)
+		return fmt.Errorf("usage: haven sim idp %s %s", idpPublicWords(words), verb.usage)
 	}
 	api, err := simAPI(d, inv, "idp")
 	if err != nil {
@@ -158,10 +161,18 @@ func findIdPVerb(args []string) (idpVerb, string, []string, bool) {
 	return idpVerb{}, "", nil, false
 }
 
+// idpPublicWords is a verb's words as the public vocabulary spells them.
+func idpPublicWords(words string) string {
+	if words == "tamper" {
+		return "fault"
+	}
+	return strings.Join(simPublicArgv("idp", strings.Fields(words)), " ")
+}
+
 func idpUsage() string {
 	lines := make([]string, 0, len(idpVerbs))
 	for words, verb := range idpVerbs {
-		lines = append(lines, "  haven idp "+words+" "+verb.usage)
+		lines = append(lines, "  haven sim idp "+idpPublicWords(words)+" "+verb.usage)
 	}
 	sort.Strings(lines)
 	return "usage:\n" + strings.Join(lines, "\n")
@@ -249,6 +260,15 @@ func envSecret(inv invocation, envFlag string) (string, error) {
 	return value, nil
 }
 
+// idpTenants prints the console's landing list: every tenant this idpsim serves.
+func idpTenants(c idpCall) error {
+	raw, err := c.api.GetRaw("/api/tenants", nil)
+	if err != nil {
+		return err
+	}
+	return printSimRaw(raw)
+}
+
 func idpTenantShow(c idpCall) error {
 	t, err := c.tenant()
 	if err != nil {
@@ -258,17 +278,30 @@ func idpTenantShow(c idpCall) error {
 		Domain, BaseURL, SCIMToken string
 		Users                      []struct{ Email string }
 		Applications               []struct{ Name, ClientID string }
+		Signing                    *struct {
+			Keys        []string
+			SkewSeconds int
+			Armed       string
+		}
 	}) {
 		fmt.Printf("tenant %s\ndomain: %s\nissuer: %s\nscim token: %s\nusers: %d\n", t, v.Domain, v.BaseURL, v.SCIMToken, len(v.Users))
 		for _, a := range v.Applications {
 			fmt.Printf("app: %s (%s)\n", a.Name, a.ClientID)
+		}
+		if v.Signing != nil {
+			fmt.Printf("signing keys: %s (first signs)\nskew: %ds\n", strings.Join(v.Signing.Keys, ", "), v.Signing.SkewSeconds)
+			armed := v.Signing.Armed
+			if armed == "" {
+				armed = "none"
+			}
+			fmt.Printf("armed break: %s\n", armed)
 		}
 	})
 }
 
 func idpAppsAdd(c idpCall) error {
 	if !c.inv.has("--name") {
-		return errors.New("usage: haven idp apps add " + idpAppsAddUsage)
+		return errors.New("usage: haven sim idp apps add " + idpAppsAddUsage)
 	}
 	return c.postTenant("apps", map[string]any{
 		"name": c.inv.value("--name"), "redirectUris": splitList(c.inv.value("--redirect")),
@@ -293,7 +326,7 @@ func idpPopulate(c idpCall) error {
 		return err
 	}
 	if !c.inv.has("--users") {
-		return fmt.Errorf("usage: haven idp populate <tenant> --users <n> [--groups <n>] [--domain <d>] [--seed <n>]")
+		return fmt.Errorf("usage: haven sim idp populate <tenant> --users <n> [--groups <n>] [--domain <d>] [--seed <n>]")
 	}
 	if c.inv.has("--domain") {
 		body["domain"] = c.inv.value("--domain")
@@ -311,7 +344,7 @@ func idpChurn(c idpCall) error {
 
 func idpUserAdd(c idpCall) error {
 	if !c.inv.has("--email") {
-		return fmt.Errorf("usage: haven idp user add <tenant> --email <e> [--given-name <n>] [--family-name <n>] [--groups <id,...>]")
+		return fmt.Errorf("usage: haven sim idp user add <tenant> --email <e> [--given-name <n>] [--family-name <n>] [--groups <id,...>]")
 	}
 	return c.postTenant("users", map[string]any{
 		"email": c.inv.value("--email"), "givenName": c.inv.value("--given-name"),
@@ -327,6 +360,16 @@ func idpDNSAdd(c idpCall) error {
 // idpDNSRemove sends no values, which idpsim reads as "remove".
 func idpDNSRemove(c idpCall) error {
 	return c.put("/control/dns/txt", map[string]any{"domain": c.rest[0]})
+}
+
+// idpVerificationSet makes idpsim serve token as the domain's /.well-known/ verification file.
+func idpVerificationSet(c idpCall) error {
+	return c.put("/control/verification", map[string]any{"domain": c.rest[0], "token": c.rest[1]})
+}
+
+// idpVerificationClear sends no token, which idpsim reads as "remove".
+func idpVerificationClear(c idpCall) error {
+	return c.put("/control/verification", map[string]any{"domain": c.rest[0]})
 }
 
 func idpActivity(c idpCall) error {
@@ -350,7 +393,7 @@ func idpReset(c idpCall) error { return c.postTenant("reset", nil) }
 
 func idpSamlp(c idpCall) error {
 	if c.rest[1] != "on" && c.rest[1] != "off" {
-		return fmt.Errorf("usage: haven idp samlp <tenant> <on|off>")
+		return fmt.Errorf("usage: haven sim idp samlp <tenant> <on|off>")
 	}
 	return c.postTenant("config", map[string]bool{"samlpSubjects": c.rest[1] == "on"})
 }

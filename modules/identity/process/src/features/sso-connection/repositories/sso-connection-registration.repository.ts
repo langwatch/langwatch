@@ -18,4 +18,6 @@ export interface SsoConnectionRegistrationSlot {
 export abstract class SsoConnectionRegistrationRepository {
   /** Takes the slot, or answers the slot that stands in the way. */
   abstract claim(candidate: SsoConnectionRegistrationSlot): Promise<SsoConnectionRegistrationSlot>;
+  /** Frees the slot one command claimed, unless its connection row already stands. */
+  abstract release(claim: { organizationId: string; commandId: string }): Promise<void>;
 }

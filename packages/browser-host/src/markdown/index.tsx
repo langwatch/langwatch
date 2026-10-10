@@ -1,16 +1,14 @@
+import { CodePreview } from "@langwatch/design-system/code-preview";
+import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
+import { getProxiedImageUrl } from "@langwatch/design-system/external-image";
 import { chakra } from "@langwatch/design-system/primitives";
 import { createLogger } from "@langwatch/observability/browser";
 import { Children, isValidElement, memo, type ReactNode, useState } from "react";
 import ReactMarkdown, { defaultUrlTransform } from "react-markdown";
 import remarkGfm from "remark-gfm";
 
-import { useRouter } from "../use-router.ts";
-import { RenderCode } from "./render-code.tsx";
-export { RenderCode } from "./render-code.tsx";
-import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
-import { getProxiedImageUrl } from "@langwatch/design-system/external-image";
-
 import { Link as UiLink } from "../link.tsx";
+import { useRouter } from "../use-router.ts";
 import { Prose } from "./prose.tsx";
 
 function codeText(children: ReactNode): string {
@@ -20,6 +18,9 @@ function codeText(children: ReactNode): string {
 }
 
 const logger = createLogger("langwatch:components:Markdown");
+
+/** The only `data:` addresses kept: inline raster pictures, as an image source. */
+const RASTER_DATA_URL_RE = /^data:image\/(?:png|jpe?g|gif|webp|avif|bmp)[;,]/i;
 
 export const proxyMarkdownImageUrls = (markdown: string): string => {
   // Matches markdown image syntax: ![description](url)
@@ -61,7 +62,8 @@ function MarkdownWithPluginsAndProxy({
     );
   }
 
-  const urlTransform = (url: string) => (url.startsWith("data:") ? url : defaultUrlTransform(url));
+  const urlTransform = (url: string, key: string) =>
+    key === "src" && RASTER_DATA_URL_RE.test(url) ? url : defaultUrlTransform(url);
 
   return (
     <Prose className={className} fontSize={fontSize} maxWidth="none" {...(color ? { color } : {})}>
@@ -82,7 +84,7 @@ function MarkdownWithPluginsAndProxy({
             const code = codeText(children).replace(/\n$/, "");
 
             if (code.includes("\n")) {
-              return <RenderCode language={match ? match[1]! : ""} code={code} />;
+              return <CodePreview language={match?.[1] ?? "text"} code={code} compact />;
             }
             return (
               <code className={className} {...rest}>

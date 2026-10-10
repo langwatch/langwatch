@@ -23,13 +23,6 @@ export const parseClickHouseDateTimeMs = (value: string): number => {
   return Number.isFinite(parsed) ? parsed : 0;
 };
 
-// Rollup uses TenantId IN array predicate, not single-tenant, because tenant
-// guard checks single value; avoids widening guard to match wrong scope.
-export const CROSS_TENANT_ROLLUP = {
-  reason:
-    "A pull-request rollup reads one organization's project tenants together, scoped by TenantId IN {tenantIds:Array(String)}.",
-} as const;
-
 /** Route cross-tenant rollup by first tenant (all share one organization). */
 export function routingTenantOf(tenantIds: readonly string[]): string {
   const [first] = tenantIds;

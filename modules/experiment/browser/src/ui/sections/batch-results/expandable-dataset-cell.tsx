@@ -243,7 +243,7 @@ export function ExpandableDatasetCell({
             bg="bg.panel/75"
             backdropFilter="blur(8px)"
             borderRadius="md"
-            boxShadow="0 0 0 2px var(--chakra-colors-border-emphasized), 0 4px 12px rgba(0,0,0,0.15)"
+            boxShadow="0 0 0 2px var(--chakra-colors-border-emphasized), 0 4px 12px color-mix(in srgb, var(--chakra-colors-bg-scrim) 15%, transparent)"
             zIndex={1001}
             display="flex"
             flexDirection="column"

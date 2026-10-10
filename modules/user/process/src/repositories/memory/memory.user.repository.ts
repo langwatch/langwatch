@@ -1,6 +1,7 @@
 import { generate } from "@langwatch/ksuid";
-import { nowInstant, toDate, type Instant } from "@langwatch/time";
+import { nowInstant, Temporal, toDate, type Instant } from "@langwatch/time";
 import {
+  EmailAlreadyRegisteredError,
   createdUserSchema,
   userAccountInfoSchema,
   userFullProfileSchema,
@@ -31,6 +32,7 @@ import type {
   CreatePasskeyUserRow,
   SetFirstUserPasswordRow,
   UserCreatedRow,
+  UserStandingRow,
   UserDeactivationOutcome,
   UserRepository,
   StoredProfileChange,
@@ -90,6 +92,21 @@ export class MemoryUserRepository implements UserRepository {
       .map((row) => ({ id: row.id, createdAt: row.createdAt }));
   }
 
+  async findStandingPage({
+    afterId,
+    limit,
+  }: {
+    afterId: string | null;
+    limit: number;
+  }): Promise<UserStandingRow[]> {
+    return this.#database
+      .rows()
+      .filter((row) => afterId === null || row.id > afterId)
+      .toSorted((a, b) => Number(a.id > b.id) - Number(a.id < b.id))
+      .slice(0, limit)
+      .map((row) => ({ id: row.id, deactivatedAt: row.deactivatedAt }));
+  }
+
   async findProfiles(userIds: string[]): Promise<UserFullProfile[]> {
     if (userIds.length === 0) return [];
 
@@ -109,6 +126,10 @@ export class MemoryUserRepository implements UserRepository {
   }
 
   async create(input: CreateUserInput): Promise<UserProfile> {
+    // The store's email is unique as written, so only an exact twin collides.
+    if (this.#database.usersWithEmail(input.email).some((row) => row.email === input.email)) {
+      throw new EmailAlreadyRegisteredError();
+    }
     const row = this.#insertUser({ name: input.name, email: input.email, emailVerified: false });
     await this.#appendMintFacts({ row });
 
@@ -197,6 +218,7 @@ export class MemoryUserRepository implements UserRepository {
       hasPasskey: this.#database.passkeyCount(id) > 0,
       twoStepEnabled: user?.twoFactorEnabled ?? false,
       dismissedAt: dismissedAt ? toDate(dismissedAt) : null,
+      accountCreatedAt: toDate(user?.createdAt ?? Temporal.Instant.fromEpochMilliseconds(0)),
     });
   }
 

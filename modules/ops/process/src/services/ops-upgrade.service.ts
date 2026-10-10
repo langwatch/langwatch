@@ -1,7 +1,10 @@
 import type {
+  OpsUpgradeDeprecation,
   OpsUpgradeIdInput,
   OpsUpgradeListRunsInput,
   OpsUpgradeListStepsInput,
+  OpsUpgradePreview,
+  OpsUpgradePreviewInput,
   OpsUpgradeRelease,
   OpsUpgradeReleasePage,
   OpsUpgradeRun,
@@ -13,9 +16,12 @@ import type {
   OpsUpgradeStepDetail,
   OpsUpgradeStepPage,
   OpsUpgradeTarget,
+  OpsUpgradeTargetSummary,
 } from "@langwatch/ops-contract";
 import { UpgradeStepNotFailedError } from "@langwatch/ops-contract";
+import type { Deprecation } from "@langwatch/upgrade/manifest";
 import type {
+  UpgradePreview,
   UpgradeReleaseSummary,
   UpgradeRunDetail,
   UpgradeRunPhaseView,
@@ -23,6 +29,7 @@ import type {
   UpgradeStatus,
   UpgradeStepDetail,
   UpgradeStepView,
+  UpgradeTargetSummary,
   UpgradeTargetView,
 } from "@langwatch/upgrade/reader";
 
@@ -33,7 +40,12 @@ function runSummaryOf(run: UpgradeRunSummary): OpsUpgradeRunSummary {
   return { id, kind, release, floor, startedAt, finishedAt, outcome };
 }
 
-function statusOf(status: UpgradeStatus): OpsUpgradeStatus {
+function deprecationOf(entry: Deprecation): OpsUpgradeDeprecation {
+  const { id, what, kind, deprecatedIn, removedIn, notice } = entry;
+  return { id, what, kind, deprecatedIn, removedIn, successor: entry.successor ?? null, notice };
+}
+
+function statusOf(status: UpgradeStatus): Omit<OpsUpgradeStatus, "deprecations"> {
   const { lease, lastRun } = status;
   return {
     state: status.state,
@@ -76,12 +88,14 @@ function stepOf(step: UpgradeStepView): OpsUpgradeStep {
     statusLabel: step.statusLabel,
     owner: step.owner,
     description: step.description,
+    finishBy: step.finishBy,
     recorded: step.recorded,
     inferred: step.inferred,
     attempt: step.attempt,
     lastError: step.lastError,
     report: step.report,
     progress: step.progress,
+    waitingOn: step.waitingOn.map((writer) => ({ ...writer })),
     runId: step.runId,
     startedAt: step.startedAt,
     finishedAt: step.finishedAt,
@@ -113,6 +127,35 @@ function runOf(run: UpgradeRunDetail): OpsUpgradeRun {
   };
 }
 
+function previewOf(preview: UpgradePreview): OpsUpgradePreview {
+  const { plan } = preview;
+  return {
+    installed: preview.installed,
+    plan:
+      plan.outcome === "planned"
+        ? {
+            outcome: "planned",
+            fresh: plan.fresh,
+            releases: plan.releases.map((release) => ({ ...release })),
+            notNeeded: [...plan.notNeeded],
+          }
+        : { outcome: "refused", code: plan.code, stopAt: plan.stopAt, message: plan.message },
+    preflight: preview.preflight.map((row) => ({
+      id: row.id,
+      name: row.name,
+      outcome: row.outcome,
+      detail: row.detail ?? null,
+      fix: row.fix ?? null,
+      docsPath: row.docsPath ?? null,
+    })),
+  };
+}
+
+function targetSummaryOf(summary: UpgradeTargetSummary): OpsUpgradeTargetSummary {
+  const { target, version, outstanding, lastError } = summary;
+  return { target, version, outstanding, lastError };
+}
+
 /**
  * The Upgrades pages' reads over UpgradeReader (round 8, U2-API), mapped field by field into
  * ops' own contract shapes; the reader's `upgrade_not_found` passes through.
@@ -126,7 +169,8 @@ export class OpsUpgradeService {
   private constructor(private readonly ledger: UpgradeLedgerRepository) {}
 
   async getStatus(): Promise<OpsUpgradeStatus> {
-    return statusOf(await this.ledger.findStatus());
+    const deprecations = this.ledger.findDeprecations().map(deprecationOf);
+    return { ...statusOf(await this.ledger.findStatus()), deprecations };
   }
 
   async listReleases(): Promise<OpsUpgradeReleasePage> {
@@ -150,6 +194,14 @@ export class OpsUpgradeService {
 
   async getRun({ id }: OpsUpgradeIdInput): Promise<OpsUpgradeRun> {
     return runOf(await this.ledger.getRun({ id }));
+  }
+
+  async preview({ to }: OpsUpgradePreviewInput): Promise<OpsUpgradePreview> {
+    return previewOf(await this.ledger.findPreview({ to }));
+  }
+
+  async listTargets(): Promise<OpsUpgradeTargetSummary[]> {
+    return (await this.ledger.findTargets()).map(targetSummaryOf);
   }
 
   /** Reopens a failed step for the worker's next sweep, its checkpoint kept (D6). */

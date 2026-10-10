@@ -19,7 +19,7 @@ export function PipelineTreeFilter({
           <Search size={11} color="var(--chakra-colors-fg-muted)" />
         </Box>
         <Input
-          size="xs"
+          size="sm"
           aria-label="Filter pipelines"
           placeholder="Filter..."
           value={filter}
@@ -27,10 +27,10 @@ export function PipelineTreeFilter({
           paddingLeft={7}
         />
       </Box>
-      <Button variant="ghost" size="2xs" onClick={onExpandAll}>
+      <Button variant="ghost" size="sm" onClick={onExpandAll}>
         Expand all
       </Button>
-      <Button variant="ghost" size="2xs" onClick={onCollapseAll}>
+      <Button variant="ghost" size="sm" onClick={onCollapseAll}>
         Collapse
       </Button>
     </>

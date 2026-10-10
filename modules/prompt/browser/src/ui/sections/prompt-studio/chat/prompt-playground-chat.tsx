@@ -1,5 +1,7 @@
 import { Box, type BoxProps, HStack, IconButton } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import { AggregateReadOnlyNotice } from "@langwatch/error-views";
+import { isAggregateProjectKind } from "@langwatch/project-contract";
 import type { PromptConfigFormValues, runtimeInputsSchema } from "@langwatch/prompt-contract";
 import { type DisplayPart, flattenMessages } from "@langwatch/trace-contract/conversation";
 import { forwardRef, useCallback, useImperativeHandle, useMemo } from "react";
@@ -107,6 +109,16 @@ const PromptPlaygroundChat = forwardRef<PromptPlaygroundChatRef, PromptPlaygroun
       (part: DisplayPart) => <MessageActions part={part} onDelete={() => deleteMessage(part.id)} />,
       [deleteMessage],
     );
+
+    // An aggregate (ADR-177) holds no key to send the chat with and runs
+    // nothing, so the thread and input are never shown and no request is sent.
+    if (isAggregateProjectKind(project?.kind)) {
+      return (
+        <Box width="full" height="full" padding={4} {...boxProps}>
+          <AggregateReadOnlyNotice />
+        </Box>
+      );
+    }
 
     return (
       <Box width="full" height="full" display="flex" flexDirection="column" {...boxProps}>

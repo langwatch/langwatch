@@ -4,7 +4,6 @@ import { createTestLogger } from "@langwatch/test-harness";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { MemoryProductAnalyticsChannel } from "../../channels/memory/memory.saas.channels.ts";
 import { MemorySaasRateLimitRepository } from "../../repositories/memory/memory.saas-rate-limit.repository.ts";
 import type { SaasRateLimitRepository } from "../../repositories/saas-rate-limit.repository.ts";
 import { LangWatchCloudService } from "../langwatch-cloud.service.ts";
@@ -33,19 +32,20 @@ function setup({
     return Promise.resolve([]);
   },
   release = {},
+  failFacts = false,
 }: {
+  failFacts?: boolean;
   isSaas?: boolean;
   release?: Partial<Parameters<typeof UsageReportReceiverService.create>[0]["release"]>;
   rateLimits?: SaasRateLimitRepository;
   recordUsageReport?: LicensingApi["recordUsageReport"];
 } = {}) {
-  const analytics = MemoryProductAnalyticsChannel.create();
+  const facts: unknown[] = [];
   const { logger, lines } = createTestLogger();
   const receiver = UsageReportReceiverService.create({
     cloud: LangWatchCloudService.create({ isSaas }),
     rateLimits,
     registry: createApiFixture<LicensingApi>({ recordUsageReport }),
-    analytics,
     logger,
     release: {
       latestRelease: void 0,
@@ -54,7 +54,16 @@ function setup({
       ...release,
     },
   });
-  return { receiver, analytics, lines };
+  receiver.connect({
+    recordUsageReportReceived: {
+      send: (payload) => {
+        if (failFacts) return Promise.reject(new Error("event log down"));
+        facts.push(payload);
+        return Promise.resolve();
+      },
+    },
+  });
+  return { receiver, facts, lines };
 }
 
 function report(extra: Record<string, unknown> = {}) {
@@ -76,9 +85,9 @@ describe("UsageReportReceiverService", () => {
 
   describe("when Cloud receives a report", () => {
     /** @scenario "An accepted report is recorded and sent to product analytics" */
-    it("records the known fields and sends the same event on, counting the unknown ones", async () => {
+    it("records the known fields and the received fact, counting the unknown ones", async () => {
       recorded.length = 0;
-      const { receiver, analytics } = setup();
+      const { receiver, facts } = setup();
 
       await expect(receiver.receive(report({ from_the_future: 1 }))).resolves.toEqual({
         message: "Event captured",
@@ -92,11 +101,14 @@ describe("UsageReportReceiverService", () => {
           receivedAt: RECEIVED_AT,
         },
       ]);
-      expect(analytics.captured).toEqual([
+      expect(facts).toEqual([
         {
-          distinctId: "install-1",
+          tenantId: "platform",
+          occurredAt: Date.parse(RECEIVED_AT),
+          instanceId: "install-1",
           event: "daily_usage_stats",
-          properties: { version: "3.1.0", unknown_fields: 1 },
+          properties: { version: "3.1.0" },
+          unknownFields: 1,
         },
       ]);
     });
@@ -110,7 +122,7 @@ describe("UsageReportReceiverService", () => {
         pipelines: null,
         migrations: {},
       };
-      const { receiver, analytics } = setup();
+      const { receiver, facts } = setup();
 
       await receiver.receive(report({ report_schema_version: 4, ops_health: opsHealth }));
 
@@ -118,22 +130,27 @@ describe("UsageReportReceiverService", () => {
         properties: { report_schema_version: 4, ops_health: opsHealth },
         unknownFields: 0,
       });
-      expect(analytics.captured[0]?.properties).toMatchObject({
-        ops_health: opsHealth,
-        unknown_fields: 0,
-      });
+      expect(facts[0]).toMatchObject({ properties: { ops_health: opsHealth }, unknownFields: 0 });
     });
 
     /** @scenario "A report the registry cannot store is still accepted" */
     /** @scenario "Storage failing never refuses the report" */
     it("answers the report and logs when the registry fails", async () => {
-      const { receiver, analytics, lines } = setup({
+      const { receiver, facts, lines } = setup({
         recordUsageReport: () => Promise.reject(new Error("registry down")),
       });
 
       await expect(receiver.receive(report())).resolves.toEqual({ message: "Event captured" });
-      expect(analytics.captured).toHaveLength(1);
+      expect(facts).toHaveLength(1);
       expect(lines.findLine("error", "not recorded in the install registry")).toBeDefined();
+    });
+
+    /** @scenario "A report whose fact cannot be recorded is still accepted" */
+    it("answers the report and logs when the fact is not recorded", async () => {
+      const { receiver, lines } = setup({ failFacts: true });
+
+      await expect(receiver.receive(report())).resolves.toEqual({ message: "Event captured" });
+      expect(lines.findLine("error", "its fact was not recorded")).toBeDefined();
     });
   });
 
@@ -173,11 +190,11 @@ describe("UsageReportReceiverService", () => {
       ["per-install", "track_usage:instance:install-1"],
     ])("refuses at the %s limit before recording anything", async (_, key) => {
       recorded.length = 0;
-      const { receiver, analytics } = setup({ rateLimits: limiterRefusing(key) });
+      const { receiver, facts } = setup({ rateLimits: limiterRefusing(key) });
 
       await expect(receiver.receive(report())).rejects.toMatchObject({ code: "rate_limited" });
       expect(recorded).toEqual([]);
-      expect(analytics.captured).toEqual([]);
+      expect(facts).toEqual([]);
     });
 
     it("counts no per-address bucket where the sender named no address", async () => {
@@ -195,14 +212,14 @@ describe("UsageReportReceiverService", () => {
     it("refuses before counting, recording or sending anything", async () => {
       recorded.length = 0;
       const limiter = limiterRefusing();
-      const { receiver, analytics } = setup({ isSaas: false, rateLimits: limiter });
+      const { receiver, facts } = setup({ isSaas: false, rateLimits: limiter });
 
       await expect(receiver.receive(report())).rejects.toMatchObject({
         code: "langwatch_cloud_only",
       });
       expect(limiter.asked).toEqual([]);
       expect(recorded).toEqual([]);
-      expect(analytics.captured).toEqual([]);
+      expect(facts).toEqual([]);
     });
   });
 });

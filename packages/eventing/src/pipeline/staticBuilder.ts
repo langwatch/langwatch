@@ -229,6 +229,7 @@ export class PipelineBuilder<
             subscriber.handle(subscriber.data.parse(event.data), {
               ...context,
               occurredAt: event.occurredAt,
+              createdAt: event.createdAt,
               eventId: event.id,
               ...(event.idempotencyKey && { idempotencyKey: event.idempotencyKey }),
             }),

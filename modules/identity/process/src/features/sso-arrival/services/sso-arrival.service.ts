@@ -67,7 +67,8 @@ export class SsoArrivalService {
       const { organizationId } = decision;
 
       if (await this.deps.memberships.isMember({ organizationId, userId: user.id })) {
-        await this.resumeAdmission({ user, organizationId, domain });
+        // shortcut: a retry does not read the seat, so it resumes as MEMBER; read it for VIEWER.
+        await this.resumeAdmission({ user, organizationId, domain, role: "MEMBER" });
         await this.adoptIdentity(user.id);
         return;
       }
@@ -88,7 +89,7 @@ export class SsoArrivalService {
 
       const organization = await this.deps.memberships.findOrganization({ organizationId });
       if (organization) {
-        await this.joinOrganization({ user, org: organization, domain });
+        await this.joinOrganization({ user, org: organization, domain, connectionId });
         await this.adoptIdentity(user.id);
       }
     } catch (error) {
@@ -113,10 +114,12 @@ export class SsoArrivalService {
     user,
     org,
     domain,
+    connectionId,
   }: {
     user: SsoArrivingUser;
     org: JoinedOrganization;
     domain: string;
+    connectionId: string;
   }): Promise<void> {
     const invite = await this.deps.memberships.applyPendingInvite({
       userId: user.id,
@@ -132,10 +135,13 @@ export class SsoArrivalService {
       organizationId: org.id,
       userId: user.id,
     });
-    if (written.seat === "DEVELOPER") {
-      // No grant, so nothing to resume: the row is the admission (ADR-171).
-      // Only the arrival that created it announces.
-      if (written.outcome !== "created") return;
+    if (written.outcome === "created") {
+      await this.recordArrival({ userId: user.id, organizationId: org.id, domain, connectionId });
+    }
+    if (written.seat === "DEVELOPER" || written.pending) {
+      // A Developer seat gets no grant, so the row is the admission (ADR-171); a pending one
+      // waits for a seat, shown to admins. Only the arrival that created it announces.
+      if (written.outcome !== "created" || written.pending) return;
       await this.deps.notifications?.joinedAutomatically({
         organizationId: org.id,
         requesterUserId: user.id,
@@ -144,7 +150,26 @@ export class SsoArrivalService {
       this.announceAutoJoin({ user, org, inviteId: null });
       return;
     }
-    await this.resumeAdmission({ user, organizationId: org.id, domain });
+    // A Lite seat is worth an organization-wide Viewer, as a SCIM create grants it.
+    const role = written.seat === "EXTERNAL" ? "VIEWER" : "MEMBER";
+    await this.resumeAdmission({ user, organizationId: org.id, domain, role });
+  }
+
+  /** Says how they got here for member provenance; the membership stands either way. */
+  private async recordArrival(args: {
+    userId: string;
+    organizationId: string;
+    domain: string;
+    connectionId: string;
+  }): Promise<void> {
+    try {
+      await this.deps.joinRequests?.recordSsoArrival(args);
+    } catch (error) {
+      logger.warn(
+        { error, userId: args.userId, connectionId: args.connectionId },
+        "a single sign-on arrival was admitted but not recorded, so its member reads as unexplained",
+      );
+    }
   }
 
   /**
@@ -156,17 +181,19 @@ export class SsoArrivalService {
     user,
     organizationId,
     domain,
+    role,
   }: {
     user: SsoArrivingUser;
     organizationId: string;
     domain: string;
+    role: "MEMBER" | "VIEWER";
   }): Promise<void> {
     const scope = { organizationId, userId: user.id };
     let read = await this.deps.authz.readPendingAdmission(scope);
     if (!read.pending) return;
 
     if (read.admission.state === "pending") {
-      await this.grantDefaultMembership({ ...scope, ...read.admission });
+      await this.grantDefaultMembership({ ...scope, ...read.admission, role });
       read = await this.deps.authz.readPendingAdmission(scope);
       if (!read.pending) return;
       if (read.admission.state === "pending") throw new AuthzGrantNotConfirmedError();
@@ -274,11 +301,13 @@ export class SsoArrivalService {
     userId,
     grantId,
     occurredAtMs,
+    role,
   }: {
     organizationId: string;
     userId: string;
     grantId: string;
     occurredAtMs: number;
+    role: "MEMBER" | "VIEWER";
   }): Promise<unknown> {
     return this.deps.authz.attachBindings({
       organizationId,
@@ -286,7 +315,7 @@ export class SsoArrivalService {
         {
           bindingId: grantId,
           principal: { userId },
-          role: "MEMBER",
+          role,
           customRoleId: null,
           scopeType: "ORGANIZATION",
           scopeId: organizationId,

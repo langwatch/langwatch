@@ -11,7 +11,6 @@ import {
   type LookupConnectionRow,
   type LookupDomainClaimRow,
   type LookupIdentifierRow,
-  type LookupInvitationRow,
   type LookupMembershipRow,
   type LookupUserRow,
 } from "../identity-lookup.repository.ts";
@@ -113,31 +112,6 @@ export class PrismaIdentityLookupRepository implements IdentityLookupRepository 
       organizationId: row.organizationId,
       organizationName: row.organization?.name ?? null,
       role: row.role,
-    }));
-  }
-
-  async findInvitations({ email }: { email: string }): Promise<readonly LookupInvitationRow[]> {
-    const rows = await this.prisma.organizationInvite.findMany({
-      where: { email: { equals: email, mode: "insensitive" } },
-      select: {
-        id: true,
-        email: true,
-        organizationId: true,
-        status: true,
-        expiration: true,
-        organization: { select: { name: true } },
-        requestedByUser: { select: { name: true } },
-      },
-      orderBy: { createdAt: "desc" },
-    });
-    return rows.map((row) => ({
-      inviteId: row.id,
-      email: row.email,
-      organizationId: row.organizationId,
-      organizationName: row.organization?.name ?? null,
-      invitedByName: row.requestedByUser?.name ?? null,
-      status: row.status,
-      expiresAtMs: row.expiration?.getTime() ?? null,
     }));
   }
 

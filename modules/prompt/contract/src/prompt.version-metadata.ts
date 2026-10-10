@@ -1,10 +1,11 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 /**
  * Shared version metadata schema for database-sourced prompts. `configId` is
  * stored separately at the root level, not in metadata.
  */
-export const versionMetadataSchema = z.object({
+const versionMetadataSchemaDefinition = z.object({
   /** Database ID of the specific version */
   versionId: z.string(),
   /** Version number (incremental) */
@@ -12,6 +13,8 @@ export const versionMetadataSchema = z.object({
   /** When this version was created, as an ISO string. */
   versionCreatedAt: z.string(),
 });
+export interface VersionMetadataSchema extends Named<typeof versionMetadataSchemaDefinition> {}
+export const versionMetadataSchema: VersionMetadataSchema = versionMetadataSchemaDefinition;
 
 export type VersionMetadata = z.infer<typeof versionMetadataSchema>;
 

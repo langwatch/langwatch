@@ -24,6 +24,7 @@ import {
 } from "../api.ts";
 import { RefusalCallout } from "../refusal-callout.tsx";
 import { useAct } from "../use-act.ts";
+import { AnyDomainProofs } from "./any-domain.tsx";
 
 /**
  * The DNS registry: this machine standing in for the registrar a reserved name
@@ -150,6 +151,7 @@ export const DomainTab = ({ tenant, reload }: { tenant: TenantView; reload: () =
           />
         </Panel>
       </Section>
+      <AnyDomainProofs reload={reload} />
     </Stack>
   );
 };

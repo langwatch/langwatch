@@ -8,12 +8,14 @@ import { moduleApi } from "@langwatch/module";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
+import { authorizationPort } from "../../__tests__/api-double.ts";
 import { anyAuthenticated } from "../../access/access.ts";
 import type { RestIdentity } from "../../hosting/api-door.ts";
 import { MANAGEMENT_API_VERSION } from "../addressing.ts";
 import { BearerIdentity } from "../bearer-identity.ts";
 import { defineRestRouter } from "../declaration.ts";
 import { RestHost } from "../host.ts";
+import { bindRestCredential } from "../request.ts";
 import type { RestProtocolRefusal } from "../response-kind.ts";
 
 const PROTOCOL = "application/example+json";
@@ -71,6 +73,7 @@ const directory = defineRestRouter(DirectoryApi)
   .withInput(z.object({ userName: z.string() }))
   .withAccess(anyAuthenticated({ reason: GATE }))
   .withResponse("protocol", { produces: PROTOCOL, because: BECAUSE, refusal })
+  .withoutAudit("test route")
   .handle(async ({ app, input, response }) =>
     response.write({
       status: 201,
@@ -97,6 +100,7 @@ const directory = defineRestRouter(DirectoryApi)
   .withParams(z.object({ id: z.string() }))
   .withAccess(anyAuthenticated({ reason: GATE }))
   .withResponse("protocol", { produces: PROTOCOL, because: BECAUSE, refusal })
+  .withoutAudit("test route")
   .handle(async ({ app, input, response }) => {
     await app.remove({ id: input.id });
 
@@ -107,6 +111,7 @@ const directory = defineRestRouter(DirectoryApi)
   .withInput(z.object({ userName: z.string() }))
   .withAccess(anyAuthenticated({ reason: GATE }))
   .withResponse("protocol", { produces: PROTOCOL, because: BECAUSE, refusal: malformedOnly })
+  .withoutAudit("test route")
   .handle(async ({ app, input, response }) =>
     response.write({
       status: 201,
@@ -119,6 +124,7 @@ const directory = defineRestRouter(DirectoryApi)
   .withInput(z.object({ userName: z.string() }))
   .withAccess(anyAuthenticated({ reason: GATE }))
   .withOutput(z.object({ id: z.string(), userName: z.string() }))
+  .withoutAudit("test route")
   .handle(({ app, input }) => app.create(input))
   .build();
 
@@ -152,11 +158,11 @@ function mounted() {
   };
 
   const host = RestHost.create({
+    authz: authorizationPort.forRequest(),
     identities: {
       project: closed,
       organization: closed,
       api_key: closed,
-      scim_token: door,
       instance_admin: closed,
       browser: closed,
     },
@@ -164,7 +170,9 @@ function mounted() {
     audit: { record: async () => {} },
   });
 
-  host.mount(directory.router(), () => app);
+  host.mount(directory.router(), () => app, {
+    middlewareBindings: [bindRestCredential("scim_token", () => door)],
+  });
 
   return { host: host.app, app };
 }

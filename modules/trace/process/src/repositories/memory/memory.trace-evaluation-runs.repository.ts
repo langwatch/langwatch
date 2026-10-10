@@ -1,3 +1,4 @@
+import { type Authorization, projectIdsReadBy } from "@langwatch/authorization";
 import type {
   EvaluationRunData,
   EvaluationSummary,
@@ -30,15 +31,29 @@ export class MemoryTraceEvaluationRunsRepository extends TraceEvaluationRunsRead
       .map(({ tenantId: _tenantId, ...run }) => run);
   }
 
+  async findReadableRunsByTraceId(input: {
+    authorization: Authorization;
+    traceId: string;
+  }): Promise<EvaluationRunData[]> {
+    const readable = new Set(projectIdsReadBy(input.authorization));
+    return this.runs
+      .filter((run) => readable.has(run.tenantId) && run.traceId === input.traceId)
+      .map(({ tenantId: _tenantId, ...run }) => run);
+  }
+
   async findSummariesByTraceIds(input: {
-    tenantId: string;
+    authorization: Authorization;
     traceIds: readonly string[];
     since: number;
-  }): Promise<Record<string, EvaluationSummary[]>> {
-    const output: Record<string, EvaluationSummary[]> = {};
-    for (const run of this.#within(input)) {
+  }): Promise<(EvaluationSummary & { tenantId: string })[]> {
+    const output: (EvaluationSummary & { tenantId: string })[] = [];
+    const runs = projectIdsReadBy(input.authorization).flatMap((tenantId) =>
+      this.#within({ tenantId, traceIds: input.traceIds }),
+    );
+    for (const run of runs) {
       if ((run.scheduledAt ?? 0) < input.since || !run.traceId) continue;
-      (output[run.traceId] ??= []).push({
+      output.push({
+        tenantId: run.tenantId,
         evaluationId: run.evaluationId,
         evaluatorId: run.evaluatorId,
         evaluatorType: run.evaluatorType,
@@ -83,6 +98,20 @@ export class MemoryTraceEvaluationRunsRepository extends TraceEvaluationRunsRead
           completedAt: run.completedAt,
         },
       });
+    }
+    return output;
+  }
+
+  async findReadableTraceEvaluations(input: {
+    authorization: Authorization;
+    traceIds: readonly string[];
+  }): Promise<Record<string, TraceEvaluationData[]>> {
+    const output: Record<string, TraceEvaluationData[]> = {};
+    for (const tenantId of projectIdsReadBy(input.authorization)) {
+      const read = await this.findTraceEvaluations({ tenantId, traceIds: input.traceIds });
+      for (const [traceId, evaluations] of Object.entries(read)) {
+        (output[traceId] ??= []).push(...evaluations);
+      }
     }
     return output;
   }

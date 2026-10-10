@@ -1,17 +1,13 @@
 // @vitest-environment jsdom
 /**
- * The drawer content panel is blurred and partly transparent so the page stays readable.
+ * Drawers share the opaque overlay ground with menus and dialogs.
  * @see specs/features/drawer-backdrop-transparency-blur.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render } from "@testing-library/react";
+import { cleanup } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { Drawer } from "../src/components/overlays/drawer.tsx";
-
-const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
+import { renderWithDesignSystem } from "../src/testing/index.tsx";
 
 /**
  * Chakra applies these props through an Emotion-injected class, not an inline
@@ -33,13 +29,12 @@ function cssRulesForElement(element: Element): string {
 }
 
 function openDrawerContent(): HTMLElement {
-  render(
+  renderWithDesignSystem(
     <Drawer.Root open={true} placement="end">
       <Drawer.Content>
         <Drawer.Body>Content</Drawer.Body>
       </Drawer.Content>
     </Drawer.Root>,
-    { wrapper: Wrapper },
   );
   const content = document.querySelector<HTMLElement>("[data-part='content']");
   if (!content) throw new Error("drawer content panel not found");
@@ -50,12 +45,13 @@ describe("Drawer.Content", () => {
   afterEach(cleanup);
 
   describe("when a drawer opens", () => {
-    /** @scenario "Drawer content panel applies blur filter and transparency" */
-    it("blurs its backdrop by 25px and fills at 80% opacity", () => {
+    /** @scenario "Drawer content panel shares the opaque overlay surface" */
+    it("uses the overlay token without mixing the page behind it", () => {
       const css = cssRulesForElement(openDrawerContent());
 
-      expect(css).toContain("var(--lw-backdrop-blur, blur(25px))");
-      expect(css).toContain("var(--lw-panel-alpha, 80%)");
+      expect(css).toContain("background:var(--chakra-colors-bg-overlay)");
+      expect(css).not.toContain("backdrop-filter");
+      expect(css).not.toContain("--lw-panel-alpha");
     });
   });
 });

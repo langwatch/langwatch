@@ -77,7 +77,10 @@ export type AuthzApiMap = {
       mutation: { input: Omit<AuthzChangeGrantRoleInput, "caller" | "actor">; output: Grant };
     };
     revokeGrant: {
-      mutation: { input: Omit<AuthzRevokeGrantByIdInput, "actor">; output: GrantRevoked };
+      mutation: {
+        input: Omit<AuthzRevokeGrantByIdInput, "caller" | "actor">;
+        output: GrantRevoked;
+      };
     };
     /**
      * Every grant in the organization, principals and scopes named: audit-grade

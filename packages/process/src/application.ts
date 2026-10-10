@@ -1,5 +1,5 @@
-import { type BoundTransportFacts, type TransportPeers } from "@langwatch/api";
-import { type FeatureEventing } from "@langwatch/eventing";
+import { type BoundMiddlewareBindings, type TransportPeers } from "@langwatch/api";
+import { type EventUpcastReader, type FeatureEventing } from "@langwatch/eventing";
 import {
   type DependencyToken,
   type FeatureApiIdentity,
@@ -111,6 +111,8 @@ export class BootedRuntime<Members, Rest = never, Trpc = never> {
    * everything mounted. Absent in every role that serves no requests, and in a test.
    */
   readonly handler: unknown;
+  /** This role's event-sourcing runtime, where it holds one. */
+  private readonly eventing: EventingHost | undefined;
 
   constructor({
     name,
@@ -124,6 +126,7 @@ export class BootedRuntime<Members, Rest = never, Trpc = never> {
     services,
     declaredBy = new Map(),
     handler = void 0,
+    eventing = void 0,
   }: {
     name: string;
     role: ServerRole;
@@ -136,6 +139,7 @@ export class BootedRuntime<Members, Rest = never, Trpc = never> {
     services: readonly RuntimeService[];
     declaredBy?: ReadonlyMap<unknown, string>;
     handler?: unknown;
+    eventing?: EventingHost | undefined;
   }) {
     this.name = name;
     this.role = role;
@@ -146,6 +150,7 @@ export class BootedRuntime<Members, Rest = never, Trpc = never> {
     this.contributions = contributions;
     this.declaredBy = declaredBy;
     this.handler = handler;
+    this.eventing = eventing;
     this.lifecycle = new RuntimeLifecycle(services, scope);
     this.services = services;
   }
@@ -183,6 +188,14 @@ export class BootedRuntime<Members, Rest = never, Trpc = never> {
   ): readonly Step[] {
     const { name, role, installed } = this;
     return migrationStepsOf({ process: name, role, installed, isMigrationStep });
+  }
+
+  /**
+   * The declared event upcasts and the stored events each still covers, for the upgrade ledger
+   * (§9; Alex, 2026-10-09). Undefined where this role holds no event log.
+   */
+  upcastReader(): EventUpcastReader | undefined {
+    return this.eventing?.upcastReader?.();
   }
 
   /**
@@ -512,6 +525,9 @@ export class ApplicationBuilder<
     const scope = new ResourceScope();
     const featureServices: RuntimeService[] = [];
     const installed = new Map<string, InstalledFeatureState>();
+    // Called, not handed: ops installs before the modules whose tenant steps it drives (S6-FEED).
+    const declaredMigrationSteps = () =>
+      [...installed.values()].flatMap((state) => state.migrationSteps ?? []);
     const provided = new Map<TokenIdentity, unknown>();
     const apis = new LocalFeatureApis();
     const declared: DeclaredTransports[] = [];
@@ -529,6 +545,7 @@ export class ApplicationBuilder<
           repositorySelection: selections.get(declaration.name),
           role,
           replayer,
+          declaredMigrationSteps,
           resolve: (token) => resolveInstallToken({ token, provided, apis }),
         });
         featureServices.push(...resources.sealServices());
@@ -549,11 +566,11 @@ export class ApplicationBuilder<
       // its own app gets the same instance every other caller holds.
       if (role === "api") {
         // Now: all Apps exist, nothing serves yet. Only moment doors can be built.
-        const facts = [...installed].map(([feature, state]) => ({
+        const middlewareBindings = [...installed].map(([feature, state]) => ({
           feature,
-          facts: state.facts ?? [],
+          middlewareBindings: state.middlewareBindings ?? [],
         }));
-        const hosts = this.openDoors((token) => provided.get(token), facts);
+        const hosts = this.openDoors((token) => provided.get(token), middlewareBindings);
         if (
           hosts.rest !== void 0 ||
           hosts.trpc !== void 0 ||
@@ -593,19 +610,22 @@ export class ApplicationBuilder<
       services: [...featureServices, ...this.state.services, ...consumers],
       declaredBy: contributions.declaredBy,
       handler,
+      eventing,
     });
   }
 
   /**
    * The doors this process opens, resolved once: named hosts come back as they are; a factory
-   * runs here over every installed App, by contract token, and every module's bound facts.
+   * runs here over every installed App, by contract token, and every module's middleware bindings.
    */
   private openDoors(
     resolve: (token: TokenIdentity) => unknown,
-    facts: readonly BoundTransportFacts[] = [],
+    middlewareBindings: readonly BoundMiddlewareBindings[] = [],
   ): FeatureTransportHosts<Rest, Trpc> {
     const source = this.state.hosts;
-    return typeof source === "function" ? source(transportPeersOf(resolve, facts)) : source;
+    return typeof source === "function"
+      ? source(transportPeersOf(resolve, middlewareBindings))
+      : source;
   }
 
   /** Store peer instances as-is; declare module API tokens. */
@@ -890,10 +910,10 @@ function declaredTransportsOf(
       feature: declaration.name,
       transports: declaration.transports,
       provided: () => state.provided,
-      // What the MODULE bound for the facts its own routes name, built by its
-      // install in this role. The process binds only its own doors' facts and
-      // never re-declares a route to supply a module's.
-      facts: state.facts ?? [],
+      // What the MODULE bound for its own routes, built by its install in this
+      // role. The process binds only its own doors' middleware context and never
+      // re-declares a route to supply a module's.
+      middlewareBindings: state.middlewareBindings ?? [],
     },
   ];
 }

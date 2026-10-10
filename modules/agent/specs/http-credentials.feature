@@ -63,7 +63,26 @@ Feature: HTTP agent credentials
   @unit
   Scenario: Credentials typed into an HTTP agent before this change are moved to project secrets
     Given HTTP agents in several projects, some still holding literal credentials
-    When the agent credential backfill runs, once or more
+    When the agent credential upgrade step runs, once or more
     Then each literal is stored as a project secret once and the agent keeps its reference
     And an agent holding only secret references is left alone
-    And an agent whose secret cannot be stored is left as it was, and the walk continues
+    And a dry run stores nothing, saves no progress and reports how many agents it would move
+
+  @unit
+  Scenario: An agent credential that cannot be moved holds the agent credential step
+    Given an HTTP agent whose credential cannot be stored as a project secret
+    When the agent credential upgrade step runs
+    Then that agent keeps its credential and every other agent is moved
+    And the step fails saying how many agents were held, with its progress kept before that agent's project
+
+  @unit
+  Scenario: An agent saved while its credential is being moved keeps the newer save
+    Given an HTTP agent saved again after the agent credential step read it
+    When the step writes the agent
+    Then the newer save is kept, and the agent counts as moved only once a re-read holds no literal
+
+  @unit
+  Scenario: The agent credential step resumes after the last project it finished
+    Given the step saved its progress after a project
+    When it runs again from that progress
+    Then it starts with the next project

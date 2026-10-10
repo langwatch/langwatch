@@ -3,7 +3,11 @@
  * platform and hides the surface (404) from everyone else; a refused caller is
  * recorded through onRefused, within the stranger budget (Q51).
  */
-import { defineTrpcFact, defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
+import {
+  defineMiddlewareContext,
+  defineTrpcRouter,
+  type TrpcRouterDeclaration,
+} from "@langwatch/api/trpc";
 import {
   type IdentityLookupOperator,
   IdentityLookupApi,
@@ -13,7 +17,7 @@ import {
 import { opsOperatorSchema, type OpsOperator } from "@langwatch/ops-contract";
 
 /** The signed-in operator, bound by the process under the name ops reads it by. */
-export const operatorFact = defineTrpcFact("opsOperator", opsOperatorSchema.nullable());
+export const operatorContext = defineMiddlewareContext("opsOperator", opsOperatorSchema.nullable());
 
 /** Main's surface: only a platform operator may look or repair, and nobody else sees it. */
 const OPERATOR = { at: "platform", refusal: "hidden" } as const;
@@ -50,7 +54,7 @@ export const identityLookupTrpcTransport: TrpcRouterDeclaration<
   typeof identityLookupTrpc
 > = defineTrpcRouter(IdentityLookupApi, identityLookupTrpc)
   .procedure("resolve")
-  .withFacts(operatorFact)
+  .withMiddlewareContext(operatorContext)
   .onRefused(
     refused("resolve", ({ address }: { address: string }) => ({
       address: normalizeIdentifierValue(address),
@@ -62,7 +66,7 @@ export const identityLookupTrpcTransport: TrpcRouterDeclaration<
   )
 
   .procedure("person")
-  .withFacts(operatorFact)
+  .withMiddlewareContext(operatorContext)
   .onRefused(
     refused("person", ({ userId, address }: { userId: string; address: string }) => ({
       userId,
@@ -75,7 +79,7 @@ export const identityLookupTrpcTransport: TrpcRouterDeclaration<
   )
 
   .procedure("recentActivity")
-  .withFacts(operatorFact)
+  .withMiddlewareContext(operatorContext)
   .onRefused(refused("recentActivity"))
   .withPermission("ops:manage", OPERATOR)
   .handle(({ app, actor }, operator) =>
@@ -83,7 +87,7 @@ export const identityLookupTrpcTransport: TrpcRouterDeclaration<
   )
 
   .procedure("claimQueue")
-  .withFacts(operatorFact)
+  .withMiddlewareContext(operatorContext)
   .onRefused(refused("claimQueue"))
   .withPermission("ops:manage", OPERATOR)
   .handle(({ app, actor }, operator) =>
@@ -91,7 +95,7 @@ export const identityLookupTrpcTransport: TrpcRouterDeclaration<
   )
 
   .procedure("confirmProposedSignIn")
-  .withFacts(operatorFact)
+  .withMiddlewareContext(operatorContext)
   .onRefused(
     refused("confirmProposedSignIn", (input: Readonly<Record<string, string | null>>) => input),
   )
@@ -101,7 +105,7 @@ export const identityLookupTrpcTransport: TrpcRouterDeclaration<
   )
 
   .procedure("rejectProposedSignIn")
-  .withFacts(operatorFact)
+  .withMiddlewareContext(operatorContext)
   .onRefused(
     refused("rejectProposedSignIn", (input: Readonly<Record<string, string | null>>) => input),
   )
@@ -111,7 +115,7 @@ export const identityLookupTrpcTransport: TrpcRouterDeclaration<
   )
 
   .procedure("detachMethod")
-  .withFacts(operatorFact)
+  .withMiddlewareContext(operatorContext)
   .onRefused(refused("detachMethod", (input: Readonly<Record<string, string | null>>) => input))
   .withPermission("ops:manage", OPERATOR)
   .handle(({ app, input, actor }, operator) =>
@@ -119,7 +123,7 @@ export const identityLookupTrpcTransport: TrpcRouterDeclaration<
   )
 
   .procedure("endSessions")
-  .withFacts(operatorFact)
+  .withMiddlewareContext(operatorContext)
   .onRefused(refused("endSessions", (input: Readonly<Record<string, string | null>>) => input))
   .withPermission("ops:manage", OPERATOR)
   .handle(({ app, input, actor }, operator) =>
@@ -127,7 +131,7 @@ export const identityLookupTrpcTransport: TrpcRouterDeclaration<
   )
 
   .procedure("resendInvitation")
-  .withFacts(operatorFact)
+  .withMiddlewareContext(operatorContext)
   .onRefused(refused("resendInvitation", (input: Readonly<Record<string, string | null>>) => input))
   .withPermission("ops:manage", OPERATOR)
   .handle(({ app, input, actor }, operator) =>
@@ -135,7 +139,7 @@ export const identityLookupTrpcTransport: TrpcRouterDeclaration<
   )
 
   .procedure("extendInvitation")
-  .withFacts(operatorFact)
+  .withMiddlewareContext(operatorContext)
   .onRefused(refused("extendInvitation", (input: Readonly<Record<string, string | null>>) => input))
   .withPermission("ops:manage", OPERATOR)
   .handle(({ app, input, actor }, operator) =>

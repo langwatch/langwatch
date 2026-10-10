@@ -41,7 +41,7 @@ describe("<ScenarioTargetRow/>", () => {
       const row = renderRow(runOf({ status: ScenarioRunStatus.SUCCESS }));
 
       const circle = row.firstElementChild;
-      expect(circle).toHaveStyle({ background: "var(--chakra-colors-green-500)" });
+      expect(circle).toHaveStyle({ background: "var(--chakra-colors-green-fg)" });
       expect(circle).toHaveStyle({ borderRadius: "var(--chakra-radii-full)" });
       expect(row.querySelector("svg")).toBeNull();
     });
@@ -73,7 +73,7 @@ describe("<ScenarioTargetRow/>", () => {
       const row = renderRow(runOf({ status: ScenarioRunStatus.FAILED, durationInMs: 5400 }));
       const listRow = row.parentElement!;
 
-      expect(row.firstElementChild).toHaveStyle({ background: "var(--chakra-colors-red-500)" });
+      expect(row.firstElementChild).toHaveStyle({ background: "var(--chakra-colors-red-fg)" });
       expect(within(listRow).getByText("Failed")).toBeInTheDocument();
       expect(within(listRow).getByText("5.4s")).toBeInTheDocument();
     });

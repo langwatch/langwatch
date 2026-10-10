@@ -16,7 +16,7 @@ export interface GovernanceSummaryBarItem {
    */
   label: string;
   /** One shorter line beneath the pair. Omitted rather than padded. */
-  hint?: ReactNode;
+  hint?: string;
   /** A small glyph above the figure, saying what kind of thing it counts. */
   icon?: ReactNode;
 }

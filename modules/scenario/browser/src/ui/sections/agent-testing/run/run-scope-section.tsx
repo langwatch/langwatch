@@ -318,7 +318,7 @@ export function RunScopeSection({
                 checked={scope.mode === choice.mode}
                 onChange={() => onChange(emptyScopeOf(choice.mode))}
                 cursor="pointer"
-                accentColor="var(--chakra-colors-blue-500)"
+                accentColor="var(--chakra-colors-blue-solid)"
                 data-testid={`run-scope-${choice.mode}`}
               />
               {choice.label}

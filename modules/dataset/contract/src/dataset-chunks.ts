@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 /** Tenant-prefixed, ordered chunk key for the object-backed dataset layout. */
 export const chunkKey = (projectId: string, datasetId: string, index: number): string =>
@@ -47,9 +48,14 @@ const normalizeTarget = {
  * Durable payload for Dataset's normalization worker lane. The `stagingKey`
  * form was queued by the previous release and is read for one more (ADR-155).
  */
-export const datasetNormalizePayloadSchema = z.union([
+const datasetNormalizePayloadSchemaDefinition = z.union([
   z.object({ ...normalizeTarget, sourceStoredObjectId: z.string().min(1) }),
   z.object({ ...normalizeTarget, stagingKey: z.string().min(1) }),
 ]);
+export interface DatasetNormalizePayloadSchema extends Named<
+  typeof datasetNormalizePayloadSchemaDefinition
+> {}
+export const datasetNormalizePayloadSchema: DatasetNormalizePayloadSchema =
+  datasetNormalizePayloadSchemaDefinition;
 
 export type DatasetNormalizePayload = z.infer<typeof datasetNormalizePayloadSchema>;

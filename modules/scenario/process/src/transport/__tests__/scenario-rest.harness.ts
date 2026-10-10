@@ -2,9 +2,9 @@ import { EventEmitter } from "node:events";
 
 import type { AgentApi } from "@langwatch/agent-contract";
 import {
-  bindRestMiddleware,
+  bindMiddlewareContext,
   createRestRuntime,
-  projectRestFacts,
+  projectRequestContext,
   UnauthorizedError,
 } from "@langwatch/api/rest";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
@@ -19,6 +19,7 @@ import type { ResourceOwnership } from "@langwatch/process";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { type SimulationService } from "@langwatch/scenario-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { UserApi } from "@langwatch/user-contract";
 
@@ -131,6 +132,8 @@ export function createScenarioRestTestRuntime(
   } = {},
 ) {
   const runtime = createRestRuntime({
+    audit: { record: () => {} },
+    authorization: restTestAuthorization(),
     identity: {
       authenticate: () => {
         if (options.authenticated === false) {
@@ -145,11 +148,11 @@ export function createScenarioRestTestRuntime(
     },
   });
 
-  const projectFacts = bindRestMiddleware(projectRestFacts, () => ({
+  const projectContext = bindMiddlewareContext(projectRequestContext, () => ({
     projectSlug: PROJECT_SLUG,
     viewerUserId: options.viewerUserId === undefined ? "user_scenario_rest" : options.viewerUserId,
     actorId: options.actorId ?? "user_scenario_rest",
   }));
 
-  return { runtime, projectFacts };
+  return { runtime, projectContext };
 }

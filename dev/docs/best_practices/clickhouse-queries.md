@@ -233,7 +233,7 @@ Anything else that wants to skip the filter should be a repository method taking
 A table whose whole purpose is to total usage _across_ an organization's projects cannot lead with `TenantId` — the aggregate it exists to answer has no single tenant. Two tables qualify today:
 
 - `metric_usage_estimates` (written by `clickhouse.metric-data-point-append.repository.ts`; it has no reader today, so the first one must meet every condition below) — ORDER BY `(OrganizationId, TenantId, PointId)`.
-- `billable_events` (`enterprise/modules/billing/process/src/repositories/clickhouse/clickhouse.billable-events.repository.ts`, every organization read declaring `unscoped` with its reason) — ORDER BY `(OrganizationId, TenantId, DeduplicationKeyHash)`; the columns are identifiers, an event type and timestamps only. Open items against the conditions below, checked 2026-09-23 — see the note after them.
+- `billable_events` (`enterprise/modules/billing/process/src/repositories/clickhouse/clickhouse.billable-events.repository.ts`, every organization read setting `SKIP_TENANT_CHECK: true` under a comment giving its reason) — ORDER BY `(OrganizationId, TenantId, DeduplicationKeyHash)`; the columns are identifiers, an event type and timestamps only. Open items against the conditions below, checked 2026-09-23 — see the note after them.
 
 It is allowed to lead with `OrganizationId` **only** because all of these hold:
 
@@ -256,7 +256,7 @@ A new table wanting this carve-out needs all six, plus a line here. Anything tha
 
 An id-only `/api/files/:storedObjectId` URL (minted before issue #4947) names no project, so one read must find which project owns the object before any tenant-scoped read can run. `stored_objects` qualifies, through `ClickHouseStoredObjectOwnerRepository.findOwner` (`modules/stored-object/process/src/repositories/clickhouse/clickhouse.stored-object-owner.repository.ts`). The bar, all of which holds today:
 
-1. The unscoped read **SELECTs the owning `project_id` and nothing else** — no bytes, metadata or payload columns — and declares `unscoped` with its reason.
+1. The unscoped read **SELECTs the owning `project_id` and nothing else** — no bytes, metadata or payload columns — and sets `SKIP_TENANT_CHECK: true` under a comment giving its reason.
 2. The transport (`stored-object-file.rest.ts`) throttles the caller by its own identity **before** the lookup, then runs `authorizeFileRead` against the owner it found **before** any other read.
 3. Every read after that is project-scoped (`readById({ projectId, id })`) to the same pinned owner id the gate authorized.
 4. A bound integration scenario pins the order (`stored-object-files-route.integration.test.ts`: the owner is resolved from the row id before the membership check).

@@ -42,6 +42,8 @@ export const inboxSchema = z.object({
   smtpAddr: z.string(),
   baseUrl: z.string(),
   persistent: z.boolean(),
+  /** The stack's own inbox address; empty on a standalone sink. */
+  address: z.string(),
 });
 export type Inbox = z.infer<typeof inboxSchema>;
 

@@ -1,16 +1,16 @@
 import { Link } from "@langwatch/browser-host/link";
+import { AccessState } from "@langwatch/design-system/access-state";
 /**
  * Whether every member must prove a second factor. The server enforces it; the
  * switch stays available for turning it off after an Enterprise plan lapses.
  * Spec: specs/identity/mfa-and-session-shape.feature
  */
-import { Alert, Box, HStack, Text } from "@langwatch/design-system/primitives";
-import { SettingsCard } from "@langwatch/design-system/settings-card";
+import { Alert, Box, Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { Switch } from "@langwatch/design-system/switch";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { Lock } from "lucide-react";
 
 import { EnterprisePlanBadge } from "../../../../ui/elements/enterprise-plan-badge.tsx";
+import { PolicySection } from "../elements/policy-section.tsx";
 
 const OFF_EXPLANATION =
   "Requiring two-step verification of every member is part of the Enterprise plan. Members can still set it up on their own accounts.";
@@ -41,16 +41,32 @@ export function TwoStepRequirementCard({
   const explanation = mfaRequired ? HELD_EXPLANATION : OFF_EXPLANATION;
 
   return (
-    <SettingsCard
+    <PolicySection
       title="Require two-step verification"
       hint="A code, a passkey, or one their identity provider confirms. Turning it on signs nobody out."
       badge={
-        <HStack gap={2}>
-          {planLocked && <EnterprisePlanBadge data-testid="two-step-requirement-plan-badge" />}
+        planLocked ? <EnterprisePlanBadge data-testid="two-step-requirement-plan-badge" /> : void 0
+      }
+      actions={
+        <HStack
+          width="full"
+          justify="space-between"
+          gap={3}
+          borderTopWidth="1px"
+          borderColor="border.muted"
+          paddingTop={1.5}
+        >
+          <VStack align="start" gap={0}>
+            <Text fontSize="xs">Require two-step verification</Text>
+            <Text color="fg.muted" fontSize="xs">
+              Changes apply immediately.
+            </Text>
+          </VStack>
           {/* The tooltip hangs off a wrapper: a disabled switch takes no pointer events. */}
           <Tooltip content={explanation} disabled={!planLocked || mfaRequired}>
             <Box>
               <Switch
+                size="sm"
                 checked={mfaRequired}
                 disabled={saving || (!canTurnOn && !mfaRequired)}
                 onCheckedChange={(details) => onChange(details.checked)}
@@ -64,20 +80,21 @@ export function TwoStepRequirementCard({
       data-testid="two-step-requirement-card"
     >
       {planLocked && (
-        <HStack gap={2} align="start" data-testid="two-step-requirement-plan-notice">
-          <Box color="fg.muted" marginTop="1px" flexShrink={0}>
-            <Lock size={14} />
-          </Box>
-          <Text color="fg.muted" fontSize="xs">
-            {explanation}{" "}
-            <Link href={planLink.href} colorPalette="orange" color="colorPalette.fg">
-              {planLink.label}
-            </Link>
-          </Text>
-        </HStack>
+        <AccessState
+          kind="upgrade"
+          compact
+          title="Requiring two-step verification needs Enterprise"
+          description={explanation}
+          data-testid="two-step-requirement-plan-notice"
+          actions={
+            <Button asChild size="xs" colorPalette="orange">
+              <Link href={planLink.href}>{planLink.label}</Link>
+            </Button>
+          }
+        />
       )}
 
-      <Text fontSize="sm" data-testid="two-step-held-count">
+      <Text fontSize="xs" data-testid="two-step-held-count">
         {heldCount === 0
           ? `All ${memberCount} members can prove a second factor.`
           : `${heldCount} of ${memberCount} members cannot prove a second factor yet${
@@ -88,7 +105,7 @@ export function TwoStepRequirementCard({
       </Text>
 
       {connection.connected && !connection.assertsSecondFactor ? (
-        <Alert.Root status="warning" data-testid="two-step-connection-warning">
+        <Alert.Root size="sm" status="warning" data-testid="two-step-connection-warning">
           <Alert.Indicator />
           <Alert.Content>
             <Alert.Title>
@@ -103,6 +120,6 @@ export function TwoStepRequirementCard({
           </Alert.Content>
         </Alert.Root>
       ) : null}
-    </SettingsCard>
+    </PolicySection>
   );
 }

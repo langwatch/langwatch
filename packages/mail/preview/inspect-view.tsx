@@ -15,6 +15,7 @@ import {
 import { useEffect, useState, type JSX, type ReactNode } from "react";
 
 import { PropsForm } from "./props-form.tsx";
+import { documentUrl as documentUrlOf, fetchRender, isStaticStudio } from "./studio-endpoints.ts";
 import {
   prepareMailDocument,
   renderResponseSchema,
@@ -64,15 +65,13 @@ export const InspectView = ({
   const [tab, setTab] = useState<Tab>("html");
 
   const template = templates.find((entry) => entry.id === selected?.id) ?? null;
+  const fixtureIndex =
+    template?.fixtures.findIndex((fixture) => fixture.name === selected?.fixture) ?? -1;
 
   useEffect(() => {
     if (!selected || currentProps === null) return;
     const controller = new AbortController();
-    fetch("/__render", {
-      method: "POST",
-      body: JSON.stringify({ id: selected.id, props: currentProps }),
-      signal: controller.signal,
-    })
+    fetchRender({ id: selected.id, fixtureIndex, props: currentProps, signal: controller.signal })
       .then((response) => response.json())
       .then((json: unknown) => {
         const body = renderResponseSchema.parse(json);
@@ -85,10 +84,10 @@ export const InspectView = ({
       })
       .catch(() => undefined);
     return () => controller.abort();
-  }, [selected, currentProps]);
+  }, [selected, fixtureIndex, currentProps]);
 
   const documentUrl = selected
-    ? `/__document?id=${encodeURIComponent(selected.id)}&props=${encodeURIComponent(JSON.stringify(currentProps))}`
+    ? documentUrlOf({ id: selected.id, fixtureIndex, props: currentProps })
     : "#";
   const frameHtml = rendered ? prepareMailDocument(rendered.html, previewDark) : "";
 
@@ -155,21 +154,42 @@ export const InspectView = ({
 
         <div className="mailroom-props">
           <Panel title="Props">
-            {template ? (
-              <PropsForm
-                schema={template.formSchema}
-                props={currentProps}
-                onChange={onPropsChange}
-              />
-            ) : (
-              <Text tone="secondary">Pick a message to edit its props.</Text>
-            )}
+            <PropsPanelBody
+              template={template}
+              currentProps={currentProps}
+              onPropsChange={onPropsChange}
+            />
           </Panel>
         </div>
       </div>
     </Page>
   );
 };
+
+/** The live props form, or under the built studio the fixture's props, read-only. */
+function PropsPanelBody({
+  template,
+  currentProps,
+  onPropsChange,
+}: {
+  template: TemplateSummary | null;
+  currentProps: unknown;
+  onPropsChange: (next: unknown) => void;
+}): JSX.Element {
+  if (!template) return <Text tone="secondary">Pick a message to edit its props.</Text>;
+  if (!isStaticStudio) {
+    return <PropsForm schema={template.formSchema} props={currentProps} onChange={onPropsChange} />;
+  }
+  return (
+    <Stack gap={2}>
+      <Text tone="secondary">
+        Read-only: this studio was rendered at build time. `pnpm --filter @langwatch/mail dev` edits
+        props live.
+      </Text>
+      <CodeBlock code={JSON.stringify(currentProps, null, 2)} label="Props" wrap />
+    </Stack>
+  );
+}
 
 /** One template in the navigation: its title, when it is sent, and a button per fixture. */
 function TemplateNavEntry({

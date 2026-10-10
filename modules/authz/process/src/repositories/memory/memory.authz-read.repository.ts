@@ -1,16 +1,18 @@
-import type { ShareableResourceKind } from "@langwatch/authorization";
+import { grantConditionSchema, type ShareableResourceKind } from "@langwatch/authorization";
 import type { AuthzPrincipalRef, CollectedBinding } from "@langwatch/authz-contract";
 
 import {
   AuthzReadRepository,
   type CustomRolePermissionsRow,
   type OrganizationMembership,
+  type SharedReadRow,
   type ShareLinkRow,
 } from "../authz-read.repository.ts";
 import {
   BINDING_SCOPE_TYPES,
   collectBindings,
   rolesExclusiveTo,
+  sharedProjectReadsOf,
   shareLinkRowFrom,
   SYSTEM_API_KEY_ROLE_KIND,
 } from "../eventing/eventing.authz-read.mapper.ts";
@@ -184,11 +186,44 @@ export class MemoryAuthzReadRepository extends AuthzReadRepository {
     projectId,
   }: {
     projectId: string;
-  }): Promise<{ teamId: string; organizationId: string } | null> => {
+  }): Promise<{ teamId: string; organizationId: string; kind: string } | null> => {
     const project = this.memory.projects.find((row) => row.id === projectId && !row.archivedAt);
     const team = this.memory.teams.find((row) => row.id === project?.teamId);
     if (!project || !team) return null;
-    return { teamId: team.id, organizationId: team.organizationId };
+    return {
+      teamId: team.id,
+      organizationId: team.organizationId,
+      kind: project.kind ?? "application",
+    };
+  };
+
+  findLiveSharedReads = async ({
+    organizationId,
+    readerProjectId,
+  }: {
+    organizationId: string;
+    readerProjectId: string;
+  }): Promise<SharedReadRow[]> => {
+    const wanted = sharedProjectReadsOf({ organizationId, readerProjectId });
+    return this.memory.grants.flatMap((row) => {
+      const matches =
+        !row.revokedAt &&
+        row.organizationId === wanted.organizationId &&
+        row.principalType === wanted.principalType &&
+        row.principalId === wanted.principalId &&
+        row.scopeType === wanted.scopeType &&
+        row.roleKey === wanted.roleKey;
+      const condition = grantConditionSchema.safeParse(row.condition);
+      if (!matches || !condition.success) return [];
+      return [
+        {
+          grantId: row.id,
+          memberProjectId: row.scopeId,
+          condition: condition.data,
+          expiresAt: row.expiresAt,
+        },
+      ];
+    });
   };
 
   findTeamOrganization = async ({

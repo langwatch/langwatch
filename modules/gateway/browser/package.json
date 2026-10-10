@@ -37,13 +37,14 @@
     "@langwatch/model-provider-contract": "workspace:*",
     "@langwatch/onboarding-client": "workspace:*",
     "@langwatch/onboarding-contract": "workspace:*",
+    "@langwatch/project-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
     "lucide-react": "catalog:",
     "papaparse": "catalog:",
     "react-hook-form": "catalog:",
     "recharts": "catalog:",
-    "shiki": "^3.15.0",
+    "shiki": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {

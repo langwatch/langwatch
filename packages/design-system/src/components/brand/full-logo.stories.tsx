@@ -6,7 +6,13 @@ import { FullLogo } from "./full-logo.tsx";
 import { LogoIcon } from "./logo-icon.tsx";
 
 const meta = {
-  title: "Foundations/Full logo",
+  title: "Brand/Full logo",
+  parameters: {
+    usage: {
+      use: "The product lockup: the mark beside the wordmark.",
+      avoid: "Small spaces: use Logo icon.",
+    },
+  },
   component: FullLogo,
   tags: ["autodocs"],
 } satisfies Meta<typeof FullLogo>;

@@ -9,10 +9,12 @@ import { NullLogRecordStorageRepository } from "../log-record-storage.repository
 import { NullSessionGroupsRepository } from "../session-groups.repository.ts";
 import type { TraceAnalyticsFoldCacheRepository } from "../trace-analytics-fold-cache.repository.ts";
 import { TracePayloadReaderRepository } from "../trace-payload-reader.repository.ts";
+import { TraceProjectedReadRepository } from "../trace-projected-read.repository.ts";
 import type { TraceSummaryFoldCacheRepository } from "../trace-summary-fold-cache.repository.ts";
 import type { TraceRepositories } from "../trace.repositories.ts";
 import { MemoryNullTraceAttributedRollupRepository } from "./memory.null-trace-attributed-rollup.repository.ts";
 import { MemoryNullTraceClusteringSampleRepository } from "./memory.null-trace-clustering-sample.repository.ts";
+import { MemoryNullTraceLegacyReadRepository } from "./memory.null-trace-legacy-read.repository.ts";
 import { MemoryNullTraceListRepository } from "./memory.null-trace-list.repository.ts";
 import { MemorySpanStorageRepository } from "./memory.span-storage.repository.ts";
 import { MemoryTraceAnalyticsRepository } from "./memory.trace-analytics-projection.repository.ts";
@@ -25,6 +27,7 @@ import { MemoryTraceEditOverlayRepository } from "./memory.trace-edit-overlay.re
 import { MemoryTraceEvaluationRunsRepository } from "./memory.trace-evaluation-runs.repository.ts";
 import { MemoryTraceExistenceRepository } from "./memory.trace-existence.repository.ts";
 import { MemoryTraceExportSlotRepository } from "./memory.trace-export-slot.repository.ts";
+import { MemoryTraceIndexMaterialisationRepository } from "./memory.trace-index-materialisation.repository.ts";
 import { MemoryTraceIngestSourceBillingRepository } from "./memory.trace-ingest-source-billing.repository.ts";
 import { MemoryTraceInstantEvalRunsRepository } from "./memory.trace-instant-eval-runs.repository.ts";
 import { MemoryTraceModelSpendRepository } from "./memory.trace-model-spend.repository.ts";
@@ -50,6 +53,37 @@ class MemoryTraceAnalyticsFoldCacheRepository implements TraceAnalyticsFoldCache
 }
 
 /** The memory tier opens no ClickHouse: a raw tenant client is refused by name, never faked. */
+/** The span tree reads ClickHouse alone, so this tier refuses it as the raw client does. */
+class MemoryTraceProjectedReadRepository extends TraceProjectedReadRepository {
+  static create(): MemoryTraceProjectedReadRepository {
+    return new MemoryTraceProjectedReadRepository();
+  }
+
+  private refuse(): Promise<never> {
+    return Promise.reject(new TraceCapabilityUnavailableError("memory", "a ClickHouse client"));
+  }
+
+  findEvaluationSpans(): Promise<never> {
+    return this.refuse();
+  }
+
+  findEvaluationEvents(): Promise<never> {
+    return this.refuse();
+  }
+
+  findIngestLag(): Promise<never> {
+    return this.refuse();
+  }
+
+  listSummaryPage(): Promise<never> {
+    return this.refuse();
+  }
+
+  findSummarySince(): Promise<never> {
+    return this.refuse();
+  }
+}
+
 class MemoryTraceClickHouseClientsRepository extends TraceClickHouse {
   static create(): MemoryTraceClickHouseClientsRepository {
     return new MemoryTraceClickHouseClientsRepository();
@@ -114,6 +148,7 @@ export class MemoryTraceRepositories {
       summaryFoldCache: MemoryTraceSummaryFoldCacheRepository.create(),
       analyticsFoldCache: MemoryTraceAnalyticsFoldCacheRepository.create(),
       spanStorage: MemorySpanStorageRepository.create(spans),
+      spanTree: MemoryTraceProjectedReadRepository.create(),
       existence: MemoryTraceExistenceRepository.create(spans),
       derivationSpans: MemoryTraceDerivationSpanRepository.create(spans),
       summary: MemoryTraceSummaryRepository.create(),
@@ -126,6 +161,7 @@ export class MemoryTraceRepositories {
       evaluationRuns: MemoryTraceEvaluationRunsRepository.create(),
       annotations: MemoryTraceAnnotationsRepository.create(),
       annotationScores: MemoryTraceAnnotationScoresRepository.create(),
+      legacyRead: MemoryNullTraceLegacyReadRepository.create(),
       // The list and the session rollup are ClickHouse aggregations over the
       // summary projection, which this tier does not fold: they answer empty
       // pages rather than a half-built rollup over the spans it does hold.
@@ -134,6 +170,7 @@ export class MemoryTraceRepositories {
       eventPayloads: MemoryTracePayloadReaderRepository.create(),
       clusteringSample: MemoryNullTraceClusteringSampleRepository.create(),
       usageCount: MemoryTraceUsageCountRepository.create(),
+      indexMaterialisation: MemoryTraceIndexMaterialisationRepository.create(),
       modelSpend: MemoryTraceModelSpendRepository.create(),
       attributeSpend: MemoryTraceAttributeSpendRepository.create(),
       attributedRollup: MemoryNullTraceAttributedRollupRepository.create(),

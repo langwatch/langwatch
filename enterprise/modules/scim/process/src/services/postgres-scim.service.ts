@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { UserApi } from "@langwatch/user-contract";
 
+import type { ScimSeatRepository } from "../repositories/scim-seat.repository.ts";
 import type { ScimRepository } from "../repositories/scim.repository.ts";
 import type { ScimCostCenterFacts } from "./scim-cost-center.service.ts";
 import type { ScimOrganizationAdministration } from "./scim-deprovision.service.ts";
@@ -20,6 +22,8 @@ export class PostgresScimService {
     users: UserApi;
     costCenterFacts: ScimCostCenterFacts;
     organization: ScimOrganizationAdministration;
+    seats: ScimSeatRepository;
+    members: Pick<OrganizationApi, "deleteMember">;
     entitlements: Pick<EntitlementApi, "getActivePlan">;
     lifecycle: ScimSyncLifecycle;
     provenOffboarding: boolean;
@@ -33,6 +37,8 @@ export class PostgresScimService {
       users: options.users,
       costCenterFacts: options.costCenterFacts,
       organization: options.organization,
+      seats: options.seats,
+      members: options.members,
       entitlements: options.entitlements,
       lifecycle: options.lifecycle,
       provenOffboarding: options.provenOffboarding,

@@ -1,3 +1,4 @@
+import { type Authorization, projectIdsReadBy } from "@langwatch/authorization";
 import type {
   DerivedTraceEvent,
   NormalizedSpan,
@@ -34,32 +35,46 @@ export class MemorySpanStorageRepository extends NullSpanStorageRepository {
   }
 
   override async findNormalizedSpansByTraceId(
-    parameters: { tenantId: string; traceId: string; limit?: number } & OccurredAtHint,
+    parameters: { authorization: Authorization; traceId: string; limit?: number } & OccurredAtHint,
   ): Promise<NormalizedSpan[]> {
-    const spans = this.#store.findNormalizedByTrace(parameters);
+    const spans = this.#normalizedSpans(parameters);
     return typeof parameters.limit === "number" ? spans.slice(0, parameters.limit) : spans;
   }
 
   override async findNormalizedSpanById(parameters: {
-    tenantId: string;
+    authorization: Authorization;
     traceId: string;
     spanId: string;
   }): Promise<NormalizedSpan | null> {
-    const spans = this.#store.findNormalizedByTrace(parameters);
+    const spans = this.#normalizedSpans(parameters);
     return spans.find((span) => span.spanId === parameters.spanId) ?? null;
   }
 
   override async findTraceEventsByTraceId(
-    parameters: { tenantId: string; traceId: string } & OccurredAtHint,
+    parameters: { authorization: Authorization; traceId: string } & OccurredAtHint,
   ): Promise<DerivedTraceEvent[]> {
-    return this.#store.findDerivedEvents(parameters);
+    return projectIdsReadBy(parameters.authorization).flatMap((tenantId) =>
+      this.#store.findDerivedEvents({ tenantId, traceId: parameters.traceId }),
+    );
   }
 
   override async findSpanByIds(
-    _parameters: { tenantId: string; traceId: string; spanId: string } & OccurredAtHint,
+    _parameters: { authorization: Authorization; traceId: string; spanId: string } & OccurredAtHint,
   ): Promise<Span | null> {
     // The rendered span is a different shape from the row written here, and
     // this store keeps no rendering of it.
     return null;
+  }
+
+  #normalizedSpans({
+    authorization,
+    traceId,
+  }: {
+    authorization: Authorization;
+    traceId: string;
+  }): NormalizedSpan[] {
+    return projectIdsReadBy(authorization).flatMap((tenantId) =>
+      this.#store.findNormalizedByTrace({ tenantId, traceId }),
+    );
   }
 }

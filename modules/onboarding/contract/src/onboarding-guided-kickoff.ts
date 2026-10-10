@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 /**
  * The kickoff message that hands the guided onboarding to Langy once the
  * tour ends: a typed part the panel renders as the tour card, plus a text
@@ -18,7 +19,7 @@ export const guidedKickoffTourStatusSchema = z.enum(["completed", "skipped", "no
 export type GuidedKickoffTourStatus = z.infer<typeof guidedKickoffTourStatusSchema>;
 
 /** What the takeover collected, as the tour hands it over. */
-export const guidedKickoffInputSchema = z.object({
+const guidedKickoffInputSchemaDefinition = z.object({
   path: guidedPathSchema,
   /** Every pick from the value screen, in the order they were made. */
   paths: z.array(guidedPathSchema),
@@ -38,6 +39,11 @@ export const guidedKickoffInputSchema = z.object({
   virtualKeyPreview: z.string().optional(),
   virtualKeyRevealId: z.string().optional(),
 });
+export interface GuidedKickoffInputSchema extends Named<
+  typeof guidedKickoffInputSchemaDefinition
+> {}
+export const guidedKickoffInputSchema: GuidedKickoffInputSchema =
+  guidedKickoffInputSchemaDefinition;
 export type GuidedKickoffInput = z.infer<typeof guidedKickoffInputSchema>;
 
 /** What the tour hands the panel: the input plus the attached conversation, if any. */
@@ -75,10 +81,12 @@ export function guidedKickoffStateFactsOf(
   };
 }
 
-export const guidedKickoffPartSchema = z.object({
+const guidedKickoffPartSchemaDefinition = z.object({
   type: z.literal(GUIDED_ONBOARDING_KICKOFF_PART_TYPE),
   ...guidedKickoffInputSchema.shape,
 });
+export interface GuidedKickoffPartSchema extends Named<typeof guidedKickoffPartSchemaDefinition> {}
+export const guidedKickoffPartSchema: GuidedKickoffPartSchema = guidedKickoffPartSchemaDefinition;
 export type GuidedKickoffPart = z.infer<typeof guidedKickoffPartSchema>;
 
 /** Parse an opaque message part as the kickoff part, or null. */

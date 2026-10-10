@@ -51,7 +51,7 @@ export function SeriesFiltersDialog({
         </Dialog.Body>
         <Dialog.Footer>
           <HStack justifyContent="flex-end" width="full">
-            <Button colorPalette="blue" onClick={() => onOpenChange(false)}>
+            <Button colorPalette="orange" onClick={() => onOpenChange(false)}>
               Done
             </Button>
           </HStack>

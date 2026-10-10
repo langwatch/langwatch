@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import { findAliasTarget } from "./latest-aliases.ts";
@@ -12,12 +13,17 @@ function isModelTier(name: string): name is ModelTier {
 }
 
 /** One model worth pointing a tier at, as a picker renders it. */
-export const tierTargetSuggestionSchema = z.object({
+const tierTargetSuggestionSchemaDefinition = z.object({
   modelId: z.string(),
   name: z.string(),
   provider: z.string(),
   recommended: z.boolean().optional(),
 });
+export interface TierTargetSuggestionSchema extends Named<
+  typeof tierTargetSuggestionSchemaDefinition
+> {}
+export const tierTargetSuggestionSchema: TierTargetSuggestionSchema =
+  tierTargetSuggestionSchemaDefinition;
 export type TierTargetSuggestion = z.infer<typeof tierTargetSuggestionSchema>;
 
 export interface SuggestTierTargetsInput {

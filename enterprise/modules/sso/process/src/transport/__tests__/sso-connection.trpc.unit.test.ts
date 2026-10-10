@@ -11,6 +11,7 @@ import type {
   SsoSetupApi,
 } from "@langwatch/identity-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { testAuthorizeDefaults } from "@langwatch/test-harness/trpc-members";
 import { initTRPC } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -52,6 +53,7 @@ function runtimePorts(): TrpcRuntimeMembers<TestContext> {
     },
     authorization: {
       forRequest: () => ({
+        ...testAuthorizeDefaults,
         getDecision: async () => ({ permitted: true, organizationRole: null }),
         getProjectAnyDecision: async () => ({ permitted: true, organizationRole: null }),
         checkScopeLineage: async () => ({ kind: "consistent" }),
@@ -74,7 +76,13 @@ async function harness() {
   const connections = RecordingSsoConnectionLedger.create();
   const record = vi.fn<AuditLogApi["record"]>(async () => ({ id: "audit", occurredAt: 0 }));
   const getHistory = vi.fn<SsoConnectionHistoryApi["getHistory"]>(async () => [
-    { eventId: "evt_1", occurredAtMs: 1, summary: "Registered", carriedOver: false },
+    {
+      eventId: "evt_1",
+      eventType: "lw.identity.connection_registered",
+      occurredAtMs: 1,
+      summary: "Registered",
+      carriedOver: false,
+    },
   ]);
   const getMigrationProgress = vi.fn<SsoSetupApi["getMigrationProgress"]>(async () => ({
     migration: null,
@@ -381,14 +389,20 @@ describe("the admin single sign-on surface", () => {
       expect(context.getHistory).not.toHaveBeenCalled();
     });
 
-    it("reads the history under the connection's own organization and audits it", async () => {
+    it("preserves history event types under the connection's own organization and audits it", async () => {
       context.connections.findById.mockResolvedValue(legacyConnection("org_acme"));
       const caller = context.callerFor({ id: STAFF_ID });
 
       const history = await caller.getHistory({ connectionId: "ssoc_1" });
 
       expect(history).toEqual([
-        { eventId: "evt_1", occurredAtMs: 1, summary: "Registered", carriedOver: false },
+        {
+          eventId: "evt_1",
+          eventType: "lw.identity.connection_registered",
+          occurredAtMs: 1,
+          summary: "Registered",
+          carriedOver: false,
+        },
       ]);
       expect(context.getHistory).toHaveBeenCalledWith({
         organizationId: "org_acme",
@@ -406,7 +420,13 @@ describe("the admin single sign-on surface", () => {
       await expect(
         context.callerFor({ id: STAFF_ID }).getHistory({ connectionId: "ssoc_1" }),
       ).resolves.toEqual([
-        { eventId: "evt_1", occurredAtMs: 1, summary: "Registered", carriedOver: false },
+        {
+          eventId: "evt_1",
+          eventType: "lw.identity.connection_registered",
+          occurredAtMs: 1,
+          summary: "Registered",
+          carriedOver: false,
+        },
       ]);
       expect(context.getHistory).toHaveBeenCalledOnce();
 

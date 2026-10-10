@@ -1,11 +1,11 @@
 /**
  * Data Retention's answer to the port its screen declares: every method
- * projects a `@langwatch/browser-host` capability, so the module mounts it,
+ * projects a `@langwatch/browser-host` host service, so the module mounts it,
  * not the application. ARCHITECTURE.md §10.1.
  */
 
 import {
-  useUiCapabilities,
+  useUiHostServices,
   useUiScope,
   type UiFeedback,
   type UiRoute,
@@ -31,7 +31,7 @@ type RetentionHostReadings = {
   isEnterprise: boolean;
 };
 
-class CapabilityDataRetentionHost extends DataRetentionHostApi {
+class HostServiceDataRetentionHost extends DataRetentionHostApi {
   constructor(
     private readonly deps: {
       scope: RetentionHostScope;
@@ -80,6 +80,14 @@ class CapabilityDataRetentionHost extends DataRetentionHostApi {
     this.deps.feedback.succeeded(notice);
   }
 
+  warned(notice: RetentionSuccessNotice): void {
+    this.deps.feedback.warned(notice);
+  }
+
+  informed(notice: RetentionSuccessNotice): void {
+    this.deps.feedback.informed(notice);
+  }
+
   failed(failure: RetentionFailureNotice): void {
     this.deps.feedback.failed(failure);
   }
@@ -91,7 +99,7 @@ class CapabilityDataRetentionHost extends DataRetentionHostApi {
  * is what `mounts.load` resolves.
  */
 export default function DataRetentionHostMount({ children }: { children?: ReactNode }) {
-  const { session, feedback, route } = useUiCapabilities();
+  const { session, feedback, route } = useUiHostServices();
   const uiScope = useUiScope();
   const { organizationId, projectId } = uiScope.activeScope();
   const teamId = uiScope.scopeHost()?.team()?.id;
@@ -127,7 +135,7 @@ export default function DataRetentionHostMount({ children }: { children?: ReactN
 
   const host = useMemo(
     () =>
-      new CapabilityDataRetentionHost({
+      new HostServiceDataRetentionHost({
         scope: {
           organizationId: organizationId ?? void 0,
           teamId,

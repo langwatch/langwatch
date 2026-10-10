@@ -1,13 +1,19 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import type { SharedDef } from "../provider-types.ts";
 
-export const annotationQueueActionParamsSchema = z.object({
+const annotationQueueActionParamsSchemaDefinition = z.object({
   annotators: z
     .array(z.object({ id: z.string(), name: z.string() }))
     .min(1, "Add at least one annotator."),
   createdByUserId: z.string().min(1).optional(),
 });
+export interface AnnotationQueueActionParamsSchema extends Named<
+  typeof annotationQueueActionParamsSchemaDefinition
+> {}
+export const annotationQueueActionParamsSchema: AnnotationQueueActionParamsSchema =
+  annotationQueueActionParamsSchemaDefinition;
 export type AnnotationQueueActionParams = z.infer<typeof annotationQueueActionParamsSchema>;
 
 const definition: SharedDef = {

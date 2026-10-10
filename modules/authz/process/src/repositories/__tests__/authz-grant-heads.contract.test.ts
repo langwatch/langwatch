@@ -510,6 +510,61 @@ describe.each(backends)("given the grant heads on the $name backend", (backend) 
     });
   });
 
+  describe.skipIf(backend.skip)(
+    "when identical skipping grants land inside the projection lag",
+    () => {
+      /** @scenario "Identical skipping grants applied inside the projection lag leave one live grant" */
+      it("keeps one live grant, and its revoke leaves none", async () => {
+        const heads = await open();
+        const { userId } = await heads.member();
+        const first = userGrant({ organizationId: heads.organizationId, principalId: userId });
+        const second = { ...first, id: id("grant"), occurredAt: at(T0 + 1) };
+        const third = { ...first, id: id("grant"), occurredAt: at(T0 + 2) };
+        const projection = heads.repositories.grantProjection;
+        const skipping = (row: GrantRowShape) =>
+          ({ kind: "grant.upsert", row, onDuplicate: "skip" }) as const;
+
+        await Promise.all([
+          projection.append(skipping(first), CONTEXT),
+          projection.append(skipping(second), CONTEXT),
+        ]);
+        await projection.bulkAppend?.([skipping(third)], CONTEXT);
+        const live: GrantRowShape[] = [];
+        for (const row of [first, second, third]) {
+          const peek = await heads.grant(row.id);
+          if (peek && peek.revokedAtMs === null) live.push(row);
+        }
+        expect(live).toHaveLength(1);
+
+        await projection.append(
+          {
+            kind: "grant.revoke",
+            organizationId: heads.organizationId,
+            grantId: live[0]?.id ?? "",
+            reason: null,
+            occurredAt: at(T0 + 3),
+          },
+          CONTEXT,
+        );
+        for (const row of [first, second, third]) {
+          expect((await heads.grant(row.id))?.revokedAtMs ?? "absent").not.toBeNull();
+        }
+      });
+
+      it("still writes an identical grant whose writer did not ask to skip", async () => {
+        const heads = await open();
+        const { userId } = await heads.member();
+        const first = userGrant({ organizationId: heads.organizationId, principalId: userId });
+        const second = { ...first, id: id("grant") };
+        const projection = heads.repositories.grantProjection;
+        await projection.append({ kind: "grant.upsert", row: first }, CONTEXT);
+        await projection.append({ kind: "grant.upsert", row: second }, CONTEXT);
+
+        expect(await heads.grant(second.id)).not.toBeNull();
+      });
+    },
+  );
+
   describe.skipIf(backend.skip)("when the synchronous deny runs", () => {
     it("marks only the named organization's live grants and keeps an earlier mark", async () => {
       const heads = await open();

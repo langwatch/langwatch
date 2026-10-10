@@ -15,7 +15,7 @@ const mutations = {
         "ProviderMembers<Live>",
       );
     },
-    diagnostic: "relational",
+    diagnostic: "prisma",
   },
   "closed custom members": {
     file: "src/process-supply.ts",

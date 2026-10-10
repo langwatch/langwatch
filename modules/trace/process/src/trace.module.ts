@@ -1,26 +1,29 @@
 import {
-  bindRestMiddleware,
   principalOfCredential,
   projectCredentialOfRequest,
+  projectRequestContextOf,
 } from "@langwatch/api/rest";
 import { defineProcessModule, type PublishedProcessModule } from "@langwatch/process";
 import type { TraceApi, TraceServerConfig } from "@langwatch/trace-contract";
+import { defineMigrationStep } from "@langwatch/upgrade/step";
 
 import { TraceModule } from "./app/trace.app.ts";
+import { traceChannels } from "./channels/trace-channels.registry.ts";
 import { traceProcessingEventing } from "./eventing/trace-processing.pipeline.ts";
 import { traceProjectMilestonesEventing } from "./eventing/trace-project-milestones.pipeline.ts";
 import { traceCollectorEvaluationsEventing } from "./features/ingestion/eventing/trace-collector-evaluations.pipeline.ts";
 import { traceIngestSourceBillingEventing } from "./features/ingestion/eventing/trace-ingest-source-billing.pipeline.ts";
 import { traceRepositories } from "./repositories/trace-repositories.registry.ts";
+import { TraceIndexMaterialisationService } from "./services/trace-index-materialisation.service.ts";
 import { collectorRest } from "./transport/collector.rest.ts";
 import { exportProgressTrpcTransport } from "./transport/export-progress.trpc.ts";
-import { otlpIngestRest } from "./transport/otlp-ingest.rest.ts";
+import { otlpIngestDoor, otlpIngestRest } from "./transport/otlp-ingest.rest.ts";
 import { sharedTraceTrpcTransport } from "./transport/shared-trace.trpc.ts";
 import { spansTrpcTransport } from "./transport/spans.trpc.ts";
 import { traceEditOverlayTrpcTransport } from "./transport/trace-edit-overlay.trpc.ts";
 import { traceExportRest } from "./transport/trace-export.rest.ts";
 import { traceLegacyRest } from "./transport/trace-legacy.rest.ts";
-import { tracesRest, tracesRestCredential } from "./transport/traces.rest.ts";
+import { tracesRest } from "./transport/traces.rest.ts";
 import { tracesTrpcTransport } from "./transport/traces.trpc.ts";
 import { trackedEventLegacyPathRest, trackedEventRest } from "./transport/tracked-event.rest.ts";
 
@@ -31,6 +34,7 @@ import { trackedEventLegacyPathRest, trackedEventRest } from "./transport/tracke
 export const traceProcessModule: PublishedProcessModule<"trace", TraceApi, TraceServerConfig> =
   defineProcessModule("trace")
     .withRepositories(traceRepositories)
+    .withChannels(traceChannels)
     .withApi(TraceModule)
     .withTransports(
       tracesTrpcTransport,
@@ -59,16 +63,37 @@ export const traceProcessModule: PublishedProcessModule<"trace", TraceApi, Trace
       // of the REST families — the path alias's wildcard must come after it.
       otlpIngestRest,
     )
-    .withTransportFacts(() => [
+    .provideMiddlewareContext({
+      projectRequestContext: projectRequestContextOf,
       // The v1 trace reads answer through the key's own grants, so the routes
       // read the CREDENTIAL - its api key id and the member it acts as - rather
       // than whoever holds it. A legacy project key names neither.
-      bindRestMiddleware(tracesRestCredential, (context) => {
-        const credential = projectCredentialOfRequest(context.req.raw);
+      tracesRestCredential: (request) => {
+        const credential = projectCredentialOfRequest(request);
         return { principal: principalOfCredential(credential) };
-      }),
-    ])
+      },
+    })
+    // The OTLP receiver's key, resolved before the body is read (W02-DOOR-SHAPE, 2026-10-10).
+    .withDoors({ otlp_ingest: otlpIngestDoor })
     .withEventing(traceProcessingEventing)
     .withEventing(traceProjectMilestonesEventing)
     .withEventing(traceCollectorEvaluationsEventing)
-    .withEventing(traceIngestSourceBillingEventing);
+    .withEventing(traceIngestSourceBillingEventing)
+    .withMigrations(({ repositories }) => [
+      defineMigrationStep({
+        id: "trace:track-updated-at-index-materialisation",
+        kind: "data",
+        mode: "background",
+        description:
+          "Waits for ClickHouse to build the trace summaries updated-at index over existing rows.",
+        needsOldWritersGone: false,
+        run: ({ checkpoint, dryRun, signal }) =>
+          TraceIndexMaterialisationService.create({
+            mutations: repositories.indexMaterialisation,
+          }).waitForUpdatedAtIndex({
+            dryRun,
+            signal,
+            onPoll: (progress) => checkpoint.save({ report: progress }),
+          }),
+      }),
+    ]);

@@ -1,5 +1,4 @@
 import type { AuthzApi } from "@langwatch/authz-contract";
-import { HandledError } from "@langwatch/handled-error";
 import {
   PERSONAL_TEAM_ARCHIVE_REFUSAL,
   PersonalTeamProtectedError,
@@ -22,6 +21,7 @@ import {
 } from "@langwatch/organization-contract";
 
 import type { TeamRepository } from "../repositories/team.repository.ts";
+import { teamNameTaken } from "../rules/team-name.rules.ts";
 import type { TeamIdentity } from "./team-identity.service.ts";
 
 /** Team reads and lifecycle in an organization: lookup, creation with a unique slug, archive. */
@@ -58,18 +58,10 @@ export class OrganizationTeamService {
   async createTeam(input: CreateOrganizationTeamInput): Promise<OrganizationTeam> {
     const parsed = createOrganizationTeamInputSchema.parse(input);
     const identity = this.deps.teamIdentities.createTeam({ name: parsed.name });
-    const slugTaken = await this.deps.teams
-      .getBySlug({ organizationId: parsed.organizationId, slug: identity.slug })
-      .then(
-        () => true,
-        (error: unknown) => {
-          if (HandledError.isHandled(error) && error.code === "team_not_found") return false;
-          throw error;
-        },
-      );
-    if (slugTaken) {
-      throw new TeamSlugConflictError();
-    }
+    await this.assertNameFree({
+      organizationId: parsed.organizationId,
+      name: parsed.name,
+    });
 
     return this.deps.teams.create({
       organizationId: parsed.organizationId,
@@ -78,10 +70,29 @@ export class OrganizationTeamService {
     });
   }
 
-  updateTeam(input: UpdateOrganizationTeamInput): Promise<OrganizationTeam> {
+  async updateTeam(input: UpdateOrganizationTeamInput): Promise<OrganizationTeam> {
     const parsed = updateOrganizationTeamInputSchema.parse(input);
+    if (parsed.name !== undefined) {
+      await this.assertNameFree({
+        organizationId: parsed.organizationId,
+        name: parsed.name,
+        exceptTeamId: parsed.teamId,
+      });
+    }
 
     return this.deps.teams.update(parsed);
+  }
+
+  /** Refuses a name a live team of the organization already holds (WEB-11100). */
+  async assertNameFree(input: {
+    organizationId: string;
+    name: string;
+    exceptTeamId?: string;
+  }): Promise<void> {
+    const live = await this.deps.teams.findActive({ organizationId: input.organizationId });
+    if (teamNameTaken({ name: input.name, teams: live, exceptTeamId: input.exceptTeamId })) {
+      throw new TeamSlugConflictError(input.name.trim());
+    }
   }
 
   async archiveTeam(input: GetOrganizationTeamInput): Promise<OrganizationTeam> {

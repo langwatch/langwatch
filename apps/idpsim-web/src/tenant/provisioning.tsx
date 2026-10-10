@@ -25,6 +25,7 @@ import {
 } from "../api.ts";
 import { RefusalCallout } from "../refusal-callout.tsx";
 import { useAct } from "../use-act.ts";
+import { DirectoryEvents } from "./directory-events.tsx";
 
 const connectionSchema = z.object({
   configured: z.boolean(),
@@ -319,6 +320,7 @@ export const ProvisioningTab = ({ tenant, reload }: { tenant: TenantView; reload
       )}
       {tenant.lastProvisioning !== null && <LastOutcome outcome={tenant.lastProvisioning} />}
     </Stack>
+    <DirectoryEvents tenant={tenant} reload={reload} />
     <ScalePanel tenant={tenant} reload={reload} />
   </Stack>
 );

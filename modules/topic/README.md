@@ -11,7 +11,7 @@ A project's conversation topics, and what the last topic-clustering run did.
 | Classification | core (`modules/catalogue.json`)                                                           |
 | Subjects       | topic, topic-clustering                                                                   |
 | Halves         | [contract](contract) · [process](process/README.md) · [browser](browser)                  |
-| Api token      | `TopicApi` = `moduleApi<TopicApi>()("topic")`, `contract/src/topic.ts:111` (5 operations) |
+| Api token      | `TopicApi` = `moduleApi<TopicApi>()("topic")`, `contract/src/topic.ts:115` (5 operations) |
 | Other token    | `TopicBrowserApi`, `process/src/transport/topic.trpc.ts:30`                               |
 | Installed by   | api, worker, tasks (process); ui (browser)                                                |
 
@@ -34,6 +34,7 @@ Anything else topic needs belongs to another module and is reached through its `
 | ---------------- | ------------------ | --------------------------------------------- |
 | `evaluations`    | `EvaluationApi`    | [evaluation](../evaluation/README.md)         |
 | `modelProviders` | `ModelProviderApi` | [model-provider](../model-provider/README.md) |
+| `retention`      | `DataRetentionApi` | [data-retention](../data-retention/README.md) |
 | `traces`         | `TraceApi`         | [trace](../trace/README.md)                   |
 
 ## Who depends on topic

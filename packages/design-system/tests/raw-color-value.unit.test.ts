@@ -42,6 +42,8 @@ describe("getRawColorValue", () => {
 
   it("returns a scale step from the palette without a stylesheet", () => {
     expect(getRawColorValue("gray.400")).toBe("#9CA3AF");
+    expect(getRawColorValue("zinc.900")).toBe("#10101a");
+    expect(getRawColorValue("orange.500")).toBe("#ED8926");
   });
 
   it("throws for a token the stylesheet does not define instead of guessing", () => {

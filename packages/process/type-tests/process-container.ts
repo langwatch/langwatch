@@ -8,7 +8,7 @@ import type {
 } from "../src/process-container.ts";
 import { ProjectApi } from "../tests/process-supply.fixtures.ts";
 
-type Booted<Container extends { boot(): Promise<unknown> }> = Awaited<
+type Booted<Container extends { boot(...args: never[]): Promise<unknown> }> = Awaited<
   ReturnType<Container["boot"]>
 >;
 

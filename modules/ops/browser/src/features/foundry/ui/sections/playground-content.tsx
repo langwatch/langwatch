@@ -1,4 +1,6 @@
-import { Box, Flex, Grid, GridItem, Tabs, Text } from "@langwatch/design-system/primitives";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
+import { Box, Flex, Grid, GridItem, Tabs, Button } from "@langwatch/design-system/primitives";
+import { MousePointer2, Plus } from "lucide-react";
 
 import { useTraceStore } from "../../behavior/trace.store.ts";
 import { ConnectionSettings } from "./connection-settings.tsx";
@@ -12,12 +14,19 @@ import { WaterfallView } from "./waterfall-view.tsx";
 
 export function PlaygroundContent({ compact = false }: { compact?: boolean }) {
   const selectedSpanId = useTraceStore((s) => s.selectedSpanId);
-  const sidebarW = compact ? "260px" : "300px";
+  const addSpan = useTraceStore((s) => s.addSpan);
+  const sidebarW = compact ? "280px" : "340px";
 
   return (
-    <Grid h="full" w="full" templateColumns={`${sidebarW} minmax(0, 1fr)`} overflow="hidden">
+    <Grid
+      h="full"
+      w="full"
+      templateColumns={{ base: "minmax(0, 1fr)", md: `${sidebarW} minmax(0, 1fr)` }}
+      templateRows={{ base: "minmax(200px, 40%) minmax(0, 1fr)", md: "minmax(0, 1fr)" }}
+      overflow="hidden"
+    >
       {/* Left sidebar — fixed width, scrolls independently */}
-      <GridItem overflow="auto" borderRight="1px solid" borderColor="border">
+      <GridItem overflow="auto" bg="bg.subtle" borderRight="1px solid" borderColor="border.muted">
         <Flex direction="column" minH="full">
           <ConnectionSettings compact={compact} />
           <Box borderTop="1px solid" borderColor="border">
@@ -37,6 +46,7 @@ export function PlaygroundContent({ compact = false }: { compact?: boolean }) {
         <Tabs.Root
           defaultValue="editor"
           variant="line"
+          colorPalette="accent"
           size="sm"
           display="flex"
           flexDirection="column"
@@ -51,41 +61,41 @@ export function PlaygroundContent({ compact = false }: { compact?: boolean }) {
           <Tabs.List borderBottom="1px solid" borderColor="border" px={3} gap={0} flexShrink={0}>
             <Tabs.Trigger
               value="editor"
-              fontSize="xs"
-              px={3}
-              py={1.5}
+              fontSize="sm"
+              px={4}
+              py={3}
               color="fg.muted"
-              _selected={{ color: "fg.default", borderColor: "orange.500" }}
+              _selected={{ color: "fg.default", borderColor: "accent.solid" }}
             >
               Editor
             </Tabs.Trigger>
             <Tabs.Trigger
               value="waterfall"
-              fontSize="xs"
-              px={3}
-              py={1.5}
+              fontSize="sm"
+              px={4}
+              py={3}
               color="fg.muted"
-              _selected={{ color: "fg.default", borderColor: "orange.500" }}
+              _selected={{ color: "fg.default", borderColor: "accent.solid" }}
             >
               Waterfall
             </Tabs.Trigger>
             <Tabs.Trigger
               value="graph"
-              fontSize="xs"
-              px={3}
-              py={1.5}
+              fontSize="sm"
+              px={4}
+              py={3}
               color="fg.muted"
-              _selected={{ color: "fg.default", borderColor: "orange.500" }}
+              _selected={{ color: "fg.default", borderColor: "accent.solid" }}
             >
               Graph
             </Tabs.Trigger>
             <Tabs.Trigger
               value="json"
-              fontSize="xs"
-              px={3}
-              py={1.5}
+              fontSize="sm"
+              px={4}
+              py={3}
               color="fg.muted"
-              _selected={{ color: "fg.default", borderColor: "orange.500" }}
+              _selected={{ color: "fg.default", borderColor: "accent.solid" }}
             >
               JSON
             </Tabs.Trigger>
@@ -96,14 +106,17 @@ export function PlaygroundContent({ compact = false }: { compact?: boolean }) {
               {selectedSpanId ? (
                 <SpanEditorPanel />
               ) : (
-                <Flex h="300px" align="center" justify="center" color="fg.muted">
-                  <Box textAlign="center">
-                    <Text fontSize="md">Select a span to edit</Text>
-                    <Text fontSize="sm" mt={1}>
-                      Or add a new span from the tree
-                    </Text>
-                  </Box>
-                </Flex>
+                <Box minHeight="360px" display="flex" alignItems="center" padding={6}>
+                  <NoDataInfoBlock
+                    icon={<MousePointer2 />}
+                    title="Select a span to edit"
+                    description="Choose a span from the trace tree to edit its input, output, timing, and attributes."
+                  >
+                    <Button size="sm" colorPalette="accent" onClick={() => addSpan(null, "llm")}>
+                      <Plus size={16} /> Add LLM span
+                    </Button>
+                  </NoDataInfoBlock>
+                </Box>
               )}
             </Tabs.Content>
             <Tabs.Content value="waterfall" p={0}>

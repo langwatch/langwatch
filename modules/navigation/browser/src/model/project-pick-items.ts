@@ -17,6 +17,8 @@ export interface ProjectPickGroup {
     projectId: string;
     label: string;
     href: string;
+    /** An aggregate project (ADR-177), marked in the list. */
+    isAggregate?: boolean;
   }[];
 }
 
@@ -28,6 +30,7 @@ export interface ProjectPickItem {
   /** What the filter matches against: the team name plus the project name. */
   searchText: string;
   kind: "project" | "new-project";
+  isAggregate?: boolean;
 }
 
 function toPickItems(groups: ProjectPickGroup[]): ProjectPickItem[] {
@@ -39,6 +42,7 @@ function toPickItems(groups: ProjectPickGroup[]): ProjectPickItem[] {
       href: project.href,
       searchText: `${group.team.label} ${project.label}`.toLowerCase(),
       kind: "project" as const,
+      isAggregate: project.isAggregate,
     })),
     ...(group.team.canCreateProject
       ? [

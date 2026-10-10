@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import {
   evaluatorAttachmentSchema,
   MAX_EVALUATOR_ATTACHMENTS,
@@ -37,39 +38,60 @@ export const queryBoolean = z
   );
 
 /** The run plan a `/run-plans/:id` route addresses. */
-export const runPlanIdParamsSchema = z.object({
+const runPlanIdParamsSchemaDefinition = z.object({
   id: z.string().min(1).describe("The run plan id."),
 });
+export interface RunPlanIdParamsSchema extends Named<typeof runPlanIdParamsSchemaDefinition> {}
+export const runPlanIdParamsSchema: RunPlanIdParamsSchema = runPlanIdParamsSchemaDefinition;
 
-export const runPlanListQuerySchema = z.object({
+const runPlanListQuerySchemaDefinition = z.object({
   includeArchived: queryBoolean.describe(
     "Include archived run plans in the list. true, 1, yes for yes; false, 0, no or omitted for no.",
   ),
 });
+export interface RunPlanListQuerySchema extends Named<typeof runPlanListQuerySchemaDefinition> {}
+export const runPlanListQuerySchema: RunPlanListQuerySchema = runPlanListQuerySchemaDefinition;
 
-export const runPlanArchiveResultSchema = z.object({
+const runPlanArchiveResultSchemaDefinition = z.object({
   id: z.string().describe("The run plan that was archived."),
   archived: z.literal(true).describe("Always true once the plan is archived."),
 });
+export interface RunPlanArchiveResultSchema extends Named<
+  typeof runPlanArchiveResultSchemaDefinition
+> {}
+export const runPlanArchiveResultSchema: RunPlanArchiveResultSchema =
+  runPlanArchiveResultSchemaDefinition;
 
 /** The test suite a `/test-suites/:id` route addresses. */
-export const testSuiteIdParamsSchema = z.object({
+const testSuiteIdParamsSchemaDefinition = z.object({
   id: z.string().min(1).describe("The test suite id."),
 });
+export interface TestSuiteIdParamsSchema extends Named<typeof testSuiteIdParamsSchemaDefinition> {}
+export const testSuiteIdParamsSchema: TestSuiteIdParamsSchema = testSuiteIdParamsSchemaDefinition;
 
-export const testSuiteListQuerySchema = z.object({
+const testSuiteListQuerySchemaDefinition = z.object({
   includeArchived: queryBoolean.describe(
     "Include archived test suites in the list. true, 1, yes for yes; false, 0, no or omitted for no.",
   ),
 });
+export interface TestSuiteListQuerySchema extends Named<
+  typeof testSuiteListQuerySchemaDefinition
+> {}
+export const testSuiteListQuerySchema: TestSuiteListQuerySchema =
+  testSuiteListQuerySchemaDefinition;
 
-export const testSuiteArchiveResultSchema = z.object({
+const testSuiteArchiveResultSchemaDefinition = z.object({
   id: z.string().describe("The test suite that was archived."),
   archived: z.literal(true).describe("Always true once the suite is archived."),
 });
+export interface TestSuiteArchiveResultSchema extends Named<
+  typeof testSuiteArchiveResultSchemaDefinition
+> {}
+export const testSuiteArchiveResultSchema: TestSuiteArchiveResultSchema =
+  testSuiteArchiveResultSchemaDefinition;
 
 /** What a run plan covers, in the words this family was published with. */
-export const wireScopeSchema = z
+const wireScopeSchemaDefinition = z
   .discriminatedUnion("mode", [
     z.object({ mode: z.literal("all") }),
     z.object({ mode: z.literal("folders"), folderIds: z.array(z.string()) }),
@@ -79,6 +101,8 @@ export const wireScopeSchema = z
   .describe(
     "What the run plan covers: all (every active scenario), folders (the scenarios filed in the named test suites), labels (the scenarios carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan.",
   );
+export interface WireScopeSchema extends Named<typeof wireScopeSchemaDefinition> {}
+export const wireScopeSchema: WireScopeSchema = wireScopeSchemaDefinition;
 
 export type WireScope = z.infer<typeof wireScopeSchema>;
 
@@ -88,7 +112,7 @@ export type WireScope = z.infer<typeof wireScopeSchema>;
  * generated before they existed would fail reading them as required.
  * @see specs/api-reference/legacy-response-fields-optional.feature
  */
-export const suiteResponseSchema = z.object({
+const suiteResponseSchemaDefinition = z.object({
   id: z.string(),
   name: z.string(),
   slug: z.string(),
@@ -107,11 +131,18 @@ export const suiteResponseSchema = z.object({
   createdAt: z.string(),
   updatedAt: z.string(),
 });
+export interface SuiteResponseSchema extends Named<typeof suiteResponseSchemaDefinition> {}
+export const suiteResponseSchema: SuiteResponseSchema = suiteResponseSchemaDefinition;
 
-export const suiteResponseWithPlatformUrlSchema = z.object({
+const suiteResponseWithPlatformUrlSchemaDefinition = z.object({
   ...suiteResponseSchema.shape,
   platformUrl: z.string().url(),
 });
+export interface SuiteResponseWithPlatformUrlSchema extends Named<
+  typeof suiteResponseWithPlatformUrlSchemaDefinition
+> {}
+export const suiteResponseWithPlatformUrlSchema: SuiteResponseWithPlatformUrlSchema =
+  suiteResponseWithPlatformUrlSchemaDefinition;
 
 /** What a create body carries, before either kind's guards are applied. */
 export type CreateSuiteBody = {
@@ -173,7 +204,7 @@ export function refusePlanGaps(body: CreateSuiteBody, ctx: z.RefinementCtx): voi
  * plan and keeps the historical at-least-one guards. Strict, so a field this
  * endpoint does not have (`schedule`, `cron`) is refused by name, not dropped.
  */
-export const createSuiteInputSchema = z
+const createSuiteInputSchemaDefinition = z
   .object({
     name: z.string().min(1, "name is required"),
     kind: z
@@ -198,8 +229,10 @@ export const createSuiteInputSchema = z
     }
     refusePlanGaps(body, ctx);
   });
+export interface CreateSuiteInputSchema extends Named<typeof createSuiteInputSchemaDefinition> {}
+export const createSuiteInputSchema: CreateSuiteInputSchema = createSuiteInputSchemaDefinition;
 
-export const listSuitesQuerySchema = z.object({
+const listSuitesQuerySchemaDefinition = z.object({
   kind: z
     .enum(["custom", "folder"])
     .default("custom")
@@ -207,8 +240,10 @@ export const listSuitesQuerySchema = z.object({
       "Which kind of suite to list. Defaults to custom, so callers that predate test suites keep seeing exactly the run plans they always did.",
     ),
 });
+export interface ListSuitesQuerySchema extends Named<typeof listSuitesQuerySchemaDefinition> {}
+export const listSuitesQuerySchema: ListSuitesQuerySchema = listSuitesQuerySchemaDefinition;
 
-export const updateSuiteInputSchema = z.object({
+const updateSuiteInputSchemaDefinition = z.object({
   name: z.string().min(1).optional(),
   description: z.string().nullable().optional(),
   scope: wireScopeSchema.optional(),
@@ -217,8 +252,10 @@ export const updateSuiteInputSchema = z.object({
   repeatCount: z.number().int().min(1).max(100).optional(),
   labels: z.array(z.string()).optional(),
 });
+export interface UpdateSuiteInputSchema extends Named<typeof updateSuiteInputSchemaDefinition> {}
+export const updateSuiteInputSchema: UpdateSuiteInputSchema = updateSuiteInputSchemaDefinition;
 
-export const runSuiteInputSchema = z.object({
+const runSuiteInputSchemaDefinition = z.object({
   idempotencyKey: z.string().optional(),
   name: z
     .string()
@@ -265,8 +302,10 @@ export const runSuiteInputSchema = z.object({
     "One short line describing why this batch was run, e.g. a commit hash or what you changed. It is stored on every run of the batch and shown beside the run in the platform. Up to 200 characters.",
   ),
 });
+export interface RunSuiteInputSchema extends Named<typeof runSuiteInputSchemaDefinition> {}
+export const runSuiteInputSchema: RunSuiteInputSchema = runSuiteInputSchemaDefinition;
 
-export const suiteRunResultSchema = z.object({
+const suiteRunResultSchemaDefinition = z.object({
   scheduled: z.boolean(),
   batchRunId: z.string(),
   setId: z.string(),
@@ -290,18 +329,37 @@ export const suiteRunResultSchema = z.object({
   created: z.boolean().optional(),
   planSlug: z.string(),
 });
+export interface SuiteRunResultSchema extends Named<typeof suiteRunResultSchemaDefinition> {}
+export const suiteRunResultSchema: SuiteRunResultSchema = suiteRunResultSchemaDefinition;
 
-export const suiteAliasIdParamsSchema = z.object({ id: z.string().min(1) });
+const suiteAliasIdParamsSchemaDefinition = z.object({ id: z.string().min(1) });
+export interface SuiteAliasIdParamsSchema extends Named<
+  typeof suiteAliasIdParamsSchemaDefinition
+> {}
+export const suiteAliasIdParamsSchema: SuiteAliasIdParamsSchema =
+  suiteAliasIdParamsSchemaDefinition;
 
 /** A duplicate takes no body: the source suite travels in the path. */
-export const duplicateSuiteBodySchema = z.object({});
-export const archivedSuiteSchema = z.object({ id: z.string(), archived: z.boolean() });
+const duplicateSuiteBodySchemaDefinition = z.object({});
+export interface DuplicateSuiteBodySchema extends Named<
+  typeof duplicateSuiteBodySchemaDefinition
+> {}
+export const duplicateSuiteBodySchema: DuplicateSuiteBodySchema =
+  duplicateSuiteBodySchemaDefinition;
+const archivedSuiteSchemaDefinition = z.object({ id: z.string(), archived: z.boolean() });
+export interface ArchivedSuiteSchema extends Named<typeof archivedSuiteSchemaDefinition> {}
+export const archivedSuiteSchema: ArchivedSuiteSchema = archivedSuiteSchemaDefinition;
 
-export const scenarioMappingWireSchema = scenarioMappingSchema.describe(
+const scenarioMappingWireSchemaDefinition = scenarioMappingSchema.describe(
   "Where one evaluator input reads its value. A source mapping names conversation (first_user_message, last_agent_message, transcript, messages), scenario (situation, criteria, or fields followed by a field identifier) or trace (contexts, spans, or tool_calls followed by a tool name and input or output). A value mapping is a literal.",
 );
+export interface ScenarioMappingWireSchema extends Named<
+  typeof scenarioMappingWireSchemaDefinition
+> {}
+export const scenarioMappingWireSchema: ScenarioMappingWireSchema =
+  scenarioMappingWireSchemaDefinition;
 
-export const evaluatorAttachmentWireSchema = z
+const evaluatorAttachmentWireSchemaDefinition = z
   .object({
     ...evaluatorAttachmentSchema.shape,
     mappings: z
@@ -313,21 +371,33 @@ export const evaluatorAttachmentWireSchema = z
   .describe(
     "One evaluator that runs after every scenario run, with where each of its inputs reads from.",
   );
+export interface EvaluatorAttachmentWireSchema extends Named<
+  typeof evaluatorAttachmentWireSchemaDefinition
+> {}
+export const evaluatorAttachmentWireSchema: EvaluatorAttachmentWireSchema =
+  evaluatorAttachmentWireSchemaDefinition;
 
-export const evaluatorAttachmentsWireSchema = z
+const evaluatorAttachmentsWireSchemaDefinition = z
   .array(evaluatorAttachmentWireSchema)
   .max(MAX_EVALUATOR_ATTACHMENTS)
   .describe(
     `The evaluators that run after every scenario run. Up to ${MAX_EVALUATOR_ATTACHMENTS}. A required evaluator that fails fails the scenario; a score-only evaluator reports and never gates.`,
   );
+export interface EvaluatorAttachmentsWireSchema extends Named<
+  typeof evaluatorAttachmentsWireSchemaDefinition
+> {}
+export const evaluatorAttachmentsWireSchema: EvaluatorAttachmentsWireSchema =
+  evaluatorAttachmentsWireSchemaDefinition;
 
 /** What a run plan covers. */
-export const runPlanScopeSchema = suiteScopeSchema.describe(
+const runPlanScopeSchemaDefinition = suiteScopeSchema.describe(
   "What the run plan covers: all (every active scenario), test_suites (the scenarios filed in the named test suites), labels (the scenarios carrying any of the labels), or scenarios (the scenarioIds sent with the configuration). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan.",
 );
+export interface RunPlanScopeSchema extends Named<typeof runPlanScopeSchemaDefinition> {}
+export const runPlanScopeSchema: RunPlanScopeSchema = runPlanScopeSchemaDefinition;
 
 /** One run plan, as the API publishes it. */
-export const runPlanWireSchema = z.object({
+const runPlanWireSchemaDefinition = z.object({
   id: z.string().describe("The run plan id."),
   name: z
     .string()
@@ -369,5 +439,7 @@ export const runPlanWireSchema = z.object({
   updatedAt: z.string().describe("When the plan was last written."),
   platformUrl: z.string().url().describe("Where to open this run plan in the LangWatch platform."),
 });
+export interface RunPlanWireSchema extends Named<typeof runPlanWireSchemaDefinition> {}
+export const runPlanWireSchema: RunPlanWireSchema = runPlanWireSchemaDefinition;
 
 export type RunPlanWire = z.infer<typeof runPlanWireSchema>;

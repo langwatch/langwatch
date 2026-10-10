@@ -183,6 +183,12 @@ Feature: Knowable failures reach the customer as themselves
     Then the confirmation field explains that the passwords must match
     And the account is not created
 
+  @integration
+  Scenario: A sign-up form does not judge a field while it is being typed in
+    Given a sign-up form
+    When a short password is typed and the confirmation is not touched
+    Then neither field shows an error until its field is left or the form is submitted
+
 
   # ---------------------------------------------------------------------------
   # The gateway's own failures

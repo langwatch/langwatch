@@ -25,9 +25,11 @@ import {
   type CreditGrantKind,
   type RenewalCompletion,
 } from "@langwatch/enterprise-billing-contract";
+import type { EventingCommands } from "@langwatch/eventing";
 import { nowInstant, Temporal, type Instant } from "@langwatch/time";
 
 import type { ConnectedInvoicingChannel } from "../../../channels/connected-invoicing.channel.ts";
+import type { ConnectedBillingPipeline } from "../../../eventing/connected-billing.pipeline.ts";
 import type {
   ConnectedBillingAccountRecord,
   ConnectedBillingRepository,
@@ -64,10 +66,6 @@ export interface ConnectedBillingTerms {
     byUsdCents: number;
     operatorId: string;
   }): Promise<void>;
-  /** Re-derives the organization budget's cap from the license terms. */
-  syncBudget(input: { organizationId: string; operatorId: string }): Promise<void>;
-  /** Starts a new budget window: spend so far no longer counts. */
-  resetBudget(input: { organizationId: string; operatorId: string }): Promise<void>;
 }
 
 export class ConnectedBillingService {
@@ -77,6 +75,7 @@ export class ConnectedBillingService {
   private readonly isSaas: boolean;
   private readonly bankDetails: () => string | null;
   private readonly now: () => Instant;
+  #commands: EventingCommands<ConnectedBillingPipeline> | undefined;
 
   private constructor({
     repository,
@@ -121,6 +120,11 @@ export class ConnectedBillingService {
     });
   }
 
+  /** Binds the connected_billing pipeline's senders the onboarding and renewal facts go through. */
+  connect(commands: EventingCommands<ConnectedBillingPipeline>): void {
+    this.#commands = commands;
+  }
+
   /**
    * Onboards a customer, or completes an onboarding that stopped halfway. Each
    * step is skipped when its id is already stored.
@@ -139,10 +143,8 @@ export class ConnectedBillingService {
       termEndsAt: input.termEndsAt,
     });
     await this.ensureAnnualInvoice({ account: withSubscription, ...input });
-    await this.terms.syncBudget({
-      organizationId: input.organizationId,
-      operatorId: input.operatorId,
-    });
+    // Connect syncs the contract budget from this fact (C3a D4).
+    await this.facts().recordConnectedCustomerOnboarded.send(this.factOf(input));
 
     return (await this.repository.findAccount(input.organizationId)) ?? withSubscription;
   }
@@ -199,17 +201,27 @@ export class ConnectedBillingService {
       },
     });
     await this.ensureAnnualInvoice({ account, ...input });
-    await this.terms.resetBudget({
-      organizationId: input.organizationId,
-      operatorId: input.operatorId,
-    });
-    await this.terms.syncBudget({
-      organizationId: input.organizationId,
-      operatorId: input.operatorId,
-    });
+    // Connect starts the budget's new window, then syncs it, from this fact (C3a D4).
+    await this.facts().recordConnectedTermRenewed.send(this.factOf(input));
     await this.completeRenewalIfDue({ organizationId: input.organizationId });
 
     return (await this.repository.findAccount(input.organizationId)) ?? account;
+  }
+
+  private facts(): EventingCommands<ConnectedBillingPipeline> {
+    if (!this.#commands) {
+      throw new Error("connected_billing pipeline senders are not connected yet");
+    }
+    return this.#commands;
+  }
+
+  private factOf({ organizationId, operatorId }: { organizationId: string; operatorId: string }) {
+    return {
+      tenantId: organizationId,
+      occurredAt: this.now().epochMilliseconds,
+      organizationId,
+      operatorId,
+    };
   }
 
   /** The connected account billed through this customer; a Cloud customer throws connected_billing_not_onboarded. */

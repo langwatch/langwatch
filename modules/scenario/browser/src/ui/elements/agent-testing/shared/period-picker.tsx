@@ -88,12 +88,8 @@ export function AgentTestingPeriodPicker({
               color: FG_MUTED,
             }
           : {
-              height: TOOLBAR_BUTTON_PROPS.height,
-              paddingX: TOOLBAR_BUTTON_PROPS.paddingX,
-              fontSize: TOOLBAR_BUTTON_PROPS.fontSize,
-              fontWeight: TOOLBAR_BUTTON_PROPS.fontWeight,
-              borderRadius: TOOLBAR_BUTTON_PROPS.borderRadius,
-              background: TOOLBAR_BUTTON_PROPS.background,
+              ...TOOLBAR_BUTTON_PROPS,
+              size: "sm",
             }),
       }}
     />

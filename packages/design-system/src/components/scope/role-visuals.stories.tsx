@@ -14,7 +14,8 @@ function RoleVisuals({ role, isScenario }: { role: SourceRole; isScenario: boole
 }
 
 const meta = {
-  title: "Components/Role visuals",
+  title: "Data display/Role visuals",
+  parameters: { usage: { use: "How a message role reads, including the Scenario SDK's roles." } },
   component: RoleVisuals,
   tags: ["autodocs"],
   args: { role: "user", isScenario: false },

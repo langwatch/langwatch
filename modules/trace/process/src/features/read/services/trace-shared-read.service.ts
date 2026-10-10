@@ -4,6 +4,7 @@
  */
 import { createHash } from "node:crypto";
 
+import type { FoldReadAuthorizer } from "@langwatch/eventing";
 import type { Project } from "@langwatch/project-contract";
 import {
   ShareLinkNotFoundError,
@@ -24,7 +25,6 @@ import {
   type TraceResourceInfoDto,
 } from "@langwatch/trace-contract";
 
-import type { TraceRateLimitRepository } from "../../ingestion/repositories/trace-rate-limit.repository.ts";
 import {
   deriveTraceDropPrivacy,
   mapLegacySpanSummaryToTreeNode,
@@ -41,6 +41,7 @@ import {
   withoutHiddenResourceAttrs,
 } from "../../../rules/trace-view-gates.rules.ts";
 import type { TraceViewerProtectionService } from "../../../services/trace-viewer-protection.service.ts";
+import type { TraceRateLimitRepository } from "../../ingestion/repositories/trace-rate-limit.repository.ts";
 
 /** Main's per-window ceilings: a person refreshing never meets them; a fan-out driver does. */
 const SHARE_READ_LIMIT_WINDOW_SECONDS = 60;
@@ -63,6 +64,8 @@ type TraceSharedReads = Pick<
 
 type TraceSharedReadDependencies = Readonly<{
   reads: TraceSharedReads;
+  /** Fences the shared trace's reads to its own project: a public read widens through no grant. */
+  authorize: FoldReadAuthorizer;
   share: Pick<ShareApi, "resolveForViewer" | "findCachedPayload" | "cachePayload">;
   projects: Readonly<{
     findById(
@@ -161,18 +164,22 @@ export class TraceSharedReadService {
     traceId: string;
     protections: Protections;
   }): Promise<Omit<SharedTraceDto, "project">> {
-    const { reads, mappers } = this.deps;
+    const { reads, mappers, authorize } = this.deps;
     const visibilityCutoffMs = protections.visibilityCutoffMs ?? null;
+    const authorization = await authorize({
+      projectId,
+      purpose: { kind: "route", route: "sharedTrace.get" },
+    });
     let summary;
     try {
       summary = traceSummaryDataSchema.parse(
-        await reads.readTraceSummary({ projectId, traceId, visibilityCutoffMs }),
+        await reads.readTraceSummary({ authorization, traceId, visibilityCutoffMs }),
       );
     } catch (error) {
       if (error instanceof TraceNotFoundError) throw new ShareLinkNotFoundError();
       throw error;
     }
-    const at = { projectId, traceId, occurredAtMs: summary.occurredAt };
+    const at = { authorization, traceId, occurredAtMs: summary.occurredAt };
 
     const [summaryRows, fullSpans, signalRows, resourceRows, eventRows, evaluationsByTrace] =
       await Promise.all([
@@ -231,17 +238,25 @@ function hashViewer({
     .slice(0, 32);
 }
 
+/** Stamped by the ingestion receiver; an internal key id the share page never renders. */
+const API_KEY_ID_ATTRIBUTE = "langwatch.api_key.id";
+
+function sharedResourceAttrs(attrs: Record<string, string>): Record<string, string> {
+  const { [API_KEY_ID_ATTRIBUTE]: _apiKeyId, ...rest } = withoutHiddenResourceAttrs(attrs);
+  return rest;
+}
+
 function resourceInfoOf(rows: SpanResourceInfo[]): TraceResourceInfoDto {
   const root = rows.find((row) => row.parentSpanId == null) ?? rows[0] ?? null;
 
   return {
     rootSpanId: root?.spanId ?? null,
-    resourceAttributes: withoutHiddenResourceAttrs(root?.resourceAttributes ?? {}),
+    resourceAttributes: sharedResourceAttrs(root?.resourceAttributes ?? {}),
     scope: root ? { name: root.scopeName ?? "", version: root.scopeVersion } : null,
     spans: rows.map((row) => ({
       spanId: row.spanId,
       parentSpanId: row.parentSpanId,
-      resourceAttributes: withoutHiddenResourceAttrs(row.resourceAttributes),
+      resourceAttributes: sharedResourceAttrs(row.resourceAttributes),
       scope: { name: row.scopeName ?? "", version: row.scopeVersion },
     })),
   };

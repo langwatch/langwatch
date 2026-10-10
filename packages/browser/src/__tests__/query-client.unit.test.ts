@@ -11,6 +11,8 @@ function recordingHost() {
     failed,
     host: {
       succeeded: (_notice: UiSuccessNotice) => {},
+      warned: (_notice: UiSuccessNotice) => {},
+      informed: (_notice: UiSuccessNotice) => {},
       failed: (failure: UiFailureNotice) => void failed.push(failure),
     },
   };

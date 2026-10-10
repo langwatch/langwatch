@@ -37,6 +37,11 @@ export const shareTrpcTransport: TrpcRouterDeclaration<ShareApi, typeof shareTrp
       await app.revokeById(input);
     })
 
+    /** Same standing as switching trace sharing off, which this count is asked before. */
+    .procedure("countTraceShares")
+    .withPermission("project:manage")
+    .handle(async ({ app, input }) => app.countTraceShares(input))
+
     .procedure("revokeAllTraceShares")
     .withPermission("project:update")
     .handle(async ({ app, input }) => {

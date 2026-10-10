@@ -189,11 +189,12 @@ export class AuthzGrantManagementService {
   async revoke({
     organizationId,
     grantId,
+    caller,
     actor,
   }: AuthzRevokeGrantByIdInput): Promise<GrantRevoked> {
     await speakingGrants({
       context: { grantId },
-      run: () => this.options.writer.delete({ organizationId, bindingId: grantId, actor }),
+      run: () => this.options.writer.delete({ organizationId, bindingId: grantId, actor, caller }),
     });
 
     return { id: grantId, revoked: true };

@@ -10,6 +10,7 @@ import { generateSpecs } from "hono-openapi";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
+import { authorizationPort } from "../../__tests__/api-double.ts";
 import type { Entitlements } from "../../access/access.ts";
 import { permissionBy } from "../../access/input-permission.ts";
 import { createErrorHandler } from "../../errors.ts";
@@ -63,7 +64,7 @@ function door({
         throw new PermissionDeniedError({
           permission: missing,
           scope: { type: "project", id: "project-1" },
-          denialReason: "no-binding",
+          denialReason: "no-grant",
         });
       }
 
@@ -91,7 +92,11 @@ function mount(
   identity: RestIdentity,
   entitlements?: Entitlements,
 ) {
-  return createRestRuntime({ identity, ...(entitlements ? { entitlements } : {}) }).mount(router, {
+  return createRestRuntime({
+    identity,
+    authorization: authorizationPort,
+    ...(entitlements ? { entitlements } : {}),
+  }).mount(router, {
     app: () => runsApp,
     onError: createErrorHandler(),
   });
@@ -107,6 +112,7 @@ describe("a route that requires several permissions together", () => {
       .withInput(z.object({ name: z.string() }))
       .withPermission(["workflows:create", "evaluations:view"])
       .withOutput(z.object({ ran: z.boolean() }))
+      .withoutAudit("test route")
       .handle(() => {
         ran.push("trigger");
 
@@ -173,6 +179,7 @@ describe("a route that requires several permissions together", () => {
         param: "projectId",
       })
       .withOutput(z.object({ ran: z.boolean() }))
+      .withoutAudit("test route")
       .handle(() => {
         ran.push("trigger");
 
@@ -259,6 +266,7 @@ describe("a route that chooses its permission from its parsed input", () => {
       .withInput(dispatchInput)
       .withPermission(BY_KIND)
       .withOutput(z.object({ ran: z.boolean() }))
+      .withoutAudit("test route")
       .handle(({ target }) => {
         ran.push(target);
 
@@ -346,6 +354,7 @@ describe("a route that chooses its permission from its parsed input", () => {
           // @ts-expect-error the map names no permission for share
           permissionBy({ field: "kind", map: { view: "project:view", update: "project:update" } }),
         )
+        .withoutAudit("test route")
         .handle(handled),
     ).toThrow(/unnamed: share/);
 
@@ -358,6 +367,7 @@ describe("a route that chooses its permission from its parsed input", () => {
             view: { permission: "organization:manage", tier: "project", field: "kind" },
           },
         })
+        .withoutAudit("test route")
         .handle(handled),
     ).toThrow(/a tier that cannot grant it/);
 
@@ -381,12 +391,17 @@ describe("a route that chooses its permission from its parsed input", () => {
       .withInput(dispatchInput)
       .withPermission(BY_KIND)
       .withOutput(z.object({ ran: z.boolean() }))
+      .withoutAudit("test route")
       .handle(() => ({ ran: true }))
       .build()
       .router();
 
     expect(() =>
-      createRestRuntime({ identity, doors: { browser: identity } }).mount(browser, {
+      createRestRuntime({
+        identity,
+        doors: { browser: identity },
+        authorization: authorizationPort,
+      }).mount(browser, {
         app: () => runsApp,
         onError: createErrorHandler(),
       }),

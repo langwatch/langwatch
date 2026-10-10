@@ -161,6 +161,7 @@ describe("deriveFollowUps", () => {
   });
 
   describe("given a turn whose calls produced nothing", () => {
+    /** @scenario "A card with nothing worth suggesting shows no suggestion row" */
     it("offers nothing rather than an empty row of chips", () => {
       expect(
         deriveFollowUps({

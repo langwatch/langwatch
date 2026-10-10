@@ -4,7 +4,13 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { CloseButton } from "./close-button.tsx";
 
 const meta = {
-  title: "Primitives/Close button",
+  title: "Overlays/Close button",
+  parameters: {
+    usage: {
+      use: "The close control in a dialog, drawer or panel header.",
+      avoid: "Any other icon action: IconButton from primitives with an accessible name.",
+    },
+  },
   component: CloseButton,
   tags: ["autodocs"],
   args: {

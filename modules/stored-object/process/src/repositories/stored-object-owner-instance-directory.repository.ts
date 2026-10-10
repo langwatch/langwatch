@@ -4,7 +4,7 @@ type StoredObjectOwnerClickHouseClient = Readonly<{
     query_params: Record<string, string>;
     format: "JSONEachRow";
     /** Set when the statement genuinely spans tenants; see the tenant-scope guard. */
-    unscoped?: { reason: string };
+    SKIP_TENANT_CHECK?: true;
   }): Promise<{
     json<Result>(): Promise<Result[]>;
   }>;

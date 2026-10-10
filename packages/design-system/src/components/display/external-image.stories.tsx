@@ -7,7 +7,13 @@ const SAMPLE =
   "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNDAiIGhlaWdodD0iMTQwIj48cmVjdCB3aWR0aD0iMjQwIiBoZWlnaHQ9IjE0MCIgZmlsbD0iI2VkODkyNiIvPjx0ZXh0IHg9IjEyMCIgeT0iNzYiIGZvbnQtZmFtaWx5PSJzYW5zLXNlcmlmIiBmb250LXNpemU9IjE4IiBmaWxsPSIjZmZmIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj5BdHRhY2htZW50PC90ZXh0Pjwvc3ZnPg==";
 
 const meta = {
-  title: "Components/External image",
+  title: "Data display/External image",
+  parameters: {
+    usage: {
+      use: "An image from an address the data supplied, with a safe fallback.",
+      avoid: "Product artwork: ship it as an asset.",
+    },
+  },
   component: ExternalImage,
   tags: ["autodocs"],
   args: {

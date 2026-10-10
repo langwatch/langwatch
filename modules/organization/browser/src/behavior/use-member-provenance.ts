@@ -3,7 +3,7 @@
  * join admissions (round 24 EF-3). Asked apart from the list, so a failure costs only the chips.
  */
 import { identityClient } from "@langwatch/identity-client";
-import { memberProvenanceFor } from "@langwatch/organization-contract";
+import { memberProvenanceFor, splitJoinAdmissions } from "@langwatch/organization-contract";
 import { useMemo } from "react";
 
 import { organizationApi } from "./organization-api.ts";
@@ -48,7 +48,7 @@ export function useMemberProvenance({
         ? memberProvenanceFor({
             userIds: invited.data.memberUserIds,
             invitedUserIds: invited.data.invitedUserIds,
-            admissions: pages.flatMap((page) => page.data ?? []),
+            ...splitJoinAdmissions(pages.flatMap((page) => page.data ?? [])),
           })
         : undefined,
     // oxlint-disable-next-line react-hooks/exhaustive-deps -- keyed on what the answers are

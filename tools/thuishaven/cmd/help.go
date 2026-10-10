@@ -19,33 +19,39 @@ import (
 var helpText = `thuishaven (haven) — LangWatch local-dev orchestrator, your apps' home port.
 
 Every worktree gets its own stack, reachable by hostname rather than by port:
-app|gateway|nlp.<slug>.langwatch.localhost, where <slug> is the worktree's own
-directory name. Bare "haven" opens the hub — every stack, with actions.
+app|gateway|nlp.<slug>.langwatch.localhost. Bare "haven" prints this with a
+status summary; the interactive hub is "haven hub".
 
 USAGE
     haven <command> [flags]
 
-COMMANDS
 ` + commandsHelp() + `
+GLOBAL FLAGS
+    --stack <slug>   the stack to act on (else HAVEN_STACK, else this worktree's)
+    --json [a,b]     versioned JSON {"v":1,...}; a field list selects fields
+    --agent          agent mode: no prompts, no colour, detach (automatic with
+                     no terminal, or under CLAUDECODE, CODEX_* and the like)
+
+EXIT CODES
+    0 ok · 64 usage (also a retired spelling) · 65 not running · 66 timeout
+    67 refused by the machine gate · 1-63 a wrapped command's own code
+
 EXAMPLES
     haven up                     # stack up in the background + attached log view
-    haven up +langy              # add a service here, now and from now on
-    haven up +design-system +mail-room  # add the design-system Storybook + mail studio
-    haven up +langevals          # run the evaluators monitors and evaluations call
-    haven up +llm                # answer every model call from llmsim, at no cost
-    haven up +analytics          # catch PostHog and Customer.io calls in analyticssim
-    haven up +telemetry          # send, load or fuzz OTLP traffic with telemetrysim
-    haven                        # the hub: the whole machine + actions (git/cleanup/down/destroy)
-    haven status                 # every stack + shared-server health, one shot
-    haven logs nlp -t            # tail one service live
-    haven errors                 # the last distinct failures, grouped and counted
-    haven traces --json          # this stack's recent root spans, for an agent
+    haven up +llm -langy         # add or drop services here, now and from now on
+    haven defaults +llm          # every new stack on this machine starts with llm
+    haven wait --for ready       # block until this stack answers
+    haven status --json stacks   # one field of the report, for an agent
+    haven logs nlp -f            # follow one service live
+    haven sim                    # every simulator: running here, console, verbs, skill
+    haven sim mail list --json   # what mailsim caught
+    haven obs traces --json      # this stack's recent root spans
     haven db seed demo           # reseed in place, dropping nothing
-    haven pr 4913                # try PR #4913 locally in a fresh worktree
-    haven down                   # stop the stack, keep the databases
+    haven pr 4913 --throwaway    # a PR in a sandbox that quitting destroys
+    haven down --destroy --yes   # stop the stack and drop its databases
 
 MORE
-    haven help <command>         # what it does, and every flag it takes
+    haven help <command>         # what it does, and every flag it takes (haven help sim mail)
     haven help env               # environment variables, and where they resolve from
     haven help hosts             # the hostname scheme and the shared machine-wide URLs
 `
@@ -61,13 +67,15 @@ hostname through the portless proxy:
     nlp.portless.langwatch.localhost         NLP engine (Go)
     clickhouse.portless.langwatch.localhost  ClickHouse (this stack's own DB, HTTP)
 
-The six simulators each have a console at <name>.<slug>.langwatch.localhost: mail,
-idp and storage run by default; llm, voice and analytics come with "haven up +llm
-+voice +analytics". Read one's output with "haven logs <name>". Drive one from a
-terminal with "haven mail|llm|analytics|storage|voice <verb>" (--json on every read).
-telemetrysim ("haven up +telemetry") has no console: "haven telemetry send|load|fuzz|status|stop".
+The ten simulators each have a console at <name>.<slug>.langwatch.localhost: mail,
+idp, storage, payment and telemetry run by default; llm, voice, analytics, outbound and lambda come with
+"haven up +llm +voice +analytics +outbound +lambda". Billing uses paymentsim unless .env sets a Stripe
+key; "haven up" prints which. "haven sim --json" lists every one: running
+here or not, its console, its verbs and its skill. Read one's output with "haven logs
+<name>". Drive one from a terminal with "haven sim mail|idp|llm|analytics|outbound|payment|storage|voice|telemetry|lambda
+<verb>" (--json on every read).
 
-    mail|idp|storage|llm|voice|analytics.portless.langwatch.localhost
+    mail|idp|storage|llm|voice|analytics|outbound|telemetry|lambda.portless.langwatch.localhost
 
 Two more only when the worktree asked for them ("haven up +design-system +mail-room"):
 
@@ -106,7 +114,7 @@ var envHelpText = `Environment variables.
 
     These describe ONE run rather than one machine, so they are read from the
     process environment only: LANGWATCH_SLUG, HAVEN_BASELINE, LANGWATCH_SEED,
-    HAVEN_SEED_TRACES, HAVEN_STUB, HAVEN_AGENT, NO_COLOR, FORCE_COLOR,
+    HAVEN_SEED_TRACES, HAVEN_STUB, HAVEN_AGENT, HAVEN_NO_MAIL, NO_COLOR, FORCE_COLOR,
     HAVEN_TRUSTED_REPO_ROOT, HAVEN_UNTRUSTED_CHECKOUT, HAVEN_JOB_DIR,
     CLAUDE_JOB_DIR. Every worktree shares one
     .env, so pinning a slug or a baseline marker there would apply it to all of
@@ -138,7 +146,7 @@ var envHelpText = `Environment variables.
                                  — zero token waste when an AI agent drives haven.
 
   Machine load: slots, pressure and reaping
-    HAVEN_TYPECHECK_SLOTS=N      Cap concurrent "haven typecheck" runs (default:
+    HAVEN_TYPECHECK_SLOTS=N      Cap concurrent "haven machine typecheck" runs (default:
                                  the shared CHECK_SLOTS policy).
     HAVEN_TYPECHECK_MAX_RSS_MB   Kill a typecheck run over this RSS (default 6144
                                  = 6 GiB) or over 10 minutes wall-clock — a
@@ -146,7 +154,7 @@ var envHelpText = `Environment variables.
                                  forever. Per slot: an --affected run
                                  holding N slots may use N times this.
     CHECK_SLOTS=N                Concurrent checks across optional agent hooks,
-                                 "haven slot run" and "haven typecheck". The
+                                 "haven machine slot run" and "haven machine typecheck". The
                                  default uses available machine capacity; plain
                                  repository scripts run directly. A live queue
                                  owner is recognized through CHECK_QUEUE_HELD
@@ -154,32 +162,36 @@ var envHelpText = `Environment variables.
     CHECK_PRESSURE=green|amber|red
                                  Override the measured machine pressure when
                                  resolving the shared queue's capacity.
-    HAVEN_SLOT_HELD=1            Set by "haven run" inside the command it spawns:
+    HAVEN_SLOT_HELD=1            Set by "haven machine run" inside the command it spawns:
                                  this run is already admitted, do not admit again.
     HAVEN_IDLE_TTL=4h            Reap a stack whose heartbeat is older than this.
     HAVEN_DB_TTL=96h             Background-prune databases whose worktree has not
                                  been up for this long (default 4 days; 0 disables).
                                  Only databases haven itself created are considered,
                                  and lw_main is always kept.
-    HAVEN_PRUNE_STALE_DAYS=5     Idle age at which "haven clean" pre-ticks a
+    HAVEN_PRUNE_STALE_DAYS=5     Idle age at which "haven machine clean" pre-ticks a
                                  worktree for deletion (--stale-days N overrides).
                                  Temporary and merged worktrees are pre-ticked on
                                  their class instead, whatever their age.
     HAVEN_JOBS_ROOT=<dir>        Where agent job directories live (default
-                                 ~/.claude/jobs). "haven clean" and the daemon
+                                 ~/.claude/jobs). "haven machine clean" and the daemon
                                  reclaim a cold job's scratch and keep its
                                  state.json + timeline.jsonl. Cold means terminal
                                  for more than 48h, or untouched for a week; a job
                                  that finished more recently is reached only by
-                                 "haven clean --include-recent". Empty disables it.
+                                 "haven machine clean --include-recent". Empty disables it.
 
   Services and data
     LANGWATCH_SEED=1             Seed the DB during up.
-    LANGWATCH_GO_WATCH=1         Hot-reload the Go services via air (else go run).
-    LANGWATCH_DEV_ONE_PROCESS=1  Run ui + api + worker as one app lane (ADR-168);
-                                 haven up -f switches a running stack.
-    LANGWATCH_GO_ONE_PROCESS=1   Host the simulators in the go lane: one Go process
-                                 for the data plane and sims (trial; Langy apart).
+    LANGWATCH_GO_WATCH=0         Keep the Go watcher off even under haven up --watch
+                                 or --hmr (where haven rebuilds and swaps the Go
+                                 child on a change).
+    LANGWATCH_DEV_ONE_PROCESS=0  Split the go lane (data plane + sims) into go and
+                                 sims. The Node lanes do not read it: --hmr always
+                                 runs Vite as its own ui lane (ADR-168).
+                                 haven up --force switches a running stack.
+                                 LANGWATCH_GO_ONE_PROCESS is a deprecated alias,
+                                 refused when it disagrees.
     HAVEN_WORKTREE_DIR=<dir>     Where haven pr creates PR worktrees (default: the
                                  sibling worktrees/ dir next to the checkout).
     LANGWATCH_LOCAL_API_KEY      Stable local dev API key haven seeds + injects
@@ -221,9 +233,9 @@ var envHelpText = `Environment variables.
                                  (writes fail loudly at the cap instead of the
                                  machine paging; 0 disables the cap).
 
-  Machine limits (also: haven limits [set <name> <value> | unset <name>])
+  Machine limits (also: haven machine limits [set <name> <value> | unset <name>])
     Each is a knob below, and a settings file in haven's home holds what
-    "haven limits set" saves. Precedence: environment > .env > settings > default.
+    "haven machine limits set" saves. Precedence: environment > .env > settings > default.
     LW_OBS_MEMORY_MB             Observability container memory ceiling in MB.
     HAVEN_COLIMA_CPUS            CPUs of a colima VM haven creates (never resizes one).
     HAVEN_COLIMA_MEMORY_GIB      Memory of a colima VM haven creates, in GiB.
@@ -253,15 +265,16 @@ var envHelpText = `Environment variables.
                                  LW_OBS_OTLP_GRPC_PORT=4317).
     LANGY_UNSAFE_CONTAINER=1     Run the langyagent worker in colima with the
                                  per-worker UID sandbox off. Default (neither
-                                 flag) keeps the sandbox on, mirroring production.
+                                 flag) keeps the sandbox on off macOS; on macOS
+                                 the default is the host tier, no colima.
     LANGY_UNSAFE_HOST_ACCESS=1   Run the langyagent worker as a bare host process
                                  with no colima and no VM boundary, so it has
                                  full host access. The fast-iteration tier.
-                                 A development stack with no container runtime
-                                 resolves to it on its own and says so on "up";
-                                 LANGY_UNSAFE_HOST_ACCESS=0 refuses that and
-                                 keeps the sandboxed tier (langy then does not
-                                 start without a runtime).
+                                 A development stack on macOS, or with no
+                                 container runtime, resolves to it on its own
+                                 and says so on "up"; LANGY_UNSAFE_HOST_ACCESS=0
+                                 refuses that and keeps the sandboxed tier in
+                                 colima (langy does not start without a runtime).
     HAVEN_LANGY_IMAGE_REGISTRY   Registry ref (e.g. ghcr.io/langwatch/langyagent)
                                  to pull a CI-published langy image for the
                                  current content hash instead of building.
@@ -272,6 +285,7 @@ var envHelpText = `Environment variables.
 // failure rather than a successful print of an apology — a script that names a
 // topic which has since been renamed should learn about it from the exit code.
 func helpTopic(topic string) (string, bool) {
+	topic = strings.TrimSpace(topic)
 	switch topic {
 	case "":
 		return helpText, true

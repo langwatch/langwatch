@@ -18,6 +18,7 @@ func TestLLMProviderEnvPointsProvidersAtLlmsim(t *testing.T) {
 		"DEEPSEEK_BASE_URL=http://127.0.0.1:45595/v1", "XAI_BASE_URL=http://127.0.0.1:45595/v1",
 		"CEREBRAS_BASE_URL=http://127.0.0.1:45595/v1", "GROQ_BASE_URL=http://127.0.0.1:45595/v1",
 		"GEMINI_BASE_URL=http://127.0.0.1:45595/v1", "ALLOWED_PROXY_HOSTS=127.0.0.1",
+		"HAVEN_SEED_LLMSIM_MODELS=1",
 	} {
 		if !slices.Contains(env, want) {
 			t.Errorf("overlay %v lacks %q", env, want)
@@ -29,7 +30,7 @@ func TestLLMProviderEnvPointsProvidersAtLlmsim(t *testing.T) {
 func TestLLMProviderEnvLeavesAChosenProviderAlone(t *testing.T) {
 	env := LLMProviderEnv(map[string]string{"OPENAI_BASE_URL": "https://proxy.example", "ANTHROPIC_API_KEY": "real"}, 45595)
 	for _, line := range env {
-		if line == "OPENAI_API_KEY=llmsim" || line == "ANTHROPIC_API_KEY=llmsim" || strings.HasPrefix(line, "OPENAI_BASE_URL=") {
+		if line == "OPENAI_API_KEY=llmsim" || line == "ANTHROPIC_API_KEY=llmsim" || line == "HAVEN_SEED_LLMSIM_MODELS=1" || strings.HasPrefix(line, "OPENAI_BASE_URL=") {
 			t.Errorf("overlay %v overrides a value .env chose", env)
 		}
 	}

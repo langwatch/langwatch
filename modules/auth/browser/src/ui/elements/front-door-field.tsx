@@ -4,7 +4,6 @@ import { type ReactNode, useId } from "react";
 import type { FieldError } from "react-hook-form";
 
 import "./auth-front-door.css";
-import { MONO_FONT } from "../../model/front-door-theme.ts";
 
 /** Form field row: label with optional end slot, input, and error below. */
 export function FrontDoorField({
@@ -24,16 +23,7 @@ export function FrontDoorField({
   return (
     <Box width="full">
       <HStack width="full" justify="space-between" marginBottom="7px">
-        {/* The site's small technical voice: mono, spaced, quiet — the same
-            register the "or" divider speaks in. */}
-        <Text
-          asChild
-          fontFamily={MONO_FONT}
-          fontSize="11px"
-          textTransform="uppercase"
-          letterSpacing="0.14em"
-          color="fg.muted"
-        >
+        <Text asChild fontSize="13px" fontWeight={500} color="fg">
           <label htmlFor={id}>{label}</label>
         </Text>
         {labelEnd ?? null}
@@ -48,10 +38,10 @@ export function FrontDoorField({
   );
 }
 
-/** The focus treatment every front-door input shares: the brand's ring. */
+/** The focus treatment every front-door input shares: the product's own ring. */
 export const FIELD_FOCUS = {
-  borderColor: "frontDoor.detail",
-  boxShadow: "0 0 0 3px {colors.frontDoor.focusRing}",
+  borderColor: "frontDoor.focusRing",
+  boxShadow: "0 0 0 1px {colors.frontDoor.focusRing}",
   outline: "none",
 } as const;
 

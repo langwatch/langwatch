@@ -14,6 +14,13 @@ Feature: Canonical OTLP log processing
     And canonicalLogStorage projects the records to `log_records` and `log_usage_estimates`
 
   @unit
+  Scenario: A protobuf log export is canonicalised like its JSON twin
+    Given an OTLP log request sent as protobuf, whose decoded messages are class instances
+    When the Log service prepares the request
+    Then each record is accepted with its hex wire ids
+    And no record is dropped without being counted as a rejection
+
+  @unit
   Scenario: Invalid log siblings use partial success
     Given an OTLP log request containing one valid record, one malformed record, and one record over the 1 MiB canonical payload limit
     When the Log service prepares the request

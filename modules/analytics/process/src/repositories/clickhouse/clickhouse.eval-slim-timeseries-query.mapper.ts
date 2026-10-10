@@ -1,27 +1,7 @@
 /**
- * Slim SQL builder for `evaluation_analytics` — ADR-034 Phase 6 (eval mirror
- * of `slim-timeseries-query.ts`).
- *
- * Deliberately separate from the trace slim builder because the column set
- * differs: the eval slim has typed columns for Score / Passed / EvaluatorType
- * / Status / Label rather than the trace slim's TraceName / Models / cost-
- * and-token bag. Parameterising one builder across both would devolve into a
- * pile of source-conditional column picks; two builders read straight-line
- * better and let each one's exhaustiveness assertion guard its own column
- * set.
- *
- * Routing decides whether to call this builder (`pickAnalyticsTable` returns
- * `"evaluation_analytics"`); the builder only handles what the eval slim
- * supports — any unsupported shape is a programmer error and throws.
- *
- * All queries:
- *   * include `WHERE TenantId = {tenantId:String}` as the FIRST predicate
- *     (multi-tenancy contract);
- *   * filter on the partition column `OccurredAt` so ClickHouse prunes
- *     partitions (clickhouse-queries best-practices);
- *   * dedup the slim table to the latest version of each evaluation (eval
- *     slim is `ReplacingMergeTree(UpdatedAt)`) with the spillable `argMax`
- *     collapse of `latestVersionSubquery`.
+ * Slim SQL builder for `evaluation_analytics` (ADR-034 Phase 6); `pickAnalyticsTable` routes
+ * here and an unsupported shape throws. Every query leads with `TenantId = {tenantId:String}`,
+ * filters on `OccurredAt` and dedups with `latestVersionSubquery`.
  */
 
 import type { AnalyticsAggregation, BuiltAnalyticsQuery } from "@langwatch/analytics-contract";
@@ -141,11 +121,9 @@ function evalSlimAggExpression(agg: AnalyticsAggregation, column: string): strin
 }
 
 /**
- * Deduped FROM-clause for the eval slim table: the latest version of each
- * evaluation in range (slim is `ReplacingMergeTree(UpdatedAt)`), collapsed
- * with the spillable `argMax` form of {@link latestVersionSubquery}, carrying
- * only the columns the outer query reads. Same pattern as the trace slim
- * builder.
+ * Deduped FROM-clause for the eval slim table (`ReplacingMergeTree(UpdatedAt)`): the latest
+ * version of each evaluation in range via {@link latestVersionSubquery}, carrying only the
+ * columns the outer query reads.
  */
 function dedupedSlim({
   alias,

@@ -4,8 +4,9 @@ import { TRACE_LIST_MAX_OFFSET_ROWS } from "@langwatch/trace-contract";
  */
 import { describe, expect, it, vi } from "vitest";
 
-import { CLICKHOUSE_FACET_CATALOG } from "../../../facet/repositories/clickhouse/clickhouse.trace-facet-registry.mapper.ts";
+import { ownProof } from "../../../../__tests__/support/authorization-proofs.fixture.ts";
 import { MemoryTraceEvaluationRunsRepository } from "../../../../repositories/memory/memory.trace-evaluation-runs.repository.ts";
+import { CLICKHOUSE_FACET_CATALOG } from "../../../facet/repositories/clickhouse/clickhouse.trace-facet-registry.mapper.ts";
 import { TraceListService } from "../trace-list-read.service.ts";
 
 function serviceWithRepository(listAll: ReturnType<typeof vi.fn>) {
@@ -19,7 +20,7 @@ function serviceWithRepository(listAll: ReturnType<typeof vi.fn>) {
 }
 
 const listParams = {
-  tenantId: "tenant-1",
+  authorization: ownProof({ projectId: "tenant-1" }),
   timeRange: { from: 1_700_000_000_000, to: 1_700_086_400_000 },
   sort: { columnId: "timestamp", direction: "desc" as const },
   pageSize: 50,

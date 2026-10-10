@@ -1,5 +1,5 @@
 import {
-  defineTrpcFact,
+  defineMiddlewareContext,
   defineTrpcRouter,
   type TrpcHandlerActor,
   type TrpcRouterDeclaration,
@@ -10,12 +10,12 @@ import { z } from "zod";
 const accepted = { ok: true } as const;
 
 /** The signed-in person the door binds under this name, as langy and onboarding declare it. */
-export const presenceSessionPersonFact = defineTrpcFact(
+export const presenceSessionPersonContext = defineMiddlewareContext(
   "organizationSessionPerson",
   z.object({ name: z.string().nullable(), image: z.string().nullable() }).nullable(),
 );
 
-type SessionPerson = z.infer<typeof presenceSessionPersonFact.schema>;
+type SessionPerson = z.infer<typeof presenceSessionPersonContext.schema>;
 
 /** The presenter: the authenticated id, with the session's name and image, never the payload's. */
 function presenterOf(actor: TrpcHandlerActor, person: SessionPerson): PresenceUser {
@@ -25,7 +25,7 @@ function presenterOf(actor: TrpcHandlerActor, person: SessionPerson): PresenceUs
 export const presenceTrpcTransport: TrpcRouterDeclaration<PresenceApi, typeof presenceTrpc> =
   defineTrpcRouter(PresenceApi, presenceTrpc)
     .procedure("update")
-    .withFacts(presenceSessionPersonFact)
+    .withMiddlewareContext(presenceSessionPersonContext)
     .withPermission("traces:view")
     .handle(async ({ app, input, actor }, person) => {
       await app.update({ ...input, user: presenterOf(actor, person) });
@@ -42,7 +42,7 @@ export const presenceTrpcTransport: TrpcRouterDeclaration<PresenceApi, typeof pr
     })
 
     .procedure("cursor")
-    .withFacts(presenceSessionPersonFact)
+    .withMiddlewareContext(presenceSessionPersonContext)
     .withPermission("traces:view")
     .handle(async ({ app, input, actor }, person) => {
       await app.broadcastCursor({ ...input, user: presenterOf(actor, person) });

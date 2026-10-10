@@ -77,6 +77,9 @@
       "path": "../../packages/design-system/tsconfig.build.json"
     },
     {
+      "path": "../../packages/design-system-internal/tsconfig.build.json"
+    },
+    {
       "path": "../../enterprise/modules/billing/browser/tsconfig.build.json"
     },
     {

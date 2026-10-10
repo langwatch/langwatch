@@ -63,7 +63,7 @@ export const otlpHeadersSecret: TelemetrySecret = {
 
 /**
  * The bearer a Prometheus scrape presents, main's name (ADR-175). Absent
- * leaves the door open outside production.
+ * leaves the door unmounted in every environment.
  */
 export const metricsScrapeTokenSecret: TelemetrySecret = {
   id: "METRICS_API_KEY",
@@ -84,8 +84,6 @@ export type TelemetrySecrets = Readonly<{
 export type TelemetryContext = Readonly<{
   config: Readonly<{
     observability: TelemetrySettings;
-    /** The process slice's `NODE_ENV`; production closes an ungated scrape door. */
-    process?: Readonly<{ nodeEnvironment?: string | undefined }>;
   }>;
   secrets: TelemetrySecrets;
   /** Field paths every log record masks; the boot seam names them, this package holds none. */

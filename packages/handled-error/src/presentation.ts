@@ -1115,6 +1115,10 @@ const presentations = {
     title: "Prompt not found",
     describe: () => "It may have been deleted. Reload to see the current list.",
   },
+  prompt_tag_conflict: {
+    title: "That tag is already in use",
+    describe: () => "Pick a different name, or move the existing tag to the version you want.",
+  },
   prompt_not_a_copy: {
     // Refused on "sync from source". This prompt was written here rather than
     // copied from somewhere, so there is nothing to sync from and no retry to
@@ -1361,6 +1365,13 @@ const presentations = {
     describe: () =>
       "Saving this would remove the credentials already stored for this provider. Leave the credential fields as they are to keep them, or empty them yourself if removing them is what you want.",
   },
+  model_provider_invalid: {
+    title: "That provider can't be saved",
+    describe: (error) =>
+      strEq(error, "reason", "endpoint_not_allowed")
+        ? "The base URL can't be used. Check it is a full address such as https://inference.acme.internal/v1 that resolves to a public host, then save again."
+        : "Check the provider's fields, then save again.",
+  },
   model_provider_custom_keys_missing: {
     title: "This provider has no credentials saved",
     describe: () => "Add the provider's API key in Model Providers settings, then try again.",
@@ -1549,6 +1560,39 @@ const presentations = {
   },
 
   // ---- access, org & limits ----
+  aggregate_project_admin_only: {
+    // Reached from the new-project flow or the rule editor by someone whose
+    // role lets them manage projects but who is not an organisation admin.
+    // Nothing was written, so the copy says who can do it.
+    title: "Only organization admins can do this",
+    describe: () =>
+      "This project reads traces from every member project, including personal ones, so only an organization admin can create it or change what it reads.",
+  },
+  aggregate_project_has_no_credential: {
+    // Reached by an SDK or exporter pointed at the aggregate, so the answer is
+    // where the traces should go instead. The key is not the problem.
+    title: "This project doesn't receive traces",
+    describe: () =>
+      "It reads traces from other projects and accepts no API key of its own. Send traces to one of its member projects instead.",
+  },
+  aggregate_project_is_read_only: {
+    // Reached from any save, create or edit aimed at an aggregate, often a
+    // form opened before the project was switched, so the copy says where
+    // the change belongs rather than what went wrong. Renaming, archiving
+    // and editing its rule still work, so the title names data, not the
+    // project.
+    title: "Data can't be added to this project",
+    describe: () =>
+      "It reads traces from other projects and keeps nothing of its own. Open the project the data belongs to and make the change there.",
+  },
+  aggregate_rule_outside_organization: {
+    // Raised before anything is written, so the form is still open with the
+    // rule in it: the copy says what to change there. One answer for a
+    // foreign id and a missing one, on purpose.
+    title: "That rule names something outside this organization",
+    describe: () =>
+      "An aggregate project can only read projects and departments of this organization. Remove the project or department that isn't listed here, then create it again.",
+  },
   project_not_found: {
     title: "Project not found",
     describe: () =>
@@ -1701,8 +1745,9 @@ const presentations = {
     describe: () => "Pick a name no other team in this organization uses.",
   },
   lite_member_restricted: {
-    title: "Your account doesn't include this",
-    describe: () => "Ask an admin on your team to upgrade your access.",
+    title: "You don't have access to this",
+    describe: () =>
+      "Your role doesn't include this action. Ask an organization admin to give you access.",
   },
   personal_project_key_required: {
     // Reached with a key in hand, so the answer is which key to use instead.
@@ -2311,7 +2356,7 @@ const presentations = {
     // Names the permission when the server sent one, for the same reason
     // `project_permission_denied` does: "ask an admin for access" is an
     // errand with no address, whereas the exact grant can be forwarded as-is.
-    title: "You don't have permission to do this",
+    title: "You don't have access to this",
     describe: (error) => {
       const permission = str(error, "required_permission", "");
       return permission
@@ -2359,7 +2404,7 @@ const presentations = {
     // `project_permission_denied`: the exact grant can be forwarded as-is.
     // Lite-member denials carry their own client modal via the middleware's
     // cause; this copy is what everyone else reads.
-    title: "You don't have permission to do this",
+    title: "You don't have access to this",
     describe: (error) => {
       const permission = str(error, "permission", "");
       return permission
@@ -3147,7 +3192,7 @@ const presentations = {
   sso_setup_address_mismatch: {
     title: "That sign-in came from a different address",
     describe: () =>
-      "The test sign-in used an address outside the domain this connection is being set up for. Sign in with an account on the connection's domain.",
+      "Until this connection is live, only the person who registered it can test it, and your identity provider signed in somebody else. Sign in at your identity provider as the person who registered the connection.",
   },
   sso_domain_not_verified: {
     title: "This domain is not verified yet",
@@ -3309,6 +3354,11 @@ const presentations = {
     title: "An account with this address already exists",
     describe: () =>
       "Its address was never confirmed, so single sign-on can be added only once your organization has verified the domain, and not while your identity provider reports the address as unverified. Sign in the way you did before, or ask whoever manages single sign-on to check both.",
+  },
+  sso_member_deactivated: {
+    title: "Your access has been turned off",
+    describe: () =>
+      "Your organization's directory has turned off your access. Ask an administrator of your organization.",
   },
   identity_link_proposal_not_found: {
     title: "That waiting sign-in is no longer there",
@@ -4842,6 +4892,11 @@ const presentations = {
     title: "That request was sent in the wrong format",
     describe: () => "Send the body with the Content-Type this endpoint reads, then try again.",
   },
+  upgrade_in_progress: {
+    title: "LangWatch is upgrading",
+    describe: () =>
+      "This part of LangWatch is being upgraded and will be back in a minute or two. It retries on its own.",
+  },
   upgrade_not_found: {
     title: "That upgrade record wasn't found",
     describe: () => "The step or run may be from another installation. Reload the upgrades page.",
@@ -4849,6 +4904,11 @@ const presentations = {
   upgrade_invalid_cursor: {
     title: "That page of upgrade runs couldn't be read",
     describe: () => "Reload the upgrades page to start from the newest run.",
+  },
+  upgrade_plan_unavailable: {
+    title: "The upgrade preview isn't available here",
+    describe: () =>
+      "This process was started without the release manifests a preview needs. Open the preview from the API.",
   },
   upgrade_step_not_failed: {
     title: "Only a failed step can be retried",
@@ -5400,6 +5460,13 @@ const presentations = {
         : "Pick the project where its traces and costs land. Without one they go to a hidden governance project, and every budget on the project you had in mind counts nothing.";
     },
   },
+  gateway_trace_project_not_a_destination: {
+    // The form is still open with the aggregate picked, so the copy says
+    // what to pick instead.
+    title: "That project doesn't receive traces",
+    describe: () =>
+      "It reads traces from other projects and has none of its own. Pick one of the projects it reads as this key's destination.",
+  },
   gateway_trace_project_unknown: {
     // Says the destination is the problem, not the key, because the form
     // shows a picker and the natural reading of a refusal there is that the
@@ -5478,8 +5545,15 @@ const presentations = {
     // server's sentence: `meta.message` on this code can carry an internal
     // reason, and the customer channel is not where that goes.
     title: "That webhook endpoint can't be saved",
-    describe: () =>
-      "Check the address matches the destination: an HTTPS endpoint needs a URL reachable over HTTPS, and an Amazon SQS destination needs a standard queue URL plus credentials that may write to it. Then check that every subscribed event type is one the catalog lists, that the delivery controls are inside their limits, and that you are not moving an existing endpoint to another destination, which needs a new endpoint instead.",
+    describe: (error) => {
+      if (strEq(error, "reason", "metadata_address")) {
+        return "That address is reserved for the hosting platform's own services, so webhooks can't be sent to it. Use the address of your own receiving service.";
+      }
+      if (strEq(error, "reason", "private_address")) {
+        return "That address is on a private network, so webhooks can't be sent to it. Use a publicly reachable HTTPS address.";
+      }
+      return "Check the address matches the destination: an HTTPS endpoint needs a URL reachable over HTTPS, and an Amazon SQS destination needs a standard queue URL plus credentials that may write to it. Then check that every subscribed event type is one the catalog lists, that the delivery controls are inside their limits, and that you are not moving an existing endpoint to another destination, which needs a new endpoint instead.";
+    },
   },
   webhook_event_not_found: {
     // Says the two things a caller can act on: the log's horizon, and that
@@ -5772,6 +5846,16 @@ const presentations = {
     title: "This step has no model selected",
     describe: () => "Open the node and choose a model.",
   },
+  workflow_model_provider_unavailable: {
+    title: "A step's model provider isn't available",
+    describe: (error) => {
+      const provider = str(error, "provider", "");
+      const subject = provider ? `The ${provider} model provider` : "The model provider";
+      return error.meta.disabled === true
+        ? `${subject} is switched off. Turn it on in Settings, Model Providers, or pick another model.`
+        : `${subject} isn't set up for this project. Add it in Settings, Model Providers, or pick another model.`;
+    },
+  },
 
   // ---- code node ----
   code_runner_error: {
@@ -5881,6 +5965,34 @@ const presentations = {
   attachment_fetch_error: {
     title: "Couldn't load an attachment",
     describe: () => "Check the file is still available, then run again.",
+  },
+  connect_credential_pending: {
+    title: "Hosted services are still being set up",
+    describe: () =>
+      "Your license is valid and its key is being prepared. Try again in a few seconds.",
+  },
+  below_lts_floor: {
+    title: "This version is too old to upgrade from",
+    describe: () =>
+      "Upgrade to the oldest supported long-term release first, then continue to this version.",
+  },
+  image_below_ledger_floor: {
+    title: "This image is older than the database",
+    describe: () =>
+      "The database has already been upgraded past what this image supports. Start an image at or above the version last run.",
+  },
+  step_after_unknown: {
+    title: "An upgrade step depends on a step that doesn't exist",
+    describe: () => "This build's upgrade steps are inconsistent. Use an official image.",
+  },
+  step_after_cycle: {
+    title: "Upgrade steps depend on each other in a loop",
+    describe: () => "This build's upgrade steps are inconsistent. Use an official image.",
+  },
+  contract_archive_failed: {
+    title: "The upgrade couldn't archive data before removing it",
+    describe: () =>
+      "Nothing was dropped. Check the archive destination is reachable and writable, then retry the step.",
   },
   connect_instance_required: {
     title: "This install did not identify itself",

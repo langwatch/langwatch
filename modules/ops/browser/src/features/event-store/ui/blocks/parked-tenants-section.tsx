@@ -1,3 +1,4 @@
+import { ListTable } from "@langwatch/design-system/list-table";
 import {
   Box,
   Collapsible,
@@ -50,7 +51,10 @@ export function ParkedTenantsSection({
         </Text>
       </Box>
       <Table.ScrollArea>
-        <Table.Root
+        <ListTable
+          density="compact"
+          columnRules={false}
+          containerProps={{ overflowX: "auto" }}
           size="sm"
           variant="line"
           css={{ "& tr:last-child td": { borderBottom: "none" } }}
@@ -76,7 +80,7 @@ export function ParkedTenantsSection({
               />
             ))}
           </Table.Body>
-        </Table.Root>
+        </ListTable>
       </Table.ScrollArea>
     </Box>
   );
@@ -115,7 +119,7 @@ function ParkedTenantRow({
             aria-expanded={open}
             aria-controls={panelId}
             variant="ghost"
-            size="2xs"
+            size="sm"
             color="fg.muted"
             onClick={() => setOpen((prior) => !prior)}
           >

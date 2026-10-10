@@ -5,28 +5,28 @@ import { SCENARIO_RUN_STATUS_CONFIG } from "../../../../model/scenario-run-statu
 
 const LIGHT_MODE_GRADIENTS = {
   pass: `
-    radial-gradient(ellipse at 0% 100%, rgba(134, 239, 172, 0.55) 0%, transparent 50%),
-    radial-gradient(ellipse at 100% 50%, rgba(72, 187, 120, 0.5) 0%, transparent 45%),
-    radial-gradient(ellipse at 70% 0%, rgba(56, 161, 105, 0.55) 0%, transparent 50%),
-    linear-gradient(160deg, rgba(56, 161, 105, 0.58) 0%, rgba(104, 211, 145, 0.52) 100%)
+    radial-gradient(ellipse at 0% 100%, color-mix(in srgb, var(--chakra-colors-green-subtle) 55%, transparent) 0%, transparent 50%),
+    radial-gradient(ellipse at 100% 50%, color-mix(in srgb, var(--chakra-colors-green-subtle) 50%, transparent) 0%, transparent 45%),
+    radial-gradient(ellipse at 70% 0%, color-mix(in srgb, var(--chakra-colors-green-subtle) 55%, transparent) 0%, transparent 50%),
+    linear-gradient(160deg, color-mix(in srgb, var(--chakra-colors-green-subtle) 58%, transparent) 0%, color-mix(in srgb, var(--chakra-colors-green-subtle) 52%, transparent) 100%)
   `,
   cancelled: `
-    radial-gradient(ellipse at 0% 100%, rgba(226, 232, 240, 0.55) 0%, transparent 50%),
-    radial-gradient(ellipse at 100% 50%, rgba(160, 174, 192, 0.5) 0%, transparent 45%),
-    radial-gradient(ellipse at 70% 0%, rgba(113, 128, 150, 0.55) 0%, transparent 50%),
-    linear-gradient(160deg, rgba(113, 128, 150, 0.58) 0%, rgba(160, 174, 192, 0.52) 100%)
+    radial-gradient(ellipse at 0% 100%, color-mix(in srgb, var(--chakra-colors-gray-subtle) 55%, transparent) 0%, transparent 50%),
+    radial-gradient(ellipse at 100% 50%, color-mix(in srgb, var(--chakra-colors-gray-subtle) 50%, transparent) 0%, transparent 45%),
+    radial-gradient(ellipse at 70% 0%, color-mix(in srgb, var(--chakra-colors-gray-subtle) 55%, transparent) 0%, transparent 50%),
+    linear-gradient(160deg, color-mix(in srgb, var(--chakra-colors-gray-subtle) 58%, transparent) 0%, color-mix(in srgb, var(--chakra-colors-gray-subtle) 52%, transparent) 100%)
   `,
   fail: `
-    radial-gradient(ellipse at 0% 100%, rgba(254, 178, 178, 0.55) 0%, transparent 50%),
-    radial-gradient(ellipse at 100% 50%, rgba(245, 101, 101, 0.5) 0%, transparent 45%),
-    radial-gradient(ellipse at 70% 0%, rgba(229, 62, 62, 0.55) 0%, transparent 50%),
-    linear-gradient(160deg, rgba(229, 62, 62, 0.58) 0%, rgba(252, 129, 129, 0.52) 100%)
+    radial-gradient(ellipse at 0% 100%, color-mix(in srgb, var(--chakra-colors-red-subtle) 55%, transparent) 0%, transparent 50%),
+    radial-gradient(ellipse at 100% 50%, color-mix(in srgb, var(--chakra-colors-red-subtle) 50%, transparent) 0%, transparent 45%),
+    radial-gradient(ellipse at 70% 0%, color-mix(in srgb, var(--chakra-colors-red-subtle) 55%, transparent) 0%, transparent 50%),
+    linear-gradient(160deg, color-mix(in srgb, var(--chakra-colors-red-subtle) 58%, transparent) 0%, color-mix(in srgb, var(--chakra-colors-red-subtle) 52%, transparent) 100%)
   `,
   stalled: `
-    radial-gradient(ellipse at 0% 100%, rgba(251, 211, 141, 0.55) 0%, transparent 50%),
-    radial-gradient(ellipse at 100% 50%, rgba(236, 201, 75, 0.5) 0%, transparent 45%),
-    radial-gradient(ellipse at 70% 0%, rgba(214, 158, 46, 0.55) 0%, transparent 50%),
-    linear-gradient(160deg, rgba(214, 158, 46, 0.58) 0%, rgba(236, 201, 75, 0.52) 100%)
+    radial-gradient(ellipse at 0% 100%, color-mix(in srgb, var(--chakra-colors-yellow-subtle) 55%, transparent) 0%, transparent 50%),
+    radial-gradient(ellipse at 100% 50%, color-mix(in srgb, var(--chakra-colors-yellow-subtle) 50%, transparent) 0%, transparent 45%),
+    radial-gradient(ellipse at 70% 0%, color-mix(in srgb, var(--chakra-colors-yellow-subtle) 55%, transparent) 0%, transparent 50%),
+    linear-gradient(160deg, color-mix(in srgb, var(--chakra-colors-yellow-subtle) 58%, transparent) 0%, color-mix(in srgb, var(--chakra-colors-yellow-subtle) 52%, transparent) 100%)
   `,
 } as const;
 

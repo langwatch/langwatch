@@ -24,13 +24,7 @@ export interface LangyVisibility {
 /** The gate, with its own uncertainty exposed. See {@link LangyVisibility}. */
 export function useLangyVisibility(): LangyVisibility {
   const { data: session, status: sessionStatus } = useRequiredSession();
-  const {
-    team,
-    project,
-    organization,
-    organizationRole,
-    isLoading: contextLoading,
-  } = useOrganizationTeamProject({
+  const { team, project, organization, organizationRole } = useOrganizationTeamProject({
     redirectToOnboarding: false,
     redirectToProjectOnboarding: false,
   });
@@ -63,7 +57,7 @@ export function useLangyVisibility(): LangyVisibility {
   // no project at all is DECIDED (they cannot have Langy), not pending. Only
   // the three things that are genuinely in flight count.
   const isResolving =
-    sessionStatus === "loading" || contextLoading || (mayReadLangy && flagLoading);
+    sessionStatus === "loading" || traceHost.isLoading() || (mayReadLangy && flagLoading);
 
   return { show: mayReadLangy && releaseLangy, isResolving };
 }

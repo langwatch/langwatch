@@ -23,7 +23,8 @@ const productOptions: ProductOption[] = [
     title: "Via the Platform",
     description: "Configure everything directly from the LangWatch dashboard",
     icon: Monitor,
-    gradient: "linear-gradient(135deg, rgba(49,130,206,0.05) 0%, transparent 50%)",
+    gradient:
+      "linear-gradient(135deg, color-mix(in srgb, var(--chakra-colors-blue-solid) 5%, transparent) 0%, transparent 50%)",
   },
   {
     key: "via-claude-code",
@@ -31,21 +32,24 @@ const productOptions: ProductOption[] = [
     description:
       "Set up with prompts, skills, or MCP. Works with Claude Code, Cursor, Windsurf, and more",
     icon: Terminal,
-    gradient: "linear-gradient(135deg, rgba(237,137,38,0.06) 0%, transparent 50%)",
+    gradient:
+      "linear-gradient(135deg, color-mix(in srgb, var(--chakra-colors-accent-solid) 6%, transparent) 0%, transparent 50%)",
   },
   {
     key: "via-claude-desktop",
     title: "Via MCP",
     description: "Connect any MCP client. Claude Desktop, ChatGPT, Cursor, Windsurf, and more",
     icon: MessageSquare,
-    gradient: "linear-gradient(135deg, rgba(128,90,213,0.05) 0%, transparent 50%)",
+    gradient:
+      "linear-gradient(135deg, color-mix(in srgb, var(--chakra-colors-purple-solid) 5%, transparent) 0%, transparent 50%)",
   },
   {
     key: "manually",
     title: "Manually",
     description: "Integrate the LangWatch SDK directly into your codebase",
     icon: Code,
-    gradient: "linear-gradient(135deg, rgba(56,161,105,0.05) 0%, transparent 50%)",
+    gradient:
+      "linear-gradient(135deg, color-mix(in srgb, var(--chakra-colors-green-solid) 5%, transparent) 0%, transparent 50%)",
   },
 ];
 
@@ -70,7 +74,7 @@ export const ProductSelectionScreen: React.FC<ProductSelectionScreenProps> = ({
           borderRadius="2xl"
           bg="bg.panel/80"
           border="1px solid"
-          borderColor={{ base: "orange.200", _dark: "orange.800" }}
+          borderColor={{ base: "orange.emphasized", _dark: "orange.emphasized" }}
           boxShadow="sm"
           backdropFilter="blur(20px) saturate(1.3)"
           px={6}
@@ -86,7 +90,8 @@ export const ProductSelectionScreen: React.FC<ProductSelectionScreenProps> = ({
           transition={{ duration: 0.27, delay: i * 0.054, ease: "easeOut" }}
           whileHover={{
             y: -3,
-            boxShadow: "0 12px 40px rgba(0,0,0,0.08), 0 2px 6px rgba(0,0,0,0.04)",
+            boxShadow:
+              "0 12px 40px color-mix(in srgb, var(--chakra-colors-bg-scrim) 8%, transparent), 0 2px 6px color-mix(in srgb, var(--chakra-colors-bg-scrim) 4%, transparent)",
             borderColor: "var(--chakra-colors-orange-emphasized)",
             transition: { duration: 0.25, ease: "easeOut" },
           }}
@@ -114,23 +119,16 @@ export const ProductSelectionScreen: React.FC<ProductSelectionScreenProps> = ({
               border="1px solid"
               borderColor={accentChipBorder}
               transition="all 0.25s ease"
-              // The hover wash brightens the chip by one step. Written as raw
-              // custom properties because it rides a `button:hover` selector,
-              // so it needs its own dark-mode branch — `_dark` cannot reach
-              // inside a nested `css` selector.
+              // Semantic variables keep the nested hover selector mode-aware.
               css={{
                 "button:hover &": {
-                  background: "var(--chakra-colors-orange-100)",
-                  borderColor: "var(--chakra-colors-orange-200)",
+                  background: "var(--chakra-colors-accent-muted)",
+                  borderColor: "var(--chakra-colors-orange-emphasized)",
                   transform: "scale(1.05)",
-                },
-                ".dark button:hover &": {
-                  background: "var(--chakra-colors-orange-900)",
-                  borderColor: "var(--chakra-colors-orange-800)",
                 },
               }}
             >
-              <Icon color="orange.500" boxSize={6}>
+              <Icon color="orange.fg" boxSize={6}>
                 <opt.icon strokeWidth={1.5} />
               </Icon>
             </Box>

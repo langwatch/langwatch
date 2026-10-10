@@ -55,6 +55,7 @@ const APPLICATION_NAMES: Record<ApplicationPackageRole, string> = {
   worker: "@langwatch/worker",
   server: "@langwatch/server",
   tasks: "@langwatch/tasks",
+  backend: "@langwatch/backend",
 };
 
 function application(
@@ -121,8 +122,8 @@ function policy(name: string): ArchitectureViolation[] {
 }
 
 describe("application workspace classification", () => {
-  it("classifies the five fixed application paths and names", () => {
-    for (const role of ["ui", "api", "worker", "server", "tasks"] as const) {
+  it("classifies the six fixed application paths and names", () => {
+    for (const role of ["ui", "api", "worker", "server", "tasks", "backend"] as const) {
       application(role);
     }
 
@@ -137,6 +138,7 @@ describe("application workspace classification", () => {
       ["worker", "@langwatch/worker"],
       ["server", "@langwatch/server"],
       ["tasks", "@langwatch/tasks"],
+      ["backend", "@langwatch/backend"],
     ]);
   });
 
@@ -229,6 +231,61 @@ describe("combined contributor runtime", () => {
     expect(policy("application-boundary")).toEqual([
       expect.objectContaining({ file: "tools/scripts/src" }),
     ]);
+  });
+});
+
+describe("the one-process backend application", () => {
+  const COMPOSES_BOTH =
+    'import { startApi } from "@langwatch/platform-api"; import { startWorker } from "@langwatch/worker"; export { startApi, startWorker };';
+  const BOTH_RUNTIMES = {
+    "@langwatch/platform-api": "workspace:*",
+    "@langwatch/worker": "workspace:*",
+  };
+
+  function runtimeApplications(): void {
+    application("api", { source: "export const startApi = true;" });
+    application("worker", { source: "export const startWorker = true;" });
+  }
+
+  /** @scenario "apps/backend is the one application that composes the api and the worker" */
+  it("admits apps/backend depending on and importing the api and the worker", () => {
+    runtimeApplications();
+    application("backend", { dependencies: BOTH_RUNTIMES, source: COMPOSES_BOTH });
+
+    expect(policy("application-layout")).toEqual([]);
+    expect(policy("application-boundary")).toEqual([]);
+  });
+
+  it("refuses apps/backend composing any application but the api and the worker", () => {
+    runtimeApplications();
+    application("tasks", { source: "export const runTask = true;" });
+    application("backend", {
+      dependencies: { "@langwatch/tasks": "workspace:*" },
+      source: 'import { runTask } from "@langwatch/tasks"; export { runTask };',
+    });
+
+    expect(policy("application-boundary").map(({ file, message }) => [file, message])).toEqual([
+      ["apps/backend/package.json", "Application backend cannot depend on application tasks."],
+      ["apps/backend/src/index.ts", "Application backend cannot import application tasks source."],
+    ]);
+  });
+
+  it("refuses every other application that composes the api and the worker", () => {
+    runtimeApplications();
+    application("server", { dependencies: BOTH_RUNTIMES, source: COMPOSES_BOTH });
+
+    expect(policy("application-boundary").map(({ file, message }) => [file, message])).toEqual(
+      expect.arrayContaining([
+        ["apps/server/package.json", "Application server cannot depend on application api."],
+        ["apps/server/package.json", "Application server cannot depend on application worker."],
+        ["apps/server/src/index.ts", "Application server cannot import application api source."],
+        ["apps/server/src/index.ts", "Application server cannot import application worker source."],
+        [
+          "apps/server/src",
+          "apps/server imports both API and worker runtime construction entry points.",
+        ],
+      ]),
+    );
   });
 });
 

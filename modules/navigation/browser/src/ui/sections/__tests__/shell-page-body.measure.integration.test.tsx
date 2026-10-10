@@ -22,7 +22,7 @@ vi.mock("../../../behavior/navigation-api.ts", () => ({
 
 afterEach(() => cleanup());
 
-function measureAt({ pathname }: { pathname: string }): string {
+function frameAt({ pathname }: { pathname: string }): DOMStringMap {
   renderWithDesignSystem(
     <WithStubNavigationHost readings={{ pathname, currentUserId: "user_1", isLoading: true }}>
       <ShellPageBody>
@@ -30,31 +30,58 @@ function measureAt({ pathname }: { pathname: string }): string {
       </ShellPageBody>
     </WithStubNavigationHost>,
   );
-  return screen.getByText("Page content").parentElement?.dataset.pageMeasure ?? "";
+  return screen.getByText("Page content").parentElement?.dataset ?? {};
+}
+
+function measureAt({ pathname }: { pathname: string }): string {
+  return frameAt({ pathname }).pageMeasure ?? "";
 }
 
 describe("given a settings page", () => {
   describe("when it is a form page", () => {
-    it.each(["/settings", "/settings/profile", "/settings/security", "/settings/checkup"])(
-      "frames %s at the form measure",
-      (pathname) => {
-        expect(measureAt({ pathname })).toBe("820px");
-      },
-    );
+    it.each([
+      "/settings",
+      "/settings/profile",
+      "/settings/security",
+      "/settings/checkup",
+      "/settings/data-privacy",
+      "/settings/license",
+      "/settings/connect",
+      "/settings/integrations",
+    ])("frames %s at the form measure", (pathname) => {
+      expect(measureAt({ pathname })).toBe("820px");
+    });
+  });
+
+  describe("when it is your own account page", () => {
+    it.each(["/settings/profile", "/settings/security"])("aligns %s to the left", (pathname) => {
+      expect(frameAt({ pathname }).pageAlign).toBe("start");
+    });
+
+    it("centres the organization's settings", () => {
+      expect(frameAt({ pathname: "/settings" }).pageAlign).toBe("center");
+    });
   });
 
   describe("when it is a list or table page", () => {
-    it.each(["/settings/api-keys", "/settings/secrets", "/settings/data-retention"])(
-      "frames %s at the table measure",
-      (pathname) => {
-        expect(measureAt({ pathname })).toBe("1280px");
-      },
-    );
+    it.each([
+      "/settings/api-keys",
+      "/settings/secrets",
+      "/settings/data-retention",
+      "/settings/audit-log",
+      "/settings/subscription",
+      "/settings/model-providers",
+    ])("frames %s at the table measure", (pathname) => {
+      expect(measureAt({ pathname })).toBe("1280px");
+    });
   });
 
   describe("when it is the authentication family", () => {
-    it("fills the card", () => {
-      expect(measureAt({ pathname: "/settings/authentication/provider" })).toBe("100%");
-    });
+    it.each(["/settings/authentication", "/settings/authentication/provider"])(
+      "leaves %s unmeasured, so its section rail fills the card",
+      (pathname) => {
+        expect(measureAt({ pathname })).toBe("");
+      },
+    );
   });
 });

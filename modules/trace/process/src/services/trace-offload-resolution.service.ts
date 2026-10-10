@@ -11,11 +11,14 @@ import type { TraceIOExtractionService } from "#features/derivation/services/tra
  * pointers and re-runs IO extraction. A missing row logs at warn and keeps the preview.
  */
 import type { ResolveTraceSpansFn } from "../features/legacy/repositories/trace-legacy-read.repository.ts";
+import type { BlobResolutionDeps } from "../features/legacy/services/trace-legacy-read.service.ts";
+import type { TraceBlobStoreService } from "../features/media/services/trace-blob-store.service.ts";
+import {
+  BlobFieldNotFoundError,
+  BlobNotFoundError,
+} from "../features/media/services/trace-blob-store.service.ts";
 import { TraceEventPayloadFieldNotFoundError } from "../repositories/trace-payload-reader.repository.ts";
 import { hasEventRefs, parseSpanEventRefs } from "../rules/trace-event-ref-parsing.rules.ts";
-import type { TraceBlobStoreService } from "../features/media/services/trace-blob-store.service.ts";
-import { BlobFieldNotFoundError, BlobNotFoundError } from "../features/media/services/trace-blob-store.service.ts";
-import type { BlobResolutionDeps } from "../features/legacy/services/trace-legacy-read.service.ts";
 
 const offloadResolutionLogger = createLogger("langwatch:traces:clickhouse-legacy-read");
 

@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import { SUITE_RUN_EVENT_TYPES, SUITE_RUN_EVENT_VERSIONS } from "./suite-run.constants.ts";
@@ -19,7 +20,7 @@ const suiteRunEventSchema = z.object({
 /**
  * SuiteRunStarted event - emitted when a suite run begins.
  */
-export const suiteRunStartedEventDataSchema = z.object({
+const suiteRunStartedEventDataSchemaDefinition = z.object({
   batchRunId: z.string(),
   scenarioSetId: z.string(),
   suiteId: z.string(),
@@ -27,38 +28,58 @@ export const suiteRunStartedEventDataSchema = z.object({
   scenarioIds: z.array(z.string()),
   targetIds: z.array(z.string()),
 });
+export interface SuiteRunStartedEventDataSchema extends Named<
+  typeof suiteRunStartedEventDataSchemaDefinition
+> {}
+export const suiteRunStartedEventDataSchema: SuiteRunStartedEventDataSchema =
+  suiteRunStartedEventDataSchemaDefinition;
 export type SuiteRunStartedEventData = z.infer<typeof suiteRunStartedEventDataSchema>;
 
-export const SuiteRunStartedEventSchema = z.object({
+const SuiteRunStartedEventSchemaDefinition = z.object({
   ...suiteRunEventSchema.shape,
   type: z.literal(SUITE_RUN_EVENT_TYPES.STARTED),
   version: z.literal(SUITE_RUN_EVENT_VERSIONS.STARTED),
   data: suiteRunStartedEventDataSchema,
 });
+export interface SuiteRunStartedEventSchema extends Named<
+  typeof SuiteRunStartedEventSchemaDefinition
+> {}
+export const SuiteRunStartedEventSchema: SuiteRunStartedEventSchema =
+  SuiteRunStartedEventSchemaDefinition;
 export type SuiteRunStartedEvent = z.infer<typeof SuiteRunStartedEventSchema>;
 
 /**
  * SuiteRunItemStarted event - emitted when an individual item in the suite starts.
  */
-export const suiteRunItemStartedEventDataSchema = z.object({
+const suiteRunItemStartedEventDataSchemaDefinition = z.object({
   batchRunId: z.string(),
   scenarioRunId: z.string(),
   scenarioId: z.string(),
 });
+export interface SuiteRunItemStartedEventDataSchema extends Named<
+  typeof suiteRunItemStartedEventDataSchemaDefinition
+> {}
+export const suiteRunItemStartedEventDataSchema: SuiteRunItemStartedEventDataSchema =
+  suiteRunItemStartedEventDataSchemaDefinition;
 export type SuiteRunItemStartedEventData = z.infer<typeof suiteRunItemStartedEventDataSchema>;
 
-export const SuiteRunItemStartedEventSchema = z.object({
+const SuiteRunItemStartedEventSchemaDefinition = z.object({
   ...suiteRunEventSchema.shape,
   type: z.literal(SUITE_RUN_EVENT_TYPES.ITEM_STARTED),
   version: z.literal(SUITE_RUN_EVENT_VERSIONS.ITEM_STARTED),
   data: suiteRunItemStartedEventDataSchema,
 });
+export interface SuiteRunItemStartedEventSchema extends Named<
+  typeof SuiteRunItemStartedEventSchemaDefinition
+> {}
+export const SuiteRunItemStartedEventSchema: SuiteRunItemStartedEventSchema =
+  SuiteRunItemStartedEventSchemaDefinition;
 export type SuiteRunItemStartedEvent = z.infer<typeof SuiteRunItemStartedEventSchema>;
 
 /**
  * SuiteRunItemCompleted event - emitted when an individual item finishes.
  */
-export const suiteRunItemCompletedEventDataSchema = z.object({
+const suiteRunItemCompletedEventDataSchemaDefinition = z.object({
   batchRunId: z.string(),
   scenarioRunId: z.string(),
   scenarioId: z.string(),
@@ -68,14 +89,24 @@ export const suiteRunItemCompletedEventDataSchema = z.object({
   reasoning: z.string().optional(),
   error: z.string().optional(),
 });
+export interface SuiteRunItemCompletedEventDataSchema extends Named<
+  typeof suiteRunItemCompletedEventDataSchemaDefinition
+> {}
+export const suiteRunItemCompletedEventDataSchema: SuiteRunItemCompletedEventDataSchema =
+  suiteRunItemCompletedEventDataSchemaDefinition;
 export type SuiteRunItemCompletedEventData = z.infer<typeof suiteRunItemCompletedEventDataSchema>;
 
-export const SuiteRunItemCompletedEventSchema = z.object({
+const SuiteRunItemCompletedEventSchemaDefinition = z.object({
   ...suiteRunEventSchema.shape,
   type: z.literal(SUITE_RUN_EVENT_TYPES.ITEM_COMPLETED),
   version: z.literal(SUITE_RUN_EVENT_VERSIONS.ITEM_COMPLETED),
   data: suiteRunItemCompletedEventDataSchema,
 });
+export interface SuiteRunItemCompletedEventSchema extends Named<
+  typeof SuiteRunItemCompletedEventSchemaDefinition
+> {}
+export const SuiteRunItemCompletedEventSchema: SuiteRunItemCompletedEventSchema =
+  SuiteRunItemCompletedEventSchemaDefinition;
 export type SuiteRunItemCompletedEvent = z.infer<typeof SuiteRunItemCompletedEventSchema>;
 
 /**
@@ -83,7 +114,7 @@ export type SuiteRunItemCompletedEvent = z.infer<typeof SuiteRunItemCompletedEve
  * because an attached evaluator gates it. Carries the before/after verdict
  * so the fold moves counters without per-item state.
  */
-export const suiteRunItemRegradedEventDataSchema = z.object({
+const suiteRunItemRegradedEventDataSchemaDefinition = z.object({
   batchRunId: z.string(),
   scenarioRunId: z.string(),
   scenarioId: z.string(),
@@ -92,14 +123,24 @@ export const suiteRunItemRegradedEventDataSchema = z.object({
   status: z.string(),
   verdict: z.string().optional(),
 });
+export interface SuiteRunItemRegradedEventDataSchema extends Named<
+  typeof suiteRunItemRegradedEventDataSchemaDefinition
+> {}
+export const suiteRunItemRegradedEventDataSchema: SuiteRunItemRegradedEventDataSchema =
+  suiteRunItemRegradedEventDataSchemaDefinition;
 export type SuiteRunItemRegradedEventData = z.infer<typeof suiteRunItemRegradedEventDataSchema>;
 
-export const SuiteRunItemRegradedEventSchema = z.object({
+const SuiteRunItemRegradedEventSchemaDefinition = z.object({
   ...suiteRunEventSchema.shape,
   type: z.literal(SUITE_RUN_EVENT_TYPES.ITEM_REGRADED),
   version: z.literal(SUITE_RUN_EVENT_VERSIONS.ITEM_REGRADED),
   data: suiteRunItemRegradedEventDataSchema,
 });
+export interface SuiteRunItemRegradedEventSchema extends Named<
+  typeof SuiteRunItemRegradedEventSchemaDefinition
+> {}
+export const SuiteRunItemRegradedEventSchema: SuiteRunItemRegradedEventSchema =
+  SuiteRunItemRegradedEventSchemaDefinition;
 export type SuiteRunItemRegradedEvent = z.infer<typeof SuiteRunItemRegradedEventSchema>;
 
 /**

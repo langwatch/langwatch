@@ -1,4 +1,5 @@
-import { actorSchema, ledgerActorSchema } from "@langwatch/authorization";
+import { actorSchema, grantConditionSchema, ledgerActorSchema } from "@langwatch/authorization";
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import {
@@ -59,13 +60,15 @@ const ONE_LEDGER_PER_ORGANIZATION = {
   path: ["tenantId"],
 };
 
-export const attachGrantEntrySchema = z
+const attachGrantEntrySchemaDefinition = z
   .object({
     grantId: z.string().min(1),
     principal: ledgerPrincipalSchema,
     roleKey: z.string().min(1).nullable(),
     scope: ledgerScopeSchema,
     resource: resourceGrantTermsSchema.optional(),
+    /** Present only on a shared project-reader grant (ADR-177). */
+    condition: grantConditionSchema.optional(),
     legacyRole: legacyBindingRoleSchema.optional(),
     expiresAtMs: z.number().int().positive().optional(),
     source: grantEventSourceSchema,
@@ -76,6 +79,8 @@ export const attachGrantEntrySchema = z
     membershipStamp: z.string().min(1).optional(),
     /** Only founder creation may use this while its transaction is open. */
     membershipBootstrap: z.boolean().optional(),
+    /** The writer asked to skip an identical live grant; the fold honours it too. */
+    onDuplicate: z.literal("skip").optional(),
   })
   .strict()
   .refine(grantShapeRefinement.check, {
@@ -98,9 +103,11 @@ export const attachGrantEntrySchema = z
       path: ["membershipBootstrap"],
     },
   );
+export interface AttachGrantEntrySchema extends Named<typeof attachGrantEntrySchemaDefinition> {}
+export const attachGrantEntrySchema: AttachGrantEntrySchema = attachGrantEntrySchemaDefinition;
 export type AttachGrantEntry = z.infer<typeof attachGrantEntrySchema>;
 
-export const attachGrantCommandDataSchema = commandIdentitySchema
+const attachGrantCommandDataSchemaDefinition = commandIdentitySchema
   .safeExtend({
     grant: attachGrantEntrySchema,
   })
@@ -115,9 +122,14 @@ export const attachGrantCommandDataSchema = commandIdentitySchema
       path: ["grant", "scope", "id"],
     },
   );
+export interface AttachGrantCommandDataSchema extends Named<
+  typeof attachGrantCommandDataSchemaDefinition
+> {}
+export const attachGrantCommandDataSchema: AttachGrantCommandDataSchema =
+  attachGrantCommandDataSchemaDefinition;
 export type AttachGrantCommandData = z.infer<typeof attachGrantCommandDataSchema>;
 
-export const changeGrantRoleCommandDataSchema = commandIdentitySchema
+const changeGrantRoleCommandDataSchemaDefinition = commandIdentitySchema
   .safeExtend({
     grantId: z.string().min(1),
     from: z.string().min(1).nullable(),
@@ -126,9 +138,14 @@ export const changeGrantRoleCommandDataSchema = commandIdentitySchema
     occurredAtMs: z.number().int().nonnegative(),
   })
   .refine(isOneLedgerPerOrganization, ONE_LEDGER_PER_ORGANIZATION);
+export interface ChangeGrantRoleCommandDataSchema extends Named<
+  typeof changeGrantRoleCommandDataSchemaDefinition
+> {}
+export const changeGrantRoleCommandDataSchema: ChangeGrantRoleCommandDataSchema =
+  changeGrantRoleCommandDataSchemaDefinition;
 export type ChangeGrantRoleCommandData = z.infer<typeof changeGrantRoleCommandDataSchema>;
 
-export const revokeGrantCommandDataSchema = commandIdentitySchema
+const revokeGrantCommandDataSchemaDefinition = commandIdentitySchema
   .safeExtend({
     grantId: z.string().min(1),
     reason: z.string().min(1).optional(),
@@ -136,9 +153,14 @@ export const revokeGrantCommandDataSchema = commandIdentitySchema
     occurredAtMs: z.number().int().nonnegative(),
   })
   .refine(isOneLedgerPerOrganization, ONE_LEDGER_PER_ORGANIZATION);
+export interface RevokeGrantCommandDataSchema extends Named<
+  typeof revokeGrantCommandDataSchemaDefinition
+> {}
+export const revokeGrantCommandDataSchema: RevokeGrantCommandDataSchema =
+  revokeGrantCommandDataSchemaDefinition;
 export type RevokeGrantCommandData = z.infer<typeof revokeGrantCommandDataSchema>;
 
-export const defineRoleEntrySchema = z
+const defineRoleEntrySchemaDefinition = z
   .object({
     roleId: z.string().min(1),
     name: z.string().min(1),
@@ -148,17 +170,24 @@ export const defineRoleEntrySchema = z
     occurredAtMs: z.number().int().nonnegative(),
   })
   .strict();
+export interface DefineRoleEntrySchema extends Named<typeof defineRoleEntrySchemaDefinition> {}
+export const defineRoleEntrySchema: DefineRoleEntrySchema = defineRoleEntrySchemaDefinition;
 export type DefineRoleEntry = z.infer<typeof defineRoleEntrySchema>;
 
-export const defineRoleCommandDataSchema = commandIdentitySchema
+const defineRoleCommandDataSchemaDefinition = commandIdentitySchema
   .safeExtend({
     role: defineRoleEntrySchema,
     actor: ledgerActorSchema,
   })
   .refine(isOneLedgerPerOrganization, ONE_LEDGER_PER_ORGANIZATION);
+export interface DefineRoleCommandDataSchema extends Named<
+  typeof defineRoleCommandDataSchemaDefinition
+> {}
+export const defineRoleCommandDataSchema: DefineRoleCommandDataSchema =
+  defineRoleCommandDataSchemaDefinition;
 export type DefineRoleCommandData = z.infer<typeof defineRoleCommandDataSchema>;
 
-export const changeRolePermissionsCommandDataSchema = commandIdentitySchema
+const changeRolePermissionsCommandDataSchemaDefinition = commandIdentitySchema
   .safeExtend({
     roleId: z.string().min(1),
     permissions: z.array(z.string().min(1)),
@@ -166,17 +195,27 @@ export const changeRolePermissionsCommandDataSchema = commandIdentitySchema
     occurredAtMs: z.number().int().nonnegative(),
   })
   .refine(isOneLedgerPerOrganization, ONE_LEDGER_PER_ORGANIZATION);
+export interface ChangeRolePermissionsCommandDataSchema extends Named<
+  typeof changeRolePermissionsCommandDataSchemaDefinition
+> {}
+export const changeRolePermissionsCommandDataSchema: ChangeRolePermissionsCommandDataSchema =
+  changeRolePermissionsCommandDataSchemaDefinition;
 export type ChangeRolePermissionsCommandData = z.infer<
   typeof changeRolePermissionsCommandDataSchema
 >;
 
-export const deleteRoleCommandDataSchema = commandIdentitySchema
+const deleteRoleCommandDataSchemaDefinition = commandIdentitySchema
   .safeExtend({
     roleId: z.string().min(1),
     actor: ledgerActorSchema,
     occurredAtMs: z.number().int().nonnegative(),
   })
   .refine(isOneLedgerPerOrganization, ONE_LEDGER_PER_ORGANIZATION);
+export interface DeleteRoleCommandDataSchema extends Named<
+  typeof deleteRoleCommandDataSchemaDefinition
+> {}
+export const deleteRoleCommandDataSchema: DeleteRoleCommandDataSchema =
+  deleteRoleCommandDataSchemaDefinition;
 export type DeleteRoleCommandData = z.infer<typeof deleteRoleCommandDataSchema>;
 
 /**
@@ -186,14 +225,19 @@ export type DeleteRoleCommandData = z.infer<typeof deleteRoleCommandDataSchema>;
 export const authzLedgerWriteSourceSchema = grantEventSourceSchema;
 export type AuthzLedgerWriteSource = z.infer<typeof authzLedgerWriteSourceSchema>;
 
-export const authzLedgerBindingPrincipalSchema = z.union([
+const authzLedgerBindingPrincipalSchemaDefinition = z.union([
   z.object({ userId: z.string().min(1) }).strict(),
   z.object({ groupId: z.string().min(1) }).strict(),
   z.object({ apiKeyId: z.string().min(1) }).strict(),
 ]);
+export interface AuthzLedgerBindingPrincipalSchema extends Named<
+  typeof authzLedgerBindingPrincipalSchemaDefinition
+> {}
+export const authzLedgerBindingPrincipalSchema: AuthzLedgerBindingPrincipalSchema =
+  authzLedgerBindingPrincipalSchemaDefinition;
 export type AuthzLedgerBindingPrincipal = z.infer<typeof authzLedgerBindingPrincipalSchema>;
 
-export const authzLedgerBindingAttachSchema = z
+const authzLedgerBindingAttachSchemaDefinition = z
   .object({
     bindingId: z.string().min(1),
     principal: authzLedgerBindingPrincipalSchema,
@@ -209,6 +253,11 @@ export const authzLedgerBindingAttachSchema = z
     membershipBootstrap: z.boolean().optional(),
   })
   .strict();
+export interface AuthzLedgerBindingAttachSchema extends Named<
+  typeof authzLedgerBindingAttachSchemaDefinition
+> {}
+export const authzLedgerBindingAttachSchema: AuthzLedgerBindingAttachSchema =
+  authzLedgerBindingAttachSchemaDefinition;
 export type AuthzLedgerBindingAttach = z.infer<typeof authzLedgerBindingAttachSchema>;
 
 function ledgerPrincipalId(principal: AuthzLedgerBindingPrincipal): string {
@@ -236,12 +285,17 @@ export function authzBindingIdentityKey({
   return [principalId, scopeType, scopeId, roleIdentity].join("\u001f");
 }
 
-export const authzAttachOutcomeSchema = z
+const authzAttachOutcomeSchemaDefinition = z
   .object({
     attached: z.array(z.string().min(1)),
     duplicates: z.array(z.string().min(1)),
   })
   .strict();
+export interface AuthzAttachOutcomeSchema extends Named<
+  typeof authzAttachOutcomeSchemaDefinition
+> {}
+export const authzAttachOutcomeSchema: AuthzAttachOutcomeSchema =
+  authzAttachOutcomeSchemaDefinition;
 export type AuthzAttachOutcome = z.infer<typeof authzAttachOutcomeSchema>;
 
 /**
@@ -249,13 +303,15 @@ export type AuthzAttachOutcome = z.infer<typeof authzAttachOutcomeSchema>;
  * there; `system` is a consequence of an already-authorized act (an accepted invite, SCIM,
  * sign-up).
  */
-export const authzGrantCallerSchema = z.union([
+const authzGrantCallerSchemaDefinition = z.union([
   authzPrincipalRefSchema,
   z.object({ type: z.literal("system") }).strict(),
 ]);
+export interface AuthzGrantCallerSchema extends Named<typeof authzGrantCallerSchemaDefinition> {}
+export const authzGrantCallerSchema: AuthzGrantCallerSchema = authzGrantCallerSchemaDefinition;
 export type AuthzGrantCaller = z.infer<typeof authzGrantCallerSchema>;
 
-export const authzAttachBindingsInputSchema = z
+const authzAttachBindingsInputSchemaDefinition = z
   .object({
     organizationId: z.string().min(1),
     bindings: z.array(authzLedgerBindingAttachSchema),
@@ -275,15 +331,25 @@ export const authzAttachBindingsInputSchema = z
     requireProjection: z.boolean().optional(),
   })
   .strict();
+export interface AuthzAttachBindingsInputSchema extends Named<
+  typeof authzAttachBindingsInputSchemaDefinition
+> {}
+export const authzAttachBindingsInputSchema: AuthzAttachBindingsInputSchema =
+  authzAttachBindingsInputSchemaDefinition;
 export type AuthzAttachBindingsInput = z.infer<typeof authzAttachBindingsInputSchema>;
 export const authzAttachBindingsOutputSchema = authzAttachOutcomeSchema;
 export type AuthzAttachBindingsOutput = AuthzAttachOutcome;
 
-export const authzLedgerResourcePrincipalSchema = z.discriminatedUnion("type", [
+const authzLedgerResourcePrincipalSchemaDefinition = z.discriminatedUnion("type", [
   z.object({ type: z.literal("anyone"), id: z.null() }).strict(),
   z.object({ type: z.literal("organization"), id: z.string().min(1) }).strict(),
   z.object({ type: z.literal("project"), id: z.string().min(1) }).strict(),
 ]);
+export interface AuthzLedgerResourcePrincipalSchema extends Named<
+  typeof authzLedgerResourcePrincipalSchemaDefinition
+> {}
+export const authzLedgerResourcePrincipalSchema: AuthzLedgerResourcePrincipalSchema =
+  authzLedgerResourcePrincipalSchemaDefinition;
 export type AuthzLedgerResourcePrincipal = z.infer<typeof authzLedgerResourcePrincipalSchema>;
 
 export const AUTHZ_SHARE_PERMISSION = "traces:view" as const;
@@ -307,7 +373,7 @@ export function authzShareAudience({
   }
 }
 
-export const authzLedgerResourceTermsSchema = z
+const authzLedgerResourceTermsSchemaDefinition = z
   .object({
     token: z.string().min(1),
     permission: z.string().min(1),
@@ -317,9 +383,14 @@ export const authzLedgerResourceTermsSchema = z
     createdByUserId: z.string().min(1).optional(),
   })
   .strict();
+export interface AuthzLedgerResourceTermsSchema extends Named<
+  typeof authzLedgerResourceTermsSchemaDefinition
+> {}
+export const authzLedgerResourceTermsSchema: AuthzLedgerResourceTermsSchema =
+  authzLedgerResourceTermsSchemaDefinition;
 export type AuthzLedgerResourceTerms = z.infer<typeof authzLedgerResourceTermsSchema>;
 
-export const authzAttachResourceGrantInputSchema = z
+const authzAttachResourceGrantInputSchemaDefinition = z
   .object({
     organizationId: z.string().min(1),
     grantId: z.string().min(1),
@@ -331,11 +402,16 @@ export const authzAttachResourceGrantInputSchema = z
     commandId: z.string().min(1).optional(),
   })
   .strict();
+export interface AuthzAttachResourceGrantInputSchema extends Named<
+  typeof authzAttachResourceGrantInputSchemaDefinition
+> {}
+export const authzAttachResourceGrantInputSchema: AuthzAttachResourceGrantInputSchema =
+  authzAttachResourceGrantInputSchemaDefinition;
 export type AuthzAttachResourceGrantInput = z.infer<typeof authzAttachResourceGrantInputSchema>;
 export const authzAttachResourceGrantOutputSchema = z.void();
 export type AuthzAttachResourceGrantOutput = z.infer<typeof authzAttachResourceGrantOutputSchema>;
 
-export const authzRevokeResourceGrantsInputSchema = z
+const authzRevokeResourceGrantsInputSchemaDefinition = z
   .object({
     organizationId: z.string().min(1),
     grantIds: z.array(z.string().min(1)),
@@ -343,11 +419,102 @@ export const authzRevokeResourceGrantsInputSchema = z
     reason: z.string().min(1).optional(),
   })
   .strict();
+export interface AuthzRevokeResourceGrantsInputSchema extends Named<
+  typeof authzRevokeResourceGrantsInputSchemaDefinition
+> {}
+export const authzRevokeResourceGrantsInputSchema: AuthzRevokeResourceGrantsInputSchema =
+  authzRevokeResourceGrantsInputSchemaDefinition;
 export type AuthzRevokeResourceGrantsInput = z.infer<typeof authzRevokeResourceGrantsInputSchema>;
 export const authzRevokeResourceGrantsOutputSchema = z.void();
 export type AuthzRevokeResourceGrantsOutput = z.infer<typeof authzRevokeResourceGrantsOutputSchema>;
 
-export const authzChangeBindingRoleInputSchema = z
+/** One reader project's live shared reads (ADR-177), one per member project. */
+const authzFindLiveSharedProjectGrantsInputSchemaDefinition = z
+  .object({ organizationId: z.string().min(1), readerProjectId: z.string().min(1) })
+  .strict();
+export interface AuthzFindLiveSharedProjectGrantsInputSchema extends Named<
+  typeof authzFindLiveSharedProjectGrantsInputSchemaDefinition
+> {}
+export const authzFindLiveSharedProjectGrantsInputSchema: AuthzFindLiveSharedProjectGrantsInputSchema =
+  authzFindLiveSharedProjectGrantsInputSchemaDefinition;
+export type AuthzFindLiveSharedProjectGrantsInput = z.infer<
+  typeof authzFindLiveSharedProjectGrantsInputSchema
+>;
+const authzSharedProjectGrantSchemaDefinition = z.object({
+  grantId: z.string().min(1),
+  memberProjectId: z.string().min(1),
+});
+export interface AuthzSharedProjectGrantSchema extends Named<
+  typeof authzSharedProjectGrantSchemaDefinition
+> {}
+export const authzSharedProjectGrantSchema: AuthzSharedProjectGrantSchema =
+  authzSharedProjectGrantSchemaDefinition;
+export type AuthzSharedProjectGrant = z.infer<typeof authzSharedProjectGrantSchema>;
+
+const authzAttachSharedProjectGrantInputSchemaDefinition = z
+  .object({
+    organizationId: z.string().min(1),
+    readerProjectId: z.string().min(1),
+    memberProjectId: z.string().min(1),
+    condition: grantConditionSchema,
+    actor: ledgerActorSchema,
+    source: grantEventSourceSchema.optional(),
+    commandId: z.string().min(1).optional(),
+    awaitProjection: z.boolean().optional(),
+  })
+  .strict();
+export interface AuthzAttachSharedProjectGrantInputSchema extends Named<
+  typeof authzAttachSharedProjectGrantInputSchemaDefinition
+> {}
+export const authzAttachSharedProjectGrantInputSchema: AuthzAttachSharedProjectGrantInputSchema =
+  authzAttachSharedProjectGrantInputSchemaDefinition;
+export type AuthzAttachSharedProjectGrantInput = z.infer<
+  typeof authzAttachSharedProjectGrantInputSchema
+>;
+const authzAttachSharedProjectGrantOutputSchemaDefinition = z.object({
+  grantId: z.string().min(1),
+  wasAttached: z.boolean(),
+});
+export interface AuthzAttachSharedProjectGrantOutputSchema extends Named<
+  typeof authzAttachSharedProjectGrantOutputSchemaDefinition
+> {}
+export const authzAttachSharedProjectGrantOutputSchema: AuthzAttachSharedProjectGrantOutputSchema =
+  authzAttachSharedProjectGrantOutputSchemaDefinition;
+export type AuthzAttachSharedProjectGrantOutput = z.infer<
+  typeof authzAttachSharedProjectGrantOutputSchema
+>;
+
+const authzAwaitSharedProjectGrantsInputSchemaDefinition = z
+  .object({ organizationId: z.string().min(1), grantIds: z.array(z.string().min(1)) })
+  .strict();
+export interface AuthzAwaitSharedProjectGrantsInputSchema extends Named<
+  typeof authzAwaitSharedProjectGrantsInputSchemaDefinition
+> {}
+export const authzAwaitSharedProjectGrantsInputSchema: AuthzAwaitSharedProjectGrantsInputSchema =
+  authzAwaitSharedProjectGrantsInputSchemaDefinition;
+export type AuthzAwaitSharedProjectGrantsInput = z.infer<
+  typeof authzAwaitSharedProjectGrantsInputSchema
+>;
+
+const authzRevokeSharedProjectGrantsInputSchemaDefinition = z
+  .object({
+    organizationId: z.string().min(1),
+    readerProjectId: z.string().min(1),
+    memberProjectIds: z.array(z.string().min(1)).optional(),
+    actor: ledgerActorSchema,
+    reason: z.string().min(1).optional(),
+  })
+  .strict();
+export interface AuthzRevokeSharedProjectGrantsInputSchema extends Named<
+  typeof authzRevokeSharedProjectGrantsInputSchemaDefinition
+> {}
+export const authzRevokeSharedProjectGrantsInputSchema: AuthzRevokeSharedProjectGrantsInputSchema =
+  authzRevokeSharedProjectGrantsInputSchemaDefinition;
+export type AuthzRevokeSharedProjectGrantsInput = z.infer<
+  typeof authzRevokeSharedProjectGrantsInputSchema
+>;
+
+const authzChangeBindingRoleInputSchemaDefinition = z
   .object({
     organizationId: z.string().min(1),
     bindingId: z.string().min(1),
@@ -357,11 +524,16 @@ export const authzChangeBindingRoleInputSchema = z
     actor: ledgerActorSchema,
   })
   .strict();
+export interface AuthzChangeBindingRoleInputSchema extends Named<
+  typeof authzChangeBindingRoleInputSchemaDefinition
+> {}
+export const authzChangeBindingRoleInputSchema: AuthzChangeBindingRoleInputSchema =
+  authzChangeBindingRoleInputSchemaDefinition;
 export type AuthzChangeBindingRoleInput = z.infer<typeof authzChangeBindingRoleInputSchema>;
 export const authzChangeBindingRoleOutputSchema = z.void();
 export type AuthzChangeBindingRoleOutput = z.infer<typeof authzChangeBindingRoleOutputSchema>;
 
-export const authzRevokeBindingsInputSchema = z
+const authzRevokeBindingsInputSchemaDefinition = z
   .object({
     organizationId: z.string().min(1),
     bindingIds: z.array(z.string().min(1)),
@@ -369,6 +541,11 @@ export const authzRevokeBindingsInputSchema = z
     reason: z.string().min(1).optional(),
   })
   .strict();
+export interface AuthzRevokeBindingsInputSchema extends Named<
+  typeof authzRevokeBindingsInputSchemaDefinition
+> {}
+export const authzRevokeBindingsInputSchema: AuthzRevokeBindingsInputSchema =
+  authzRevokeBindingsInputSchemaDefinition;
 export type AuthzRevokeBindingsInput = z.infer<typeof authzRevokeBindingsInputSchema>;
 export const authzRevokeBindingsOutputSchema = z.void();
 export type AuthzRevokeBindingsOutput = z.infer<typeof authzRevokeBindingsOutputSchema>;
@@ -378,7 +555,7 @@ export type AuthzRevokeBindingsOutput = z.infer<typeof authzRevokeBindingsOutput
  * these people; group membership supplies their access now. An
  * administrator's own grant at the same scope carries another source.
  */
-export const authzRetireDirectoryGrantsInputSchema = z
+const authzRetireDirectoryGrantsInputSchemaDefinition = z
   .object({
     organizationId: z.string().min(1),
     userIds: z.array(z.string().min(1)),
@@ -386,6 +563,11 @@ export const authzRetireDirectoryGrantsInputSchema = z
     reason: z.string().min(1).optional(),
   })
   .strict();
+export interface AuthzRetireDirectoryGrantsInputSchema extends Named<
+  typeof authzRetireDirectoryGrantsInputSchemaDefinition
+> {}
+export const authzRetireDirectoryGrantsInputSchema: AuthzRetireDirectoryGrantsInputSchema =
+  authzRetireDirectoryGrantsInputSchemaDefinition;
 export type AuthzRetireDirectoryGrantsInput = z.infer<typeof authzRetireDirectoryGrantsInputSchema>;
 /** How many grants were retired. */
 export const authzRetireDirectoryGrantsOutputSchema = z.number().int().nonnegative();
@@ -398,17 +580,22 @@ export type AuthzRetireDirectoryGrantsOutput = z.infer<
  * grants it wrote and the ones it took back, newest first. A read, asked of
  * the module that owns grants because nobody else queries them.
  */
-export const authzDirectoryCausedChangesInputSchema = z
+const authzDirectoryCausedChangesInputSchemaDefinition = z
   .object({
     organizationId: z.string().min(1),
     limit: z.number().int().positive(),
   })
   .strict();
+export interface AuthzDirectoryCausedChangesInputSchema extends Named<
+  typeof authzDirectoryCausedChangesInputSchemaDefinition
+> {}
+export const authzDirectoryCausedChangesInputSchema: AuthzDirectoryCausedChangesInputSchema =
+  authzDirectoryCausedChangesInputSchemaDefinition;
 export type AuthzDirectoryCausedChangesInput = z.infer<
   typeof authzDirectoryCausedChangesInputSchema
 >;
 
-export const authzDirectoryCausedChangeSchema = z
+const authzDirectoryCausedChangeSchemaDefinition = z
   .object({
     grantId: z.string().min(1),
     /** Null where the grant names a principal that is not a person. */
@@ -417,8 +604,18 @@ export const authzDirectoryCausedChangeSchema = z
     occurredAtMs: z.number().int().nonnegative(),
   })
   .strict();
+export interface AuthzDirectoryCausedChangeSchema extends Named<
+  typeof authzDirectoryCausedChangeSchemaDefinition
+> {}
+export const authzDirectoryCausedChangeSchema: AuthzDirectoryCausedChangeSchema =
+  authzDirectoryCausedChangeSchemaDefinition;
 export type AuthzDirectoryCausedChange = z.infer<typeof authzDirectoryCausedChangeSchema>;
-export const authzDirectoryCausedChangesOutputSchema = z.array(authzDirectoryCausedChangeSchema);
+const authzDirectoryCausedChangesOutputSchemaDefinition = z.array(authzDirectoryCausedChangeSchema);
+export interface AuthzDirectoryCausedChangesOutputSchema extends Named<
+  typeof authzDirectoryCausedChangesOutputSchemaDefinition
+> {}
+export const authzDirectoryCausedChangesOutputSchema: AuthzDirectoryCausedChangesOutputSchema =
+  authzDirectoryCausedChangesOutputSchemaDefinition;
 export type AuthzDirectoryCausedChangesOutput = z.infer<
   typeof authzDirectoryCausedChangesOutputSchema
 >;
@@ -434,7 +631,7 @@ const authzBindingIdFilterSchema = z
 
 /** A closed, transport-safe selector. Tenant scope is intentionally absent:
  * organizationId is a required top-level field and always wins. */
-export const authzBindingFilterSchema = z
+const authzBindingFilterSchemaDefinition = z
   .object({
     userId: z.string().min(1).optional(),
     groupId: z.string().min(1).optional(),
@@ -445,9 +642,14 @@ export const authzBindingFilterSchema = z
     id: z.union([z.string().min(1), authzBindingIdFilterSchema]).optional(),
   })
   .strict();
+export interface AuthzBindingFilterSchema extends Named<
+  typeof authzBindingFilterSchemaDefinition
+> {}
+export const authzBindingFilterSchema: AuthzBindingFilterSchema =
+  authzBindingFilterSchemaDefinition;
 export type AuthzBindingFilter = z.infer<typeof authzBindingFilterSchema>;
 
-export const authzRevokeBindingsWhereInputSchema = z
+const authzRevokeBindingsWhereInputSchemaDefinition = z
   .object({
     organizationId: z.string().min(1),
     where: authzBindingFilterSchema,
@@ -455,11 +657,16 @@ export const authzRevokeBindingsWhereInputSchema = z
     reason: z.string().min(1).optional(),
   })
   .strict();
+export interface AuthzRevokeBindingsWhereInputSchema extends Named<
+  typeof authzRevokeBindingsWhereInputSchemaDefinition
+> {}
+export const authzRevokeBindingsWhereInputSchema: AuthzRevokeBindingsWhereInputSchema =
+  authzRevokeBindingsWhereInputSchemaDefinition;
 export type AuthzRevokeBindingsWhereInput = z.infer<typeof authzRevokeBindingsWhereInputSchema>;
 export const authzRevokeBindingsWhereOutputSchema = z.number().int().nonnegative();
 export type AuthzRevokeBindingsWhereOutput = z.infer<typeof authzRevokeBindingsWhereOutputSchema>;
 
-export const authzOffboardMemberInputSchema = z
+const authzOffboardMemberInputSchemaDefinition = z
   .object({
     organizationId: z.string().min(1),
     userId: z.string().min(1),
@@ -467,11 +674,16 @@ export const authzOffboardMemberInputSchema = z
     actor: ledgerActorSchema,
   })
   .strict();
+export interface AuthzOffboardMemberInputSchema extends Named<
+  typeof authzOffboardMemberInputSchemaDefinition
+> {}
+export const authzOffboardMemberInputSchema: AuthzOffboardMemberInputSchema =
+  authzOffboardMemberInputSchemaDefinition;
 export type AuthzOffboardMemberInput = z.infer<typeof authzOffboardMemberInputSchema>;
 export const authzOffboardMemberOutputSchema = z.void();
 export type AuthzOffboardMemberOutput = z.infer<typeof authzOffboardMemberOutputSchema>;
 
-export const authzDefineRoleInputSchema = z
+const authzDefineRoleInputSchemaDefinition = z
   .object({
     organizationId: z.string().min(1),
     roleId: z.string().min(1),
@@ -484,11 +696,16 @@ export const authzDefineRoleInputSchema = z
     requireProjection: z.boolean().optional(),
   })
   .strict();
+export interface AuthzDefineRoleInputSchema extends Named<
+  typeof authzDefineRoleInputSchemaDefinition
+> {}
+export const authzDefineRoleInputSchema: AuthzDefineRoleInputSchema =
+  authzDefineRoleInputSchemaDefinition;
 export type AuthzDefineRoleInput = z.infer<typeof authzDefineRoleInputSchema>;
 export const authzDefineRoleOutputSchema = z.void();
 export type AuthzDefineRoleOutput = z.infer<typeof authzDefineRoleOutputSchema>;
 
-export const authzDeleteRoleInputSchema = z
+const authzDeleteRoleInputSchemaDefinition = z
   .object({
     organizationId: z.string().min(1),
     roleId: z.string().min(1),
@@ -496,27 +713,38 @@ export const authzDeleteRoleInputSchema = z
     awaitProjection: z.boolean().optional(),
   })
   .strict();
+export interface AuthzDeleteRoleInputSchema extends Named<
+  typeof authzDeleteRoleInputSchemaDefinition
+> {}
+export const authzDeleteRoleInputSchema: AuthzDeleteRoleInputSchema =
+  authzDeleteRoleInputSchemaDefinition;
 export type AuthzDeleteRoleInput = z.infer<typeof authzDeleteRoleInputSchema>;
 export const authzDeleteRoleOutputSchema = z.void();
 export type AuthzDeleteRoleOutput = z.infer<typeof authzDeleteRoleOutputSchema>;
 
-export const authzGrantActorSchema = z.object({ userId: z.string().min(1) }).strict();
+const authzGrantActorSchemaDefinition = z.object({ userId: z.string().min(1) }).strict();
+export interface AuthzGrantActorSchema extends Named<typeof authzGrantActorSchemaDefinition> {}
+export const authzGrantActorSchema: AuthzGrantActorSchema = authzGrantActorSchemaDefinition;
 export type AuthzGrantActor = z.infer<typeof authzGrantActorSchema>;
 
-export const grantPrincipalSchema = z.discriminatedUnion("type", [
+const grantPrincipalSchemaDefinition = z.discriminatedUnion("type", [
   z.object({ type: z.literal("user"), id: z.string().min(1) }).strict(),
   z.object({ type: z.literal("group"), id: z.string().min(1) }).strict(),
   z.object({ type: z.literal("apiKey"), id: z.string().min(1) }).strict(),
 ]);
+export interface GrantPrincipalSchema extends Named<typeof grantPrincipalSchemaDefinition> {}
+export const grantPrincipalSchema: GrantPrincipalSchema = grantPrincipalSchemaDefinition;
 export type GrantPrincipal = z.infer<typeof grantPrincipalSchema>;
 
-export const grantRoleSchema = z.union([
+const grantRoleSchemaDefinition = z.union([
   z.object({ builtin: z.enum(["ADMIN", "MEMBER", "VIEWER"]) }).strict(),
   z.object({ customRoleId: z.string().min(1) }).strict(),
 ]);
+export interface GrantRoleSchema extends Named<typeof grantRoleSchemaDefinition> {}
+export const grantRoleSchema: GrantRoleSchema = grantRoleSchemaDefinition;
 export type GrantRole = z.infer<typeof grantRoleSchema>;
 
-export const authzAttachGrantInputSchema = z
+const authzAttachGrantInputSchemaDefinition = z
   .object({
     actor: authzGrantActorSchema,
     who: grantPrincipalSchema,
@@ -526,12 +754,22 @@ export const authzAttachGrantInputSchema = z
     expiresAtMs: z.number().int().optional(),
   })
   .strict();
+export interface AuthzAttachGrantInputSchema extends Named<
+  typeof authzAttachGrantInputSchemaDefinition
+> {}
+export const authzAttachGrantInputSchema: AuthzAttachGrantInputSchema =
+  authzAttachGrantInputSchemaDefinition;
 export type AuthzAttachGrantInput = z.infer<typeof authzAttachGrantInputSchema>;
 
-export const authzBindingOutputSchema = z.object({ bindingId: z.string().min(1) }).strict();
+const authzBindingOutputSchemaDefinition = z.object({ bindingId: z.string().min(1) }).strict();
+export interface AuthzBindingOutputSchema extends Named<
+  typeof authzBindingOutputSchemaDefinition
+> {}
+export const authzBindingOutputSchema: AuthzBindingOutputSchema =
+  authzBindingOutputSchemaDefinition;
 export type AuthzBindingOutput = z.infer<typeof authzBindingOutputSchema>;
 
-export const authzUpdateGrantInputSchema = z
+const authzUpdateGrantInputSchemaDefinition = z
   .object({
     actor: authzGrantActorSchema,
     bindingId: z.string().min(1),
@@ -539,9 +777,14 @@ export const authzUpdateGrantInputSchema = z
     role: grantRoleSchema,
   })
   .strict();
+export interface AuthzUpdateGrantInputSchema extends Named<
+  typeof authzUpdateGrantInputSchemaDefinition
+> {}
+export const authzUpdateGrantInputSchema: AuthzUpdateGrantInputSchema =
+  authzUpdateGrantInputSchemaDefinition;
 export type AuthzUpdateGrantInput = z.infer<typeof authzUpdateGrantInputSchema>;
 
-export const authzRevokeGrantInputSchema = z
+const authzRevokeGrantInputSchemaDefinition = z
   .object({
     // The same widening offboard carries: a system principal (SCIM de-enroll,
     // a migration) revokes under its own name, and writeActor already renders
@@ -552,9 +795,14 @@ export const authzRevokeGrantInputSchema = z
     organizationId: z.string().min(1),
   })
   .strict();
+export interface AuthzRevokeGrantInputSchema extends Named<
+  typeof authzRevokeGrantInputSchemaDefinition
+> {}
+export const authzRevokeGrantInputSchema: AuthzRevokeGrantInputSchema =
+  authzRevokeGrantInputSchemaDefinition;
 export type AuthzRevokeGrantInput = z.infer<typeof authzRevokeGrantInputSchema>;
 
-export const authzReplaceGrantInputSchema = z
+const authzReplaceGrantInputSchemaDefinition = z
   .object({
     actor: authzGrantActorSchema,
     who: grantPrincipalSchema,
@@ -565,18 +813,28 @@ export const authzReplaceGrantInputSchema = z
     expiresAtMs: z.number().int().optional(),
   })
   .strict();
+export interface AuthzReplaceGrantInputSchema extends Named<
+  typeof authzReplaceGrantInputSchemaDefinition
+> {}
+export const authzReplaceGrantInputSchema: AuthzReplaceGrantInputSchema =
+  authzReplaceGrantInputSchemaDefinition;
 export type AuthzReplaceGrantInput = z.infer<typeof authzReplaceGrantInputSchema>;
 
-export const authzOffboardInputSchema = z
+const authzOffboardInputSchemaDefinition = z
   .object({
     actor: z.union([authzGrantActorSchema, actorSchema]),
     userId: z.string().min(1),
     organizationId: z.string().min(1),
   })
   .strict();
+export interface AuthzOffboardInputSchema extends Named<
+  typeof authzOffboardInputSchemaDefinition
+> {}
+export const authzOffboardInputSchema: AuthzOffboardInputSchema =
+  authzOffboardInputSchemaDefinition;
 export type AuthzOffboardInput = z.infer<typeof authzOffboardInputSchema>;
 
-export const offboardCountsSchema = z
+const offboardCountsSchemaDefinition = z
   .object({
     bindings: z.number().int().nonnegative(),
     groupMemberships: z.number().int().nonnegative(),
@@ -585,9 +843,11 @@ export const offboardCountsSchema = z
     organizationMembership: z.boolean(),
   })
   .strict();
+export interface OffboardCountsSchema extends Named<typeof offboardCountsSchemaDefinition> {}
+export const offboardCountsSchema: OffboardCountsSchema = offboardCountsSchemaDefinition;
 export type OffboardCounts = z.infer<typeof offboardCountsSchema>;
 
-export const authzOffboardOutputSchema = z
+const authzOffboardOutputSchemaDefinition = z
   .object({
     removed: offboardCountsSchema,
     needsHumanDecision: z
@@ -598,5 +858,10 @@ export const authzOffboardOutputSchema = z
       .strict(),
   })
   .strict();
+export interface AuthzOffboardOutputSchema extends Named<
+  typeof authzOffboardOutputSchemaDefinition
+> {}
+export const authzOffboardOutputSchema: AuthzOffboardOutputSchema =
+  authzOffboardOutputSchemaDefinition;
 export type AuthzOffboardOutput = z.infer<typeof authzOffboardOutputSchema>;
 export type OffboardResult = AuthzOffboardOutput;

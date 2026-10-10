@@ -27,6 +27,7 @@ import {
   prismaModelNames,
 } from "./persistence/prisma-table-ownership.ts";
 import { lintRerunnableMigrations } from "./persistence/rerunnable-migrations.ts";
+import { lintUpgradeSignInTables } from "./persistence/upgrade-sign-in-tables.ts";
 import { lintComposedExports } from "./quality/composed-exports.ts";
 import { lintStrictContractBuildConfigs } from "./quality/contract-build-config.ts";
 import { lintDeclarationProjectReferences } from "./quality/declaration-project-references.ts";
@@ -36,6 +37,7 @@ import {
   lintDeletedSpellingsInCode,
   lintDeletedSpellingsInTeaching,
 } from "./quality/deleted-spellings.ts";
+import { lintDependencyCatalog } from "./quality/dependency-catalog.ts";
 import { lintServiceCeilings } from "./quality/service-ceilings.ts";
 import { lintServiceProjectionBoundaries } from "./quality/service-projection-boundaries.ts";
 import { lintLintRuleSkillPointers, lintTeachingCitations } from "./quality/teaching-citations.ts";
@@ -122,6 +124,11 @@ export const POLICIES: readonly PolicyDefinition[] = [
     id: "migration-owners",
     spec: "specs/migration-owners.feature",
     run: lintMigrationOwners,
+  }),
+  definePolicy({
+    id: "upgrade-sign-in-tables",
+    spec: "specs/upgrade-sign-in-tables.feature",
+    run: lintUpgradeSignInTables,
   }),
   definePolicy({
     id: "rerunnable-migrations",
@@ -222,6 +229,11 @@ export const POLICIES: readonly PolicyDefinition[] = [
     id: "declarations",
     spec: FEATURE_PACKAGE_BOUNDARIES,
     run: lintDeclarations,
+  }),
+  definePolicy({
+    id: "dependency-catalog",
+    spec: "specs/dependency-catalog.feature",
+    run: lintDependencyCatalog,
   }),
   definePolicy({
     id: "workspace-seams",

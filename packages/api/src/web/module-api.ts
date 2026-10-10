@@ -158,8 +158,14 @@ export type WireOf<TValue> = OutputsFromMap<{
   value: { query: { input: void; output: TValue } };
 }>["value"];
 
-/** Feature's typed tRPC hooks; cache keys derive from procedure path alone. */
-export type ModuleApi<TMap extends ModuleApiMap> = CreateTRPCReact<RouterFromMap<TMap>, unknown>;
+/**
+ * Feature's typed tRPC hooks; cache keys derive from procedure path alone. `& {}` keeps the
+ * name in emitted declarations: a bare alias-of-alias is expanded (911 KB for annotation-api).
+ */
+export type ModuleApi<TMap extends ModuleApiMap> = CreateTRPCReact<
+  RouterFromMap<TMap>,
+  unknown
+> & {};
 
 export function createModuleApi<TMap extends ModuleApiMap>(): ModuleApi<TMap> {
   return createTRPCReact<RouterFromMap<TMap>>();

@@ -148,6 +148,12 @@ Feature: Cloud upgrades run on deploy while old and new builds serve side by sid
     Then nothing is reopened
 
   @unit
+  Scenario: An upcast step is never reopened by a serving process
+    Given the last upgrade run finished and the upcast step "upcast:entitlement:lw.usage.month_counted" is done
+    When a process of this image is admitted after that run
+    Then the upcast step stays done, because each upgrade run recounts it from the stored events
+
+  @unit
   Scenario: A ledger with no finished upgrade run reopens nothing
     Given no upgrade run has finished
     When a process whose image declares no background step is admitted

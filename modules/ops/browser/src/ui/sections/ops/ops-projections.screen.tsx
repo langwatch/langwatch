@@ -14,7 +14,7 @@ export default function OpsProjectionsScreen() {
     <EventSourcingLayout pageTitle="Projections">
       <HStack marginBottom={3}>
         <Spacer />
-        <Button size="xs" variant="outline" onClick={() => replay.open("open")}>
+        <Button size="sm" variant="outline" onClick={() => replay.open("open")}>
           <RotateCcw size={12} />
           Replay projections
         </Button>

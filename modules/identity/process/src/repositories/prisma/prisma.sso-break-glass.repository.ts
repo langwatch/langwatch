@@ -4,6 +4,7 @@ import {
   SsoConnectionActivationBlockedError,
   type BreakGlassBinding,
 } from "@langwatch/identity-contract";
+import { skipTenantCheck } from "@langwatch/prisma-client";
 import type {
   Prisma,
   PrismaClient,
@@ -297,7 +298,10 @@ async function lockOrganization(
   organizationId: string,
 ): Promise<void> {
   await tx.$executeRaw`
-    -- @tenancy: organization-scoped advisory lock keyed by the bound organization id
+    ${skipTenantCheck({
+      // Organization-scoped advisory lock keyed by the bound organization id.
+      SKIP_TENANT_CHECK: true,
+    })}
     SELECT pg_advisory_xact_lock(hashtextextended(${organizationId}, 0))
   `;
 }

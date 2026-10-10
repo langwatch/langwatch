@@ -23,13 +23,14 @@ function harness() {
   const fixture = signInSecurityFixture({ now });
   const memory = MemoryAuthDatabase.create();
   const rows = MemoryAuthSessionRepository.create({ memory });
+  const images = new Map<string, string>();
   const users = new TestUserApi({
     findById: async ({ id }): Promise<UserProfile> => ({
       id,
       name: null,
       email: `${id}@example.com`,
       emailVerified: true,
-      image: null,
+      image: images.get(id) ?? null,
       pendingSsoSetup: false,
       createdAt: new Date(0),
       updatedAt: new Date(0),
@@ -71,7 +72,7 @@ function harness() {
     clock = clock.add({ seconds });
   };
 
-  return { service, fixture, memory, reads, signIn, secondsPass };
+  return { service, fixture, memory, reads, images, signIn, secondsPass };
 }
 
 describe("reading a browser session", () => {
@@ -166,6 +167,24 @@ describe("reading a browser session", () => {
 
       expect(sam).toMatchObject({ session: { user: { id: "sam", email: "sam@example.com" } } });
       expect(kim).toMatchObject({ session: { user: { id: "kim", email: "kim@example.com" } } });
+    });
+  });
+
+  describe("when the person saves a photo while their details are remembered", () => {
+    /** @scenario "The browser's session poll shows a saved photo at once" */
+    it("answers the poll with the new photo and remembers it for the next request", async () => {
+      const { service, images, signIn } = harness();
+      const verified = signIn("sam");
+      await service.resolveBrowserSession({ verified });
+
+      images.set("sam", "/api/user-avatar/p1/a1");
+
+      await expect(service.resolveBrowserSession({ verified, fresh: true })).resolves.toMatchObject(
+        { session: { user: { image: "/api/user-avatar/p1/a1" } } },
+      );
+      await expect(service.resolveBrowserSession({ verified })).resolves.toMatchObject({
+        session: { user: { image: "/api/user-avatar/p1/a1" } },
+      });
     });
   });
 });

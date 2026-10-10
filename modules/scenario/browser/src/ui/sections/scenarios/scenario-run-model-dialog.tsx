@@ -29,7 +29,7 @@ export function ScenarioRunModelDialog({
 }) {
   return (
     <Dialog.Root open={open} onOpenChange={(details) => onOpenChange(details.open)}>
-      <Dialog.Content bg="bg">
+      <Dialog.Content>
         <Dialog.Header>
           <Dialog.Title>Choose models for this run</Dialog.Title>
         </Dialog.Header>
@@ -57,7 +57,7 @@ export function ScenarioRunModelDialog({
           <Dialog.ActionTrigger asChild>
             <Button variant="outline">Cancel</Button>
           </Dialog.ActionTrigger>
-          <Button colorPalette="blue" loading={isRunning} onClick={onConfirm}>
+          <Button colorPalette="orange" loading={isRunning} onClick={onConfirm}>
             Save and run
           </Button>
         </Dialog.Footer>

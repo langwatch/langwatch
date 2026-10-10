@@ -11,6 +11,7 @@ import { type Suite, suiteSchema, type SuiteApi } from "@langwatch/suite-contrac
  * `/api/health/scenarios` over the real probe and canary, peers scripted per call.
  */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it, vi } from "vitest";
 
 import { MemorySubsystemProbeChannel } from "../../channels/memory/memory.subsystem-probe.channel.ts";
@@ -90,6 +91,7 @@ function probe() {
     scenarioCanary,
   });
   const hono = createRestRuntime({
+    authorization: restTestAuthorization(),
     identity: {
       authenticate: () => {
         throw new Error("The probes resolve their own key.");

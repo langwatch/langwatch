@@ -2,6 +2,7 @@ import { formatCost, formatTokens } from "@langwatch/design-system/display-forma
 import { GitHubIcon } from "@langwatch/design-system/icons";
 import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { Pagination } from "@langwatch/design-system/pagination";
 import { Button, HStack, Skeleton, Table, Text, VStack } from "@langwatch/design-system/primitives";
 import { SearchInput } from "@langwatch/design-system/search-input";
@@ -35,7 +36,6 @@ import type { Period, PeriodMode } from "../../model/session-filters.ts";
 import { computeRelativeWindow, PeriodSelector } from "../blocks/period-selector.tsx";
 import { Link } from "../elements/activity-link.tsx";
 import { CostBreakdownTooltipContent } from "../elements/cost-breakdown-tooltip.tsx";
-import { NoDataInfoBlock } from "../elements/no-data-info-block.tsx";
 import { PeerComparisonCell, peerComparisonSentence } from "../elements/peer-comparison-cell.tsx";
 import { PullRequestStatusBadge } from "../elements/pull-request-status-badge.tsx";
 import { SortableColumnHeader } from "../elements/sortable-column-header.tsx";

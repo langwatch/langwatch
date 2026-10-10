@@ -7,6 +7,7 @@ import { nowInstant } from "@langwatch/time";
 
 import type {
   OneTimeRevealRepository,
+  RevealAddress,
   StoredReveal,
   TakenReveal,
 } from "../one-time-reveal.repository.ts";
@@ -29,30 +30,18 @@ export class MemoryOneTimeRevealRepository implements OneTimeRevealRepository {
   }
 
   async put({
-    organizationId,
-    revealId,
     reveal,
     ttlMs,
-  }: {
-    organizationId: string;
-    revealId: string;
-    reveal: StoredReveal;
-    ttlMs: number;
-  }): Promise<void> {
-    this.#reveals.set(this.keyOf(organizationId, revealId), {
+    ...address
+  }: RevealAddress & { reveal: StoredReveal; ttlMs: number }): Promise<void> {
+    this.#reveals.set(this.keyOf(address), {
       value: reveal,
       expiresAtMs: this.#nowMs() + ttlMs,
     });
   }
 
-  async take({
-    organizationId,
-    revealId,
-  }: {
-    organizationId: string;
-    revealId: string;
-  }): Promise<TakenReveal> {
-    const key = this.keyOf(organizationId, revealId);
+  async take(address: RevealAddress): Promise<TakenReveal> {
+    const key = this.keyOf(address);
     const entry = this.#reveals.get(key);
     this.#reveals.delete(key);
     if (!entry || entry.expiresAtMs <= this.#nowMs()) return { taken: false };
@@ -60,26 +49,12 @@ export class MemoryOneTimeRevealRepository implements OneTimeRevealRepository {
     return { taken: true, reveal: entry.value };
   }
 
-  async markServed({
-    organizationId,
-    revealId,
-    ttlMs,
-  }: {
-    organizationId: string;
-    revealId: string;
-    ttlMs: number;
-  }): Promise<void> {
-    this.#markers.set(this.keyOf(organizationId, revealId), this.#nowMs() + ttlMs);
+  async markServed({ ttlMs, ...address }: RevealAddress & { ttlMs: number }): Promise<void> {
+    this.#markers.set(this.keyOf(address), this.#nowMs() + ttlMs);
   }
 
-  async wasServed({
-    organizationId,
-    revealId,
-  }: {
-    organizationId: string;
-    revealId: string;
-  }): Promise<boolean> {
-    const key = this.keyOf(organizationId, revealId);
+  async wasServed(address: RevealAddress): Promise<boolean> {
+    const key = this.keyOf(address);
     const expiresAtMs = this.#markers.get(key);
     if (expiresAtMs === undefined) return false;
     if (expiresAtMs > this.#nowMs()) return true;
@@ -88,9 +63,9 @@ export class MemoryOneTimeRevealRepository implements OneTimeRevealRepository {
     return false;
   }
 
-  /** The organization is part of the key, so one organization's id never
-   *  reads another's reveal even where the ids collide. */
-  private keyOf(organizationId: string, revealId: string): string {
-    return `${organizationId}${revealId}`;
+  /** The organization and recipient are part of the key, so nobody else's id
+   *  reads this reveal even where the ids collide. */
+  private keyOf({ organizationId, recipientUserId, revealId }: RevealAddress): string {
+    return `${organizationId}${recipientUserId}${revealId}`;
   }
 }

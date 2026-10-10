@@ -18,6 +18,7 @@
     "langwatch/transport-declares": "error",
     "langwatch/clickhouse-no-version-order-limit": "error",
     "langwatch/clickhouse-tenant-id": "error",
+    "langwatch/skip-tenant-check-reason": "error",
     "langwatch/no-form-watch-in-child": "error",
     "langwatch/no-hand-rolled-plan-gate": "error",
     "langwatch/no-tautological-assertion": "error",
@@ -39,6 +40,7 @@
     // Two calls joined by `&&` read fine; three calls, four operators, a nested
     // ternary or a deep chain that also combines are what a reader trips on.
     "langwatch/condition-shape": ["error", { "maxCalls": 2, "maxOperators": 3, "maxHops": 3 }],
+    "langwatch/contract-schema-named": "error",
     "langwatch/conditional-type-depth": "error",
     "langwatch/em-dash-in-copy": "error",
     "langwatch/environment-boundaries": "error",
@@ -67,7 +69,9 @@
     "langwatch/prisma-count-in-list-query": "error",
     "langwatch/refusal-is-a-handled-error": "error",
     "langwatch/no-hono-http-exception": "error",
+    "langwatch/slice-reader-is-a-hook": "error",
     "langwatch/access-escape-kind": "error",
+    "langwatch/authz-members-required": "error",
     "langwatch/schema-outside-contract": "error",
     "langwatch/service-does-not-open-a-channel": "error",
     "langwatch/service-loads-its-own-config": "error",

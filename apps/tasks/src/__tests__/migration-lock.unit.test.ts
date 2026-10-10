@@ -1,101 +1,151 @@
-/** @see specs/clickhouse/concurrent-boot-migrations.feature */
+/**
+ * @see specs/clickhouse/concurrent-boot-migrations.feature
+ * @see specs/setup/boot-sequence.feature
+ * @see specs/upgrade/upgrade-stuck-states-locks.feature
+ */
+import { DEFAULT_LEASE_TIMING, holdUpgradeLease } from "@langwatch/upgrade/runner";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { holdMigrationLock, migrationLockKey } from "../migration-lock.ts";
+import { holdTasksLease, LEGACY_TASKS_IMAGE } from "../migration-lock.ts";
 
-const logs = vi.hoisted(() => ({ info: vi.fn() }));
+const logs = vi.hoisted(() => ({ info: vi.fn(), warn: vi.fn() }));
 
-vi.mock("@langwatch/observability", () => ({ createLogger: () => ({ info: logs.info }) }));
-
-const database = vi.hoisted(() => ({
-  query: vi.fn<(sql: string, values: string[]) => Promise<{ rows: { locked: boolean }[] }>>(),
-  release: vi.fn(),
-  connect: vi.fn(),
-  end: vi.fn<() => Promise<void>>(),
+vi.mock("@langwatch/observability", () => ({
+  createLogger: () => ({ info: logs.info, warn: logs.warn }),
 }));
 
-/** The pool the opened database hands in; closing it is the database's job. */
-const pool = { connect: database.connect };
+const FAST = { ...DEFAULT_LEASE_TIMING, waitMs: 200, pollMs: 10 };
+
+/** The one lease row, as the ledger keeps it: one holder at a time, released by its owner. */
+function leaseTable() {
+  let holder: { owner: string; image: string; host: string } | null = null;
+  const row = () =>
+    holder && {
+      name: "upgrade",
+      ...holder,
+      heartbeatAt: new Date(0),
+      expiresAt: new Date(60_000),
+    };
+  return {
+    held: () => holder,
+    take: (taker: { owner: string; image: string; host: string }) => {
+      holder = taker;
+    },
+    free: () => {
+      holder = null;
+    },
+    ledger: {
+      acquireLease: async (taker: { owner: string; image: string; host: string }) => {
+        if (holder) return null;
+        holder = { owner: taker.owner, image: taker.image, host: taker.host };
+        return row();
+      },
+      renewLease: async ({ owner }: { owner: string }) => (holder?.owner === owner ? row() : null),
+      releaseLease: async ({ owner }: { owner: string }) => {
+        if (holder?.owner !== owner) return false;
+        holder = null;
+        return true;
+      },
+    },
+    runner: { findLease: async () => row() },
+  };
+}
 
 beforeEach(() => {
   logs.info.mockReset();
-  database.query.mockReset().mockResolvedValue({ rows: [{ locked: true }] });
-  database.release.mockReset();
-  database.connect
-    .mockReset()
-    .mockResolvedValue({ query: database.query, release: database.release });
-  database.end.mockReset().mockResolvedValue();
+  logs.warn.mockReset();
 });
 
-describe("given the deployment migration lock", () => {
-  describe("when another runner holds it", () => {
-    /** @scenario "Two migration runs started together never overlap" */
+describe("holdTasksLease", () => {
+  describe("when the lease is free", () => {
     /** @scenario "The migration lock is released when the run ends" */
-    /** @scenario A second runner waits for the first rather than migrating alongside it */
-    it("waits on the same session and unlocks after the sequence", async () => {
-      database.query.mockResolvedValueOnce({ rows: [{ locked: false }] });
-      const run = vi.fn(async () => {
-        expect(database.query).toHaveBeenLastCalledWith("SELECT pg_advisory_lock($1::bigint)", [
-          migrationLockKey(),
-        ]);
-        expect(database.release).not.toHaveBeenCalled();
-      });
-      await holdMigrationLock(pool, run);
-      expect(run).toHaveBeenCalledOnce();
-      expect(database.query).toHaveBeenLastCalledWith("SELECT pg_advisory_unlock($1::bigint)", [
-        migrationLockKey(),
-      ]);
-      expect(database.connect).toHaveBeenCalledOnce();
-      expect(database.release).toHaveBeenCalledOnce();
-    });
-  });
-
-  describe("when it is free", () => {
     /** @scenario Waiting is announced once, and only when there was a wait */
-    it("says nothing about waiting", async () => {
-      await holdMigrationLock(pool, async () => {});
-
+    it("runs the tasks under the lease, says nothing about waiting, and releases it", async () => {
+      const table = leaseTable();
+      const run = vi.fn(async () => {
+        expect(table.held()?.image).toBe(LEGACY_TASKS_IMAGE);
+      });
+      await holdTasksLease({ ...table, run, timing: FAST });
+      expect(run).toHaveBeenCalledOnce();
+      expect(table.held()).toBeNull();
       expect(logs.info).not.toHaveBeenCalled();
     });
   });
 
-  describe("when it has to be waited for", () => {
+  describe("when another task runner holds it and then finishes", () => {
+    /** @scenario "Two migration runs started together never overlap" */
+    /** @scenario A second runner waits for the first rather than migrating alongside it */
     /** @scenario A runner that has to wait says so */
-    /** @scenario Waiting is announced once, and only when there was a wait */
-    it("says once that it is waiting for the migration lock", async () => {
-      database.query.mockResolvedValueOnce({ rows: [{ locked: false }] });
-
-      await holdMigrationLock(pool, async () => {});
-
+    it("waits, says once that it is waiting, and runs after", async () => {
+      const table = leaseTable();
+      table.take({ owner: "first", image: LEGACY_TASKS_IMAGE, host: "pod-1" });
+      setTimeout(table.free, 50);
+      const run = vi.fn(async () => {});
+      await holdTasksLease({ ...table, run, timing: FAST });
+      expect(run).toHaveBeenCalledOnce();
       expect(logs.info).toHaveBeenCalledTimes(1);
-      expect(logs.info).toHaveBeenCalledWith(expect.stringContaining("waiting for migration lock"));
+      expect(logs.info).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.stringContaining("waiting for the upgrade lease"),
+      );
+    });
+  });
+
+  describe("when an upgrade holds it past the wait", () => {
+    /** @scenario "Legacy tasks refuse while an upgrade holds the lease" */
+    it("refuses naming the upgrade and runs nothing", async () => {
+      const table = leaseTable();
+      table.take({ owner: "upgrade-run", image: "3.21.0", host: "pod-2" });
+      const run = vi.fn(async () => {});
+      await expect(holdTasksLease({ ...table, run, timing: FAST })).rejects.toThrow(
+        /refusing to run the tasks: the upgrade lease is held by upgrade-run on pod-2 \(3\.21\.0\)/,
+      );
+      expect(run).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when legacy tasks hold it", () => {
+    /** @scenario "An upgrade refuses while legacy tasks hold the lease" */
+    it("an upgrade cannot take it and is told the legacy tasks hold it", async () => {
+      const table = leaseTable();
+      let upgrade: Awaited<ReturnType<typeof holdUpgradeLease>> | null = null;
+      await holdTasksLease({
+        ...table,
+        timing: FAST,
+        run: async () => {
+          upgrade = await holdUpgradeLease({
+            ...table,
+            identity: { owner: "upgrade-run", image: "3.21.0", host: "pod-2" },
+            timing: { ...FAST, waitMs: 0 },
+            log: { info: () => {}, warn: () => {} },
+            signal: new AbortController().signal,
+            work: async () => "ran",
+          });
+        },
+      });
+      expect(upgrade).toMatchObject({
+        acquired: false,
+        holder: { image: LEGACY_TASKS_IMAGE },
+      });
     });
   });
 
   describe("when a task fails", () => {
     /** @scenario "A failed migration run releases the lock" */
     /** @scenario The lock is released even when a task fails */
-    it("unlocks and closes the session before propagating the failure", async () => {
+    it("releases the lease before propagating the failure", async () => {
+      const table = leaseTable();
       const failure = new Error("task failed");
       await expect(
-        holdMigrationLock(pool, async () => {
-          throw failure;
+        holdTasksLease({
+          ...table,
+          timing: FAST,
+          run: async () => {
+            throw failure;
+          },
         }),
       ).rejects.toBe(failure);
-      expect(database.query).toHaveBeenLastCalledWith("SELECT pg_advisory_unlock($1::bigint)", [
-        migrationLockKey(),
-      ]);
-      expect(database.release).toHaveBeenCalledOnce();
-    });
-  });
-
-  describe("when the database connection fails", () => {
-    it("runs no migration", async () => {
-      const failure = new Error("connection failed");
-      database.connect.mockRejectedValueOnce(failure);
-      const run = vi.fn<() => Promise<void>>();
-      await expect(holdMigrationLock(pool, run)).rejects.toBe(failure);
-      expect(run).not.toHaveBeenCalled();
+      expect(table.held()).toBeNull();
     });
   });
 });

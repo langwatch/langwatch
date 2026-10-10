@@ -34,6 +34,7 @@ import { MemoryProjectDatabase } from "../../repositories/memory/memory.project.
 import { MemoryProjectRepository } from "../../repositories/memory/memory.project.repository.ts";
 import { PersonalProjectService } from "../../services/personal-project.service.ts";
 import { ProjectCreatedNoticeService } from "../../services/project-created-notice.service.ts";
+import { ProjectCredentialsService } from "../../services/project-credentials.service.ts";
 import {
   RecordProjectCreatedCommand,
   RecordProjectLegacyKeyRevokedCommand,
@@ -232,6 +233,8 @@ describe("given organization records a newly created personal workspace", () => 
       recordProjectArchived: lifecycle.commands.recordProjectArchived,
       recordProjectDepartmentAssigned: lifecycle.commands.recordProjectDepartmentAssigned,
       recordProjectTraceSharingDisabled: lifecycle.commands.recordProjectTraceSharingDisabled,
+      recordProjectAggregateRuleChanged: lifecycle.commands.recordProjectAggregateRuleChanged,
+      recordProjectRevived: lifecycle.commands.recordProjectRevived,
     });
     eventing.register(createdListener(heard));
 
@@ -278,6 +281,8 @@ describe("given organization records a personal team's creation twice under two 
     const recorded = vi.fn(async (_input: { projectId: string; organizationId: string }) => void 0);
     const personalProjects = PersonalProjectService.create({
       projects: MemoryProjectRepository.create({ memory }),
+      credentials: ProjectCredentialsService.create(),
+      lifecycle: { revived: async () => undefined },
     });
     const eventing = new EventSourcing({ eventStore: EventStoreMemory.createForTesting() });
     const organization = eventing.register(organizationStandIn());

@@ -1,7 +1,8 @@
 /**
  * @vitest-environment node
  */
-import { bindRestMiddleware, createRestRuntime } from "@langwatch/api/rest";
+import { bindMiddlewareContext, createRestRuntime } from "@langwatch/api/rest";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
@@ -13,6 +14,8 @@ import {
 import { tracesRestCredential } from "../traces.rest.ts";
 
 const runtime = createRestRuntime({
+  audit: { record: () => {} },
+  authorization: restTestAuthorization(),
   identity: {
     authenticate: () => ({
       actor: { type: "user" as const, id: "user-1" },
@@ -41,7 +44,7 @@ function mount() {
   };
   const family = runtime.mount(traceLegacyRest.router(), {
     app: () => members,
-    facts: [bindRestMiddleware(tracesRestCredential, () => ({ principal: null }))],
+    middlewareContext: [bindMiddlewareContext(tracesRestCredential, () => ({ principal: null }))],
     onError: (error, context) => context.json({ error: String(error) }, 500),
   });
   const send = (body: Record<string, unknown>) =>

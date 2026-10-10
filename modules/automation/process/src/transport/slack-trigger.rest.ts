@@ -21,6 +21,7 @@ export const slackAutomationRest = defineRestRouter(AutomationApi)
   .withAddressing("literal", { v1Twin: true })
 
   .post("/api/trigger/slack", "postApiTriggerSlack")
+  .withAudit("automation.create")
   .withInput(slackAutomationRestInputSchema)
   .withPermission("triggers:manage")
   .withOutput(slackAutomationRestCreatedSchema)

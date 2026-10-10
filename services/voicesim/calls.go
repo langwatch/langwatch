@@ -104,6 +104,13 @@ func (l *callLog) len() int {
 	return len(l.calls)
 }
 
+// clear forgets every call; ids keep counting, so a cleared id is never reused.
+func (l *callLog) clear() {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.calls = nil
+}
+
 // marshal renders the calls newest first, under the lock.
 func (l *callLog) marshal() ([]byte, error) {
 	l.mu.Lock()

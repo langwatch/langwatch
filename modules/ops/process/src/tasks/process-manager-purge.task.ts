@@ -8,7 +8,7 @@ import type {
 
 const logger = createLogger("langwatch:task:process-manager-purge");
 
-export type ProcessManagerPurgeOptions = Readonly<{
+type ProcessManagerPurgeOptions = Readonly<{
   repository: ProcessManagerPurgeRepository;
   retentionDays?: number;
   batchSize?: number;
@@ -19,7 +19,7 @@ export type ProcessManagerPurgeOptions = Readonly<{
   signal?: AbortSignal;
 }>;
 
-export type ProcessManagerPurgeReport = Readonly<{
+type ProcessManagerPurgeReport = Readonly<{
   mode: "dry-run" | "apply";
   targets: readonly { name: string; eligible: number; deleted: number; capped: boolean }[];
 }>;

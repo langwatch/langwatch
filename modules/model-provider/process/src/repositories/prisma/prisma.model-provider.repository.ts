@@ -7,12 +7,14 @@ import {
   type ModelProvider,
   type ModelProviderUsageCount,
 } from "@langwatch/model-provider-contract";
+import { skipTenantCheck } from "@langwatch/prisma-client";
 import {
   type PrismaClient,
   type ModelProvider as PrismaModelProvider,
   type ModelProviderScope,
   Prisma,
 } from "@langwatch/prisma-client/generated";
+import { fromDate, toDate } from "@langwatch/time";
 import { z } from "zod";
 
 import type {
@@ -23,11 +25,24 @@ import type {
   ModelProviderRepository,
 } from "../model-provider.repository.ts";
 
-type Database = Pick<PrismaClient, "modelProvider" | "gatewayChangeEvent" | "$transaction">;
+type Database = Pick<
+  PrismaClient,
+  "modelProvider" | "gatewayChangeEvent" | "$transaction" | "$queryRaw"
+>;
 
 const recordSchema = z.record(z.string(), z.unknown());
 const stringRecordSchema = z.record(z.string(), z.string());
 const jsonValueSchema = z.json();
+const legacyColumnsRowsSchema = z.array(
+  z.object({
+    id: z.string(),
+    provider: z.string(),
+    customKeys: z.unknown(),
+    customModels: z.unknown(),
+    customEmbeddingsModels: z.unknown(),
+    updatedAt: z.date(),
+  }),
+);
 const headerSchema = z.object({ key: z.string(), value: z.string() });
 const storedModelSchema = z.union([
   z.string(),
@@ -254,45 +269,65 @@ export class PrismaModelProviderRepository implements ModelProviderRepository {
   }
 
   async findProjectScopedLegacyColumns(): Promise<ModelProviderLegacyColumns[]> {
-    return this.database.modelProvider.findMany({
-      where: { scopes: { some: { scopeType: "PROJECT" } } },
-      select: {
-        id: true,
-        provider: true,
-        customKeys: true,
-        customModels: true,
-        customEmbeddingsModels: true,
-      },
+    const rows = await this.database.$queryRaw<unknown[]>`
+      SELECT p."id", p."provider", p."customKeys", p."customModels",
+             p."customEmbeddingsModels", p."updatedAt"
+      FROM "ModelProvider" p
+      WHERE EXISTS (
+        SELECT 1 FROM "ModelProviderScope" s
+        WHERE s."modelProviderId" = p."id" AND s."scopeType" = 'PROJECT'
+      )
+      ${skipTenantCheck({
+        // Model provider legacy-column sweep, every organization (upgrade step, worker)
+        SKIP_TENANT_CHECK: true,
+      })}
+    `;
+    return legacyColumnsRowsSchema
+      .parse(rows)
+      .map((row) => ({ ...row, updatedAt: fromDate(row.updatedAt) }));
+  }
+
+  async updateLegacyColumns(input: ModelProviderLegacyColumnsUpdate): Promise<void> {
+    await this.database.modelProvider.update({
+      where: { id: input.id },
+      data: this.legacyColumnsData(input),
     });
   }
 
-  async updateLegacyColumns({
-    id,
+  async updateLegacyColumnsIfUnchanged(
+    input: Parameters<ModelProviderRepository["updateLegacyColumnsIfUnchanged"]>[0],
+  ): Promise<boolean> {
+    const written = await this.database.modelProvider.updateMany({
+      where: { id: input.id, updatedAt: toDate(input.updatedAt) },
+      data: this.legacyColumnsData(input),
+    });
+
+    return written.count === 1;
+  }
+
+  private legacyColumnsData({
     customKeys,
     customModels,
     customEmbeddingsModels,
-  }: ModelProviderLegacyColumnsUpdate): Promise<void> {
-    await this.database.modelProvider.update({
-      where: { id },
-      data: {
-        ...(customKeys === undefined
-          ? {}
-          : {
-              customKeys: PrismaModelProviderRepository.toPrismaInputJson(
-                this.credentials.encode(customKeys),
-              ),
-            }),
-        ...(customModels === undefined
-          ? {}
-          : { customModels: PrismaModelProviderRepository.toPrismaInputJson(customModels) }),
-        ...(customEmbeddingsModels === undefined
-          ? {}
-          : {
-              customEmbeddingsModels:
-                PrismaModelProviderRepository.toPrismaInputJson(customEmbeddingsModels),
-            }),
-      },
-    });
+  }: ModelProviderLegacyColumnsUpdate) {
+    return {
+      ...(customKeys === undefined
+        ? {}
+        : {
+            customKeys: PrismaModelProviderRepository.toPrismaInputJson(
+              this.credentials.encode(customKeys),
+            ),
+          }),
+      ...(customModels === undefined
+        ? {}
+        : { customModels: PrismaModelProviderRepository.toPrismaInputJson(customModels) }),
+      ...(customEmbeddingsModels === undefined
+        ? {}
+        : {
+            customEmbeddingsModels:
+              PrismaModelProviderRepository.toPrismaInputJson(customEmbeddingsModels),
+          }),
+    };
   }
 
   isRoutingHandleConflict(error: unknown): boolean {

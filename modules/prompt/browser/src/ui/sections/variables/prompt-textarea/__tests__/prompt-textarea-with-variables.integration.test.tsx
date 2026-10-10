@@ -119,6 +119,24 @@ describe("PromptTextAreaWithVariables", () => {
     });
   });
 
+  describe("when the textarea loses focus right after typing", () => {
+    /** @scenario "Typing then saving at once keeps the last characters" */
+    it("flushes the pending debounced change", () => {
+      vi.useFakeTimers();
+      const onChange = vi.fn();
+      renderComponent({ onChange });
+
+      const textarea = screen.getByRole("textbox");
+      fireEvent.change(textarea, {
+        target: { value: "t62 prompt v1 for {{input}}", selectionStart: 27 },
+      });
+      fireEvent.blur(textarea);
+
+      expect(onChange).toHaveBeenCalledWith("t62 prompt v1 for {{input}}");
+      vi.useRealTimers();
+    });
+  });
+
   describe("given variable warnings", () => {
     it("shows warning for undefined variables", () => {
       renderComponent({

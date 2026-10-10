@@ -3,7 +3,7 @@ import { nowInstant } from "@langwatch/time";
 import type {
   BugReportRateLimitRepository,
   BugReportRateLimitWindow,
-} from "../bug-report-rate-limit.repository.ts";
+} from "../bug-report.repository.ts";
 
 /** Expired windows are swept past this many keys, so a stream of distinct callers cannot leak. */
 const SWEEP_THRESHOLD = 1_000;

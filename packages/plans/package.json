@@ -1,6 +1,5 @@
 {
   "name": "@langwatch/plans",
-  "langwatch": { "group": "framework" },
   "version": "0.1.0",
   "private": true,
   "description": "The one catalogue of LangWatch plans: identity, pricing, limits with their units, gates, ladder rungs, the self-hosted baseline, and the overrides a bespoke contract applies over them. Zod and nothing else, so contract, server, web and mail can all read it.",
@@ -35,5 +34,8 @@
     "@types/node": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
+  },
+  "langwatch": {
+    "group": "framework"
   }
 }

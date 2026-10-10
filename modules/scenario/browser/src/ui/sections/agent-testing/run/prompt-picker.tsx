@@ -57,7 +57,7 @@ function PromptRow({
       textAlign="left"
       boxShadow={QUIET_BUTTON_SHADOW}
       borderWidth="1px"
-      borderColor={isActive ? "blue.500" : "transparent"}
+      borderColor={isActive ? "blue.fg" : "transparent"}
       background={isActive ? "blue.subtle" : undefined}
       _hover={{ background: isActive ? "blue.subtle" : "bg.muted/60" }}
       borderRadius="lg"
@@ -68,7 +68,7 @@ function PromptRow({
       data-testid={`run-dialog-prompt-${prompt.id}`}
       aria-pressed={isActive}
     >
-      <FileText size={15} color="var(--chakra-colors-green-500)" />
+      <FileText size={15} color="var(--chakra-colors-green-fg)" />
       <Box minWidth={0} flex={1}>
         <Text fontSize="12.5px" fontWeight="medium" truncate>
           {prompt.handle ?? prompt.id}
@@ -77,7 +77,7 @@ function PromptRow({
           v{prompt.version}
         </Text>
       </Box>
-      {isActive && <Check size={14} color="var(--chakra-colors-blue-500)" />}
+      {isActive && <Check size={14} color="var(--chakra-colors-blue-fg)" />}
     </HStack>
   );
 }

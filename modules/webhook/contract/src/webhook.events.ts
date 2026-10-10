@@ -1,12 +1,15 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
-export const webhookEventTypeSchema = z.object({
+const webhookEventTypeSchemaDefinition = z.object({
   type: z.string().min(1),
   family: z.string().min(1),
   schemaVersion: z.literal("1"),
   isEmitting: z.boolean(),
   description: z.string().min(1),
 });
+export interface WebhookEventTypeSchema extends Named<typeof webhookEventTypeSchemaDefinition> {}
+export const webhookEventTypeSchema: WebhookEventTypeSchema = webhookEventTypeSchemaDefinition;
 export type WebhookEventType = z.infer<typeof webhookEventTypeSchema>;
 
 export const WEBHOOK_EVENT_TYPES = [

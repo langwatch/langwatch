@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 /** A project's trace milestones, recorded by trace and reacted to by peers from their side (§9). */
@@ -5,7 +6,7 @@ export const FIRST_TRACE_RECORDED_EVENT_TYPE = "lw.trace.first_trace_recorded" a
 export const TRACE_RECEIVED_EVENT_TYPE = "lw.trace.trace_received" as const;
 
 /** The project's first real trace, against the org admin, with the SDK it came from. */
-export const firstTraceRecordedEventDataSchema = z.object({
+const firstTraceRecordedEventDataSchemaDefinition = z.object({
   tenantId: z.string().min(1),
   projectId: z.string().min(1),
   /** The organization's admin when recorded, as `resolveOrgAdmin` picks it. */
@@ -18,10 +19,15 @@ export const firstTraceRecordedEventDataSchema = z.object({
   /** Which onboarding the organization went through; a string, so no new dependency. */
   onboardingVariant: z.string().nullish(),
 });
+export interface FirstTraceRecordedEventDataSchema extends Named<
+  typeof firstTraceRecordedEventDataSchemaDefinition
+> {}
+export const firstTraceRecordedEventDataSchema: FirstTraceRecordedEventDataSchema =
+  firstTraceRecordedEventDataSchemaDefinition;
 export type FirstTraceRecordedEventData = z.infer<typeof firstTraceRecordedEventDataSchema>;
 
 /** A later real trace on a project that already sent its first; `occurredAt` is the trace's. */
-export const traceReceivedEventDataSchema = z.object({
+const traceReceivedEventDataSchemaDefinition = z.object({
   tenantId: z.string().min(1),
   projectId: z.string().min(1),
   /** The organization's admin when recorded. */
@@ -32,4 +38,9 @@ export const traceReceivedEventDataSchema = z.object({
   /** Which onboarding the organization went through; a string, so no new dependency. */
   onboardingVariant: z.string().nullish(),
 });
+export interface TraceReceivedEventDataSchema extends Named<
+  typeof traceReceivedEventDataSchemaDefinition
+> {}
+export const traceReceivedEventDataSchema: TraceReceivedEventDataSchema =
+  traceReceivedEventDataSchemaDefinition;
 export type TraceReceivedEventData = z.infer<typeof traceReceivedEventDataSchema>;

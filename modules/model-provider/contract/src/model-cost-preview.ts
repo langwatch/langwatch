@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 /**
  * What the cost-rule drawer's live preview answers, and the model ceilings the model
  * pickers read. Moved out of `platform/app` so these shapes are checked, not `unknown`.
@@ -17,7 +18,7 @@ export interface CostRulePreviewInput {
 }
 
 /** One span the rule would match, priced under the rates being edited. */
-export const costRulePreviewSampleSpanSchema = z
+const costRulePreviewSampleSpanSchemaDefinition = z
   .object({
     traceId: z.string(),
     spanId: z.string(),
@@ -36,10 +37,15 @@ export const costRulePreviewSampleSpanSchema = z
     exampleCost: z.number().nullable(),
   })
   .strict();
+export interface CostRulePreviewSampleSpanSchema extends Named<
+  typeof costRulePreviewSampleSpanSchemaDefinition
+> {}
+export const costRulePreviewSampleSpanSchema: CostRulePreviewSampleSpanSchema =
+  costRulePreviewSampleSpanSchemaDefinition;
 export type CostRulePreviewSampleSpan = z.infer<typeof costRulePreviewSampleSpanSchema>;
 
 /** The whole preview: what matched, what did not, and a sample of each. */
-export const costRuleMatchingSpansPreviewSchema = z
+const costRuleMatchingSpansPreviewSchemaDefinition = z
   .object({
     windowDays: z.number(),
     totalMatchedSpans: z.number(),
@@ -55,14 +61,21 @@ export const costRuleMatchingSpansPreviewSchema = z
     unmatchedModels: z.object({ model: z.string(), spanCount: z.number() }).strict().array(),
   })
   .strict();
+export interface CostRuleMatchingSpansPreviewSchema extends Named<
+  typeof costRuleMatchingSpansPreviewSchemaDefinition
+> {}
+export const costRuleMatchingSpansPreviewSchema: CostRuleMatchingSpansPreviewSchema =
+  costRuleMatchingSpansPreviewSchemaDefinition;
 export type CostRuleMatchingSpansPreview = z.infer<typeof costRuleMatchingSpansPreviewSchema>;
 
 /** The registry's context-window and output ceilings for one model id. */
-export const modelLimitsSchema = z
+const modelLimitsSchemaDefinition = z
   .object({
     maxInputTokens: z.number().optional(),
     maxOutputTokens: z.number().optional(),
     maxTokens: z.number().optional(),
   })
   .strict();
+export interface ModelLimitsSchema extends Named<typeof modelLimitsSchemaDefinition> {}
+export const modelLimitsSchema: ModelLimitsSchema = modelLimitsSchemaDefinition;
 export type ModelLimits = z.infer<typeof modelLimitsSchema>;

@@ -133,6 +133,7 @@ describe("MemoryProjectRepository", () => {
         id: "project_1",
         teamId: TEAM_ID,
         archivedAt: expect.any(Date),
+        kind: "application",
       });
       expect(
         await repository.findLiveTraceDestination({
@@ -411,6 +412,13 @@ describe("MemoryProjectRepository", () => {
         slug: "gov",
       });
       database.putProject({ ...internal, kind: PROJECT_KIND.INTERNAL_GOVERNANCE });
+      const aggregate = await repository.create({
+        ...creation,
+        id: "project_agg",
+        name: "Bbb",
+        slug: "agg",
+      });
+      database.putProject({ ...aggregate, kind: PROJECT_KIND.AGGREGATE });
 
       await expect(
         repository.assignProjectDepartment({
@@ -427,8 +435,19 @@ describe("MemoryProjectRepository", () => {
         }),
       ).resolves.toBe(false);
       expect(
-        await repository.findProjectsWithDepartments({ organizationId: ORGANIZATION_ID }),
+        await repository.findProjectsWithDepartments({
+          organizationId: ORGANIZATION_ID,
+          hiddenKinds: [PROJECT_KIND.AGGREGATE],
+        }),
       ).toEqual([{ id: "project_1", name: "Checkout assistant", departmentId: "dept_eng" }]);
+      expect(
+        (
+          await repository.findProjectsWithDepartments({
+            organizationId: ORGANIZATION_ID,
+            hiddenKinds: [],
+          })
+        ).map((project) => project.id),
+      ).toEqual(["project_agg", "project_1"]);
     });
   });
 

@@ -2,13 +2,17 @@ import type { LedgerActor } from "@langwatch/authorization";
 import { newAuthzGrantId, type AuthzApi } from "@langwatch/authz-contract";
 import { HandledError } from "@langwatch/handled-error";
 import {
+  admissionSeat,
+  type AdmissionSeat,
   CannotRemoveLastAdminError,
   CannotRemoveSelfError,
   OrganizationUserRole,
+  type OrganizationAdmission,
 } from "@langwatch/organization-contract";
 
 import type { OrganizationMembershipRepository } from "../repositories/organization-membership.repository.ts";
 import type { DeveloperAdmissionVia } from "../rules/admission-audit.rules.ts";
+import type { OrganizationSeatLicense } from "./organization-seat-license.service.ts";
 
 /** The grant half of an admission, answered by the authorization peer. */
 export type OrganizationAdmissions = Pick<AuthzApi, "attachBindings" | "completeAdmission">;
@@ -22,12 +26,29 @@ export interface PersonalWorkspaceArchiveNotice {
   }): Promise<void>;
 }
 
+/** Records a membership change as organization's fact; peers such as governance react (§9). */
+export interface OrganizationMemberChangeNotice {
+  memberRemoved(input: {
+    organizationId: string;
+    userId: string;
+    removedByUserId: string | null;
+  }): Promise<void>;
+  memberDepartmentChanged(input: {
+    organizationId: string;
+    userId: string;
+    departmentId: string | null;
+  }): Promise<void>;
+}
+
 /** Admitting a member on the joiner seat, and removing one without orphaning the organization. */
 export class OrganizationMemberAdmissionService {
   static create(dependencies: {
     repository: OrganizationMembershipRepository;
     admissions: OrganizationAdmissions;
+    /** The licence's seats, asked before a full seat (seat-limit-at-provisioning.feature). */
+    seats: Pick<OrganizationSeatLicense, "checkLimit">;
     workspaceNotices: PersonalWorkspaceArchiveNotice;
+    memberNotices: OrganizationMemberChangeNotice;
   }): OrganizationMemberAdmissionService {
     return new OrganizationMemberAdmissionService(dependencies);
   }
@@ -36,7 +57,10 @@ export class OrganizationMemberAdmissionService {
     private readonly dependencies: {
       repository: OrganizationMembershipRepository;
       admissions: OrganizationAdmissions;
+      /** The licence's seats, asked before a full seat (seat-limit-at-provisioning.feature). */
+      seats: Pick<OrganizationSeatLicense, "checkLimit">;
       workspaceNotices: PersonalWorkspaceArchiveNotice;
+      memberNotices: OrganizationMemberChangeNotice;
     },
   ) {}
 
@@ -66,6 +90,11 @@ export class OrganizationMemberAdmissionService {
       userId: params.userId,
       actingUserId: params.actingUserId ?? null,
     });
+    await this.dependencies.memberNotices.memberRemoved({
+      organizationId: params.organizationId,
+      userId: params.userId,
+      removedByUserId: params.actingUserId ?? null,
+    });
     if (teamIds.length === 0) return;
     await this.dependencies.workspaceNotices.personalWorkspaceArchived({
       organizationId: params.organizationId,
@@ -74,9 +103,9 @@ export class OrganizationMemberAdmissionService {
     });
   }
 
-  /** Admits somebody on the joiner seat (ADR-171). A MEMBER row carries the
-   *  grant intent an unfinished admission resumes from, in the ledger's own
-   *  scheme (ADR-129); a DEVELOPER row is the whole admission, no grant. */
+  /** Admits somebody on the seat the licence leaves free (ADR-171, admission-seat.ts). A MEMBER
+   *  or Lite row carries the grant intent an unfinished admission resumes from, in the ledger's
+   *  own scheme (ADR-129); a DEVELOPER or pending row is the whole admission, no grant. */
   async createMembership({
     organizationId,
     userId,
@@ -89,17 +118,25 @@ export class OrganizationMemberAdmissionService {
     admittedBy?: Readonly<{ actor: LedgerActor; commandId: string }>;
     seat?: "MEMBER" | "DEVELOPER";
     origin?: "web" | "cli";
-  }): Promise<{ outcome: "created" | "already-present"; seat: "MEMBER" | "DEVELOPER" }> {
+  }): Promise<OrganizationAdmission> {
     const grantId = newAuthzGrantId();
+    const requested = seat ?? (await this.repo.readJoinerSeat({ organizationId }));
+    const decided = await this.decideSeat({ organizationId, userId, requested });
     const admission = await this.repo.createMembership({
       organizationId,
       userId,
       pendingAdmissionId: grantId,
       via: admissionVia(admittedBy),
-      ...(seat === undefined ? {} : { seat }),
+      seat: decided.role,
+      pending: decided.pending,
       ...(origin === undefined ? {} : { origin }),
     });
-    if (admission.outcome !== "created" || !admittedBy || admission.seat === "DEVELOPER") {
+    if (
+      admission.outcome !== "created" ||
+      !admittedBy ||
+      admission.pending ||
+      admission.seat === "DEVELOPER"
+    ) {
       return admission;
     }
 
@@ -111,7 +148,8 @@ export class OrganizationMemberAdmissionService {
         {
           bindingId: grantId,
           principal: { userId },
-          role: "MEMBER",
+          // A Lite seat is worth an organization-wide Viewer, as a SCIM create grants it.
+          role: admission.seat === "EXTERNAL" ? "VIEWER" : "MEMBER",
           customRoleId: null,
           scopeType: "ORGANIZATION",
           scopeId: organizationId,
@@ -126,6 +164,32 @@ export class OrganizationMemberAdmissionService {
     });
     await this.dependencies.admissions.completeAdmission({ organizationId, userId, grantId });
     return admission;
+  }
+
+  /** Asks the seats only for a full seat: a Developer is its own seat (ADR-171). The person
+   *  admitted stands in as the plan user; no human acts on an arrival. */
+  private async decideSeat({
+    organizationId,
+    userId,
+    requested,
+  }: {
+    organizationId: string;
+    userId: string;
+    requested: "MEMBER" | "DEVELOPER";
+  }): Promise<AdmissionSeat<"MEMBER" | "DEVELOPER">> {
+    if (requested === "DEVELOPER") {
+      return admissionSeat({ requested, fullSeatFree: true, liteSeatFree: true });
+    }
+    const user = { id: userId };
+    const [members, membersLite] = await Promise.all([
+      this.dependencies.seats.checkLimit({ organizationId, resource: "members", user }),
+      this.dependencies.seats.checkLimit({ organizationId, resource: "membersLite", user }),
+    ]);
+    return admissionSeat({
+      requested,
+      fullSeatFree: members.allowed,
+      liteSeatFree: membersLite.allowed,
+    });
   }
 
   /** Refuses when taking this member out would leave the organization with no

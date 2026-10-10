@@ -3,7 +3,7 @@ import type { RedisConnection } from "@langwatch/redis-client";
 import type {
   BugReportRateLimitRepository,
   BugReportRateLimitWindow,
-} from "../bug-report-rate-limit.repository.ts";
+} from "../bug-report.repository.ts";
 import { MemoryBugReportRateLimitRepository } from "../memory/memory.bug-report-rate-limit.repository.ts";
 
 type CounterConnection = Pick<RedisConnection, "incr" | "expire" | "ttl">;

@@ -47,10 +47,11 @@ export const SignIn = ({ tenantId, query }: { tenantId: number; query: string })
     () => matchAccounts({ users: data?.users ?? [], needle }),
     [data, needle],
   );
+  const played = data?.provider === undefined ? "identity provider" : `${data.provider} sign-in`;
   const subtitle =
     data === undefined
       ? `Simulated identity provider, tenant ${tenantId}`
-      : `Simulated identity provider, tenant ${tenantId} (${data.domain})`;
+      : `Simulated ${played}, tenant ${tenantId} (${data.domain})`;
 
   return (
     <SimConsole
@@ -118,6 +119,11 @@ export const SignIn = ({ tenantId, query }: { tenantId: number; query: string })
                     </List>
                   )}
                 </Panel>
+                {data?.cancelHref !== undefined && (
+                  <div>
+                    <Button href={data.cancelHref}>Cancel</Button>
+                  </div>
+                )}
                 <Text tone="muted" size="sm">
                   There are no passwords: picking a person is the whole ceremony. Scripts skip this
                   page with login_hint=&lt;email&gt; on the authorization request.

@@ -1,3 +1,5 @@
+import { ListPageSkeleton } from "@langwatch/design-system/list-page";
+import { HandledErrorAlert } from "@langwatch/error-views";
 import { useMemo } from "react";
 
 import { api } from "../../../../behavior/ops-api.ts";
@@ -54,16 +56,36 @@ export function SubscribersCard() {
     mutation.mutate({ queueName: selectedQueue, key: row.pauseKey });
   };
 
+  if (registry.isPending || dashboard.isPending) {
+    return <ListPageSkeleton label="Loading subscribers" />;
+  }
+  if ((registry.isError || dashboard.isError) && (!registry.data || !dashboard.data)) {
+    return (
+      <HandledErrorAlert
+        error={registry.error ?? dashboard.error}
+        fallbackTitle="The subscribers could not load"
+      />
+    );
+  }
+
   return (
-    <SubscribersCardView
-      rows={rows}
-      queueName={queueName}
-      hasAccess={hasAccess}
-      onTogglePause={onTogglePause}
-      isPausePending={(row) => {
-        const mutation = row.isPaused ? actions.unpauseMutation : actions.pauseMutation;
-        return mutation.isPending && mutation.variables?.key === row.pauseKey;
-      }}
-    />
+    <>
+      {(registry.isError || dashboard.isError) && (
+        <HandledErrorAlert
+          error={registry.error ?? dashboard.error}
+          fallbackTitle="Subscribers could not refresh; showing the last snapshot"
+        />
+      )}
+      <SubscribersCardView
+        rows={rows}
+        queueName={queueName}
+        hasAccess={hasAccess}
+        onTogglePause={onTogglePause}
+        isPausePending={(row) => {
+          const mutation = row.isPaused ? actions.unpauseMutation : actions.pauseMutation;
+          return mutation.isPending && mutation.variables?.key === row.pauseKey;
+        }}
+      />
+    </>
   );
 }

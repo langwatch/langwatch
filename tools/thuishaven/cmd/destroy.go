@@ -3,7 +3,6 @@ package cmd
 import (
 	"bufio"
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -12,26 +11,18 @@ import (
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
 
-// `haven destroy <slug>` is `haven down` plus the data. It exists because
-// "stop this stack and take its databases with it" was reachable only through
-// the hub's interactive worktree picker, which addresses a DIRECTORY - the
-// wrong noun for a throwaway stack booted inside a checkout somebody else
-// owns. apidiff boots one stack per instance under its own run-scoped slug in
-// the developer's own worktree; naming the slug is what lets its teardown take
-// exactly what it started and nothing else.
+// `haven down --destroy` is `haven down` plus the data. Naming the stack with
+// --stack is what lets apidiff's teardown take exactly the run-scoped stack it
+// booted inside somebody else's worktree, and nothing else.
 //
-// It is destructive, so it follows the same ceremony as `haven db reset`: a
-// y/N prompt for a person, `--yes` for a script, and an agent gets no prompt
-// at all - only the explicit flag.
+// It is destructive, so a person types the slug (a plain y does not count), a
+// script passes --yes, and an agent gets no prompt at all: only the flag.
 
-// runDestroy is `haven destroy <slug> [--yes]`.
-func runDestroy(ctx context.Context, d deps, inv invocation) error {
-	if len(inv.args) == 0 {
-		return errors.New("usage: haven destroy <slug> [--yes] - the slug names the stack, `haven status` lists them")
-	}
-	slug := inv.args[0]
-	if !domain.ValidSlug(slug) {
-		return domain.ErrInvalidSlug(slug)
+// runDownDestroy is `haven down --destroy [--stack <slug>] [--yes]`.
+func runDownDestroy(ctx context.Context, d deps, inv invocation) error {
+	slug, err := d.orch.ResolveSlug(d.params)
+	if err != nil {
+		return err
 	}
 	proceed, err := confirmDestroy(destroyConfirm{
 		slug:    slug,
@@ -44,6 +35,7 @@ func runDestroy(ctx context.Context, d deps, inv invocation) error {
 	if err != nil || !proceed {
 		return err
 	}
+	stopBrowser(slug)
 	return d.orch.DestroyStack(ctx, slug)
 }
 
@@ -71,14 +63,13 @@ func confirmDestroy(c destroyConfirm) (bool, error) {
 	case c.yes:
 		return true, nil
 	case c.isAgent:
-		return false, fmt.Errorf(
-			"destroy stops stack %q and drops its database %s on the managed ClickHouse and Postgres - pass --yes to confirm", c.slug, c.db)
+		return false, usageErr(
+			"down --destroy stops stack %q and drops its database %s on the managed ClickHouse and Postgres - pass --yes to confirm", c.slug, c.db)
 	}
 	fmt.Fprintf(c.out,
-		"This stops stack %q and drops its database %q on the managed ClickHouse and\nPostgres. The worktree is left alone. Continue? [y/N] ", c.slug, c.db)
+		"This stops stack %q and drops its database %q on the managed ClickHouse and\nPostgres. The worktree is left alone. Type the stack's slug to continue: ", c.slug, c.db)
 	answer, _ := bufio.NewReader(c.in).ReadString('\n')
-	switch strings.ToLower(strings.TrimSpace(answer)) {
-	case "y", "yes":
+	if strings.TrimSpace(answer) == c.slug {
 		return true, nil
 	}
 	fmt.Fprintln(c.out, "aborted - nothing was stopped or dropped")

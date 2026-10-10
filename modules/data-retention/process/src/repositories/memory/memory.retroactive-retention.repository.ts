@@ -8,7 +8,11 @@ import { EventLogRetention } from "@langwatch/eventing/server";
 import { type Instant, nowInstant, toDate } from "@langwatch/time";
 
 import { EVENT_LOG_RETENTION_CLASSIFICATION } from "../../rules/event-log-retention.rules.ts";
-import type { RetroactiveRetentionRepository } from "../retroactive-retention.repository.ts";
+import type {
+  ClickHouseTarget,
+  KeepForeverRewrite,
+  RetroactiveRetentionRepository,
+} from "../retroactive-retention.repository.ts";
 
 /**
  * A real twin, not a null object: mutations track in-progress rewrites and
@@ -27,6 +31,11 @@ export class MemoryRetroactiveRetentionRepository implements RetroactiveRetentio
     client: { command: async () => {} },
     classification: EVENT_LOG_RETENTION_CLASSIFICATION,
   });
+
+  /** Keep-forever rewrites by target (`""` is the shared one), newest first; done at once. */
+  readonly #keepForever = new Map<string, KeepForeverRewrite[]>();
+  /** The private dataplanes this twin routes to; tests set them. */
+  privateOrganizations: readonly string[] = [];
 
   private constructor(private readonly now: () => Instant) {}
 
@@ -85,5 +94,25 @@ export class MemoryRetroactiveRetentionRepository implements RetroactiveRetentio
         (mutation) => mutation.mutationId !== input.mutationId,
       ),
     );
+  }
+
+  keepForeverTargets(): readonly ClickHouseTarget[] {
+    return [{}, ...this.privateOrganizations.map((organizationId) => ({ organizationId }))];
+  }
+
+  async findKeepForeverRewrites(input: ClickHouseTarget): Promise<KeepForeverRewrite[]> {
+    return [...(this.#keepForever.get(input.organizationId ?? "") ?? [])];
+  }
+
+  async startKeepForeverRewrite(input: ClickHouseTarget): Promise<void> {
+    await this.#eventLogRetention.keepIndefiniteRows(input);
+    const key = input.organizationId ?? "";
+    const rewrite = {
+      mutationId: `mutation_${this.#nextId++}`,
+      isDone: true,
+      partsToDo: 0,
+      latestFailReason: "",
+    };
+    this.#keepForever.set(key, [rewrite, ...(this.#keepForever.get(key) ?? [])]);
   }
 }

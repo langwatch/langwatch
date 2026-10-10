@@ -1,6 +1,6 @@
 import { Button } from "@langwatch/design-system/primitives";
 import type { WorkflowField } from "@langwatch/workflow-contract";
-import { Terminal } from "react-feather";
+import { Terminal } from "lucide-react";
 
 import {
   buildRunSnippet,

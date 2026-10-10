@@ -7,7 +7,7 @@ import {
   BEFORE_MEMBERSHIP,
   callerOf,
   customRoleGate,
-  organizationSessionPersonFact,
+  organizationSessionPersonContext,
 } from "./organization.trpc.ts";
 
 export const inviteTrpcTransport: TrpcRouterDeclaration<OrganizationApi, typeof inviteTrpc> =
@@ -19,7 +19,7 @@ export const inviteTrpcTransport: TrpcRouterDeclaration<OrganizationApi, typeof 
      */
     .procedure("createInvites")
     .withEntitlement("enterprise", customRoleGate)
-    .withFacts(organizationSessionPersonFact)
+    .withMiddlewareContext(organizationSessionPersonContext)
     .withPermission("organization:manage")
     .handle(({ app, input, actor }, person) =>
       app.createInvitations({ ...input, validation: "lenient" }, callerOf(actor, person)),
@@ -45,7 +45,7 @@ export const inviteTrpcTransport: TrpcRouterDeclaration<OrganizationApi, typeof 
 
     /** The seat checkout and the invitations that motivated it, as one act (C2 A). */
     .procedure("upgradeWithInvites")
-    .withFacts(organizationSessionPersonFact)
+    .withMiddlewareContext(organizationSessionPersonContext)
     .withPermission("organization:manage")
     .handle(({ app, input, actor }, person) =>
       app.createSeatCheckoutWithInvites(input, callerOf(actor, person)),
@@ -53,7 +53,7 @@ export const inviteTrpcTransport: TrpcRouterDeclaration<OrganizationApi, typeof 
 
     /** The invitee's own act: they hold the code and are not a member yet. */
     .procedure("acceptInvite")
-    .withFacts(organizationSessionPersonFact)
+    .withMiddlewareContext(organizationSessionPersonContext)
     .noPermission(BEFORE_MEMBERSHIP)
     .handle(({ app, input, actor }, person) =>
       app.acceptInvitation({ inviteCode: input.inviteCode }, callerOf(actor, person)),
@@ -64,7 +64,7 @@ export const inviteTrpcTransport: TrpcRouterDeclaration<OrganizationApi, typeof 
      * to no organization yet, which is the condition being reported.
      */
     .procedure("myPendingInvitation")
-    .withFacts(organizationSessionPersonFact)
+    .withMiddlewareContext(organizationSessionPersonContext)
     .noPermission(BEFORE_MEMBERSHIP)
     .handle(({ app, actor }, person) => app.getPendingInvitation(callerOf(actor, person)))
 
@@ -73,7 +73,7 @@ export const inviteTrpcTransport: TrpcRouterDeclaration<OrganizationApi, typeof 
      * carries the invitation code, the secret from the mail.
      */
     .procedure("pendingForMe")
-    .withFacts(organizationSessionPersonFact)
+    .withMiddlewareContext(organizationSessionPersonContext)
     .noPermission(BEFORE_MEMBERSHIP)
     .handle(({ app, actor }, person) =>
       app.listPendingInvitationsForCaller(callerOf(actor, person)),

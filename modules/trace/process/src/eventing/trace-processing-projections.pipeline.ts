@@ -25,14 +25,14 @@ import {
   traceNameChangedEventSchema,
 } from "@langwatch/trace-contract";
 
+import type { TraceIoExtraction } from "../features/derivation/services/trace-io-extraction.service.ts";
+import type { TraceModelCost } from "../features/derivation/services/trace-model-cost.service.ts";
 import {
   clampSpanShardCount,
   spanCommandGroupKey,
 } from "../features/ingestion/rules/trace-span-command-shard.rules.ts";
-import type { TraceSpanNormalization } from "../features/span/services/span-normalization.service.ts";
-import type { TraceIoExtraction } from "../features/derivation/services/trace-io-extraction.service.ts";
 import type { TraceMediaReferenceResolver } from "../features/media/services/trace-media-reference.service.ts";
-import type { TraceModelCost } from "../features/derivation/services/trace-model-cost.service.ts";
+import type { TraceSpanNormalization } from "../features/span/services/span-normalization.service.ts";
 import { TraceProjectionRuntimeService } from "../services/trace-projection-runtime.service.ts";
 import { EventingRecordSpanAdapter, RECORD_SPAN_DEDUPLICATION } from "./record-span.commands.ts";
 import { SpanStorageMapProjection } from "./span-storage.projection.ts";

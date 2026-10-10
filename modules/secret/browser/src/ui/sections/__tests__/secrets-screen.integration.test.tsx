@@ -5,10 +5,11 @@
  * @see specs/secrets/secrets-manager.feature
  */
 
-import { cleanup, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { SecretHostProvider } from "../../../model/secret-host.ts";
 import { FakeSecretHost, renderWithSecretHost } from "../../../testing.tsx";
 import SecretsScreen from "../secrets-screen.tsx";
 
@@ -215,6 +216,39 @@ describe("given no secrets exist", () => {
     renderWithSecretHost(<SecretsScreen />);
     expect(screen.getByText("No secrets configured")).toBeInTheDocument();
     expect(screen.getByText("Add secrets to use in code blocks")).toBeInTheDocument();
+  });
+});
+
+describe("given the list is still loading", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    state.isLoading = true;
+  });
+  afterEach(() => vi.useRealTimers());
+
+  /** @scenario A fast load never flashes a skeleton */
+  it("shows neither skeleton nor table when it answers quickly, then the empty state", () => {
+    const view = renderWithSecretHost(<SecretsScreen />);
+    act(() => vi.advanceTimersByTime(100));
+    expect(screen.queryByTestId("secrets-loading")).toBeNull();
+    state.isLoading = false;
+    view.rerender(
+      <SecretHostProvider value={view.host}>
+        <SecretsScreen />
+      </SecretHostProvider>,
+    );
+    expect(screen.queryByTestId("secrets-loading")).toBeNull();
+    expect(screen.queryByRole("table")).toBeNull();
+    expect(screen.getByText("No secrets configured")).toBeInTheDocument();
+  });
+
+  /** @scenario A slow load shows a light skeleton */
+  it("shows a skeleton once the delay has passed", () => {
+    renderWithSecretHost(<SecretsScreen />);
+    expect(screen.queryByTestId("secrets-loading")).toBeNull();
+    act(() => vi.advanceTimersByTime(400));
+    expect(screen.getByTestId("secrets-loading")).toBeInTheDocument();
+    expect(screen.queryByRole("table")).toBeNull();
   });
 });
 

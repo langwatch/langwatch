@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -101,8 +102,8 @@ func waitFor(t *testing.T, ok func() bool) {
 	}
 }
 
-// @scenario "The orchestrator prepares the worktree through the same step"
-func TestUpPreparesTheWorktreeWithTheScriptTheLocalLauncherRuns(t *testing.T) {
+// @scenario "A modular stack boots without a migration step"
+func TestUpRunsNoMigrationBeforeTheServicesBoot(t *testing.T) {
 	root := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(root, "node_modules"), 0o750); err != nil {
 		t.Fatal(err)
@@ -113,36 +114,64 @@ func TestUpPreparesTheWorktreeWithTheScriptTheLocalLauncherRuns(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(root, "node_modules", ".modules.yaml"), []byte("{}\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	sup := &fakeSupervisor{err: os.ErrInvalid, errOn: "start:prepare:db"}
+	sup := &fakeSupervisor{}
 	o := &Orchestrator{sup: sup, sys: &fakeSystem{now: time.Now()}, store: &fakeStore{}, log: zap.NewNop()}
 
-	st := domain.Stack{Slug: "feat-x", WorktreeDir: root, Layout: domain.LayoutModular}
-	_ = o.prepareWorktree(context.Background(), UpParams{WorktreeDir: root}, st)
-
-	var prepared []string
-	for _, shell := range sup.shells {
-		if strings.Contains(shell, "start:prepare:db") {
-			prepared = append(prepared, shell)
-		}
-	}
-	if len(prepared) != 1 {
-		t.Fatalf("the orchestrator ran %v, want the one preparation script once", sup.shells)
-	}
-
-	launcher, err := os.ReadFile(filepath.Join("..", "..", "..", "dev", "scripts", "dev-stack.sh"))
+	st := domain.Stack{Slug: "feat-x", WorktreeDir: root, Layout: domain.LayoutModular, APIPort: 6560, PostgresPort: 5432, PostgresDatabase: "feat_x"}
+	seed, err := o.prepareWorktree(context.Background(), UpParams{WorktreeDir: root}, st)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("prepareWorktree: %v", err)
 	}
-	var launched []string
-	for _, line := range strings.Split(string(launcher), "\n") {
-		if trimmed := strings.TrimSpace(line); strings.HasPrefix(trimmed, "pnpm ") && strings.Contains(trimmed, "start:prepare:db") {
-			launched = append(launched, trimmed)
+	for _, shell := range sup.shells {
+		if strings.Contains(shell, "start:prepare:db") || strings.Contains(shell, "task upgrade") || strings.Contains(shell, "prisma:seed") {
+			t.Errorf("the up ran %q before boot; the worker runs the upgrade and the keeper seeds after it", shell)
 		}
 	}
-	if len(launched) != 1 {
-		t.Fatalf("dev-stack.sh runs %v, want the one preparation script once", launched)
+	if !slices.ContainsFunc(sup.shells, func(s string) bool { return strings.Contains(s, "ensure:built") }) {
+		t.Errorf("ran %v, want the dist packages the lanes import built before boot", sup.shells)
 	}
-	if !strings.HasSuffix(launched[0], "run start:prepare:db") || !strings.HasSuffix(prepared[0], "run start:prepare:db") {
-		t.Fatalf("launcher runs %q and haven runs %q, want the same `run start:prepare:db`", launched[0], prepared[0])
+	if seed == nil {
+		t.Fatal("no seed was handed to the keeper")
+	}
+	if seed.ReadyURL != "http://127.0.0.1:6560/readyz" {
+		t.Errorf("the seed waits on %q, want the api's readiness probe", seed.ReadyURL)
+	}
+	if !strings.Contains(seed.Job.Shell, "prisma:seed") {
+		t.Errorf("the keeper's seed runs %q, want the checkout's seed script", seed.Job.Shell)
+	}
+}
+
+// @scenario "The seed writes the llmsim base URLs into the seeded providers"
+func TestSeedEnvCarriesTheLLMSimBaseURLs(t *testing.T) {
+	root := t.TempDir()
+	for _, f := range []struct{ path, body string }{
+		{filepath.Join(root, "pnpm-lock.yaml"), "lockfileVersion: '9.0'\n"},
+		{filepath.Join(root, "node_modules", ".modules.yaml"), "{}\n"},
+	} {
+		if err := os.MkdirAll(filepath.Dir(f.path), 0o750); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(f.path, []byte(f.body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	o := &Orchestrator{sup: &fakeSupervisor{}, sys: &fakeSystem{now: time.Now()}, store: &fakeStore{}, log: zap.NewNop()}
+	st := domain.Stack{
+		Slug: "feat-x", WorktreeDir: root, Layout: domain.LayoutModular, APIPort: 6560,
+		PostgresPort: 5432, PostgresDatabase: "feat_x",
+		Services: []domain.Service{{Name: domain.LLMService, Port: 45595}},
+	}
+
+	seed, err := o.prepareWorktree(context.Background(), UpParams{WorktreeDir: root}, st)
+	if err != nil {
+		t.Fatalf("prepareWorktree: %v", err)
+	}
+	if seed == nil {
+		t.Fatal("no seed was handed to the keeper")
+	}
+	for _, want := range []string{"OPENAI_BASE_URL=http://127.0.0.1:45595/v1", "ANTHROPIC_BASE_URL=http://127.0.0.1:45595"} {
+		if !slices.Contains(seed.Job.Env, want) {
+			t.Errorf("the seed's env lacks %q, so the seeded provider rows would not reach llmsim", want)
+		}
 	}
 }

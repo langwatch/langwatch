@@ -1,11 +1,11 @@
 /**
  * Annotation's answer to the port its screens declare: every method
- * projects a `@langwatch/browser-host` capability, so the module mounts it,
+ * projects a `@langwatch/browser-host` host service, so the module mounts it,
  * not the application. ARCHITECTURE.md §10.1.
  */
 
 import {
-  useUiCapabilities,
+  useUiHostServices,
   useUiScope,
   useUiTraceFilters,
   type UiFeedback,
@@ -14,8 +14,8 @@ import {
   type UiSession,
   type UiTraceFilters,
 } from "@langwatch/browser-host/capabilities";
-import type { UiScopeStatus } from "@langwatch/browser-host/session";
 import { useDrawer } from "@langwatch/browser-host/drawer";
+import type { UiScopeStatus } from "@langwatch/browser-host/session";
 import { useMemo, type ReactNode } from "react";
 
 import {
@@ -31,7 +31,7 @@ import {
 import { isOwnPersonalWorkspace } from "../model/annotation-personal-workspace.ts";
 import { annotationApi } from "./annotation-api.ts";
 
-class CapabilityAnnotationHost extends AnnotationHostApi {
+class HostServiceAnnotationHost extends AnnotationHostApi {
   constructor(
     private readonly deps: {
       organizationId: string | undefined;
@@ -132,7 +132,7 @@ class CapabilityAnnotationHost extends AnnotationHostApi {
  * is what `mounts.load` resolves.
  */
 export default function AnnotationHostMount({ children }: { children?: ReactNode }) {
-  const { session, navigation, route, feedback } = useUiCapabilities();
+  const { session, navigation, route, feedback } = useUiHostServices();
   const uiScope = useUiScope();
   const traceFilters = useUiTraceFilters();
   const { organizationId } = uiScope.activeScope();
@@ -151,7 +151,7 @@ export default function AnnotationHostMount({ children }: { children?: ReactNode
 
   const host = useMemo(
     () =>
-      new CapabilityAnnotationHost({
+      new HostServiceAnnotationHost({
         organizationId: organizationId ?? void 0,
         project: hostProject
           ? { id: hostProject.id, slug: hostProject.slug, name: hostProject.name }

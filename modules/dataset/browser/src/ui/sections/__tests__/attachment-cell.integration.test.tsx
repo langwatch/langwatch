@@ -457,5 +457,11 @@ describe("AttachmentCell", () => {
       expect(screen.queryByRole("link")).not.toBeInTheDocument();
       expect(screen.queryByTestId("attachment-chip")).not.toBeInTheDocument();
     });
+
+    it("renders a scriptable picture type as plain text, with no chip", () => {
+      renderCell({ dataType: "file", value: "data:image/svg+xml;base64,PHN2Zy8+" });
+
+      expect(screen.queryByTestId("attachment-chip")).not.toBeInTheDocument();
+    });
   });
 });

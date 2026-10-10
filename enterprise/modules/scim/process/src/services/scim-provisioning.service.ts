@@ -7,16 +7,27 @@ import {
   type ScimUser,
 } from "@langwatch/enterprise-scim-contract";
 import { ScimProtocolError } from "@langwatch/enterprise-scim-contract";
-import type { UserProfile, UserApi } from "@langwatch/user-contract";
+import type { EntitlementApi } from "@langwatch/entitlement-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
+import {
+  EmailAlreadyRegisteredError,
+  type UserProfile,
+  type UserApi,
+} from "@langwatch/user-contract";
 
+import type { ScimSeatRepository } from "../repositories/scim-seat.repository.ts";
 import type {
   ScimRepository,
   ScimUserRecord,
   ScimUserResourceRecord,
 } from "../repositories/scim.repository.ts";
+import { ScimAdmissionService } from "./scim-admission.service.ts";
 import { ScimCostCenterService, type ScimCostCenterFacts } from "./scim-cost-center.service.ts";
 import type { ScimOrganizationAdministration } from "./scim-deprovision.service.ts";
-import type { ScimDirectoryIdentityService } from "./scim-directory-identity.service.ts";
+import type {
+  ScimDirectoryIdentityService,
+  ScimHeldConnections,
+} from "./scim-directory-identity.service.ts";
 import type { ScimGrantsService } from "./scim-grants.service.ts";
 import { ScimMembershipAccessService } from "./scim-membership-access.service.ts";
 import { ScimUserListingService } from "./scim-user-listing.service.ts";
@@ -45,13 +56,12 @@ type ScimOrganizationUser = {
 export class ScimProvisioningService {
   private readonly prisma: ScimRepository;
   private readonly userService: ScimUserProvisioning;
-  private readonly grants: ScimGrantsService;
-  private readonly provenOffboarding: boolean;
   private readonly membershipAccess: ScimMembershipAccessService;
   private readonly listing: ScimUserListingService;
   private readonly costCenters: ScimCostCenterService;
   private readonly patches: ScimUserPatchService;
   private readonly authority: Pick<ScimDirectoryIdentityService, "assertWritable">;
+  private readonly admission: ScimAdmissionService;
 
   private constructor({
     prisma,
@@ -60,9 +70,13 @@ export class ScimProvisioningService {
     users,
     costCenterFacts,
     organization,
+    members,
     lifecycle,
     provenOffboarding,
     authority,
+    seats,
+    plans,
+    connections,
   }: {
     prisma: ScimRepository;
     writer: AuthzGrantsService;
@@ -70,24 +84,36 @@ export class ScimProvisioningService {
     users: ScimUserProvisioning;
     costCenterFacts: ScimCostCenterFacts;
     organization: ScimOrganizationAdministration;
+    members: Pick<OrganizationApi, "deleteMember">;
     lifecycle: ScimSyncLifecycle;
     provenOffboarding: boolean;
     authority: Pick<ScimDirectoryIdentityService, "assertWritable">;
+    seats: ScimSeatRepository;
+    plans: Pick<EntitlementApi, "getActivePlan">;
+    connections: ScimHeldConnections;
   }) {
     this.prisma = prisma;
     this.authority = authority;
     this.userService = users;
-    this.grants = grants;
     this.membershipAccess = ScimMembershipAccessService.create({
       prisma,
       writer,
       grants,
       lifecycle,
       organization,
+      members,
       provenOffboarding,
     });
     this.listing = ScimUserListingService.create(prisma);
-    this.provenOffboarding = provenOffboarding;
+    this.admission = ScimAdmissionService.create({
+      prisma,
+      grants,
+      provenOffboarding,
+      seats,
+      plans,
+      connections,
+      membershipAccess: this.membershipAccess,
+    });
     this.costCenters = ScimCostCenterService.create(costCenterFacts);
     this.patches = ScimUserPatchService.create(this.costCenters);
   }
@@ -99,9 +125,13 @@ export class ScimProvisioningService {
     users: ScimUserProvisioning;
     costCenterFacts: ScimCostCenterFacts;
     organization: ScimOrganizationAdministration;
+    members: Pick<OrganizationApi, "deleteMember">;
     lifecycle: ScimSyncLifecycle;
     provenOffboarding: boolean;
     authority: Pick<ScimDirectoryIdentityService, "assertWritable">;
+    seats: ScimSeatRepository;
+    plans: Pick<EntitlementApi, "getActivePlan">;
+    connections: ScimHeldConnections;
   }): ScimProvisioningService {
     return new ScimProvisioningService(options);
   }
@@ -188,6 +218,17 @@ export class ScimProvisioningService {
     }
   }
 
+  /** A concurrent push that loses the mint answers as the sequential duplicate does. */
+  private async mintUser(input: { name: string; email: string }): Promise<UserProfile> {
+    try {
+      return await this.userService.create(input);
+    } catch (error) {
+      if (!(error instanceof EmailAlreadyRegisteredError)) throw error;
+
+      return this.scimError({ status: "409", detail: "User already exists in this organization" });
+    }
+  }
+
   async createUser({
     request,
     organizationId,
@@ -220,6 +261,18 @@ export class ScimProvisioningService {
         });
       }
       returning = previous !== null && previous.deletedAt === null;
+      // An account another domain vouches for is never adopted by an active push.
+      const admitting = request.active !== false && !returning;
+      if (
+        admitting &&
+        !(await this.admission.isOnProvenDomain({ organizationId, user: existingUser }))
+      ) {
+        return this.scimError({
+          status: "409",
+          scimType: "uniqueness",
+          detail: "User name is held by an account outside this organization's verified domains",
+        });
+      }
     }
 
     await this.assertUserNameIsFree({
@@ -230,11 +283,10 @@ export class ScimProvisioningService {
 
     const name = nameFromScimRequest(request);
     // Minting the account is the only global state a directory push writes.
-    const user = existingUser ?? (await this.userService.create({ name, email: request.userName }));
+    const user = existingUser ?? (await this.mintUser({ name, email: request.userName }));
     const active = request.active !== false;
-
     if (active && !returning) {
-      await this.admit({ userId: user.id, organizationId });
+      await this.admission.admit({ userId: user.id, organizationId });
       await this.costCenters.sync({
         userId: user.id,
         organizationId,
@@ -251,46 +303,6 @@ export class ScimProvisioningService {
     });
 
     return scimUserOf(user, resource);
-  }
-
-  /** A retried create still repairs the grant beside an existing membership. */
-  private async admit({
-    userId,
-    organizationId,
-  }: {
-    userId: string;
-    organizationId: string;
-  }): Promise<void> {
-    const role = await this.directoryAssertedOrganizationRole({ userId, organizationId });
-    try {
-      await this.prisma.addMembership({ userId, organizationId, role });
-    } catch (error) {
-      if (!isUniqueViolation(error)) throw error;
-    }
-
-    await this.membershipAccess.reconcileOrganizationMembership({ userId, organizationId });
-  }
-
-  /**
-   * The membership row's role, from what the directory asserts: ADMIN when a SCIM group mapped
-   * ADMIN at organization scope holds them under SCIM_V2_GRANTS, else MEMBER. A provisioned
-   * person is a member whatever else was or was not mapped; without the flag, always MEMBER.
-   */
-  private async directoryAssertedOrganizationRole({
-    userId,
-    organizationId,
-  }: {
-    userId: string;
-    organizationId: string;
-  }): Promise<"ADMIN" | "MEMBER"> {
-    if (!this.provenOffboarding) return "MEMBER";
-    const groupIds = await this.prisma.findDirectoryGroupIds({ userId, organizationId });
-    const roles = await this.grants.findDirectoryAssertedRoles({
-      organizationId,
-      userId,
-      groupIds,
-    });
-    return roles.includes("ADMIN") ? "ADMIN" : "MEMBER";
   }
 
   async getUser({ id, organizationId }: { id: string; organizationId: string }): Promise<ScimUser> {

@@ -79,8 +79,8 @@ export function EditorStatusBar({
 
   const problemsLabel = problemsLabelFor({ errorCount, warningCount });
 
-  const warningColor = warningCount > 0 ? "orange.500" : undefined;
-  const problemsColor = errorCount > 0 ? "red.500" : warningColor;
+  const warningColor = warningCount > 0 ? "orange.fg" : undefined;
+  const problemsColor = errorCount > 0 ? "red.fg" : warningColor;
 
   return (
     <HStack

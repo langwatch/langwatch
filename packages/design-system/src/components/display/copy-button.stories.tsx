@@ -3,7 +3,13 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { CopyButton } from "./copy-button.tsx";
 
 const meta = {
-  title: "Primitives/Copy button",
+  title: "Data display/Copy button",
+  parameters: {
+    usage: {
+      use: "Copying a value the reader needs elsewhere: an id, a key, an address.",
+      avoid: "A whole snippet: Code preview carries its own copy action.",
+    },
+  },
   component: CopyButton,
   tags: ["autodocs"],
   args: {

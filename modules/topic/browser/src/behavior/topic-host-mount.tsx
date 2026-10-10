@@ -1,11 +1,11 @@
 /**
  * Topic's answer to the port its screen declares: every method projects a
- * `@langwatch/browser-host` capability, so the module mounts it, not the
+ * `@langwatch/browser-host` host service, so the module mounts it, not the
  * application. ARCHITECTURE.md §10.1.
  */
 
 import {
-  useUiCapabilities,
+  useUiHostServices,
   useUiScope,
   type UiFeedback,
 } from "@langwatch/browser-host/capabilities";
@@ -19,7 +19,7 @@ import {
   type TopicSuccessNotice,
 } from "../model/topic-host.ts";
 
-class CapabilityTopicHost extends TopicHostApi {
+class HostServiceTopicHost extends TopicHostApi {
   constructor(private readonly deps: { projectId: string | undefined; feedback: UiFeedback }) {
     super();
   }
@@ -30,6 +30,14 @@ class CapabilityTopicHost extends TopicHostApi {
 
   succeeded(notice: TopicSuccessNotice): void {
     this.deps.feedback.succeeded(notice);
+  }
+
+  warned(notice: TopicSuccessNotice): void {
+    this.deps.feedback.warned(notice);
+  }
+
+  informed(notice: TopicSuccessNotice): void {
+    this.deps.feedback.informed(notice);
   }
 
   failed(failure: TopicFailureNotice): void {
@@ -43,10 +51,10 @@ class CapabilityTopicHost extends TopicHostApi {
  * is what `mounts.load` resolves.
  */
 export default function TopicHostMount({ children }: { children?: ReactNode }) {
-  const { feedback } = useUiCapabilities();
+  const { feedback } = useUiHostServices();
   const { projectId } = useUiScope().activeScope();
   const host = useMemo(
-    () => new CapabilityTopicHost({ projectId: projectId ?? void 0, feedback }),
+    () => new HostServiceTopicHost({ projectId: projectId ?? void 0, feedback }),
     [projectId, feedback],
   );
   return <TopicHostProvider value={host}>{children}</TopicHostProvider>;

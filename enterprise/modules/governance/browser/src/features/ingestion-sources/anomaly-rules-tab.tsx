@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import { Drawer } from "@langwatch/design-system/drawer";
+import { InlineCode } from "@langwatch/design-system/inline-code";
 import {
   Badge,
   Box,
   Button,
-  Heading,
   HStack,
   Input,
   Spacer,
@@ -719,9 +719,7 @@ function RuleComposer({
       <Drawer.Content>
         <Drawer.Header>
           <Drawer.CloseTrigger />
-          <Heading as="h2" size="md">
-            {isEdit ? "Edit anomaly rule" : "New anomaly rule"}
-          </Heading>
+          <Drawer.Title>{isEdit ? "Edit anomaly rule" : "New anomaly rule"}</Drawer.Title>
         </Drawer.Header>
         <Drawer.Body>
           <VStack align="stretch" gap={3}>
@@ -732,7 +730,7 @@ function RuleComposer({
                 </Text>
                 <Input
                   size="sm"
-                  backgroundColor="white"
+                  backgroundColor="bg.control"
                   value={composer.name}
                   onChange={(e) => setComposer({ ...composer, name: e.target.value })}
                   placeholder="Display name for this rule"
@@ -757,7 +755,7 @@ function RuleComposer({
               </Text>
               <Textarea
                 size="sm"
-                backgroundColor="white"
+                backgroundColor="bg.control"
                 rows={2}
                 value={composer.description}
                 onChange={(e) => setComposer({ ...composer, description: e.target.value })}
@@ -772,7 +770,7 @@ function RuleComposer({
                 </Text>
                 <Input
                   size="sm"
-                  backgroundColor="white"
+                  backgroundColor="bg.control"
                   list="rule-type-suggestions"
                   value={composer.ruleType}
                   onChange={(e) => {
@@ -800,9 +798,10 @@ function RuleComposer({
                   ))}
                 </datalist>
                 <Text fontSize="xs" color="fg.muted">
-                  Only <code>spend_spike</code> is evaluated by the anomaly subscriber today. Other
-                  rule types (<code>rate_limit</code>,<code>after_hours</code>, …) are{" "}
-                  <Link href={docsUrl("/ai-governance/anomaly-rules")} color="blue.600">
+                  Only <InlineCode>spend_spike</InlineCode> is evaluated by the anomaly subscriber
+                  today. Other rule types (<InlineCode>rate_limit</InlineCode>,
+                  <InlineCode>after_hours</InlineCode>, …) are{" "}
+                  <Link href={docsUrl("/ai-governance/anomaly-rules")} color="blue.fg">
                     preview
                   </Link>{" "}
                   , persisted as active but not yet detected.
@@ -840,7 +839,7 @@ function RuleComposer({
                       size="xs"
                       variant="ghost"
                       fontSize="xs"
-                      color="blue.600"
+                      color="blue.fg"
                       onClick={() => setScopeIdMode((m) => (m === "picker" ? "custom" : "picker"))}
                     >
                       {scopeIdMode === "picker" ? "type a custom ID" : "use picker"}
@@ -873,7 +872,7 @@ function RuleComposer({
                   {showCustomScopeId && (
                     <Input
                       size="sm"
-                      backgroundColor="white"
+                      backgroundColor="bg.control"
                       value={composer.scopeId}
                       onChange={(e) => setComposer({ ...composer, scopeId: e.target.value })}
                       placeholder={customScopeIdPlaceholder(composer.scope)}
@@ -892,7 +891,7 @@ function RuleComposer({
                 <Link
                   href={docsUrl("/ai-governance/anomaly-rules#threshold-config")}
                   isExternal
-                  color="blue.600"
+                  color="blue.fg"
                   fontSize="xs"
                   fontWeight="medium"
                 >
@@ -904,7 +903,7 @@ function RuleComposer({
               </HStack>
               <Textarea
                 size="sm"
-                backgroundColor="white"
+                backgroundColor="bg.control"
                 rows={4}
                 fontFamily="mono"
                 value={composer.thresholdConfig}
@@ -963,10 +962,10 @@ function readDestination(raw: string) {
   };
 }
 
-/** The picker's value: the named endpoint, nothing for an inline webhook, else dashboard only. */
+/** The picker's value: the named endpoint (a migrated inline one too), else dashboard only. */
 function destinationPickerValue(destination: ReturnType<typeof readDestination>) {
   if (destination.type === "webhook_endpoint") return destination.endpointId;
-  if (destination.type === "webhook") return "";
+  if (destination.type === "webhook") return destination.endpointId;
   return NO_DESTINATION;
 }
 
@@ -991,7 +990,7 @@ function RuleDestinationField({
     enabled: canViewEndpoints,
   });
   const destination = readDestination(composer.destinationConfig);
-  const isInline = destination.type === "webhook";
+  const isInline = destination.type === "webhook" && destination.endpointId === "";
   const pickerOptions = useMemo(
     () => [{ value: NO_DESTINATION, label: "Governance dashboard only" }, ...options],
     [options],
@@ -1069,16 +1068,28 @@ function customScopeIdPlaceholder(scope: Scope): string {
 
 function thresholdPreviewPalette(kind: ReturnType<typeof summariseThresholdConfig>["kind"]) {
   if (kind === "ok") {
-    return { bg: "blue.50", border: "blue.300", fg: "blue.900", label: "Preview", badge: "blue" };
+    return {
+      bg: "blue.subtle",
+      border: "blue.emphasized",
+      fg: "blue.fg",
+      label: "Preview",
+      badge: "blue",
+    };
   }
   if (kind === "unsupported") {
     return {
-      bg: "orange.50",
-      border: "orange.300",
-      fg: "orange.900",
+      bg: "orange.subtle",
+      border: "orange.emphasized",
+      fg: "orange.fg",
       label: "Won't fire",
       badge: "orange",
     };
   }
-  return { bg: "red.50", border: "red.300", fg: "red.900", label: "Invalid", badge: "red" };
+  return {
+    bg: "red.subtle",
+    border: "red.emphasized",
+    fg: "red.fg",
+    label: "Invalid",
+    badge: "red",
+  };
 }

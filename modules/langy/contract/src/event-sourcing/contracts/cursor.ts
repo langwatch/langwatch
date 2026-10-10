@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 /**
@@ -5,12 +6,14 @@ import { z } from "zod";
  * by `(acceptedAt, eventId)`; tie-break MUST be byte-wise (`<`/`>`), NEVER
  * `localeCompare` — it can disagree with KSUID byte order.
  */
-export const langyEventCursorSchema = z.object({
+const langyEventCursorSchemaDefinition = z.object({
   /** When the canonical event log accepted the event (Unix ms, UTC). */
   acceptedAt: z.number().int().nonnegative(),
   /** KSUID tie-breaker for events accepted in the same millisecond. */
   eventId: z.string(),
 });
+export interface LangyEventCursorSchema extends Named<typeof langyEventCursorSchemaDefinition> {}
+export const langyEventCursorSchema: LangyEventCursorSchema = langyEventCursorSchemaDefinition;
 
 export type LangyEventCursor = z.infer<typeof langyEventCursorSchema>;
 

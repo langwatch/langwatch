@@ -16,11 +16,11 @@ export {
   virtualKeyPepper,
 } from "./shared-secrets.ts";
 export {
-  SecretNotSetError as AbsentSecretError,
   OnePasswordInProductionError,
   OnePasswordUnavailableError,
   SealedSecretsError,
   SecretClaimedTwiceError,
+  SecretNotSetError,
   SecretsPreflightError,
   UndeclaredSecretError,
 } from "./secrets.errors.ts";

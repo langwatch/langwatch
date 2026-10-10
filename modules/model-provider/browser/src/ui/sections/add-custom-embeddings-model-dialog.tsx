@@ -98,7 +98,7 @@ export function AddCustomEmbeddingsModelDialog({
                 onChange={(e) => setModelId(e.target.value)}
                 aria-label="Model ID"
               />
-              {errors.modelId && <SmallLabel color="red.500">{errors.modelId}</SmallLabel>}
+              {errors.modelId && <SmallLabel color="red.fg">{errors.modelId}</SmallLabel>}
             </VStack>
             <VStack gap={1} align="stretch">
               <SmallLabel>Display Name</SmallLabel>
@@ -108,7 +108,7 @@ export function AddCustomEmbeddingsModelDialog({
                 onChange={(e) => setDisplayName(e.target.value)}
                 aria-label="Display Name"
               />
-              {errors.displayName && <SmallLabel color="red.500">{errors.displayName}</SmallLabel>}
+              {errors.displayName && <SmallLabel color="red.fg">{errors.displayName}</SmallLabel>}
             </VStack>
           </VStack>
         </DialogBody>

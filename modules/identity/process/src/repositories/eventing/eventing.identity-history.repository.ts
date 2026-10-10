@@ -1,17 +1,18 @@
-import type { OwnEventStore } from "@langwatch/eventing";
+import { createTenantId, type EventReadSeat } from "@langwatch/eventing";
 import {
   IDENTITY_EVENT_TYPES,
   type IdentityHistoryEntry,
   type LinkProposalRecord,
   MFA_EVENT_TYPES,
+  USER_IDENTITY_AGGREGATE_TYPE,
 } from "@langwatch/identity-contract";
 
 import type { IdentityEvent } from "../../eventing/identity-state.projection.ts";
 import { identityHistoryEntries, linkProposalsOf } from "../../rules/identity-history.rules.ts";
 import { IdentityHistoryRepository } from "../identity-history.repository.ts";
 
-/** The one read this repository takes off the user_identity pipeline's own store. */
-type IdentityEventReads = Pick<OwnEventStore, "read">;
+/** The one read this repository takes: one person's user_identity stream. */
+type IdentityEventReads = Pick<EventReadSeat, "findAggregateEvents">;
 
 /** Every fact the user_identity aggregate states: the MFA facts share it and the panel. */
 const USER_IDENTITY_EVENT_TYPE_SET: ReadonlySet<unknown> = new Set([
@@ -20,15 +21,15 @@ const USER_IDENTITY_EVENT_TYPE_SET: ReadonlySet<unknown> = new Set([
 ]);
 
 /**
- * The identity log itself, read through the user_identity pipeline's own store: the history
- * panel and the proposals are both folds of the same scan.
+ * The identity log itself, read through eventing's read seat so a producer-only api answers it
+ * too (WEB-9103): the history panel and the proposals are both folds of the same scan.
  */
 export class EventingIdentityHistoryRepository extends IdentityHistoryRepository {
-  static create(deps: { eventStore: IdentityEventReads }): EventingIdentityHistoryRepository {
-    return new EventingIdentityHistoryRepository(deps.eventStore);
+  static create(deps: { eventReadSeat: IdentityEventReads }): EventingIdentityHistoryRepository {
+    return new EventingIdentityHistoryRepository(deps.eventReadSeat);
   }
 
-  private constructor(private readonly eventStore: IdentityEventReads) {
+  private constructor(private readonly eventReadSeat: IdentityEventReads) {
     super();
   }
 
@@ -47,11 +48,12 @@ export class EventingIdentityHistoryRepository extends IdentityHistoryRepository
   }
 
   private async readEvents({ userId }: { userId: string }): Promise<readonly IdentityEvent[]> {
-    return this.eventStore.read({
-      tenantId: userId,
+    const events = await this.eventReadSeat.findAggregateEvents({
+      tenantId: createTenantId(userId),
+      aggregateType: USER_IDENTITY_AGGREGATE_TYPE,
       aggregateId: userId,
-      accepts: isUserIdentityEvent,
     });
+    return events.filter(isUserIdentityEvent);
   }
 }
 

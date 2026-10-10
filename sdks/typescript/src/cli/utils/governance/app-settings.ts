@@ -33,6 +33,11 @@ const TARGETS: Record<string, TargetSpec> = {
 export function appSettingsTargetFor(tool: string): AppSettingsTarget | null {
   const spec = TARGETS[tool];
   if (!spec) return null;
+  const configDir = tool === "claude" ? process.env.CLAUDE_CONFIG_DIR?.trim() : undefined;
+  if (configDir) {
+    const file = path.join(configDir, "settings.json");
+    return { tool, path: file, displayPath: file };
+  }
   const home = os.homedir();
   return {
     tool,

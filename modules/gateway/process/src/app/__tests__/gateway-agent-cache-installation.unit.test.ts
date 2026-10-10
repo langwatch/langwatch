@@ -27,6 +27,7 @@ function gatewayApp(): Promise<GatewayModule> {
       traces: createApiFixture({}),
       oneTimeReveals: createApiFixture({}),
       apiKeys: createApiFixture({}),
+      licensing: createApiFixture({}),
     },
     repositories: MemoryGatewayRepositories.create(),
     config: {

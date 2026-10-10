@@ -3,7 +3,7 @@ import { EventSourcingLayout } from "../../../ui/sections/event-sourcing-layout.
 
 export default function OpsDeadLettersScreen() {
   return (
-    <EventSourcingLayout pageTitle="Dead Letters">
+    <EventSourcingLayout pageTitle="Dead letters">
       <DeadLettersContent />
     </EventSourcingLayout>
   );

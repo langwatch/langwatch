@@ -118,6 +118,10 @@ const POLICIES: Record<string, LangyRecoveryPolicy> = {
   // behind a spinner. The user gets the card and decides.
   langy_agent_errored: terminal("langy_agent_errored"),
 
+  // A turn on an aggregate project, which takes no writes: the identical turn is refused
+  // identically for as long as the project is an aggregate, so there is nothing to retry.
+  aggregate_project_is_read_only: terminal("aggregate_project_is_read_only"),
+
   // A spawn that failed is usually transient (a slow skill install, a readiness
   // timeout under load) and the next one succeeds. Retry it here, bounded — the
   // SERVER cannot, because the spawn it would retry is the one that just died.

@@ -1,4 +1,4 @@
-import { simFetch } from "@langwatch/sim-console";
+import { SimFetchError, simFetch } from "@langwatch/sim-console";
 import { z } from "zod";
 
 z.config({ jitless: true });
@@ -28,10 +28,27 @@ const requestSchema = z.object({
   key: z.string(),
   status: z.number(),
   at: z.coerce.date(),
+  auth: z.string(),
+  requestId: z.string(),
 });
 export type RequestEntry = z.infer<typeof requestSchema>;
 
 const query = (params: Record<string, string>) => new URLSearchParams(params).toString();
+
+const presignSchema = z.object({ url: z.string(), method: z.string(), expiresAt: z.string() });
+
+const refusalSchema = z.object({ error: z.string() });
+
+/** A mutating control call: resolves on 2xx, else throws the sim's own refusal. */
+const send = async ({ path, method }: { path: string; method: "DELETE" | "POST" }) => {
+  const response = await fetch(path, { method });
+  if (response.ok) return;
+  const refusal = refusalSchema.safeParse(await response.json().catch(() => undefined));
+  throw new SimFetchError({
+    status: response.status,
+    message: refusal.success ? refusal.data.error : `Request failed (${response.status}).`,
+  });
+};
 
 export const storageApi = {
   buckets: async () =>
@@ -57,6 +74,14 @@ export const storageApi = {
         schema: z.object({ requests: z.array(requestSchema) }),
       })
     ).requests,
+  remove: ({ bucket, key }: { bucket: string; key: string }) =>
+    send({ path: `/_sim/api/object?${query({ bucket, key })}`, method: "DELETE" }),
+  /** Every object in `bucket`, or in every bucket when it is "". */
+  clear: ({ bucket }: { bucket: string }) =>
+    send({ path: `/_sim/api/objects?${query(bucket === "" ? {} : { bucket })}`, method: "DELETE" }),
+  seed: () => send({ path: "/_sim/api/seed", method: "POST" }),
+  presign: ({ bucket, key }: { bucket: string; key: string }) =>
+    simFetch({ path: `/_sim/api/presign?${query({ bucket, key })}`, schema: presignSchema }),
   rawPath: ({
     bucket,
     key,

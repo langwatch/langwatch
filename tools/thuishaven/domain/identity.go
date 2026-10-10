@@ -22,4 +22,10 @@ const (
 	// traces:create only) — the least-privileged key type this codebase has;
 	// there is no true client-safe/publishable-key concept here.
 	DefaultPublicAccessToken = "ik-lw-LocalDevPublicIk_LocalDevPublicIngestionTokenSecretFixedValue0000"
+
+	// The seeded organization, team and project slugs (ORG_SLUG, TEAM_SLUG,
+	// PROJECT_SLUG in storage-seed.ts).
+	DefaultOrganizationSlug = "local-dev-org"
+	DefaultTeamSlug         = "local-dev-team"
+	DefaultProjectSlug      = "local-dev-project"
 )

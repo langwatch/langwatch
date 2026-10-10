@@ -26,11 +26,20 @@ export function readPasskeyErrorCode(error: object): string | undefined {
  * server means no status, and `status: 0` is that case wearing a number —
  * both mean "can't tell", which is what `undefined` says here.
  */
-export function passkeyFailureFrom(error: { status?: number } | null | undefined): {
+export function passkeyFailureFrom(error: { status?: number; code?: unknown } | null | undefined): {
   error: string;
 } {
   const status = error?.status;
+  if (failedInBrowser({ code: error?.code })) return passkeyFailure(void 0);
   return passkeyFailure(status === 0 ? void 0 : status);
+}
+
+/**
+ * The plugin stamps 400 on a ceremony that failed in this browser too, so the code tells: its own
+ * `AUTH_CANCELLED` or a WebAuthn `ERROR_*` code means no credential ever reached the server.
+ */
+export function failedInBrowser({ code }: { code?: unknown }): boolean {
+  return typeof code === "string" && (code === "AUTH_CANCELLED" || code.startsWith("ERROR_"));
 }
 
 /**
@@ -47,5 +56,12 @@ export function isCeremonyAbandoned({
   /** A thrown `DOMException`'s name — the platform's own word for it. */
   name?: string;
 }): boolean {
-  return code === "ERROR_CEREMONY_ABORTED" || name === "AbortError" || name === "NotAllowedError";
+  // The WebAuthn client passes a NotAllowedError (dismissed, timed out, no credential) through
+  // under its own code once the plugin has resolved it.
+  return (
+    code === "ERROR_CEREMONY_ABORTED" ||
+    code === "ERROR_PASSTHROUGH_SEE_CAUSE_PROPERTY" ||
+    name === "AbortError" ||
+    name === "NotAllowedError"
+  );
 }

@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import {
@@ -13,13 +14,18 @@ export const PULLED_USAGE_COMMAND_TYPES = {
 } as const;
 export const PULLED_USAGE_PROCESSING_COMMAND_TYPES = Object.values(PULLED_USAGE_COMMAND_TYPES);
 
-export const recordPulledUsageCommandSchema = z
+const recordPulledUsageCommandSchemaDefinition = z
   .object({
     tenantId: z.string().min(1),
     occurredAt: z.number().int().nonnegative().optional(),
     data: pulledUsageObservedEventDataSchema,
   })
   .strict();
+export interface RecordPulledUsageCommandSchema extends Named<
+  typeof recordPulledUsageCommandSchemaDefinition
+> {}
+export const recordPulledUsageCommandSchema: RecordPulledUsageCommandSchema =
+  recordPulledUsageCommandSchemaDefinition;
 export type RecordPulledUsageCommand = z.infer<typeof recordPulledUsageCommandSchema>;
 export type PulledUsageProcessingCommandType =
   (typeof PULLED_USAGE_PROCESSING_COMMAND_TYPES)[number];

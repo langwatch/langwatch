@@ -44,7 +44,7 @@ export class SlackConnectionAccessService {
         type: target.scopeType === "ORGANIZATION" ? "organization" : "project",
         id: target.scopeId,
       },
-      denialReason: "no-binding",
+      denialReason: "no-grant",
     });
   }
 

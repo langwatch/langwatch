@@ -1,13 +1,16 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import type { PreviewEnvelope, SharedDef } from "../provider-types.ts";
 
 export const EMAIL_RX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-export const emailActionParamsSchema = z.object({
+const emailActionParamsSchemaDefinition = z.object({
   members: z
     .array(z.string().regex(EMAIL_RX, "Invalid email address"))
     .min(1, "Add at least one recipient."),
 });
+export interface EmailActionParamsSchema extends Named<typeof emailActionParamsSchemaDefinition> {}
+export const emailActionParamsSchema: EmailActionParamsSchema = emailActionParamsSchemaDefinition;
 export type EmailActionParams = z.infer<typeof emailActionParamsSchema>;
 
 export interface EmailPreview extends PreviewEnvelope {

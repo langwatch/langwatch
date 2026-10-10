@@ -8,6 +8,7 @@ import {
   CreateTeamDrawerToken,
   EditProjectDrawerToken,
   InviteMemberDrawerToken,
+  JoinInsteadToken,
   JoinOfferToken,
   PendingJoinRequestsToken,
   PersonDrawerToken,
@@ -37,14 +38,16 @@ describe("the organization browser declaration", () => {
       expect(loaded).toHaveProperty("default");
     });
     /** @scenario Each wave 3 owner lends by its client tokens */
-    it.each([JoinOfferToken, PendingJoinRequestsToken, ProjectDepartmentFieldToken])(
-      "loads the lent component for $key",
-      async (token) => {
-        const lend = lendOf(token);
-        const loaded = lend && "load" in lend ? await lend.load() : undefined;
+    it.each([
+      JoinOfferToken,
+      JoinInsteadToken,
+      PendingJoinRequestsToken,
+      ProjectDepartmentFieldToken,
+    ])("loads the lent component for $key", async (token) => {
+      const lend = lendOf(token);
+      const loaded = lend && "load" in lend ? await lend.load() : undefined;
 
-        expect(loaded).toHaveProperty("default");
-      },
-    );
+      expect(loaded).toHaveProperty("default");
+    });
   });
 });

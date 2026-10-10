@@ -4,7 +4,7 @@
  * remove it so the next tier applies again.
  */
 
-import { defineTrpcContract } from "@langwatch/module";
+import { defineTrpcContract, type Named } from "@langwatch/module";
 import { z } from "zod";
 
 import { dataPrivacySnapshotSchema } from "./data-privacy.snapshot.ts";
@@ -15,19 +15,34 @@ import {
 } from "./data-privacy.ts";
 
 /** The project every privacy procedure is opened from. */
-export const dataPrivacyProjectScopeSchema = z.object({ projectId: z.string() });
+const dataPrivacyProjectScopeSchemaDefinition = z.object({ projectId: z.string() });
+export interface DataPrivacyProjectScopeSchema extends Named<
+  typeof dataPrivacyProjectScopeSchemaDefinition
+> {}
+export const dataPrivacyProjectScopeSchema: DataPrivacyProjectScopeSchema =
+  dataPrivacyProjectScopeSchemaDefinition;
 
 /** The (tier, id) pair a rule hangs on, in the tiers the contract enumerates. */
-export const dataPrivacyScopeInputSchema = z.object({
+const dataPrivacyScopeInputSchemaDefinition = z.object({
   scopeType: z.enum(DATA_PRIVACY_SCOPE_TYPES),
   scopeId: z.string().min(1),
 });
+export interface DataPrivacyScopeInputSchema extends Named<
+  typeof dataPrivacyScopeInputSchemaDefinition
+> {}
+export const dataPrivacyScopeInputSchema: DataPrivacyScopeInputSchema =
+  dataPrivacyScopeInputSchemaDefinition;
 
-export const dataPrivacyScopeTargetInputSchema = z.object({
+const dataPrivacyScopeTargetInputSchemaDefinition = z.object({
   ...dataPrivacyProjectScopeSchema.shape,
   scope: dataPrivacyScopeInputSchema,
   personalOnly: z.boolean(),
 });
+export interface DataPrivacyScopeTargetInputSchema extends Named<
+  typeof dataPrivacyScopeTargetInputSchemaDefinition
+> {}
+export const dataPrivacyScopeTargetInputSchema: DataPrivacyScopeTargetInputSchema =
+  dataPrivacyScopeTargetInputSchemaDefinition;
 
 export const dataPrivacyTrpc = defineTrpcContract("dataPrivacy")
   /**

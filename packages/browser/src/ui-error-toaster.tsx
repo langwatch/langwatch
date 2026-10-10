@@ -12,7 +12,7 @@ export function UiErrorToaster() {
     <Toaster
       renderMeta={(meta) => {
         const actions = readUiErrorActions(meta);
-        return <ErrorActions {...actions} />;
+        return <ErrorActions {...actions} color="inherit" accentColor="inherit" />;
       }}
     />
   );

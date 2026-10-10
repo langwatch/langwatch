@@ -269,17 +269,14 @@ export class MemoryScimRepository extends ScimRepository {
     organizationId: string;
     userId: string;
     role: string;
+    pending?: boolean;
   }): Promise<void> => {
     if (this.#isMember(input)) throw new Error("The membership already exists");
-    this.memberships.push({ ...input });
-  };
-
-  removeMembership = async (input: { organizationId: string; userId: string }): Promise<void> => {
-    const index = this.memberships.findIndex(
-      (row) => row.organizationId === input.organizationId && row.userId === input.userId,
-    );
-    if (index === -1) throw new Error("No such membership to remove");
-    this.memberships.splice(index, 1);
+    this.memberships.push({
+      organizationId: input.organizationId,
+      userId: input.userId,
+      role: input.role,
+    });
   };
 
   async findDirectoryGroupIds(input: {
@@ -297,7 +294,10 @@ export class MemoryScimRepository extends ScimRepository {
   async findGroup(input: { organizationId: string; id: string }): Promise<ScimGroupRecord | null> {
     return (
       this.groups.find(
-        (row) => row.id === input.id && row.organizationId === input.organizationId,
+        (row) =>
+          row.id === input.id &&
+          row.organizationId === input.organizationId &&
+          row.scimSource !== null,
       ) ?? null
     );
   }
@@ -683,6 +683,11 @@ export class MemoryScimRepository extends ScimRepository {
     const owned = new Map<string, ScimDirectoryOwnership>();
     for (const row of [...this.directoryUsers, ...this.directoryIdentities]) {
       if (!input.connectionIds.includes(row.connectionId)) continue;
+      // Somebody the directory deactivated is no longer one it manages here.
+      const resource = this.resources.find(
+        (held) => held.organizationId === row.organizationId && held.userId === row.userId,
+      );
+      if (resource && !resource.active) continue;
       owned.set(`${row.connectionId}\u0000${row.userId}`, {
         connectionId: row.connectionId,
         userId: row.userId,

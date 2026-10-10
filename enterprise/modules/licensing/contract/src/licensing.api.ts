@@ -7,20 +7,14 @@ import type {
   IssueActivationCodeInput,
   IssuedActivationCode,
 } from "./activation-code.ts";
-import type {
-  ConnectedSeats,
-  ContractTerms,
-  HostedCapAnswer,
-  HostedCaller,
-  HostedClassifyAnswer,
-  HostedUsageAnswer,
-} from "./connect-hosted.ts";
+import type { ConnectedSeats, ContractTerms } from "./connect-hosted.ts";
 import type {
   ActivationAnswer,
   ConnectClassifyAnswer,
   ConnectDeploymentView,
   ConnectServiceState,
   ConnectStatus,
+  ConnectUpstream,
   InstanceIdentityView,
   LicenseRefreshOutcome,
   LicenseSyncAnswer,
@@ -39,6 +33,8 @@ import type { PlanInfo } from "./license-constants.ts";
 import type { IssueLicenseInput } from "./license-registry.ts";
 import type {
   ConnectCredentialResolution,
+  ConnectActivationCaller,
+  ConnectLicenceCaller,
   ConnectPresentedCredential,
   LicenseSyncBody,
 } from "./license-sync.ts";
@@ -155,10 +151,15 @@ export interface LicensingApi {
     token: string;
     instanceId: string | null | undefined;
   }): Promise<ConnectCredentialResolution>;
-  /** One daily sync from a connected install; a refusal throws its credential code. */
-  recordLicenseSync(
-    input: ConnectPresentedCredential & { body: LicenseSyncBody },
-  ): Promise<LicenseSyncAnswer>;
+  /** The `licence_token` door's check on a sync bearer; a refusal throws its code. */
+  verifyLicenceToken(input: ConnectPresentedCredential): Promise<ConnectLicenceCaller>;
+  /** The door's check on an activation bearer: looked up, never claimed (W02-ACTIVATE-DOOR). */
+  verifyActivationCode(input: ConnectPresentedCredential): Promise<ConnectActivationCaller>;
+  /** One daily sync from the install its door verified; a refusal throws its code. */
+  recordLicenseSync(input: {
+    caller: ConnectLicenceCaller;
+    body: LicenseSyncBody;
+  }): Promise<LicenseSyncAnswer>;
 
   /**
    * The install end of Connect (ADR-156, section 9). A self-hosted deployment
@@ -200,6 +201,12 @@ export interface LicensingApi {
     text: string;
     questions: readonly unknown[];
   }): Promise<ConnectClassifyAnswer>;
+  /**
+   * The upstream this organization's gateway presents to LangWatch: one entry while Connect is on
+   * and a licence (the organization's, else the instance-wide key) yields a token, else empty.
+   * Gateway reads it on licensing's `connect_upstream_set` fact; the token never enters an event.
+   */
+  findConnectUpstream(input: { organizationId: string }): Promise<ConnectUpstream[]>;
   /** Runs the daily sync by hand and reports what it changed. */
   refreshLicense(input: { organizationId: string }): Promise<LicenseRefreshOutcome>;
   /** The daily pass over every organization whose license names a hosted service. */
@@ -216,20 +223,6 @@ export interface LicensingApi {
     hostnameOptOut?: boolean;
   }): Promise<void>;
 
-  /**
-   * The hosted end of Connect (ADR-156 §5), which only LangWatch Cloud
-   * composes: whether the calling key belongs to an entitled license.
-   */
-  classifyForHostedCaller(input: {
-    caller: HostedCaller;
-    payload: unknown;
-    /** The calling install's request: a judgement it no longer waits for is abandoned. */
-    signal?: AbortSignal;
-  }): Promise<HostedClassifyAnswer>;
-  /** What the caller spent against every budget that applies to it. */
-  getHostedUsage(input: { caller: HostedCaller }): Promise<HostedUsageAnswer>;
-  /** The customer moves its own hosted cap, up to the contract maximum. */
-  setHostedBudgetCap(input: { caller: HostedCaller; payload: unknown }): Promise<HostedCapAnswer>;
   /** What a customer's licenses add up to commercially, right now. */
   getContractTerms(input: { organizationId: string }): Promise<ContractTerms>;
   /** The seats a connected customer holds and last reported, for its statement and overview. */
@@ -242,10 +235,6 @@ export interface LicensingApi {
     byUsdCents: number;
     operatorId: string;
   }): Promise<IssuedLicenseView>;
-  /** Re-derives the contract budget's cap from the license terms. */
-  syncContractBudget(input: { organizationId: string; operatorId: string }): Promise<void>;
-  /** Starts a new budget window: spend so far no longer counts. */
-  resetContractBudget(input: { organizationId: string; operatorId: string }): Promise<void>;
   /**
    * The hosted services the active license behind one managed key is entitled
    * to, empty when no active license names that key. The gateway resolves a
@@ -255,6 +244,15 @@ export interface LicensingApi {
     virtualKeyId: string;
     organizationId: string;
   }): Promise<ConnectService[]>;
+  /**
+   * The active license behind one managed key in one organization, as the
+   * hosted routes check it: one entry naming its entitled services (possibly
+   * none), or empty where no active license of that organization holds the key.
+   */
+  findManagedKeyLicense(input: {
+    virtualKeyId: string;
+    organizationId: string;
+  }): Promise<{ services: ConnectService[] }[]>;
 
   /**
    * Activation codes (ADR-156, section 5): the short code a fresh install
@@ -268,8 +266,8 @@ export interface LicensingApi {
     organizationId?: string;
   }): Promise<ActivationCodePage>;
   revokeActivationCode(input: { id: string; operatorId: string }): Promise<ActivationCodeView>;
-  /** One install presenting one code as its bearer, answered with one license, once. */
-  redeemActivationCode(input: ConnectPresentedCredential): Promise<ActivationAnswer>;
+  /** Claims the code the door found redeemable, answered with one license, once. */
+  redeemActivationCode(input: ConnectActivationCaller): Promise<ActivationAnswer>;
 
   /**
    * The registry of self-hosted installs (ADR-156, section 10). A report

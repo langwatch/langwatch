@@ -5,6 +5,39 @@ import { setSessionCookie } from "better-auth/cookies";
 const logger = createLogger("langwatch:better-auth:password-reset-session");
 
 const RESET_PATH = "/reset-password";
+const RESET_LINK_PREFIX = "reset-password:";
+
+/** The adapter call {@link replaceLiveResetLink} makes: Better Auth's own storage. */
+export type ResetLinkStorage = {
+  deleteMany: (input: {
+    model: "verification";
+    where: { field: string; value: string; operator?: "eq" | "starts_with" }[];
+  }) => Promise<number>;
+};
+
+/**
+ * A reset link keeps its user id in the unique `token` column, so asking again while a link was
+ * live failed on that key. The newer request replaces the live link: the fresh mail is the one
+ * that works. Runs before Better Auth writes the new link.
+ */
+export async function replaceLiveResetLink({
+  verification,
+  storage,
+}: {
+  verification: { identifier?: unknown; value?: unknown };
+  storage: ResetLinkStorage | undefined;
+}): Promise<void> {
+  const { identifier, value } = verification;
+  if (typeof identifier !== "string" || !identifier.startsWith(RESET_LINK_PREFIX)) return;
+  if (typeof value !== "string" || !storage) return;
+  await storage.deleteMany({
+    model: "verification",
+    where: [
+      { field: "value", value },
+      { field: "identifier", value: RESET_LINK_PREFIX, operator: "starts_with" },
+    ],
+  });
+}
 
 /** The fields of Better Auth's after-hook context this reads. */
 export type PasswordResetEndpointContext = {

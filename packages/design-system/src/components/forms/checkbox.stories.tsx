@@ -4,7 +4,14 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { Checkbox, CheckboxGroup } from "./checkbox.tsx";
 
 const meta = {
-  title: "Primitives/Checkbox",
+  title: "Inputs and forms/Checkbox",
+  parameters: {
+    usage: {
+      use: "An on-or-off choice saved with a form, or picking rows in a list.",
+      avoid:
+        "A setting that takes effect at once: use Switch. One choice out of several: use Radio or Segmented control.",
+    },
+  },
   component: Checkbox,
   tags: ["autodocs"],
   args: { children: "Include archived traces" },

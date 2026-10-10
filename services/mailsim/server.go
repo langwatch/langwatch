@@ -26,6 +26,7 @@ type Server struct {
 	http    *http.Server
 	smtp    *smtp.Server
 	console http.Handler
+	fault   forcedError
 }
 
 // NewServer wires the store, the SMTP intake and the HTTP surface together.
@@ -50,7 +51,7 @@ func newServer(cfg Config, bundle fs.FS) (*Server, error) {
 	s := &Server{cfg: cfg, store: store, console: newConsole(bundle)}
 	s.mux = s.buildMux()
 	s.http = &http.Server{Handler: s.mux, ReadHeaderTimeout: 10 * time.Second}
-	s.smtp = newSMTPServer(cfg.SMTPAddr, store, cfg.MaxMessageBytes)
+	s.smtp = newSMTPServer(cfg.SMTPAddr, store, cfg.MaxMessageBytes, &s.fault)
 	return s, nil
 }
 
@@ -70,6 +71,8 @@ func (s *Server) buildMux() *http.ServeMux {
 	mux.HandleFunc("GET /api/messages/{id}/html", s.handleGetMessageHTML)
 	mux.HandleFunc("DELETE /api/messages", s.handleClearMessages)
 	mux.HandleFunc("DELETE /api/messages/{id}", s.handleDeleteMessage)
+	mux.HandleFunc("GET /_sim/api/settings", s.handleSettings)
+	mux.HandleFunc("PUT /_sim/api/settings", s.handleSettings)
 	mux.HandleFunc("GET /", s.handleConsole)
 	return mux
 }
@@ -106,7 +109,7 @@ func setUIHeaders(w http.ResponseWriter) {
 // setUIHeaders: a caught message's HTML is untrusted input, not this
 // service's own page and not a JSON answer, so it gets its own header shape
 // rather than inheriting either. `default-src 'none'` refuses every network
-// fetch a tracking pixel might attempt; X-Frame-Options: SAMEORIGIN is what
+// fetch except images over https, as a mail client loads them; X-Frame-Options: SAMEORIGIN is what
 // lets the inbox itself frame it while refusing every other page.
 //
 // The sandbox allows exactly one thing: opening a link in a new tab. A
@@ -118,7 +121,7 @@ func setUIHeaders(w http.ResponseWriter) {
 func setCaughtHTMLHeaders(w http.ResponseWriter) {
 	setBaseHeaders(w)
 	w.Header().Set("Content-Security-Policy",
-		"sandbox allow-popups allow-popups-to-escape-sandbox; default-src 'none'; style-src 'unsafe-inline'; img-src data:")
+		"sandbox allow-popups allow-popups-to-escape-sandbox; default-src 'none'; style-src 'unsafe-inline'; img-src https: data:")
 	w.Header().Set("X-Frame-Options", "SAMEORIGIN")
 }
 

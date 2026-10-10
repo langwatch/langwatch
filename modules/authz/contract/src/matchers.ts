@@ -5,7 +5,7 @@
 import { permissionSatisfiedBy } from "@langwatch/authorization";
 
 import type { AuthzScopeRef, CollectedBinding, CollectedGrants, ResourceGrant } from "./authz.ts";
-import { builtinRoleGrants } from "./roles.ts";
+import { builtinRoleGrants, PROJECT_READER_ROLE_KEY } from "./roles.ts";
 import { audienceMatches, bindingScopeCanGrantPermission } from "./scope.ts";
 
 /**
@@ -22,6 +22,40 @@ function developerSeatExcludes({
 }): boolean {
   if (grants.organizationRole !== "DEVELOPER") return false;
   return binding.scopeType === "ORGANIZATION" || Boolean(binding.viaGroupId);
+}
+
+/**
+ * A Lite seat holds at most a Lite Member's permissions however the grant arrives (a direct
+ * custom role too), and nothing organization-wide through a group. Read at every collect, so
+ * the cap lifts once the person holds a full seat (seat-limit-at-provisioning.feature).
+ */
+function liteSeatWithholds({
+  binding,
+  grants,
+  permission,
+}: {
+  binding: Pick<CollectedBinding, "scopeType" | "viaGroupId">;
+  grants: Pick<CollectedGrants, "organizationRole">;
+  permission: string;
+}): boolean {
+  if (grants.organizationRole !== "EXTERNAL") return false;
+  if (binding.viaGroupId && binding.scopeType === "ORGANIZATION") return true;
+  return !builtinRoleGrants({ role: "lite-member", permission });
+}
+
+/** Whether the seat holds this binding below the permissions it lists: shown as capped. */
+export function seatCapsBinding({
+  binding,
+  organizationRole,
+  permissions,
+}: {
+  binding: Pick<CollectedBinding, "scopeType" | "viaGroupId">;
+  organizationRole: CollectedGrants["organizationRole"];
+  permissions: readonly string[];
+}): boolean {
+  return permissions.some((permission) =>
+    liteSeatWithholds({ binding, grants: { organizationRole }, permission }),
+  );
 }
 
 /** A custom role grants exactly its own permissions; an unknown or empty one grants nothing. */
@@ -62,11 +96,22 @@ export function bindingGrants({
   }
 
   if (developerSeatExcludes({ binding, grants })) return false;
+  if (liteSeatWithholds({ binding, grants, permission })) return false;
 
   const { roleKey } = binding;
   // A custom key is authoritative, including grants imported beside a legacy
   // built-in role. Missing or empty role facts never restore that old role.
   if (roleKey.startsWith("custom:")) return customRoleGrants({ roleKey, grants, permission });
+
+  // ADR-177: a shared project-to-project read, placed on a PROJECT scope only.
+  // No organisation role or EXTERNAL cap widens or narrows it: the principal
+  // is a project, which has neither.
+  if (roleKey === PROJECT_READER_ROLE_KEY) {
+    return (
+      binding.scopeType === "PROJECT" &&
+      builtinRoleGrants({ role: PROJECT_READER_ROLE_KEY, permission })
+    );
+  }
 
   if (roleKey !== "admin" && roleKey !== "member" && roleKey !== "viewer") {
     return false;
@@ -80,7 +125,7 @@ export function bindingGrants({
     return builtinRoleGrants({ role: "org-member", permission });
   }
 
-  // EXTERNAL membership caps built-in team/project grants, not custom roles.
+  // EXTERNAL membership holds a built-in team/project grant as the lite-member bag.
   if (grants.organizationRole === "EXTERNAL") {
     return builtinRoleGrants({ role: "lite-member", permission });
   }

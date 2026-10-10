@@ -8,7 +8,7 @@ import { createUpgradeGate, SERVING_ROSTER_TIMING } from "../index.ts";
 const PRISMA = "prisma:20261006180000_add_column";
 const GOOSE = "clickhouse:00042";
 const ledgerStep = (id: string, status: UpgradeStepStatus) =>
-  ({ id, status, mode: "blocking", release: "3.21.0" }) as const;
+  ({ id, kind: "data", status, mode: "blocking", release: "3.21.0" }) as const;
 
 function workerGate({ goose = "done" }: { goose?: UpgradeStepStatus } = {}) {
   const rosterLedger = new MemoryServingRosterLedger();

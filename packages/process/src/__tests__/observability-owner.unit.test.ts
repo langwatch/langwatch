@@ -8,7 +8,7 @@ import {
 import { resolveTelemetry, TelemetryAliasConflictError } from "@langwatch/observability/node";
 import { describe, expect, it } from "vitest";
 
-import { observabilityOwner } from "../observability-owner.ts";
+import { observabilityOwner, processLoggerConfiguration } from "../observability-owner.ts";
 
 const parse = (environment: Record<string, string | undefined>) =>
   parseProcessConfig({ owners: [observabilityOwner], environment }).observability;
@@ -27,6 +27,16 @@ describe("the observability owner's declaration", () => {
       expect(grafana.baseUrl).toBe("https://grafana.example.com");
       expect(grafana.tempoDatasourceUid).toBe("tempo-prod");
       expect(parse({ GRAFANA_BASE_URL: "" }).grafana.baseUrl).toBeUndefined();
+    });
+  });
+
+  describe("given a Pyroscope address in the environment", () => {
+    /** @scenario "A Pyroscope address reaches the telemetry settings" */
+    it("carries it to the telemetry settings, and nothing when blank", () => {
+      expect(
+        parse({ PYROSCOPE_SERVER_ADDRESS: "http://pyroscope:4040" }).profilingServerAddress,
+      ).toBe("http://pyroscope:4040");
+      expect(parse({ PYROSCOPE_SERVER_ADDRESS: "" }).profilingServerAddress).toBeUndefined();
     });
   });
 
@@ -190,6 +200,46 @@ describe("the observability owner's declaration", () => {
         ]),
       );
       expect(configEnvNames(observabilityOwner.config)).not.toContain("LANGWATCH_METRICS_MODE");
+    });
+  });
+});
+
+describe("processLoggerConfiguration", () => {
+  describe("given a process that boots no preamble, such as tasks or the scenario child", () => {
+    /** @scenario "A process without a preamble reads the same logger names" */
+    it("takes LOG_LEVEL, the collector switch and OTEL_SERVICE_NAME over its own name", () => {
+      const { configuration } = processLoggerConfiguration({
+        environment: { ...collector, LOG_LEVEL: "warn", OTEL_SERVICE_NAME: "tasks-eu" },
+        serviceName: "langwatch-tasks",
+      });
+      expect(configuration).toMatchObject({
+        serviceName: "tasks-eu",
+        level: "warn",
+        consoleLevel: "warn",
+        otelLevel: "warn",
+        otelExportEnabled: true,
+      });
+      const quiet = processLoggerConfiguration({ environment: {}, serviceName: "langwatch-tasks" });
+      expect(quiet.configuration).toMatchObject({
+        serviceName: "langwatch-tasks",
+        otelExportEnabled: false,
+      });
+    });
+
+    /** @scenario "A process without a preamble reads main's names as warned aliases" */
+    it("reads an old name with one warning and refuses one that disagrees", () => {
+      const { configuration, deprecations } = processLoggerConfiguration({
+        environment: { PINO_LOG_LEVEL: "error" },
+        serviceName: "langwatch-scenario-child",
+      });
+      expect(configuration.level).toBe("error");
+      expect(deprecations).toEqual([expect.stringContaining("PINO_LOG_LEVEL is deprecated")]);
+      expect(() =>
+        processLoggerConfiguration({
+          environment: { LOG_LEVEL: "info", _LOG_LEVEL: "debug" },
+          serviceName: "langwatch-tasks",
+        }),
+      ).toThrowError(TelemetryAliasConflictError);
     });
   });
 });

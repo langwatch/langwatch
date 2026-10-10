@@ -196,7 +196,7 @@ function DrawerLoadingFallback() {
       zIndex="overlay"
       pointerEvents="none"
     >
-      <Spinner size="lg" color="blue.500" />
+      <Spinner size="lg" color="blue.fg" />
     </Center>
   );
 }

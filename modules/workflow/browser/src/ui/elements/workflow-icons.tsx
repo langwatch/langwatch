@@ -1,4 +1,3 @@
-import { WeaviateIcon } from "@langwatch/design-system/icons";
 import { Box, type BoxProps } from "@langwatch/design-system/primitives";
 import type { ComponentType, SourceType } from "@langwatch/workflow-contract";
 import {
@@ -57,14 +56,15 @@ export function ColorfulBlockIcon({
   return (
     <Box
       colorPalette={colorPalette}
-      backgroundColor="colorPalette.solid"
+      backgroundColor="colorPalette.subtle"
       borderRadius="4px"
       fontSize={fontSizeMap[size]}
       display="flex"
       alignItems="center"
       justifyContent="center"
-      color="colorPalette.contrast"
+      color="colorPalette.fg"
       _icon={{
+        strokeWidth: 2,
         padding: paddingMap[size],
         minWidth: sizeMap[size],
         minHeight: sizeMap[size],
@@ -140,7 +140,7 @@ const CLASS_ICONS: Record<string, React.ReactNode> = {
   ExactMatchEvaluator: <Equal />,
   "azure/prompt_injection": <Shield />,
   "openai/moderation": <Shield />,
-  WeaviateRM: <WeaviateIcon />,
+  WeaviateRM: <Database />,
 };
 
 export const ComponentIcon = ({

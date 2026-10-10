@@ -44,8 +44,7 @@ export function AdminTable({
           onChange={(event) => onSearchChange(event.target.value)}
           placeholder={searchPlaceholder ?? "Search"}
           maxLength={200}
-          width="full"
-          maxWidth="480px"
+          containerProps={{ width: "full", maxWidth: "lg", minWidth: 0 }}
         />
       }
       errorContent={

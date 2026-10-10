@@ -109,6 +109,8 @@ async function seed(
     userId: COLLEAGUE_ID,
     pendingAdmissionId: "admission-colleague",
     via: "invite",
+    seat: "MEMBER",
+    pending: false,
   });
   await membership.createForProvisioning({
     orgId: OTHER_ORGANIZATION_ID,

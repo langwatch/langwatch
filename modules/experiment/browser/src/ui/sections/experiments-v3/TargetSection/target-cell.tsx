@@ -1,6 +1,7 @@
 import { useDrawer } from "@langwatch/browser-host/drawer";
 import { formatLatency } from "@langwatch/design-system/metric-value-formatters";
 import {
+  Alert,
   Box,
   Button,
   HStack,
@@ -14,15 +15,7 @@ import { useEscapeKey } from "@langwatch/design-system/use-escape-key";
 import { evaluatorHasMissingMappings } from "@langwatch/experiment-contract/mapping-validation";
 import type { SerializedHandledError } from "@langwatch/handled-error";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  LuCheck,
-  LuCircleAlert,
-  LuCopy,
-  LuListTree,
-  LuPlay,
-  LuPlus,
-  LuSquare,
-} from "react-icons/lu";
+import { LuCheck, LuCopy, LuListTree, LuPlay, LuPlus, LuSquare } from "react-icons/lu";
 
 import { useEvaluationsV3Store } from "../../../../behavior/experiments-v3/use-evaluations-v3-store.ts";
 import { useCodeEvaluatorIds } from "../../../../behavior/experiments-v3/use-evaluator-name.ts";
@@ -34,6 +27,7 @@ import type { EvaluatorConfig, TargetConfig } from "../../../../model/experiment
 import { isComparisonEvaluator } from "../../../../model/experiments-v3/types.ts";
 import { parseLLMError } from "../../../../model/format-llm-error.ts";
 import { formatTargetOutput } from "../../../../model/format-target-output.ts";
+import { EvaluatorResultCell } from "../../../elements/evaluator/evaluator-result-cell.tsx";
 import { EvaluatorChip } from "./evaluator-chip.tsx";
 
 // Max characters to display for performance reasons
@@ -104,51 +98,41 @@ function CellFailure({
 }) {
   return (
     <Box position="relative">
-      <HStack
-        gap={2}
-        p={2}
-        bg="red.subtle"
-        borderRadius="md"
-        color="red.fg"
-        fontSize="13px"
-        align="start"
+      <Alert.Root
+        status="error"
+        size="sm"
         cursor={isErrorOverflowing && !isErrorExpanded ? "pointer" : undefined}
         onClick={() => setIsErrorExpanded(true)}
         onDoubleClick={isErrorOverflowing ? () => setIsErrorExpanded(false) : undefined}
       >
-        <Box flexShrink={0} paddingTop={0.5}>
-          <LuCircleAlert size={16} />
-        </Box>
-        <VStack align="start" gap={0.5}>
-          <Text
+        <Alert.Indicator />
+        <Alert.Content>
+          <Alert.Title
             lineClamp={isOpen ? undefined : 2}
             userSelect="text"
             whiteSpace="pre-wrap"
             wordBreak="break-word"
           >
             {parseLLMError(failure.title).message}
-          </Text>
+          </Alert.Title>
           {failure.description && (
-            <Text fontSize="12px" color="fg.muted" userSelect="text">
-              {failure.description}
-            </Text>
+            <Alert.Description userSelect="text">{failure.description}</Alert.Description>
           )}
           {/* The engine's own words, for the person debugging the target
               they built — on request (the expanded cell), never as the
               headline. See ADR-045. */}
           {isOpen && failure.raw && failure.raw !== failure.title && (
-            <Text
-              fontSize="12px"
+            <Alert.Description
               opacity={0.7}
               userSelect="text"
               whiteSpace="pre-wrap"
               wordBreak="break-word"
             >
               {parseLLMError(failure.raw).message}
-            </Text>
+            </Alert.Description>
           )}
-        </VStack>
-      </HStack>
+        </Alert.Content>
+      </Alert.Root>
     </Box>
   );
 }
@@ -575,6 +559,9 @@ export function TargetCellContent({
         </Text>
       );
     }
+    if (target.type === "evaluator") {
+      return <EvaluatorResultCell result={output} />;
+    }
     return expanded ? (
       <ExpandedOutput displayOutput={displayOutput} isTruncated={isTruncated} />
     ) : (
@@ -685,7 +672,7 @@ export function TargetCellContent({
             bg="bg.panel/75"
             backdropFilter="blur(8px)"
             borderRadius="md"
-            boxShadow="0 0 0 2px var(--chakra-colors-border-emphasized), 0 4px 12px rgba(0,0,0,0.15)"
+            boxShadow="0 0 0 2px var(--chakra-colors-border-emphasized), 0 4px 12px color-mix(in srgb, var(--chakra-colors-bg-scrim) 15%, transparent)"
             zIndex={1001}
             display="flex"
             flexDirection="column"

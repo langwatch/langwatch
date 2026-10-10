@@ -7,6 +7,7 @@ import { moduleApi } from "@langwatch/module";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
+import { authorizationPort } from "../../__tests__/api-double.ts";
 import { publicRoute } from "../../access/access.ts";
 import { BearerIdentity } from "../bearer-identity.ts";
 import { defineRestRouter } from "../declaration.ts";
@@ -17,11 +18,11 @@ const read = () => ({ read: () => ({ ok: true }) });
 function mountedHost() {
   const closed = BearerIdentity.create({ name: "unconfigured", token: void 0 });
   const host = RestHost.create({
+    authz: authorizationPort.forRequest(),
     identities: {
       project: closed,
       organization: closed,
       api_key: closed,
-      scim_token: closed,
       instance_admin: closed,
       browser: closed,
     },

@@ -72,10 +72,10 @@ function DeadLetterBanner({
 }) {
   const oldest = Math.min(...byProcess.map((row) => row.oldestUpdatedAt));
   return (
-    <Card.Root borderColor="red.500" borderWidth="1px">
+    <Card.Root borderColor="red.fg" borderWidth="1px">
       <Card.Body padding={4}>
         <HStack align="start" gap={3}>
-          <Box color="red.500" paddingTop={0.5}>
+          <Box color="red.fg" paddingTop={0.5}>
             <Skull size={18} />
           </Box>
           <Box flex={1}>
@@ -93,7 +93,7 @@ function DeadLetterBanner({
               {formatTimeAgo(oldest, now)}
             </Text>
           </Box>
-          <Button size="xs" variant="outline" asChild>
+          <Button size="sm" variant="outline" asChild>
             <Link href="/ops/event-sourcing/dead-letters">
               View <ArrowRight size={12} />
             </Link>
@@ -126,7 +126,7 @@ function HealthLine({
     );
   }
   return (
-    <Card.Root borderColor="orange.500" borderWidth="1px">
+    <Card.Root borderColor="orange.fg" borderWidth="1px">
       <Card.Body padding={4}>
         <HStack justify="space-between">
           <Box>
@@ -139,7 +139,7 @@ function HealthLine({
               {troubledNames.length > 4 ? `, +${troubledNames.length - 4} more` : ""}
             </Text>
           </Box>
-          <Button size="xs" variant="outline" asChild>
+          <Button size="sm" variant="outline" asChild>
             <Link href="/ops/event-sourcing/processes">
               Inspect <ArrowRight size={12} />
             </Link>

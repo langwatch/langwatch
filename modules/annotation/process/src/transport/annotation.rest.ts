@@ -7,17 +7,9 @@ import {
   annotationRestResponseSchema,
   annotationRestWriteSchema,
 } from "@langwatch/annotation-contract";
-import {
-  defineRestRouter,
-  MANAGEMENT_API_VERSION,
-  type RestTransportDeclaration,
-} from "@langwatch/api/rest";
+import { defineRestRouter, MANAGEMENT_API_VERSION } from "@langwatch/api/rest";
 
-export const annotationRest: Readonly<{
-  protocol: "rest";
-  namespace: string;
-  router: () => RestTransportDeclaration<AnnotationApi>;
-}> = defineRestRouter(AnnotationApi)
+export const annotationRest = defineRestRouter(AnnotationApi)
   .withNamespace("annotations")
   .withVersion(MANAGEMENT_API_VERSION)
 
@@ -56,6 +48,7 @@ export const annotationRest: Readonly<{
   })
 
   .patch("/:id", "updateAnnotation")
+  .withAudit("annotation.update")
   .withParams(annotationRestParamsSchema)
   .withInput(annotationRestWriteSchema)
   .withPermission("annotations:manage")
@@ -74,6 +67,7 @@ export const annotationRest: Readonly<{
   })
 
   .delete("/:id", "deleteAnnotation")
+  .withAudit("annotation.deleteById")
   .withParams(annotationRestParamsSchema)
   .withPermission("annotations:manage")
   .withOutput(annotationRestDeletedSchema)
@@ -107,6 +101,7 @@ export const annotationRest: Readonly<{
   })
 
   .post("/trace/:id", "createTraceAnnotation")
+  .withAudit("annotation.create")
   .withParams(annotationRestParamsSchema)
   .withInput(annotationRestWriteSchema)
   .withPermission("annotations:create")

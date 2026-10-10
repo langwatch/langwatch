@@ -3,7 +3,11 @@
  * What `/api/model-defaults` refuses, and for whom.
  * @see specs/model-providers/model-default-config-cascade.feature
  */
-import { bindRestMiddleware, createRestRuntime, canonicalErrorResponse } from "@langwatch/api/rest";
+import {
+  bindMiddlewareContext,
+  createRestRuntime,
+  canonicalErrorResponse,
+} from "@langwatch/api/rest";
 import type { AuthzPermission, PrincipalRef } from "@langwatch/authorization";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import { HandledError } from "@langwatch/handled-error";
@@ -13,6 +17,7 @@ import type {
   ModelDefaultConfig,
 } from "@langwatch/model-provider-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it, vi } from "vitest";
 
 import { ModelProviderAuthorizationService } from "../../services/model-provider-authorization.service.ts";
@@ -59,6 +64,8 @@ function mount(
 
   const { app } = mountableModelProviderApp({ modelProviders: options.modelProviders ?? {} });
   const hono = createRestRuntime({
+    authorization: restTestAuthorization(),
+    audit: { record: () => {} },
     identity: {
       authenticate: ({ permission }) => {
         asked.push(permission);
@@ -75,7 +82,7 @@ function mount(
     app: () => app,
     credential: "project",
     onError: canonicalErrorResponse,
-    facts: [bindRestMiddleware(modelDefaultsRestCredential, () => credential)],
+    middlewareContext: [bindMiddlewareContext(modelDefaultsRestCredential, () => credential)],
   });
 
   const send = (method: string, path: string, body?: unknown) =>

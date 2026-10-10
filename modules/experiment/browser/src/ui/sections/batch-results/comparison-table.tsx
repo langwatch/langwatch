@@ -229,6 +229,7 @@ const buildComparisonColumns = ({
                 value: targetOutput ? (
                   <BatchTargetCell
                     targetOutput={targetOutput}
+                    isEvaluator={targetCol.type === "evaluator"}
                     showOutput={showOutputs}
                     showEvaluations={showEvaluations}
                     showCostAndLatency={showCostAndLatency}

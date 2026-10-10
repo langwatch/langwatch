@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 /**
  * Scenario feature tRPC response schemas: declared in contract, checked in dev/test.
  */
@@ -7,39 +8,59 @@ import { runParameterValuesSchema } from "./scenario.parameters.ts";
 import { scenarioVersionSummarySchema, scenarioVersionDetailSchema } from "./scenario.version.ts";
 
 /** One saved version, with the human name resolved for the author it stores as an id. */
-export const scenarioVersionSummaryWithAuthorSchema = scenarioVersionSummarySchema
+const scenarioVersionSummaryWithAuthorSchemaDefinition = scenarioVersionSummarySchema
   .safeExtend({ authorName: z.string().nullable() })
   .strict();
+export interface ScenarioVersionSummaryWithAuthorSchema extends Named<
+  typeof scenarioVersionSummaryWithAuthorSchemaDefinition
+> {}
+export const scenarioVersionSummaryWithAuthorSchema: ScenarioVersionSummaryWithAuthorSchema =
+  scenarioVersionSummaryWithAuthorSchemaDefinition;
 export type ScenarioVersionSummaryWithAuthor = z.infer<
   typeof scenarioVersionSummaryWithAuthorSchema
 >;
 
 /** One page of a scenario's saved versions, newest first. */
-export const scenarioVersionPageSchema = z
+const scenarioVersionPageSchemaDefinition = z
   .object({
     versions: z.array(scenarioVersionSummaryWithAuthorSchema),
     nextCursor: z.number().int().nullable(),
   })
   .strict();
+export interface ScenarioVersionPageSchema extends Named<
+  typeof scenarioVersionPageSchemaDefinition
+> {}
+export const scenarioVersionPageSchema: ScenarioVersionPageSchema =
+  scenarioVersionPageSchemaDefinition;
 export type ScenarioVersionPage = z.infer<typeof scenarioVersionPageSchema>;
 
 export { scenarioVersionDetailSchema };
 
 /** A cancel request against one running job. */
-export const scenarioCancelJobResultSchema = z.object({ cancelled: z.boolean() }).strict();
+const scenarioCancelJobResultSchemaDefinition = z.object({ cancelled: z.boolean() }).strict();
+export interface ScenarioCancelJobResultSchema extends Named<
+  typeof scenarioCancelJobResultSchemaDefinition
+> {}
+export const scenarioCancelJobResultSchema: ScenarioCancelJobResultSchema =
+  scenarioCancelJobResultSchemaDefinition;
 export type ScenarioCancelJobResult = z.infer<typeof scenarioCancelJobResultSchema>;
 
 /** A cancel request against a whole batch run: how many jobs it reached. */
-export const scenarioCancelBatchRunResultSchema = z
+const scenarioCancelBatchRunResultSchemaDefinition = z
   .object({
     cancelledCount: z.number().int().nonnegative(),
     skippedCount: z.number().int().nonnegative(),
   })
   .strict();
+export interface ScenarioCancelBatchRunResultSchema extends Named<
+  typeof scenarioCancelBatchRunResultSchemaDefinition
+> {}
+export const scenarioCancelBatchRunResultSchema: ScenarioCancelBatchRunResultSchema =
+  scenarioCancelBatchRunResultSchemaDefinition;
 export type ScenarioCancelBatchRunResult = z.infer<typeof scenarioCancelBatchRunResultSchema>;
 
 /** A run was scheduled; the caller tracks it by these ids. */
-export const scenarioRunScheduledSchema = z
+const scenarioRunScheduledSchemaDefinition = z
   .object({
     scheduled: z.literal(true),
     setId: z.string(),
@@ -47,21 +68,31 @@ export const scenarioRunScheduledSchema = z
     scenarioRunId: z.string(),
   })
   .strict();
+export interface ScenarioRunScheduledSchema extends Named<
+  typeof scenarioRunScheduledSchemaDefinition
+> {}
+export const scenarioRunScheduledSchema: ScenarioRunScheduledSchema =
+  scenarioRunScheduledSchemaDefinition;
 export type ScenarioRunScheduled = z.infer<typeof scenarioRunScheduledSchema>;
 
 /** The batch-archive request's own report of what landed and what did not. */
-export const scenarioBatchArchiveResultSchema = z
+const scenarioBatchArchiveResultSchemaDefinition = z
   .object({
     archived: z.array(z.string()),
     failed: z.array(z.object({ id: z.string(), error: z.string() }).strict()),
   })
   .strict();
+export interface ScenarioBatchArchiveResultSchema extends Named<
+  typeof scenarioBatchArchiveResultSchemaDefinition
+> {}
+export const scenarioBatchArchiveResultSchema: ScenarioBatchArchiveResultSchema =
+  scenarioBatchArchiveResultSchemaDefinition;
 export type ScenarioBatchArchiveResult = z.infer<typeof scenarioBatchArchiveResultSchema>;
 
 // -- the Results tab --------------------------------------------------------
 
 /** One scenario, run once against one target, inside one run — the Results tab's grain. */
-export const resultAtomSchema = z
+const resultAtomSchemaDefinition = z
   .object({
     planSlug: z.string(),
     runId: z.string(),
@@ -83,16 +114,20 @@ export const resultAtomSchema = z
     costSource: z.enum(["run", "traces", "none", "unknown"]),
   })
   .strict();
+export interface ResultAtomSchema extends Named<typeof resultAtomSchemaDefinition> {}
+export const resultAtomSchema: ResultAtomSchema = resultAtomSchemaDefinition;
 export type ResultAtomResponse = z.infer<typeof resultAtomSchema>;
 
 /** One page of atoms, newest first, keyset paginated. */
-export const resultAtomsPageSchema = z
+const resultAtomsPageSchemaDefinition = z
   .object({
     atoms: z.array(resultAtomSchema),
     nextCursor: z.string().optional(),
     hasMore: z.boolean(),
   })
   .strict();
+export interface ResultAtomsPageSchema extends Named<typeof resultAtomsPageSchemaDefinition> {}
+export const resultAtomsPageSchema: ResultAtomsPageSchema = resultAtomsPageSchemaDefinition;
 export type ResultAtomsPage = z.infer<typeof resultAtomsPageSchema>;
 
 const atomCostSchema = z
@@ -137,17 +172,21 @@ const resultTotalsSchema = z
   .strict();
 
 /** The stat strip and the group rows for one grouping, aggregated in the database. */
-export const resultsOverviewSchema = z
+const resultsOverviewSchemaDefinition = z
   .object({ totals: resultTotalsSchema, groups: z.array(resultGroupSchema) })
   .strict();
+export interface ResultsOverviewSchema extends Named<typeof resultsOverviewSchemaDefinition> {}
+export const resultsOverviewSchema: ResultsOverviewSchema = resultsOverviewSchemaDefinition;
 export type ResultsOverviewResponse = z.infer<typeof resultsOverviewSchema>;
 
 /** One scenario that ran from code inside the window, for the scenario filter. */
-export const codeScenarioSchema = z.object({ key: z.string(), name: z.string() }).strict();
+const codeScenarioSchemaDefinition = z.object({ key: z.string(), name: z.string() }).strict();
+export interface CodeScenarioSchema extends Named<typeof codeScenarioSchemaDefinition> {}
+export const codeScenarioSchema: CodeScenarioSchema = codeScenarioSchemaDefinition;
 export type CodeScenarioResponse = z.infer<typeof codeScenarioSchema>;
 
 /** One target the window names that the stored agent and prompt lists cannot. */
-export const runTargetSchema = z
+const runTargetSchemaDefinition = z
   .object({
     key: z.string(),
     referenceId: z.string().nullable(),
@@ -155,6 +194,8 @@ export const runTargetSchema = z
     name: z.string(),
   })
   .strict();
+export interface RunTargetSchema extends Named<typeof runTargetSchemaDefinition> {}
+export const runTargetSchema: RunTargetSchema = runTargetSchemaDefinition;
 export type RunTargetResponse = z.infer<typeof runTargetSchema>;
 
 /**
@@ -166,7 +207,7 @@ export type RunTargetResponse = z.infer<typeof runTargetSchema>;
 /** The most configurations one history read may carry back. */
 export const MAX_RUN_CONFIGURATIONS = 200;
 
-export const runConfigurationEntrySchema = z
+const runConfigurationEntrySchemaDefinition = z
   .object({
     key: z.string(),
     planId: z.string(),
@@ -190,4 +231,9 @@ export const runConfigurationEntrySchema = z
     lastRunAt: z.date(),
   })
   .strict();
+export interface RunConfigurationEntrySchema extends Named<
+  typeof runConfigurationEntrySchemaDefinition
+> {}
+export const runConfigurationEntrySchema: RunConfigurationEntrySchema =
+  runConfigurationEntrySchemaDefinition;
 export type RunConfigurationEntryResponse = z.infer<typeof runConfigurationEntrySchema>;

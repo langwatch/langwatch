@@ -50,6 +50,21 @@ Feature: The REST runtime renders what a transport may not hand-roll
       Then it is refused with 400 and the code malformed_request, never a 500
       And the handler is not reached, while a body without such a key reaches it unchanged
 
+    # Alex, round 86 (workflows post_event): the door asks at the project a raw JSON body names.
+    @unit
+    Scenario: A raw-body route asks its permission at the project its body names
+      Given a route that takes its JSON body raw and asks its permission at the body's projectId
+      When a signed-in caller posts a body naming a project
+      Then the permission is asked at that project and the handler is handed the raw body unchanged
+      And malformed JSON is refused with 400 malformed_request and a body without the project with 422 validation_error
+      And a caller with no session is refused 401 before the body is read
+
+    @unit
+    Scenario: A raw-body route refuses a write under an aggregate project its body names
+      Given a route that takes its JSON body raw and asks a write permission at the body's projectId
+      When the body names an aggregate project
+      Then it is refused 403 aggregate_project_is_read_only and the handler is not reached
+
   Rule: A protocol route renders every refusal in its protocol's own document
 
     @integration
@@ -127,18 +142,18 @@ Feature: The REST runtime renders what a transport may not hand-roll
       And a matching signature hands the handler the exact bytes that were verified
 
     @integration
-    Scenario: A public route's credential fact refuses before the body is validated
-      Given a public route whose fact reads the credential alone and refuses with a hidden 404
+    Scenario: A public route's credential context refuses before the body is validated
+      Given a public route whose middleware context reads the credential alone and refuses with a hidden 404
       When a caller it refuses sends a body that fails its schema
       Then it is refused with 404, never 422, and the handler is not reached
       And a caller it admits is refused with 422 for the same body, and reaches the handler with a valid one
 
     @integration
-    Scenario: A fact that reads the parsed input resolves after the body is validated
-      Given a route whose fact is declared to read the parsed input
+    Scenario: A middleware context that reads the parsed input resolves after the body is validated
+      Given a route whose middleware context is declared to read the parsed input
       When a caller sends a valid body
-      Then the fact sees the validated body
-      And a body that fails its schema is refused with 422 before the fact resolves
+      Then the context sees the validated body
+      And a body that fails its schema is refused with 422 before the context resolves
 
     @integration
     Scenario: The project a route acts on is still resolved from its parsed input

@@ -203,7 +203,7 @@ func TestControlPlaneMaterialiserEmitsTheBudgetContract(t *testing.T) {
 // group bucket as <groupId>:<userId>.
 func TestControlPlaneBucketSeparatorsAreStable(t *testing.T) {
 	src := readControlPlaneSource(t,
-		"modules", "gateway", "contract", "src",
+		"modules", "gateway", "contract", "src", "features", "budget",
 		"gateway.budget-bucket-scope.ts")
 
 	if !strings.Contains(src, `const PROVIDER_BUCKET_SEPARATOR = "|provider:"`) {
@@ -231,7 +231,7 @@ func TestSpanAttributeContractForProviderAttribution(t *testing.T) {
 		"the Go constant is the wire name the control plane reads")
 
 	accumulation := readControlPlaneSource(t,
-		"modules", "trace", "contract", "src",
+		"modules", "trace", "contract", "src", "features", "attribute",
 		"trace-attribute-extraction.ts")
 	if !strings.Contains(accumulation, `"`+customertracebridge.AttrModelProviderID+`"`) {
 		t.Error("the accumulation allowlist dropped langwatch.model_provider_id, so the fold will never see the provider")

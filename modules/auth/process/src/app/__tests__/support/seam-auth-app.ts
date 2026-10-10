@@ -46,11 +46,11 @@ export async function composedAuth({ repositories }: { repositories: AuthReposit
     repositories,
     dependencies: {
       projects: createApiFixture<ProjectApi>(),
-      users: new TestUserApi({}) as never,
+      users: new TestUserApi({ hasAnyAccount: async () => true }) as never,
       apiKeys: { findResolvedToken: async () => null } as never,
       featureFlags: {} as never,
       identity: createApiFixture<IdentityApi>({
-    createStorageAdapter: ({ legacyEngine }) => legacyEngine,
+        createStorageAdapter: ({ legacyEngine }) => legacyEngine,
         ceremonies: () => ({
           beforeUserDelete: async () => undefined,
           createAccountIdentifier: async () => ({ pinned: false }),
@@ -84,7 +84,9 @@ export async function composedAuth({ repositories }: { repositories: AuthReposit
         record: async () => ({ id: "audit", occurredAt: 0 }),
       }),
     },
-    channels: MemoryAuthChannels.create(),
+    channels: MemoryAuthChannels.create({
+      bound: { notifications: createApiFixture<NotificationService>() },
+    }),
     resources: { own: () => undefined } as never,
     secrets: new ScopedSecrets(async (handle, build) =>
       build({ NEXTAUTH_SECRET: "test-session-secret" }[handle.id]),

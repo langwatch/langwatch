@@ -41,6 +41,7 @@ const seats: OrganizationSeatLicense = {
 };
 const seatNotices: OrganizationSeatRevocationNotice = {
   memberDisabled: vi.fn(),
+  memberEnabled: vi.fn(),
 };
 const grantCache: OrganizationGrantCache = {
   invalidateOrganization: vi.fn(),
@@ -103,6 +104,10 @@ describe.skipIf(!DB_URL)("OrganizationMembershipService.createForProvisioning", 
       const attempted: string[] = [];
       const failing = OrganizationMembershipService.create({
         workspaceNotices: { personalWorkspaceArchived: () => Promise.resolve() },
+        memberNotices: {
+          memberRemoved: () => Promise.resolve(),
+          memberDepartmentChanged: () => Promise.resolve(),
+        },
         repository: repo,
         creations: buildFailingPrompts(attempted),
         seats,
@@ -129,6 +134,10 @@ describe.skipIf(!DB_URL)("OrganizationMembershipService.createForProvisioning", 
 
       const retried = await OrganizationMembershipService.create({
         workspaceNotices: { personalWorkspaceArchived: () => Promise.resolve() },
+        memberNotices: {
+          memberRemoved: () => Promise.resolve(),
+          memberDepartmentChanged: () => Promise.resolve(),
+        },
         repository: repo,
         creations: buildWorkingPrompts(),
         seats,

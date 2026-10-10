@@ -453,5 +453,8 @@ const MACHINE_PROSE = new RegExp(
     "\\bnode_modules\\b",
     "\\b\\d{1,3}(?:\\.\\d{1,3}){3}:\\d+", // an address WITH a port
     "\\b(?:invocation|constraint failed|deadlock detected)\\b",
+    // tRPC's own answer for a path the server has no procedure for: what a client
+    // newer than the server it reached during a deploy reads.
+    "\\bNo procedure found on path\\b",
   ].join("|"),
 );

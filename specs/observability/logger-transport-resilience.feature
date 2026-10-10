@@ -14,3 +14,8 @@ Feature: A failing log export transport degrades quietly
     When the process logs the next line
     Then a fresh transport worker takes the line
     And no new warning is written
+
+  Scenario: The console honours its own level when no export is configured
+    Given LOG_CONSOLE_LEVEL is warn and no OTel log export is configured
+    When the process logs at debug, info and warn
+    Then only the warn line reaches the console

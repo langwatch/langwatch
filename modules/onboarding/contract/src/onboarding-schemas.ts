@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 /**
  * What sign-up collects, and where a guided onboarding stands on the organization.
  * @see specs/features/onboarding/guided-onboarding-variant.feature
@@ -20,7 +21,7 @@ export type OnboardingVariant = z.infer<typeof onboardingVariantSchema>;
  * one set up now. `currentPath` is the path being guided, `donePaths` the
  * ones whose setup completed.
  */
-export const guidedOnboardingStateSchema = z.object({
+const guidedOnboardingStateSchemaDefinition = z.object({
   paths: z.array(guidedPathSchema).default([]),
   currentPath: guidedPathSchema.optional(),
   donePaths: z.array(guidedPathSchema).default([]),
@@ -40,6 +41,11 @@ export const guidedOnboardingStateSchema = z.object({
   virtualKeyPreview: z.string().optional(),
   virtualKeyRevealId: z.string().optional(),
 });
+export interface GuidedOnboardingStateSchema extends Named<
+  typeof guidedOnboardingStateSchemaDefinition
+> {}
+export const guidedOnboardingStateSchema: GuidedOnboardingStateSchema =
+  guidedOnboardingStateSchemaDefinition;
 export type GuidedOnboardingState = z.infer<typeof guidedOnboardingStateSchema>;
 
 export const EMPTY_GUIDED_ONBOARDING_STATE: GuidedOnboardingState = {
@@ -51,10 +57,15 @@ export const EMPTY_GUIDED_ONBOARDING_STATE: GuidedOnboardingState = {
  * The record the process's own repository stores per organization: state and
  * variant together, since a Redis read has no schema to join them back with.
  */
-export const guidedOnboardingRecordSchema = z.object({
+const guidedOnboardingRecordSchemaDefinition = z.object({
   state: guidedOnboardingStateSchema,
   variant: onboardingVariantSchema.nullable(),
 });
+export interface GuidedOnboardingRecordSchema extends Named<
+  typeof guidedOnboardingRecordSchemaDefinition
+> {}
+export const guidedOnboardingRecordSchema: GuidedOnboardingRecordSchema =
+  guidedOnboardingRecordSchemaDefinition;
 export type GuidedOnboardingRecord = z.infer<typeof guidedOnboardingRecordSchema>;
 
 const attributionShape = ATTRIBUTION_FIELDS.reduce(
@@ -65,7 +76,7 @@ const attributionShape = ATTRIBUTION_FIELDS.reduce(
   {} as Record<AttributionField, z.ZodNullable<z.ZodOptional<z.ZodString>>>,
 );
 
-export const signUpDataSchema = z.object({
+const signUpDataSchemaDefinition = z.object({
   usage: z.string().optional().nullable(),
   solution: z.string().optional().nullable(),
   terms: z.boolean().optional(),
@@ -82,6 +93,8 @@ export const signUpDataSchema = z.object({
   guidedOnboarding: guidedOnboardingStateSchema.optional().nullable(),
   ...attributionShape,
 });
+export interface SignUpDataSchema extends Named<typeof signUpDataSchemaDefinition> {}
+export const signUpDataSchema: SignUpDataSchema = signUpDataSchemaDefinition;
 export type SignUpData = z.infer<typeof signUpDataSchema>;
 
 /**
@@ -108,16 +121,31 @@ export function parseOnboardingVariant(signupData: unknown): OnboardingVariant |
 
 /** The `/api/v1/onboarding/guided` REST door's own parameters and credential. */
 
-export const guidedPathRestParamsSchema = z.object({
+const guidedPathRestParamsSchemaDefinition = z.object({
   path: z.string().min(1).describe("The onboarding path: llmops, coding, gateway or governance."),
 });
+export interface GuidedPathRestParamsSchema extends Named<
+  typeof guidedPathRestParamsSchemaDefinition
+> {}
+export const guidedPathRestParamsSchema: GuidedPathRestParamsSchema =
+  guidedPathRestParamsSchemaDefinition;
 
 /** Completing a path takes no body; an absent one is read as this. */
-export const guidedPathCompleteRestInputSchema = z.object({});
+const guidedPathCompleteRestInputSchemaDefinition = z.object({});
+export interface GuidedPathCompleteRestInputSchema extends Named<
+  typeof guidedPathCompleteRestInputSchemaDefinition
+> {}
+export const guidedPathCompleteRestInputSchema: GuidedPathCompleteRestInputSchema =
+  guidedPathCompleteRestInputSchemaDefinition;
 
 /** The resolved credential the door reads: an organization, and its user when one is bound. */
-export const onboardingRestCredentialSchema = z.object({
+const onboardingRestCredentialSchemaDefinition = z.object({
   organizationId: z.string(),
   userId: z.string().nullable(),
 });
+export interface OnboardingRestCredentialSchema extends Named<
+  typeof onboardingRestCredentialSchemaDefinition
+> {}
+export const onboardingRestCredentialSchema: OnboardingRestCredentialSchema =
+  onboardingRestCredentialSchemaDefinition;
 export type OnboardingRestCredential = z.infer<typeof onboardingRestCredentialSchema>;

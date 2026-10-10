@@ -1,6 +1,6 @@
 import {
   canonicalErrorResponse,
-  bindRestMiddleware,
+  bindMiddlewareContext,
   createRestRuntime,
   type IdempotentRunner,
 } from "@langwatch/api/rest";
@@ -15,6 +15,7 @@ import type {
   GatewayRequestCredential,
 } from "@langwatch/gateway-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -47,6 +48,8 @@ const keyDoor = () => ({
 function mountedPlatform() {
   const app = createApiFixture<GatewayApi>({});
   const runtime = createRestRuntime({
+    audit: { record: () => {} },
+    authorization: restTestAuthorization(),
     // Unrelated creates on this family declare themselves replayable, so the
     // whole family refuses to mount without the port. It runs and keeps no
     // receipt: no test here replays anything.
@@ -58,16 +61,16 @@ function mountedPlatform() {
   return runtime.mount(gatewayPlatformRest.router(), {
     app: () => app,
     onError: canonicalErrorResponse,
-    facts: [
-      bindRestMiddleware(gatewayKeyCaller, (): GatewayKeyCaller => ({
+    middlewareContext: [
+      bindMiddlewareContext(gatewayKeyCaller, (): GatewayKeyCaller => ({
         kind: "project",
         projectId: PROJECT_ID,
       })),
-      bindRestMiddleware(gatewayVirtualKeyCaller, (): GatewayKeyCaller => ({
+      bindMiddlewareContext(gatewayVirtualKeyCaller, (): GatewayKeyCaller => ({
         kind: "project",
         projectId: PROJECT_ID,
       })),
-      bindRestMiddleware(gatewayRestCredential, (): GatewayRequestCredential => ({
+      bindMiddlewareContext(gatewayRestCredential, (): GatewayRequestCredential => ({
         kind: "legacyProjectKey",
       })),
     ],

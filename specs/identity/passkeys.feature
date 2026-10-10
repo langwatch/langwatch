@@ -133,6 +133,16 @@ Feature: Passkeys - the fastest way in, and the one phishing cannot take
     Then nothing is offered, about either of them
     But once the interval has passed the offer comes back
 
+  # A brand-new account goes straight into onboarding and its guided tour; a
+  # dialog over that is in the way. The session that created the account gets
+  # no offer, and the next sign-in does.
+  @unit
+  Scenario: The offer waits past the sign-up session
+    Given "sam" has just signed up with a password and holds neither
+    When the signed-in shell asks what to offer "sam" on the session the sign-up started
+    Then nothing is offered
+    But on a later sign-in the offer is made
+
   # ADR-120's rule is that a passkey is offered where it REPLACES a password.
   # Somebody who just signed in through their employer's identity provider did
   # not type one and cannot stop typing one, and somebody who signed in with a

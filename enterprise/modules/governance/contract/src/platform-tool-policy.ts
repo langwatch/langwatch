@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 export const PLATFORM_TOOL_SLUGS = [
@@ -10,9 +11,14 @@ export const PLATFORM_TOOL_SLUGS = [
   "code",
 ] as const;
 export const platformToolSlugSchema = z.enum(PLATFORM_TOOL_SLUGS);
-export const platformToolPolicySchema = z
+const platformToolPolicySchemaDefinition = z
   .object({ allowVk: z.boolean(), allowOtelDirect: z.boolean() })
   .strict();
+export interface PlatformToolPolicySchema extends Named<
+  typeof platformToolPolicySchemaDefinition
+> {}
+export const platformToolPolicySchema: PlatformToolPolicySchema =
+  platformToolPolicySchemaDefinition;
 export type PlatformToolSlug = z.infer<typeof platformToolSlugSchema>;
 export type PlatformToolPolicy = z.infer<typeof platformToolPolicySchema>;
 export type PlatformToolPolicyMap = Record<PlatformToolSlug, PlatformToolPolicy>;

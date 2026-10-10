@@ -1,10 +1,10 @@
 /**
  * Scenario's answer to the port its screens declare: every method projects a
- * `@langwatch/browser-host` capability, so the module mounts it, not the
+ * `@langwatch/browser-host` host service, so the module mounts it, not the
  * application. ARCHITECTURE.md §10.1.
  */
 
-import { useUiCapabilities } from "@langwatch/browser-host/capabilities";
+import { useUiHostServices } from "@langwatch/browser-host/capabilities";
 import { useMemo, type ReactNode } from "react";
 
 import {
@@ -40,7 +40,7 @@ type ScenarioHostActions = {
   readonly failed: (failure: ScenarioFailureNotice) => void;
 };
 
-class CapabilityScenarioHost extends ScenarioHostApi {
+class HostServiceScenarioHost extends ScenarioHostApi {
   constructor(
     private readonly readings: ScenarioHostReadings,
     private readonly actions: ScenarioHostActions,
@@ -110,9 +110,10 @@ class CapabilityScenarioHost extends ScenarioHostApi {
  * is what `mounts.load` resolves.
  */
 export default function ScenarioHostMount({ children }: { children?: ReactNode }) {
-  const { session, navigation, route, feedback } = useUiCapabilities();
-  const { organization, team, project, status } = session.snapshot().scope;
+  const { session, navigation, route, feedback } = useUiHostServices();
+  const { organization, team, project } = session.snapshot().scope;
   const actor = session.currentUser();
+  const isSettled = session.isSettled();
 
   // Primitive dependencies only, so the host stays the SAME object across
   // renders carrying the same reading: `lazy()` resolved this mount once, and
@@ -131,7 +132,7 @@ export default function ScenarioHostMount({ children }: { children?: ReactNode }
 
   const host = useMemo(
     () =>
-      new CapabilityScenarioHost(
+      new HostServiceScenarioHost(
         {
           project:
             projectId === void 0
@@ -147,7 +148,7 @@ export default function ScenarioHostMount({ children }: { children?: ReactNode }
             actorId === void 0
               ? void 0
               : { id: actorId, name: actorName, email: actorEmail, image: actorImage },
-          isLoading: status === "loading",
+          isLoading: !isSettled,
         },
         {
           hasPermission: (permission) => session.hasPermission(permission),
@@ -178,7 +179,7 @@ export default function ScenarioHostMount({ children }: { children?: ReactNode }
       actorName,
       actorEmail,
       actorImage,
-      status,
+      isSettled,
       session,
       navigation,
       route,

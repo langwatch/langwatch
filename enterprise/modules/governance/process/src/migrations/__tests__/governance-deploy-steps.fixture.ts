@@ -1,9 +1,10 @@
-// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import type { AgentApi } from "@langwatch/agent-contract";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { AuthApi } from "@langwatch/auth-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { EnterpriseGatewayApi } from "@langwatch/enterprise-gateway-contract";
 import {
   CODING_ASSISTANT_BILLING_AGGREGATE_TYPE,
@@ -107,6 +108,7 @@ export async function bootGovernanceWorker({
       }),
     )
     .provide({
+      "data-retention": createApiFixture<DataRetentionApi>({}),
       agent: createApiFixture<AgentApi>(),
       project: createApiFixture<ProjectApi>(),
       auth: createApiFixture<AuthApi>(),

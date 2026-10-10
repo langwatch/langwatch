@@ -4,7 +4,11 @@
  * read when they do.
  * @see specs/identity/mfa-and-session-shape.feature
  */
-import { bindTrpcFact, browserSessionFact, createTrpcRuntime } from "@langwatch/api/trpc";
+import {
+  bindTrpcMiddlewareContext,
+  browserSessionContext,
+  createTrpcRuntime,
+} from "@langwatch/api/trpc";
 import type { TwoStepVerificationApi } from "@langwatch/identity-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { trpcTestMembers } from "@langwatch/test-harness/trpc-members";
@@ -12,7 +16,7 @@ import { initTRPC } from "@trpc/server";
 import { describe, expect, it } from "vitest";
 
 import {
-  twoStepRequestHeadersFact,
+  twoStepRequestHeadersContext,
   twoStepVerificationTrpcTransport,
 } from "../two-step-verification.trpc.ts";
 
@@ -34,9 +38,9 @@ function mount() {
     procedure: trpc.procedure,
     members: trpcTestMembers<StandingContext>(),
   }).mount(twoStepVerificationTrpcTransport, () => api, {
-    facts: [
-      bindTrpcFact(browserSessionFact, () => null),
-      bindTrpcFact(twoStepRequestHeadersFact, () => null),
+    middlewareContext: [
+      bindTrpcMiddlewareContext(browserSessionContext, () => null),
+      bindTrpcMiddlewareContext(twoStepRequestHeadersContext, () => null),
     ],
   });
 

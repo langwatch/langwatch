@@ -4,7 +4,6 @@
  */
 import type { AuthzApi } from "@langwatch/authz-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import type { UserApi } from "@langwatch/user-contract";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { SignUpPolicyRepository } from "../../repositories/sign-up-policy.repository.ts";
@@ -38,12 +37,6 @@ describe("SignUpPolicyService", () => {
     SignUpPolicyService.create({
       settings,
       repository,
-      users: createApiFixture<UserApi>({
-        hasAnyAccount: async () => {
-          reads++;
-          return accounts > 0;
-        },
-      }),
       authorization: createApiFixture<AuthzApi>({
         can: async ({ principal, permission, scope }) => {
           reads++;
@@ -73,7 +66,9 @@ describe("SignUpPolicyService", () => {
   describe("when sign-up is open with no allowed domains", () => {
     /** @scenario "Open sign-up admits anybody" */
     it("admits any address without reading anything", async () => {
-      await expect(policy().checkSignUp({ email: "sam@acme.com" })).resolves.toEqual({
+      await expect(
+        policy().checkSignUp({ email: "sam@acme.com", hasAnyAccount: accounts > 0 }),
+      ).resolves.toEqual({
         allowed: true,
         via: "open",
       });
@@ -105,7 +100,9 @@ describe("SignUpPolicyService", () => {
 
     /** @scenario "Invite-only refuses an address with no invitation" */
     it("refuses an address with no invitation", async () => {
-      await expect(policy().checkSignUp({ email: "stranger@example.com" })).resolves.toEqual({
+      await expect(
+        policy().checkSignUp({ email: "stranger@example.com", hasAnyAccount: accounts > 0 }),
+      ).resolves.toEqual({
         allowed: false,
         reason: "invite_only",
       });
@@ -115,7 +112,9 @@ describe("SignUpPolicyService", () => {
     it("admits an address holding a pending invitation, whatever its case", async () => {
       repository.invited.add("sam@acme.com");
 
-      await expect(policy().checkSignUp({ email: "Sam@Acme.com" })).resolves.toEqual({
+      await expect(
+        policy().checkSignUp({ email: "Sam@Acme.com", hasAnyAccount: accounts > 0 }),
+      ).resolves.toEqual({
         allowed: true,
         via: "invitation",
       });
@@ -144,7 +143,9 @@ describe("SignUpPolicyService", () => {
     it("admits an address listed in ADMIN_EMAILS", async () => {
       settings = { ...settings, adminEmails: ["Ops@acme.com"] };
 
-      await expect(policy().checkSignUp({ email: "ops@acme.com" })).resolves.toEqual({
+      await expect(
+        policy().checkSignUp({ email: "ops@acme.com", hasAnyAccount: accounts > 0 }),
+      ).resolves.toEqual({
         allowed: true,
         via: "instance_admin",
       });
@@ -157,7 +158,9 @@ describe("SignUpPolicyService", () => {
 
       /** @scenario "The first account on an empty installation is admitted when ADMIN_EMAILS is empty" */
       it("admits the first account when ADMIN_EMAILS is empty", async () => {
-        await expect(policy().checkSignUp({ email: "founder@acme.com" })).resolves.toEqual({
+        await expect(
+          policy().checkSignUp({ email: "founder@acme.com", hasAnyAccount: accounts > 0 }),
+        ).resolves.toEqual({
           allowed: true,
           via: "first_account",
         });
@@ -167,7 +170,9 @@ describe("SignUpPolicyService", () => {
       it("refuses anybody else once ADMIN_EMAILS names the administrator", async () => {
         settings = { ...settings, adminEmails: ["ops@acme.com"] };
 
-        await expect(policy().checkSignUp({ email: "stranger@example.com" })).resolves.toEqual({
+        await expect(
+          policy().checkSignUp({ email: "stranger@example.com", hasAnyAccount: accounts > 0 }),
+        ).resolves.toEqual({
           allowed: false,
           reason: "invite_only",
         });
@@ -176,7 +181,9 @@ describe("SignUpPolicyService", () => {
       it("still applies the allowed domains to the first account", async () => {
         settings = { ...settings, allowedDomains: ["acme.com"] };
 
-        await expect(policy().checkSignUp({ email: "stranger@example.com" })).resolves.toEqual({
+        await expect(
+          policy().checkSignUp({ email: "stranger@example.com", hasAnyAccount: accounts > 0 }),
+        ).resolves.toEqual({
           allowed: false,
           reason: "domain_not_allowed",
         });
@@ -229,14 +236,18 @@ describe("SignUpPolicyService", () => {
 
     /** @scenario "An address outside the allowed domains is refused" */
     it("refuses an address outside them", async () => {
-      await expect(policy().checkSignUp({ email: "stranger@example.com" })).resolves.toEqual({
+      await expect(
+        policy().checkSignUp({ email: "stranger@example.com", hasAnyAccount: accounts > 0 }),
+      ).resolves.toEqual({
         allowed: false,
         reason: "domain_not_allowed",
       });
     });
 
     it("admits an address inside them", async () => {
-      await expect(policy().checkSignUp({ email: "sam@ACME.com" })).resolves.toEqual({
+      await expect(
+        policy().checkSignUp({ email: "sam@ACME.com", hasAnyAccount: accounts > 0 }),
+      ).resolves.toEqual({
         allowed: true,
         via: "open",
       });
@@ -244,10 +255,12 @@ describe("SignUpPolicyService", () => {
 
     it("does not admit a subdomain or a look-alike suffix", async () => {
       for (const email of ["sam@eu.acme.com", "sam@notacme.com"]) {
-        await expect(policy().checkSignUp({ email })).resolves.toEqual({
-          allowed: false,
-          reason: "domain_not_allowed",
-        });
+        await expect(policy().checkSignUp({ email, hasAnyAccount: accounts > 0 })).resolves.toEqual(
+          {
+            allowed: false,
+            reason: "domain_not_allowed",
+          },
+        );
       }
     });
 
@@ -255,7 +268,9 @@ describe("SignUpPolicyService", () => {
     it("admits an invited address outside them", async () => {
       repository.invited.add("contractor@example.com");
 
-      await expect(policy().checkSignUp({ email: "contractor@example.com" })).resolves.toEqual({
+      await expect(
+        policy().checkSignUp({ email: "contractor@example.com", hasAnyAccount: accounts > 0 }),
+      ).resolves.toEqual({
         allowed: true,
         via: "invitation",
       });

@@ -533,6 +533,43 @@ describe("handleTrpcCallLogging", () => {
       });
     });
 
+    describe("when the cause is an upgrade_in_progress 503", () => {
+      it("logs at warn level, not error", () => {
+        const log = createMockLog();
+        class UpgradeInProgress extends HandledError {
+          constructor() {
+            super("upgrade_in_progress", "upgrading", { httpStatus: 503, fault: "platform" });
+          }
+        }
+        const cause = new UpgradeInProgress();
+        const error = new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "upgrading", cause });
+
+        handleTrpcCallLogging({ ...baseArgs, result: { ok: false, error }, log, capture: vi.fn() });
+
+        expect(log.warn).toHaveBeenCalledWith(
+          expect.objectContaining({ statusCode: 503 }),
+          "trpc call",
+        );
+        expect(log.error).not.toHaveBeenCalled();
+      });
+
+      it("keeps another platform-fault handled 503 at error", () => {
+        const log = createMockLog();
+        class UpstreamDown extends HandledError {
+          constructor() {
+            super("upstream_down", "down", { httpStatus: 503, fault: "platform" });
+          }
+        }
+        const cause = new UpstreamDown();
+        const error = new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "down", cause });
+
+        handleTrpcCallLogging({ ...baseArgs, result: { ok: false, error }, log, capture: vi.fn() });
+
+        expect(log.error).toHaveBeenCalled();
+        expect(log.warn).not.toHaveBeenCalled();
+      });
+    });
+
     describe("when error is BAD_REQUEST", () => {
       it("derives 400 from TRPCError code and logs at warn level", () => {
         const log = createMockLog();

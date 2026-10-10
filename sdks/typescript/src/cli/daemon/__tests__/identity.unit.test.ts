@@ -64,6 +64,15 @@ describe("resolveIdentity", () => {
     });
   });
 
+  describe("given a different NODE_EXTRA_CA_CERTS", () => {
+    it("resolves a different socket, so a daemon booted without the CA is not reused", () => {
+      const without = resolveIdentity({ ...process.env, NODE_EXTRA_CA_CERTS: "" });
+      const withCa = resolveIdentity({ ...process.env, NODE_EXTRA_CA_CERTS: "/tmp/ca.pem" });
+
+      expect(withCa.socketPath).not.toBe(without.socketPath);
+    });
+  });
+
   describe("given a different endpoint", () => {
     it("resolves a different socket", () => {
       const cloud = resolveIdentity(process.env);

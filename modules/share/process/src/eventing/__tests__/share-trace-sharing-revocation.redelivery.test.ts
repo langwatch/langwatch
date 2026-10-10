@@ -37,7 +37,10 @@ const DISABLED: ProjectTraceSharingDisabledEventData = {
   disabledByUserId: "user-1",
 };
 
-function disabledEvent({ id = "event-1" }: { id?: string } = {}): Event {
+function disabledEvent({
+  id = "event-1",
+  revokeExistingLinks,
+}: { id?: string; revokeExistingLinks?: boolean } = {}): Event {
   return {
     id,
     aggregateId: DISABLED.projectId,
@@ -47,7 +50,7 @@ function disabledEvent({ id = "event-1" }: { id?: string } = {}): Event {
     occurredAt: DISABLED.occurredAt,
     type: PROJECT_TRACE_SHARING_DISABLED_EVENT_TYPE,
     version: PROJECT_TRACE_SHARING_DISABLED_EVENT_VERSION,
-    data: DISABLED,
+    data: revokeExistingLinks === undefined ? DISABLED : { ...DISABLED, revokeExistingLinks },
   };
 }
 
@@ -149,6 +152,30 @@ describe("share's trace sharing revocation peer lane", () => {
 
       expect(definition.eventTypes).toEqual([PROJECT_TRACE_SHARING_DISABLED_EVENT_TYPE]);
       expect(await linkCounts(shares)).toEqual([0, 0, 1]);
+    });
+  });
+
+  describe("when the admin chose to revoke the links", () => {
+    /** @scenario "Turning sharing off and revoking the links removes them for good" */
+    it("revokes the project's trace links and counts none left", async () => {
+      const { definition, shares } = await revocationLane();
+      expect(await shares.countTraceShares({ projectId: "project-1" })).toBe(2);
+
+      await definition.handle(disabledEvent({ revokeExistingLinks: true }), CONTEXT);
+
+      expect(await linkCounts(shares)).toEqual([0, 0, 1]);
+      expect(await shares.countTraceShares({ projectId: "project-1" })).toBe(0);
+    });
+  });
+
+  describe("when the admin chose to keep the links paused", () => {
+    /** @scenario "Turning sharing off and keeping the links paused leaves them in place" */
+    it("leaves every trace link in place", async () => {
+      const { definition, shares } = await revocationLane();
+
+      await definition.handle(disabledEvent({ revokeExistingLinks: false }), CONTEXT);
+
+      expect(await linkCounts(shares)).toEqual([1, 1, 1]);
     });
   });
 

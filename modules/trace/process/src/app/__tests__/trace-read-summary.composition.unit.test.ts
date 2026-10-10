@@ -12,12 +12,13 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { traceSummaryDataSchema, type TraceSummaryData } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
+import { ownProof } from "../../__tests__/support/authorization-proofs.fixture.ts";
 import { S3TraceLegacySpoolChannel } from "../../channels/s3/s3.trace-legacy-spool.channel.ts";
+import { TraceCanonicalisationService } from "../../features/derivation/services/trace-canonicalisation.service.ts";
+import { TraceBlobStoreService } from "../../features/media/services/trace-blob-store.service.ts";
 import { MemoryTraceSpanDedupRepository } from "../../repositories/memory/memory.trace-span-dedup.repository.ts";
 import { MemoryTraceRepositories } from "../../repositories/memory/memory.trace.repositories.ts";
 import type { TraceRepositories } from "../../repositories/trace.repositories.ts";
-import { TraceBlobStoreService } from "../../features/media/services/trace-blob-store.service.ts";
-import { TraceCanonicalisationService } from "../../features/derivation/services/trace-canonicalisation.service.ts";
 import { TraceModule } from "../trace.app.ts";
 import { createTraceAppHarness } from "./support/trace-app.harness.ts";
 
@@ -80,7 +81,10 @@ function unreachablePeers() {
   }
 
   return {
-    authz: apis.reference(AuthzApi),
+    // The fold read mints its own-only proof through authz; every other peer stays unreachable.
+    authz: createApiFixture<AuthzApi>({
+      authorizeInternal: async ({ projectId }) => ownProof({ projectId }),
+    }),
     dataPrivacy: apis.reference(DataPrivacyApi),
     dataRetention: apis.reference(DataRetentionApi),
     plans: apis.reference(EntitlementApi),

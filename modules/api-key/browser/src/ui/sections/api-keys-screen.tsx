@@ -153,15 +153,23 @@ function ApiKeyTableRow({
 }) {
   return (
     <Table.Row id={apiKeyRowAnchorId(apiKey.id)}>
-      <Table.Cell>
+      <Table.Cell minWidth="220px" maxWidth="360px">
         <HStack align="start">
-          <Box paddingTop={1} color="fg.muted">
+          <Box paddingTop={1} color="fg.muted" flexShrink={0}>
             <Key size={14} />
           </Box>
-          <VStack align="start" gap={0}>
-            <Text fontWeight="medium">{apiKey.name}</Text>
+          <VStack align="start" gap={0} minWidth={0}>
+            <Text fontWeight="medium" maxWidth="full" truncate title={apiKey.name}>
+              {apiKey.name}
+            </Text>
             {apiKey.description && (
-              <Text fontSize="xs" color="fg.muted">
+              <Text
+                fontSize="xs"
+                color="fg.muted"
+                maxWidth="full"
+                lineClamp={2}
+                title={apiKey.description}
+              >
                 {apiKey.description}
               </Text>
             )}
@@ -208,10 +216,14 @@ function ApiKeyTableRow({
           </Text>
         )}
       </Table.Cell>
-      <Table.Cell>
+      <Table.Cell maxWidth="240px">
         {apiKey.userId ? (
-          <Badge size="sm" variant="outline">
-            {apiKey.userEmail ?? apiKey.userName ?? " - "}
+          <Badge
+            size="sm"
+            variant="outline"
+            title={apiKey.userEmail ?? apiKey.userName ?? undefined}
+          >
+            <Text truncate>{apiKey.userEmail ?? apiKey.userName ?? " - "}</Text>
           </Badge>
         ) : (
           <Badge size="sm" colorPalette="purple">
@@ -219,7 +231,7 @@ function ApiKeyTableRow({
           </Badge>
         )}
       </Table.Cell>
-      <Table.Cell>{scopeBadge}</Table.Cell>
+      <Table.Cell maxWidth="240px">{scopeBadge}</Table.Cell>
       <Table.Cell>
         <PermissionBadge permissionMode={apiKey.permissionMode} />
       </Table.Cell>
@@ -492,7 +504,7 @@ export default function ApiKeysScreen() {
                 <Table.Root variant="line" size="md" width="full">
                   <Table.Header>
                     <Table.Row>
-                      <Table.ColumnHeader>Name</Table.ColumnHeader>
+                      <Table.ColumnHeader minWidth="220px">Name</Table.ColumnHeader>
                       <Table.ColumnHeader>Status</Table.ColumnHeader>
                       <Table.ColumnHeader whiteSpace="nowrap">Secret key</Table.ColumnHeader>
                       <Table.ColumnHeader>Created</Table.ColumnHeader>

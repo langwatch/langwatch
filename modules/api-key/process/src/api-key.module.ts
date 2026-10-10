@@ -1,6 +1,5 @@
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import {
-  bindRestMiddleware,
   organizationCredentialOfRequest,
   principalOfCredential,
   projectCredentialOfRequest,
@@ -12,11 +11,7 @@ import { apiKeyEventing } from "./eventing/api-key.pipeline.ts";
 import { apiKeyRepositories } from "./repositories/api-key-repositories.registry.ts";
 import { apiKeyOrganizationsRest } from "./transport/api-key-organizations.rest.ts";
 import { apiKeyProjectsRest } from "./transport/api-key-projects.rest.ts";
-import {
-  apiKeyIngestionCaller,
-  apiKeyRest,
-  apiKeyRestCredential,
-} from "./transport/api-key.rest.ts";
+import { apiKeyRest } from "./transport/api-key.rest.ts";
 import { apiKeyTrpcTransport } from "./transport/api-key.trpc.ts";
 
 /**
@@ -32,14 +27,14 @@ export const apiKeyProcessModule: PublishedProcessModule<"api-key", ApiKeyApi> =
     // The credential itself, not just its holder: two of these routes ask whether
     // the KEY may act organization-wide as well as whether the member may, so a
     // narrowed key cannot borrow the reach of whoever created it.
-    .withTransportFacts(() => [
-      bindRestMiddleware(apiKeyRestCredential, (context) => {
-        const credential = organizationCredentialOfRequest(context.req.raw);
+    .provideMiddlewareContext({
+      apiKeyRestCredential: (request) => {
+        const credential = organizationCredentialOfRequest(request);
 
         return { apiKeyId: credential.apiKeyId, userId: credential.userId };
-      }),
-      bindRestMiddleware(apiKeyIngestionCaller, (context) => {
-        const credential = projectCredentialOfRequest(context.req.raw);
+      },
+      apiKeyIngestionCaller: (request) => {
+        const credential = projectCredentialOfRequest(request);
 
         return {
           principal: principalOfCredential(credential),
@@ -48,6 +43,6 @@ export const apiKeyProcessModule: PublishedProcessModule<"api-key", ApiKeyApi> =
               ? credential.project.organizationId
               : credential.organizationId,
         };
-      }),
-    ])
+      },
+    })
     .withEventing(apiKeyEventing);

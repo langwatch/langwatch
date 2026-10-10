@@ -3,7 +3,7 @@
  * @see specs/identity/auth-read-caching.feature
  */
 
-import type { PermissionDecision } from "@langwatch/authorization";
+import { type PermissionDecision, sealAuthorization } from "@langwatch/authorization";
 import { defineTrpcContract, moduleApi } from "@langwatch/module";
 import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
 import { describe, expect, it, vi } from "vitest";
@@ -44,6 +44,7 @@ function served() {
     }),
     checkScopeLineage: async () => ({ kind: "consistent" }),
     organizationOf: async () => null,
+    projectKindOf: async () => "application",
   });
   const decisions = vi.spyOn(authz, "getDecision");
   const lineages = vi.spyOn(authz, "checkScopeLineage");
@@ -156,5 +157,155 @@ describe("given a procedure that asks a platform-tier permission", () => {
 
     expect(((await response.json()) as { result?: unknown }).result).toBeDefined();
     expect(platform).toHaveBeenCalledTimes(1);
+  });
+});
+
+interface TraceReadsApi {
+  count(input: { projectId: string; proofPresent: boolean }): { count: number };
+}
+
+const TraceReadsApi = moduleApi<TraceReadsApi>()("trace");
+
+const traceReads = defineTrpcRouter(
+  TraceReadsApi,
+  defineTrpcContract("traces")
+    .query("newCount")
+    .withInput(z.object({ projectId: z.string() }))
+    .withOutput(z.object({ count: z.number() }))
+    .mutation("annotate")
+    .withInput(z.object({ projectId: z.string() }))
+    .withOutput(z.object({ count: z.number() }))
+    .build(),
+)
+  .procedure("newCount")
+  .withPermission("traces:view")
+  .handle(({ app, input, authorization }) =>
+    app.count({ projectId: input.projectId, proofPresent: authorization !== null }),
+  )
+  .procedure("annotate")
+  .withPermission("annotations:manage")
+  .handle(({ app, input }) => app.count({ projectId: input.projectId, proofPresent: false }))
+  .build();
+
+function servedTraceReads({
+  organizationRole,
+  kind,
+}: {
+  organizationRole: PermissionDecision["organizationRole"];
+  kind: string;
+}) {
+  const proof = sealAuthorization({
+    actor: { type: "user", id: "sam" },
+    principal: { type: "user", id: "sam" },
+    scope: { organizationId: "org_acme" },
+    grants: [{ projectId: "p1", permissions: ["traces:view"], via: [], kind: "own" }],
+    expiresAt: Date.now() + 60_000,
+    purpose: { kind: "route", route: "traces.newCount" },
+  });
+  const kindReads: string[] = [];
+  const authz = createApiDouble<Authorize>({
+    getDecision: async (): Promise<PermissionDecision> => ({ permitted: true, organizationRole }),
+    checkScopeLineage: async () => ({ kind: "consistent" }),
+    organizationOf: async () => "org_acme",
+    projectKindOf: async (projectId) => {
+      kindReads.push(projectId);
+      return kind;
+    },
+    authorization: async () => proof,
+    assertSecondFactor: async () => {},
+  });
+  const trpc = TrpcHost.create({
+    sessions: SessionReader.create({ verify: async () => ({ userId: "sam" }) }),
+    authz,
+  });
+  const proofsSeen: boolean[] = [];
+  trpc.mount(composeTrpcRouters("traces", [traceReads]), () => ({
+    count: ({ proofPresent }: { proofPresent: boolean }) => {
+      proofsSeen.push(proofPresent);
+      return { count: 3 };
+    },
+  }));
+  const input = JSON.stringify({ projectId: "p1" });
+  const call = async (procedure: "newCount" | "annotate" = "newCount") => {
+    const request =
+      procedure === "newCount"
+        ? new Request(
+            `http://api.test${TrpcHost.path}/traces.newCount?input=${encodeURIComponent(input)}`,
+          )
+        : new Request(`http://api.test${TrpcHost.path}/traces.annotate`, {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: input,
+          });
+    const response = await fetchRequestHandler({
+      endpoint: TrpcHost.path,
+      req: request,
+      router: trpc.router,
+      createContext: () => trpc.context({ request }),
+    });
+
+    const body: { result?: unknown; error?: unknown } = await response.json();
+
+    return body;
+  };
+
+  return { call, proofsSeen, kindReads };
+}
+
+describe("given a request whose procedure reads traces on one project", () => {
+  describe("when it is served through the request's shared decisions", () => {
+    /** @scenario "Shared decisions still mint the route's proof" */
+    it("hands the handler the proof the host's authorization minted", async () => {
+      const { call, proofsSeen } = servedTraceReads({
+        organizationRole: "ADMIN",
+        kind: "application",
+      });
+
+      const answer = await call();
+
+      expect(answer.error).toBeUndefined();
+      expect(proofsSeen).toEqual([true]);
+    });
+  });
+
+  describe("when a member who is not an admin opens an aggregate project", () => {
+    /** @scenario "Shared decisions still refuse a non-admin on an aggregate project" */
+    it("refuses the request before the handler runs", async () => {
+      const { call, proofsSeen, kindReads } = servedTraceReads({
+        organizationRole: "MEMBER",
+        kind: "aggregate",
+      });
+
+      const answer = await call();
+
+      expect(answer.result).toBeUndefined();
+      expect(answer.error).toMatchObject({
+        data: {
+          code: "FORBIDDEN",
+          error: { code: "permission_denied", meta: { denialReason: "no-grant" } },
+        },
+      });
+      expect(proofsSeen).toEqual([]);
+      expect(kindReads).toEqual(["p1"]);
+    });
+  });
+
+  describe("when an admin writes on an aggregate project", () => {
+    /** @scenario "Shared decisions still refuse a write on an aggregate project" */
+    it("refuses the write as read only before the handler runs", async () => {
+      const { call, proofsSeen, kindReads } = servedTraceReads({
+        organizationRole: "ADMIN",
+        kind: "aggregate",
+      });
+
+      const answer = await call("annotate");
+
+      expect(answer.result).toBeUndefined();
+      expect(answer.error).toMatchObject({
+        data: { code: "FORBIDDEN", error: { code: "aggregate_project_is_read_only" } },
+      });
+      expect(proofsSeen).toEqual([]);
+      expect(kindReads).toEqual(["p1"]);
+    });
   });
 });

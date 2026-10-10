@@ -1,6 +1,7 @@
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import {
   Badge,
-  Box,
+  Card,
   Button,
   HStack,
   Spacer,
@@ -9,7 +10,7 @@ import {
 } from "@langwatch/design-system/primitives";
 import { ProviderScopeChips } from "@langwatch/design-system/provider-scope-chips";
 import type { ScopeTriadEntry } from "@langwatch/design-system/scope-chip-picker";
-import { Plus } from "lucide-react";
+import { Plus, Route } from "lucide-react";
 
 import { isModelTier } from "../../model/model-tier-presets.ts";
 import { RoutingPolicyRowActions } from "../elements/routing-policy-row-actions.tsx";
@@ -78,7 +79,7 @@ export function RoutingPoliciesTable({
       {SCOPE_LEVELS.map(({ level, label, subtitle }) => {
         const rows = bucketed.get(level) ?? [];
         return (
-          <Box key={level} borderWidth="1px" borderColor="border" borderRadius="lg" padding={4}>
+          <Card.Root key={level} variant="showcase" padding={4}>
             <HStack alignItems="start" marginBottom={3}>
               <VStack align="start" gap={0}>
                 <Text fontSize="sm" fontWeight="semibold">
@@ -103,9 +104,11 @@ export function RoutingPoliciesTable({
 
             <VStack align="stretch" gap={0}>
               {rows.length === 0 && (
-                <Text fontSize="sm" color="fg.muted" paddingY={2}>
-                  No policies here yet.
-                </Text>
+                <NoDataInfoBlock
+                  icon={<Route />}
+                  title="No policies here yet."
+                  description={subtitle}
+                />
               )}
               {rows.map((policy) => (
                 <PolicyRow
@@ -119,12 +122,12 @@ export function RoutingPoliciesTable({
                 />
               ))}
             </VStack>
-          </Box>
+          </Card.Root>
         );
       })}
 
       {unplaced.length > 0 && (
-        <Box borderWidth="1px" borderColor="orange.muted" borderRadius="lg" padding={4}>
+        <Card.Root variant="showcase" padding={4}>
           <VStack align="start" gap={0} marginBottom={3}>
             <Text fontSize="sm" fontWeight="semibold">
               Elsewhere
@@ -147,7 +150,7 @@ export function RoutingPoliciesTable({
               />
             ))}
           </VStack>
-        </Box>
+        </Card.Root>
       )}
     </>
   );

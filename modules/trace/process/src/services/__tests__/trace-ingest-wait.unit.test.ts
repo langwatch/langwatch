@@ -1,3 +1,5 @@
+import type { Authorization } from "@langwatch/authorization";
+import { ownProjectIdOf } from "@langwatch/clickhouse-client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { TestModelProviderService } from "../../__tests__/support/model-provider.service.fake.ts";
@@ -26,8 +28,10 @@ class IngestLagRepository extends TraceProjectedReadRepository {
     return Promise.resolve([]);
   }
 
-  async findIngestLag(input: { tenantId: string }): Promise<TraceIngestLagSample | null> {
-    this.calls.push(input.tenantId);
+  async findIngestLag(input: {
+    authorization: Authorization;
+  }): Promise<TraceIngestLagSample | null> {
+    this.calls.push(ownProjectIdOf({ authorization: input.authorization, reads: "traces" }));
     if (this.failure) throw this.failure;
     return this.sample;
   }

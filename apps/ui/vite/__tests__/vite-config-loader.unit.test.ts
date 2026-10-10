@@ -149,6 +149,42 @@ describe("given the apps/ui Vite config", () => {
   });
 });
 
+const BARE_SHELL = "<html><head></head><body></body></html>";
+
+describe("given no api answering yet", () => {
+  describe("when the dev server serves a page", () => {
+    /** @scenario "The api is unreachable when the dev server starts" */
+    it("loads its config and serves the bare shell at once, which boots into the waiting page", async () => {
+      const dead = createServer();
+      await new Promise<void>((resolve) => dead.listen(0, "127.0.0.1", resolve));
+      const address = dead.address();
+      await new Promise((resolve) => dead.close(resolve));
+      if (address === null || typeof address === "string") throw new Error("no port bound");
+      const { port } = address;
+      const html = await withoutEnv("LANGWATCH_PORTLESS", () =>
+        withEnv("LANGWATCH_API_URL", `http://127.0.0.1:${port}`, async () => {
+          const loaded = await loadConfigFromFile(
+            { command: "serve", mode: "development" },
+            "vite.config.ts",
+            packageRoot,
+            undefined,
+            undefined,
+            configLoaderOf(requiredScript("dev")),
+          );
+          const inject = loaded?.config.plugins
+            ?.flat()
+            .find(
+              (plugin) =>
+                plugin && "name" in plugin && plugin.name === "inject-development-public-config",
+            );
+          return transformIndexHtmlOf(inject)(BARE_SHELL);
+        }),
+      );
+      expect(html).toBe(BARE_SHELL);
+    }, 15_000);
+  });
+});
+
 /** A plugin's `transformIndexHtml`, when it is declared as a plain function hook. */
 function transformIndexHtmlOf(plugin: unknown): (html: string) => Promise<string> {
   if (typeof plugin !== "object" || plugin === null || !("transformIndexHtml" in plugin)) {

@@ -15,8 +15,8 @@ data:
     {{- /* Each job keeps only its own workload's pods, by the
            app.kubernetes.io/name label its Deployment sets. Every annotated pod
            in the namespace matches the scrape annotation, and the two workloads
-           serve /metrics on different ports, so the annotation alone would
-           send each job to the other's pods on a port they do not listen on. */}}
+           have different labels, so the annotation alone would send each job
+           to the other's pods. */}}
     scrape_configs:
       - job_name: 'langwatch'
         kubernetes_sd_configs:
@@ -36,7 +36,7 @@ data:
           - source_labels: [__meta_kubernetes_pod_ip]
             action: replace
             target_label: __address__
-            replacement: $1:5560
+            replacement: $1:{{ include "langwatch.metricsPort" . }}
           - source_labels: [__meta_kubernetes_pod_name]
             action: replace
             target_label: pod
@@ -66,7 +66,7 @@ data:
           - source_labels: [__meta_kubernetes_pod_ip]
             action: replace
             target_label: __address__
-            replacement: $1:2999
+            replacement: $1:{{ include "langwatch.metricsPort" . }}
           - source_labels: [__meta_kubernetes_pod_name]
             action: replace
             target_label: pod

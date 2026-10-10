@@ -38,12 +38,15 @@ function createToast({ host, toast }: { host: AutomationHost; toast: AutomationT
     });
     return;
   }
-  host.succeeded({
+  const notice = {
     title: toast.title,
     ...(toast.description ? { description: toast.description } : {}),
     ...(toast.id ? { id: toast.id } : {}),
     ...(toast.action ? { action: toast.action } : {}),
-  });
+  };
+  if (toast.type === "warning") host.warned(notice);
+  else if (toast.type === "info") host.informed(notice);
+  else host.succeeded(notice);
 }
 
 export type AutomationErrorToastOptions = {

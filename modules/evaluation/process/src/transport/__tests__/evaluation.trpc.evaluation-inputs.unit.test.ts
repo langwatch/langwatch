@@ -19,7 +19,7 @@ const STORED_INPUTS = { input: "What is the refund window?", contexts: ["30 days
 
 function harness() {
   const findInputs = vi.fn<EvaluationApi["findInputs"]>(async (query) =>
-    query.tenantId === PROJECT_ID && query.evaluationId === "eval-1" ? STORED_INPUTS : null,
+    query.projectId === PROJECT_ID && query.evaluationId === "eval-1" ? STORED_INPUTS : null,
   );
   const app = createApiFixture<EvaluationApi>({ findInputs });
 
@@ -42,7 +42,12 @@ describe("given an evaluation in a project whose inputs evaluation stored", () =
       await expect(
         caller.getEvaluationInputs({ projectId: PROJECT_ID, evaluationId: "eval-1" }),
       ).resolves.toEqual(STORED_INPUTS);
-      expect(findInputs).toHaveBeenCalledWith({ tenantId: PROJECT_ID, evaluationId: "eval-1" });
+      expect(findInputs).toHaveBeenCalledWith({
+        projectId: PROJECT_ID,
+        evaluationId: "eval-1",
+        userId: "reader-1",
+        authorization: expect.objectContaining({ grants: expect.any(Array) }),
+      });
     });
   });
 });
@@ -56,6 +61,24 @@ describe("given an evaluation in a project with no stored inputs", () => {
       await expect(
         caller.getEvaluationInputs({ projectId: PROJECT_ID, evaluationId: "eval-unknown" }),
       ).resolves.toBeNull();
+    });
+  });
+});
+
+describe("given an aggregate whose drawer is on a member", () => {
+  describe("when the trace drawer asks for an evaluation's inputs", () => {
+    it("hands evaluations the member so the proof narrows to it", async () => {
+      const { caller, findInputs } = harness();
+
+      await caller.getEvaluationInputs({
+        projectId: PROJECT_ID,
+        evaluationId: "eval-1",
+        tenantId: "member-1",
+      });
+
+      expect(findInputs).toHaveBeenCalledWith(
+        expect.objectContaining({ projectId: PROJECT_ID, tenantId: "member-1" }),
+      );
     });
   });
 });

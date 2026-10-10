@@ -15,13 +15,21 @@ import { describe, expect, it, vi } from "vitest";
 
 import { GrantsFake } from "../../__tests__/support/grants-fake.ts";
 import { HeldConnectionsFake } from "../../__tests__/support/held-connections-fake.ts";
-import { OrganizationAdministrationFake } from "../../__tests__/support/organization-administration-fake.ts";
+import {
+  MembersFake,
+  OrganizationAdministrationFake,
+} from "../../__tests__/support/organization-administration-fake.ts";
 import { scimRepositoryFixture } from "../../__tests__/support/scim-repository-fixture.ts";
 import type { ScimRepository } from "../../repositories/scim.repository.ts";
 import type { ScimCostCenterFacts } from "../scim-cost-center.service.ts";
 import type { ScimUserProvisioning } from "../scim-provisioning.service.ts";
 import { ScimService } from "../scim.service.ts";
 import { QuietScimSyncLifecycle } from "./support/quiet-scim-sync-lifecycle.ts";
+
+/** Every seat free, so these tests admit full members (seat-limit-at-provisioning.feature). */
+const openSeats = {
+  countMemberSeats: async () => ({ fullMembers: 0, liteMembers: 0, developers: 0 }),
+};
 
 const ORGANIZATION = "org_acme";
 const ADMIN = "user_ana";
@@ -92,6 +100,7 @@ function stack({ provenOffboarding, refuses }: { provenOffboarding: boolean; ref
   const userService = users();
   const writer = new GrantsFake();
   const organization = new OrganizationAdministrationFake();
+  const members = new MembersFake();
   if (refuses) {
     organization.findActiveOrganizationAdministrators.mockResolvedValue([ADMIN]);
   }
@@ -101,7 +110,9 @@ function stack({ provenOffboarding, refuses }: { provenOffboarding: boolean; ref
     userService,
     writer,
     organization,
+    members,
     service: ScimService.create({
+      members,
       connections: HeldConnectionsFake.of([CONNECTION]),
       prisma: repository,
       writer,
@@ -112,6 +123,7 @@ function stack({ provenOffboarding, refuses }: { provenOffboarding: boolean; ref
       lifecycle: new QuietScimSyncLifecycle(),
       provenOffboarding,
       tokenPepper: "scim-test-pepper",
+      seats: openSeats,
     }),
   };
 }
@@ -157,7 +169,7 @@ describe("given the organization's only administrator", () => {
 
     /** @scenario "The refusal does not depend on the directory grants flag" */
     it("refuses a deletion before the membership row goes", async () => {
-      const { service, repository, writer } = stack({
+      const { service, repository, writer, members } = stack({
         provenOffboarding: false,
         refuses: true,
       });
@@ -171,15 +183,16 @@ describe("given the organization's only administrator", () => {
       ).rejects.toMatchObject({ code: "cannot_remove_last_admin" });
 
       expect(writer.offboardMember).not.toHaveBeenCalled();
-      expect(repository.removeMembership).not.toHaveBeenCalled();
+      expect(members.deleteMember).not.toHaveBeenCalled();
       expect(repository.saveUserResource).not.toHaveBeenCalled();
     });
   });
 });
 
 describe("given somebody whose removal costs the organization no administrator", () => {
+  /** @scenario "Deleting a directory user removes the membership through organization" */
   it("is deleted without the guard having an opinion", async () => {
-    const { service, repository, organization } = stack({
+    const { service, organization, members } = stack({
       provenOffboarding: false,
       refuses: false,
     });
@@ -193,6 +206,9 @@ describe("given somebody whose removal costs the organization no administrator",
     expect(organization.findActiveOrganizationAdministrators).toHaveBeenCalledWith({
       organizationId: ORGANIZATION,
     });
-    expect(repository.removeMembership).toHaveBeenCalled();
+    expect(members.deleteMember).toHaveBeenCalledWith(
+      { organizationId: ORGANIZATION, userId: ADMIN },
+      null,
+    );
   });
 });

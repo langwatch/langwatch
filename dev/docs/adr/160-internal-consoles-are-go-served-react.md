@@ -44,7 +44,7 @@ from one package, `@langwatch/design-system-internal` (and read the clock throug
 tokens, a stylesheet and a small set of React components. It depends on React
 only; no Chakra, no product design system, no product module.
 
-The built bundles are not committed. `make haven install` and `make service`
+The built bundles are not committed. `make haven install` (now `make haven self install`) and `make service`
 build them first (Nx-cached); a Go build without them serves the not-built page
 and its tests use an in-memory filesystem.
 

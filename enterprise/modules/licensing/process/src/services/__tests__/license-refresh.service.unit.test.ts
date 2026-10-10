@@ -4,6 +4,7 @@ import { NodeLicenseCryptographyService } from "@langwatch/enterprise-license-si
  * delivered replacement does when it lands.
  * @see specs/self-hosting/connected-services/license-sync.feature
  */
+import { ConnectCredentialPendingError } from "@langwatch/enterprise-licensing-contract";
 import { Temporal, type Instant } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
@@ -97,7 +98,11 @@ function refresher({
     publicKey: TEST_PUBLIC_KEY,
   });
   const stored: string[] = [];
+  const waits: number[] = [];
   const service = LicenseRefreshService.create({
+    wait: async (ms) => {
+      waits.push(ms);
+    },
     install,
     instanceId: async () => "instance-1",
     facts: appliedConnectFacts(rows),
@@ -122,7 +127,7 @@ function refresher({
     version: () => "1.42.0",
     now: () => NOW,
   });
-  return { service, organizations, host, stored };
+  return { service, organizations, host, stored, waits };
 }
 
 describe("what leaves the install on a sync", () => {
@@ -249,6 +254,62 @@ describe("what a sync leaves behind", () => {
     await service.syncAll([ORGANIZATION]);
 
     expect((await organizations.findById(ORGANIZATION))?.lastSyncError).toBe("license_sync_failed");
+  });
+});
+
+describe("a sync answered pending while the managed key is set up", () => {
+  /** A host that answers pending the first time and the given answer after. */
+  function pendingOnce(after: Error | null): MemoryConnectLicenseChannel {
+    const host = MemoryConnectLicenseChannel.create();
+    const answer = host.syncLicense.bind(host);
+    let calls = 0;
+    host.syncLicense = async (input) => {
+      calls += 1;
+      await answer(input);
+      if (calls === 1) throw new ConnectCredentialPendingError();
+      if (after) throw after;
+      return { services: ["instant_evals"] };
+    };
+    return host;
+  }
+
+  /** @scenario An install whose managed key is pending syncs that organisation again 30 seconds later */
+  it("waits 30 seconds once and syncs that organization again in the same pass", async () => {
+    const { service, organizations, host, waits } = refresher({
+      license: licenseNaming({ services: ["instant_evals"] }),
+      host: pendingOnce(null),
+    });
+
+    await service.syncAll([ORGANIZATION]);
+
+    expect(waits).toEqual([30_000]);
+    expect(host.syncs).toHaveLength(2);
+    expect((await organizations.findById(ORGANIZATION))?.lastSyncError).toBeNull();
+  });
+
+  it("records the pending code when the retry is pending too, and retries no more", async () => {
+    const { service, organizations, host, waits } = refresher({
+      license: licenseNaming({ services: ["instant_evals"] }),
+      host: pendingOnce(new ConnectCredentialPendingError()),
+    });
+
+    await service.syncAll([ORGANIZATION]);
+
+    expect(waits).toEqual([30_000]);
+    expect(host.syncs).toHaveLength(2);
+    expect((await organizations.findById(ORGANIZATION))?.lastSyncError).toBe(
+      "connect_credential_pending",
+    );
+  });
+
+  it("does not wait when no organization was answered pending", async () => {
+    const { service, waits } = refresher({
+      license: licenseNaming({ services: ["instant_evals"] }),
+    });
+
+    await service.syncAll([ORGANIZATION]);
+
+    expect(waits).toEqual([]);
   });
 });
 

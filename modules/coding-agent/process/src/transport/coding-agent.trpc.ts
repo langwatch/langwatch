@@ -65,18 +65,19 @@ export const codingAgentTrpcTransport: TrpcRouterDeclaration<
 
   .procedure("transcript")
   .withPermission(CODING_AGENT_PERMISSION)
-  .handle(({ app, input, actor }) =>
+  .handle(({ app, input, actor, authorization }) =>
     app.readTranscriptForViewer({
       projectId: input.projectId,
       traceId: input.traceId,
       occurredAtMs: input.occurredAtMs,
       viewerUserId: actor.id,
+      authorization,
     }),
   )
 
   .procedure("sessionGroups")
   .withPermission(CODING_AGENT_PERMISSION)
-  .handle(({ app, input, actor }) =>
-    app.readSessionGroupsForViewer({ ...input, viewerUserId: actor.id }),
+  .handle(({ app, input, actor, authorization }) =>
+    app.readSessionGroupsForViewer({ ...input, viewerUserId: actor.id, authorization }),
   )
   .build();

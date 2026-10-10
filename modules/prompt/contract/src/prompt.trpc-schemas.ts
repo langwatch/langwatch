@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 /** tRPC input shapes; accept unknown keys for forward-compatible clients. */
 import { z } from "zod";
 
@@ -14,22 +15,37 @@ import { promptScopeSchema } from "./prompt.ts";
 import type { PromptTagAssignment, VersionedPrompt } from "./prompt.ts";
 
 /** One project, named by the surface that is reading it. */
-export const promptProjectTrpcInputSchema = z.object({ projectId: z.string() });
+const promptProjectTrpcInputSchemaDefinition = z.object({ projectId: z.string() });
+export interface PromptProjectTrpcInputSchema extends Named<
+  typeof promptProjectTrpcInputSchemaDefinition
+> {}
+export const promptProjectTrpcInputSchema: PromptProjectTrpcInputSchema =
+  promptProjectTrpcInputSchemaDefinition;
 
 /**
  * One prompt inside one project, addressed by id or handle. Shared by every
  * read and write that needs nothing else: the copies listing, the modify
  * probe, the version listing, delete, duplicate and the sync-from-source.
  */
-export const promptIdOrHandleTrpcInputSchema = z.object({
+const promptIdOrHandleTrpcInputSchemaDefinition = z.object({
   projectId: z.string(),
   idOrHandle: z.string(),
 });
+export interface PromptIdOrHandleTrpcInputSchema extends Named<
+  typeof promptIdOrHandleTrpcInputSchemaDefinition
+> {}
+export const promptIdOrHandleTrpcInputSchema: PromptIdOrHandleTrpcInputSchema =
+  promptIdOrHandleTrpcInputSchemaDefinition;
 
-export const promptRestoreVersionTrpcInputSchema = z.object({
+const promptRestoreVersionTrpcInputSchemaDefinition = z.object({
   versionId: z.string(),
   projectId: z.string(),
 });
+export interface PromptRestoreVersionTrpcInputSchema extends Named<
+  typeof promptRestoreVersionTrpcInputSchemaDefinition
+> {}
+export const promptRestoreVersionTrpcInputSchema: PromptRestoreVersionTrpcInputSchema =
+  promptRestoreVersionTrpcInputSchemaDefinition;
 
 /** The dataset schema the two write shapes take for `demonstrations`. */
 export type PromptDemonstrationsSchemaInput<TDemonstrations extends z.ZodType> = Readonly<{
@@ -165,7 +181,7 @@ export function createPromptUpdateTrpcInputSchema<TDemonstrations extends z.ZodT
 }
 
 /** Handle and scope move without cutting a version, so they write alone. */
-export const promptUpdateHandleTrpcInputSchema = z.object({
+const promptUpdateHandleTrpcInputSchemaDefinition = z.object({
   projectId: z.string(),
   id: z.string(),
   data: z.object({
@@ -173,8 +189,13 @@ export const promptUpdateHandleTrpcInputSchema = z.object({
     scope: promptScopeSchema,
   }),
 });
+export interface PromptUpdateHandleTrpcInputSchema extends Named<
+  typeof promptUpdateHandleTrpcInputSchemaDefinition
+> {}
+export const promptUpdateHandleTrpcInputSchema: PromptUpdateHandleTrpcInputSchema =
+  promptUpdateHandleTrpcInputSchemaDefinition;
 
-export const promptGetByIdOrHandleTrpcInputSchema = z.object({
+const promptGetByIdOrHandleTrpcInputSchemaDefinition = z.object({
   idOrHandle: z.string(),
   projectId: z.string(),
   /** Optional: fetch a specific version by ID */
@@ -184,36 +205,66 @@ export const promptGetByIdOrHandleTrpcInputSchema = z.object({
   /** Optional: fetch the version pointed to by this tag */
   tag: z.string().optional(),
 });
+export interface PromptGetByIdOrHandleTrpcInputSchema extends Named<
+  typeof promptGetByIdOrHandleTrpcInputSchemaDefinition
+> {}
+export const promptGetByIdOrHandleTrpcInputSchema: PromptGetByIdOrHandleTrpcInputSchema =
+  promptGetByIdOrHandleTrpcInputSchemaDefinition;
 
-export const promptHandleUniquenessTrpcInputSchema = z.object({
+const promptHandleUniquenessTrpcInputSchemaDefinition = z.object({
   handle: handleSchema,
   projectId: z.string(),
   scope: promptScopeSchema,
 });
+export interface PromptHandleUniquenessTrpcInputSchema extends Named<
+  typeof promptHandleUniquenessTrpcInputSchemaDefinition
+> {}
+export const promptHandleUniquenessTrpcInputSchema: PromptHandleUniquenessTrpcInputSchema =
+  promptHandleUniquenessTrpcInputSchemaDefinition;
 
-export const promptCopyTrpcInputSchema = z.object({
+const promptCopyTrpcInputSchemaDefinition = z.object({
   idOrHandle: z.string(),
   projectId: z.string(),
   sourceProjectId: z.string(),
 });
+export interface PromptCopyTrpcInputSchema extends Named<
+  typeof promptCopyTrpcInputSchemaDefinition
+> {}
+export const promptCopyTrpcInputSchema: PromptCopyTrpcInputSchema =
+  promptCopyTrpcInputSchemaDefinition;
 
-export const promptPushToCopiesTrpcInputSchema = z.object({
+const promptPushToCopiesTrpcInputSchemaDefinition = z.object({
   projectId: z.string(),
   idOrHandle: z.string(),
   copyIds: z.array(z.string()).optional(), // Optional: if provided, only push to selected copies
 });
+export interface PromptPushToCopiesTrpcInputSchema extends Named<
+  typeof promptPushToCopiesTrpcInputSchemaDefinition
+> {}
+export const promptPushToCopiesTrpcInputSchema: PromptPushToCopiesTrpcInputSchema =
+  promptPushToCopiesTrpcInputSchemaDefinition;
 
-export const promptConfigTagsTrpcInputSchema = z.object({
+const promptConfigTagsTrpcInputSchemaDefinition = z.object({
   projectId: z.string(),
   configId: z.string(),
 });
+export interface PromptConfigTagsTrpcInputSchema extends Named<
+  typeof promptConfigTagsTrpcInputSchemaDefinition
+> {}
+export const promptConfigTagsTrpcInputSchema: PromptConfigTagsTrpcInputSchema =
+  promptConfigTagsTrpcInputSchemaDefinition;
 
-export const promptAssignTagTrpcInputSchema = z.object({
+const promptAssignTagTrpcInputSchemaDefinition = z.object({
   projectId: z.string(),
   configId: z.string(),
   versionId: z.string(),
   tag: z.string().min(1),
 });
+export interface PromptAssignTagTrpcInputSchema extends Named<
+  typeof promptAssignTagTrpcInputSchemaDefinition
+> {}
+export const promptAssignTagTrpcInputSchema: PromptAssignTagTrpcInputSchema =
+  promptAssignTagTrpcInputSchemaDefinition;
 
 /**
  * The input shapes the nine borrowed procedures take, as declared types. The

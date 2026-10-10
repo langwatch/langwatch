@@ -9,18 +9,15 @@ import type {
   RuntimeEvent,
   ServiceHandle,
 } from "../shared/runtime-contract.ts";
-import { startAigateway } from "./aigateway.ts";
 import { ensureAppDir } from "./app-dir.ts";
 import { startClickhouse } from "./clickhouse.ts";
 import { readEnvFile } from "./env-file.ts";
 import { EventBus } from "./event-bus.ts";
+import { startGoServices } from "./go-services.ts";
 import { startLangevals } from "./langevals.ts";
-import { startLangwatchWorkers } from "./langwatch-workers.ts";
 import { startLangwatch } from "./langwatch.ts";
 import { ensureLangyCli } from "./langy-cli.ts";
 import { monobinarySupportsLangyagent, startLangyagent } from "./langyagent.ts";
-import { runMigrations } from "./migrate.ts";
-import { startNlpgo } from "./nlpgo.ts";
 import { ensureLangwatchDeps } from "./node-deps.ts";
 import { ensureTiktokenEncodings } from "./offline-defaults.ts";
 import { startPostgres } from "./postgres.ts";
@@ -89,16 +86,6 @@ const runtimeImpl: RuntimeApi = {
     ]);
     handles.push(pg, redis, ch);
 
-    // Phase 2: migrations (Prisma + ClickHouse goose). Both shell out to
-    // the langwatch app's existing pnpm scripts so we stay in lockstep with
-    // helm/docker.
-    try {
-      await runMigrations(ctx, bus, envFromFile);
-    } catch (err) {
-      await stopHandles(handles);
-      throw err;
-    }
-
     // Phase 3: app-tier services in parallel. The langwatch app receives
     // userEnv overlay so the user's provider keys (OPENAI_API_KEY etc.)
     // win over the blank .env entries written by scaffoldEnvFile. The
@@ -121,32 +108,20 @@ const runtimeImpl: RuntimeApi = {
     };
     if (!effective.isLangyEnabled) hideLangyFrom(childEnv);
 
-    // Use allSettled not all: partial boot must not leak handles.
+    // Use allSettled not all: partial boot must not leak handles. The langwatch
+    // backend is one process: the api, and the worker that consumes its queues.
     const results = await Promise.allSettled([
-      startNlpgo(ctx, bus, childEnv),
-      startLangevals(ctx, bus, childEnv),
-      startAigateway(ctx, bus, childEnv),
-      startLangwatch(ctx, bus, childEnv),
+      startGoServices(ctx, bus, childEnv),
+      startLangevals(ctx, bus, childEnv).then((handle) => [handle]),
+      startLangwatch(ctx, bus, childEnv).then((handle) => [handle]),
     ]);
     for (const r of results) {
-      if (r.status === "fulfilled") handles.push(r.value);
+      if (r.status === "fulfilled") handles.push(...r.value);
     }
     const failure = results.find((r): r is PromiseRejectedResult => r.status === "rejected");
     if (failure) {
       await stopHandles(handles);
       throw failure.reason;
-    }
-
-    try {
-      // Phase 3b: workers, spawned AFTER the app is healthy so they share
-      // its boot env (Redis + Prisma migrated). Without them the BullMQ
-      // queues fill up with no consumer and the UI waits forever for a
-      // first trace. Resolves once the worker's health door answers.
-      const workers = await startLangwatchWorkers(ctx, bus, childEnv);
-      handles.push(workers);
-    } catch (err) {
-      await stopHandles(handles);
-      throw err;
     }
 
     return handles.map(toServiceHandle);

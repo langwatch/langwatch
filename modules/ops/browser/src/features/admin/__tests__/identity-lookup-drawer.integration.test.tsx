@@ -3,14 +3,15 @@
  * The person drawer: methods in every state, one waiting panel, named repairs.
  * Corresponds to specs/identity/platform-ops-identity-lookup.feature.
  */
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { renderWithOpsHost } from "../../../testing.tsx";
 import { IdentityLookupDrawer } from "../ui/sections/identity-lookup-drawer.tsx";
 
 const personState = vi.hoisted(() => ({
-  current: { data: undefined as unknown, error: null as Error | null },
+  current: { data: void 0 as unknown, error: null as Error | null },
+  refetch: vi.fn(),
 }));
 
 vi.mock("../../../behavior/ops-api.ts", () => {
@@ -19,7 +20,13 @@ vi.mock("../../../behavior/ops-api.ts", () => {
     api: {
       useContext: () => ({ identityLookup: { invalidate: vi.fn() } }),
       identityLookup: {
-        person: { useQuery: () => personState.current },
+        person: {
+          useQuery: () => ({
+            ...personState.current,
+            refetch: personState.refetch,
+            isFetching: false,
+          }),
+        },
         confirmProposedSignIn: mutation(),
         rejectProposedSignIn: mutation(),
         detachMethod: mutation(),
@@ -162,19 +169,36 @@ describe("given an operator who has opened a person from the lookup", () => {
   });
 
   describe("when the drawer is rendered", () => {
+    /** @scenario "Removed sign-in methods remain visible without repair actions" */
+    it("shows when a method was removed without offering any actions on it", () => {
+      const removed = detail();
+      removed.identifiers = removed.identifiers.filter(
+        (identifier) => identifier.state === "DETACHED",
+      );
+      removed.sessions = [{ ...removed.sessions[0]!, identifierId: "idf_old" }];
+      personState.current = { data: removed, error: null };
+      renderDrawer();
+      expect(screen.getByText("Removed")).toBeVisible();
+      expect(screen.getByText(/ · Removed /)).toBeVisible();
+      expect(screen.queryByRole("button", { name: "Remove" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "End its sessions" })).not.toBeInTheDocument();
+    });
+
     /** @scenario "Each person's sign-in methods are listed whatever state they are in" */
     it("lists every method in every state, with what proved it and when it stopped counting", () => {
       renderDrawer();
 
       // The proved one, and the one that no longer signs anybody in.
-      expect(screen.getByText("sam@acme.com · proved", { exact: false })).toBeInTheDocument();
-      expect(screen.getByText("sam@example.com · removed", { exact: false })).toBeInTheDocument();
+      expect(screen.getAllByText("sam@acme.com").length).toBeGreaterThan(0);
+      expect(screen.getByText("proved")).toBeInTheDocument();
+      expect(screen.getByText("sam@example.com")).toBeInTheDocument();
+      expect(screen.getByText("Removed")).toBeInTheDocument();
 
       // Each says when it was attached, what proved it, and — where it
       // applies — when it stopped counting.
       expect(screen.getByText(/proved by email on/, { exact: false })).toBeInTheDocument();
       expect(screen.getByText(/nothing has proved it/, { exact: false })).toBeInTheDocument();
-      expect(screen.getByText(/stopped counting/, { exact: false })).toBeInTheDocument();
+      expect(screen.getByText(/ · Removed /, { exact: false })).toBeInTheDocument();
     });
 
     /** @scenario "Everything waiting on a human is on one panel" */
@@ -272,6 +296,52 @@ describe("given an operator who has opened a person from the lookup", () => {
       expect(screen.queryByText("Resend")).not.toBeInTheDocument();
       expect(screen.queryByText("Extend")).not.toBeInTheDocument();
       expect(screen.queryByText("End its sessions")).not.toBeInTheDocument();
+    });
+  });
+});
+
+describe("given a person detail request", () => {
+  describe("when the request is pending", () => {
+    /** @scenario "A person drawer remains informative while its read is pending or failed" */
+    it("shows loading feedback and replaces it with the person's summary", () => {
+      personState.current = { data: void 0, error: null };
+      const result = renderDrawer();
+      expect(screen.getByRole("status", { name: "Loading person details" })).toBeVisible();
+      expect(screen.queryByText("Sign-in methods")).not.toBeInTheDocument();
+
+      personState.current = { data: detail(), error: null };
+      result.rerenderWithOpsHost(
+        <IdentityLookupDrawer
+          userId="user_sam"
+          address="sam@acme.com"
+          canRepair={false}
+          onClose={vi.fn()}
+        />,
+      );
+      expect(
+        screen.queryByRole("status", { name: "Loading person details" }),
+      ).not.toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: "Sam Carter" })).toBeVisible();
+      expect(screen.getByText("Organizations")).toBeVisible();
+      expect(screen.getByText("Acme")).toBeVisible();
+      expect(screen.getByText("Sign-in methods")).toBeVisible();
+    });
+  });
+
+  describe("when the request fails", () => {
+    /** @scenario "A person drawer remains informative while its read is pending or failed" */
+    it("shows an error alert and retries the read", () => {
+      personState.current = { data: void 0, error: new Error("Internal server error") };
+      personState.refetch.mockClear();
+      renderDrawer();
+      expect(
+        within(screen.getByRole("alert")).getByText("Couldn't load this person"),
+      ).toBeVisible();
+      expect(
+        screen.queryByRole("status", { name: "Loading person details" }),
+      ).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+      expect(personState.refetch).toHaveBeenCalledTimes(1);
     });
   });
 });

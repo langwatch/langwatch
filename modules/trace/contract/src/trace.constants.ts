@@ -10,6 +10,9 @@ export const RECORD_SPAN_COMMAND_TYPE = "lw.obs.trace.record_span" as const;
 /** Maximum accepted span age, shared by every Trace ingestion transport. */
 export const SPAN_MAX_PAST_MS = 31 * 24 * 60 * 60 * 1000;
 
+/** The furthest an in-process backfill may reach (`OtlpTracesInput.backfillMaxPastDays`). */
+export const SPAN_BACKFILL_MAX_PAST_DAYS = 365;
+
 export const SPAN_RECORDED_EVENT_TYPE = "lw.trace.span_recorded" as const;
 export const SPAN_RECORDED_EVENT_VERSION_LATEST = "2026-08-27" as const;
 

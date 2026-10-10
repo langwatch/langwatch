@@ -59,6 +59,7 @@ async function etag() {
           organizationId: row.team.organizationId,
           isPersonal: false,
           ownerUserId: null,
+          kind: "application",
         })),
     }),
   }).versionToken(await loadVk());

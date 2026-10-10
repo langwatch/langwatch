@@ -56,6 +56,7 @@ async function gatewayApp(): Promise<GatewayModule> {
       traces: peer("traces"),
       oneTimeReveals: peer("oneTimeReveals"),
       apiKeys: peer("apiKeys"),
+      licensing: peer("licensing"),
     },
     repositories: MemoryGatewayRepositories.create(),
     config: {
@@ -105,6 +106,7 @@ describe("GatewayModule.getKeyCaller", () => {
       organizationId: ORGANIZATION_ID,
       isPersonal: false,
       ownerUserId: null,
+      kind: "application",
     });
   });
 
@@ -211,6 +213,7 @@ describe("GatewayModule.getVirtualKeyCaller", () => {
       organizationId: ORGANIZATION_ID,
       isPersonal: false,
       ownerUserId: null,
+      kind: "application",
     });
   });
 

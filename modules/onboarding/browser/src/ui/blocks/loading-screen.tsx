@@ -113,8 +113,8 @@ export const LoadingScreen = () => {
           style={{
             contain: "layout paint",
             background: [
-              "radial-gradient(ellipse 80% 50% at 50% -10%, rgba(237,137,38,0.06) 0%, transparent 70%)",
-              "radial-gradient(ellipse 60% 40% at 70% 100%, rgba(237,137,38,0.02) 0%, transparent 60%)",
+              "radial-gradient(ellipse 80% 50% at 50% -10%, color-mix(in srgb, var(--chakra-colors-accent-solid) 6%, transparent) 0%, transparent 70%)",
+              "radial-gradient(ellipse 60% 40% at 70% 100%, color-mix(in srgb, var(--chakra-colors-accent-solid) 2%, transparent) 0%, transparent 60%)",
             ].join(", "),
           }}
         />

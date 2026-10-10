@@ -64,6 +64,17 @@ func itoa(value int) string {
 }
 
 // argv joins one recorded command back into the line a person would type.
+// destroyedSlug is the slug a `haven down --destroy --stack <slug>` call names.
+func destroyedSlug(spec commandSpec) (string, bool) {
+	if len(spec.args) == 0 || spec.args[0] != "down" || !slices.Contains(spec.args, "--destroy") {
+		return "", false
+	}
+	if at := slices.Index(spec.args, "--stack"); at >= 0 && at+1 < len(spec.args) {
+		return spec.args[at+1], true
+	}
+	return "", false
+}
+
 func argv(spec commandSpec) string {
 	return spec.name + " " + strings.Join(spec.args, " ")
 }
@@ -281,15 +292,15 @@ func TestTeardownNamesItsOwnTwoSlugs(t *testing.T) {
 			state.teardown()
 			var destroys []string
 			for _, spec := range fake.commands[before:] {
-				if len(spec.args) > 0 && spec.args[0] == "destroy" {
+				if _, ok := destroyedSlug(spec); ok {
 					destroys = append(destroys, argv(spec))
 					continue
 				}
 				t.Errorf("teardown also ran %q; it may only destroy what it started", argv(spec))
 			}
 			want := []string{
-				"haven destroy apidiff-20260909t2230-branch --agent --yes",
-				"haven destroy apidiff-20260909t2230-main --agent --yes",
+				"haven down --destroy --stack apidiff-20260909t2230-branch --agent --yes",
+				"haven down --destroy --stack apidiff-20260909t2230-main --agent --yes",
 			}
 			if strings.Join(destroys, "\n") != strings.Join(want, "\n") {
 				t.Errorf("teardown ran\n%s\nwant\n%s", strings.Join(destroys, "\n"), strings.Join(want, "\n"))
@@ -324,8 +335,8 @@ func TestAFailedBootTearsDownOnlyItsOwnSlugs(t *testing.T) {
 			state.teardown()
 			var destroyed []string
 			for _, spec := range fake.commands[before:] {
-				if len(spec.args) > 1 && spec.args[0] == "destroy" {
-					destroyed = append(destroyed, spec.args[1])
+				if slug, ok := destroyedSlug(spec); ok {
+					destroyed = append(destroyed, slug)
 				}
 			}
 			want := []string{"apidiff-20260909t2230-branch", "apidiff-20260909t2230-main"}
@@ -423,7 +434,7 @@ func TestReadyMeansTheBackendLaneIsHealthy(t *testing.T) {
 		if err := state.havenWaitReady(context.Background(), &instance); err != nil {
 			t.Fatalf("havenWaitReady: %v", err)
 		}
-		if got := argv(fake.commands[0]); got != "haven status --agent --json" {
+		if got := argv(fake.commands[0]); got != "haven status --agent --json stacks" {
 			t.Errorf("readiness asked %q, want the machine-readable status", got)
 		}
 	})
@@ -633,15 +644,16 @@ func TestApidiffRunsAndTheDeveloperStackIsUntouched(t *testing.T) {
 				}
 			})
 
-			t.Run("then every haven up and haven destroy command names one of the two worktree directories", func(t *testing.T) {
+			t.Run("then every haven up and haven down --destroy command names one of the two worktree directories", func(t *testing.T) {
 				for _, spec := range fake.commands {
 					if spec.name != havenCommand || len(spec.args) == 0 {
 						continue
 					}
-					if spec.args[0] != "up" && spec.args[0] != "destroy" {
+					_, destroying := destroyedSlug(spec)
+					if spec.args[0] != "up" && !destroying {
 						continue
 					}
-					if spec.args[0] == "destroy" {
+					if destroying {
 						// destroy targets a stack by its slug argument and never needs
 						// a worktree directory; it still must not run from inside the
 						// invoking checkout (asserted above).
@@ -655,10 +667,10 @@ func TestApidiffRunsAndTheDeveloperStackIsUntouched(t *testing.T) {
 
 			t.Run("then the developer's own stack is never started, restarted or destroyed", func(t *testing.T) {
 				for _, spec := range fake.commands {
-					if spec.name != havenCommand || len(spec.args) < 2 {
+					if spec.name != havenCommand {
 						continue
 					}
-					if spec.args[0] == "destroy" && strings.HasPrefix(spec.args[1], "feat-") {
+					if slug, ok := destroyedSlug(spec); ok && strings.HasPrefix(slug, "feat-") {
 						t.Errorf("a developer-derived slug was destroyed: %s", argv(spec))
 					}
 				}
@@ -734,15 +746,16 @@ func TestTeardownOnHavenPathNeverRunsFromTheInvokingCheckout(t *testing.T) {
 		t.Run("when the run tears down", func(t *testing.T) {
 			state.teardown()
 
-			t.Run("then haven destroy runs for exactly the branch and base slugs, never from the invoking checkout", func(t *testing.T) {
+			t.Run("then haven down --destroy runs for exactly the branch and base slugs, never from the invoking checkout", func(t *testing.T) {
 				var destroyed []string
 				for _, spec := range fake.commands {
-					if len(spec.args) == 0 || spec.args[0] != "destroy" {
+					slug, ok := destroyedSlug(spec)
+					if !ok {
 						continue
 					}
-					destroyed = append(destroyed, spec.args[1])
+					destroyed = append(destroyed, slug)
 					if spec.dir == invoking {
-						t.Errorf("haven destroy %s ran from the invoking checkout", spec.args[1])
+						t.Errorf("haven down --destroy --stack %s ran from the invoking checkout", slug)
 					}
 				}
 				want := []string{"apidiff-run-branch", "apidiff-run-main"}

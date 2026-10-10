@@ -1,5 +1,5 @@
 import {
-  bindTrpcFact,
+  bindTrpcMiddlewareContext,
   createTrpcRuntime,
   TrpcRootDefinition,
   type TrpcRuntimeMembers,
@@ -12,9 +12,10 @@ import {
 import type { EnterpriseOpsApi } from "@langwatch/enterprise-ops-contract";
 import type { OpsOperator } from "@langwatch/ops-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { testAuthorizeDefaults } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it } from "vitest";
 
-import { licenseRegistryTrpcTransport, operatorFact } from "../license-registry.trpc.ts";
+import { licenseRegistryTrpcTransport, operatorContext } from "../license-registry.trpc.ts";
 import { selfHostedInstancesTrpcTransport } from "../self-hosted-instance.trpc.ts";
 
 type Context = { actor: { type: "user"; id: string } | null; operator: OpsOperator | null };
@@ -30,6 +31,7 @@ function members(): TrpcRuntimeMembers<Context> {
     identity: { caller: (ctx) => ({ actor: ctx.actor }) },
     authorization: {
       forRequest: () => ({
+        ...testAuthorizeDefaults,
         getDecision: async () => ({ permitted: false, organizationRole: null }),
         getProjectAnyDecision: async () => ({ permitted: false, organizationRole: null }),
         checkScopeLineage: async () => ({ kind: "consistent" }),
@@ -65,7 +67,9 @@ function cloudAdmin(reached: string[]) {
     procedure: root.procedure,
     members: members(),
   });
-  const facts = { facts: [bindTrpcFact(operatorFact, (ctx: Context) => ctx.operator)] };
+  const mountOptions = {
+    middlewareContext: [bindTrpcMiddlewareContext(operatorContext, (ctx: Context) => ctx.operator)],
+  };
   const as = (id: string | null) => ({
     actor: id ? ({ type: "user", id } as const) : null,
     operator: id ? { id, email: `${id}@langwatch.test` } : null,
@@ -73,9 +77,9 @@ function cloudAdmin(reached: string[]) {
 
   return {
     instances: (id: string | null) =>
-      runtime.mount(selfHostedInstancesTrpcTransport, () => app, facts).createCaller(as(id)),
+      runtime.mount(selfHostedInstancesTrpcTransport, () => app, mountOptions).createCaller(as(id)),
     licenses: (id: string | null) =>
-      runtime.mount(licenseRegistryTrpcTransport, () => app, facts).createCaller(as(id)),
+      runtime.mount(licenseRegistryTrpcTransport, () => app, mountOptions).createCaller(as(id)),
   };
 }
 

@@ -1,15 +1,14 @@
 import {
   badRequestSchema,
-  defineRestMiddleware,
+  defineMiddlewareContext,
   defineRestRouter,
   documentedResponses,
   MANAGEMENT_API_VERSION,
-  projectRestFacts,
+  projectRequestContext,
   RequestValidationError,
   resolver,
-  type RestTransportDeclaration,
 } from "@langwatch/api/rest";
-import type { PrincipalRef } from "@langwatch/authorization";
+import type { Authorization, PrincipalRef } from "@langwatch/authorization";
 import { createLogger } from "@langwatch/observability";
 import { resolveRequestBound } from "@langwatch/plans";
 import { toEpochMs } from "@langwatch/time";
@@ -38,16 +37,16 @@ import {
 } from "@langwatch/trace-contract";
 import type { z } from "zod";
 
-import { enrichTracesWithEvaluations } from "#rules/trace-evaluation-enrichment.rules";
+import { unkeyedLegacyFilterViolations } from "#features/legacy/rules/trace-legacy-filter-keys.rules";
+import { compileProjection } from "#features/projection/rules/trace-projection-compile.rules";
+import { enrichTracesWithEvaluations } from "#rules/trace-evaluation-mapping.rules";
 /**
  * /api/traces: v1 trace reads (search, facets, get-by-id, transcript, metadata
  * PATCH). Route order load-bearing: register :traceId sub-resources, and the
  * literal /facets, before the bare :traceId.
  */
 import { formatTraceSummaryDigest } from "#rules/trace-formatting.rules";
-import { unkeyedLegacyFilterViolations } from "#features/legacy/rules/trace-legacy-filter-keys.rules";
 import { tracePath } from "#rules/trace-platform-url.rules";
-import { compileProjection } from "#features/projection/rules/trace-projection-compile.rules";
 
 const logger = createLogger("langwatch:api:traces");
 
@@ -61,7 +60,7 @@ const logger = createLogger("langwatch:api:traces");
 const DEFAULT_TRACES_PAGE_SIZE = resolveRequestBound("tracesPageSizeMax", "FREE");
 
 /** The credential a route reads: an API key's own id, and the member it acts as. */
-export const tracesRestCredential = defineRestMiddleware(
+export const tracesRestCredential = defineMiddlewareContext(
   "tracesRestCredential",
   tracesRestCredentialSchema,
 );
@@ -210,12 +209,14 @@ async function searchTraces({
   scope,
   project,
   caller,
+  authorization,
 }: {
   app: TraceApi;
   input: z.infer<typeof traceSearchBodySchema>;
   scope: { id: string };
   project: { projectSlug: string };
   caller: { principal: PrincipalRef | null };
+  authorization: Authorization;
 }): Promise<string> {
   const params = input;
   const {
@@ -274,6 +275,7 @@ async function searchTraces({
       scrollId: scrollId ?? undefined,
       dateField,
       filterWhere,
+      authorization,
       ...(projection ? { projection: projection.plan } : {}),
     },
   });
@@ -300,20 +302,17 @@ async function searchTraces({
   return streamSearchEnvelope(serializedTraces, pagination, schemaSuffix);
 }
 
-function createTracesRest(): Readonly<{
-  protocol: "rest";
-  namespace: string;
-  router: () => RestTransportDeclaration<TraceApi>;
-}> {
+function createTracesRest() {
   let router = defineRestRouter(TraceApi)
     .withNamespace("traces")
     .withVersion(MANAGEMENT_API_VERSION)
 
     .post("/search", "searchTraces")
+    .withoutAudit("read sent as a POST")
     .withInput(traceSearchBodySchema)
     .withPermission("traces:view")
     .withResponse("bytes", { produces: "application/json" })
-    .withMiddleware(projectRestFacts, tracesRestCredential)
+    .withMiddlewareContext(projectRequestContext, tracesRestCredential)
     .withDocs({
       operationId: "postApiTracesSearch",
       description: "Search traces for a project",
@@ -325,8 +324,8 @@ function createTracesRest(): Readonly<{
         ...SHARED_ERROR_ANSWERS,
       },
     })
-    .handle(async ({ app, input, scope, response }, project, caller) =>
-      response.buffer(await searchTraces({ app, input, scope, project, caller }), {
+    .handle(async ({ app, input, scope, authorization, response }, project, caller) =>
+      response.buffer(await searchTraces({ app, input, scope, project, caller, authorization }), {
         mediaType: "application/json",
       }),
     );
@@ -338,7 +337,7 @@ function createTracesRest(): Readonly<{
     .withQuery(traceFacetsQuerySchema)
     .withPermission("traces:view")
     .withOutput(traceFacetsResponseSchema)
-    .withMiddleware(projectRestFacts, tracesRestCredential)
+    .withMiddlewareContext(projectRequestContext, tracesRestCredential)
     .withDocs({
       operationId: "getApiTracesFacets",
       summary: "Discover what the trace filter fields hold",
@@ -357,9 +356,10 @@ function createTracesRest(): Readonly<{
         ...FACETS_ERROR_ANSWERS,
       },
     })
-    .handle(({ app, input, scope }, _project, caller) =>
+    .handle(({ app, input, scope, authorization }, _project, caller) =>
       app.readTraceFacetsForApiKey({
         projectId: scope.id,
+        authorization,
         query: input,
         principal: caller.principal,
       }),
@@ -370,7 +370,7 @@ function createTracesRest(): Readonly<{
     .withParams(traceIdParamsSchema)
     .withPermission("traces:view")
     .withOutput(transcriptRestResponseSchema)
-    .withMiddleware(projectRestFacts, tracesRestCredential)
+    .withMiddlewareContext(projectRequestContext, tracesRestCredential)
     .withDocs({
       operationId: "getApiTracesByTraceIdTranscript",
       description:
@@ -406,6 +406,7 @@ function createTracesRest(): Readonly<{
 
   router = router
     .patch("/:traceId/metadata", "updateTraceMetadata")
+    .withAudit("traces.changeMetadata")
     .withParams(traceIdParamsSchema)
     .withInput(traceMetadataBodySchema)
     .withPermission("traces:update")
@@ -434,7 +435,7 @@ function createTracesRest(): Readonly<{
     .withQuery(traceFormatQuerySchema)
     .withPermission("traces:view")
     .withOutput(traceDetailResponseSchema)
-    .withMiddleware(projectRestFacts, tracesRestCredential)
+    .withMiddlewareContext(projectRequestContext, tracesRestCredential)
     .withDocs({
       operationId: "getApiTracesByTraceId",
       description: "Get a single trace by ID.",

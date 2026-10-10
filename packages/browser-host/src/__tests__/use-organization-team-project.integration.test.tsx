@@ -13,7 +13,6 @@ const host = createUiScopeHost({
   organization: () => ({ id: "organization_1" }),
   team: () => ({ id: "team_1" }),
   organizationRole: () => "ADMIN",
-  hasPermission: (permission) => permission === "TRACES_VIEW",
   isLoading: () => false,
 });
 
@@ -33,13 +32,6 @@ describe("useOrganizationTeamProject", () => {
       expect(result.current.organizationRole).toBe("ADMIN");
       expect(result.current.isResolved).toBe(true);
     });
-
-    it("fails closed on a grant the reader does not hold", () => {
-      const { result } = renderHook(() => useOrganizationTeamProject(), { wrapper: withHost });
-
-      expect(result.current.hasPermission("TRACES_VIEW")).toBe(true);
-      expect(result.current.hasPermission("PROJECT_DELETE")).toBe(false);
-    });
   });
 
   describe("when no scope host is mounted", () => {
@@ -49,7 +41,6 @@ describe("useOrganizationTeamProject", () => {
       expect(result.current.project).toBeUndefined();
       expect(result.current.isResolved).toBe(false);
       expect(result.current.isLoading).toBe(false);
-      expect(result.current.hasPermission("TRACES_VIEW")).toBe(false);
     });
   });
 

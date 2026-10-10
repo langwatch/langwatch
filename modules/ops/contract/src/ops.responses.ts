@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { searchProjectsResultSchema } from "@langwatch/project-contract";
 /**
  * What the `ops.*` tRPC surface answers. Every acknowledgement is its own
@@ -26,10 +27,12 @@ import { opsScheduledJobSchema } from "./ops-scheduler.ts";
  * rather than a refusal, so the global menu can poll the probe on every
  * page load without spamming the console.
  */
-export const opsScopeSchema = z.union([
+const opsScopeSchemaDefinition = z.union([
   z.object({ kind: z.literal("none") }).strict(),
   z.object({ kind: z.literal("platform") }).strict(),
 ]);
+export interface OpsScopeSchema extends Named<typeof opsScopeSchemaDefinition> {}
+export const opsScopeSchema: OpsScopeSchema = opsScopeSchemaDefinition;
 export type OpsScope = z.infer<typeof opsScopeSchema>;
 
 /**
@@ -37,7 +40,7 @@ export type OpsScope = z.infer<typeof opsScopeSchema>;
  * impersonation session - it keeps an impersonating operator an operator on
  * a read, and refuses them on a write nobody would notice the damage of.
  */
-export const opsOperatorSchema = z.object({
+const opsOperatorSchemaDefinition = z.object({
   id: z.string(),
   name: z.string().nullable().optional(),
   email: z.string().nullable().optional(),
@@ -50,26 +53,35 @@ export const opsOperatorSchema = z.object({
     .nullable()
     .optional(),
 });
+export interface OpsOperatorSchema extends Named<typeof opsOperatorSchemaDefinition> {}
+export const opsOperatorSchema: OpsOperatorSchema = opsOperatorSchemaDefinition;
 export type OpsOperator = z.infer<typeof opsOperatorSchema>;
 
 /** The two grains the operator surface is gated at: reads and writes. */
 export type OpsOperatorPermission = "ops:view" | "ops:manage";
 
 /** What the status probe answers, for any authenticated caller. */
-export const opsScopeProbeSchema = z.object({ scope: opsScopeSchema }).strict();
+const opsScopeProbeSchemaDefinition = z.object({ scope: opsScopeSchema }).strict();
+export interface OpsScopeProbeSchema extends Named<typeof opsScopeProbeSchemaDefinition> {}
+export const opsScopeProbeSchema: OpsScopeProbeSchema = opsScopeProbeSchemaDefinition;
 
 /**
  * What `ops.getBadgeCounts` answers. `computedAt` is nullable because a
  * zero count can mean "we cannot say" rather than "nothing is wrong", and a
  * current timestamp beside it would present that as a fresh all-clear.
  */
-export const opsApiGetBadgeCountsOutputSchema = z
+const opsApiGetBadgeCountsOutputSchemaDefinition = z
   .object({
     blockedCount: z.number(),
     dlqCount: z.number(),
     computedAt: z.date().nullable(),
   })
   .strict();
+export interface OpsApiGetBadgeCountsOutputSchema extends Named<
+  typeof opsApiGetBadgeCountsOutputSchemaDefinition
+> {}
+export const opsApiGetBadgeCountsOutputSchema: OpsApiGetBadgeCountsOutputSchema =
+  opsApiGetBadgeCountsOutputSchemaDefinition;
 export type OpsApiGetBadgeCountsOutput = z.infer<typeof opsApiGetBadgeCountsOutputSchema>;
 
 // ---------------------------------------------------------------------------
@@ -81,7 +93,7 @@ export type OpsApiGetBadgeCountsOutput = z.infer<typeof opsApiGetBadgeCountsOutp
  * fields, not `unknown` - a tRPC procedure publishes what its handler
  * returns, so `unknown` here is what the browser would get.
  */
-export const opsProjectionRegistrationSchema = z.object({
+const opsProjectionRegistrationSchemaDefinition = z.object({
   projectionName: z.string(),
   pipelineName: z.string(),
   aggregateType: z.string(),
@@ -91,23 +103,38 @@ export const opsProjectionRegistrationSchema = z.object({
   pauseKey: z.string(),
   kind: z.enum(["fold", "map", "state"]),
 });
+export interface OpsProjectionRegistrationSchema extends Named<
+  typeof opsProjectionRegistrationSchemaDefinition
+> {}
+export const opsProjectionRegistrationSchema: OpsProjectionRegistrationSchema =
+  opsProjectionRegistrationSchemaDefinition;
 export type OpsProjectionRegistration = z.infer<typeof opsProjectionRegistrationSchema>;
 
 /** One registered event subscriber, and the event types it reacts to. */
-export const opsEventSubscriberRegistrationSchema = z.object({
+const opsEventSubscriberRegistrationSchemaDefinition = z.object({
   subscriberName: z.string(),
   pipelineName: z.string(),
   aggregateType: z.string(),
   /** The event types this subscriber reacts to - its transition triggers. */
   eventTypes: z.array(z.string()).readonly(),
 });
+export interface OpsEventSubscriberRegistrationSchema extends Named<
+  typeof opsEventSubscriberRegistrationSchemaDefinition
+> {}
+export const opsEventSubscriberRegistrationSchema: OpsEventSubscriberRegistrationSchema =
+  opsEventSubscriberRegistrationSchemaDefinition;
 export type OpsEventSubscriberRegistration = z.infer<typeof opsEventSubscriberRegistrationSchema>;
 
 /** The registered projections and event subscribers, in one reading. */
-export const opsPipelineRegistrationsSchema = z.object({
+const opsPipelineRegistrationsSchemaDefinition = z.object({
   projections: z.array(opsProjectionRegistrationSchema),
   eventSubscribers: z.array(opsEventSubscriberRegistrationSchema),
 });
+export interface OpsPipelineRegistrationsSchema extends Named<
+  typeof opsPipelineRegistrationsSchemaDefinition
+> {}
+export const opsPipelineRegistrationsSchema: OpsPipelineRegistrationsSchema =
+  opsPipelineRegistrationsSchemaDefinition;
 export type OpsPipelineRegistrations = z.infer<typeof opsPipelineRegistrationsSchema>;
 
 /**
@@ -115,21 +142,31 @@ export type OpsPipelineRegistrations = z.infer<typeof opsPipelineRegistrationsSc
  * the env-derived hot-tier window, so the surface can say up front where reads
  * get slower.
  */
-export const opsEventLogSearchWindowSchema = z.object({
+const opsEventLogSearchWindowSchemaDefinition = z.object({
   searchLookbackDays: z.number(),
   hotTierDays: z.number().nullable(),
   hotTierEnvVar: z.string().nullable(),
 });
+export interface OpsEventLogSearchWindowSchema extends Named<
+  typeof opsEventLogSearchWindowSchemaDefinition
+> {}
+export const opsEventLogSearchWindowSchema: OpsEventLogSearchWindowSchema =
+  opsEventLogSearchWindowSchemaDefinition;
 export type OpsEventLogSearchWindow = z.infer<typeof opsEventLogSearchWindowSchema>;
 
 /** Grafana deep-link configuration; null when no Grafana is configured. */
-export const opsGrafanaLinkConfigSchema = z
+const opsGrafanaLinkConfigSchemaDefinition = z
   .object({
     baseUrl: z.string(),
     tempoDatasourceUid: z.string().optional(),
     lokiDatasourceUid: z.string().optional(),
   })
   .nullable();
+export interface OpsGrafanaLinkConfigSchema extends Named<
+  typeof opsGrafanaLinkConfigSchemaDefinition
+> {}
+export const opsGrafanaLinkConfigSchema: OpsGrafanaLinkConfigSchema =
+  opsGrafanaLinkConfigSchemaDefinition;
 export type OpsGrafanaLinkConfig = z.infer<typeof opsGrafanaLinkConfigSchema>;
 
 // ---------------------------------------------------------------------------
@@ -137,43 +174,105 @@ export type OpsGrafanaLinkConfig = z.infer<typeof opsGrafanaLinkConfigSchema>;
 // ---------------------------------------------------------------------------
 
 /** Whether the group was blocked before the act - false means nothing moved. */
-export const opsQueueUnblockedGroupSchema = z.object({ wasBlocked: z.boolean() });
-export const opsQueueUnblockedAllSchema = z.object({ unblockedCount: z.number() });
-export const opsQueueDrainedGroupSchema = z.object({ jobsRemoved: z.number() });
-export const opsQueueDrainedTenantSchema = z.object({
+const opsQueueUnblockedGroupSchemaDefinition = z.object({ wasBlocked: z.boolean() });
+export interface OpsQueueUnblockedGroupSchema extends Named<
+  typeof opsQueueUnblockedGroupSchemaDefinition
+> {}
+export const opsQueueUnblockedGroupSchema: OpsQueueUnblockedGroupSchema =
+  opsQueueUnblockedGroupSchemaDefinition;
+const opsQueueUnblockedAllSchemaDefinition = z.object({ unblockedCount: z.number() });
+export interface OpsQueueUnblockedAllSchema extends Named<
+  typeof opsQueueUnblockedAllSchemaDefinition
+> {}
+export const opsQueueUnblockedAllSchema: OpsQueueUnblockedAllSchema =
+  opsQueueUnblockedAllSchemaDefinition;
+const opsQueueDrainedGroupSchemaDefinition = z.object({ jobsRemoved: z.number() });
+export interface OpsQueueDrainedGroupSchema extends Named<
+  typeof opsQueueDrainedGroupSchemaDefinition
+> {}
+export const opsQueueDrainedGroupSchema: OpsQueueDrainedGroupSchema =
+  opsQueueDrainedGroupSchemaDefinition;
+const opsQueueDrainedTenantSchemaDefinition = z.object({
   groupsDrained: z.number(),
   jobsDrained: z.number(),
 });
-export const opsQueueMovedToDlqSchema = z.object({ jobsMoved: z.number() });
-export const opsQueueMovedAllToDlqSchema = z.object({
+export interface OpsQueueDrainedTenantSchema extends Named<
+  typeof opsQueueDrainedTenantSchemaDefinition
+> {}
+export const opsQueueDrainedTenantSchema: OpsQueueDrainedTenantSchema =
+  opsQueueDrainedTenantSchemaDefinition;
+const opsQueueMovedToDlqSchemaDefinition = z.object({ jobsMoved: z.number() });
+export interface OpsQueueMovedToDlqSchema extends Named<
+  typeof opsQueueMovedToDlqSchemaDefinition
+> {}
+export const opsQueueMovedToDlqSchema: OpsQueueMovedToDlqSchema =
+  opsQueueMovedToDlqSchemaDefinition;
+const opsQueueMovedAllToDlqSchemaDefinition = z.object({
   movedCount: z.number(),
   jobsMoved: z.number(),
 });
-export const opsQueueReplayedFromDlqSchema = z.object({ jobsReplayed: z.number() });
-export const opsQueueReplayedAllFromDlqSchema = z.object({
+export interface OpsQueueMovedAllToDlqSchema extends Named<
+  typeof opsQueueMovedAllToDlqSchemaDefinition
+> {}
+export const opsQueueMovedAllToDlqSchema: OpsQueueMovedAllToDlqSchema =
+  opsQueueMovedAllToDlqSchemaDefinition;
+const opsQueueReplayedFromDlqSchemaDefinition = z.object({ jobsReplayed: z.number() });
+export interface OpsQueueReplayedFromDlqSchema extends Named<
+  typeof opsQueueReplayedFromDlqSchemaDefinition
+> {}
+export const opsQueueReplayedFromDlqSchema: OpsQueueReplayedFromDlqSchema =
+  opsQueueReplayedFromDlqSchemaDefinition;
+const opsQueueReplayedAllFromDlqSchemaDefinition = z.object({
   replayedCount: z.number(),
   jobsReplayed: z.number(),
 });
-export const opsQueueRedrivenDlqGroupsSchema = z.object({
+export interface OpsQueueReplayedAllFromDlqSchema extends Named<
+  typeof opsQueueReplayedAllFromDlqSchemaDefinition
+> {}
+export const opsQueueReplayedAllFromDlqSchema: OpsQueueReplayedAllFromDlqSchema =
+  opsQueueReplayedAllFromDlqSchemaDefinition;
+const opsQueueRedrivenDlqGroupsSchemaDefinition = z.object({
   redrivenCount: z.number(),
   jobsRedriven: z.number(),
 });
-export const opsQueueDiscardedDlqGroupsSchema = z.object({
+export interface OpsQueueRedrivenDlqGroupsSchema extends Named<
+  typeof opsQueueRedrivenDlqGroupsSchemaDefinition
+> {}
+export const opsQueueRedrivenDlqGroupsSchema: OpsQueueRedrivenDlqGroupsSchema =
+  opsQueueRedrivenDlqGroupsSchemaDefinition;
+const opsQueueDiscardedDlqGroupsSchemaDefinition = z.object({
   discardedCount: z.number(),
   jobsDiscarded: z.number(),
 });
+export interface OpsQueueDiscardedDlqGroupsSchema extends Named<
+  typeof opsQueueDiscardedDlqGroupsSchemaDefinition
+> {}
+export const opsQueueDiscardedDlqGroupsSchema: OpsQueueDiscardedDlqGroupsSchema =
+  opsQueueDiscardedDlqGroupsSchemaDefinition;
 /** A canary names the groups it touched, so the operator can check them. */
-export const opsQueueCanaryRedrivenSchema = z.object({
+const opsQueueCanaryRedrivenSchemaDefinition = z.object({
   redrivenCount: z.number(),
   groupIds: z.array(z.string()),
 });
-export const opsQueueCanaryUnblockedSchema = z.object({
+export interface OpsQueueCanaryRedrivenSchema extends Named<
+  typeof opsQueueCanaryRedrivenSchemaDefinition
+> {}
+export const opsQueueCanaryRedrivenSchema: OpsQueueCanaryRedrivenSchema =
+  opsQueueCanaryRedrivenSchemaDefinition;
+const opsQueueCanaryUnblockedSchemaDefinition = z.object({
   unblockedCount: z.number(),
   groupIds: z.array(z.string()),
 });
+export interface OpsQueueCanaryUnblockedSchema extends Named<
+  typeof opsQueueCanaryUnblockedSchemaDefinition
+> {}
+export const opsQueueCanaryUnblockedSchema: OpsQueueCanaryUnblockedSchema =
+  opsQueueCanaryUnblockedSchemaDefinition;
 
 /** The queue names a pause or a listing answers with. */
-export const opsQueueNameListSchema = z.array(z.string());
+const opsQueueNameListSchemaDefinition = z.array(z.string());
+export interface OpsQueueNameListSchema extends Named<typeof opsQueueNameListSchemaDefinition> {}
+export const opsQueueNameListSchema: OpsQueueNameListSchema = opsQueueNameListSchemaDefinition;
 
 // ---------------------------------------------------------------------------
 // Scheduler and process-manager pages
@@ -183,50 +282,111 @@ export const opsQueueNameListSchema = z.array(z.string());
  * The switched-off schedules, with the total so the panel can say how many
  * exist rather than how many it drew.
  */
-export const opsPausedSchedulesPageSchema = z.object({
+const opsPausedSchedulesPageSchemaDefinition = z.object({
   schedules: z.array(opsScheduledJobSchema),
   total: z.number(),
 });
+export interface OpsPausedSchedulesPageSchema extends Named<
+  typeof opsPausedSchedulesPageSchemaDefinition
+> {}
+export const opsPausedSchedulesPageSchema: OpsPausedSchedulesPageSchema =
+  opsPausedSchedulesPageSchemaDefinition;
 
 /** Retired messages across the fleet, with the per-process split beside them. */
-export const opsDeadLetterPageSchema = z.object({
+const opsDeadLetterPageSchemaDefinition = z.object({
   messages: z.array(deadOutboxMessageViewSchema),
   total: z.number(),
   byProcess: z.array(deadLetterCountSchema),
 });
+export interface OpsDeadLetterPageSchema extends Named<typeof opsDeadLetterPageSchemaDefinition> {}
+export const opsDeadLetterPageSchema: OpsDeadLetterPageSchema = opsDeadLetterPageSchemaDefinition;
 
-export const opsProcessInstancePageSchema = z.object({
+const opsProcessInstancePageSchemaDefinition = z.object({
   instances: z.array(processInstanceRowSchema),
   total: z.number(),
 });
+export interface OpsProcessInstancePageSchema extends Named<
+  typeof opsProcessInstancePageSchemaDefinition
+> {}
+export const opsProcessInstancePageSchema: OpsProcessInstancePageSchema =
+  opsProcessInstancePageSchemaDefinition;
 
-export const opsProcessOutboxPageSchema = z.object({
+const opsProcessOutboxPageSchemaDefinition = z.object({
   messages: z.array(processOutboxMessageViewSchema),
   total: z.number(),
 });
+export interface OpsProcessOutboxPageSchema extends Named<
+  typeof opsProcessOutboxPageSchemaDefinition
+> {}
+export const opsProcessOutboxPageSchema: OpsProcessOutboxPageSchema =
+  opsProcessOutboxPageSchemaDefinition;
 
 // ---------------------------------------------------------------------------
 // Process-manager acknowledgements
 // ---------------------------------------------------------------------------
 
-export const opsProcessRequeuedSchema = z.object({ requeued: z.number() });
-export const opsProcessWokeSchema = z.object({ woke: z.boolean() });
-export const opsProcessRedrivenMessageSchema = z.object({ redriven: z.boolean() });
-export const opsProcessDiscardedMessageSchema = z.object({ discarded: z.boolean() });
-export const opsProcessRedrivenDeadLettersSchema = z.object({ redriven: z.number() });
-export const opsProcessDiscardedDeadLettersSchema = z.object({ discarded: z.number() });
-export const opsProcessReleasedLeaseSchema = z.object({ released: z.boolean() });
+const opsProcessRequeuedSchemaDefinition = z.object({ requeued: z.number() });
+export interface OpsProcessRequeuedSchema extends Named<
+  typeof opsProcessRequeuedSchemaDefinition
+> {}
+export const opsProcessRequeuedSchema: OpsProcessRequeuedSchema =
+  opsProcessRequeuedSchemaDefinition;
+const opsProcessWokeSchemaDefinition = z.object({ woke: z.boolean() });
+export interface OpsProcessWokeSchema extends Named<typeof opsProcessWokeSchemaDefinition> {}
+export const opsProcessWokeSchema: OpsProcessWokeSchema = opsProcessWokeSchemaDefinition;
+const opsProcessRedrivenMessageSchemaDefinition = z.object({ redriven: z.boolean() });
+export interface OpsProcessRedrivenMessageSchema extends Named<
+  typeof opsProcessRedrivenMessageSchemaDefinition
+> {}
+export const opsProcessRedrivenMessageSchema: OpsProcessRedrivenMessageSchema =
+  opsProcessRedrivenMessageSchemaDefinition;
+const opsProcessDiscardedMessageSchemaDefinition = z.object({ discarded: z.boolean() });
+export interface OpsProcessDiscardedMessageSchema extends Named<
+  typeof opsProcessDiscardedMessageSchemaDefinition
+> {}
+export const opsProcessDiscardedMessageSchema: OpsProcessDiscardedMessageSchema =
+  opsProcessDiscardedMessageSchemaDefinition;
+const opsProcessRedrivenDeadLettersSchemaDefinition = z.object({ redriven: z.number() });
+export interface OpsProcessRedrivenDeadLettersSchema extends Named<
+  typeof opsProcessRedrivenDeadLettersSchemaDefinition
+> {}
+export const opsProcessRedrivenDeadLettersSchema: OpsProcessRedrivenDeadLettersSchema =
+  opsProcessRedrivenDeadLettersSchemaDefinition;
+const opsProcessDiscardedDeadLettersSchemaDefinition = z.object({ discarded: z.number() });
+export interface OpsProcessDiscardedDeadLettersSchema extends Named<
+  typeof opsProcessDiscardedDeadLettersSchemaDefinition
+> {}
+export const opsProcessDiscardedDeadLettersSchema: OpsProcessDiscardedDeadLettersSchema =
+  opsProcessDiscardedDeadLettersSchemaDefinition;
+const opsProcessReleasedLeaseSchemaDefinition = z.object({ released: z.boolean() });
+export interface OpsProcessReleasedLeaseSchema extends Named<
+  typeof opsProcessReleasedLeaseSchemaDefinition
+> {}
+export const opsProcessReleasedLeaseSchema: OpsProcessReleasedLeaseSchema =
+  opsProcessReleasedLeaseSchemaDefinition;
 
 // ---------------------------------------------------------------------------
 // Event log, replay and anomalies
 // ---------------------------------------------------------------------------
 
 /** The tenant picker's answer: the projects the operator's query matched. */
-export const opsTenantSearchSchema = z.array(searchProjectsResultSchema);
+const opsTenantSearchSchemaDefinition = z.array(searchProjectsResultSchema);
+export interface OpsTenantSearchSchema extends Named<typeof opsTenantSearchSchemaDefinition> {}
+export const opsTenantSearchSchema: OpsTenantSearchSchema = opsTenantSearchSchemaDefinition;
 
 export const opsAggregateDiscoverySchema = aggregateDiscoverySchema;
-export const opsAggregateSearchSchema = z.array(aggregateSearchResultSchema);
-export const opsAggregateEventsSchema = z.array(aggregateEventViewSchema);
+const opsAggregateSearchSchemaDefinition = z.array(aggregateSearchResultSchema);
+export interface OpsAggregateSearchSchema extends Named<
+  typeof opsAggregateSearchSchemaDefinition
+> {}
+export const opsAggregateSearchSchema: OpsAggregateSearchSchema =
+  opsAggregateSearchSchemaDefinition;
+const opsAggregateEventsSchemaDefinition = z.array(aggregateEventViewSchema);
+export interface OpsAggregateEventsSchema extends Named<
+  typeof opsAggregateEventsSchemaDefinition
+> {}
+export const opsAggregateEventsSchema: OpsAggregateEventsSchema =
+  opsAggregateEventsSchemaDefinition;
 export const opsProjectionStateSchema = projectionStateAtEventSchema;
 
 /**
@@ -234,31 +394,72 @@ export const opsProjectionStateSchema = projectionStateAtEventSchema;
  * the page renders `status` and `message` today, and a real dry run replacing
  * this has to keep answering something the page can read.
  */
-export const opsDryRunReplaySchema = z.object({
+const opsDryRunReplaySchemaDefinition = z.object({
   status: z.literal("coming_soon"),
   message: z.string(),
   projectionNames: z.array(z.string()),
   sampleSize: z.number(),
 });
+export interface OpsDryRunReplaySchema extends Named<typeof opsDryRunReplaySchemaDefinition> {}
+export const opsDryRunReplaySchema: OpsDryRunReplaySchema = opsDryRunReplaySchemaDefinition;
 
 /** The started run's id. The status query is what reports its progress. */
-export const opsReplayStartedSchema = z.object({ runId: z.string() });
-export const opsReplayCancelledSchema = z.object({ cancelled: z.boolean() });
+const opsReplayStartedSchemaDefinition = z.object({ runId: z.string() });
+export interface OpsReplayStartedSchema extends Named<typeof opsReplayStartedSchemaDefinition> {}
+export const opsReplayStartedSchema: OpsReplayStartedSchema = opsReplayStartedSchemaDefinition;
+const opsReplayCancelledSchemaDefinition = z.object({ cancelled: z.boolean() });
+export interface OpsReplayCancelledSchema extends Named<
+  typeof opsReplayCancelledSchemaDefinition
+> {}
+export const opsReplayCancelledSchema: OpsReplayCancelledSchema =
+  opsReplayCancelledSchemaDefinition;
 
 /** Active tenant anomalies, hard tier first. */
-export const opsAnomalyListingSchema = z.object({ anomalies: z.array(anomalySchema) });
+const opsAnomalyListingSchemaDefinition = z.object({ anomalies: z.array(anomalySchema) });
+export interface OpsAnomalyListingSchema extends Named<typeof opsAnomalyListingSchemaDefinition> {}
+export const opsAnomalyListingSchema: OpsAnomalyListingSchema = opsAnomalyListingSchemaDefinition;
 /** False when the anomaly had already cleared, which is not a failure. */
-export const opsAnomalyDismissedSchema = z.object({ dismissed: z.boolean() });
+const opsAnomalyDismissedSchemaDefinition = z.object({ dismissed: z.boolean() });
+export interface OpsAnomalyDismissedSchema extends Named<
+  typeof opsAnomalyDismissedSchemaDefinition
+> {}
+export const opsAnomalyDismissedSchema: OpsAnomalyDismissedSchema =
+  opsAnomalyDismissedSchemaDefinition;
 
 // ---------------------------------------------------------------------------
 // System migrations
 // ---------------------------------------------------------------------------
 
-export const opsMigrationEnrolledSchema = z.object({ enrolled: z.literal(true) });
-export const opsMigrationWithdrawnSchema = z.object({ withdrawn: z.literal(true) });
-export const opsMigrationPassStartedSchema = z.object({ started: z.literal(true) });
-export const opsMigrationDrainAssertedSchema = z.object({ asserted: z.literal(true) });
-export const opsMigrationRolledBackSchema = z.object({ rolledBack: z.literal(true) });
+const opsMigrationEnrolledSchemaDefinition = z.object({ enrolled: z.literal(true) });
+export interface OpsMigrationEnrolledSchema extends Named<
+  typeof opsMigrationEnrolledSchemaDefinition
+> {}
+export const opsMigrationEnrolledSchema: OpsMigrationEnrolledSchema =
+  opsMigrationEnrolledSchemaDefinition;
+const opsMigrationWithdrawnSchemaDefinition = z.object({ withdrawn: z.literal(true) });
+export interface OpsMigrationWithdrawnSchema extends Named<
+  typeof opsMigrationWithdrawnSchemaDefinition
+> {}
+export const opsMigrationWithdrawnSchema: OpsMigrationWithdrawnSchema =
+  opsMigrationWithdrawnSchemaDefinition;
+const opsMigrationPassStartedSchemaDefinition = z.object({ started: z.literal(true) });
+export interface OpsMigrationPassStartedSchema extends Named<
+  typeof opsMigrationPassStartedSchemaDefinition
+> {}
+export const opsMigrationPassStartedSchema: OpsMigrationPassStartedSchema =
+  opsMigrationPassStartedSchemaDefinition;
+const opsMigrationDrainAssertedSchemaDefinition = z.object({ asserted: z.literal(true) });
+export interface OpsMigrationDrainAssertedSchema extends Named<
+  typeof opsMigrationDrainAssertedSchemaDefinition
+> {}
+export const opsMigrationDrainAssertedSchema: OpsMigrationDrainAssertedSchema =
+  opsMigrationDrainAssertedSchemaDefinition;
+const opsMigrationRolledBackSchemaDefinition = z.object({ rolledBack: z.literal(true) });
+export interface OpsMigrationRolledBackSchema extends Named<
+  typeof opsMigrationRolledBackSchemaDefinition
+> {}
+export const opsMigrationRolledBackSchema: OpsMigrationRolledBackSchema =
+  opsMigrationRolledBackSchemaDefinition;
 
 // ---------------------------------------------------------------------------
 // The operator-only ClickHouse EXPLAIN
@@ -269,10 +470,12 @@ export const opsExplainTypeSchema = z.enum(["PLAN", "SYNTAX", "PIPELINE", "AST",
 export type OpsExplainType = z.infer<typeof opsExplainTypeSchema>;
 
 /** What the operator tool posts. */
-export const opsExplainRequestSchema = z.object({
+const opsExplainRequestSchemaDefinition = z.object({
   query: z.string().trim().min(1, "query is required").max(50_000),
   type: opsExplainTypeSchema.optional(),
 });
+export interface OpsExplainRequestSchema extends Named<typeof opsExplainRequestSchemaDefinition> {}
+export const opsExplainRequestSchema: OpsExplainRequestSchema = opsExplainRequestSchemaDefinition;
 export type OpsExplainRequest = z.infer<typeof opsExplainRequestSchema>;
 
 /**

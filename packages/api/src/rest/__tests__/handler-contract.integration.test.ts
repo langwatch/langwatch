@@ -7,6 +7,7 @@ import { moduleApi } from "@langwatch/module";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
+import { authorizationPort } from "../../__tests__/api-double.ts";
 import { createErrorHandler } from "../../errors.ts";
 import { defineRestRouter } from "../declaration.ts";
 import { createRestRuntime } from "../runtime.ts";
@@ -26,6 +27,7 @@ const notes = defineRestRouter(NoteApi)
   .withInput(z.object({ projectId: z.string(), pages: z.coerce.number().int() }))
   .withPermission("annotations:update")
   .withOutput(z.object({ id: z.string(), pages: z.number() }))
+  .withoutAudit("test route")
   .handle(({ app, input }) => app.createNote(input))
   .build();
 
@@ -45,7 +47,10 @@ function mountNotes() {
     authorize,
   };
 
-  const app = createRestRuntime({ identity }).mount(notes.router(), {
+  const app = createRestRuntime({
+    authorization: authorizationPort,
+    identity,
+  }).mount(notes.router(), {
     app: () => ({ createNote }),
     onError: createErrorHandler(),
   });

@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   createReloadTrigger,
+  createRetrySchedule,
   invalidateModules,
   recycleReason,
   staleModuleIds,
@@ -26,6 +27,32 @@ describe("given the in-process reload trigger", () => {
       }
       expect(run).toHaveBeenCalledTimes(1);
       expect(run.mock.calls[0]?.[0]).toHaveLength(30);
+      trigger.cancel();
+    });
+  });
+
+  describe("when edits arrive while the first boot is still running", () => {
+    /** @scenario "A change during the one-process host's boot is answered by one follow-up reload" */
+    it("waits for the boot, then reloads once with every file", async () => {
+      let finishBoot = (): void => {};
+      const run = vi.fn(
+        (files: string[]) =>
+          new Promise<void>((resolve) => {
+            if (files.length === 0) finishBoot = resolve;
+            else resolve();
+          }),
+      );
+      const trigger = createReloadTrigger({ quietMs: 2_000, maxWaitMs: 30_000, run });
+      const booted = trigger.boot();
+      trigger.note("/repo/a.ts");
+      trigger.note("/repo/b.ts");
+      await vi.advanceTimersByTimeAsync(10_000);
+      expect(run).toHaveBeenCalledTimes(1);
+      finishBoot();
+      await booted;
+      await vi.advanceTimersByTimeAsync(2_000);
+      expect(run).toHaveBeenCalledTimes(2);
+      expect(run.mock.calls[1]?.[0]).toEqual(["/repo/a.ts", "/repo/b.ts"]);
       trigger.cancel();
     });
   });
@@ -88,6 +115,43 @@ describe("given the in-process host's recycle bounds", () => {
       expect(recycleReason({ generation: 1, rssMiB: 300, isDrainFailed: true, limits })).toBe(
         "generation 1 did not drain",
       );
+    });
+  });
+});
+
+describe("given a boot that failed", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  describe("when it keeps failing", () => {
+    /** @scenario "A failed boot retries on its own with a backoff" */
+    it("retries after 2 s, 5 s, 15 s, then every 30 s", async () => {
+      const retry = vi.fn();
+      const retries = createRetrySchedule({ retry });
+      const delays = Array.from({ length: 5 }, () => retries.failed());
+      expect(delays).toEqual([2_000, 5_000, 15_000, 30_000, 30_000]);
+      await vi.advanceTimersByTimeAsync(29_999);
+      expect(retry).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(1);
+      expect(retry).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("when a change arrives or a boot succeeds", () => {
+    /** @scenario "A failed boot retries on its own with a backoff" */
+    it("starts the schedule over and drops the pending retry", async () => {
+      const retry = vi.fn();
+      const retries = createRetrySchedule({ retry });
+      retries.failed();
+      retries.failed();
+      retries.reset();
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(retry).not.toHaveBeenCalled();
+      expect(retries.failed()).toBe(2_000);
     });
   });
 });

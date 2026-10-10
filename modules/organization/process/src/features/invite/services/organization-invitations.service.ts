@@ -8,12 +8,13 @@ import type {
   OrganizationListedInvite,
   OrganizationPendingInviteApplied,
   OrganizationUserRole,
+  PendingInvitationsByEmail,
 } from "@langwatch/organization-contract";
 
 import type { OrganizationInviteRepository } from "../../../repositories/organization-invite.repository.ts";
 import type { OrganizationUserDirectoryRepository } from "../../../repositories/organization-user-directory.repository.ts";
 import { resolveInviteDisplayStatus } from "../../../rules/invite-display-status.rules.ts";
-import { buildInviteAcceptUrl } from "../../../rules/invite-link.rules.ts";
+import { buildInviteAcceptUrl, buildMembersSettingsUrl } from "../../../rules/invite-link.rules.ts";
 import type {
   SeatLimitNoticeService,
   SeatLimitReached,
@@ -22,11 +23,11 @@ import type { InviteSendThrottleService } from "./invite-send-throttle.service.t
 import { InviteService } from "./invite.service.ts";
 
 /** One invitation as the acceptance ceremony reads it: the row and its organization. */
-export type OrganizationInviteWithOrganization = OrganizationInvite &
+type OrganizationInviteWithOrganization = OrganizationInvite &
   Readonly<{ organization: Readonly<{ id: string; name: string }> }>;
 
 /** One batch of invitations, and the organization they were written against. */
-export type OrganizationInvitesCreated = Readonly<{
+type OrganizationInvitesCreated = Readonly<{
   organization: Readonly<{ members: readonly unknown[] }>;
   invites: readonly Readonly<{ invite: OrganizationInvite; emailNotSent: boolean }>[];
 }>;
@@ -71,9 +72,15 @@ type OrganizationInvitationsStatusFacts = Readonly<{
 
 export interface OrganizationInvitations {
   create(input: OrganizationInvitationsCreateInput): Promise<OrganizationInvitesCreated>;
-  findPendingForAddresses(
-    input: Readonly<{ addresses: readonly string[] }>,
-  ): Promise<{ inviteCode: string; organizationName: string; role: OrganizationUserRole }[]>;
+  findPendingForAddresses(input: Readonly<{ addresses: readonly string[] }>): Promise<
+    {
+      inviteCode: string;
+      organizationName: string;
+      inviterName: string | null;
+      role: OrganizationUserRole;
+    }[]
+  >;
+  findPendingByEmail(input: Readonly<{ email: string }>): Promise<PendingInvitationsByEmail>;
   revoke(input: Readonly<{ organizationId: string; inviteId: string }>): Promise<void>;
   /**
    * Throttled per INVITATION, because the thing protected is the recipient's
@@ -105,6 +112,14 @@ export interface OrganizationInvitations {
   findByCode(
     input: Readonly<{ inviteCode: string }>,
   ): Promise<OrganizationInviteWithOrganization | null>;
+  /** {@link findByCode}, with the name of whoever sent the invitation. */
+  findLandingByCode(
+    input: Readonly<{ inviteCode: string }>,
+  ): Promise<
+    (OrganizationInviteWithOrganization & Readonly<{ inviterName: string | null }>) | null
+  >;
+  /** Mails an expired invitation's admins that somebody is waiting; mints nothing. */
+  requestFresh(input: Readonly<{ inviteCode: string }>): Promise<void>;
   /**
    * Whether ANY of the signed-in person's VERIFIED identifiers holds the
    * invited address, and which one vouched. Somebody not yet on identifiers
@@ -184,10 +199,13 @@ export class OrganizationInvitationsService implements OrganizationInvitations {
    * The answer carries the invitation code, the secret from the mail, so the
    * caller hands in verified addresses only. One read per distinct address.
    */
-  async findPendingForAddresses({
-    addresses,
-  }: Readonly<{ addresses: readonly string[] }>): Promise<
-    { inviteCode: string; organizationName: string; role: OrganizationUserRole }[]
+  async findPendingForAddresses({ addresses }: Readonly<{ addresses: readonly string[] }>): Promise<
+    {
+      inviteCode: string;
+      organizationName: string;
+      inviterName: string | null;
+      role: OrganizationUserRole;
+    }[]
   > {
     const normalized = [
       ...new Set(addresses.map((address) => address.trim().toLowerCase())),
@@ -198,6 +216,13 @@ export class OrganizationInvitationsService implements OrganizationInvitations {
       ),
     );
     return invites.filter((invite) => invite !== null);
+  }
+
+  /** Every pending invitation on one address, in any organization: the operator's lookup. */
+  findPendingByEmail({ email }: Readonly<{ email: string }>): Promise<PendingInvitationsByEmail> {
+    return this.options.repository.findPendingInvitesForAddress({
+      address: email.trim().toLowerCase(),
+    });
   }
 
   create(input: OrganizationInvitationsCreateInput): Promise<OrganizationInvitesCreated> {
@@ -278,6 +303,34 @@ export class OrganizationInvitationsService implements OrganizationInvitations {
 
     const { organization, ...invite } = found;
     return { ...invite, organization: { id: organization.id, name: organization.name } };
+  }
+
+  async findLandingByCode(
+    input: Readonly<{ inviteCode: string }>,
+  ): Promise<
+    (OrganizationInviteWithOrganization & Readonly<{ inviterName: string | null }>) | null
+  > {
+    const found = await this.options.repository
+      .getInviteLandingByCode(input)
+      .catch((error: unknown) => {
+        if (HandledError.isHandled(error) && error.code === "invite_not_found") return undefined;
+        throw error;
+      });
+    if (found === undefined || found.organization === null) return null;
+
+    const { organization, requestedByUser, ...invite } = found;
+    return {
+      ...invite,
+      organization: { id: organization.id, name: organization.name },
+      inviterName: requestedByUser?.name ?? null,
+    };
+  }
+
+  async requestFresh(input: Readonly<{ inviteCode: string }>): Promise<void> {
+    await this.options.invites.requestFreshInvite({
+      inviteCode: input.inviteCode,
+      membersSettingsUrl: buildMembersSettingsUrl(this.options.baseHost),
+    });
   }
 
   async matchToAcceptor(

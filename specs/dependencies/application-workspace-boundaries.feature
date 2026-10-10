@@ -43,6 +43,15 @@ Feature: Physical application workspace boundaries
       Then apps/scenario-child is not refused
       And the other directory is refused as an unknown application workspace
 
+    # dev/docs/ARCHITECTURE.md §1: npx @langwatch/server runs api and worker in one process (Alex, 2026-10-10).
+    @unit
+    Scenario: apps/backend is the one application that composes the api and the worker
+      Given apps/backend depends on and imports the api and the worker applications
+      When the application boundaries are checked
+      Then apps/backend is not refused
+      And apps/backend is refused for composing any other application
+      And any other application that composes the api and the worker is refused
+
     @unimplemented
     @architecture @packaging
     Scenario: The repository root is not the published server package

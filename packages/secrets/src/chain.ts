@@ -1,19 +1,20 @@
 /**
- * The lookup order the app states on the Server preamble. An order, never a
- * store: nothing pre-fetched or held — each fetch walks the adapters front to
- * back for ONE id, or one declared family's prefix, and forgets its answer.
+ * The lookup order the app states on the Server preamble. Each fetch walks the
+ * adapters front to back for ONE id, or one declared family's prefix. Only
+ * 1Password holds its answers, and only until the resolver seals.
  */
 import childProcess from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 
-import { OnePasswordInProductionError, OnePasswordUnavailableError } from "./secrets.errors.ts";
+import { OnePasswordInProductionError } from "./secrets.errors.ts";
 
 /** One place a single id can be read from, one key at a time, or scanned by one prefix. */
 type SecretAdapter = Readonly<{
   describe: string;
   read(id: string): Promise<string | undefined>;
   scan(prefix: string): Promise<ReadonlyMap<string, string>>;
+  forget?: () => void;
 }>;
 
 export class SecretsChain {
@@ -48,9 +49,9 @@ export class SecretsChain {
   }
 
   /**
-   * 1Password: one account key plus convention — your private vault, the
-   * LangWatch item, the handle's own id as the field. No account, inert
-   * word. A development convenience only: production refuses it by name.
+   * 1Password: vault Private, item LangWatch, the handle's id as the field; no
+   * account, inert. Best effort: one probe per boot, then capped parallel
+   * reads; a failed probe warns once and answers nothing. Production refuses.
    */
   withOnePassword(account: string | undefined): SecretsChain {
     const chosen = account?.trim();
@@ -61,11 +62,26 @@ export class SecretsChain {
       throw new OnePasswordInProductionError();
     }
 
+    let available: Promise<boolean> | undefined;
+    const answers = new Map<string, Promise<string | undefined>>();
+    const slot = limitTo(ONE_PASSWORD_CONCURRENCY);
+    const read = async (id: string): Promise<string | undefined> => {
+      available ??= probeOnePassword(chosen);
+      if (!(await available)) return undefined;
+
+      return slot(() => readOnePasswordField({ account: chosen, id }));
+    };
+
     return this.with({
       describe: `1password:${chosen}`,
-      read: (id) => readOnePasswordField({ account: chosen, id }),
+      read: (id) => {
+        const answer = answers.get(id) ?? read(id);
+        answers.set(id, answer);
+        return answer;
+      },
       // A vault item is not enumerated: a family answers from the environment only.
       scan: () => Promise.resolve(new Map()),
+      forget: () => answers.clear(),
     });
   }
 
@@ -93,6 +109,11 @@ export class SecretsChain {
     return answers;
   }
 
+  /** Drops every answer an adapter held; the resolver calls it when it seals. */
+  forget(): void {
+    for (const adapter of this.adapters) adapter.forget?.();
+  }
+
   private with(adapter: SecretAdapter): SecretsChain {
     return new SecretsChain(this.environment, [...this.adapters, adapter]);
   }
@@ -100,8 +121,22 @@ export class SecretsChain {
 
 const ONE_PASSWORD_VAULT = "Private";
 const ONE_PASSWORD_ITEM = "LangWatch";
+const ONE_PASSWORD_CONCURRENCY = 8;
+const ONE_PASSWORD_TIMEOUT_MS = 15_000;
 
-/** `op read op://Private/LangWatch/<id>`: a missing key is an ordinary miss. */
+/** One cheap `op whoami`; a failure warns once, naming why, and 1Password sits out the boot. */
+async function probeOnePassword(account: string): Promise<boolean> {
+  const result = await run("op", ["whoami", "--account", account]);
+
+  if (result.code === 0) return true;
+
+  console.warn(
+    `[secrets] 1Password skipped for this boot (${firstLine(result)}); optional secrets stay unset.`,
+  );
+  return false;
+}
+
+/** `op read op://Private/LangWatch/<id>`: a missing key, or any failure, is a miss. */
 async function readOnePasswordField(options: {
   account: string;
   id: string;
@@ -111,26 +146,58 @@ async function readOnePasswordField(options: {
 
   if (result.code === 0) return presentOrAbsent(result.stdout);
 
-  if (/isn't an item|not found|no item matched|isn't a field/i.test(result.stderr)) {
-    return undefined;
+  if (!/isn't an item|not found|no item matched|isn't a field/i.test(result.stderr)) {
+    console.warn(`[secrets] 1Password could not read ${options.id} (${firstLine(result)}).`);
   }
 
-  throw new OnePasswordUnavailableError(result.stderr.split("\n")[0] || `op exited ${result.code}`);
+  return undefined;
 }
 
-function run(
-  command: string,
-  args: readonly string[],
-): Promise<{ code: number; stdout: string; stderr: string }> {
-  return new Promise((resolve, reject) => {
-    const child = childProcess.spawn(command, [...args], { stdio: ["ignore", "pipe", "pipe"] });
+type RunResult = { code: number; stdout: string; stderr: string };
+
+/** Never rejects: a missing binary or a timeout is a failed result like any other. */
+function run(command: string, args: readonly string[]): Promise<RunResult> {
+  return new Promise((resolve) => {
+    const child = childProcess.spawn(command, [...args], {
+      stdio: ["ignore", "pipe", "pipe"],
+      timeout: ONE_PASSWORD_TIMEOUT_MS,
+    });
     let stdout = "";
     let stderr = "";
     child.stdout.on("data", (chunk: Buffer) => (stdout += chunk.toString("utf8")));
     child.stderr.on("data", (chunk: Buffer) => (stderr += chunk.toString("utf8")));
-    child.on("error", reject);
-    child.on("close", (code) => resolve({ code: code ?? 0, stdout, stderr }));
+    child.on("error", (error: NodeJS.ErrnoException) => {
+      const reason = error.code === "ENOENT" ? `${command} not found` : error.message;
+      resolve({ code: -1, stdout: "", stderr: reason });
+    });
+    child.on("close", (code, signal) => {
+      const reason = signal === null ? stderr : `${command} timed out (${signal})`;
+      resolve({ code: code ?? -1, stdout, stderr: reason });
+    });
   });
+}
+
+function firstLine(result: RunResult): string {
+  return result.stderr.split("\n")[0] || `op exited ${result.code}`;
+}
+
+/** At most `max` tasks in flight; a finished task hands its slot straight to the next. */
+function limitTo(max: number): <T>(task: () => Promise<T>) => Promise<T> {
+  let active = 0;
+  const waiting: (() => void)[] = [];
+
+  return async (task) => {
+    if (active < max) active++;
+    else await new Promise<void>((wake) => waiting.push(wake));
+
+    try {
+      return await task();
+    } finally {
+      const next = waiting.shift();
+      if (next) next();
+      else active--;
+    }
+  };
 }
 
 /** Reads one KEY=VALUE line from a dotenv file without holding the file. */

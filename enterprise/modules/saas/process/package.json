@@ -22,15 +22,16 @@
   },
   "dependencies": {
     "@langwatch/api": "workspace:*",
+    "@langwatch/authz-contract": "workspace:*",
     "@langwatch/enterprise-licensing-contract": "workspace:*",
     "@langwatch/enterprise-saas-contract": "workspace:*",
+    "@langwatch/eventing": "workspace:*",
     "@langwatch/module": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/ops-contract": "workspace:*",
     "@langwatch/process": "workspace:*",
     "@langwatch/process-stores": "workspace:*",
     "@langwatch/time": "workspace:*",
-    "posthog-node": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {

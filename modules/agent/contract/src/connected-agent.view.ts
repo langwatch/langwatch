@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 /** Connected-agent presence and ownership displayed by the management UI (ADR-128). */
@@ -6,15 +7,17 @@ import type { ConnectedAgentConfig } from "./config/connected.ts";
 import type { ConnectedAgentSelectability } from "./connected-agent.selectable.ts";
 
 /** The SDK that registered an agent, as the card prints it. */
-export const connectedAgentSdkSchema = z.object({
+const connectedAgentSdkSchemaDefinition = z.object({
   name: z.string(),
   version: z.string(),
   language: z.string(),
 });
+export interface ConnectedAgentSdkSchema extends Named<typeof connectedAgentSdkSchemaDefinition> {}
+export const connectedAgentSdkSchema: ConnectedAgentSdkSchema = connectedAgentSdkSchemaDefinition;
 export type ConnectedAgentSdk = z.infer<typeof connectedAgentSdkSchema>;
 
 /** One instance of a connected agent, as the drawer's table reads it. */
-export const connectedAgentInstanceSchema = z.object({
+const connectedAgentInstanceSchemaDefinition = z.object({
   instanceId: z.string(),
   hostname: z.string(),
   username: z.string(),
@@ -25,13 +28,20 @@ export const connectedAgentInstanceSchema = z.object({
   inflight: z.number(),
   maxConcurrency: z.number(),
 });
+export interface ConnectedAgentInstanceSchema extends Named<
+  typeof connectedAgentInstanceSchemaDefinition
+> {}
+export const connectedAgentInstanceSchema: ConnectedAgentInstanceSchema =
+  connectedAgentInstanceSchemaDefinition;
 export type ConnectedAgentInstance = z.infer<typeof connectedAgentInstanceSchema>;
 
 /** The owner of an agent, as every surface reports it. */
-export const agentPresenceSchema = z.object({
+const agentPresenceSchemaDefinition = z.object({
   status: z.enum(["online", "offline"]),
   instances: z.array(connectedAgentInstanceSchema),
 });
+export interface AgentPresenceSchema extends Named<typeof agentPresenceSchemaDefinition> {}
+export const agentPresenceSchema: AgentPresenceSchema = agentPresenceSchemaDefinition;
 export type AgentPresence = z.infer<typeof agentPresenceSchema>;
 
 export interface ConnectedAgentOwner {

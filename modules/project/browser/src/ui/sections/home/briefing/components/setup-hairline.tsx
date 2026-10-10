@@ -54,7 +54,7 @@ export function SetupHairline() {
           borderWidth="1px"
           borderColor="border.muted"
           borderRadius="14px"
-          background="bg.surface"
+          background="bg.card"
           overflow="hidden"
         >
           <Collapsible.Trigger asChild>

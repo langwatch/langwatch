@@ -145,6 +145,7 @@ describe("the /api/webhooks/v1 door", () => {
         maxBatchSize: 50,
         maxBatchDelayMs: 5000,
         maxInFlight: 4,
+        allowSelfSignedCertificate: false,
         createdAt: new Date("2026-07-20T00:00:00.000Z"),
         updatedAt: new Date("2026-07-20T00:00:00.000Z"),
       };
@@ -194,6 +195,7 @@ describe("the /api/webhooks/v1 door", () => {
         maxBatchSize: 50,
         maxBatchDelayMs: 5000,
         maxInFlight: 4,
+        allowSelfSignedCertificate: false,
         createdAt: new Date("2026-07-20T00:00:00.000Z"),
         updatedAt: new Date("2026-07-20T00:00:00.000Z"),
       };

@@ -1,4 +1,5 @@
-import { isDeveloper, isFullMember, isLiteMember } from "@langwatch/entitlement-contract";
+import { countMemberSeats } from "@langwatch/entitlement-contract";
+import type { OrganizationMemberSeats } from "@langwatch/organization-contract";
 import {
   INVITE_STATUS,
   OrganizationUserRole,
@@ -54,8 +55,7 @@ export class PrismaOrganizationSeatRepository extends OrganizationSeatRepository
    * matching PENDING invite.
    */
   async getMemberCount(organizationId: string): Promise<number> {
-    const context = await this.getMemberClassificationContext(organizationId);
-    return this.countMembersByType(context, isFullMember);
+    return (await this.countMemberSeats(organizationId)).fullMembers;
   }
 
   /**
@@ -64,8 +64,7 @@ export class PrismaOrganizationSeatRepository extends OrganizationSeatRepository
    * expired, or no expiration).
    */
   async getMembersLiteCount(organizationId: string): Promise<number> {
-    const context = await this.getMemberClassificationContext(organizationId);
-    return this.countMembersByType(context, isLiteMember);
+    return (await this.countMemberSeats(organizationId)).liteMembers;
   }
 
   /**
@@ -73,8 +72,22 @@ export class PrismaOrganizationSeatRepository extends OrganizationSeatRepository
    * DEVELOPER invites. Shown on the plan page, never compared to a limit.
    */
   async getMembersDeveloperCount(organizationId: string): Promise<number> {
+    return (await this.countMemberSeats(organizationId)).developers;
+  }
+
+  /** Every seat in one read: full, lite and Developer, live invitations included. */
+  async countMemberSeats(organizationId: string): Promise<OrganizationMemberSeats> {
     const context = await this.getMemberClassificationContext(organizationId);
-    return this.countMembersByType(context, isDeveloper);
+    return countMemberSeats([
+      ...context.users.map((user) => ({
+        role: user.role,
+        permissions: context.userPermissionsMap.get(user.userId),
+      })),
+      ...context.pendingInvites.map((invite) => ({
+        role: invite.role,
+        permissions: this.getInvitePermissions(invite.teamAssignments, context.customRoleMap),
+      })),
+    ]);
   }
 
   /**
@@ -180,34 +193,6 @@ export class PrismaOrganizationSeatRepository extends OrganizationSeatRepository
     }
 
     return userPermissionsMap;
-  }
-
-  /**
-   * Counts members matching a classification predicate.
-   */
-  private countMembersByType(
-    context: MemberClassificationContext,
-    predicate: (role: OrganizationUserRole, permissions: string[] | undefined) => boolean,
-  ): number {
-    let count = 0;
-
-    // Count from existing users
-    for (const user of context.users) {
-      const permissions = context.userPermissionsMap.get(user.userId);
-      if (predicate(user.role, permissions)) {
-        count++;
-      }
-    }
-
-    // Count from pending invites
-    for (const invite of context.pendingInvites) {
-      const permissions = this.getInvitePermissions(invite.teamAssignments, context.customRoleMap);
-      if (predicate(invite.role, permissions)) {
-        count++;
-      }
-    }
-
-    return count;
   }
 
   /**

@@ -22,7 +22,7 @@ import (
 // footer and the agent report so the shared/non-shared split is always explicit.
 const sharedResourcesNote = "shared ClickHouse · Postgres · Redis · observability are machine-wide and never removed"
 
-// cleanLogFile is where `haven clean` writes its structured log, under the haven
+// cleanLogFile is where `haven machine clean` writes its structured log, under the haven
 // home. Every path this command takes writes there and none writes to the
 // terminal: a reclaim of two hundred items emits two hundred zap records, and
 // interleaving those with a spinner (or with the plain per-item lines an agent
@@ -36,7 +36,7 @@ const (
 	confirmNoteJobs      = "each job keeps state.json + timeline.jsonl; everything else in its directory goes."
 )
 
-// cleanOutput is who owns stdout for one `haven clean` run. The command has
+// cleanOutput is who owns stdout for one `haven machine clean` run. The command has
 // exactly two output modes and they are mutually exclusive: a full-screen picker
 // that owns the terminal, or plain lines — one per item — that a person or an
 // agent reads top to bottom. Both send the structured log to a file, because in
@@ -71,7 +71,7 @@ func decideCleanOutput(isAgent, isTTY, unattended bool) cleanOutput {
 	return cleanOutput{Stream: streamPicker, LogFile: cleanLogFile}
 }
 
-// runClean is `haven clean` — the one cleanup command. In a terminal it opens
+// runClean is `haven machine clean` — the one cleanup command. In a terminal it opens
 // two pickers in turn, worktrees then agent job scratch, each with its own
 // concurrent scan, its own pre-ticks and its own confirmation; then it reclaims
 // the safe categories — regenerable build artifacts and orphaned dev processes —
@@ -109,7 +109,7 @@ func runClean(ctx context.Context, d deps, inv invocation) error {
 	return runInteractiveClean(ctx, run)
 }
 
-// cleanRun is one `haven clean` invocation: the wired graph, the settings the
+// cleanRun is one `haven machine clean` invocation: the wired graph, the settings the
 // flags resolved to, who owns the output, and the tally the whole run adds up
 // into. It exists so each step takes the run rather than five loose arguments,
 // and so no step can read a different scope from its neighbour.
@@ -140,7 +140,7 @@ func newCleanRun(d deps, inv invocation) *cleanRun {
 	}
 }
 
-// unattended is `haven clean --yes`: no picker, no spinner, one plain line per
+// unattended is `haven machine clean --yes`: no picker, no spinner, one plain line per
 // item, and one summary naming each kind separately.
 func (r *cleanRun) unattended(ctx context.Context) error {
 	if err := r.d.orch.Prune(ctx, r.d.worktree, app.PruneOptions{
@@ -156,7 +156,7 @@ func (r *cleanRun) unattended(ctx context.Context) error {
 	return nil
 }
 
-// runInteractiveClean is the terminal cleanup flow, shared by `haven clean` and
+// runInteractiveClean is the terminal cleanup flow, shared by `haven machine clean` and
 // the hub's "c" handoff: the worktree picker, then the job-scratch picker, then
 // the always-safe orphan reaping. Two pickers, never one merged list — the two
 // kinds have different guards, different consequences and different ages, and a
@@ -327,7 +327,7 @@ func reclaimableJobs(jobs []app.JobRow) []app.JobRow {
 func reapOrphanPlays(ctx context.Context, d deps) {
 	n, err := d.orch.ReapOrphanPlays(ctx)
 	if err != nil {
-		fmt.Printf("play sandbox reaping hit errors (re-run haven clean): %v\n", err)
+		fmt.Printf("play sandbox reaping hit errors (re-run haven machine clean): %v\n", err)
 	}
 	if n > 0 {
 		fmt.Printf("reaped %d orphaned play sandbox(es)\n", n)
@@ -449,7 +449,7 @@ func (r *cleanRun) report(ctx context.Context) error {
 	metas := make([]app.PruneMeta, len(rows))
 	d.orch.ScanMeta(ctx, rows, func(i int, meta app.PruneMeta) { metas[i] = meta })
 
-	fmt.Printf("haven clean — %s\n\n", domain.WorktreeKind.Count(len(rows)))
+	fmt.Printf("haven machine clean — %s\n\n", domain.WorktreeKind.Count(len(rows)))
 	defaults := 0
 	for i, r := range rows {
 		meta := metas[i]
@@ -467,7 +467,7 @@ func (r *cleanRun) report(ctx context.Context) error {
 		for _, rec := range orphans {
 			fmt.Printf("   pr-%d  %s\n", rec.Number, rec.Checkout)
 		}
-		fmt.Println("Run `haven clean --yes` (or `haven clean` in a terminal) to reap them.")
+		fmt.Println("Run `haven machine clean --yes` (or `haven machine clean` in a terminal) to reap them.")
 	}
 
 	days := int(threshold / (24 * time.Hour))
@@ -475,7 +475,7 @@ func (r *cleanRun) report(ctx context.Context) error {
 	r.jobReport()
 	r.claudeStateReport(ctx)
 	fmt.Println(strings.ToUpper(sharedResourcesNote[:1]) + sharedResourcesNote[1:] + ".")
-	fmt.Println("Run `haven clean` in a terminal for the two pickers (worktrees, then job scratch); `haven clean --yes` reclaims build caches, orphan processes, temporary and merged worktrees, and cold job scratch — never a database.")
+	fmt.Println("Run `haven machine clean` in a terminal for the two pickers (worktrees, then job scratch); `haven machine clean --yes` reclaims build caches, orphan processes, temporary and merged worktrees, and cold job scratch — never a database.")
 	return nil
 }
 

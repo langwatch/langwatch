@@ -8,7 +8,6 @@ import {
   Alert,
   Box,
   Button,
-  Card,
   Field,
   HStack,
   Input,
@@ -17,11 +16,18 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+import {
+  SettingsEmptyState,
+  SettingsSection,
+  SettingsSectionRow,
+} from "@langwatch/design-system/settings-section";
 import { readableDate } from "@langwatch/time";
 import { Fingerprint, MoreVertical, Usb } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
+import { api } from "../../behavior/personal-workspace-api.ts";
 import { useLastWayInWarning } from "../../behavior/use-last-way-in-warning.ts";
+import { SSO_HANDLES_SIGN_IN } from "../../model/last-way-in.ts";
 import {
   usePersonalWorkspaceHost,
   type HeldPasskey,
@@ -199,46 +205,38 @@ function PasskeyGroup({
         {heading}
       </Text>
       {passkeys.map((passkey) => (
-        <Card.Root key={passkey.id} width="full" data-testid="passkey-card">
-          <Card.Body paddingY={3}>
-            <HStack>
-              <Box color="fg.muted" display="flex">
-                {isSecurityKey(passkey) ? <Usb size={16} /> : <Fingerprint size={16} />}
-              </Box>
-              <VStack align="start" gap={0}>
-                <Text fontSize="sm" fontWeight={500}>
-                  {passkeyLabel(passkey)}
-                </Text>
-                <Text fontSize="xs" color="fg.muted">
-                  Added {readableDate(passkey.createdAt).toLocaleDateString()}
-                </Text>
-              </VStack>
-              <Spacer />
-              {/* One trigger per row, per row-actions-overflow-menu.md: two icon
+        <SettingsSectionRow key={passkey.id} data-testid="passkey-card">
+          <Box color="fg.muted" display="flex">
+            {isSecurityKey(passkey) ? <Usb size={16} /> : <Fingerprint size={16} />}
+          </Box>
+          <VStack align="start" gap={0}>
+            <Text fontSize="sm" fontWeight={500}>
+              {passkeyLabel(passkey)}
+            </Text>
+            <Text fontSize="xs" color="fg.muted">
+              Added {readableDate(passkey.createdAt).toLocaleDateString()}
+            </Text>
+          </VStack>
+          <Spacer />
+          {/* One trigger per row, per row-actions-overflow-menu.md: two icon
                   buttons in a row is the pattern that doc exists to stop, and it
                   puts a destructive action one stray click from a credential. */}
-              <Menu.Root>
-                <Menu.Trigger asChild>
-                  <Button
-                    size="xs"
-                    variant="ghost"
-                    aria-label={`Actions for ${passkeyLabel(passkey)}`}
-                  >
-                    <MoreVertical size={14} />
-                  </Button>
-                </Menu.Trigger>
-                <Menu.Content>
-                  <Menu.Item value="rename" onClick={() => onRename(passkey)}>
-                    Rename
-                  </Menu.Item>
-                  <Menu.Item value="remove" color="red.500" onClick={() => onRemove(passkey)}>
-                    Remove
-                  </Menu.Item>
-                </Menu.Content>
-              </Menu.Root>
-            </HStack>
-          </Card.Body>
-        </Card.Root>
+          <Menu.Root>
+            <Menu.Trigger asChild>
+              <Button size="xs" variant="ghost" aria-label={`Actions for ${passkeyLabel(passkey)}`}>
+                <MoreVertical size={14} />
+              </Button>
+            </Menu.Trigger>
+            <Menu.Content>
+              <Menu.Item value="rename" onClick={() => onRename(passkey)}>
+                Rename
+              </Menu.Item>
+              <Menu.Item value="remove" color="red.fg" onClick={() => onRemove(passkey)}>
+                Remove
+              </Menu.Item>
+            </Menu.Content>
+          </Menu.Root>
+        </SettingsSectionRow>
       ))}
     </VStack>
   );
@@ -255,6 +253,14 @@ function LastWayInNotice({ passkeys }: { passkeys: number | undefined }) {
         <Alert.Description>{warning.message}</Alert.Description>
       </Alert.Content>
     </Alert.Root>
+  );
+}
+
+function SsoGovernedLine() {
+  return (
+    <Text fontSize="sm" color="fg.muted" data-testid="passkeys-sso-governed">
+      {SSO_HANDLES_SIGN_IN}
+    </Text>
   );
 }
 
@@ -280,10 +286,17 @@ export function PasskeysSection() {
     }
   }, [host]);
 
+  // The account-security nudge creates passkeys too, outside this card; its
+  // offer is re-read after each one, so a fresh offer means a fresh list.
+  const nudgeReadAt = api.user.secureAccountNudge.useQuery({}).dataUpdatedAt;
+  // Where an organization's single sign-on governs sign-in, a passkey is refused there anyway.
+  const ssoGoverned =
+    api.identity.mySignInGovernance.useQuery({}, { enabled: passkeysEnabled }).data
+      ?.governedBySso === true;
   useEffect(() => {
     if (!passkeysEnabled) return;
     void reload();
-  }, [passkeysEnabled, reload]);
+  }, [passkeysEnabled, reload, nudgeReadAt]);
 
   /**
    * Says what happened, and says nothing at all about a decision. A
@@ -337,52 +350,39 @@ export function PasskeysSection() {
   };
 
   return (
-    <VStack
-      width="full"
-      align="start"
-      gap={4}
+    <SettingsSection
+      anchorId="passkeys"
+      icon={<Fingerprint size={18} />}
+      title="Passkeys"
+      hint="Sign in with the fingerprint, face or screen lock you already use. There is nothing to remember and nothing to phish."
       data-testid="passkeys-settings-section"
-      id="passkeys"
     >
       <VStack width="full" align="start" gap={4} data-testid="passkeys-section">
-        <VStack align="start" gap={1}>
-          <HStack gap={2}>
-            <Fingerprint size={18} />
-            <Text fontWeight={600}>Passkeys</Text>
-          </HStack>
-          <Text color="fg.muted" fontSize="sm">
-            Sign in with the fingerprint, face or screen lock you already use. There is nothing to
-            remember and nothing to phish.
-          </Text>
-        </VStack>
-
         <LastWayInNotice passkeys={isPending ? undefined : held.length} />
 
         {isPending ? <Spinner size="sm" /> : null}
 
         {!isPending && held.length === 0 ? (
-          <Card.Root width="full" data-testid="passkeys-empty">
-            <Card.Body>
-              <VStack align="start" gap={3}>
-                <Text fontWeight={500}>No passkeys yet</Text>
-                {/* Said in terms of what somebody already does with their device,
-                  because "public key credential" is not a thing anybody has ever
-                  wanted. */}
-                <Text fontSize="sm">
-                  A passkey is an encrypted key you create with your fingerprint, face or screen
-                  lock. It is kept by your passkey provider, so it works on your other devices too.
-                </Text>
+          <SettingsEmptyState
+            icon={<Fingerprint size={20} />}
+            title="No passkeys yet"
+            description="A passkey is an encrypted key you create with your fingerprint, face or screen lock. It is kept by your passkey provider, so it works on your other devices too."
+            data-testid="passkeys-empty"
+            action={
+              ssoGoverned ? (
+                <SsoGovernedLine />
+              ) : (
                 <Button
-                  colorPalette="orange"
+                  variant="outline"
                   loading={isCreating}
                   onClick={() => void create()}
                   data-testid="create-passkey"
                 >
                   Create a passkey
                 </Button>
-              </VStack>
-            </Card.Body>
-          </Card.Root>
+              )
+            }
+          />
         ) : null}
 
         {held.length > 0 ? (
@@ -400,15 +400,19 @@ export function PasskeysSection() {
               onRemove={setRemoving}
             />
             <Box>
-              <Button
-                variant="outline"
-                size="sm"
-                loading={isCreating}
-                onClick={() => void create()}
-                data-testid="create-passkey"
-              >
-                Create a passkey
-              </Button>
+              {ssoGoverned ? (
+                <SsoGovernedLine />
+              ) : (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  loading={isCreating}
+                  onClick={() => void create()}
+                  data-testid="create-passkey"
+                >
+                  Create a passkey
+                </Button>
+              )}
             </Box>
           </VStack>
         ) : null}
@@ -440,6 +444,6 @@ export function PasskeysSection() {
           onRemove={remove}
         />
       </VStack>
-    </VStack>
+    </SettingsSection>
   );
 }

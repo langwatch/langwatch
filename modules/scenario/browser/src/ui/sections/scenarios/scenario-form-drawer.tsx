@@ -9,12 +9,12 @@ import { applyHandledErrorToForm, showErrorToast } from "@langwatch/browser-host
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { useRouter } from "@langwatch/browser-host/use-router";
 import {
+  Alert,
   Box,
   Button,
   chakra,
   Grid,
   GridItem,
-  Heading,
   HStack,
   Skeleton,
   Text,
@@ -252,7 +252,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
     <Drawer.Root open={isOpen} onOpenChange={({ open }) => !open && onClose()} size="xl">
       <Drawer.Content bg="bg">
         <Drawer.CloseTrigger />
-        <Drawer.Header borderBottomWidth="1px">
+        <Drawer.Header>
           {/* Being pointed at a scenario is enough to be editing one. Keying
               this off the loaded record alone retitled the drawer "Create
               Scenario" for the whole of the read. */}
@@ -428,28 +428,20 @@ function StaleVersionNotice({
   onReload: () => void;
 }) {
   return (
-    <VStack
-      align="start"
-      gap={2}
-      borderWidth="1px"
-      borderColor="orange.solid"
-      borderRadius="lg"
-      padding={3}
-      marginBottom={4}
-      data-testid="scenario-stale-version"
-    >
-      <Text fontSize="sm" fontWeight="medium">
-        This scenario changed since it was opened
-      </Text>
-      <Text fontSize="xs" color="fg.muted">
-        Somebody else saved {currentVersion > 0 ? `version ${currentVersion}` : "a newer version"}{" "}
-        while this one was open. Nothing was written, so your edits are still here. Reloading
-        replaces them with the newer version, so copy anything you want to keep first.
-      </Text>
-      <Button size="xs" variant="outline" onClick={onReload}>
-        Discard my edits and reload
-      </Button>
-    </VStack>
+    <Alert.Root status="warning" size="sm" marginBottom={4} data-testid="scenario-stale-version">
+      <Alert.Indicator />
+      <Alert.Content gap={2}>
+        <Alert.Title>This scenario changed since it was opened</Alert.Title>
+        <Alert.Description>
+          Somebody else saved {currentVersion > 0 ? `version ${currentVersion}` : "a newer version"}{" "}
+          while this one was open. Nothing was written, so your edits are still here. Reloading
+          replaces them with the newer version, so copy anything you want to keep first.
+        </Alert.Description>
+        <Button size="xs" variant="outline" alignSelf="start" onClick={onReload}>
+          Discard my edits and reload
+        </Button>
+      </Alert.Content>
+    </Alert.Root>
   );
 }
 
@@ -936,16 +928,14 @@ function ScenarioDrawerHeading({
     <VStack align="start" gap={1}>
       {isAgentTesting ? (
         <HStack gap={2}>
-          <Heading size="md">{isEditing ? "Edit scenario" : "New scenario"}</Heading>
+          <Drawer.Title>{isEditing ? "Edit scenario" : "New scenario"}</Drawer.Title>
           <CaseVersionChip version={version} />
         </HStack>
       ) : (
-        <Heading size="md">{isEditing ? "Edit Scenario" : "Create Scenario"}</Heading>
+        <Drawer.Title>{isEditing ? "Edit Scenario" : "Create Scenario"}</Drawer.Title>
       )}
       {isAgentTesting && (
-        <Text fontSize="sm" color="fg.muted">
-          {AGENT_TESTING_EDITOR_DESCRIPTION}
-        </Text>
+        <Drawer.Description>{AGENT_TESTING_EDITOR_DESCRIPTION}</Drawer.Description>
       )}
     </VStack>
   );

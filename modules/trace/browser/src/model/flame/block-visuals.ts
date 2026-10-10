@@ -57,7 +57,7 @@ function borderColorFor(emphasis: BlockEmphasis): string {
 
 function boxShadowFor(emphasis: BlockEmphasis): string | undefined {
   if (emphasis.isSelected) {
-    return "0 0 0 2px var(--chakra-colors-bg-panel), 0 2px 8px rgba(0,0,0,0.18)";
+    return "0 0 0 2px var(--chakra-colors-bg-panel), 0 2px 8px color-mix(in srgb, var(--chakra-colors-bg-scrim) 18%, transparent)";
   }
   return emphasis.isHovered ? "sm" : undefined;
 }

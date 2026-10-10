@@ -6,6 +6,7 @@ const observability = vi.hoisted(() => ({
   logger: {
     error: vi.fn(),
     info: vi.fn(),
+    warn: vi.fn(),
   },
 }));
 
@@ -13,7 +14,8 @@ vi.mock("@langwatch/observability", () => ({
   configureLogger: observability.configureLogger,
 }));
 
-vi.mock("@langwatch/observability/node", () => ({
+vi.mock(import("@langwatch/observability/node"), async (importOriginal) => ({
+  ...(await importOriginal()),
   createProcessObservability: vi.fn(() => ({
     logger: observability.logger,
     shutdown: observability.shutdown,
@@ -51,36 +53,30 @@ describe("local task executable", () => {
     observability.shutdown.mockResolvedValue(undefined);
     observability.logger.error.mockClear();
     observability.logger.info.mockClear();
+    observability.logger.warn.mockClear();
   });
 
-  it("preserves legacy logger aliases in its typed process projection", () => {
-    expect(
-      resolveLocalTaskExecutableConfig({
-        NODE_ENV: "production",
-        ENVIRONMENT: "staging",
-        OTEL_SERVICE_NAME: " custom-task ",
-        _LOG_LEVEL: "warn",
-        PINO_CONSOLE_LEVEL: "error",
-        PINO_OTEL_ENABLED: "true",
-        PINO_OTEL_LEVEL: "debug",
-        OTEL_RESOURCE_ATTRIBUTES: "service.version=1.2%2E3",
-        npm_package_version: "not-used-for-service-version",
-      }),
-    ).toEqual({
+  it("maps the telemetry slice, honouring old names and warning once per old name", () => {
+    const config = resolveLocalTaskExecutableConfig({
+      ENVIRONMENT: "staging",
+      OTEL_SERVICE_NAME: "custom-task",
+      _LOG_LEVEL: "warn",
+      LOG_CONSOLE_LEVEL: "error",
+    });
+
+    expect(config).toMatchObject({
       serviceName: "custom-task",
       environment: "staging",
-      logger: {
-        environment: "production",
-        format: undefined,
-        level: "warn",
-        consoleLevel: "error",
-        otelLevel: "debug",
-        otelExportEnabled: true,
-        serviceName: " custom-task ",
-        serviceVersion: "1.2.3",
-        deploymentEnvironment: "staging",
-        otelTransportServiceVersion: "not-used-for-service-version",
-      },
+      logger: { level: "warn", consoleLevel: "error", deploymentEnvironment: "staging" },
+    });
+    expect(config.deprecations).toHaveLength(1);
+  });
+
+  it("falls back to the task service name and the local environment", () => {
+    expect(resolveLocalTaskExecutableConfig(taskSource)).toMatchObject({
+      serviceName: "langwatch:task",
+      environment: "local",
+      deprecations: [],
     });
   });
 

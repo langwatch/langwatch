@@ -36,4 +36,8 @@ export const scimReconciliationTrpcTransport: TrpcRouterDeclaration<
   .withEntitlement("enterprise", { feature: "SCIM" })
   .withPermission("sso:view")
   .handle(async ({ app, input }) => (await app.findConnectionReconciliation(input))[0] ?? null)
+
+  .procedure("directoryMembers")
+  .withPermission("organization:manage")
+  .handle(({ app, input }) => app.findDirectoryMembers(input))
   .build();

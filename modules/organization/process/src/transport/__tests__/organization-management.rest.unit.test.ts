@@ -10,18 +10,19 @@ import {
   OrganizationMissingCredentialsError,
 } from "@langwatch/api";
 import {
-  bindRestMiddleware,
+  bindMiddlewareContext,
   createCanonicalFamilyErrorHandler,
   createRestRuntime,
   MANAGEMENT_API_VERSION,
 } from "@langwatch/api/rest";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { Temporal, type Instant } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
 import {
-  organizationKeyFacts,
+  organizationKeyContext,
   organizationManagementRest,
 } from "../organization-management.rest.ts";
 
@@ -45,6 +46,8 @@ function mount(app: Partial<OrganizationApi>) {
     };
   };
   const runtime = createRestRuntime({
+    audit: { record: async () => {} },
+    authorization: restTestAuthorization(),
     identity: {
       identify: ({ request }) => admit(request),
       authenticate: ({ request }) => admit(request),
@@ -55,7 +58,9 @@ function mount(app: Partial<OrganizationApi>) {
   const hono = runtime.mount(organizationManagementRest.router(), {
     app: () => createApiFixture<OrganizationApi>(app),
     onError,
-    facts: [bindRestMiddleware(organizationKeyFacts, () => ({ apiKeyId: "key-1" }))],
+    middlewareContext: [
+      bindMiddlewareContext(organizationKeyContext, () => ({ apiKeyId: "key-1" })),
+    ],
   });
 
   return (
@@ -236,6 +241,7 @@ describe("given the /api/organization family", () => {
       scopeId,
       scopeName: scopeId,
       permissions: ["traces:view"],
+      cappedBySeat: false,
     });
 
     /** @scenario "A member's access breakdown spans teams and projects" */

@@ -10,7 +10,7 @@ import {
   suiteTargetSchema,
 } from "@langwatch/suite-contract";
 import { useEffect, useMemo, useState } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 
 import {
@@ -81,12 +81,15 @@ export function useSuiteForm({
   const [rememberedTestSuiteIds, setRememberedTestSuiteIds] = useState<string[]>([]);
   const [rememberedLabels, setRememberedLabels] = useState<string[]>([]);
 
-  const selectedScenarioIds = form.watch("selectedScenarioIds");
-  const selectedTargets = z.array(suiteTargetSchema).parse(form.watch("selectedTargets"));
-  const labels = form.watch("labels");
-  const scope = suiteScopeSchema.parse(form.watch("scope"));
-  const simulatorModel = form.watch("simulatorModel");
-  const judgeModel = form.watch("judgeModel");
+  // The React Compiler memoises `form.watch()` on the stable form; useWatch subscribes.
+  const selectedScenarioIds = useWatch({ control: form.control, name: "selectedScenarioIds" });
+  const selectedTargets = z
+    .array(suiteTargetSchema)
+    .parse(useWatch({ control: form.control, name: "selectedTargets" }));
+  const labels = useWatch({ control: form.control, name: "labels" });
+  const scope = suiteScopeSchema.parse(useWatch({ control: form.control, name: "scope" }));
+  const simulatorModel = useWatch({ control: form.control, name: "simulatorModel" });
+  const judgeModel = useWatch({ control: form.control, name: "judgeModel" });
 
   const availableTargets = useMemo(() => getAvailableTargets(agents, prompts), [agents, prompts]);
 

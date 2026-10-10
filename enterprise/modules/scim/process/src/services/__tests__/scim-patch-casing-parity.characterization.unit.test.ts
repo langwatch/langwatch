@@ -7,7 +7,10 @@ import { describe, expect, it, vi } from "vitest";
 
 import { GrantsFake } from "../../__tests__/support/grants-fake.ts";
 import { HeldConnectionsFake } from "../../__tests__/support/held-connections-fake.ts";
-import { OrganizationAdministrationFake } from "../../__tests__/support/organization-administration-fake.ts";
+import {
+  MembersFake,
+  OrganizationAdministrationFake,
+} from "../../__tests__/support/organization-administration-fake.ts";
 import { scimRepositoryFixture } from "../../__tests__/support/scim-repository-fixture.ts";
 import type { ScimCostCenterFacts } from "../scim-cost-center.service.ts";
 import { ScimDirectoryService } from "../scim-directory.service.ts";
@@ -16,6 +19,11 @@ import { ScimGrantsService } from "../scim-grants.service.ts";
 import type { ScimUserProvisioning } from "../scim-provisioning.service.ts";
 import { ScimService } from "../scim.service.ts";
 import { QuietScimSyncLifecycle } from "./support/quiet-scim-sync-lifecycle.ts";
+
+/** Every seat free, so these tests admit full members (seat-limit-at-provisioning.feature). */
+const openSeats = {
+  countMemberSeats: async () => ({ fullMembers: 0, liteMembers: 0, developers: 0 }),
+};
 
 const patchSchema = "urn:ietf:params:scim:api:messages:2.0:PatchOp";
 const parse = (operations: unknown[]) =>
@@ -130,7 +138,9 @@ describe("SCIM PATCH operation casing parity", () => {
         },
       })),
     });
+    const members = new MembersFake();
     const service = ScimService.create({
+      members,
       connections: HeldConnectionsFake.of(),
       prisma: repo,
       writer: new GrantsFake(),
@@ -141,6 +151,7 @@ describe("SCIM PATCH operation casing parity", () => {
       lifecycle: new QuietScimSyncLifecycle(),
       provenOffboarding: false,
       tokenPepper: "scim-test-pepper",
+      seats: openSeats,
     });
     await service.updateUser({
       id: "user-1",
@@ -150,8 +161,11 @@ describe("SCIM PATCH operation casing parity", () => {
     expect(repo.saveUserResource).toHaveBeenCalledWith(
       expect.objectContaining({ userId: "user-1", active: false }),
     );
-    // A leaver stays a member holding nothing (scim-connection-sync.feature).
-    expect(repo.removeMembership).not.toHaveBeenCalled();
+    // A leaver's membership goes with their access (scim-connection-sync.feature).
+    expect(members.deleteMember).toHaveBeenCalledWith(
+      { organizationId: "org-1", userId: "user-1" },
+      null,
+    );
   });
 
   it("applies a capitalized Replace to group renaming", async () => {

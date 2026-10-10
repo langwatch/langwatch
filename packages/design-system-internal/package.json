@@ -1,6 +1,5 @@
 {
   "name": "@langwatch/design-system-internal",
-  "langwatch": { "group": "browser" },
   "version": "0.0.1",
   "private": true,
   "description": "The paper look of every internal console (haven hub and stack home, IdP simulator, mail sink): tokens, one stylesheet and a small set of React components (ADR-160).",
@@ -17,13 +16,15 @@
       "types": "./dist/tokens.d.ts",
       "default": "./src/tokens.ts"
     },
-    "./screenshot": "./gallery/capture.ts"
+    "./screenshot": "./gallery/capture.ts",
+    "./assets/haven.svg": "./assets/haven.svg"
   },
   "scripts": {
     "dev": "vite --config gallery/vite.config.ts",
     "screenshot": "node gallery/screenshot.ts",
     "typecheck": "tsc -b",
-    "test": "vitest run"
+    "test": "vitest run",
+    "generate:haven-icon": "node scripts/generate-haven-icon.mjs"
   },
   "dependencies": {},
   "devDependencies": {
@@ -43,5 +44,8 @@
   "peerDependencies": {
     "react": "catalog:",
     "react-dom": "catalog:"
+  },
+  "langwatch": {
+    "group": "browser"
   }
 }

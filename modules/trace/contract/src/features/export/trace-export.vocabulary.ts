@@ -1,4 +1,6 @@
 import { sharedFiltersInputSchema } from "@langwatch/analytics-contract";
+import type { Authorization } from "@langwatch/authorization";
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import type { TraceSharedFiltersInput } from "../../trace-legacy-read.types.ts";
@@ -63,6 +65,7 @@ export type ExportProgress = z.infer<typeof exportProgressSchema>;
 export type TraceExportDownloadInput = Readonly<{
   request: ExportRequest;
   userId: string;
+  authorization: Authorization;
 }>;
 
 /** A prepared export stream and the facts the HTTP door publishes before its body. */
@@ -73,7 +76,12 @@ export type TraceExportDownload = Readonly<{
   cancel(): Promise<void>;
 }>;
 
-export const traceExportRequestSchema = z.object({
+const traceExportRequestSchemaDefinition = z.object({
   ...traceExportRequestShape,
   filters: sharedFiltersInputSchema.shape.filters,
 });
+export interface TraceExportRequestSchema extends Named<
+  typeof traceExportRequestSchemaDefinition
+> {}
+export const traceExportRequestSchema: TraceExportRequestSchema =
+  traceExportRequestSchemaDefinition;

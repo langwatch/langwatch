@@ -4,7 +4,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { SelectionActionBar } from "./selection-action-bar.tsx";
 
 const meta = {
-  title: "Patterns/Selection action bar",
+  title: "Data display/Selection action bar",
   component: SelectionActionBar,
   tags: ["autodocs"],
   args: {
@@ -12,7 +12,14 @@ const meta = {
     onClear: () => undefined,
   },
   argTypes: { children: { control: false }, label: { control: "text" } },
-  parameters: { layout: "fullscreen" },
+  parameters: {
+    usage: {
+      use: "The floating bar of bulk actions once rows of a list are selected (selection-action-bar.md).",
+      avoid:
+        "Actions on one row: a Menu in the row's overflow cell (row-actions-overflow-menu.md).",
+    },
+    layout: "fullscreen",
+  },
   render: (args) => (
     <Box height="220px" position="relative">
       <SelectionActionBar {...args} />

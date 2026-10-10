@@ -1,4 +1,4 @@
-import type { ProjectApi } from "@langwatch/project-contract";
+import { isAggregateProjectKind, type ProjectApi } from "@langwatch/project-contract";
 
 /** A key read: the live project it belongs to, or an unknown key the caller refuses. */
 export type McpLiveProjectLookup =
@@ -25,7 +25,8 @@ export class ProjectMcpProjectLookupService {
     if (!projectId) return { kind: "unknown" };
 
     const identity = await this.#projects.findIdentity(projectId);
-    return identity
+    // ADR-144 decision 7: an aggregate accepts no key, its own included.
+    return identity && !isAggregateProjectKind(identity.kind)
       ? { kind: "live", project: { id: identity.id, teamId: identity.teamId } }
       : { kind: "unknown" };
   }

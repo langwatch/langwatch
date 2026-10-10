@@ -898,6 +898,134 @@
       "replacement": "`.withApi(...)`",
       "section": "§16",
       "ruled": "2026-10-01"
+    },
+    {
+      "spelling": "defineRestMiddleware",
+      "kind": "identifier",
+      "pattern": "\\bdefineRestMiddleware\\b",
+      "replacement": "`defineMiddlewareContext(name, schema)`",
+      "section": "§8, §15",
+      "ruled": "2026-10-10"
+    },
+    {
+      "spelling": "RestTransportMiddleware",
+      "kind": "identifier",
+      "pattern": "\\bRestTransportMiddleware(?:Binding)?\\b",
+      "replacement": "`MiddlewareContext` (and `MiddlewareContextBinding` at a host mount)",
+      "section": "§8, §15",
+      "ruled": "2026-10-10"
+    },
+    {
+      "spelling": ".withMiddleware(...)",
+      "kind": "call",
+      "pattern": "\\.withMiddleware\\(",
+      "replacement": "`.withMiddlewareContext(...)` on the route",
+      "section": "§8, §15",
+      "ruled": "2026-10-10"
+    },
+    {
+      "spelling": "bindRestMiddleware",
+      "kind": "identifier",
+      "pattern": "\\bbindRestMiddleware\\b",
+      "replacement": "a key of the module's `.provideMiddlewareContext({ ... })`",
+      "section": "§8, §15",
+      "ruled": "2026-10-10"
+    },
+    {
+      "spelling": "bindRestHeader",
+      "kind": "identifier",
+      "pattern": "\\bbindRestHeader\\b",
+      "replacement": "a key of `.provideMiddlewareContext({ name: (request) => request.headers.get(...) })`",
+      "section": "§8, §15",
+      "ruled": "2026-10-10"
+    },
+    {
+      "spelling": "projectRestFacts",
+      "kind": "identifier",
+      "pattern": "\\bprojectRestFacts\\b",
+      "replacement": "`projectRequestContext`, provided by the module with `projectRequestContextOf`",
+      "section": "§8, §15",
+      "ruled": "2026-10-10"
+    },
+    {
+      "spelling": "REST context bound in withTransportFacts or by the process",
+      "kind": "prose",
+      "replacement": "the owning module's `.provideMiddlewareContext({ ... })`",
+      "section": "§8, §15",
+      "ruled": "2026-10-10",
+      "note": "A binding is an ordinary call; only its place makes it wrong, which no pattern sees."
+    },
+    {
+      "spelling": "defineTrpcFact",
+      "kind": "identifier",
+      "pattern": "\\bdefineTrpcFact\\b",
+      "replacement": "`defineMiddlewareContext(name, schema)`",
+      "section": "§8, §15",
+      "ruled": "2026-10-10"
+    },
+    {
+      "spelling": "TrpcFact",
+      "kind": "identifier",
+      "pattern": "\\bTrpcFact(?:Binding|Values)?\\b",
+      "replacement": "`MiddlewareContext`, `TrpcMiddlewareContextBinding`, `TrpcMiddlewareContextValues`",
+      "section": "§8, §15",
+      "ruled": "2026-10-10"
+    },
+    {
+      "spelling": ".withFacts(...)",
+      "kind": "call",
+      "pattern": "\\.withFacts\\(",
+      "replacement": "`.withMiddlewareContext(...)` on the procedure",
+      "section": "§8, §15",
+      "ruled": "2026-10-10"
+    },
+    {
+      "spelling": "bindTrpcFact",
+      "kind": "identifier",
+      "pattern": "\\bbindTrpcFact\\b",
+      "replacement": "`bindTrpcMiddlewareContext(context, resolve)`",
+      "section": "§8, §15",
+      "ruled": "2026-10-10"
+    },
+    {
+      "spelling": "withTransportFacts",
+      "kind": "identifier",
+      "pattern": "\\bwithTransportFacts\\b",
+      "replacement": "`.provideMiddlewareBindings(() => [...])`",
+      "section": "§8, §15",
+      "ruled": "2026-10-10"
+    },
+    {
+      "spelling": "TransportFactBinding",
+      "kind": "identifier",
+      "pattern": "\\b(?:TransportFactBinding|BoundTransportFacts|ModuleTransportFacts?(?:Setup)?)\\b",
+      "replacement": "`MiddlewareBinding`, `BoundMiddlewareBindings`",
+      "section": "§8, §15",
+      "ruled": "2026-10-10"
+    },
+    {
+      "spelling": "<x>Fact middleware constants",
+      "kind": "identifier",
+      "pattern": "\\b(?:operator|sessionPerson|opsOperator|organizationSessionPerson|browserSession|callerAddress|gatewaySession|presenceSessionPerson|callerEmail|authRequestHeaders|currencyRequestHeaders|twoStepRequestHeaders|shareViewer|billingCallerEmail|automationCallerEmail)Fact\\b",
+      "replacement": "`<x>Context`",
+      "section": "§8, §15",
+      "ruled": "2026-10-10"
+    },
+    {
+      "spelling": "adminAuthSession",
+      "kind": "identifier",
+      "pattern": "\\badminAuthSession\\b",
+      "replacement": "the door's `browserSessionContext`, supplied by `browserSessionOfRequest`",
+      "section": "§8, §15",
+      "ruled": "2026-10-10"
+    },
+    {
+      "spelling": "a mount's or websocket protocol's `facts`",
+      "kind": "prose",
+      "replacement": "`middlewareBindings` on a host mount, `middlewareContext` on a tRPC mount or websocket protocol",
+      "section": "§8, §15",
+      "ruled": "2026-10-10",
+      "note": "`facts` is ordinary English for domain and event facts elsewhere, which no pattern can tell apart."
     }
   ]
 }

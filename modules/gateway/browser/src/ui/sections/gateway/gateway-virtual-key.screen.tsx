@@ -1,6 +1,7 @@
 import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
+import { ListTable } from "@langwatch/design-system/list-table";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import {
   Badge,
@@ -24,7 +25,7 @@ import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { VirtualKeyCamelDtoResponse } from "@langwatch/gateway-contract";
 import { Temporal, formatDistanceToNow, toEpochMs, readableDate } from "@langwatch/time";
 import { Bird, FileClock, PauseCircle, Pencil, PlayCircle, RotateCw, Trash2 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import {
   Area,
   AreaChart,
@@ -60,6 +61,7 @@ import { VirtualKeyEditDrawer } from "../../../features/virtual-keys/ui/sections
 import { VirtualKeySecretReveal } from "../../../features/virtual-keys/ui/sections/virtual-key-secret-reveal.tsx";
 import { VirtualKeyUsageSnippet } from "../../../features/virtual-keys/ui/sections/virtual-key-usage-snippet.tsx";
 import type { GatewayTeam } from "../../../model/gateway-host.ts";
+import { useGatewayHost } from "../../../model/gateway-host.ts";
 import { keepPreviousData } from "../../../model/keep-previous-data.ts";
 import { Link } from "../../../ui/elements/gateway-link.tsx";
 import AiGatewayLayout from "../../../ui/sections/gateway-layout.tsx";
@@ -281,7 +283,8 @@ async function runKeyAction<Key>(input: {
 
 function VirtualKeyDetailPage() {
   const showErrorToast = useShowErrorToast();
-  const { organization, hasPermission } = useOrganizationTeamProject();
+  const { organization } = useOrganizationTeamProject();
+  const host = useGatewayHost();
   const router = useGatewayRouter();
   const vkId = typeof router.query.id === "string" ? router.query.id : "";
   const orgId = organization?.id ?? "";
@@ -302,14 +305,8 @@ function VirtualKeyDetailPage() {
     { organizationId: orgId, id: routingPolicyId ?? "" },
     { enabled: !!orgId && !!routingPolicyId, retry: false },
   );
-  const availableTeams = useMemo(
-    () => organization?.teams?.map((t) => ({ id: t.id, name: t.name })) ?? [],
-    [organization?.teams],
-  );
-  const availableProjects = useMemo(
-    () => availableProjectsOf(organization?.teams ?? []),
-    [organization?.teams],
-  );
+  const availableTeams = organization?.teams?.map((t) => ({ id: t.id, name: t.name })) ?? [];
+  const availableProjects = availableProjectsOf(organization?.teams ?? []);
   // The model picked in Spend by model, or null for every model. It
   // narrows the recent-activity list only, so it rides the same query and
   // leaves the totals, the chart and the model list themselves whole.
@@ -356,9 +353,9 @@ function VirtualKeyDetailPage() {
   // provider (see snippetModel below).
   const [snippetModelOverride, setSnippetModelOverride] = useState<string | null>(null);
 
-  const canUpdate = hasPermission("virtualKeys:update");
-  const canRotate = hasPermission("virtualKeys:rotate");
-  const canAttachGuardrails = hasPermission("gatewayGuardrails:attach");
+  const canUpdate = host.hasPermission("virtualKeys:update");
+  const canRotate = host.hasPermission("virtualKeys:rotate");
+  const canAttachGuardrails = host.hasPermission("gatewayGuardrails:attach");
 
   const vk = detailQuery.data;
 
@@ -367,56 +364,44 @@ function VirtualKeyDetailPage() {
   // form (so a self-hosted / custom key shows `custom/<model>`, not the
   // OpenAI-only `gpt-5-mini`). `gpt-5-mini` is only the placeholder shown
   // before the eligible providers resolve.
-  const computedDefaultModel = useMemo(
-    () =>
-      firstEligibleDefaultModel({
-        scopes: vk?.scopes ?? [],
-        providers: (orgProvidersQuery.data ?? []) as OrgModelProvider[],
-        availableProjects,
-        organizationId: orgId,
-      }),
-    [vk?.scopes, orgProvidersQuery.data, availableProjects, orgId],
-  );
+  const computedDefaultModel = firstEligibleDefaultModel({
+    scopes: vk?.scopes ?? [],
+    providers: (orgProvidersQuery.data ?? []) as OrgModelProvider[],
+    availableProjects,
+    organizationId: orgId,
+  });
   const snippetModel = snippetModelOverride ?? computedDefaultModel ?? "gpt-5-mini";
 
   // Guardrails are project-scoped: only a VK reachable from exactly one
   // PROJECT scope has a single guardrail surface to edit.
-  const guardrailProject = useMemo(
-    () => guardrailProjectOf({ scopes: vk?.scopes ?? [], teams: organization?.teams ?? [] }),
-    [vk?.scopes, organization?.teams],
-  );
+  const guardrailProject = guardrailProjectOf({
+    scopes: vk?.scopes ?? [],
+    teams: organization?.teams ?? [],
+  });
 
-  const viewTracesHref = useMemo(
-    () => tracesHrefFor({ vk, teams: organization?.teams ?? [] }),
-    [vk, organization?.teams],
-  );
+  const viewTracesHref = tracesHrefFor({ vk, teams: organization?.teams ?? [] });
   // The same link, narrowed to whatever the usage block is showing, so the
   // trace list opens on the requests the table underneath it lists.
-  const usageTracesHref = useMemo(
-    () => tracesHrefFor({ vk, teams: organization?.teams ?? [], model: usageModel }),
-    [vk, organization?.teams, usageModel],
-  );
+  const usageTracesHref = tracesHrefFor({
+    vk,
+    teams: organization?.teams ?? [],
+    model: usageModel,
+  });
 
   const routingPolicyName = routingPolicyQuery.data?.name ?? null;
   // The providers the pinned policy walks, so the panel can mark one the
   // key may hold but dispatch would never reach.
-  const routingPolicyProviderIds = useMemo(
-    () => stringIdsOf(routingPolicyQuery.data?.modelProviderIds),
-    [routingPolicyQuery.data?.modelProviderIds],
-  );
-  const providersAllowed = useMemo(() => {
+  const routingPolicyProviderIds = stringIdsOf(routingPolicyQuery.data?.modelProviderIds);
+  const providersAllowed = (() => {
     const config = vk?.config as VkConfig | null | undefined;
     return config?.providersAllowed ?? null;
-  }, [vk?.config]);
+  })();
 
-  const guardrailAttachments = useMemo(
-    () =>
-      ((vk?.config as { guardrailAttachments?: unknown } | null)?.guardrailAttachments ?? []) as {
-        direction: "pre" | "post" | "stream_chunk";
-        guardrailIds: string[];
-      }[],
-    [vk?.config],
-  );
+  const guardrailAttachments = ((vk?.config as { guardrailAttachments?: unknown } | null)
+    ?.guardrailAttachments ?? []) as {
+    direction: "pre" | "post" | "stream_chunk";
+    guardrailIds: string[];
+  }[];
 
   const confirmRotate = () =>
     runKeyAction({
@@ -507,9 +492,7 @@ function VirtualKeyDetailPage() {
 
               <GridItem area="main" minWidth={0}>
                 <VStack align="stretch" gap={6}>
-                  <Section title="How to use">
-                    <VirtualKeyUsageSnippet model={snippetModel} />
-                  </Section>
+                  <VirtualKeyUsageSnippet model={snippetModel} />
 
                   <Section title="Scope & routing">
                     <VStack align="stretch" gap={3}>
@@ -814,8 +797,8 @@ function UsageSection({
               <AreaChart data={points} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
                 <defs>
                   <linearGradient id="vkSpendFill" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#f97316" stopOpacity={0.35} />
-                    <stop offset="100%" stopColor="#f97316" stopOpacity={0} />
+                    <stop offset="0%" stopColor="var(--chakra-colors-chart-1)" stopOpacity={0.35} />
+                    <stop offset="100%" stopColor="var(--chakra-colors-chart-1)" stopOpacity={0} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid
@@ -844,7 +827,7 @@ function UsageSection({
                 <Area
                   type="monotone"
                   dataKey="spendUsd"
-                  stroke="#f97316"
+                  stroke="var(--chakra-colors-chart-1)"
                   strokeWidth={2}
                   fill="url(#vkSpendFill)"
                 />
@@ -899,7 +882,11 @@ function UsageSection({
                 No requests on that model in the last 30 days.
               </Text>
             ) : (
-              <Table.Root size="sm" variant="line">
+              <ListTable
+                containerProps={{ overflowX: "auto", maxWidth: "full" }}
+                size="sm"
+                variant="line"
+              >
                 <Table.Header>
                   <Table.Row>
                     <Table.ColumnHeader>When</Table.ColumnHeader>
@@ -938,7 +925,7 @@ function UsageSection({
                     </Table.Row>
                   ))}
                 </Table.Body>
-              </Table.Root>
+              </ListTable>
             )}
           </VStack>
         )}

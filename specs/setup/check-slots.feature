@@ -6,7 +6,7 @@ Feature: Machine-wide slots for whole-repo checks
 
   # Optional Haven hooks own agent admission (haven-agent-hooks.feature).
   # Repository scripts and pnpm-generated tool launchers run directly.
-  # `haven slot run -- <command>` provides explicit terminal admission;
+  # `haven machine slot run -- <command>` provides explicit terminal admission;
   # The JavaScript check-queue.mjs and its bin shims are retired.
   # Flock waiters retry every 100 ms without changing capacity or memory limits.
 
@@ -294,8 +294,8 @@ Feature: Machine-wide slots for whole-repo checks
 
   # --- The queue lives inside haven ---
 
-  # The queue's decisions are Go code in haven: `haven slot run -- <cmd>`
-  # takes a slot from the same flock semaphore `haven typecheck` holds — one
+  # The queue's decisions are Go code in haven: `haven machine slot run -- <cmd>`
+  # takes a slot from the same flock semaphore `haven machine typecheck` holds — one
   # counter for everything that saturates the cores — then runs the command
   # with the gate off and the Go memory cap set, exactly as the JS wrapper
   # would. check-queue.mjs delegates to it whenever the haven binary is
@@ -332,13 +332,13 @@ Feature: Machine-wide slots for whole-repo checks
     And once a slot frees it reports how long it queued
 
   @unit
-  Scenario: haven typecheck and delegated checks share one counter
-    Given "haven typecheck" holds a check slot
+  Scenario: haven machine typecheck and delegated checks share one counter
+    Given "haven machine typecheck" holds a check slot
     Then a delegated check counts against the same semaphore, not a second ledger
 
   @unit
-  Scenario: haven typecheck is not gated twice
-    Given "haven typecheck" already holds one of its own RAM slots
+  Scenario: haven machine typecheck is not gated twice
+    Given "haven machine typecheck" already holds one of its own RAM slots
     When it runs "pnpm typecheck"
     Then it passes CHECK_SLOTS=0 to that run
     And the run is counted once, by haven's slot
@@ -424,9 +424,9 @@ Feature: Machine-wide slots for whole-repo checks
     And with HAVEN_PRIORITY unset, or a claim inside the metering window, nothing is claimed and nothing is written
 
   @unit
-  Scenario: haven slot explain shows each holder and waiter with class, age and effective priority
+  Scenario: haven machine slot explain shows each holder and waiter with class, age and effective priority
     Given at least one run holding the shared slot and at least one run queued behind it
-    When "haven slot explain" runs
+    When "haven machine slot explain" runs
     Then each holder is listed with its own kind and how long it has held the slot
     And each waiter is listed with its caller class, how long it has waited, and its effective priority right now
 

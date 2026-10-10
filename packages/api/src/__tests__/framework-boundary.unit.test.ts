@@ -156,6 +156,7 @@ describe("the @langwatch/api package boundary", () => {
         }),
         checkScopeLineage: async () => ({ kind: "consistent" }),
         organizationOf: async () => null,
+        projectKindOf: async () => "application",
       });
       const trpc = TrpcHost.create({
         sessions: SessionReader.create({ verify: async () => ({ userId: "sam" }) }),

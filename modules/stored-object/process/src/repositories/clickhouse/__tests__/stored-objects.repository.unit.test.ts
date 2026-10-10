@@ -117,7 +117,7 @@ describe("StoredObjectsRepository", () => {
     const tenantId = "proj-1";
 
     /** @scenario "Every legacy index statement declares itself unscoped" */
-    it("declares itself unscoped, or the tenant guard refuses it", async () => {
+    it("skips the tenant check, or the tenant guard refuses it", async () => {
       mockQueryResult.json.mockResolvedValue([]);
       await repo.tryFindById({ projectId: tenantId, id: "x" });
 
@@ -125,7 +125,9 @@ describe("StoredObjectsRepository", () => {
       const call = mockQuery.mock.calls[0]![0];
       const request = { tenantId, sql: call.query, params: call.query_params };
       expect(() => new TenantGuard().assert(request)).toThrow(TenantScopeError);
-      expect(() => new TenantGuard().assert({ ...request, unscoped: call.unscoped })).not.toThrow();
+      expect(() =>
+        new TenantGuard().assert({ ...request, SKIP_TENANT_CHECK: call.SKIP_TENANT_CHECK }),
+      ).not.toThrow();
       expect(call.query).toContain("project_id = {projectId:String}");
     });
   });

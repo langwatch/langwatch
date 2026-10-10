@@ -113,6 +113,12 @@ const pullSource = sourceRow({
   pullSchedule: "0 * * * *",
 });
 
+const httpPullSource = sourceRow({
+  id: "src_http_pull",
+  name: "HTTP pull",
+  sourceType: "http_custom",
+});
+
 const pushSource = sourceRow({ id: "src_push", name: "Push source", sourceType: "otel_generic" });
 
 const renderDrawer = (source: Source) =>
@@ -174,6 +180,16 @@ describe("given the edit form's closing note about what cannot change", () => {
       renderDrawer(pullSource);
 
       expect(screen.queryByText(/ingest secret are immutable/i)).toBeNull();
+      expect(screen.getByText(/Source type is immutable after create/i)).toBeInTheDocument();
+    });
+  });
+
+  describe("when the admin opens a custom HTTP pull source", () => {
+    /** @scenario "A custom HTTP pull source is not pointed at a rotate control it does not have" */
+    it("does not point at Rotate secret", () => {
+      renderDrawer(httpPullSource);
+
+      expect(screen.queryByText(/Rotate secret/i)).toBeNull();
       expect(screen.getByText(/Source type is immutable after create/i)).toBeInTheDocument();
     });
   });

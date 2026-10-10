@@ -1,4 +1,8 @@
 import type { AuthFederatedPasswordOutcome } from "@langwatch/auth-contract";
+import { Secret } from "@langwatch/secrets";
+
+/** The Auth0 Management app's secret; absent, the login app's stands in, as main's did. */
+export const auth0ManagementSecret = Secret.load("AUTH0_MGMT_CLIENT_SECRET", { optional: true });
 
 /** One password change for an identity in the deployment's Auth0 database connection. */
 export type Auth0PasswordChangeRequest = {

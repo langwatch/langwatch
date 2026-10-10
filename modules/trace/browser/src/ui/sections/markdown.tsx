@@ -1,6 +1,7 @@
 import { Link as UiLink } from "@langwatch/browser-host/link";
 import { stringifyIfObject } from "@langwatch/browser-host/markdown";
 import { useRouter } from "@langwatch/browser-host/use-router";
+import { CodePreview } from "@langwatch/design-system/code-preview";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { getProxiedImageUrl } from "@langwatch/design-system/external-image";
 import { chakra } from "@langwatch/design-system/primitives";
@@ -9,7 +10,6 @@ import { Children, isValidElement, memo, type ReactNode, useState } from "react"
 import ReactMarkdown, { defaultUrlTransform } from "react-markdown";
 import remarkGfm from "remark-gfm";
 
-import { RenderCode } from "../blocks/code/render-code.tsx";
 import { Prose } from "../elements/prose.tsx";
 
 function codeText(children: ReactNode): string {
@@ -81,7 +81,7 @@ function MarkdownWithPluginsAndProxy({
             const code = codeText(children).replace(/\n$/, "");
 
             if (code.includes("\n")) {
-              return <RenderCode language={match ? match[1]! : ""} code={code} />;
+              return <CodePreview language={match?.[1] ?? "text"} code={code} compact />;
             }
             return (
               <code className={className} {...rest}>

@@ -54,7 +54,8 @@ describe("organization routing", () => {
         organizationId: "org-private",
         sql,
         params: { organizationId: "org-private" },
-        unscoped: { reason: "Billing aggregates all projects in this organisation" },
+        // Billing aggregates all projects in this organisation.
+        SKIP_TENANT_CHECK: true,
       });
 
       expect(result.rows).toEqual([{ total: 7 }]);
@@ -151,7 +152,8 @@ describe("organization routing", () => {
           tenantId: "",
           sql: "SELECT AggregateId FROM event_log WHERE AggregateId LIKE {query:String}",
           params: { query: "%abc%" },
-          unscoped: { reason: "Operator searches across tenants" },
+          // Operator searches run across tenants.
+          SKIP_TENANT_CHECK: true,
         }),
       ).rejects.toBeInstanceOf(ClickHouseNotConfiguredError);
       expect(isolated.query).not.toHaveBeenCalled();

@@ -15,6 +15,7 @@ import {
   PromptPlaygroundSignInRequiredError,
 } from "@langwatch/prompt-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import type { StudioClientEvent, WorkflowApi } from "@langwatch/workflow-contract";
 import type { ErrorHandler } from "hono";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -119,6 +120,7 @@ function buildApi(overrides: Partial<TestOptions> = {}) {
   });
 
   const runtime = createRestRuntime({
+    authorization: restTestAuthorization(),
     identity: {
       authenticate: () => ({ actor: null, scope: null }),
       identify: async ({ request }) => {

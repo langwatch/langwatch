@@ -1,4 +1,5 @@
 import { formatCost, formatTokens } from "@langwatch/design-system/display-formatters";
+import { FormattedNumber } from "@langwatch/design-system/formatted-number";
 import { ListTable } from "@langwatch/design-system/list-table";
 import { Table } from "@langwatch/design-system/primitives";
 import numeral from "numeral";
@@ -39,10 +40,18 @@ export const ContributorsSection: React.FC<{
                 {numeral(contributor.sessionsCount).format("0,0")}
               </Table.Cell>
               <Table.Cell textAlign="end" fontSize="sm">
-                {formatTokens(contributor.totalTokens)}
+                <FormattedNumber value={contributor.totalTokens} unit="tokens">
+                  {formatTokens(contributor.totalTokens)}
+                </FormattedNumber>
               </Table.Cell>
               <Table.Cell textAlign="end" fontSize="sm">
-                {contributor.costUsd === null ? MISSING_VALUE : formatCost(contributor.costUsd)}
+                {contributor.costUsd === null ? (
+                  MISSING_VALUE
+                ) : (
+                  <FormattedNumber value={contributor.costUsd} currency="USD">
+                    {formatCost(contributor.costUsd)}
+                  </FormattedNumber>
+                )}
               </Table.Cell>
             </Table.Row>
           ))}

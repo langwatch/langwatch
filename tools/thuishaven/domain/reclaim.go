@@ -9,7 +9,7 @@ import (
 
 // WorktreeClass names why a worktree is reclaimable sooner than the plain idle
 // clock would say. The empty class is the ordinary case: nothing about the
-// worktree says it may go, so only the operator's own tick in `haven clean`
+// worktree says it may go, so only the operator's own tick in `haven machine clean`
 // removes it.
 type WorktreeClass string
 

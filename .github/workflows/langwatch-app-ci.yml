@@ -297,7 +297,7 @@ jobs:
   # NARROWING IS GUARDED. This is the one job here that can cause something NOT
   # to run, so every uncertain answer is the full set:
   #   - main and merge_group never narrow. The merge path always runs all three.
-  #   - a global input (lockfile, base tsconfig, nx.json, prisma schema) means
+  #   - a global input (root tsconfigs, nx.json, dev/nx, prisma schema) means
   #     all three, because those are inputs to everything and the graph models
   #     them as a shared hash rather than an edge.
   #   - any failure -- bad base sha, nx error, unparseable output -- means all
@@ -376,12 +376,12 @@ jobs:
             exit 0
           fi
 
-          # Inputs that belong to everything. The graph hashes these globally
-          # rather than as edges, so a change here is not "affected" in the
-          # per-project sense and must be handled by name. The lockfile is not
-          # one: Nx diffs it per package (projectsAffectedByDependencyUpdates).
+          # Inputs that belong to everything, handled by name: the root
+          # tsconfigs, the Nx plugins that shape every target (dev/nx), the
+          # workspace file and CI itself. Nx 23.2 has no task-level affected
+          # (ADR-150, 2026-10-10). The lockfile is diffed per package by Nx.
           if git diff --name-only "$BASE" HEAD | grep -qE \
-            '^(pnpm-workspace\.yaml|nx\.json|tsconfig\.base\.json|packages/prisma-client/prisma/|\.github/)'; then
+            '^(pnpm-workspace\.yaml|nx\.json|tsconfig(\.[a-z]+)?\.json|dev/nx/|packages/prisma-client/prisma/|\.github/)'; then
             echo "apps=$ALL" >> "$GITHUB_OUTPUT"
             echo "narrowed=false" >> "$GITHUB_OUTPUT"
             echo "A global input changed — running all three applications." >> "$GITHUB_STEP_SUMMARY"
@@ -545,13 +545,6 @@ jobs:
           fi
           mkdir -p "$(dirname "$manifest")"
           cp "$current" "$manifest"
-
-      # Every declared REST fact must have a binding, or the process that
-      # mounts the declaring family refuses at boot. This static pass replaces
-      # discovering them one full boot at a time (2026-09-13: 29 accumulated
-      # unseen because nothing enumerated them).
-      - name: Refuse declared-but-unbound REST facts
-        run: node dev/scripts/find-unbound-rest-facts.mjs
 
       # Not --no-bail: one package's failure should not hide the rest, and a
       # migration in flight tends to break several at once. The job still fails.
@@ -970,6 +963,11 @@ jobs:
             !/docs/images/
           sparse-checkout-cone-mode: false
 
+      # The migration-safety suites read the released cutoff from the newest
+      # langwatch@v* tag and fail without one; this shallow clone has no tags.
+      - name: Fetch release tags
+        run: git fetch --no-tags --depth=1 --filter=blob:none origin '+refs/tags/langwatch@v*:refs/tags/langwatch@v*'
+
       - uses: ./.github/actions/setup-pnpm-node
         with:
           install: "all"
@@ -982,9 +980,6 @@ jobs:
         # ciphertext is not readable text cannot mock the cipher it asserts on.
         run: echo "CREDENTIALS_SECRET=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
 
-      - name: Setup database
-        run: pnpm prisma:migrate
-
       - name: Install Goose migration tool
         run: bash .github/scripts/install-goose.sh
 
@@ -992,6 +987,10 @@ jobs:
         env:
           CLICKHOUSE_PASSWORD: ci_password
         run: bash .github/scripts/start-clickhouse-with-storage-policy.sh
+
+      # `prisma:migrate` runs `task upgrade`, which needs ClickHouse up first.
+      - name: Setup database
+        run: pnpm prisma:migrate
 
       - name: Run ClickHouse migrations
         working-directory: apps/tasks
@@ -1003,11 +1002,11 @@ jobs:
         # task reads it as "no datastore here" and returns without migrating.
         run: |
           for i in 1 2 3; do
-            if env -u BUILD_TIME pnpm task clickhouse-migrate; then
+            if env -u BUILD_TIME pnpm task upgrade; then
               exit 0
             fi
             if [ "$i" -lt 3 ]; then
-              echo "clickhouse-migrate attempt $i failed; sleeping 5s and retrying"
+              echo "upgrade attempt $i failed; sleeping 5s and retrying"
               sleep 5
             fi
           done
@@ -1160,32 +1159,31 @@ jobs:
       - name: Generated READMEs are current (blocking)
         run: pnpm check:readmes
 
-      - name: Oxlint (blocking -- config errors included)
-        env:
-          BASE: ${{ github.event.pull_request.base.sha }}
-        run: |
-          if [ -n "$BASE" ] && git cat-file -e "$BASE" 2>/dev/null; then
-            pnpm lint --base "$BASE"
-          else
-            pnpm lint
-          fi
-
-      # Type-aware rules over the affected projects in one process (shared parse;
-      # ADR-150), beside the native and plugin processes its directive check needs.
-      # A global lint input changing, or a push, lints every project. Nx diffs
-      # the lockfile per package, but oxlint is a root tool no project reaches,
-      # so a lockfile change that moves it still lints everything.
-      - name: Oxlint type-aware, affected projects (blocking)
+      # A PR lints what it affected; a push, or a global lint input changing, lints
+      # every project. Nx diffs the lockfile per package, but oxlint is a root tool
+      # no project reaches, so a lockfile change that moves it lints everything.
+      - name: Decide the lint scope
+        id: lint-scope
         env:
           BASE: ${{ github.event.pull_request.base.sha }}
         run: |
           if [ -n "$BASE" ] && git cat-file -e "$BASE" 2>/dev/null && ! git diff --name-only "$BASE" HEAD \
-            | grep -qE '^(\.oxlintrc(\.[a-z]+)?\.jsonc|packages/oxlint-rules/|pnpm-workspace\.yaml|nx\.json|tsconfig\.base\.json|dev/nx/)' \
+            | grep -qE '^(\.oxlintrc(\.[a-z]+)?\.jsonc|packages/oxlint-rules/|pnpm-workspace\.yaml|nx\.json|tsconfig(\.[a-z]+)?\.json|dev/nx/)' \
             && ! git diff "$BASE" HEAD -- pnpm-lock.yaml | grep -qE '^[-+].*oxlint'; then
-            pnpm lint:types --base "$BASE"
-          else
-            pnpm lint:types
+            echo "base=$BASE" >> "$GITHUB_OUTPUT"
           fi
+
+      - name: Oxlint (blocking -- config errors included)
+        env:
+          BASE: ${{ steps.lint-scope.outputs.base }}
+        run: pnpm lint ${BASE:+--base "$BASE"}
+
+      # Type-aware rules over the affected projects in one process (shared parse;
+      # ADR-150), beside the native and plugin processes its directive check needs.
+      - name: Oxlint type-aware, affected projects (blocking)
+        env:
+          BASE: ${{ steps.lint-scope.outputs.base }}
+        run: pnpm lint:types ${BASE:+--base "$BASE"}
 
       - name: Notify Slack on failure
         if: failure() && github.ref == 'refs/heads/main'

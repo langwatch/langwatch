@@ -1,7 +1,7 @@
 import { Link } from "@langwatch/browser-host/link";
 import { Button } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { ExternalLink } from "react-feather";
+import { ExternalLink } from "lucide-react";
 
 /**
  * Links the studio evaluations panel across to the full experiment

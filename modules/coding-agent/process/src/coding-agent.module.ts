@@ -1,5 +1,4 @@
 import {
-  bindRestMiddleware,
   credentialPrincipalOfToken,
   organizationCredentialOfRequest,
   projectCredentialOfRequest,
@@ -10,12 +9,8 @@ import { defineProcessModule, type PublishedProcessModule } from "@langwatch/pro
 import { CodingAgentModule } from "./app/coding-agent.app.ts";
 import { codingAgentEventing } from "./eventing/coding-agent-processing.pipeline.ts";
 import { codingAgentRepositories } from "./repositories/coding-agent-repositories.registry.ts";
-import { codingAgentV1Rest, codingAgentV1RestCaller } from "./transport/coding-agent-v1.rest.ts";
-import {
-  codingAgentRest,
-  codingAgentRestCaller,
-  codingAgentRollupRest,
-} from "./transport/coding-agent.rest.ts";
+import { codingAgentV1Rest } from "./transport/coding-agent-v1.rest.ts";
+import { codingAgentRest, codingAgentRollupRest } from "./transport/coding-agent.rest.ts";
 import { codingAgentTrpcTransport } from "./transport/coding-agent.trpc.ts";
 
 export const codingAgentProcessModule: PublishedProcessModule<
@@ -32,9 +27,9 @@ export const codingAgentProcessModule: PublishedProcessModule<
     codingAgentTrpcTransport,
   )
   .withEventing(codingAgentEventing)
-  .withTransportFacts(() => [
-    bindRestMiddleware(codingAgentRestCaller, (context) => {
-      const resolved = projectCredentialOfRequest(context.req.raw);
+  .provideMiddlewareContext({
+    codingAgentRestCaller: (request) => {
+      const resolved = projectCredentialOfRequest(request);
 
       return {
         project: {
@@ -43,9 +38,9 @@ export const codingAgentProcessModule: PublishedProcessModule<
         },
         credential: credentialPrincipalOfToken(resolved),
       };
-    }),
-    bindRestMiddleware(codingAgentV1RestCaller, (context) => {
-      const credential = organizationCredentialOfRequest(context.req.raw);
+    },
+    codingAgentV1RestCaller: (request) => {
+      const credential = organizationCredentialOfRequest(request);
 
       return {
         apiKeyId: credential.apiKeyId,
@@ -54,5 +49,5 @@ export const codingAgentProcessModule: PublishedProcessModule<
         // acts as nobody - one stable string per credential either way.
         actorId: credential.userId ?? `apikey:${credential.apiKeyId}`,
       };
-    }),
-  ]);
+    },
+  });

@@ -49,6 +49,20 @@ export class InMemoryConnections
     return candidate;
   }
 
+  async release({
+    organizationId,
+    commandId,
+  }: {
+    organizationId: string;
+    commandId: string;
+  }): Promise<void> {
+    for (const [key, slot] of this.registrationSlots) {
+      if (slot.organizationId !== organizationId || slot.commandId !== commandId) continue;
+      if (this.states.has(slot.connectionId)) continue;
+      this.registrationSlots.delete(key);
+    }
+  }
+
   async getConnection({ connectionId }: { connectionId: string }): Promise<SsoConnectionState> {
     const state = this.states.get(connectionId);
     if (!state) throw new SsoConnectionNotFoundError(`connection ${connectionId} does not exist`);

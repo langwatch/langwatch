@@ -1,5 +1,5 @@
 import { Drawer } from "@langwatch/design-system/drawer";
-import { Button, Heading, HStack, Spacer } from "@langwatch/design-system/primitives";
+import { Button, HStack, Spacer } from "@langwatch/design-system/primitives";
 import { ArrowLeft, Maximize2, Minimize2 } from "lucide-react";
 import { type ReactNode, useState } from "react";
 
@@ -49,7 +49,7 @@ export function SecondaryDrawerShell({
             <Button variant="ghost" size="sm" aria-label="Back" onClick={onClose}>
               <ArrowLeft size={16} />
             </Button>
-            <Heading size="md">{title}</Heading>
+            <Drawer.Title>{title}</Drawer.Title>
             <Spacer />
             {headerRight}
             <Button

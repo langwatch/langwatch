@@ -30,7 +30,7 @@ export function PatternListField({
                 placeholder={placeholder}
                 value={pattern}
                 aria-label={`${label} ${index + 1}`}
-                borderColor={error ? "red.500" : undefined}
+                borderColor={error ? "red.fg" : undefined}
                 onChange={(event) =>
                   onChange(
                     patterns.map((candidate, position) =>
@@ -49,7 +49,7 @@ export function PatternListField({
               </Button>
             </HStack>
             {error && (
-              <Text fontSize="xs" color="red.500">
+              <Text fontSize="xs" color="red.fg">
                 {error}
               </Text>
             )}

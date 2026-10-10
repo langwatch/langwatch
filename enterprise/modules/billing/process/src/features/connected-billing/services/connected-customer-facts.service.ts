@@ -3,16 +3,18 @@
 /**
  * What a connected customer's statement and admin console overview read from the
  * modules that own it (ADR-156 section 7): the customers from the organization
- * directory, the contract budget and seats from the license registry; spend
- * and projects through gateway's and project's shares (round 37 D5).
+ * directory, the terms and seats from the license registry; spend, the contract
+ * budget and projects through gateway's and project's shares (round 37 D5; C3a D5).
  */
 
 import type { ConnectedSpendView } from "@langwatch/enterprise-billing-contract";
 import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
+import { bucketScopeIdFor } from "@langwatch/gateway-contract";
 import { INSTANT_EVAL_REQUEST_TYPE } from "@langwatch/instant-eval-judge-contract";
 import type { Instant } from "@langwatch/time";
 
 import type { BillingAccountFactsRepository } from "../../../repositories/billing-account-facts.repository.ts";
+import type { BillingContractBudgetRepository } from "../../../repositories/billing-contract-budget.repository.ts";
 import type { BillingGatewaySpendRepository } from "../../../repositories/billing-gateway-spend.repository.ts";
 import type { BillingProjectDirectoryRepository } from "../../../repositories/billing-project-directory.repository.ts";
 import type {
@@ -36,16 +38,15 @@ const SERVICE_REQUEST_TYPES: Readonly<Record<string, string>> = {
 
 /** The peers the facts are read through, each only as wide as the reads. */
 export type ConnectedCustomerPeers = Readonly<{
-  licensing: Pick<LicensingApi, "getConnectedSeats" | "getHostedUsage" | "getContractTerms">;
+  licensing: Pick<LicensingApi, "getConnectedSeats" | "getContractTerms">;
   gateway: Pick<
     BillingGatewaySpendRepository,
-    "isSpendSourceAvailable" | "sumSpendNanoUsdByRequestType"
+    "isSpendSourceAvailable" | "sumSpendNanoUsdByRequestType" | "sumBudgetSpendNanoUsd"
   >;
+  contractBudgets: Pick<BillingContractBudgetRepository, "findContractBudget">;
   organizations: Pick<BillingAccountFactsRepository, "findSelfHostedCustomers">;
   projects: Pick<BillingProjectDirectoryRepository, "findProjectIds">;
 }>;
-
-const toCents = (usd: number): number => Math.round(usd * CENTS_PER_USD);
 
 export class ConnectedCustomerFactsService implements ConnectedStatementSources {
   private constructor(private readonly peers: ConnectedCustomerPeers) {}
@@ -102,25 +103,32 @@ export class ConnectedCustomerFactsService implements ConnectedStatementSources 
   }
 
   /**
-   * The contract budget as the customer's own calls see it, read off the
-   * managed key they run under. With no managed key no call has resolved one,
-   * so the spend is unread rather than zero and the cap is what the terms set.
+   * The contract budget's spend as the gateway enforces it: its bucket's successful debits since
+   * the window opened (C3a D5). With no budget synced yet the spend is unread rather than zero and
+   * the cap is what the terms set.
    */
   async readContractSpend(organizationId: string): Promise<ConnectedSpendView> {
-    const { managedVirtualKeyId } = await this.peers.licensing.getConnectedSeats({
-      organizationId,
-    });
-    if (managedVirtualKeyId) {
-      const usage = await this.peers.licensing.getHostedUsage({
-        caller: { virtualKeyId: managedVirtualKeyId, organizationId, projectId: null },
-      });
-      const contract = usage.budgets.find((budget) => budget.is_contract);
-      if (contract) {
-        return {
-          spendAvailable: usage.spend_available,
-          limitUsdCents: toCents(contract.cap_usd),
-          spentUsdCents: contract.spent_usd === null ? null : toCents(contract.spent_usd),
-        };
+    const [budget] = await this.peers.contractBudgets.findContractBudget({ organizationId });
+    if (budget) {
+      const unread = {
+        spendAvailable: false,
+        limitUsdCents: budget.limitUsdCents,
+        spentUsdCents: null,
+      };
+      if (!this.peers.gateway.isSpendSourceAvailable()) return unread;
+      const tenantIds = await this.findProjectIds(organizationId);
+      try {
+        const nanoUsd = await this.peers.gateway.sumBudgetSpendNanoUsd({
+          tenantIds,
+          budgetId: budget.id,
+          bucketScopeId: bucketScopeIdFor(budget, budget.scopeId),
+          fromMs: budget.currentPeriodStartedAt.epochMilliseconds,
+        });
+        const spentUsdCents = Math.round(nanoUsd / NANO_USD_PER_CENT);
+        return { spendAvailable: true, limitUsdCents: budget.limitUsdCents, spentUsdCents };
+      } catch {
+        // As gateway's own budget list: a failed ledger read is unread spend, never zero.
+        return unread;
       }
     }
 

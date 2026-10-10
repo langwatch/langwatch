@@ -3,6 +3,7 @@
  * in, the routes it may be answered with, and every read failing soft.
  * @see specs/traces-v2/instant-eval-search.feature
  */
+import { sealAuthorization, type Actor } from "@langwatch/authorization";
 import type { ExplorerSearchClassificationInput } from "@langwatch/instant-eval-contract";
 import type {
   InstantEvalCategoryQuestion,
@@ -14,13 +15,26 @@ import { describe, expect, it, vi } from "vitest";
 
 import { InstantEvalClassifySearchService } from "../instant-eval-classify-search.service.ts";
 import type { InstantEvalClassifyService } from "../instant-eval-classify.service.ts";
+import type { InstantEvalTraceProofService } from "../instant-eval-trace-proof.service.ts";
 
 const DAY = { from: 0, to: 24 * 3_600_000 };
 
-const INPUT: ExplorerSearchClassificationInput = {
+const ASKER = { type: "user", id: "user-1" } as const;
+/** The traces:view proof AuthzApi.authorize mints for the asker (ruling TRACE-PROOF-EVAL-PERM). */
+const PROOF = sealAuthorization({
+  actor: ASKER,
+  principal: ASKER,
+  scope: { organizationId: "organization-1" },
+  grants: [{ projectId: "project-1", permissions: ["traces:view"], via: [], kind: "own" }],
+  expiresAt: Date.now() + 5 * 60 * 1000,
+  purpose: { kind: "route", route: "instantEval.classifySearch" },
+});
+
+const INPUT: ExplorerSearchClassificationInput & { actor: Actor } = {
   projectId: "project-1",
   text: "frustrated users",
   timeRange: DAY,
+  actor: ASKER,
 };
 
 function facet(...names: string[]): FacetValuesResult {
@@ -36,18 +50,22 @@ function harness({
   judgement = async () => answering("instant_eval"),
   readFacetValues = async ({ facetKey }) =>
     facetKey === "evaluator" ? facet("ragas/faithfulness") : facet("thumbs_up_down"),
+  proof = async () => PROOF,
 }: {
   released?: () => Promise<boolean>;
   judgement?: () => Promise<InstantEvalJudgement>;
   readFacetValues?: TraceApi["readFacetValues"];
+  proof?: InstantEvalTraceProofService["mint"];
 } = {}) {
   const classify = vi.fn<InstantEvalClassifyService["classify"]>(judgement);
   const facets = vi.fn<TraceApi["readFacetValues"]>(readFacetValues);
+  const mints = vi.fn<InstantEvalTraceProofService["mint"]>(proof);
   const service = InstantEvalClassifySearchService.create({
     classifications: createApiFixture<Pick<InstantEvalClassifyService, "classify">>({ classify }),
     peers: {
       isReleased: released,
       traces: createApiFixture<Pick<TraceApi, "readFacetValues">>({ readFacetValues: facets }),
+      proofs: { mint: mints },
     },
   });
   /** The one request the judge was sent. */
@@ -62,7 +80,7 @@ function harness({
     };
   };
 
-  return { service, classify, facets, asked };
+  return { service, classify, facets, mints, asked };
 }
 
 describe("given a released project with known evaluators and events", () => {
@@ -88,7 +106,7 @@ describe("given a released project with known evaluators and events", () => {
       expect(asked().text).toContain("Event names on this project: thumbs_up_down");
       expect(asked().options).toEqual(["filter", "instant_eval", "free_text", "langy"]);
       expect(facets).toHaveBeenCalledWith({
-        tenantId: "project-1",
+        authorization: PROOF,
         timeRange: DAY,
         facetKey: "evaluator",
         limit: 20,
@@ -196,6 +214,39 @@ describe("given text with no sentence in it", () => {
 
       expect(answer).toEqual({ classified: null, isInstantEvalAvailable: true });
       expect(classify).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe("given an asker behind the analytics:view route", () => {
+  describe("when the browser asks to classify a sentence", () => {
+    it("reads both facets with the asker's traces:view proof", async () => {
+      const { service, facets, mints } = harness();
+
+      await service.classifySearch(INPUT);
+
+      expect(mints).toHaveBeenCalledWith({
+        projectId: "project-1",
+        actor: ASKER,
+        route: "instantEval.classifySearch",
+      });
+      expect(facets.mock.calls.map(([call]) => call.authorization)).toEqual([PROOF, PROOF]);
+    });
+  });
+
+  describe("when authz refuses the asker traces:view", () => {
+    it("still classifies, with no known signals and no facet read", async () => {
+      const { service, facets, asked } = harness({
+        proof: async () => {
+          throw new Error("refused");
+        },
+      });
+
+      const answer = await service.classifySearch(INPUT);
+
+      expect(answer.classified).toBe("instant_eval");
+      expect(asked().text).toContain("Evaluators with results on this project: none");
+      expect(facets).not.toHaveBeenCalled();
     });
   });
 });

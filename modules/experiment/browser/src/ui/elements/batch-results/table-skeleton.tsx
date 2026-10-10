@@ -19,12 +19,12 @@ const SkeletonTable = ({ rows = 5, columns = 3 }: Omit<TableSkeletonProps, "with
     css={{
       "& table": { width: "100%", borderCollapse: "collapse" },
       "& th": {
-        borderBottom: "1px solid var(--chakra-colors-gray-200)",
+        borderBottom: "1px solid var(--chakra-colors-border)",
         padding: "8px 12px",
         textAlign: "left",
       },
       "& td": {
-        borderBottom: "1px solid var(--chakra-colors-gray-100)",
+        borderBottom: "1px solid var(--chakra-colors-border-muted)",
         padding: "12px",
       },
     }}

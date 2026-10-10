@@ -26,7 +26,7 @@ export function PIIRedactionAlert({ children }: { children?: React.ReactNode }) 
           {children ??
             "Some content was redacted by this project's privacy settings (PII or secrets redaction)."}{" "}
           Review your privacy settings under{" "}
-          <Link asChild color="blue.600" textDecoration="underline">
+          <Link asChild color="blue.fg" textDecoration="underline">
             <RoutedLink href={settingsHref}>Settings</RoutedLink>
           </Link>
           .

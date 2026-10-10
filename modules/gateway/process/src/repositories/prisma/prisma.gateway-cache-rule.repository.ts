@@ -47,10 +47,11 @@ export class PrismaGatewayCacheRuleRepository extends GatewayCacheRuleRepository
     super();
   }
 
+  /** In the order the gateway checks them: lowest priority number first. */
   async findAll(organizationId: string): Promise<GatewayCacheRuleResource[]> {
     const rows = await this.database.gatewayCacheRule.findMany({
       where: { organizationId, archivedAt: null },
-      orderBy: [{ priority: "desc" }, { createdAt: "asc" }],
+      orderBy: [{ priority: "asc" }, { createdAt: "asc" }],
     });
     return rows.map(toResource);
   }

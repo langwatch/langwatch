@@ -4,13 +4,14 @@
  */
 import { ProjectMissingCredentialsError } from "@langwatch/api";
 import {
-  bindRestMiddleware,
+  bindMiddlewareContext,
   canonicalErrorResponse,
   createRestRuntime,
-  projectRestFacts,
+  projectRequestContext,
   UnauthorizedError,
 } from "@langwatch/api/rest";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it, vi } from "vitest";
 
 import { experimentV3Rest, experimentWorkbenchCredential } from "../experiment-v3.rest.ts";
@@ -20,6 +21,8 @@ import { experimentWorkbenchRunRest } from "../experiment-workbench-run.rest.ts"
 /** The key door as it answers a request carrying neither header it reads. */
 function keyDoorOver(app: Partial<ExperimentV3RestApi>) {
   const runtime = createRestRuntime({
+    audit: { record: () => {} },
+    authorization: restTestAuthorization(),
     identity: {
       authenticate: ({ request }) => {
         if (!request.headers.get("X-Auth-Token") && !request.headers.get("Authorization")) {
@@ -39,13 +42,13 @@ function keyDoorOver(app: Partial<ExperimentV3RestApi>) {
     app: () => api,
     credential: "project",
     onError: canonicalErrorResponse,
-    facts: [
-      bindRestMiddleware(projectRestFacts, () => ({
+    middlewareContext: [
+      bindMiddlewareContext(projectRequestContext, () => ({
         projectSlug: "acme",
         viewerUserId: null,
         actorId: "key-1",
       })),
-      bindRestMiddleware(experimentWorkbenchCredential, () => ({
+      bindMiddlewareContext(experimentWorkbenchCredential, () => ({
         kind: "legacyProjectKey" as const,
       })),
     ],
@@ -97,6 +100,8 @@ describe("given the experiment doors behind an identity door that finds no crede
         throw new UnauthorizedError("Please log in");
       };
       const runtime = createRestRuntime({
+        audit: { record: () => {} },
+        authorization: restTestAuthorization(),
         identity: { identify: noSession, authenticate: noSession, authorize: noSession },
       });
       const hono = runtime.mount(experimentWorkbenchRunRest.router(), {

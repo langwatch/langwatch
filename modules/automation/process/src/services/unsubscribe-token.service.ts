@@ -2,7 +2,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 
 import { nowInstant, Temporal, type Instant } from "@langwatch/time";
 
-export type UnsubscribeTokenPayload = {
+type UnsubscribeTokenPayload = {
   projectId: string;
   triggerId: string | null;
   email: string;

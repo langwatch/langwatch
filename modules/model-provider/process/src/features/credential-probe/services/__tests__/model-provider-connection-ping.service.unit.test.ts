@@ -1,6 +1,5 @@
 import {
   ProviderKeyInvalidError,
-  type ModelProviderApi,
   type ModelProviderCredentialVerdict,
 } from "@langwatch/model-provider-contract";
 import { LANGY_VK_SECRET_NAME, type SecretApi } from "@langwatch/secret-contract";
@@ -13,7 +12,7 @@ import type { ModelProviderPingReply } from "../../../../channels/model-provider
 import { ModelProviderConnectionPingService } from "../model-provider-connection-ping.service.ts";
 
 const VERIFIED: ModelProviderCredentialVerdict = { outcome: "verified", valid: true };
-const ROW = { id: "mp_1", provider: "openai", customModels: [] };
+const ROW = { id: "provider_1", provider: "openai", customModels: [] };
 
 function failed(overrides: Partial<Extract<ModelProviderPingReply, { outcome: "failed" }>>) {
   return {
@@ -33,13 +32,13 @@ function setup(
   const channel = MemoryModelProviderConnectionPingChannel.create(reply);
   const codexChannel = MemoryModelProviderCodexGatewayPingChannel.create(reply);
   const secrets = createApiFixture<SecretApi>({ getValues: async () => storedSecrets });
-  const prepared: { model: string; projectId?: string }[] = [];
-  const modelProviders = createApiFixture<ModelProviderApi>({
-    prepareExecution: async (input) => {
+  const prepared: { id: string; model: string; projectId: string }[] = [];
+  const execution = {
+    prepareRow: async (input: { id: string; model: string; projectId: string }) => {
       prepared.push(input);
       return { api_key: "sk-stored" };
     },
-  });
+  };
   return {
     channel,
     codexChannel,
@@ -48,7 +47,7 @@ function setup(
       channel,
       codexChannel,
       secrets,
-      modelProviders,
+      execution,
     }),
   };
 }
@@ -67,7 +66,7 @@ describe("ModelProviderConnectionPingService", () => {
         });
 
         expect(verdict).toEqual(VERIFIED);
-        expect(prepared[0]?.model).toMatch(/^mp_1\//);
+        expect(prepared[0]?.id).toBe("provider_1");
         expect(channel.sent).toHaveLength(1);
         expect(channel.sent[0]).toMatchObject({
           providerKey: "openai",

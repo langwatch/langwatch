@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 /**
  * Result DIGEST: compact reference for the card to hydrate fresh data via API.
  */
@@ -18,7 +19,7 @@ export type DigestStrategy = (typeof DIGEST_STRATEGIES)[number];
  * The digest itself. Additive and optional everywhere it rides (tool parts,
  * final tool calls), so old turns and non-CLI tools render exactly as before.
  */
-export const cliResultDigestSchema = z.object({
+const cliResultDigestSchemaDefinition = z.object({
   resource: z.string().min(1),
   verb: z.string().min(1),
   strategy: z.enum(DIGEST_STRATEGIES),
@@ -41,6 +42,8 @@ export const cliResultDigestSchema = z.object({
   /** The structure-reduced document, for the `reduced` tier only. */
   reduced: z.unknown().optional(),
 });
+export interface CliResultDigestSchema extends Named<typeof cliResultDigestSchemaDefinition> {}
+export const cliResultDigestSchema: CliResultDigestSchema = cliResultDigestSchemaDefinition;
 
 export type CliResultDigest = z.infer<typeof cliResultDigestSchema>;
 

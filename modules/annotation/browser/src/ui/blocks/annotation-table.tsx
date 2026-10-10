@@ -137,8 +137,6 @@ export function AnnotationTable({
             <Table.Row
               key={row.id}
               cursor="pointer"
-              backgroundColor={row.doneAt ? "bg.subtle" : "bg.panel"}
-              _hover={{ backgroundColor: "bg.emphasized" }}
               onClick={() => onRowClick(row)}
               data-testid="annotation-row"
             >
@@ -370,7 +368,7 @@ function RowActions({
         {queueItemId && (
           <Menu.Item
             value="remove-from-queue"
-            color="red.500"
+            color="red.fg"
             onClick={(event) => {
               event.stopPropagation();
               onRemoveFromQueue(queueItemId);

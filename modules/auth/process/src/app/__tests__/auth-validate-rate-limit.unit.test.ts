@@ -95,7 +95,9 @@ async function appFor(
         findResolvedToken: async () => ({ project: { slug: "acme" } }),
       } as never,
       featureFlags: {} as never,
-      identity: createApiFixture<IdentityApi>({ createStorageAdapter: ({ legacyEngine }) => legacyEngine }),
+      identity: createApiFixture<IdentityApi>({
+        createStorageAdapter: ({ legacyEngine }) => legacyEngine,
+      }),
       organizations: createApiFixture<OrganizationApi>(),
       entitlements: createApiFixture<EntitlementApi>(),
       licensing: createApiFixture<LicensingApi>(),
@@ -106,7 +108,9 @@ async function appFor(
         record: async () => ({ id: "audit", occurredAt: 0 }),
       }),
     },
-    channels: MemoryAuthChannels.create(),
+    channels: MemoryAuthChannels.create({
+      bound: { notifications: createApiFixture<NotificationService>() },
+    }),
     resources: { own: () => undefined } as never,
     secrets: new ScopedSecrets(async (_handle, build) => build(void 0)),
   });

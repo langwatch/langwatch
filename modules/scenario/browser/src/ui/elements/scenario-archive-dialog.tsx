@@ -23,12 +23,10 @@ export function ScenarioArchiveDialog({
 
   return (
     <Dialog.Root open={open} onOpenChange={onClose} placement="center">
-      <Dialog.Content bg="bg" maxWidth="500px" onClick={(event) => event.stopPropagation()}>
+      <Dialog.Content maxWidth="500px" onClick={(event) => event.stopPropagation()}>
         <Dialog.CloseTrigger />
         <Dialog.Header>
-          <Dialog.Title fontSize="md" fontWeight="500">
-            {title}
-          </Dialog.Title>
+          <Dialog.Title>{title}</Dialog.Title>
         </Dialog.Header>
         <Dialog.Body>
           <VStack align="stretch" gap={4}>

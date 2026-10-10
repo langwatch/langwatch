@@ -5,7 +5,6 @@ import {
   Button,
   createListCollection,
   Field,
-  Heading,
   HStack,
   Input,
   Spacer,
@@ -127,7 +126,7 @@ export function EditProjectDrawer({
       <Drawer.Content bg="bg">
         <Drawer.Header>
           <Drawer.CloseTrigger onClick={closeDrawer} />
-          <Heading>Edit Project</Heading>
+          <Drawer.Title>Edit Project</Drawer.Title>
         </Drawer.Header>
         <Drawer.Body>
           <form onSubmit={handleSubmit(onSubmit)}>

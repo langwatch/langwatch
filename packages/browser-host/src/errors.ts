@@ -70,6 +70,27 @@ export function showErrorToast({ error, ...options }: ShowErrorToastOptions): vo
 }
 
 /**
+ * Mutation options for a write the screen already shows as done: once it settles `reload`
+ * reads the server's copy back, and a refusal is toasted under `fallbackTitle` first, so a
+ * refused edit does not stick on screen.
+ */
+export function reloadingWriteOptions({
+  fallbackTitle,
+  reload,
+}: {
+  fallbackTitle: string;
+  reload: () => void;
+}): { onSuccess: () => void; onError: (error: unknown) => void } {
+  return {
+    onSuccess: reload,
+    onError: (error) => {
+      showErrorToast({ error, fallbackTitle });
+      reload();
+    },
+  };
+}
+
+/**
  * The whole explanation as one string, for a slot that can only take text. Registry copy beats
  * the caller's fallback for the same reason it does on a toast: a code the registry knows
  * describes this exact failure, where the caller's headline only names the action.

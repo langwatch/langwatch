@@ -1,3 +1,6 @@
+import { explainHandledError } from "@langwatch/handled-error/presentation";
+import { readHandledError } from "@langwatch/handled-error/read-handled-error";
+
 /** Which version each tag names in the deploy dialog, by tag name; "" is unassigned. */
 export type TagSelections = Record<string, string>;
 
@@ -53,6 +56,8 @@ export function changedTagAssignments({
 
 /** What the add-tag field says when creating a tag was refused. */
 export function addTagErrorMessage({ error, name }: { error: unknown; name: string }): string {
-  const message = error instanceof Error ? error.message : "Failed to create tag";
-  return message.toLowerCase().includes("already exists") ? `${name} already exists` : message;
+  const handled = readHandledError(error);
+  if (!handled) return "Failed to create tag";
+  if (handled.code === "prompt_tag_conflict") return `${name} already exists`;
+  return explainHandledError(handled).title;
 }

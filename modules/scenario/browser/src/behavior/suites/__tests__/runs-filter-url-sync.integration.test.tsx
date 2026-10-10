@@ -4,9 +4,9 @@
  * @see https://github.com/langwatch/langwatch/pull/3205
  */
 
-import { UiCapabilityContextProvider } from "@langwatch/browser-host/capabilities";
+import { UiHostServicesContextProvider } from "@langwatch/browser-host/capabilities";
 import { defineSlice } from "@langwatch/browser-host/global-store";
-import { createUiCapabilitiesFromHost } from "@langwatch/browser-host/testing";
+import { createUiHostServicesFromHost } from "@langwatch/browser-host/testing";
 import { useRouter } from "@langwatch/browser-host/use-router";
 import {
   RUN_HISTORY_ABSENT,
@@ -114,9 +114,9 @@ function TestScenarioHost({ children }: { children: ReactNode }) {
   }, [location.pathname, location.search, params, navigate]);
 
   return (
-    <UiCapabilityContextProvider value={createUiCapabilitiesFromHost(host)}>
+    <UiHostServicesContextProvider value={createUiHostServicesFromHost(host)}>
       <ScenarioHostProvider value={host}>{children}</ScenarioHostProvider>
-    </UiCapabilityContextProvider>
+    </UiHostServicesContextProvider>
   );
 }
 

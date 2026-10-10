@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import { useDrawer } from "@langwatch/browser-host/drawer";
+import { CodePreview } from "@langwatch/design-system/code-preview";
 import {
   DialogBody,
   DialogCloseTrigger,
@@ -14,8 +15,8 @@ import { Drawer } from "@langwatch/design-system/drawer";
 import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import {
+  Alert,
   Badge,
-  Box,
   Button,
   Code,
   Collapsible,
@@ -34,7 +35,7 @@ import type { AiToolEntry } from "@langwatch/enterprise-governance-contract";
 import { HandledErrorAlert } from "@langwatch/error-views";
 import { Temporal, nowInstant } from "@langwatch/time";
 import { ChevronDown, Copy, KeyRound, Plug, Plus } from "lucide-react";
-import { Fragment, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, type ReactNode, useEffect, useRef, useState } from "react";
 
 import { api } from "../../../behavior/governance-api.ts";
 import {
@@ -57,6 +58,7 @@ import { IngestionSourcesTable } from "../../../features/ingestion-sources/inges
 import {
   gatedSourceTypeOptions,
   isOttlEnabledSourceType,
+  needsIngestSecret,
   NON_ENTERPRISE_INGESTION_SOURCE_CAP,
   routesConversations,
   SOURCE_TYPE_LABEL,
@@ -519,9 +521,9 @@ function useInventoryPanes({ orgId, canManageTools }: { orgId: string; canManage
     { mode: "create"; type: AiToolEntry["type"] } | { mode: "edit"; entry: AiToolEntry } | null
   >(null);
 
-  const startToolRegistration = useCallback(() => {
+  const startToolRegistration = () => {
     setToolDrawer({ mode: "create", type: "coding_assistant" });
-  }, []);
+  };
 
   const sample = useSampleMode();
 
@@ -536,21 +538,18 @@ function useInventoryPanes({ orgId, canManageTools }: { orgId: string; canManage
   const [addedEnvironments, setAddedEnvironments] = useState<EnvironmentRow[]>([]);
 
   /** Add a hand-entered environment for this sitting only. */
-  const addEnvironment = useCallback(
-    ({ name, description }: { name: string; description: string }) => {
-      setAddedEnvironments((previous) => [
-        ...previous,
-        {
-          id: `added:${name}:${previous.length}`,
-          name,
-          description,
-          createdIso: nowInstant().toString(),
-          createdBy: "You, this session",
-        },
-      ]);
-    },
-    [],
-  );
+  const addEnvironment = ({ name, description }: { name: string; description: string }) => {
+    setAddedEnvironments((previous) => [
+      ...previous,
+      {
+        id: `added:${name}:${previous.length}`,
+        name,
+        description,
+        createdIso: nowInstant().toString(),
+        createdBy: "You, this session",
+      },
+    ]);
+  };
 
   return {
     catalog,
@@ -688,19 +687,19 @@ function useSourceComposer({ orgId, refetch }: { orgId: string; refetch: () => v
    * stays red after it has been answered reads as a second, different
    * rejection.
    */
-  const updateComposer = useCallback((next: ComposerState) => {
+  const updateComposer = (next: ComposerState) => {
     setComposer(next);
     setInvalidFieldKeys((keys) =>
       keys.filter((key) => (next.parserConfig[key] ?? "").trim() === ""),
     );
-  }, []);
+  };
 
   /**
    * Open the composer on a fresh draft for the picked type — a draft left
    * over from a different type must never leak its parser or OTTL state
    * into this one.
    */
-  const startComposer = useCallback((sourceType: SourceType) => {
+  const startComposer = (sourceType: SourceType) => {
     setComposer({
       ...blankComposer(),
       sourceType,
@@ -708,7 +707,7 @@ function useSourceComposer({ orgId, refetch }: { orgId: string; refetch: () => v
     });
     setInvalidFieldKeys([]);
     setComposing(true);
-  }, []);
+  };
 
   /** Close the composer and drop the draft. */
   const closeComposer = () => {
@@ -942,29 +941,19 @@ function InventoryTabs({
       value={inventoryTab}
       onValueChange={({ value }) => selectInventoryTab(value)}
       variant="line"
+      colorPalette="accent"
+      size="sm"
       lazyMount
       unmountOnExit
     >
       <Tabs.List>
-        <Tabs.Trigger
-          value="catalog"
-          color="fg.muted"
-          _selected={{ color: "fg", fontWeight: "semibold" }}
-        >
+        <Tabs.Trigger value="catalog">
           <GovernanceTabLabel label="Catalog" count={catalogCount} />
         </Tabs.Trigger>
-        <Tabs.Trigger
-          value="environments"
-          color="fg.muted"
-          _selected={{ color: "fg", fontWeight: "semibold" }}
-        >
+        <Tabs.Trigger value="environments">
           <GovernanceTabLabel label="Environments" count={environmentCount} />
         </Tabs.Trigger>
-        <Tabs.Trigger
-          value="sources"
-          color="fg.muted"
-          _selected={{ color: "fg", fontWeight: "semibold" }}
-        >
+        <Tabs.Trigger value="sources">
           <GovernanceTabLabel label="Sources" count={sourceCount} />
         </Tabs.Trigger>
       </Tabs.List>
@@ -1180,6 +1169,7 @@ function InventoryPage() {
             setComposer={page.setComposer}
             invalidFieldKeys={page.invalidFieldKeys}
             isPending={mutations.create.isPending}
+            refusal={mutations.create.error}
             onSubmit={page.onSubmit}
             onClose={page.closeComposer}
           />
@@ -1414,6 +1404,7 @@ export function SourceComposerDrawer({
   setComposer,
   invalidFieldKeys,
   isPending,
+  refusal,
   onSubmit,
   onClose,
 }: {
@@ -1425,6 +1416,8 @@ export function SourceComposerDrawer({
   /** Required fields a refused save found empty, marked on the form itself. */
   invalidFieldKeys: readonly string[];
   isPending: boolean;
+  /** The save's failure; a parser refusal is drawn onto the statements it names. */
+  refusal?: unknown;
   onSubmit: () => void;
   onClose: () => void;
 }) {
@@ -1510,6 +1503,7 @@ export function SourceComposerDrawer({
               statements={composer.ottlStatements}
               onChange={(ottlStatements) => setComposer({ ...composer, ottlStatements })}
               enabled={isOttlEnabledSourceType(composer.sourceType)}
+              refusal={refusal}
             />
           </VStack>
         </Drawer.Body>
@@ -1848,6 +1842,7 @@ export function SourceEditDrawer({
   onClose,
   onSubmit,
   isPending,
+  refusal,
 }: {
   organizationId: string;
   /**
@@ -1860,6 +1855,8 @@ export function SourceEditDrawer({
   onClose: () => void;
   onSubmit: (input: EditSubmission) => void;
   isPending: boolean;
+  /** The save's failure; a parser refusal is drawn onto the statements it names. */
+  refusal?: unknown;
 }) {
   const isOpen = !!source;
   const form = useSourceEditForm(source);
@@ -1956,6 +1953,7 @@ export function SourceEditDrawer({
             hasPulled={hasPulled}
             organizationId={organizationId}
             destinationCtx={destinationCtx}
+            refusal={refusal}
           />
         </Drawer.Body>
         <Drawer.Footer>
@@ -1998,6 +1996,7 @@ function SourceEditBody({
   hasPulled,
   organizationId,
   destinationCtx,
+  refusal,
 }: {
   form: ReturnType<typeof useSourceEditForm>;
   source: Source;
@@ -2005,11 +2004,14 @@ function SourceEditBody({
   hasPulled: boolean;
   organizationId: string;
   destinationCtx: DestinationContext;
+  refusal?: unknown;
 }) {
   // Derived here rather than passed in: `isEditablePullSource` is a type guard,
   // and narrowing `sourceType` is what lets the pull fields below take it as a
   // `SourceType` instead of re-asserting one.
   const isPullMode = isEditablePullSource(sourceType);
+  // The row menu offers Rotate secret only for these (needsIngestSecret).
+  const hasRotatableSecret = !!sourceType && needsIngestSecret({ sourceType });
   // Read here rather than left to the field's own early return, because the
   // Advanced group has to know whether it holds anything before it offers
   // itself — a disclosure that opens onto an empty box is worse than none.
@@ -2065,12 +2067,13 @@ function SourceEditBody({
         statements={form.statements}
         onChange={form.setStatements}
         enabled={isOttlEnabledSourceType(source.sourceType)}
+        refusal={refusal}
       />
 
       <Text fontSize="xs" color="fg.muted">
-        {isPullMode
-          ? "Source type is immutable after create: archive and recreate to change it."
-          : "Source type and ingest secret are immutable after create. Use “Rotate secret” for the secret; archive + recreate to change source type."}
+        {hasRotatableSecret
+          ? "Source type and ingest secret are immutable after create. Use “Rotate secret” for the secret; archive + recreate to change source type."
+          : "Source type is immutable after create: archive and recreate to change it."}
       </Text>
     </VStack>
   );
@@ -3540,8 +3543,8 @@ export function parserFieldPresentation({
 function invalidInputStyles(isInvalid: boolean) {
   return isInvalid
     ? ({
-        borderColor: "red.500",
-        _hover: { borderColor: "red.500" },
+        borderColor: "red.fg",
+        _hover: { borderColor: "red.fg" },
         "aria-invalid": true,
       } as const)
     : {};
@@ -3648,6 +3651,7 @@ function ParserSwitchInput({
 
   return (
     <Switch
+      colorPalette="accent"
       checked={on}
       // Never blank: blank means the field's declared default, which is not
       // always off, so writing it back would flip a deliberate choice. And the
@@ -3809,7 +3813,7 @@ function ParserConfigField({
   // array's identity — so an unmemoized call resets highlight and scroll under
   // an open dropdown. It still rebuilds when `values` change, which is correct:
   // these options are a function of the form's other answers.
-  const control = useMemo(() => fieldControl({ field, values }), [field, values]);
+  const control = fieldControl({ field, values });
   const shownHint = control.hint ?? hint;
 
   return (
@@ -3821,7 +3825,7 @@ function ParserConfigField({
         <Text fontSize="xs" fontWeight="medium">
           {field.label}
           {isRequired && (
-            <Text as="span" color="red.500" marginLeft={1}>
+            <Text as="span" color="red.fg" marginLeft={1}>
               *
             </Text>
           )}
@@ -3846,7 +3850,7 @@ function ParserConfigField({
           says what to do rather than restating that something is invalid —
           the red border has already said that much. */}
       {isInvalid && (
-        <Text fontSize="xs" color="red.500" data-testid={`parser-field-error-${field.key}`}>
+        <Text fontSize="xs" color="red.fg" data-testid={`parser-field-error-${field.key}`}>
           Enter a value: this source cannot be saved without it.
         </Text>
       )}
@@ -4687,19 +4691,16 @@ function WebhookEndpointPanel({
 /** The one-shot warning, and how long the old secret keeps working. */
 function SecretGraceNotice() {
   return (
-    <Box
-      borderWidth="1px"
-      borderColor="amber.300"
-      backgroundColor="orange.subtle"
-      padding={3}
-      borderRadius="sm"
-    >
-      <Text fontSize="xs" color="amber.900">
-        <strong>Important:</strong> the secret above will not be shown again. We retained the prior
-        secret&apos;s hash for a 24h grace window if you&apos;re rotating, so you have time to roll
-        the new value through every upstream client.
-      </Text>
-    </Box>
+    <Alert.Root status="warning" size="sm">
+      <Alert.Indicator />
+      <Alert.Content>
+        <Alert.Description>
+          <strong>Important:</strong> the secret above will not be shown again. We retained the
+          prior secret&apos;s hash for a 24h grace window if you&apos;re rotating, so you have time
+          to roll the new value through every upstream client.
+        </Alert.Description>
+      </Alert.Content>
+    </Alert.Root>
   );
 }
 
@@ -4731,7 +4732,7 @@ function OtlpEndpointPanel({
         auth, same trace store. See{" "}
         <Link
           href="https://docs.langwatch.ai/observability/trace-vs-activity-ingestion"
-          color="blue.600"
+          color="blue.fg"
         >
           Choosing the right OTel endpoint
         </Link>
@@ -4788,35 +4789,13 @@ function ClaudeCodeEnvBlockPanel({
 }
 
 /** The smoke-test curl, and how to read what it returns. */
-function TestCurlPanel({
-  curl,
-  copied,
-  onCopy,
-}: {
-  curl: string;
-  copied: boolean;
-  onCopy: (value: string) => void;
-}) {
+function TestCurlPanel({ curl }: { curl: string }) {
   return (
     <VStack align="stretch" gap={1}>
       <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
         Test it now - paste this into a terminal
       </Text>
-      <Box position="relative">
-        <Code display="block" padding={3} fontSize="xs" whiteSpace="pre" overflowX="auto">
-          {curl}
-        </Code>
-        <Button
-          size="xs"
-          variant="outline"
-          position="absolute"
-          top={2}
-          right={2}
-          onClick={() => onCopy(curl)}
-        >
-          <Copy size={12} /> {copied ? "Copied" : "Copy"}
-        </Button>
-      </Box>
+      <CodePreview code={curl} language="bash" filename="terminal" />
       <Text fontSize="xs" color="fg.muted">
         Returns HTTP 202 with <Code fontSize="xs">events: 1</Code> on success. If you get{" "}
         <Code fontSize="xs">events: 0</Code> with a hint, the body shape didn&apos;t parse - check
@@ -4847,24 +4826,18 @@ function SecretModal({ details, onClose }: { details: SecretDetails | null; onCl
   const { otlpUrl, webhookUrl, usesPushUrl, usesWebhookUrl, isClaudeCode } =
     secretModalTargets(details);
 
-  const claudeCodeEnvBlock = useMemo(
-    () => (isClaudeCode && details ? buildClaudeCodeEnvBlock({ details, otlpUrl }) : ""),
-    [isClaudeCode, details, otlpUrl],
-  );
+  const claudeCodeEnvBlock =
+    isClaudeCode && details ? buildClaudeCodeEnvBlock({ details, otlpUrl }) : "";
 
-  const testCurl = useMemo(
-    () =>
-      details
-        ? buildTestCurl({
-            details,
-            otlpUrl,
-            webhookUrl,
-            usesPushUrl,
-            usesWebhookUrl,
-          })
-        : null,
-    [details, otlpUrl, webhookUrl, usesPushUrl, usesWebhookUrl],
-  );
+  const testCurl = details
+    ? buildTestCurl({
+        details,
+        otlpUrl,
+        webhookUrl,
+        usesPushUrl,
+        usesWebhookUrl,
+      })
+    : null;
 
   if (!details) return null;
 
@@ -4909,7 +4882,7 @@ function SecretModal({ details, onClose }: { details: SecretDetails | null; onCl
             {isClaudeCode && (
               <ClaudeCodeEnvBlockPanel envBlock={claudeCodeEnvBlock} onCopy={copy} />
             )}
-            {testCurl && <TestCurlPanel curl={testCurl} copied={copied} onCopy={copy} />}
+            {testCurl && <TestCurlPanel curl={testCurl} />}
             <SecretGraceNotice />
           </VStack>
         </DialogBody>
@@ -4917,7 +4890,7 @@ function SecretModal({ details, onClose }: { details: SecretDetails | null; onCl
           <Link href={`/governance/inventory/${details.sourceId}`}>
             <Button variant="outline">View source page →</Button>
           </Link>
-          <Button colorPalette="blue" onClick={onClose}>
+          <Button colorPalette="accent" onClick={onClose}>
             I&apos;ve saved it
           </Button>
         </DialogFooter>

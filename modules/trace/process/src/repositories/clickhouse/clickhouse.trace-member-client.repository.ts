@@ -1,4 +1,4 @@
-import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import { AuthorizedClickHouse, type ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 
 /** Minimal ClickHouse client primitive; rows arrive unknown and each caller parses its own. */
 export interface TraceClickHouseClient {
@@ -43,6 +43,11 @@ export class MemberTraceClickHouseClientRepository implements TraceClickHouseWri
   static resolverFor(clickhouse: ClickHouseQueryClient): TraceClickHouseWriteResolver {
     return (tenantId) =>
       Promise.resolve(MemberTraceClickHouseClientRepository.create({ clickhouse, tenantId }));
+  }
+
+  /** The member behind the proof-checked reader every fenced read goes through (ADR-177). */
+  static authorizedFor(clickhouse: ClickHouseQueryClient): AuthorizedClickHouse {
+    return new AuthorizedClickHouse({ resolveClient: () => Promise.resolve(clickhouse) });
   }
 
   static create(input: {

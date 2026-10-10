@@ -209,3 +209,64 @@ func TestMailUnknownSubcommandRefusesByName(t *testing.T) {
 		t.Errorf("error = %v, want it to name the unknown subcommand", err)
 	}
 }
+
+// @scenario "An agent can read the inbox's own facts from the CLI"
+func TestMailInboxPrintsTheSinksFacts(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /api/inbox", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"stack":"feature-one","smtpAddr":"127.0.0.1:5581",` +
+			`"baseUrl":"https://mail.feature-one.langwatch.localhost","persistent":true,` +
+			`"address":"dev@feature-one.mail.langwatch.localhost"}`))
+	})
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+
+	out := captureStdout(t, func() {
+		if err := runMailSubcommand(context.Background(), invocation{args: []string{"inbox"}}, mailSink{baseURL: srv.URL}); err != nil {
+			t.Fatalf("runMailSubcommand(inbox): %v", err)
+		}
+	})
+	for _, want := range []string{"feature-one", "dev@feature-one.mail.langwatch.localhost", "127.0.0.1:5581", "persistent: true"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("inbox output = %q, want it to contain %q", out, want)
+		}
+	}
+
+	asJSON := captureStdout(t, func() {
+		if err := runMailSubcommand(context.Background(), invocation{args: []string{"inbox"}}, mailSink{baseURL: srv.URL, asJSON: true}); err != nil {
+			t.Fatalf("runMailSubcommand(inbox --json): %v", err)
+		}
+	})
+	var info mailInbox
+	if err := json.Unmarshal([]byte(asJSON), &info); err != nil {
+		t.Fatalf("inbox --json is not JSON: %v (%q)", err, asJSON)
+	}
+	if info.Address != "dev@feature-one.mail.langwatch.localhost" || !info.Persistent {
+		t.Errorf("inbox --json = %+v, want the sink's facts", info)
+	}
+}
+
+// @scenario "A test can wait only for mail newer than one it has seen"
+func TestMailWaitPassesAfterToTheSink(t *testing.T) {
+	full := testMessage()
+	var gotAfter string
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /api/messages/wait", func(w http.ResponseWriter, r *http.Request) {
+		gotAfter = r.URL.Query().Get("after")
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(full)
+	})
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+
+	inv := invocation{args: []string{"wait"}, flags: map[string]string{"--after": "msg-0"}}
+	captureStdout(t, func() {
+		if err := runMailSubcommand(context.Background(), inv, mailSink{baseURL: srv.URL}); err != nil {
+			t.Fatalf("runMailSubcommand(wait --after): %v", err)
+		}
+	})
+	if gotAfter != "msg-0" {
+		t.Errorf("sink saw after=%q, want msg-0", gotAfter)
+	}
+}

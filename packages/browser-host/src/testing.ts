@@ -1,5 +1,5 @@
 /**
- * The capabilities a test mounts when it renders a screen outside the shell. In the product the
+ * The host services a test mounts when it renders a screen outside the shell. In the product the
  * application shell answers `UiRoute`, `UiNavigation` and `UiFeedback` above every
  * route, and a screen rendered with none of them degrades — an empty address, an inert link.
  */
@@ -10,7 +10,7 @@ import {
   UiNavigation,
   UiRoute,
   UNAVAILABLE_UI_SESSION,
-  type UiCapabilities,
+  type UiHostServices,
   type UiFailureNotice,
   type UiRouteReadingValues,
   type UiSession,
@@ -31,6 +31,8 @@ export type UiTestHost = {
   navigate(to: string, options?: { replace?: boolean }): void;
   back?(): void;
   succeeded?(notice: UiSuccessNotice): void;
+  warned?(notice: UiSuccessNotice): void;
+  informed?(notice: UiSuccessNotice): void;
   failed?(failure: UiFailureNotice): void;
 };
 
@@ -94,16 +96,24 @@ class HostUiFeedback extends UiFeedback {
     this.host.succeeded?.(notice);
   }
 
+  warned(notice: UiSuccessNotice): void {
+    this.host.warned?.(notice);
+  }
+
+  informed(notice: UiSuccessNotice): void {
+    this.host.informed?.(notice);
+  }
+
   failed(failure: UiFailureNotice): void {
     this.host.failed?.(failure);
   }
 }
 
-/** The capabilities a screen under test reads, answered by the host double. */
-export function createUiCapabilitiesFromHost(
+/** The host services a screen under test reads, answered by the host double. */
+export function createUiHostServicesFromHost(
   host: UiTestHost,
   session: UiSession = UNAVAILABLE_UI_SESSION,
-): UiCapabilities {
+): UiHostServices {
   return {
     documentTitle: BrowserUiDocumentTitle.create(),
     session,

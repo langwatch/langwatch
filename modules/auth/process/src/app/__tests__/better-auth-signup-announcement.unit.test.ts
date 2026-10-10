@@ -1,7 +1,7 @@
 import { createTestLogger } from "@langwatch/test-harness";
 import { describe, expect, it, vi } from "vitest";
 
-import { MemorySignupAnnouncementChannel } from "../../channels/memory/memory.signup-announcement.channel.ts";
+import { MemorySignupAnnouncementChannel } from "../../channels/memory/memory.auth.channels.ts";
 import type { SignupAnnouncementChannel } from "../../channels/signup-announcement.channel.ts";
 import { SlackSignupAnnouncementChannel } from "../../channels/slack/slack.signup-announcement.channel.ts";
 import { SignupAnnouncementService } from "../../services/signup-announcement.service.ts";

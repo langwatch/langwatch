@@ -46,4 +46,17 @@ describe("reading the directory back from Postgres", () => {
       );
     });
   });
+
+  describe("when a token names a group by id", () => {
+    /** @scenario "A group made in LangWatch is out of a directory token's reach by id" */
+    it("asks only for groups a directory pushed", async () => {
+      const group = { findFirst: vi.fn(async () => null) };
+      const repository = PrismaScimRepository.create(prismaDouble({ group }));
+
+      expect(await repository.findGroup({ organizationId: "org-1", id: "group-1" })).toBeNull();
+      expect(group.findFirst).toHaveBeenCalledWith({
+        where: { id: "group-1", organizationId: "org-1", scimSource: { not: null } },
+      });
+    });
+  });
 });

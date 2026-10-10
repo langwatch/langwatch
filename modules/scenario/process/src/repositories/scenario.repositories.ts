@@ -17,7 +17,7 @@ import type { VoiceNonceRepository } from "./voice-nonce.repository.ts";
 export interface ScenarioRepositories {
   readonly scenarios: ScenarioRepository;
   readonly simulationRunProcessing: SimulationRunProcessingRepository;
-  /** The install-wide stalled-run sweep only the stalled-runs-backfill task reads. */
+  /** The install-wide stalled-run sweep only the scenario:close-stalled-runs step reads. */
   readonly stalledRuns: StalledSimulationRunRepository;
   /** Which browser tabs are open on a project's simulations, and the run parked for each. */
   readonly tabs: ScenarioTabStore;

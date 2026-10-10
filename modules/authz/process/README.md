@@ -37,7 +37,7 @@ the grant or role aggregate ID.
 
 ## Installation
 
-`defineProcessModule("authz").withRepositories(authzRepositories).withApi(AuthzModule).withTransports(authzGrantRest, authzRoleBindingRest, authzTrpcTransport).withTransportFacts(…).withEventing(authzEventing)`, `src/authz.module.ts:27`.
+`defineProcessModule("authz").withRepositories(authzRepositories).withApi(AuthzModule).withTransports(authzGrantRest, authzRoleBindingRest, authzTrpcTransport).provideMiddlewareContext(…).withEventing(authzEventing).withEventing(authzAggregateReadEventing).withEventing(authzMemberOffboardedEventing)`, `src/authz.module.ts:29`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -45,7 +45,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 The complete callable authorization boundary. This is deliberately a structural interface: callers can use an installed AuthzModule without receiving its services, repositories, or transport adapters.
 
-Peers call these through the token, declared at `../contract/src/authz.api.ts:45`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/authz.api.ts:49`; nothing else in this package is public.
 
 #### `isDemoProject`
 
@@ -89,8 +89,18 @@ can(args: Queries.AuthzCanInput): Promise<boolean>;
 
 #### `authorize`
 
+With `proof` on a project scope, also mints the sealed `Authorization` its reads carry (ADR-166, ADR-177 block B); `authorization` is null everywhere else.
+
 ```typescript
-authorize(args: { principal: AuthzPrincipalRef; permission: Permission; scope: Extract<AuthzScopeRef, { type: Tier }>; }): Promise<Authorized<Tier, Permission>>;
+authorize(args: { principal: AuthzPrincipalRef; permission: Permission; scope: Extract<AuthzScopeRef, { type: Tier }>; proof?: Readonly<{ actor: Actor; purpose: AuthorizationPurpose }>; }): Promise<Authorized<Tier, Permission> & Readonly<{ authorization: Authorization | null }>>;
+```
+
+#### `authorizeInternal`
+
+The own-only proof platform code reads its own project with (ADR-177); evaluates nothing.
+
+```typescript
+authorizeInternal(args: { actor: Extract<Actor, { type: "internal" | "system" }>; projectId: string; permission: AuthzPermission; purpose: AuthorizationPurpose; }): Promise<Authorization>;
 ```
 
 #### `effectivePermissions`
@@ -337,6 +347,38 @@ attachResourceGrant(args: Commands.AuthzAttachResourceGrantInput): Promise<Comma
 revokeResourceGrants(args: Commands.AuthzRevokeResourceGrantsInput): Promise<Commands.AuthzRevokeResourceGrantsOutput>;
 ```
 
+#### `findLiveSharedProjectGrants`
+
+The live shared reads (ADR-177) one reader project holds, one per member project.
+
+```typescript
+findLiveSharedProjectGrants(args: Commands.AuthzFindLiveSharedProjectGrantsInput): Promise<Commands.AuthzSharedProjectGrant[]>;
+```
+
+#### `attachSharedProjectGrant`
+
+A `project-reader` grant from reader to member carrying `condition`; idempotent per pair.
+
+```typescript
+attachSharedProjectGrant(args: Commands.AuthzAttachSharedProjectGrantInput): Promise<Commands.AuthzAttachSharedProjectGrantOutput>;
+```
+
+#### `awaitSharedProjectGrants`
+
+One read-your-writes wait for shared reads attached with `awaitProjection: false`.
+
+```typescript
+awaitSharedProjectGrants(args: Commands.AuthzAwaitSharedProjectGrantsInput): Promise<void>;
+```
+
+#### `revokeSharedProjectGrants`
+
+Revokes a reader's live shared reads (all, or those on `memberProjectIds`); answers ids.
+
+```typescript
+revokeSharedProjectGrants(args: Commands.AuthzRevokeSharedProjectGrantsInput): Promise<string[]>;
+```
+
 #### `changeBindingRole`
 
 ```typescript
@@ -543,7 +585,7 @@ registeredMigrations(): readonly SystemMigration[];
 
 |             |                                        |
 | ----------- | -------------------------------------- |
-| Declared at | `src/transport/authz-grant.rest.ts:41` |
+| Declared at | `src/transport/authz-grant.rest.ts:36` |
 | Base URL    | `/api/grants`, twin `/api/v1/grants`   |
 | Addressing  | dated                                  |
 | Credential  | organization                           |
@@ -553,7 +595,7 @@ registeredMigrations(): readonly SystemMigration[];
 
 List grants
 
-Permission `organization:manage`. Entitlement `enterprise` (feature `MANAGEMENT_API`). Declared at `src/transport/authz-grant.rest.ts:46`.
+Permission `organization:manage`. Entitlement `enterprise` (feature `MANAGEMENT_API`). Declared at `src/transport/authz-grant.rest.ts:41`.
 
 Answers at `/api/grants`, `/api/v1/grants`; also, undocumented, `/api/grants/2026-08-07`, `/api/v1/grants/2026-08-07`, `/api/grants/latest`, `/api/v1/grants/latest`.
 
@@ -577,7 +619,7 @@ type Response = z.infer<typeof grantPageSchema>; // ../contract/src/authz-grants
 
 Grant a role
 
-Permission `organization:manage`. Entitlement `enterprise` (feature `MANAGEMENT_API`). Declared at `src/transport/authz-grant.rest.ts:62`.
+Permission `organization:manage`. Entitlement `enterprise` (feature `MANAGEMENT_API`). Declared at `src/transport/authz-grant.rest.ts:57`.
 
 Answers at `/api/grants`, `/api/v1/grants`; also, undocumented, `/api/grants/2026-08-07`, `/api/v1/grants/2026-08-07`, `/api/grants/latest`, `/api/v1/grants/latest`.
 
@@ -602,7 +644,7 @@ type Response = z.infer<typeof grantSchema>; // ../contract/src/authz-grants-res
 
 Get a grant
 
-Permission `organization:manage`. Entitlement `enterprise` (feature `MANAGEMENT_API`). Declared at `src/transport/authz-grant.rest.ts:84`.
+Permission `organization:manage`. Entitlement `enterprise` (feature `MANAGEMENT_API`). Declared at `src/transport/authz-grant.rest.ts:79`.
 
 Answers at `/api/grants/:grantId`, `/api/v1/grants/:grantId`; also, undocumented, `/api/grants/2026-08-07/:grantId`, `/api/v1/grants/2026-08-07/:grantId`, `/api/grants/latest/:grantId`, `/api/v1/grants/latest/:grantId`.
 
@@ -618,7 +660,7 @@ type Response = z.infer<typeof grantSchema>; // ../contract/src/authz-grants-res
 
 Change a grant's role
 
-Permission `organization:manage`. Entitlement `enterprise` (feature `MANAGEMENT_API`). Declared at `src/transport/authz-grant.rest.ts:100`.
+Permission `organization:manage`. Entitlement `enterprise` (feature `MANAGEMENT_API`). Declared at `src/transport/authz-grant.rest.ts:95`.
 
 Answers at `/api/grants/:grantId`, `/api/v1/grants/:grantId`; also, undocumented, `/api/grants/2026-08-07/:grantId`, `/api/v1/grants/2026-08-07/:grantId`, `/api/grants/latest/:grantId`, `/api/v1/grants/latest/:grantId`.
 
@@ -635,7 +677,7 @@ type Response = z.infer<typeof grantSchema>; // ../contract/src/authz-grants-res
 
 Revoke a grant
 
-Permission `organization:manage`. Entitlement `enterprise` (feature `MANAGEMENT_API`). Declared at `src/transport/authz-grant.rest.ts:122`.
+Permission `organization:manage`. Entitlement `enterprise` (feature `MANAGEMENT_API`). Declared at `src/transport/authz-grant.rest.ts:117`.
 
 Answers at `/api/grants/:grantId`, `/api/v1/grants/:grantId`; also, undocumented, `/api/grants/2026-08-07/:grantId`, `/api/v1/grants/2026-08-07/:grantId`, `/api/grants/latest/:grantId`, `/api/v1/grants/latest/:grantId`.
 
@@ -652,7 +694,7 @@ interface Response {
 
 |             |                                                    |
 | ----------- | -------------------------------------------------- |
-| Declared at | `src/transport/authz-role-binding.rest.ts:71`      |
+| Declared at | `src/transport/authz-role-binding.rest.ts:66`      |
 | Base URL    | `/api/role-bindings`, twin `/api/v1/role-bindings` |
 | Addressing  | dated                                              |
 | Credential  | organization                                       |
@@ -663,7 +705,7 @@ interface Response {
 
 List the organization's role bindings, each naming its principal (user, group or API key), role, scope, and the date its access ends if one was set. Filter by principal or scope; totalCount counts the filtered set.
 
-Permission `organization:manage`. Entitlement `enterprise` (feature `MANAGEMENT_API`). Declared at `src/transport/authz-role-binding.rest.ts:83`.
+Permission `organization:manage`. Entitlement `enterprise` (feature `MANAGEMENT_API`). Declared at `src/transport/authz-role-binding.rest.ts:78`.
 
 Answers at `/api/role-bindings`, `/api/v1/role-bindings`; also, undocumented, `/api/role-bindings/2026-08-07`, `/api/v1/role-bindings/2026-08-07`, `/api/role-bindings/latest`, `/api/v1/role-bindings/latest`.
 
@@ -685,7 +727,7 @@ type Response = z.infer<typeof roleBindingRestListSchema>; // ../contract/src/au
 
 Create a role binding for exactly one principal: a user, a group, or an API key. Every reference is checked against the caller's organization; an identical binding is written again, because bindings are never unique. Pass expiresAt to time-box the access: it stops granting at that moment on its own, without being revoked, and a date that has already passed answers 422 grant_expiry_in_past. The response always carries the new binding's id; the names of its principal, role and scope may be absent on this response alone, and a follow-up read carries them.
 
-Permission `organization:manage`. Entitlement `enterprise` (feature `MANAGEMENT_API`). Declared at `src/transport/authz-role-binding.rest.ts:108`.
+Permission `organization:manage`. Entitlement `enterprise` (feature `MANAGEMENT_API`). Declared at `src/transport/authz-role-binding.rest.ts:103`.
 
 Answers at `/api/role-bindings`, `/api/v1/role-bindings`; also, undocumented, `/api/role-bindings/2026-08-07`, `/api/v1/role-bindings/2026-08-07`, `/api/role-bindings/latest`, `/api/v1/role-bindings/latest`.
 
@@ -708,7 +750,7 @@ type Response = z.infer<typeof roleBindingRestSchema>; // ../contract/src/authz-
 
 Change a binding's role (and custom role). The principal and scope are the binding's identity and do not change; create a new binding instead.
 
-Permission `organization:manage`. Entitlement `enterprise` (feature `MANAGEMENT_API`). Declared at `src/transport/authz-role-binding.rest.ts:151`.
+Permission `organization:manage`. Entitlement `enterprise` (feature `MANAGEMENT_API`). Declared at `src/transport/authz-role-binding.rest.ts:146`.
 
 Answers at `/api/role-bindings/:id`, `/api/v1/role-bindings/:id`; also, undocumented, `/api/role-bindings/2026-08-07/:id`, `/api/v1/role-bindings/2026-08-07/:id`, `/api/role-bindings/latest/:id`, `/api/v1/role-bindings/latest/:id`.
 
@@ -729,7 +771,7 @@ type Response = z.infer<typeof roleBindingRestSchema>; // ../contract/src/authz-
 
 Delete a role binding. An id that does not exist in the caller's organization answers 404 role_binding_not_found.
 
-Permission `organization:manage`. Entitlement `enterprise` (feature `MANAGEMENT_API`). Declared at `src/transport/authz-role-binding.rest.ts:175`.
+Permission `organization:manage`. Entitlement `enterprise` (feature `MANAGEMENT_API`). Declared at `src/transport/authz-role-binding.rest.ts:170`.
 
 Answers at `/api/role-bindings/:id`, `/api/v1/role-bindings/:id`; also, undocumented, `/api/role-bindings/2026-08-07/:id`, `/api/v1/role-bindings/2026-08-07/:id`, `/api/role-bindings/latest/:id`, `/api/v1/role-bindings/latest/:id`.
 
@@ -838,7 +880,7 @@ interface Input {
     scopeId: string;
   }[];
 }
-// Output: authzBindingMutationSuccessSchema, ../contract/src/authz.grant-management.ts:190
+// Output: authzBindingMutationSuccessSchema, ../contract/src/authz.grant-management.ts:193
 interface Output {
   success: true;
 }
@@ -849,6 +891,14 @@ interface Output {
 None: this module declares no websocket, rawsocket or rawhttp door.
 
 ## Workers
+
+### Pipeline `authz_aggregate_read` (aggregate `authz_aggregate_read`)
+
+Declared at `src/eventing/authz-aggregate-read.pipeline.ts:18`. Events: `authzAggregateReadEventSchema`.
+
+| Kind    | Name                  | Handles | Declared at                                        |
+| ------- | --------------------- | ------- | -------------------------------------------------- |
+| command | `recordAggregateRead` | –       | `src/eventing/authz-aggregate-read.pipeline.ts:23` |
 
 ### Pipeline `authz_grant` (aggregate `authz_grant`)
 
@@ -872,6 +922,14 @@ The chain builds early when `!sessionVersions` (`src/eventing/authz-grant.pipeli
 | peer subscriber           | `userErased`                                                   | `lw.identity.user_erased` from [identity](../../identity/README.md) | `src/eventing/authz-grant.pipeline.ts:116` | always               |
 | ClickHouse map projection | `≈ AuthzGrantProjection.create(options.authzGrantsWriteStore)` | –                                                                   | `src/eventing/authz-grant.pipeline.ts:64`  | always               |
 | projection subscriber     | `sessionVersion`                                               | –                                                                   | `src/eventing/authz-grant.pipeline.ts:126` | past the early build |
+
+### Pipeline `authz_member_offboarded` (aggregate `authz_member_offboarded`)
+
+Declared at `src/eventing/authz-member-offboarded.pipeline.ts:18`. Events: `authzMemberOffboardedEventSchema`.
+
+| Kind    | Name                     | Handles | Declared at                                           |
+| ------- | ------------------------ | ------- | ----------------------------------------------------- |
+| command | `recordMemberOffboarded` | –       | `src/eventing/authz-member-offboarded.pipeline.ts:23` |
 
 ## Configuration
 

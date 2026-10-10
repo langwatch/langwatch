@@ -1,3 +1,4 @@
+import { InlineCode } from "@langwatch/design-system/inline-code";
 import { Box, Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import type {
   CliSessionCard,
@@ -267,7 +268,7 @@ function RevokeAllConfirmation({
     >
       <Text fontSize="xs" color="red.fg" flex={1}>
         Revoke every device on your account? Their ingestion keys stop with them, and you'll need to
-        re-run <code>langwatch login</code> on each device after this.
+        re-run <InlineCode>langwatch login</InlineCode> on each device after this.
       </Text>
       <Button size="xs" variant="ghost" onClick={onCancel} disabled={isRevoking}>
         Cancel

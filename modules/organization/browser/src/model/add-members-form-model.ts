@@ -40,6 +40,25 @@ export function splitInviteEmails(raw: string): string[] {
     .filter(Boolean);
 }
 
+/** One address as the email box judges it, to flag a chip before the form is sent. */
+export function isInviteEmail(email: string): boolean {
+  return EMAIL_PATTERN.test(email);
+}
+
+/** The email box read as chips: every finished address, and the one still being typed. */
+export function inviteEmailChips(raw: string): { chips: string[]; draft: string } {
+  const emails = splitInviteEmails(raw);
+  if (raw === "" || /[\s,;]$/.test(raw)) return { chips: emails, draft: "" };
+  return { chips: emails.slice(0, -1), draft: emails.at(-1) ?? "" };
+}
+
+/** The email box's raw text from its chips and the address being typed. */
+export function inviteEmailsRaw({ chips, draft }: { chips: string[]; draft: string }): string {
+  return (
+    [...chips, draft].filter(Boolean).join(", ") + (draft === "" && chips.length > 0 ? ", " : "")
+  );
+}
+
 /** The email box's validation: true, or the message to show under it. */
 export function validateInviteEmails(raw: string): true | string {
   const emails = splitInviteEmails(raw);

@@ -3,11 +3,7 @@
  * The two timestamps leave as ISO strings, as this family has always sent them.
  * A graph posted without a size is 1 by 1 here, as on main; tRPC's default is 4 by 3.
  */
-import {
-  defineRestRouter,
-  MANAGEMENT_API_VERSION,
-  type RestTransportDeclaration,
-} from "@langwatch/api/rest";
+import { defineRestRouter, MANAGEMENT_API_VERSION } from "@langwatch/api/rest";
 import {
   DashboardApi,
   graphDeletedResponseSchema,
@@ -34,11 +30,7 @@ const graphResponse = (graph: Graph) => ({
   updatedAt: graph.updatedAt.toISOString(),
 });
 
-export const graphRest: Readonly<{
-  protocol: "rest";
-  namespace: string;
-  router: () => RestTransportDeclaration<DashboardApi>;
-}> = defineRestRouter(DashboardApi)
+export const graphRest = defineRestRouter(DashboardApi)
   .withNamespace("graphs")
   .withVersion(MANAGEMENT_API_VERSION)
 
@@ -70,6 +62,7 @@ export const graphRest: Readonly<{
 
   // Creating asks for `analytics:create`; `:manage` still implies it.
   .post("/", "postApiGraphs")
+  .withAudit("graphs.create")
   .withInput(graphRestCreateSchema)
   .withPermission("analytics:create")
   .withOutput(graphRestResponseSchema)
@@ -94,6 +87,7 @@ export const graphRest: Readonly<{
   )
 
   .patch("/:id", "patchApiGraphsById")
+  .withAudit("graphs.updateById")
   .withParams(graphRestParamsSchema)
   .withInput(graphRestUpdateSchema)
   .withPermission("analytics:update")
@@ -116,6 +110,7 @@ export const graphRest: Readonly<{
 
   // Destruction deliberately stays at `:manage`.
   .delete("/:id", "deleteApiGraphsById")
+  .withAudit("graphs.delete")
   .withParams(graphRestParamsSchema)
   .withPermission("analytics:manage")
   .withOutput(graphDeletedResponseSchema)

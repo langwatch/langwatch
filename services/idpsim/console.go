@@ -58,9 +58,11 @@ func (s *Server) serveConsolePage(w http.ResponseWriter, r *http.Request, status
 	w.Header().Set("Cache-Control", "no-store")
 	page, err := fs.ReadFile(s.bundle, "index.html")
 	if err != nil {
-		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.WriteHeader(status)
-		_, _ = io.WriteString(w, webconsole.NotBuiltMessage(consoleBuildCommand))
+		if r.Method != http.MethodHead {
+			_, _ = io.WriteString(w, webconsole.NotBuiltPage(consoleBuildCommand))
+		}
 		return
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")

@@ -1,4 +1,4 @@
-import { bindRestMiddleware, createRestRuntime } from "@langwatch/api/rest";
+import { bindMiddlewareContext, createRestRuntime } from "@langwatch/api/rest";
 import type { AuditLogApi, RecordAuditLogCommand } from "@langwatch/audit-log-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
@@ -12,6 +12,7 @@ import { ScopedSecrets } from "@langwatch/secrets";
  * refuses by name, and what it writes down about the read.
  */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { UserApi } from "@langwatch/user-contract";
 import type { ErrorHandler } from "hono";
@@ -147,6 +148,7 @@ function mount({
   } as const;
 
   const runtime = createRestRuntime({
+    authorization: restTestAuthorization(),
     identity: {
       authenticate: () => ({
         actor: { type: "api_key", id: "key-1" } as const,
@@ -159,8 +161,8 @@ function mount({
     app: () => app,
     credential: "project",
     onError: renderHandled,
-    facts: [
-      bindRestMiddleware(codingAgentRestCaller, () => ({
+    middlewareContext: [
+      bindMiddlewareContext(codingAgentRestCaller, () => ({
         project: { isPersonal: project.isPersonal, ownerUserId: project.ownerUserId },
         credential,
       })),

@@ -8,6 +8,7 @@ import {
   definePipeline,
   type EventingSetup,
   type Projection,
+  type RetentionPolicyResolver,
   type StaticPipelineDefinition,
 } from "@langwatch/eventing";
 
@@ -35,15 +36,17 @@ export type EvaluationLifecyclePipeline = StaticPipelineDefinition<
 >;
 
 /** evaluation_lifecycle: evaluation records its facts; peers react from their own side (§9). */
-export function buildEvaluationLifecyclePipeline(): EvaluationLifecyclePipeline {
-  return definePipeline({
+export function buildEvaluationLifecyclePipeline(
+  retention?: RetentionPolicyResolver,
+): EvaluationLifecyclePipeline {
+  const pipeline = definePipeline({
     name: EVALUATION_LIFECYCLE_PIPELINE_NAME,
     aggregate: defineAggregate({ type: EVALUATION_LIFECYCLE_AGGREGATE_TYPE }),
   })
     .withEvents([evaluationRanEventSchema, evaluationLifecycleCompletedEventSchema])
     .withCommand("recordEvaluationRan", RecordEvaluationRanCommand)
-    .withCommand("recordEvaluationLifecycleCompleted", RecordEvaluationLifecycleCompletedCommand)
-    .build();
+    .withCommand("recordEvaluationLifecycleCompleted", RecordEvaluationLifecycleCompletedCommand);
+  return (retention === undefined ? pipeline : pipeline.withRetention(retention)).build();
 }
 
 export const evaluationLifecycleEventing = defineEventingModule({

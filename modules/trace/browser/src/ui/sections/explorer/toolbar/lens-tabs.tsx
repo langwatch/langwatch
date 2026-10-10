@@ -2,6 +2,7 @@ import { Kbd } from "@langwatch/design-system/kbd";
 import { MenuContent, MenuItem, MenuRoot, MenuTrigger } from "@langwatch/design-system/menu";
 import { Box, Button, HStack, Tabs, Text } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import { isAggregateProjectKind } from "@langwatch/project-contract";
 import { ChevronDown, PanelLeftOpen, RotateCcw } from "lucide-react";
 import type React from "react";
 import { startTransition, useMemo, useRef, useState } from "react";
@@ -9,6 +10,7 @@ import { startTransition, useMemo, useRef, useState } from "react";
 import { useViewStore } from "../../../../behavior/explorer.store.ts";
 import { useOverflowVisibility } from "../../../../behavior/explorer/use-overflow-visibility.ts";
 import { useUIStore } from "../../../../behavior/ui.store.ts";
+import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import {
   type LensConfig,
   COST_LENS_IDS,
@@ -48,6 +50,8 @@ export const LensTabs: React.FC = () => {
   const revertLens = useViewStore((s) => s.revertLens);
   const isDraft = useViewStore((s) => s.isDraft);
   const errorCount = useErrorCount();
+  const { project } = useOrganizationTeamProject();
+  const canSaveLenses = !isAggregateProjectKind(project?.kind);
 
   const [pendingLensId, setPendingLensId] = useState<string | null>(null);
   // Save-as-new from the unsaved-changes prompt routes through the shared
@@ -141,35 +145,34 @@ export const LensTabs: React.FC = () => {
 
   return (
     <>
-      <HStack gap={0} flex="1" minWidth={0}>
-        {sidebarCollapsed && (
-          <Tooltip
-            content={
-              <HStack gap={1.5}>
-                <Text>Show filters sidebar</Text>
-                <Kbd>{"["}</Kbd>
-              </HStack>
-            }
-            positioning={{ placement: "bottom" }}
+      {sidebarCollapsed && (
+        <Tooltip
+          content={
+            <HStack gap={1.5}>
+              <Text>Show filters sidebar</Text>
+              <Kbd>{"["}</Kbd>
+            </HStack>
+          }
+          positioning={{ placement: "bottom" }}
+        >
+          {/* Reads as a real button (matching the time-range button) with a
+              "Filters" label, not a bare chevron the user has to decode. */}
+          <Button
+            aria-label="Show filters sidebar"
+            variant="outline"
+            size="xs"
+            fontWeight="medium"
+            gap={1.5}
+            color="fg.subtle"
+            onClick={toggleSidebar}
+            flexShrink={0}
           >
-            {/* Reads as a real button (matching the time-range button) with a
-                "Filters" label, not a bare chevron the user has to decode. */}
-            <Button
-              aria-label="Show filters sidebar"
-              variant="outline"
-              size="xs"
-              fontWeight="medium"
-              gap={1.5}
-              color="fg.subtle"
-              onClick={toggleSidebar}
-              marginRight={2}
-              flexShrink={0}
-            >
-              <PanelLeftOpen size={14} />
-              Filters
-            </Button>
-          </Tooltip>
-        )}
+            <PanelLeftOpen size={14} />
+            Filters
+          </Button>
+        </Tooltip>
+      )}
+      <HStack gap={0} flex="1" minWidth={0}>
         <Tabs.Root
           value={activeLensId}
           onValueChange={(e) => handleLensChange(e.value)}
@@ -254,7 +257,7 @@ export const LensTabs: React.FC = () => {
       <UnsavedLensDialog
         open={pendingLensId !== null}
         lensName={activeLens?.name ?? ""}
-        onSaveAsNew={resolvePendingSaveAsNew}
+        onSaveAsNew={canSaveLenses ? resolvePendingSaveAsNew : undefined}
         onDiscard={resolvePendingDiscard}
         onCancel={() => setPendingLensId(null)}
       />

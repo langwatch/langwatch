@@ -117,7 +117,8 @@ describe("when a run is asked for while one is already underway", () => {
     fireEvent.click(screen.getByRole("button", { name: /run topic clustering/i }));
 
     expect(host.failures).toHaveLength(0);
-    expect(host.successes.at(-1)?.title).toBe("A run is already in progress");
+    expect(host.successes).toHaveLength(0);
+    expect(host.infos.at(-1)?.title).toBe("A run is already in progress");
   });
 });
 
@@ -129,5 +130,16 @@ describe("when a run is asked for and starts", () => {
 
     expect(calls.trigger).toHaveBeenCalledWith({ projectId: "project-1" });
     expect(host.successes.at(-1)?.title).toBe("Topic clustering started");
+  });
+});
+
+describe("given the last run completed without finding any topic", () => {
+  it("says no new topics were found instead of organizing into zero", () => {
+    state.status = settledStatus({ lastRunOutcome: "completed", lastRunTracesProcessed: 51 });
+
+    renderWithTopicHost(<TopicClusteringScreen />);
+
+    expect(screen.getByText(/found no new topics in 51 traces/i)).toBeTruthy();
+    expect(screen.queryByText(/into 0 topics/i)).toBeNull();
   });
 });

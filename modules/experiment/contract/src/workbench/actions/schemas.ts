@@ -1,4 +1,5 @@
 import { AVAILABLE_EVALUATORS } from "@langwatch/evaluator-contract";
+import type { Named } from "@langwatch/module";
 import type { Field } from "@langwatch/workflow-contract";
 import { fieldSchema } from "@langwatch/workflow-contract";
 import { z } from "zod";
@@ -26,7 +27,7 @@ import {
  * Extends the target object rather than `targetConfigSchema`: the refinement
  * stays on the latter, which is what validates the state written back.
  */
-export const addTargetPayloadSchema = z
+const addTargetPayloadSchemaDefinition = z
   .object({
     ...targetConfigObjectSchema.shape,
     id: z
@@ -48,6 +49,8 @@ export const addTargetPayloadSchema = z
       "Use it to put a new candidate beside the ones already on the board. " +
       "The column lands to the right of the existing ones and runs nothing until a run covers it.",
   );
+export interface AddTargetPayloadSchema extends Named<typeof addTargetPayloadSchemaDefinition> {}
+export const addTargetPayloadSchema: AddTargetPayloadSchema = addTargetPayloadSchemaDefinition;
 /**
  * Field lists are typed as the domain `Field`, the way `TargetConfig` and
  * `EvaluatorConfig` are in `../types`: the inferred zod shape spells `json_schema` as a
@@ -61,11 +64,13 @@ export type AddTargetPayload = Omit<
   outputs?: Field[];
 };
 
-export const addTargetResultSchema = z.object({
+const addTargetResultSchemaDefinition = z.object({
   targetId: z.string().describe("Id of the column that was added."),
 });
+export interface AddTargetResultSchema extends Named<typeof addTargetResultSchemaDefinition> {}
+export const addTargetResultSchema: AddTargetResultSchema = addTargetResultSchemaDefinition;
 
-export const duplicateTargetPayloadSchema = z
+const duplicateTargetPayloadSchemaDefinition = z
   .object({
     targetId: z.string().describe("Id of the column to copy."),
     /**
@@ -84,17 +89,27 @@ export const duplicateTargetPayloadSchema = z
       "Use it to start a candidate from a column already on the board, then change one thing about the copy. " +
       "The copy shares the original's name, so both columns read as the same name with a (1) and a (2) suffix.",
   );
+export interface DuplicateTargetPayloadSchema extends Named<
+  typeof duplicateTargetPayloadSchemaDefinition
+> {}
+export const duplicateTargetPayloadSchema: DuplicateTargetPayloadSchema =
+  duplicateTargetPayloadSchemaDefinition;
 export type DuplicateTargetPayload = z.infer<typeof duplicateTargetPayloadSchema>;
 
-export const duplicateTargetResultSchema = z.object({
+const duplicateTargetResultSchemaDefinition = z.object({
   targetId: z.string().describe("Id of the new copy."),
   name: z
     .string()
     .optional()
     .describe("The name held in state after the copy, when the column can hold one."),
 });
+export interface DuplicateTargetResultSchema extends Named<
+  typeof duplicateTargetResultSchemaDefinition
+> {}
+export const duplicateTargetResultSchema: DuplicateTargetResultSchema =
+  duplicateTargetResultSchemaDefinition;
 
-export const removeTargetPayloadSchema = z
+const removeTargetPayloadSchemaDefinition = z
   .object({
     targetId: z.string().describe("Id of the column to remove."),
   })
@@ -103,13 +118,23 @@ export const removeTargetPayloadSchema = z
       "Use it to drop a candidate that lost. " +
       "A comparison that judges the removed column keeps naming it and refuses to run until its variants are picked again.",
   );
+export interface RemoveTargetPayloadSchema extends Named<
+  typeof removeTargetPayloadSchemaDefinition
+> {}
+export const removeTargetPayloadSchema: RemoveTargetPayloadSchema =
+  removeTargetPayloadSchemaDefinition;
 export type RemoveTargetPayload = z.infer<typeof removeTargetPayloadSchema>;
 
-export const removeTargetResultSchema = z.object({
+const removeTargetResultSchemaDefinition = z.object({
   targetId: z.string().describe("Id of the column that was removed."),
 });
+export interface RemoveTargetResultSchema extends Named<
+  typeof removeTargetResultSchemaDefinition
+> {}
+export const removeTargetResultSchema: RemoveTargetResultSchema =
+  removeTargetResultSchemaDefinition;
 
-export const setTargetPromptPayloadSchema = z
+const setTargetPromptPayloadSchemaDefinition = z
   .object({
     targetId: z.string().describe("Id of the column to write the prompt into."),
     localPromptConfig: localPromptConfigSchema.describe(
@@ -129,6 +154,11 @@ export const setTargetPromptPayloadSchema = z
       "Use it to try a rewrite: the column runs the draft, and the library keeps the version other experiments use. " +
       "The column shows an unsaved marker until someone saves the draft.",
   );
+export interface SetTargetPromptPayloadSchema extends Named<
+  typeof setTargetPromptPayloadSchemaDefinition
+> {}
+export const setTargetPromptPayloadSchema: SetTargetPromptPayloadSchema =
+  setTargetPromptPayloadSchemaDefinition;
 export type SetTargetPromptPayload = Omit<
   z.infer<typeof setTargetPromptPayloadSchema>,
   "inputs" | "outputs"
@@ -137,11 +167,16 @@ export type SetTargetPromptPayload = Omit<
   outputs?: Field[];
 };
 
-export const setTargetPromptResultSchema = z.object({
+const setTargetPromptResultSchemaDefinition = z.object({
   targetId: z.string().describe("Id of the column that now runs the draft."),
 });
+export interface SetTargetPromptResultSchema extends Named<
+  typeof setTargetPromptResultSchemaDefinition
+> {}
+export const setTargetPromptResultSchema: SetTargetPromptResultSchema =
+  setTargetPromptResultSchemaDefinition;
 
-export const updateTargetModelPayloadSchema = z
+const updateTargetModelPayloadSchemaDefinition = z
   .object({
     targetId: z.string().describe("Id of the column to change."),
     model: z
@@ -156,18 +191,28 @@ export const updateTargetModelPayloadSchema = z
       "Use it to compare the same prompt on two models. " +
       "The column needs a prompt already: a column with none is refused.",
   );
+export interface UpdateTargetModelPayloadSchema extends Named<
+  typeof updateTargetModelPayloadSchemaDefinition
+> {}
+export const updateTargetModelPayloadSchema: UpdateTargetModelPayloadSchema =
+  updateTargetModelPayloadSchemaDefinition;
 export type UpdateTargetModelPayload = z.infer<typeof updateTargetModelPayloadSchema>;
 
-export const updateTargetModelResultSchema = z.object({
+const updateTargetModelResultSchemaDefinition = z.object({
   targetId: z.string().describe("Id of the column that was changed."),
   model: z.string().describe("The model the column runs now."),
 });
+export interface UpdateTargetModelResultSchema extends Named<
+  typeof updateTargetModelResultSchemaDefinition
+> {}
+export const updateTargetModelResultSchema: UpdateTargetModelResultSchema =
+  updateTargetModelResultSchemaDefinition;
 
 // ============================================================================
 // Mappings
 // ============================================================================
 
-export const setMappingPayloadSchema = z
+const setMappingPayloadSchemaDefinition = z
   .object({
     targetId: z.string().describe("Id of the column whose input is being wired."),
     datasetId: z
@@ -187,9 +232,11 @@ export const setMappingPayloadSchema = z
       "Use it when a column reads nothing, or reads the incorrect column. " +
       "An input field left unwired makes every row of that column fail.",
   );
+export interface SetMappingPayloadSchema extends Named<typeof setMappingPayloadSchemaDefinition> {}
+export const setMappingPayloadSchema: SetMappingPayloadSchema = setMappingPayloadSchemaDefinition;
 export type SetMappingPayload = z.infer<typeof setMappingPayloadSchema>;
 
-export const setEvaluatorMappingPayloadSchema = z
+const setEvaluatorMappingPayloadSchemaDefinition = z
   .object({
     evaluatorId: z.string().describe("Id of the evaluator being wired."),
     datasetId: z.string().describe("Dataset the mapping belongs to."),
@@ -210,6 +257,11 @@ export const setEvaluatorMappingPayloadSchema = z
       "Use it after adding an evaluator whose fields the workbench could not infer. " +
       "An evaluator that resolves no input reports the row as an error instead of scoring empty against empty.",
   );
+export interface SetEvaluatorMappingPayloadSchema extends Named<
+  typeof setEvaluatorMappingPayloadSchemaDefinition
+> {}
+export const setEvaluatorMappingPayloadSchema: SetEvaluatorMappingPayloadSchema =
+  setEvaluatorMappingPayloadSchemaDefinition;
 export type SetEvaluatorMappingPayload = z.infer<typeof setEvaluatorMappingPayloadSchema>;
 
 // ============================================================================
@@ -231,7 +283,7 @@ const isKnownEvaluatorType = (evaluatorType: string): boolean =>
     (prefix) => evaluatorType.startsWith(prefix) && evaluatorType.length > prefix.length,
   );
 
-export const addEvaluatorPayloadSchema = z
+const addEvaluatorPayloadSchemaDefinition = z
   .object({
     ...evaluatorConfigSchema.pick({
       evaluatorType: true,
@@ -290,19 +342,29 @@ export const addEvaluatorPayloadSchema = z
       `Set \`comparison\` and the evaluator becomes a column of its own that judges the columns it names against each other. Only the Comparison judge (${COMPARISON_EVALUATOR_TYPE}) may do that, and any other type given a comparison config is refused. ` +
       "Run `langwatch evaluator types` to list the types this workbench accepts.",
   );
+export interface AddEvaluatorPayloadSchema extends Named<
+  typeof addEvaluatorPayloadSchemaDefinition
+> {}
+export const addEvaluatorPayloadSchema: AddEvaluatorPayloadSchema =
+  addEvaluatorPayloadSchemaDefinition;
 export type AddEvaluatorPayload = Omit<z.input<typeof addEvaluatorPayloadSchema>, "inputs"> & {
   inputs?: Field[];
 };
 
-export const addEvaluatorResultSchema = z.object({
+const addEvaluatorResultSchemaDefinition = z.object({
   evaluatorId: z.string().describe("Id of the evaluator that was added."),
 });
+export interface AddEvaluatorResultSchema extends Named<
+  typeof addEvaluatorResultSchemaDefinition
+> {}
+export const addEvaluatorResultSchema: AddEvaluatorResultSchema =
+  addEvaluatorResultSchemaDefinition;
 
 // ============================================================================
 // Datasets (inline only — saved datasets belong to the dataset API)
 // ============================================================================
 
-export const setCellValuePayloadSchema = z
+const setCellValuePayloadSchemaDefinition = z
   .object({
     datasetId: z.string().describe("Id of the dataset holding the cell."),
     rowIndex: z.number().int().min(0).describe("Row to write, counted from 0."),
@@ -314,9 +376,14 @@ export const setCellValuePayloadSchema = z
       "Use it to correct a test case, or to fill an expected answer. " +
       "Only an inline dataset can be edited here: a saved dataset belongs to the dataset API, and a column the dataset does not have is refused.",
   );
+export interface SetCellValuePayloadSchema extends Named<
+  typeof setCellValuePayloadSchemaDefinition
+> {}
+export const setCellValuePayloadSchema: SetCellValuePayloadSchema =
+  setCellValuePayloadSchemaDefinition;
 export type SetCellValuePayload = z.infer<typeof setCellValuePayloadSchema>;
 
-export const addColumnPayloadSchema = z
+const addColumnPayloadSchemaDefinition = z
   .object({
     datasetId: z.string().describe("Id of the inline dataset to add to."),
     column: z
@@ -332,14 +399,18 @@ export const addColumnPayloadSchema = z
       "Use it to hold a value a target or an evaluator needs to read, such as an expected answer. " +
       "Existing rows get an empty cell for the new column.",
   );
+export interface AddColumnPayloadSchema extends Named<typeof addColumnPayloadSchemaDefinition> {}
+export const addColumnPayloadSchema: AddColumnPayloadSchema = addColumnPayloadSchemaDefinition;
 export type AddColumnPayload = z.input<typeof addColumnPayloadSchema>;
 
-export const addColumnResultSchema = z.object({
+const addColumnResultSchemaDefinition = z.object({
   datasetId: z.string().describe("Id of the dataset that was changed."),
   columnId: z.string().describe("Id of the column that was added."),
 });
+export interface AddColumnResultSchema extends Named<typeof addColumnResultSchemaDefinition> {}
+export const addColumnResultSchema: AddColumnResultSchema = addColumnResultSchemaDefinition;
 
-export const addRowsPayloadSchema = z
+const addRowsPayloadSchemaDefinition = z
   .object({
     datasetId: z.string().describe("Id of the inline dataset to add to."),
     rows: z
@@ -354,19 +425,23 @@ export const addRowsPayloadSchema = z
       "Use it to add test cases, for example the ones a failing run exposed. " +
       "The rows are added at the end and are not run until a run covers them.",
   );
+export interface AddRowsPayloadSchema extends Named<typeof addRowsPayloadSchemaDefinition> {}
+export const addRowsPayloadSchema: AddRowsPayloadSchema = addRowsPayloadSchemaDefinition;
 export type AddRowsPayload = z.infer<typeof addRowsPayloadSchema>;
 
-export const addRowsResultSchema = z.object({
+const addRowsResultSchemaDefinition = z.object({
   datasetId: z.string().describe("Id of the dataset that was changed."),
   addedRows: z.number().describe("How many rows were appended."),
   rowCount: z.number().describe("How many rows the dataset holds now."),
 });
+export interface AddRowsResultSchema extends Named<typeof addRowsResultSchemaDefinition> {}
+export const addRowsResultSchema: AddRowsResultSchema = addRowsResultSchemaDefinition;
 
 // ============================================================================
 // Read and run
 // ============================================================================
 
-export const getStatePayloadSchema = z
+const getStatePayloadSchemaDefinition = z
   .object({
     includeResults: z
       .boolean()
@@ -380,9 +455,11 @@ export const getStatePayloadSchema = z
       "Use it before deciding anything, and again after a run finishes. " +
       "The answer is capped in size, so sample rows go first and `truncated` says when anything was left out.",
   );
+export interface GetStatePayloadSchema extends Named<typeof getStatePayloadSchemaDefinition> {}
+export const getStatePayloadSchema: GetStatePayloadSchema = getStatePayloadSchemaDefinition;
 export type GetStatePayload = z.infer<typeof getStatePayloadSchema>;
 
-export const runPayloadSchema = z
+const runPayloadSchemaDefinition = z
   .object({
     /**
      * An entry has to name a target: an empty string is not a target, and a list
@@ -406,9 +483,11 @@ export const runPayloadSchema = z
       "Use the run id to follow the run: `langwatch experiment status` for progress, `langwatch experiment results` for the cells. " +
       "Read the workbench again once the run ends, because that is where the cells land.",
   );
+export interface RunPayloadSchema extends Named<typeof runPayloadSchemaDefinition> {}
+export const runPayloadSchema: RunPayloadSchema = runPayloadSchemaDefinition;
 export type RunPayload = z.infer<typeof runPayloadSchema>;
 
-export const runResultSchema = z.object({
+const runResultSchemaDefinition = z.object({
   runId: z
     .string()
     .optional()
@@ -419,3 +498,5 @@ export const runResultSchema = z.object({
     .enum(["idle", "running", "success", "error", "stopped"])
     .describe("The run's state when it answered, which is normally running."),
 });
+export interface RunResultSchema extends Named<typeof runResultSchemaDefinition> {}
+export const runResultSchema: RunResultSchema = runResultSchemaDefinition;

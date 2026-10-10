@@ -8,6 +8,7 @@ package webconsole
 import (
 	"bytes"
 	"fmt"
+	"html"
 	"io"
 	"io/fs"
 	"net/http"
@@ -57,7 +58,7 @@ func (c *Console) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	if !c.IsBuilt() {
-		c.serveNotBuilt(w)
+		c.serveNotBuilt(w, r)
 		return
 	}
 	if name == "" || name == indexFile {
@@ -103,14 +104,27 @@ func cacheControl(name string) string {
 	}
 }
 
-func (c *Console) serveNotBuilt(w http.ResponseWriter) {
-	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+func (c *Console) serveNotBuilt(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
 	w.WriteHeader(http.StatusServiceUnavailable)
-	_, _ = io.WriteString(w, NotBuiltMessage(c.buildCommand))
+	if r.Method != http.MethodHead {
+		_, _ = io.WriteString(w, NotBuiltPage(c.buildCommand))
+	}
 }
 
 // NotBuiltMessage is the not-built page's whole text.
 func NotBuiltMessage(buildCommand string) string {
 	return fmt.Sprintf("This console is not built into this binary. Run `%s`, then rebuild the binary that serves it.\n", buildCommand)
+}
+
+// NotBuiltPage gives consoles without a bundle the same favicon as the built UI.
+func NotBuiltPage(buildCommand string) string {
+	return fmt.Sprintf(`<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>haven | Console not built</title>
+<link rel="icon" type="image/svg+xml" href="%s">
+</head><body><p>%s</p></body></html>
+`, havenIconDataURL, html.EscapeString(NotBuiltMessage(buildCommand)))
 }

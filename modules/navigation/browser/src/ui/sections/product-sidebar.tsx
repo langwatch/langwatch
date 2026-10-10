@@ -128,9 +128,13 @@ function SidebarBottomBlock({
  * tab, else the remembered product's home (settings-shell-v2.feature).
  */
 function SettingsBackEntry({ showLabel }: { showLabel: boolean }) {
-  const organization = useNavigationHost().organization();
+  const host = useNavigationHost();
+  const organization = host.organization();
   const { reachableProducts } = useReachableProducts();
   const projectSlug = useLlmOpsProjectSlug();
+  // Refused /ops view: the remembered product is not where the viewer came from.
+  const isRefusedOps = isPathUnder({ pathname: host.pathname(), base: "/ops" });
+  if (isRefusedOps && !host.opsAccess().hasAccess) return null;
   const target = resolveSettingsBackTarget({
     organizationId: organization?.id ?? null,
     rememberedProduct: organization
@@ -146,7 +150,9 @@ function SettingsBackEntry({ showLabel }: { showLabel: boolean }) {
       paddingX={1}
       borderBottomWidth="1px"
       borderBottomColor="border"
-      paddingBottom={2.5}
+      height="shellHeader"
+      display="flex"
+      alignItems="center"
     >
       <SideMenuLink
         icon={ArrowLeft}
@@ -321,7 +327,7 @@ export function SidebarContent({
 
   return (
     <VStack
-      paddingTop={2}
+      paddingTop={surface === "settings" ? 0 : 2}
       paddingBottom={2}
       gap={0}
       height="100%"
@@ -359,12 +365,14 @@ export function SidebarContent({
           // opt out of the ::-webkit-scrollbar styling below, and the
           // native bar it falls back to is a wide one with a track.
           // Firefox takes its default scrollbar instead.
-          "&::-webkit-scrollbar": { width: "4px" },
+          "&::-webkit-scrollbar": { width: "10px" },
           "&::-webkit-scrollbar-thumb": {
             background: "var(--chakra-colors-border-emphasized)",
-            borderRadius: "2px",
+            backgroundClip: "padding-box",
+            border: "3px solid transparent",
+            borderRadius: "999px",
           },
-          "&::-webkit-scrollbar-track": { background: "transparent" },
+          "&::-webkit-scrollbar-track": { background: "transparent", marginBlock: "6px" },
         }}
       >
         <QuickSearchMenuItem showLabel={showExpanded} />

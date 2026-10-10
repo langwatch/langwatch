@@ -7,9 +7,9 @@ import { useChakraContext } from "@langwatch/design-system/primitives";
 import { cleanup, render } from "@testing-library/react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
-import { composeUiDesignSystem, loadUiRootCapabilities } from "../ui-root-capabilities";
+import { composeUiDesignSystem, loadUiRootHostServices } from "../ui-root-host-services";
 
-const uiDesignSystem = composeUiDesignSystem(await loadUiRootCapabilities());
+const uiDesignSystem = composeUiDesignSystem(await loadUiRootHostServices());
 
 // jsdom ships no matchMedia, and the colour-mode provider reads it on mount.
 beforeAll(() => {

@@ -8,8 +8,13 @@ import {
   MAX_LWQL_LENGTH,
   type LangWatchQLProtections,
 } from "@langwatch/analytics-contract";
-import { bindRestMiddleware, canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
+import {
+  bindMiddlewareContext,
+  canonicalErrorResponse,
+  createRestRuntime,
+} from "@langwatch/api/rest";
 import { LocalFeatureApis } from "@langwatch/process";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { TRACE_FILTER_EXAMPLES } from "@langwatch/trace-contract";
 import { Hono } from "hono";
 
@@ -46,10 +51,11 @@ export function mountQueryDoor({
   /** What the authenticated key's project lets it see; fully permitted when absent. */
   protections?: LangWatchQLProtections;
 }): { fetch: (path: string, init?: RequestInit) => Promise<Response> } {
-  // An API key resolves its organization; the key-reach fact below fans it out to the tenant.
+  // An API key resolves its organization; the key-reach context below fans it out to the tenant.
   const keyScope = () => ({ tier: "organization" as const, id: `org-of-${tenant().id}` });
 
   const runtime = createRestRuntime({
+    authorization: restTestAuthorization(),
     // The whole of the credential chain this test fakes: one authenticated key.
     identity: {
       authenticate: () => ({ actor: { type: "api_key", id: "key-asking" }, scope: keyScope() }),
@@ -98,8 +104,8 @@ export function mountQueryDoor({
     runtime.mount(queryRest.router(), {
       app: () => apis.reference(AnalyticsQueryApi),
       onError: canonicalErrorResponse,
-      facts: [
-        bindRestMiddleware(langWatchQLKeyReach, () => ({
+      middlewareContext: [
+        bindMiddlewareContext(langWatchQLKeyReach, () => ({
           kind: "project" as const,
           projectId: tenant().id,
         })),

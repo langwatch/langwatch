@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 /**
  * Wire shapes the Go data plane sends to /api/internal/gateway; uses Go
  * naming (lower_snake_case), matches deployed gateway exactly.
@@ -8,30 +9,45 @@ import { spendUsageSchema } from "./features/spend/gateway-spend.schemas.ts";
 import { GUARDRAIL_WIRE_DIRECTIONS } from "./gateway-guardrail.ts";
 
 /** The virtual key a data-plane node presents for exchange against a JWT. */
-export const gatewayInternalResolveKeySchema = z.object({
+const gatewayInternalResolveKeySchemaDefinition = z.object({
   key_presented: z.string().min(1),
   /** The install presenting an `lwl_` license token; ignored for a virtual key. */
   instance_id: z.string().optional(),
   /** Which node asked. Recorded on the auth decision log, never enforced. */
   gateway_node_id: z.string().optional(),
 });
+export interface GatewayInternalResolveKeySchema extends Named<
+  typeof gatewayInternalResolveKeySchemaDefinition
+> {}
+export const gatewayInternalResolveKeySchema: GatewayInternalResolveKeySchema =
+  gatewayInternalResolveKeySchemaDefinition;
 
 /** The provider row whose Codex session a 401 recovery re-mints against. */
-export const gatewayInternalCodexRefreshSchema = z.object({
+const gatewayInternalCodexRefreshSchemaDefinition = z.object({
   provider_row_id: z.string().min(1),
 });
+export interface GatewayInternalCodexRefreshSchema extends Named<
+  typeof gatewayInternalCodexRefreshSchemaDefinition
+> {}
+export const gatewayInternalCodexRefreshSchema: GatewayInternalCodexRefreshSchema =
+  gatewayInternalCodexRefreshSchemaDefinition;
 
 /** The key whose warm-cache configuration bundle is being revalidated. */
-export const gatewayInternalConfigParamsSchema = z.object({
+const gatewayInternalConfigParamsSchemaDefinition = z.object({
   vk_id: z.string().min(1),
 });
+export interface GatewayInternalConfigParamsSchema extends Named<
+  typeof gatewayInternalConfigParamsSchemaDefinition
+> {}
+export const gatewayInternalConfigParamsSchema: GatewayInternalConfigParamsSchema =
+  gatewayInternalConfigParamsSchemaDefinition;
 
 /**
  * One guardrail verdict request. The direction vocabulary is the WIRE's,
  * deliberately not the stored Prisma enum: a mismatch here fails every real
  * call, and a guardrail that cannot answer falls open.
  */
-export const gatewayInternalGuardrailCheckSchema = z.object({
+const gatewayInternalGuardrailCheckSchemaDefinition = z.object({
   vk_id: z.string().min(1),
   project_id: z.string().min(1),
   gateway_request_id: z.string().optional(),
@@ -48,6 +64,11 @@ export const gatewayInternalGuardrailCheckSchema = z.object({
     .optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
 });
+export interface GatewayInternalGuardrailCheckSchema extends Named<
+  typeof gatewayInternalGuardrailCheckSchemaDefinition
+> {}
+export const gatewayInternalGuardrailCheckSchema: GatewayInternalGuardrailCheckSchema =
+  gatewayInternalGuardrailCheckSchemaDefinition;
 
 /** The three commands the spend spine accepts, as the drainer names them. */
 export const GATEWAY_INTERNAL_SPEND_COMMANDS = ["admitSpend", "confirmSpend", "failSpend"] as const;
@@ -59,23 +80,33 @@ export type GatewayInternalSpendCommandName = (typeof GATEWAY_INTERNAL_SPEND_COM
  * against the command's own schema after `project_id` maps to the tenant
  * id — a payload rejection is told apart from a malformed envelope.
  */
-export const gatewayInternalSpendCommandSchema = z.object({
+const gatewayInternalSpendCommandSchemaDefinition = z.object({
   command: z.enum(GATEWAY_INTERNAL_SPEND_COMMANDS),
   payload: z.record(z.string(), z.unknown()),
   /** Which pod drained it, and where in that pod's sequence — the gap detector's evidence. */
   pod_id: z.string().max(128).default(""),
   pod_seq: z.number().int().min(0).default(0),
 });
+export interface GatewayInternalSpendCommandSchema extends Named<
+  typeof gatewayInternalSpendCommandSchemaDefinition
+> {}
+export const gatewayInternalSpendCommandSchema: GatewayInternalSpendCommandSchema =
+  gatewayInternalSpendCommandSchemaDefinition;
 
 export type GatewayInternalSpendCommandRecord = z.infer<typeof gatewayInternalSpendCommandSchema>;
 
 /** A drain batch. Capped so one post cannot outgrow a single append transaction. */
-export const gatewayInternalSpendCommandBatchSchema = z.object({
+const gatewayInternalSpendCommandBatchSchemaDefinition = z.object({
   records: z.array(gatewayInternalSpendCommandSchema).min(1).max(500),
 });
+export interface GatewayInternalSpendCommandBatchSchema extends Named<
+  typeof gatewayInternalSpendCommandBatchSchemaDefinition
+> {}
+export const gatewayInternalSpendCommandBatchSchema: GatewayInternalSpendCommandBatchSchema =
+  gatewayInternalSpendCommandBatchSchemaDefinition;
 
 /** The realtime voice session a mint is booked against. */
-export const gatewayInternalReserveSessionSchema = z.object({
+const gatewayInternalReserveSessionSchemaDefinition = z.object({
   session_id: z.string().min(1).max(256),
   project_id: z.string().min(1).max(256),
   organization_id: z.string().min(1).max(256),
@@ -99,13 +130,18 @@ export const gatewayInternalReserveSessionSchema = z.object({
   /** Epoch milliseconds at which the minted credential stops opening a socket. */
   credential_expires_at: z.number().int().positive().optional(),
 });
+export interface GatewayInternalReserveSessionSchema extends Named<
+  typeof gatewayInternalReserveSessionSchemaDefinition
+> {}
+export const gatewayInternalReserveSessionSchema: GatewayInternalReserveSessionSchema =
+  gatewayInternalReserveSessionSchemaDefinition;
 
 /**
  * A correlation or a terminal status on a booked session. Both fields are
  * optional alone; the refinement stops a project_id-only body from parsing
  * and 404ing as though the session were missing.
  */
-export const gatewayInternalPatchSessionSchema = z
+const gatewayInternalPatchSessionSchemaDefinition = z
   .object({
     project_id: z.string().min(1).max(256),
     vendor_conversation_id: z.string().min(1).max(256).optional(),
@@ -117,13 +153,18 @@ export const gatewayInternalPatchSessionSchema = z
     (body) => Boolean(body.vendor_conversation_id ?? body.status ?? body.credential_expires_at),
     { message: "a vendor_conversation_id, a credential expiry or a terminal status is required" },
   );
+export interface GatewayInternalPatchSessionSchema extends Named<
+  typeof gatewayInternalPatchSessionSchemaDefinition
+> {}
+export const gatewayInternalPatchSessionSchema: GatewayInternalPatchSessionSchema =
+  gatewayInternalPatchSessionSchemaDefinition;
 
 /**
  * What one booked session consumed. `virtual_key_id` is required: several
  * keys can point at one project, so the project alone doesn't say whose
  * session this is — spend belongs to the key that was admitted.
  */
-export const gatewayInternalReportUsageSchema = z
+const gatewayInternalReportUsageSchemaDefinition = z
   .object({
     project_id: z.string().min(1).max(256),
     virtual_key_id: z.string().min(1).max(256),
@@ -142,11 +183,21 @@ export const gatewayInternalReportUsageSchema = z
   .refine((body) => body.usage !== undefined || body.final === true, {
     message: "usage is required unless the report only closes the session",
   });
+export interface GatewayInternalReportUsageSchema extends Named<
+  typeof gatewayInternalReportUsageSchemaDefinition
+> {}
+export const gatewayInternalReportUsageSchema: GatewayInternalReportUsageSchema =
+  gatewayInternalReportUsageSchemaDefinition;
 
 /** The booked session a patch or a usage report names. */
-export const gatewayInternalSessionParamsSchema = z.object({
+const gatewayInternalSessionParamsSchemaDefinition = z.object({
   session_id: z.string().min(1),
 });
+export interface GatewayInternalSessionParamsSchema extends Named<
+  typeof gatewayInternalSessionParamsSchemaDefinition
+> {}
+export const gatewayInternalSessionParamsSchema: GatewayInternalSessionParamsSchema =
+  gatewayInternalSessionParamsSchemaDefinition;
 
 const gatewayInternalRefusalSchema = z.object({
   error: z
@@ -264,19 +315,34 @@ export const gatewayInternalBootstrapAnswers = {
   }),
 } as const;
 
-export const gatewayInternalHeadersSchema = z.object({
+const gatewayInternalHeadersSchemaDefinition = z.object({
   "if-none-match": z.string().optional(),
   "x-langwatch-gateway-node": z.string().optional(),
 });
-export const gatewayInternalChangesQuerySchema = z.object({
+export interface GatewayInternalHeadersSchema extends Named<
+  typeof gatewayInternalHeadersSchemaDefinition
+> {}
+export const gatewayInternalHeadersSchema: GatewayInternalHeadersSchema =
+  gatewayInternalHeadersSchemaDefinition;
+const gatewayInternalChangesQuerySchemaDefinition = z.object({
   organization_id: z.string().optional(),
   since: z.string().default("0"),
   timeout_s: z.string().default("10"),
 });
-export const gatewayInternalBucketQuerySchema = z.object({
+export interface GatewayInternalChangesQuerySchema extends Named<
+  typeof gatewayInternalChangesQuerySchemaDefinition
+> {}
+export const gatewayInternalChangesQuerySchema: GatewayInternalChangesQuerySchema =
+  gatewayInternalChangesQuerySchemaDefinition;
+const gatewayInternalBucketQuerySchemaDefinition = z.object({
   budget_id: z.string().default(""),
   end_user_id: z.string().default(""),
 });
+export interface GatewayInternalBucketQuerySchema extends Named<
+  typeof gatewayInternalBucketQuerySchemaDefinition
+> {}
+export const gatewayInternalBucketQuerySchema: GatewayInternalBucketQuerySchema =
+  gatewayInternalBucketQuerySchemaDefinition;
 
 /* The credential a connected install presents on `/resolve-key` (ADR-156): `lwl_` and a SHA-256.
  * The gateway looks a key up by a second hash of it, so a stored hash is never a credential. */

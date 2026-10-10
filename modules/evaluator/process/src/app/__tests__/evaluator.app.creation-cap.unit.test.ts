@@ -57,6 +57,21 @@ describe("EvaluatorModule creation cap", () => {
       ).rejects.toMatchObject({ meta: { limitType: "evaluators", current: 3, max: 3 } });
     });
 
+    it("refuses a create against models the caller already resolved", async () => {
+      const repository = await organizationWithEvaluators(3);
+      const { app } = createEvaluatorTestApp({ repository, plan: CLOUD_FREE });
+
+      await expect(
+        app.createWithDefaults({
+          id: "evaluator-new",
+          projectId: "project-1",
+          name: "Fourth",
+          type: "evaluator",
+          config: { evaluatorType: "ragas/faithfulness" },
+        }),
+      ).rejects.toMatchObject({ meta: { limitType: "evaluators", current: 3, max: 3 } });
+    });
+
     /** @scenario Copying a custom evaluator past the cap is refused with the limit shape */
     it("refuses copying an evaluator into another project", async () => {
       const repository = await organizationWithEvaluators(3);

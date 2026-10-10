@@ -4,6 +4,7 @@
  * arrives through {@link TraceSearchRouterDeps}. @see ADR-144
  */
 
+import type { Authorization } from "@langwatch/authorization";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import {
@@ -37,6 +38,7 @@ export interface TraceSearchRouterDeps {
   /** Builds a filter from a sentence (the Ask AI composer's own builder). */
   buildFilter: (input: {
     projectId: string;
+    authorization: Authorization;
     prompt: string;
     timeRange: { from: number; to: number };
   }) => Promise<AiActionResult>;
@@ -50,6 +52,7 @@ export interface TraceSearchRouterDeps {
   /** Decides and builds in one model call, when there is no classification. */
   routeWithModel: (input: {
     projectId: string;
+    authorization: Authorization;
     text: string;
     timeRange: { from: number; to: number };
     target: InstantEvalSearchTarget;
@@ -59,7 +62,7 @@ export interface TraceSearchRouterDeps {
   }) => Promise<SearchRouteDecision>;
   /** Evaluator and event names on the project, for the context line. */
   listKnownSignals: (input: {
-    projectId: string;
+    authorization: Authorization;
     timeRange: { from: number; to: number };
   }) => Promise<KnownProjectSignals>;
   /** Counts a decision. Never metered. */
@@ -68,7 +71,7 @@ export interface TraceSearchRouterDeps {
 
 /** The sentence and the explicit terms as one shared context for the routes. */
 interface RouteContext {
-  input: RouteSearchInput;
+  input: RouteSearchInput & { authorization: Authorization };
   sentence: string;
   explicitQuery: string;
   target: InstantEvalSearchTarget;
@@ -129,7 +132,9 @@ export class TraceSearchRouterService {
     return new TraceSearchRouterService(deps);
   }
 
-  async route(input: RouteSearchInput): Promise<RouteSearchResult> {
+  async route(
+    input: RouteSearchInput & { authorization: Authorization },
+  ): Promise<RouteSearchResult> {
     const { sentence, explicitQuery } = splitBareWords(input.text);
     if (!sentence) {
       this.deps.recordDecision({ route: "filter", decidedBy: "fallback" });
@@ -191,6 +196,7 @@ export class TraceSearchRouterService {
     try {
       decision = await this.deps.routeWithModel({
         projectId: input.projectId,
+        authorization: input.authorization,
         text: context.sentence,
         timeRange: input.timeRange,
         target: context.target,
@@ -318,6 +324,7 @@ export class TraceSearchRouterService {
     try {
       built = await this.deps.buildFilter({
         projectId: context.input.projectId,
+        authorization: context.input.authorization,
         prompt: context.sentence,
         timeRange: context.input.timeRange,
       });
@@ -379,10 +386,12 @@ export class TraceSearchRouterService {
     });
   }
 
-  private async knownSignals(input: RouteSearchInput): Promise<KnownProjectSignals> {
+  private async knownSignals(
+    input: RouteSearchInput & { authorization: Authorization },
+  ): Promise<KnownProjectSignals> {
     try {
       return await this.deps.listKnownSignals({
-        projectId: input.projectId,
+        authorization: input.authorization,
         timeRange: input.timeRange,
       });
     } catch (error) {

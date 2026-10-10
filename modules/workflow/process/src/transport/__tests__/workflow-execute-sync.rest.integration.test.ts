@@ -6,6 +6,7 @@
 import { canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
 import { HandledError } from "@langwatch/handled-error";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 
@@ -49,6 +50,7 @@ function mount({
     turnCeilingMs: CEILING_MS,
   });
   const runtime = createRestRuntime({
+    authorization: restTestAuthorization(),
     identity: {
       authenticate: ({ permission }) => {
         if (!authenticated) throw new UnauthenticatedTestError();

@@ -1,4 +1,4 @@
-import { Panel, Table } from "@langwatch/design-system-internal";
+import { Button, Panel, Table } from "@langwatch/design-system-internal";
 import { SimEmpty, SimTime } from "@langwatch/sim-console";
 
 import { formatSize } from "./format.ts";
@@ -14,12 +14,22 @@ export const BucketsTab = ({
   buckets,
   objects,
   onOpen,
+  onSeed,
 }: {
   buckets: Bucket[];
   objects: StoredObject[];
   onOpen: (bucket: string) => void;
+  onSeed: () => void;
 }) => (
-  <Panel title="Buckets" meta={String(buckets.length)}>
+  <Panel
+    title="Buckets"
+    meta={String(buckets.length)}
+    actions={
+      <Button size="sm" onClick={onSeed}>
+        Add demo objects
+      </Button>
+    }
+  >
     <Table
       caption="Buckets"
       rows={buckets}

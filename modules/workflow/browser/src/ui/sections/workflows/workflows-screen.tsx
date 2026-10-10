@@ -57,7 +57,7 @@ export default function WorkflowsScreen() {
           title="No workflows yet"
           description="Create reusable workflows with the Optimization Studio."
           icon={<Workflow size={24} />}
-          color="blue.500"
+          color="blue.fg"
         >
           <PageLayout.HeaderButton primary onClick={onOpen}>
             <Plus size={16} /> Create your first workflow

@@ -1,4 +1,5 @@
 import { execFileSync } from "node:child_process";
+import { existsSync } from "node:fs";
 import { extname, resolve, sep } from "node:path";
 
 import { walkFiles } from "./layout.ts";
@@ -49,7 +50,7 @@ function trackedSourceFiles(root: string): string[] | undefined {
     .split("\0")
     .filter((path) => path.length > 0)
     .map((path) => resolve(root, path))
-    .filter(isSourceFile)
+    .filter((path) => isSourceFile(path) && existsSync(path))
     .toSorted();
 }
 

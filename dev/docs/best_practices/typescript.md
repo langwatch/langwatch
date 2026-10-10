@@ -9,6 +9,13 @@ have its up-to-date check re-run by most of the other 194, and reported
 `TS6305` errors that were only an artefact of checking a package before a
 sibling's declarations existed.
 
+Many agent sessions share one machine, so parallelism multiplies: every
+heavy command stays at one builder and one checker. `pnpm build:types` runs
+`GOMEMLIMIT=2GiB tsc -b --builders 1` like `typecheck` (it was 16 builders),
+`pnpm-workspace.yaml` caps recursive `pnpm -r`/`--filter` runs with
+`workspaceConcurrency: 2`, and Nx runs at most two tasks at once
+(`parallel` in `nx.json`, `--parallel=2` on the test scripts).
+
 A package's own check root is its `tsconfig.json`, or the
 `tsconfig.test.json` that widens it — same sources, `exclude: []`, test types
 added. So `pnpm typecheck` does check test files.
@@ -22,9 +29,9 @@ seconds; a tree carrying errors pays for them on every run, which is why
 "leave the error for later" is more expensive here than it looks.
 
 Install admission hooks per worktree with
-`haven setup gate-hook codex-gate-hook` for Claude and Codex respectively.
+`haven self setup gate-hook codex-gate-hook` for Claude and Codex respectively.
 Codex project hooks require a trusted project and review through `/hooks`.
-Use `haven slot run -- pnpm typecheck` for explicit terminal queueing.
+Use `haven machine slot run -- pnpm typecheck` for explicit terminal queueing.
 
 For local iteration, check the one package you touched:
 `pnpm --filter <package> typecheck`. `tsc -b` is incremental through its own
@@ -160,13 +167,10 @@ version; a manifest opts in with `"dep": "catalog:"` instead of writing the
 range itself. A dependency with a second, deliberate resolution — the
 published SDK and the MCP server pinning an older TypeScript major so they
 don't force it on their consumers, for example — gets a small named catalog
-(`"dep": "catalog:<name>"`), named for the reason rather than the package. A
-dependency whose manifests still disagree for no documented reason is left
-with its own explicit range everywhere, on purpose: `dev/scripts/print-resolved-versions.mjs`
-is what proved the migration didn't silently change any manifest's resolved
-version, and `packages/architecture-enforcer/tests/catalog-enforcement.test.ts`
-is what stops a manifest drifting back to an explicit range for a dependency
-the default catalog already carries. New manifests declare `"dep": "catalog:"`
+(`"dep": "catalog:<name>"`), named for the reason rather than the package. The
+`dependency-catalog` policy (`pnpm lint:architecture`) refuses an explicit range
+for a catalogued dependency and an uncatalogued dependency two members share; it
+has no exception list. New manifests declare `"dep": "catalog:"`
 for anything already in the catalog; `catalogMode: strict` makes `pnpm add`
 enforce the same rule for a new dependency.
 

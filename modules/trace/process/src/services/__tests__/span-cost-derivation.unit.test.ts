@@ -5,9 +5,9 @@ import {
 } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
-import { SpanCostService } from "../../features/span/services/span-cost.service.ts";
 import { TraceCanonicalisationService } from "../../features/derivation/services/trace-canonicalisation.service.ts";
 import { TraceModelCostService } from "../../features/derivation/services/trace-model-cost.service.ts";
+import { SpanCostService } from "../../features/span/services/span-cost.service.ts";
 
 /** Per-span cost computation: matches trace-summary fold accumulation and
  * non-billable cost split. */

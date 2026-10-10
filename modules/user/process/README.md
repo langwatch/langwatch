@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 Portable User use cases exposed to process peers and transports.
 
-Peers call these through the token, declared at `../contract/src/user.api.ts:62`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/user.api.ts:56`; nothing else in this package is public.
 
 #### `findById`
 
@@ -298,18 +298,6 @@ A signed URL for an uploaded avatar; anything that is not one is refused as not 
 getAvatarUrl(input: UserAvatarRestParams): Promise<UserAvatarUrl>;
 ```
 
-#### `ensurePersonalWorkspace`
-
-```typescript
-ensurePersonalWorkspace(input: PersonalWorkspaceInput): Promise<EnsuredPersonalWorkspace>;
-```
-
-#### `findPersonalWorkspace`
-
-```typescript
-findPersonalWorkspace(input: FindPersonalWorkspaceInput): Promise<PersonalWorkspace | null>;
-```
-
 #### `findLastHomePath`
 
 ```typescript
@@ -470,7 +458,7 @@ interface Output {
 // user.getTraceExplorerTourPreference
 // Input: userApiEmptyInputSchema, ../contract/src/user.schemas.ts:15
 type Input = Record<string, unknown>;
-// Output: userTourPreferenceSchema, ../contract/src/user.ts:183
+// Output: userTourPreferenceSchema, ../contract/src/user.ts:185
 interface Output {
   dismissed: boolean;
   dismissedAt: unknown | null;
@@ -478,14 +466,14 @@ interface Output {
 
 // user.dismissTraceExplorerTour
 type Input = z.infer<typeof userApiEmptyInputSchema>; // ../contract/src/user.schemas.ts:15
-type Output = z.infer<typeof userTourPreferenceSchema>; // ../contract/src/user.ts:183
+type Output = z.infer<typeof userTourPreferenceSchema>; // ../contract/src/user.ts:185
 
 // user.getNotificationPreference
 // Input: userApiNotificationTopicInputSchema, ../contract/src/user.schemas.ts:18
 interface Input {
   topic: "langy";
 }
-// Output: userNotificationPreferenceSchema, ../contract/src/user.ts:203
+// Output: userNotificationPreferenceSchema, ../contract/src/user.ts:205
 interface Output {
   topic: "langy";
   choice: "enabled" | "declined" | null;
@@ -497,7 +485,7 @@ interface Input {
   topic: "langy";
   choice: "enabled" | "declined";
 }
-type Output = z.infer<typeof userNotificationPreferenceSchema>; // ../contract/src/user.ts:203
+type Output = z.infer<typeof userNotificationPreferenceSchema>; // ../contract/src/user.ts:205
 
 // user.isAdmin
 type Input = z.infer<typeof userApiEmptyInputSchema>; // ../contract/src/user.schemas.ts:15
@@ -511,14 +499,14 @@ type Input = z.infer<typeof userApiEmptyInputSchema>; // ../contract/src/user.sc
 
 // user.getSsoStatus
 type Input = z.infer<typeof userApiEmptyInputSchema>; // ../contract/src/user.schemas.ts:15
-// Output: userSsoStatusSchema, ../contract/src/user.ts:180
+// Output: userSsoStatusSchema, ../contract/src/user.ts:182
 interface Output {
   pendingSsoSetup: boolean;
 }
 
 // user.getAccountInfo
 type Input = z.infer<typeof userApiEmptyInputSchema>; // ../contract/src/user.schemas.ts:15
-// Output: userAccountInfoSchema, ../contract/src/user.ts:177
+// Output: userAccountInfoSchema, ../contract/src/user.ts:179
 interface Output {
   createdAt: unknown;
 }

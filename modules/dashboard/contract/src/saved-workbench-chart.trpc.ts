@@ -8,7 +8,7 @@ import {
   lwqlGranularityStepSchema,
   lwqlTimeWindowSchema,
 } from "@langwatch/analytics-contract";
-import { defineTrpcContract } from "@langwatch/module";
+import { defineTrpcContract, type Named } from "@langwatch/module";
 import { z } from "zod";
 
 import { savedWorkbenchChartSchema } from "./saved-workbench-chart.ts";
@@ -19,7 +19,12 @@ const chartScopeSchema = z.object({ ...projectScopeSchema.shape, id: z.string() 
 /** Request shape only — length, not meaning. */
 const nameSchema = z.string().min(1).max(200);
 
-export const savedWorkbenchChartDeletedSchema = z.object({ success: z.literal(true) });
+const savedWorkbenchChartDeletedSchemaDefinition = z.object({ success: z.literal(true) });
+export interface SavedWorkbenchChartDeletedSchema extends Named<
+  typeof savedWorkbenchChartDeletedSchemaDefinition
+> {}
+export const savedWorkbenchChartDeletedSchema: SavedWorkbenchChartDeletedSchema =
+  savedWorkbenchChartDeletedSchemaDefinition;
 
 export const savedWorkbenchChartTrpc = defineTrpcContract("analytics.savedWorkbenchCharts")
   .query("getAll")

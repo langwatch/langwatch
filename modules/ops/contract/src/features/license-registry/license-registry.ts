@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 /** The license registry (ADR-156). `licensing` is an enterprise module, so
  * every shape here is declared locally rather than imported from it. */
 import { z } from "zod";
@@ -9,7 +10,7 @@ const issuedLicenseStatusSchema = z.enum(["active", "revoked", "superseded", "ex
 const seatCurrencySchema = z.enum(["USD", "EUR"]);
 
 /** A registry row as the admin console reads it — never the held license itself. */
-export const issuedLicenseViewSchema = z.object({
+const issuedLicenseViewSchemaDefinition = z.object({
   id: z.string(),
   licenseId: z.string(),
   tokenHash: z.string(),
@@ -46,21 +47,32 @@ export const issuedLicenseViewSchema = z.object({
   status: issuedLicenseStatusSchema,
   hasPendingDelivery: z.boolean(),
 });
+export interface IssuedLicenseViewSchema extends Named<typeof issuedLicenseViewSchemaDefinition> {}
+export const issuedLicenseViewSchema: IssuedLicenseViewSchema = issuedLicenseViewSchemaDefinition;
 export type IssuedLicenseView = z.infer<typeof issuedLicenseViewSchema>;
 
-export const issuedLicensePageSchema = z.object({
+const issuedLicensePageSchemaDefinition = z.object({
   licenses: z.array(issuedLicenseViewSchema),
   total: z.number(),
 });
+export interface IssuedLicensePageSchema extends Named<typeof issuedLicensePageSchemaDefinition> {}
+export const issuedLicensePageSchema: IssuedLicensePageSchema = issuedLicensePageSchemaDefinition;
 export type IssuedLicensePage = z.infer<typeof issuedLicensePageSchema>;
 
-export const listIssuedLicensesInputSchema = z.object({
+const listIssuedLicensesInputSchemaDefinition = z.object({
   page: z.number().int().min(0).default(0),
   pageSize: z.number().int().min(1).max(200).default(25),
   search: z.string().optional(),
 });
+export interface ListIssuedLicensesInputSchema extends Named<
+  typeof listIssuedLicensesInputSchemaDefinition
+> {}
+export const listIssuedLicensesInputSchema: ListIssuedLicensesInputSchema =
+  listIssuedLicensesInputSchemaDefinition;
 
-export const licenseIdInputSchema = z.object({ id: z.string().min(1) });
+const licenseIdInputSchemaDefinition = z.object({ id: z.string().min(1) });
+export interface LicenseIdInputSchema extends Named<typeof licenseIdInputSchemaDefinition> {}
+export const licenseIdInputSchema: LicenseIdInputSchema = licenseIdInputSchemaDefinition;
 
 const licenseCustomerSchema = z.union([
   z.object({ organizationId: z.string().min(1) }),
@@ -79,7 +91,7 @@ const licenseTermsInputSchema = z.object({
 export type LicenseTermsInput = z.infer<typeof licenseTermsInputSchema>;
 
 /** What an operator supplies to issue a fresh, server-signed license. */
-export const issueLicenseInputSchema = z.object({
+const issueLicenseInputSchemaDefinition = z.object({
   customer: licenseCustomerSchema,
   email: z.string().min(1),
   planType: z.string().min(1),
@@ -90,18 +102,30 @@ export const issueLicenseInputSchema = z.object({
   expiresAt: z.string().min(1),
   terms: licenseTermsInputSchema.optional(),
 });
+export interface IssueLicenseInputSchema extends Named<typeof issueLicenseInputSchemaDefinition> {}
+export const issueLicenseInputSchema: IssueLicenseInputSchema = issueLicenseInputSchemaDefinition;
 
-export const registerLegacyLicenseInputSchema = z.object({
+const registerLegacyLicenseInputSchemaDefinition = z.object({
   licenseKey: z.string().min(1),
   organizationId: z.string().min(1),
 });
+export interface RegisterLegacyLicenseInputSchema extends Named<
+  typeof registerLegacyLicenseInputSchemaDefinition
+> {}
+export const registerLegacyLicenseInputSchema: RegisterLegacyLicenseInputSchema =
+  registerLegacyLicenseInputSchemaDefinition;
 
-export const revokeIssuedLicenseInputSchema = z.object({
+const revokeIssuedLicenseInputSchemaDefinition = z.object({
   id: z.string().min(1),
   reason: z.string().min(1),
 });
+export interface RevokeIssuedLicenseInputSchema extends Named<
+  typeof revokeIssuedLicenseInputSchemaDefinition
+> {}
+export const revokeIssuedLicenseInputSchema: RevokeIssuedLicenseInputSchema =
+  revokeIssuedLicenseInputSchemaDefinition;
 
-export const reissueLicenseInputSchema = z.object({
+const reissueLicenseInputSchemaDefinition = z.object({
   id: z.string().min(1),
   maxMembers: z.number().int().min(1).optional(),
   maxMembersLite: z.number().int().min(0).optional(),
@@ -109,35 +133,62 @@ export const reissueLicenseInputSchema = z.object({
   /** ISO 8601. The instant the new term ends. */
   expiresAt: z.string().min(1),
 });
+export interface ReissueLicenseInputSchema extends Named<
+  typeof reissueLicenseInputSchemaDefinition
+> {}
+export const reissueLicenseInputSchema: ReissueLicenseInputSchema =
+  reissueLicenseInputSchemaDefinition;
 
-export const changeLicenseSeatsInputSchema = z.object({
+const changeLicenseSeatsInputSchemaDefinition = z.object({
   id: z.string().min(1),
   maxMembers: z.number().int().min(1),
 });
+export interface ChangeLicenseSeatsInputSchema extends Named<
+  typeof changeLicenseSeatsInputSchemaDefinition
+> {}
+export const changeLicenseSeatsInputSchema: ChangeLicenseSeatsInputSchema =
+  changeLicenseSeatsInputSchemaDefinition;
 
-export const updateLicenseTermsInputSchema = z.object({
+const updateLicenseTermsInputSchemaDefinition = z.object({
   id: z.string().min(1),
   ...licenseTermsInputSchema.shape,
 });
+export interface UpdateLicenseTermsInputSchema extends Named<
+  typeof updateLicenseTermsInputSchemaDefinition
+> {}
+export const updateLicenseTermsInputSchema: UpdateLicenseTermsInputSchema =
+  updateLicenseTermsInputSchemaDefinition;
 
-export const linkLicenseToOrganizationInputSchema = z.object({
+const linkLicenseToOrganizationInputSchemaDefinition = z.object({
   id: z.string().min(1),
   organizationId: z.string().min(1),
 });
+export interface LinkLicenseToOrganizationInputSchema extends Named<
+  typeof linkLicenseToOrganizationInputSchemaDefinition
+> {}
+export const linkLicenseToOrganizationInputSchema: LinkLicenseToOrganizationInputSchema =
+  linkLicenseToOrganizationInputSchemaDefinition;
 
 /** A signed license and the row that records it. The key is handed over once. */
-export const signedIssuedLicenseSchema = z.object({
+const signedIssuedLicenseSchemaDefinition = z.object({
   licenseKey: z.string(),
   license: issuedLicenseViewSchema,
 });
+export interface SignedIssuedLicenseSchema extends Named<
+  typeof signedIssuedLicenseSchemaDefinition
+> {}
+export const signedIssuedLicenseSchema: SignedIssuedLicenseSchema =
+  signedIssuedLicenseSchemaDefinition;
 export type SignedIssuedLicense = z.infer<typeof signedIssuedLicenseSchema>;
 
 /** `pending`: billing invoices the added seats from the change licensing recorded. */
 const seatChangeBillingOutcomeSchema = z.enum(["pending", "nothing_to_invoice"]);
 
-export const seatChangeResultSchema = z.object({
+const seatChangeResultSchemaDefinition = z.object({
   ...signedIssuedLicenseSchema.shape,
   previousMaxMembers: z.number(),
   billing: seatChangeBillingOutcomeSchema,
 });
+export interface SeatChangeResultSchema extends Named<typeof seatChangeResultSchemaDefinition> {}
+export const seatChangeResultSchema: SeatChangeResultSchema = seatChangeResultSchemaDefinition;
 export type SeatChangeResult = z.infer<typeof seatChangeResultSchema>;

@@ -80,7 +80,7 @@ describe("PrismaProcessAdmin dead-letter reads", () => {
         // first chunk. Without it dbMultiTenancyProtection rejects the read,
         // which no amount of correct SQL would survive.
         const sql = queryRaw.mock.calls[0]![0] as { strings: string[] };
-        expect(sql.strings.join(" ")).toContain("-- @tenancy:");
+        expect(sql.strings.join(" ")).toContain("SKIP_TENANT_CHECK");
       });
     });
 

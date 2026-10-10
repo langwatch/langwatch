@@ -1,4 +1,7 @@
+import { ListTable } from "@langwatch/design-system/list-table";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { Badge, Table, Text, VStack } from "@langwatch/design-system/primitives";
+import { Inbox } from "lucide-react";
 
 import {
   ACTIVITY_COLORS,
@@ -22,7 +25,13 @@ export function InstancesTable({
   onOpen: (id: string) => void;
 }) {
   return (
-    <Table.Root variant="line" size="md">
+    <ListTable
+      density="compact"
+      columnRules={false}
+      containerProps={{ overflowX: "auto" }}
+      variant="line"
+      size="sm"
+    >
       <Table.Header>
         <Table.Row>
           <Table.ColumnHeader>Install</Table.ColumnHeader>
@@ -45,7 +54,7 @@ export function InstancesTable({
           />
         ))}
       </Table.Body>
-    </Table.Root>
+    </ListTable>
   );
 }
 
@@ -53,9 +62,11 @@ function EmptyRow() {
   return (
     <Table.Row>
       <Table.Cell colSpan={COLUMN_COUNT}>
-        <Text color="fg.muted" fontSize="sm">
-          No self-hosted install has reported yet.
-        </Text>
+        <NoDataInfoBlock
+          icon={<Inbox />}
+          title="No self-hosted install has reported yet."
+          description="Records will appear here when they are available."
+        />
       </Table.Cell>
     </Table.Row>
   );

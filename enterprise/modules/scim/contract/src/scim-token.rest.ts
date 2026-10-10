@@ -1,8 +1,9 @@
+import type { Named } from "@langwatch/module";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /** The wire shapes the `/api/scim-tokens` REST family publishes. */
 import { z } from "zod";
 
-export const scimTokenRestSummarySchema = z.object({
+const scimTokenRestSummarySchemaDefinition = z.object({
   id: z.string(),
   description: z.string().nullable(),
   /** D08: which single sign-on connection this token reaches. An id, never a
@@ -11,13 +12,20 @@ export const scimTokenRestSummarySchema = z.object({
   createdAt: z.date(),
   lastUsedAt: z.date().nullable(),
 });
+export interface ScimTokenRestSummarySchema extends Named<
+  typeof scimTokenRestSummarySchemaDefinition
+> {}
+export const scimTokenRestSummarySchema: ScimTokenRestSummarySchema =
+  scimTokenRestSummarySchemaDefinition;
 
-export const scimTokenIdParamsSchema = z.object({ id: z.string().min(1) });
+const scimTokenIdParamsSchemaDefinition = z.object({ id: z.string().min(1) });
+export interface ScimTokenIdParamsSchema extends Named<typeof scimTokenIdParamsSchemaDefinition> {}
+export const scimTokenIdParamsSchema: ScimTokenIdParamsSchema = scimTokenIdParamsSchemaDefinition;
 
 /** Postgres cannot store U+0000, so input carrying one is the caller's error, not a 500. */
 const withoutNullByte = (value: string) => !value.includes("\u0000");
 
-export const scimTokenCreateRestInputSchema = z.object({
+const scimTokenCreateRestInputSchemaDefinition = z.object({
   description: z
     .string()
     .trim()
@@ -36,10 +44,20 @@ export const scimTokenCreateRestInputSchema = z.object({
     .refine(withoutNullByte, "connectionId must not contain a null byte")
     .optional(),
 });
+export interface ScimTokenCreateRestInputSchema extends Named<
+  typeof scimTokenCreateRestInputSchemaDefinition
+> {}
+export const scimTokenCreateRestInputSchema: ScimTokenCreateRestInputSchema =
+  scimTokenCreateRestInputSchemaDefinition;
 
 /** The two headers an Auth0 SCIM log-stream delivery is admitted by, as the process reads them. */
 
-export const scimWebhookDeliveryHeadersSchema = z.object({
+const scimWebhookDeliveryHeadersSchemaDefinition = z.object({
   signature: z.string().nullable(),
   authorization: z.string().nullable(),
 });
+export interface ScimWebhookDeliveryHeadersSchema extends Named<
+  typeof scimWebhookDeliveryHeadersSchemaDefinition
+> {}
+export const scimWebhookDeliveryHeadersSchema: ScimWebhookDeliveryHeadersSchema =
+  scimWebhookDeliveryHeadersSchemaDefinition;

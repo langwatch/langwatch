@@ -103,8 +103,8 @@ describe("given a ClickHouse repository in a module's process half", () => {
     });
   });
 
-  describe("when the statement declares unscoped with a reason", () => {
-    /** @scenario "A statement declared unscoped is left alone" */
+  describe("when the statement sets SKIP_TENANT_CHECK", () => {
+    /** @scenario "A statement that skips the tenant check is left alone" */
     it("reports nothing for an inline declaration or one made by a method of the same class", () => {
       const found = report(
         [
@@ -112,7 +112,8 @@ describe("given a ClickHouse repository in a module's process half", () => {
           "  sweep(client) {",
           "    return client.query({",
           "      query: `SELECT TenantId FROM agent_runs WHERE Stalled = 1`,",
-          '      unscoped: { reason: "The stalled-run sweep spans every tenant." },',
+          "      // The stalled-run sweep spans every tenant.",
+          "      SKIP_TENANT_CHECK: true,",
           "    });",
           "  }",
           "  total(client) {",
@@ -121,7 +122,8 @@ describe("given a ClickHouse repository in a module's process half", () => {
           "    });",
           "  }",
           "  #organizationQuery(input) {",
-          '    return this.client.query({ query: input.sql, unscoped: { reason: "Organization ledger." } });',
+          "    // The organization ledger is keyed by organization, not tenant.",
+          "    return this.client.query({ query: input.sql, SKIP_TENANT_CHECK: true });",
           "  }",
           "}",
         ].join("\n"),

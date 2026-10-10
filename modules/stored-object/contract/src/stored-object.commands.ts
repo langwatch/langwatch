@@ -1,4 +1,5 @@
 import type { AuthzPermission } from "@langwatch/authorization";
+import type { Named } from "@langwatch/module";
 import { z, type ZodTypeAny } from "zod";
 
 import { storedObjectDeliveryAudienceSchema } from "./audiences.ts";
@@ -17,39 +18,59 @@ import {
   storedObjectsCreateUploadOutputSchema,
 } from "./uploads.ts";
 
-export const storedObjectsGetInputSchema = z
+const storedObjectsGetInputSchemaDefinition = z
   .object({
     projectId: storedObjectProjectIdSchema,
     id: storedObjectIdSchema,
     audience: storedObjectDeliveryAudienceSchema,
   })
   .strict();
+export interface StoredObjectsGetInputSchema extends Named<
+  typeof storedObjectsGetInputSchemaDefinition
+> {}
+export const storedObjectsGetInputSchema: StoredObjectsGetInputSchema =
+  storedObjectsGetInputSchemaDefinition;
 export type StoredObjectsGetInput = z.infer<typeof storedObjectsGetInputSchema>;
 
-export const storedObjectsGetOutputSchema = z
+const storedObjectsGetOutputSchemaDefinition = z
   .object({
     metadata: storedObjectMetadataSchema,
     capability: storedObjectDeliveryCapabilitySchema,
   })
   .strict();
+export interface StoredObjectsGetOutputSchema extends Named<
+  typeof storedObjectsGetOutputSchemaDefinition
+> {}
+export const storedObjectsGetOutputSchema: StoredObjectsGetOutputSchema =
+  storedObjectsGetOutputSchemaDefinition;
 export type StoredObjectsGetOutput = z.infer<typeof storedObjectsGetOutputSchema>;
 
-export const storedObjectsDeleteInputSchema = z
+const storedObjectsDeleteInputSchemaDefinition = z
   .object({
     projectId: storedObjectProjectIdSchema,
     id: storedObjectIdSchema,
     idempotencyKey: storedObjectIdempotencyKeySchema,
   })
   .strict();
+export interface StoredObjectsDeleteInputSchema extends Named<
+  typeof storedObjectsDeleteInputSchemaDefinition
+> {}
+export const storedObjectsDeleteInputSchema: StoredObjectsDeleteInputSchema =
+  storedObjectsDeleteInputSchemaDefinition;
 export type StoredObjectsDeleteInput = z.infer<typeof storedObjectsDeleteInputSchema>;
 
-export const storedObjectsDeleteOutputSchema = z
+const storedObjectsDeleteOutputSchemaDefinition = z
   .object({
     id: storedObjectIdSchema,
     generation: storedObjectGenerationSchema,
     deletedAt: storedObjectTimestampSchema,
   })
   .strict();
+export interface StoredObjectsDeleteOutputSchema extends Named<
+  typeof storedObjectsDeleteOutputSchemaDefinition
+> {}
+export const storedObjectsDeleteOutputSchema: StoredObjectsDeleteOutputSchema =
+  storedObjectsDeleteOutputSchemaDefinition;
 export type StoredObjectsDeleteOutput = z.infer<typeof storedObjectsDeleteOutputSchema>;
 
 export interface StoredObjectsRpcProcedure<Input extends ZodTypeAny, Output extends ZodTypeAny> {

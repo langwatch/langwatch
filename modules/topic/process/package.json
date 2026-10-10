@@ -21,6 +21,7 @@
   },
   "dependencies": {
     "@langwatch/api": "workspace:*",
+    "@langwatch/data-retention-contract": "workspace:*",
     "@langwatch/evaluation-contract": "workspace:*",
     "@langwatch/eventing": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
@@ -35,9 +36,10 @@
     "@langwatch/time": "workspace:*",
     "@langwatch/topic-contract": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
+    "@langwatch/upgrade": "workspace:*",
     "@trpc/server": "catalog:",
     "ioredis": "catalog:",
-    "nanoid": "^6.0.0",
+    "nanoid": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {

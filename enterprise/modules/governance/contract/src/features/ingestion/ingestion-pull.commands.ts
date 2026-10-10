@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import {
@@ -27,34 +28,54 @@ export const INGESTION_PULL_COMMAND_TYPES = {
 } as const;
 export const INGESTION_PULL_PROCESSING_COMMAND_TYPES = Object.values(INGESTION_PULL_COMMAND_TYPES);
 
-export const configureIngestionPullCommandSchema = z
+const configureIngestionPullCommandSchemaDefinition = z
   .object({
     tenantId: z.string().min(1),
     occurredAt: z.number().int().nonnegative().optional(),
     data: ingestionPullConfiguredCommandDataSchema,
   })
   .strict();
-export const disableIngestionPullCommandSchema = z
+export interface ConfigureIngestionPullCommandSchema extends Named<
+  typeof configureIngestionPullCommandSchemaDefinition
+> {}
+export const configureIngestionPullCommandSchema: ConfigureIngestionPullCommandSchema =
+  configureIngestionPullCommandSchemaDefinition;
+const disableIngestionPullCommandSchemaDefinition = z
   .object({
     tenantId: z.string().min(1),
     occurredAt: z.number().int().nonnegative().optional(),
     data: ingestionPullDisabledEventDataSchema,
   })
   .strict();
-export const recordIngestionPullRunCompletedCommandSchema = z
+export interface DisableIngestionPullCommandSchema extends Named<
+  typeof disableIngestionPullCommandSchemaDefinition
+> {}
+export const disableIngestionPullCommandSchema: DisableIngestionPullCommandSchema =
+  disableIngestionPullCommandSchemaDefinition;
+const recordIngestionPullRunCompletedCommandSchemaDefinition = z
   .object({
     tenantId: z.string().min(1),
     occurredAt: z.number().int().nonnegative().optional(),
     data: ingestionPullRunCompletedEventDataSchema,
   })
   .strict();
-export const recordIngestionPullRunFailedCommandSchema = z
+export interface RecordIngestionPullRunCompletedCommandSchema extends Named<
+  typeof recordIngestionPullRunCompletedCommandSchemaDefinition
+> {}
+export const recordIngestionPullRunCompletedCommandSchema: RecordIngestionPullRunCompletedCommandSchema =
+  recordIngestionPullRunCompletedCommandSchemaDefinition;
+const recordIngestionPullRunFailedCommandSchemaDefinition = z
   .object({
     tenantId: z.string().min(1),
     occurredAt: z.number().int().nonnegative().optional(),
     data: ingestionPullRunFailedEventDataSchema,
   })
   .strict();
+export interface RecordIngestionPullRunFailedCommandSchema extends Named<
+  typeof recordIngestionPullRunFailedCommandSchemaDefinition
+> {}
+export const recordIngestionPullRunFailedCommandSchema: RecordIngestionPullRunFailedCommandSchema =
+  recordIngestionPullRunFailedCommandSchemaDefinition;
 
 function commandOf<Data extends z.ZodType>(data: Data) {
   return z

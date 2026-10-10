@@ -26,7 +26,7 @@ export function useSignInMethodRemoval({
 }) {
   const host = usePersonalWorkspaceHost();
   const identifiers = api.identity.myIdentifiers.useQuery({});
-  const unlinkAccount = api.user.unlinkAccount.useMutation();
+  const unlinkAccount = api.auth.unlinkAccount.useMutation();
   const utils = api.useUtils();
   const [target, setTarget] = useState<SignInMethodRemovalTarget | null>(null);
 

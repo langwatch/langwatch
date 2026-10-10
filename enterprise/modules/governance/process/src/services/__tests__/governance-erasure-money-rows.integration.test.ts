@@ -10,7 +10,7 @@
  * Spec: specs/governance/governance-identity-and-erasure.feature
  */
 import { createClient, type ClickHouseClient } from "@clickhouse/client";
-import { ClickHouseQueryClient, type QueryDriver } from "@langwatch/clickhouse-client";
+import { ClickHouseQueryClient, type QueryDriver, TenantGuard } from "@langwatch/clickhouse-client";
 import {
   migrateTestClickHouseOnce,
   startTestClickHouseEndpoints,
@@ -69,7 +69,7 @@ function queryClient(raw: ClickHouseClient): ClickHouseQueryClient {
       });
     },
   };
-  return new ClickHouseQueryClient({ driver });
+  return new ClickHouseQueryClient({ tenantGuard: new TenantGuard(), driver });
 }
 
 /** One organization's governance area, holding an observed spend per day for two spenders. */

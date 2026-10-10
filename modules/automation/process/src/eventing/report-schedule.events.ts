@@ -47,5 +47,3 @@ export const reportScheduleEventSchemas = [
   reportRunRequestedEventSchema,
   reportRunSettledEventSchema,
 ] as const;
-
-export type ReportScheduleEvent = z.infer<(typeof reportScheduleEventSchemas)[number]>;

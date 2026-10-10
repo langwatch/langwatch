@@ -4,7 +4,13 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { PropertySectionTitle } from "./property-section-title.tsx";
 
 const meta = {
-  title: "Primitives/Property section title",
+  title: "Inputs and forms/Property section title",
+  parameters: {
+    usage: {
+      use: "The heading of a section inside a properties panel, as in the studio and the prompt editor.",
+      avoid: "A settings page band: use Settings section.",
+    },
+  },
   component: PropertySectionTitle,
   tags: ["autodocs"],
   args: {

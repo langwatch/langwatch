@@ -11,6 +11,7 @@ import {
   RestHost,
 } from "@langwatch/api/rest";
 import { moduleApi } from "@langwatch/module";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
@@ -41,10 +42,12 @@ const cliPlaneRest = defineRestRouter(CliPlaneApi)
   .post("/api/auth/cli/device-code", "startCliDeviceCode")
   .withAccess(CLI_PLANE_DOOR)
   .withOutput(z.object({ plane: z.string() }))
+  .withoutAudit("test route")
   .handle(({ app }) => app.deviceCode())
   .post("/api/auth/cli/project-key", "readCliProjectKey")
   .withAccess(CLI_PLANE_DOOR)
   .withOutput(z.object({ plane: z.string() }))
+  .withoutAudit("test route")
   .handle(({ app }) => app.projectKey())
   .build();
 
@@ -62,11 +65,11 @@ function mountedInInstallOrder() {
   };
   const closed = BearerIdentity.create({ name: "unconfigured", token: void 0 });
   const host = RestHost.create({
+    authz: restTestAuthorization().forRequest(),
     identities: {
       project: closed,
       organization: closed,
       api_key: closed,
-      scim_token: closed,
       instance_admin: closed,
       browser: closed,
     },

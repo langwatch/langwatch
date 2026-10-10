@@ -26,9 +26,11 @@ Feature: Inviting a teammate through a drawer
   @integration
   Scenario: Typing an email inline opens the drawer carrying that email
     Given an admin is on the organization members page
-    When they start typing an email address into the inline invite box
+    When they type a whole email address into the inline invite box
+    Then the drawer stays closed while they type
+    When they press Enter or choose "Invite people"
     Then the invite-member drawer opens
-    And the drawer's email field is pre-filled with what they typed
+    And the drawer's email field is pre-filled with the whole address
 
   @integration
   Scenario: Inviting through the drawer preserves organization and team scope

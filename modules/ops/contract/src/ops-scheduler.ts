@@ -1,9 +1,10 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 /** A held run must be untouched this long before an operator may clear it. */
 export const SLOT_STALE_AFTER_MS = 15 * 60_000;
 
-export const opsScheduledJobSchema = z.object({
+const opsScheduledJobSchemaDefinition = z.object({
   id: z.string(),
   projectId: z.string(),
   targetType: z.string(),
@@ -21,6 +22,8 @@ export const opsScheduledJobSchema = z.object({
   lastError: z.string().nullable(),
   updatedAt: z.string(),
 });
+export interface OpsScheduledJobSchema extends Named<typeof opsScheduledJobSchemaDefinition> {}
+export const opsScheduledJobSchema: OpsScheduledJobSchema = opsScheduledJobSchemaDefinition;
 export type OpsScheduledJob = z.infer<typeof opsScheduledJobSchema>;
 
 export type SchedulerControlAction =
@@ -29,7 +32,7 @@ export type SchedulerControlAction =
   | "ops.scheduler.clear_slot"
   | "ops.scheduler.run_now";
 
-export const schedulerAuditEntryViewSchema = z.object({
+const schedulerAuditEntryViewSchemaDefinition = z.object({
   id: z.string(),
   at: z.string(),
   action: z.string(),
@@ -37,6 +40,11 @@ export const schedulerAuditEntryViewSchema = z.object({
   projectId: z.string().nullable(),
   actor: z.string().nullable(),
 });
+export interface SchedulerAuditEntryViewSchema extends Named<
+  typeof schedulerAuditEntryViewSchemaDefinition
+> {}
+export const schedulerAuditEntryViewSchema: SchedulerAuditEntryViewSchema =
+  schedulerAuditEntryViewSchemaDefinition;
 export type SchedulerAuditEntryView = z.infer<typeof schedulerAuditEntryViewSchema>;
 
 export interface ListScheduledJobsInput {
@@ -67,21 +75,46 @@ export interface ScheduleControlInput {
  * are defaulted and bounded here because the transport is what a caller can
  * push on; the service inputs above leave `limit` optional.
  */
-export const opsScheduleIdInputSchema = z.object({ scheduleId: z.string() });
+const opsScheduleIdInputSchemaDefinition = z.object({ scheduleId: z.string() });
+export interface OpsScheduleIdInputSchema extends Named<
+  typeof opsScheduleIdInputSchemaDefinition
+> {}
+export const opsScheduleIdInputSchema: OpsScheduleIdInputSchema =
+  opsScheduleIdInputSchemaDefinition;
 
-export const opsListScheduledJobsInputSchema = z.object({
+const opsListScheduledJobsInputSchemaDefinition = z.object({
   limit: z.number().int().min(1).max(500).default(200),
 });
+export interface OpsListScheduledJobsInputSchema extends Named<
+  typeof opsListScheduledJobsInputSchemaDefinition
+> {}
+export const opsListScheduledJobsInputSchema: OpsListScheduledJobsInputSchema =
+  opsListScheduledJobsInputSchemaDefinition;
 
-export const opsListPausedSchedulesInputSchema = z.object({
+const opsListPausedSchedulesInputSchemaDefinition = z.object({
   limit: z.number().int().min(1).max(200).default(50),
 });
+export interface OpsListPausedSchedulesInputSchema extends Named<
+  typeof opsListPausedSchedulesInputSchemaDefinition
+> {}
+export const opsListPausedSchedulesInputSchema: OpsListPausedSchedulesInputSchema =
+  opsListPausedSchedulesInputSchemaDefinition;
 
-export const opsListSchedulerActionsInputSchema = z.object({
+const opsListSchedulerActionsInputSchemaDefinition = z.object({
   limit: z.number().int().min(1).max(100).default(20),
 });
+export interface OpsListSchedulerActionsInputSchema extends Named<
+  typeof opsListSchedulerActionsInputSchemaDefinition
+> {}
+export const opsListSchedulerActionsInputSchema: OpsListSchedulerActionsInputSchema =
+  opsListSchedulerActionsInputSchemaDefinition;
 
-export const opsSetScheduleActiveInputSchema = z.object({
+const opsSetScheduleActiveInputSchemaDefinition = z.object({
   scheduleId: z.string(),
   active: z.boolean(),
 });
+export interface OpsSetScheduleActiveInputSchema extends Named<
+  typeof opsSetScheduleActiveInputSchemaDefinition
+> {}
+export const opsSetScheduleActiveInputSchema: OpsSetScheduleActiveInputSchema =
+  opsSetScheduleActiveInputSchemaDefinition;

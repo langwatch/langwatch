@@ -8,7 +8,7 @@ import { exitCause, type RuntimeEvent } from "../shared/runtime-contract.ts";
 
 const COLORS: Record<string, (s: string) => string> = {
   langwatch: chalk.green,
-  workers: chalk.bold.green,
+  go: chalk.cyan,
   nlpgo: chalk.cyan,
   langevals: chalk.magenta,
   aigateway: chalk.yellow,
@@ -18,7 +18,6 @@ const COLORS: Record<string, (s: string) => string> = {
   "prepare:app": chalk.blue,
   "prepare:langwatch": chalk.green,
   "prepare:langevals": chalk.magenta,
-  "migrate:upgrade": chalk.dim,
 };
 
 // Wide enough to fit `prepare:langevals` without breaking alignment when

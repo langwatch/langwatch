@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 /**
  * The wire of `POST /api/gateway/v1/spend-events/replay`, which webhook answers because it
  * reads only webhook's endpoints, emitted log and stream. Moved from gateway's contract
@@ -11,7 +12,7 @@ export const WEBHOOK_SPEND_REPLAY_PAGE_SIZE = 200;
 /** Salts the batch and inbox-source ids a replay writes; never read back by kind. */
 export const WEBHOOK_SPEND_REPLAY_KSUID_RESOURCE = "replay";
 
-export const webhookSpendReplayBodySchema = z
+const webhookSpendReplayBodySchemaDefinition = z
   .object({
     from: z.number().int().positive().safe(),
     to: z.number().int().positive().safe(),
@@ -23,6 +24,11 @@ export const webhookSpendReplayBodySchema = z
   .refine((b) => b.to - b.from <= WEBHOOK_SPEND_REPLAY_MAX_WINDOW_MS, {
     message: "the replay window is capped at 7 days per call",
   });
+export interface WebhookSpendReplayBodySchema extends Named<
+  typeof webhookSpendReplayBodySchemaDefinition
+> {}
+export const webhookSpendReplayBodySchema: WebhookSpendReplayBodySchema =
+  webhookSpendReplayBodySchemaDefinition;
 export type WebhookSpendReplayBody = z.output<typeof webhookSpendReplayBodySchema>;
 
 const webhookSpendReplayResultSchema = z.object({
@@ -32,5 +38,12 @@ const webhookSpendReplayResultSchema = z.object({
   window: z.object({ from: z.string(), to: z.string() }),
 });
 
-export const webhookSpendReplayResponseSchema = z.object({ data: webhookSpendReplayResultSchema });
+const webhookSpendReplayResponseSchemaDefinition = z.object({
+  data: webhookSpendReplayResultSchema,
+});
+export interface WebhookSpendReplayResponseSchema extends Named<
+  typeof webhookSpendReplayResponseSchemaDefinition
+> {}
+export const webhookSpendReplayResponseSchema: WebhookSpendReplayResponseSchema =
+  webhookSpendReplayResponseSchemaDefinition;
 export type WebhookSpendReplayResponse = z.infer<typeof webhookSpendReplayResponseSchema>;

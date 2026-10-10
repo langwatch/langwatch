@@ -48,10 +48,9 @@ export class OpsExplainClickHouseRepository extends OpsExplainRepository {
       query: wrappedQuery,
       format: "JSONEachRow",
       ...(guardrails ? { clickhouse_settings: guardrails } : {}),
-      unscoped: {
-        reason:
-          "Operator EXPLAIN: the fleet-wide query-plan endpoint runs as the read-only ops user and is deliberately outside the tenant-scoped access pattern.",
-      },
+      // Operator EXPLAIN: the fleet-wide query-plan endpoint runs as the read-only ops user and is
+      // deliberately outside the tenant-scoped access pattern.
+      SKIP_TENANT_CHECK: true,
     });
     return result.json();
   }

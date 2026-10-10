@@ -145,7 +145,7 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
             </VStack>
           )}
         </Drawer.Body>
-        <Drawer.Footer borderTopWidth="1px" borderColor="border">
+        <Drawer.Footer>
           <HStack gap={3}>
             <Button variant="outline" onClick={form.close}>
               Cancel

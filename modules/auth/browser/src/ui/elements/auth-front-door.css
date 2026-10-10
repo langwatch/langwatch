@@ -47,66 +47,11 @@
  */
 
 :root {
-  /* The one gradient word: blue into warm orange, the site's
-	   `.text-gradient`. Not a colour token - Chakra's `colors` namespace holds
-	   colours, and this is a paint. */
-  --lw-front-door-accent-gradient: linear-gradient(100deg, #2563eb 0%, #d9531e 100%);
-}
-
-.dark {
-  /* The site's `.text-gradient-dark`: the same pair, lifted to read on ink. */
-  --lw-front-door-accent-gradient: linear-gradient(100deg, #5fa3ff 0%, #ffa24d 100%);
-}
-
-/*
- * WIDE GAMUT.
- *
- * sRGB cannot show the brand orange. #f56b1a is already at the edge of the
- * space and the deepened #c2510a is a compromise made twice over - once for
- * contrast, once for the gamut - so on a display that can do better, it
- * should.
- *
- * These re-declare the THEME's own emitted variables rather than introducing a
- * second set, which is what keeps one source of truth: the token holds the
- * sRGB value every display can render, and this block upgrades it in place
- * where `color(display-p3 ...)` is available. A browser without `color-gamut`
- * support, or a display without the gamut, never enters the block and never
- * sees a colour it would have to clip.
- *
- * Only the ORANGES are lifted. White, ink and the neutral alphas are identical
- * in both spaces, so restating them would be noise; the red is left alone
- * because a refusal gains nothing from being more saturated.
- */
-@media (color-gamut: p3) {
-  :root {
-    --chakra-colors-front-door-action: color(display-p3 0.706 0.325 0.055);
-    --chakra-colors-front-door-action-hover: color(display-p3 0.62 0.247 0.02);
-    --chakra-colors-front-door-ink: color(display-p3 0.62 0.247 0.02);
-    --chakra-colors-front-door-detail: color(display-p3 0.91 0.427 0.114);
-    --chakra-colors-front-door-tint: color(display-p3 0.98 0.925 0.882);
-    --chakra-colors-front-door-focus-ring: color(display-p3 0.91 0.427 0.114 / 0.22);
-    --chakra-colors-front-door-glow: color(display-p3 0.91 0.427 0.114 / 0.28);
-    --lw-front-door-accent-gradient: linear-gradient(
-      100deg,
-      color(display-p3 0.161 0.373 0.898) 0%,
-      color(display-p3 0.831 0.337 0.133) 100%
-    );
-  }
-
-  .dark {
-    --chakra-colors-front-door-action: color(display-p3 0.91 0.427 0.114 / 0.92);
-    --chakra-colors-front-door-action-hover: color(display-p3 0.98 0.549 0.259);
-    --chakra-colors-front-door-ink: color(display-p3 0.98 0.549 0.259);
-    --chakra-colors-front-door-detail: color(display-p3 0.98 0.549 0.259 / 0.75);
-    --chakra-colors-front-door-tint: color(display-p3 0.91 0.427 0.114 / 0.18);
-    --chakra-colors-front-door-focus-ring: color(display-p3 0.98 0.549 0.259 / 0.22);
-    --chakra-colors-front-door-glow: color(display-p3 0.98 0.549 0.259 / 0.22);
-    --lw-front-door-accent-gradient: linear-gradient(
-      100deg,
-      color(display-p3 0.408 0.639 1) 0%,
-      color(display-p3 1 0.639 0.318) 100%
-    );
-  }
+  --lw-front-door-accent-gradient: linear-gradient(
+    100deg,
+    var(--chakra-colors-blue-fg) 0%,
+    var(--chakra-colors-orange-fg) 100%
+  );
 }
 
 /* The ground itself is the design system's AmbientGround; this only places it
@@ -150,11 +95,18 @@
   inset: 0;
   pointer-events: none;
   background-image:
-    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+    linear-gradient(
+      color-mix(in srgb, var(--chakra-colors-fg) 4%, transparent) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--chakra-colors-fg) 4%, transparent) 1px,
+      transparent 1px
+    );
   background-size: 72px 72px;
-  -webkit-mask-image: linear-gradient(to right, black, transparent 82%);
-  mask-image: linear-gradient(to right, black, transparent 82%);
+  -webkit-mask-image: linear-gradient(to right, var(--chakra-colors-fg), transparent 82%);
+  mask-image: linear-gradient(to right, var(--chakra-colors-fg), transparent 82%);
 }
 
 /*
@@ -179,19 +131,26 @@
   opacity: 0;
   transition: opacity 480ms ease;
   background-image:
-    linear-gradient(rgba(255, 255, 255, 0.1) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.1) 1px, transparent 1px);
+    linear-gradient(
+      color-mix(in srgb, var(--chakra-colors-fg) 10%, transparent) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--chakra-colors-fg) 10%, transparent) 1px,
+      transparent 1px
+    );
   background-size: 72px 72px;
   -webkit-mask-image: radial-gradient(
     circle 200px at var(--lw-lens-x, -400px) var(--lw-lens-y, -400px),
-    black 0%,
-    rgba(0, 0, 0, 0.5) 55%,
+    var(--chakra-colors-fg) 0%,
+    color-mix(in srgb, var(--chakra-colors-fg) 50%, transparent) 55%,
     transparent 100%
   );
   mask-image: radial-gradient(
     circle 200px at var(--lw-lens-x, -400px) var(--lw-lens-y, -400px),
-    black 0%,
-    rgba(0, 0, 0, 0.5) 55%,
+    var(--chakra-colors-fg) 0%,
+    color-mix(in srgb, var(--chakra-colors-fg) 50%, transparent) 55%,
     transparent 100%
   );
 }
@@ -199,7 +158,7 @@
    and it never lifts when pointed at. Hover is a colour step (the theme's
    actionHover); the press below is a half pixel, felt rather than seen. */
 .lw-front-door-primary {
-  box-shadow: 0 1px 2px rgba(12, 8, 5, 0.09);
+  box-shadow: var(--chakra-shadows-xs);
   transition:
     background-color 140ms ease,
     box-shadow 140ms ease;
@@ -207,7 +166,7 @@
 
 .lw-front-door-primary:active:not(:disabled) {
   transform: translateY(0.5px);
-  box-shadow: 0 0 0 1px rgba(12, 8, 5, 0.06);
+  box-shadow: var(--chakra-shadows-xs);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -217,31 +176,6 @@
   .lw-front-door-primary:active:not(:disabled) {
     transform: none;
   }
-}
-
-/* The alert is glass too, for the same reason the pill is: it sits ON the
-   card, and an opaque panel in the middle of a translucent one reads as a
-   patch rather than part of the surface. It keeps its red hairline and its
-   red mark — the warning must not soften — and only the pane behind the
-   words becomes glass, tinted just enough to carry the alarm. The blur is
-   smaller than the card's: it is a nearer layer, and the ground should move
-   through it less. */
-.lw-front-door-alert {
-  /* A literal red rather than a mix of the theme's: every other colour in
-	   this file is a literal too, because these screens must not depend on
-	   another stylesheet's tokens having loaded. The `!important` is what
-	   takes the pane back from the component's own opaque background — the
-	   only thing being overridden. */
-  background-color: rgba(220, 62, 62, 0.1) !important;
-  background-image: linear-gradient(
-    180deg,
-    rgba(255, 255, 255, 0.14),
-    rgba(255, 255, 255, 0.03) 60%,
-    rgba(255, 255, 255, 0) 100%
-  );
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
-  -webkit-backdrop-filter: blur(10px) saturate(1.25);
-  backdrop-filter: blur(10px) saturate(1.25);
 }
 
 /*
@@ -326,16 +260,16 @@
   }
   50% {
     transform: scale(1.045);
-    box-shadow: 0 0 0 10px rgba(245, 107, 26, 0);
+    box-shadow: 0 0 0 10px transparent;
   }
 }
 
 @keyframes lw-front-door-boom {
   from {
-    box-shadow: 0 0 0 0 rgba(245, 107, 26, 0.35);
+    box-shadow: 0 0 0 0 var(--chakra-colors-front-door-glow);
   }
   to {
-    box-shadow: 0 0 0 14px rgba(245, 107, 26, 0);
+    box-shadow: 0 0 0 14px transparent;
   }
 }
 

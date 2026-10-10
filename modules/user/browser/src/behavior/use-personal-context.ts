@@ -5,6 +5,7 @@ import { useMemo } from "react";
 import type { BudgetOverviewItemView } from "../model/budget-overview-item.ts";
 import { api } from "./personal-workspace-api.ts";
 import { useCurrentUser, useOrganizationTeamProject } from "./personal-workspace-session.ts";
+import { isPersonalWorkspacePending } from "./use-personal-workspace-wait.ts";
 
 export type PersonalSummary = {
   /** Theoretical (list-price) total, including bundled / non-billed usage. */
@@ -72,6 +73,8 @@ export type PersonalContext = {
   personalProjectSlug: string | null;
   /** Whether the personal project read has answered. */
   isPersonalProjectResolved: boolean;
+  /** True while the read is retrying the 409 `personal_workspace_pending`; never an error. */
+  isWorkspacePending: boolean;
   apiKeys: PersonalApiKeyRow[];
 };
 
@@ -211,6 +214,7 @@ export function usePersonalContext(): PersonalContext {
         billedUsd: row.billedUsd,
       })) ?? [],
     isPersonalProjectResolved: personalContextQuery.isSuccess,
+    isWorkspacePending: isPersonalWorkspacePending(personalContextQuery.failureReason),
     personalProjectId: personalContextQuery.data?.workspace.project.id ?? null,
     personalProjectSlug: personalContextQuery.data?.workspace.project.slug ?? null,
     apiKeys,

@@ -22,7 +22,6 @@ export type OrganizationTeamProjectReading = {
     | undefined;
   team: { id: string; name: string } | undefined;
   project: { id: string; name: string; slug: string } | undefined;
-  hasPermission: (permission: string) => boolean;
 };
 
 export function useOrganizationTeamProject(): OrganizationTeamProjectReading {
@@ -68,8 +67,7 @@ export function useOrganizationTeamProject(): OrganizationTeamProjectReading {
       organization,
       team,
       project,
-      hasPermission: (permission: string) => host.hasPermission(permission),
     }),
-    [organization, team, project, host],
+    [organization, team, project],
   );
 }

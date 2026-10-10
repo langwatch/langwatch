@@ -113,7 +113,7 @@ export function DashboardWidgetQueryRow({
 
             <Spacer />
             {!nameEdit.isEditingName && summary && (
-              <Text fontSize="11px" color={lastRun?.error ? "red.500" : "fg.muted"} truncate>
+              <Text fontSize="11px" color={lastRun?.error ? "red.fg" : "fg.muted"} truncate>
                 {summary}
               </Text>
             )}
@@ -131,7 +131,7 @@ export function DashboardWidgetQueryRow({
             </IconButton>
           </HStack>
           {nameError && (
-            <Text fontSize="11px" color="red.500">
+            <Text fontSize="11px" color="red.fg">
               {nameError}
             </Text>
           )}
@@ -195,7 +195,7 @@ function QueryNameField({
           if (e.key === "Escape") edit.cancel();
         }}
         placeholder="query name: the LW.query(name, params) handle"
-        borderColor={nameError ? "red.400" : undefined}
+        borderColor={nameError ? "red.fg" : undefined}
         width="auto"
         minWidth="140px"
       />

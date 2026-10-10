@@ -181,11 +181,7 @@ export function summarizeSchedule(parts: ScheduleParts, timezone: string): strin
   }
 }
 
-/**
- * Humanise a raw cron for the advanced-mode summary. Mirrors the page's
- * `describeSchedule` (kept in sync by intent — the page's copy is outside this
- * feature slice), falling back to the raw expression for shapes we can't name.
- */
+/** Humanise a raw cron as plain text (messages, summaries), else the raw expression. */
 export function describeCron(cron: string, timezone: string): string {
   const parts = partsFromCron(cron);
   if (!parts) return `${cron.trim()} (${timezone.trim() || "UTC"})`;

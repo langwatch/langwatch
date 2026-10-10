@@ -67,6 +67,19 @@ func TestErrorsAreGroupedBySignature(t *testing.T) {
 }
 
 // @scenario "Errors are ordered by last seen"
+// @scenario "haven errors reports a worker that failed to boot"
+func TestErrorsReportABootFailureWrittenAtWarn(t *testing.T) {
+	tab := errorsTab(t)
+	tab.Observe(sources.LogLine{At: time.Now(), Lane: "worker", Text: `{"level":"warn","service":"langwatch-worker",` +
+		`"msg":"worker boot failed; generation 2 keeps serving what it can: redis refused"}`})
+	tab.Observe(sources.LogLine{At: time.Now(), Lane: "api", Text: `{"level":"warn","msg":"slow query"}`})
+
+	groups := tab.Groups()
+	if len(groups) != 1 || groups[0].App != "worker" || !strings.Contains(groups[0].Message, "boot failed") {
+		t.Fatalf("groups = %+v, want the worker's boot failure alone", groups)
+	}
+}
+
 func TestErrorsAreOrderedByLastSeen(t *testing.T) {
 	tab := errorsTab(t)
 	old := time.Now().Add(-10 * time.Minute)

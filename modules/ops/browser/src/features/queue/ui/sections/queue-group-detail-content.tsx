@@ -1,16 +1,9 @@
-import {
-  Badge,
-  Box,
-  Card,
-  Center,
-  HStack,
-  Spinner,
-  Text,
-  VStack,
-} from "@langwatch/design-system/primitives";
+import { CodePreview } from "@langwatch/design-system/code-preview";
+import { ListPageSkeleton } from "@langwatch/design-system/list-page";
+import { Badge, Alert, HStack, Text, VStack } from "@langwatch/design-system/primitives";
+import { SummaryList, SummaryListItem } from "@langwatch/design-system/summary-list";
 import type { GroupInfo, OpsQueueJob as JobEntry } from "@langwatch/ops-contract";
 import { nowInstant } from "@langwatch/time";
-import type { ReactNode } from "react";
 
 import { formatTimeAgo } from "../../../../model/ops-formatters.ts";
 import {
@@ -20,17 +13,6 @@ import {
 } from "../../model/queue-pipeline-utils.ts";
 import { GroupJobsSection } from "../blocks/queue-group-jobs-section.tsx";
 import { GroupStateBadge } from "../elements/queue-group-state-badge.tsx";
-
-function DetailField({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <VStack align="start" gap={0}>
-      <Text textStyle="xs" color="fg.muted">
-        {label}
-      </Text>
-      {children}
-    </VStack>
-  );
-}
 
 function GroupStatusRow({
   detail,
@@ -42,61 +24,61 @@ function GroupStatusRow({
   now: number;
 }) {
   return (
-    <HStack gap={4} flexWrap="wrap">
-      <DetailField label="Status">
+    <SummaryList>
+      <SummaryListItem label="Status">
         <GroupStateBadge c={classification} />
-      </DetailField>
-      <DetailField label="Pipeline">
+      </SummaryListItem>
+      <SummaryListItem label="Pipeline">
         <Text textStyle="sm">{detail.pipelineName ?? "—"}</Text>
-      </DetailField>
-      <DetailField label="Pending">
+      </SummaryListItem>
+      <SummaryListItem label="Pending">
         <Text textStyle="sm" fontFamily="mono">
           {detail.pendingJobs}
         </Text>
-      </DetailField>
+      </SummaryListItem>
       {classification.attempt > 0 && (
-        <DetailField label="Attempts">
-          <Text textStyle="sm" fontFamily="mono" color="orange.500">
+        <SummaryListItem label="Attempts">
+          <Text textStyle="sm" fontFamily="mono" color="fg.warning">
             {classification.attempt}
           </Text>
-        </DetailField>
+        </SummaryListItem>
       )}
-      <DetailField label="Next run">
-        <Text textStyle="sm" color={classification.state === "retrying" ? "orange.500" : undefined}>
+      <SummaryListItem label="Next run">
+        <Text textStyle="sm" color={classification.state === "retrying" ? "fg.warning" : undefined}>
           {describeNextRun(classification, now)}
         </Text>
-      </DetailField>
+      </SummaryListItem>
       {detail.activeJobId && (
-        <DetailField label="Active Job">
-          <Text textStyle="xs" fontFamily="mono" color="green.500">
+        <SummaryListItem label="Active Job">
+          <Text textStyle="xs" fontFamily="mono" color="green.fg">
             {detail.activeJobId}
           </Text>
-        </DetailField>
+        </SummaryListItem>
       )}
-    </HStack>
+    </SummaryList>
   );
 }
 
 function GroupTimingRow({ detail, now }: { detail: GroupInfo; now: number }) {
   return (
-    <HStack gap={4}>
-      <DetailField label="Oldest Job">
+    <SummaryList>
+      <SummaryListItem label="Oldest Job">
         <Text textStyle="sm">{formatTimeAgo(detail.oldestJobMs, now)}</Text>
-      </DetailField>
-      <DetailField label="Newest Job">
+      </SummaryListItem>
+      <SummaryListItem label="Newest Job">
         <Text textStyle="sm">{formatTimeAgo(detail.newestJobMs, now)}</Text>
-      </DetailField>
+      </SummaryListItem>
       {detail.processingDurationMs != null && (
-        <DetailField label="Processing">
+        <SummaryListItem label="Processing">
           <Text textStyle="sm">{detail.processingDurationMs}ms</Text>
-        </DetailField>
+        </SummaryListItem>
       )}
       {detail.activeKeyTtlSec != null && (
-        <DetailField label="Worker lease">
+        <SummaryListItem label="Worker lease">
           <Text textStyle="sm">expires in {detail.activeKeyTtlSec}s</Text>
-        </DetailField>
+        </SummaryListItem>
       )}
-    </HStack>
+    </SummaryList>
   );
 }
 
@@ -114,33 +96,23 @@ function GroupErrorSection({ detail, now }: { detail: GroupInfo; now: number }) 
           </Badge>
         )}
       </HStack>
-      <Card.Root borderColor="red.500/20">
-        <Card.Body padding={3}>
-          <Text textStyle="xs" color="red.500" whiteSpace="pre-wrap" wordBreak="break-word">
+      <Alert.Root status="error">
+        <Alert.Indicator />
+        <Alert.Content>
+          <Alert.Description whiteSpace="pre-wrap" overflowWrap="anywhere">
             {detail.errorMessage}
-          </Text>
+          </Alert.Description>
           {detail.errorStack && (
-            <Box
-              marginTop={2}
+            <CodePreview
+              code={detail.errorStack}
+              language="text"
+              filename="Stack trace"
+              compact
               maxHeight="200px"
-              overflow="auto"
-              bg="bg.subtle"
-              borderRadius="sm"
-              padding={2}
-            >
-              <Text
-                textStyle="xs"
-                fontFamily="mono"
-                color="fg.muted"
-                whiteSpace="pre"
-                fontSize="10px"
-              >
-                {detail.errorStack}
-              </Text>
-            </Box>
+            />
           )}
-        </Card.Body>
-      </Card.Root>
+        </Alert.Content>
+      </Alert.Root>
     </VStack>
   );
 }
@@ -176,11 +148,7 @@ export function GroupDetailContent({
   now?: number;
 }) {
   if (isLoading) {
-    return (
-      <Center paddingY={6}>
-        <Spinner size="sm" />
-      </Center>
-    );
+    return <ListPageSkeleton label="Loading group details" />;
   }
 
   if (!detail) {

@@ -8,6 +8,7 @@ import { PostgresOpsRepositories } from "../../../../repositories/prisma/prisma.
 import { PrismaSystemMigrationEnrollmentRepository } from "../../../../repositories/prisma/prisma.system-migration-enrollment.repository.ts";
 import { PrismaSystemMigrationStateRepository } from "../../../../repositories/prisma/prisma.system-migration-state.repository.ts";
 import { RedisMigrationLeaseRepository } from "../../../../repositories/redis/redis.migration-lease.repository.ts";
+import { SystemMigrationPassCohortService } from "../system-migration-pass-cohort.service.ts";
 import { SystemMigrationPassService } from "../system-migration-pass.service.ts";
 
 const IDENTIFIER_BACKFILL = "identity-d01-identifier-backfill";
@@ -109,9 +110,11 @@ describe("SystemMigrationPassService", () => {
           user_gil: ["org_globex"],
         },
       });
-      const { adapter } = adapterOn(database);
+      const cohorts = SystemMigrationPassCohortService.create({
+        repositories: passRepositoriesOver(database),
+      });
 
-      const cohort = await adapter.userCohort({
+      const cohort = await cohorts.user({
         isSaaS: true,
         enrollments: enrollmentsOf(database),
         migrations: [migrationOf({ name: IDENTIFIER_BACKFILL })],
@@ -138,9 +141,11 @@ describe("SystemMigrationPassService", () => {
 
     it("reads no membership and admits nobody when nothing is enrolled", async () => {
       const { database, findUnique } = stubDatabase({ enrollments: [], memberships: {} });
-      const { adapter } = adapterOn(database);
+      const cohorts = SystemMigrationPassCohortService.create({
+        repositories: passRepositoriesOver(database),
+      });
 
-      const cohort = await adapter.userCohort({
+      const cohort = await cohorts.user({
         isSaaS: true,
         enrollments: enrollmentsOf(database),
         migrations: [migrationOf({ name: IDENTIFIER_BACKFILL })],
@@ -154,9 +159,11 @@ describe("SystemMigrationPassService", () => {
 
     it("admits every user for a migration that enrolls automatically", async () => {
       const { database, findUnique } = stubDatabase({ enrollments: [], memberships: {} });
-      const { adapter } = adapterOn(database);
+      const cohorts = SystemMigrationPassCohortService.create({
+        repositories: passRepositoriesOver(database),
+      });
 
-      const cohort = await adapter.userCohort({
+      const cohort = await cohorts.user({
         isSaaS: true,
         enrollments: enrollmentsOf(database),
         migrations: [migrationOf({ name: "identity-automatic", enrolledAutomatically: true })],

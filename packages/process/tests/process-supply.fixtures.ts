@@ -103,11 +103,11 @@ class PeerApp implements PeerApi {
 export const peerModule = defineProcessModule("audit-log").withApi(PeerApp).build();
 
 type Facilities = {
-  relational: { query(): string };
-  keyvalue: { get(key: string): string };
+  prisma: { query(): string };
+  redis: { get(key: string): string };
   clock: () => string;
-  logging: { info(message: string): void };
-  metrics: { count(name: string): void };
+  logger: { info(message: string): void };
+  telemetry: { count(name: string): void };
   tracing: { span(name: string): void };
   secrets: { read(name: string): string };
   encryption: { encrypt(value: string): string };
@@ -118,21 +118,21 @@ interface FacilityApi {
 const FacilityApi = moduleApi<FacilityApi>()("user");
 class FacilityRepositories {
   static readonly requires = [
-    "relational",
-    "keyvalue",
+    "prisma",
+    "redis",
     "clock",
-    "logging",
-    "metrics",
+    "logger",
+    "telemetry",
     "tracing",
     "secrets",
     "encryption",
   ] as const;
   static create(clients: {
-    relational: Facilities["relational"];
-    keyvalue: Facilities["keyvalue"];
+    prisma: Facilities["prisma"];
+    redis: Facilities["redis"];
     clock: Facilities["clock"];
-    logging: Facilities["logging"];
-    metrics: Facilities["metrics"];
+    logger: Facilities["logger"];
+    telemetry: Facilities["telemetry"];
     tracing: Facilities["tracing"];
     secrets: Facilities["secrets"];
     encryption: Facilities["encryption"];
@@ -153,7 +153,7 @@ class FacilityApp implements FacilityApi {
     return new FacilityApp(repositories);
   }
   read(): string {
-    return this.#clients.relational.query();
+    return this.#clients.prisma.query();
   }
 }
 export const facilityModule = defineProcessModule("user")
@@ -163,15 +163,15 @@ export const facilityModule = defineProcessModule("user")
   .withApi(FacilityApp)
   .build();
 export const facilities: Facilities = {
-  relational: { query: () => "rows" },
-  keyvalue: { get: (key) => key },
+  prisma: { query: () => "rows" },
+  redis: { get: (key) => key },
   clock,
-  logging: {
+  logger: {
     info: (message) => {
       messages.push(message);
     },
   },
-  metrics: {
+  telemetry: {
     count: (name) => {
       messages.push(name);
     },
@@ -187,15 +187,9 @@ export const facilities: Facilities = {
 const messages: string[] = [];
 
 export class RelationalRepositories {
-  static readonly requires = ["relational", "clock"] as const;
-  static create({
-    relational,
-    clock,
-  }: {
-    relational: Facilities["relational"];
-    clock: () => string;
-  }) {
-    return { row: () => relational.query(), clock };
+  static readonly requires = ["prisma", "clock"] as const;
+  static create({ prisma, clock }: { prisma: Facilities["prisma"]; clock: () => string }) {
+    return { row: () => prisma.query(), clock };
   }
 }
 export class MemoryRepositories {

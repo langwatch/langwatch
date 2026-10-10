@@ -5,13 +5,19 @@
  * it (ADR-156 section 7). Instants travel as ISO strings: tRPC carries no transformer.
  */
 
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 const currencySchema = z.enum(["USD", "EUR"]);
 const isoInstantSchema = z.iso.datetime({ offset: true });
 
 /** The customer organization being billed; never the caller's own reach. */
-export const connectedCustomerInputSchema = z.object({ organizationId: z.string().min(1) });
+const connectedCustomerInputSchemaDefinition = z.object({ organizationId: z.string().min(1) });
+export interface ConnectedCustomerInputSchema extends Named<
+  typeof connectedCustomerInputSchemaDefinition
+> {}
+export const connectedCustomerInputSchema: ConnectedCustomerInputSchema =
+  connectedCustomerInputSchemaDefinition;
 
 const contractTermsInput = {
   termStartsAt: isoInstantSchema,
@@ -22,7 +28,7 @@ const contractTermsInput = {
   commitUsdCents: z.number().int().min(0),
 };
 
-export const connectedOnboardRequestSchema = z.object({
+const connectedOnboardRequestSchemaDefinition = z.object({
   ...connectedCustomerInputSchema.shape,
   organizationName: z.string().trim().min(1).max(200),
   billingEmail: z.email(),
@@ -35,23 +41,43 @@ export const connectedOnboardRequestSchema = z.object({
     .default(null),
   ...contractTermsInput,
 });
+export interface ConnectedOnboardRequestSchema extends Named<
+  typeof connectedOnboardRequestSchemaDefinition
+> {}
+export const connectedOnboardRequestSchema: ConnectedOnboardRequestSchema =
+  connectedOnboardRequestSchemaDefinition;
 export type ConnectedOnboardRequest = z.infer<typeof connectedOnboardRequestSchema>;
 
-export const connectedRenewRequestSchema = z.object({
+const connectedRenewRequestSchemaDefinition = z.object({
   ...connectedCustomerInputSchema.shape,
   ...contractTermsInput,
 });
+export interface ConnectedRenewRequestSchema extends Named<
+  typeof connectedRenewRequestSchemaDefinition
+> {}
+export const connectedRenewRequestSchema: ConnectedRenewRequestSchema =
+  connectedRenewRequestSchemaDefinition;
 export type ConnectedRenewRequest = z.infer<typeof connectedRenewRequestSchema>;
 
-export const connectedAddCommitRequestSchema = z.object({
+const connectedAddCommitRequestSchemaDefinition = z.object({
   ...connectedCustomerInputSchema.shape,
   amountUsdCents: z.number().int().positive(),
 });
+export interface ConnectedAddCommitRequestSchema extends Named<
+  typeof connectedAddCommitRequestSchemaDefinition
+> {}
+export const connectedAddCommitRequestSchema: ConnectedAddCommitRequestSchema =
+  connectedAddCommitRequestSchemaDefinition;
 export type ConnectedAddCommitRequest = z.infer<typeof connectedAddCommitRequestSchema>;
 
-export const connectedInvoiceTargetSchema = z.object({ stripeInvoiceId: z.string().min(1) });
+const connectedInvoiceTargetSchemaDefinition = z.object({ stripeInvoiceId: z.string().min(1) });
+export interface ConnectedInvoiceTargetSchema extends Named<
+  typeof connectedInvoiceTargetSchemaDefinition
+> {}
+export const connectedInvoiceTargetSchema: ConnectedInvoiceTargetSchema =
+  connectedInvoiceTargetSchemaDefinition;
 
-export const connectedBillingAccountViewSchema = z.object({
+const connectedBillingAccountViewSchemaDefinition = z.object({
   id: z.string(),
   organizationId: z.string(),
   stripeCustomerId: z.string(),
@@ -67,18 +93,28 @@ export const connectedBillingAccountViewSchema = z.object({
   /** Whether a renewal's credit still waits on the old term's last usage invoice. */
   renewalPending: z.boolean(),
 });
+export interface ConnectedBillingAccountViewSchema extends Named<
+  typeof connectedBillingAccountViewSchemaDefinition
+> {}
+export const connectedBillingAccountViewSchema: ConnectedBillingAccountViewSchema =
+  connectedBillingAccountViewSchemaDefinition;
 export type ConnectedBillingAccountView = z.infer<typeof connectedBillingAccountViewSchema>;
 
-export const connectedCreditGrantViewSchema = z.object({
+const connectedCreditGrantViewSchemaDefinition = z.object({
   stripeCreditGrantId: z.string(),
   amountUsdCents: z.number(),
   kind: z.enum(["commit", "added", "renewal"]),
   termEndsAt: z.string(),
   expiresAt: z.string(),
 });
+export interface ConnectedCreditGrantViewSchema extends Named<
+  typeof connectedCreditGrantViewSchemaDefinition
+> {}
+export const connectedCreditGrantViewSchema: ConnectedCreditGrantViewSchema =
+  connectedCreditGrantViewSchemaDefinition;
 export type ConnectedCreditGrantView = z.infer<typeof connectedCreditGrantViewSchema>;
 
-export const connectedInvoiceViewSchema = z.object({
+const connectedInvoiceViewSchemaDefinition = z.object({
   stripeInvoiceId: z.string(),
   kind: z.enum(["annual", "seat_change", "usage"]),
   currency: currencySchema,
@@ -86,8 +122,13 @@ export const connectedInvoiceViewSchema = z.object({
   status: z.string(),
   paidOutOfBandAt: z.string().nullable(),
 });
+export interface ConnectedInvoiceViewSchema extends Named<
+  typeof connectedInvoiceViewSchemaDefinition
+> {}
+export const connectedInvoiceViewSchema: ConnectedInvoiceViewSchema =
+  connectedInvoiceViewSchemaDefinition;
 
-export const connectedSeatChangeViewSchema = z.object({
+const connectedSeatChangeViewSchemaDefinition = z.object({
   licenseId: z.string(),
   changedAt: z.string(),
   addedSeats: z.number(),
@@ -98,16 +139,26 @@ export const connectedSeatChangeViewSchema = z.object({
   state: z.enum(["awaiting", "intent", "invoiced", "nothing_to_invoice", "not_onboarded"]),
   stripeInvoiceId: z.string().nullable(),
 });
+export interface ConnectedSeatChangeViewSchema extends Named<
+  typeof connectedSeatChangeViewSchemaDefinition
+> {}
+export const connectedSeatChangeViewSchema: ConnectedSeatChangeViewSchema =
+  connectedSeatChangeViewSchemaDefinition;
 
 /** The contract budget as the customer's own calls see it. `spentUsdCents` is null when unread, never zero. */
-export const connectedSpendViewSchema = z.object({
+const connectedSpendViewSchemaDefinition = z.object({
   spendAvailable: z.boolean(),
   limitUsdCents: z.number(),
   spentUsdCents: z.number().nullable(),
 });
+export interface ConnectedSpendViewSchema extends Named<
+  typeof connectedSpendViewSchemaDefinition
+> {}
+export const connectedSpendViewSchema: ConnectedSpendViewSchema =
+  connectedSpendViewSchemaDefinition;
 export type ConnectedSpendView = z.infer<typeof connectedSpendViewSchema>;
 
-export const connectedBillingOverviewSchema = z.object({
+const connectedBillingOverviewSchemaDefinition = z.object({
   account: connectedBillingAccountViewSchema.nullable(),
   grants: z.array(connectedCreditGrantViewSchema),
   invoices: z.array(connectedInvoiceViewSchema),
@@ -124,8 +175,18 @@ export const connectedBillingOverviewSchema = z.object({
   }),
   seatChanges: z.array(connectedSeatChangeViewSchema),
 });
+export interface ConnectedBillingOverviewSchema extends Named<
+  typeof connectedBillingOverviewSchemaDefinition
+> {}
+export const connectedBillingOverviewSchema: ConnectedBillingOverviewSchema =
+  connectedBillingOverviewSchemaDefinition;
 export type ConnectedBillingOverview = z.infer<typeof connectedBillingOverviewSchema>;
 
-export const connectedRenewalOutcomeSchema = z.object({
+const connectedRenewalOutcomeSchemaDefinition = z.object({
   outcome: z.enum(["completed", "waiting", "none"]),
 });
+export interface ConnectedRenewalOutcomeSchema extends Named<
+  typeof connectedRenewalOutcomeSchemaDefinition
+> {}
+export const connectedRenewalOutcomeSchema: ConnectedRenewalOutcomeSchema =
+  connectedRenewalOutcomeSchemaDefinition;

@@ -38,6 +38,7 @@ interface LwqlReconvergenceApp {
   probeLwqlAccessModelOwner(): Promise<LwqlAccessModelOwner>;
   convergeLwqlAccessModel(): Promise<void>;
   syncLwqlKeyMapRow(input: { projectId: string }): Promise<void>;
+  fillLwqlProjectKeys(input: { dryRun: boolean }): Promise<unknown>;
 }
 
 export function buildLwqlReconvergence({
@@ -68,6 +69,7 @@ export function buildLwqlReconvergence({
           runLwqlReconvergence({
             probe: () => app.probeLwqlAccessModelOwner(),
             converge: () => app.convergeLwqlAccessModel(),
+            fillKeyMap: () => app.fillLwqlProjectKeys({ dryRun: false }),
           }),
         )
         // One convergence at a time; a retry repeats a probe, which is idempotent.
@@ -82,11 +84,12 @@ function isReconvergenceApp(app: unknown): app is LwqlReconvergenceApp {
     app !== null &&
     "probeLwqlAccessModelOwner" in app &&
     "convergeLwqlAccessModel" in app &&
-    "syncLwqlKeyMapRow" in app
+    "syncLwqlKeyMapRow" in app &&
+    "fillLwqlProjectKeys" in app
   );
 }
 
-/** Narrowed to the constructed app, as the licensing transport facts do, not the contract. */
+/** Narrowed to the constructed app, as licensing's middleware bindings do, not the contract. */
 export const lwqlReconvergenceEventing = defineEventingModule({
   pipeline: LWQL_RECONVERGENCE_PIPELINE_NAME,
   build: ({ app }: EventingSetup<AnalyticsRepositories, AnalyticsApi>) => {

@@ -6,7 +6,7 @@ The server half of [licensing](../README.md). Licences: validating and storing a
 
 ## Installation
 
-`defineProcessModule("licensing").withRepositories(licensingRepositories).withApi(LicensingModule).withTransports(licenseTrpcTransport, connectTrpcTransport, connectHostedRest, connectHostRest).withTransportFacts(…).withEventing(licenseSyncEventing).withEventing(licensingCustomerEventing).withTasks(…).withMigrations(…)`, `src/licensing.module.ts:23`.
+`defineProcessModule("licensing").withRepositories(licensingRepositories).withApi(LicensingModule).withTransports(licenseTrpcTransport, connectTrpcTransport, connectHostRest).withEventing(licenseSyncEventing).withEventing(licensingCustomerEventing).withDoors(…).withTasks(…).withMigrations(…)`, `src/licensing.module.ts:21`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 The portable signed-license capability supplied to process peers.
 
-Peers call these through the token, declared at `../contract/src/licensing.api.ts:66`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/licensing.api.ts:62`; nothing else in this package is public.
 
 #### `resolve`
 
@@ -198,12 +198,28 @@ Who a presented `lwl_` bearer is, for a hosted route on LangWatch Cloud.
 resolveConnectCredential(input: { token: string; instanceId: string | null | undefined; }): Promise<ConnectCredentialResolution>;
 ```
 
-#### `recordLicenseSync`
+#### `verifyLicenceToken`
 
-One daily sync from a connected install; a refusal throws its credential code.
+The `licence_token` door's check on a sync bearer; a refusal throws its code.
 
 ```typescript
-recordLicenseSync(input: ConnectPresentedCredential & { body: LicenseSyncBody }): Promise<LicenseSyncAnswer>;
+verifyLicenceToken(input: ConnectPresentedCredential): Promise<ConnectLicenceCaller>;
+```
+
+#### `verifyActivationCode`
+
+The door's check on an activation bearer: looked up, never claimed (W02-ACTIVATE-DOOR).
+
+```typescript
+verifyActivationCode(input: ConnectPresentedCredential): Promise<ConnectActivationCaller>;
+```
+
+#### `recordLicenseSync`
+
+One daily sync from the install its door verified; a refusal throws its code.
+
+```typescript
+recordLicenseSync(input: { caller: ConnectLicenceCaller; body: LicenseSyncBody; }): Promise<LicenseSyncAnswer>;
 ```
 
 #### `getConnectStatus`
@@ -268,6 +284,14 @@ Judges one text on LangWatch for an install that holds a license. The install ha
 classifyThroughConnect(input: { organizationId: string; text: string; questions: readonly unknown[]; }): Promise<ConnectClassifyAnswer>;
 ```
 
+#### `findConnectUpstream`
+
+The upstream this organization's gateway presents to LangWatch: one entry while Connect is on and a licence (the organization's, else the instance-wide key) yields a token, else empty. Gateway reads it on licensing's `connect_upstream_set` fact; the token never enters an event.
+
+```typescript
+findConnectUpstream(input: { organizationId: string }): Promise<ConnectUpstream[]>;
+```
+
 #### `refreshLicense`
 
 Runs the daily sync by hand and reports what it changed.
@@ -316,30 +340,6 @@ What a customer switched off in the usage report; an absent switch is left alone
 setUsageReportSwitches(input: { optionalMetricsOptOut?: boolean; hostnameOptOut?: boolean; }): Promise<void>;
 ```
 
-#### `classifyForHostedCaller`
-
-The hosted end of Connect (ADR-156 §5), which only LangWatch Cloud composes: whether the calling key belongs to an entitled license.
-
-```typescript
-classifyForHostedCaller(input: { caller: HostedCaller; payload: unknown; /** The calling install's request: a judgement it no longer waits for is abandoned. */ signal?: AbortSignal; }): Promise<HostedClassifyAnswer>;
-```
-
-#### `getHostedUsage`
-
-What the caller spent against every budget that applies to it.
-
-```typescript
-getHostedUsage(input: { caller: HostedCaller }): Promise<HostedUsageAnswer>;
-```
-
-#### `setHostedBudgetCap`
-
-The customer moves its own hosted cap, up to the contract maximum.
-
-```typescript
-setHostedBudgetCap(input: { caller: HostedCaller; payload: unknown }): Promise<HostedCapAnswer>;
-```
-
 #### `getContractTerms`
 
 What a customer's licenses add up to commercially, right now.
@@ -372,28 +372,20 @@ Raises the prepaid commit a renewal or top-up invoice agreed.
 raiseContractCommit(input: { organizationId: string; byUsdCents: number; operatorId: string; }): Promise<IssuedLicenseView>;
 ```
 
-#### `syncContractBudget`
-
-Re-derives the contract budget's cap from the license terms.
-
-```typescript
-syncContractBudget(input: { organizationId: string; operatorId: string }): Promise<void>;
-```
-
-#### `resetContractBudget`
-
-Starts a new budget window: spend so far no longer counts.
-
-```typescript
-resetContractBudget(input: { organizationId: string; operatorId: string }): Promise<void>;
-```
-
 #### `findConnectServicesForManagedKey`
 
 The hosted services the active license behind one managed key is entitled to, empty when no active license names that key. The gateway resolves a CONNECT key's scope through this and never reads `IssuedLicense` itself.
 
 ```typescript
 findConnectServicesForManagedKey(input: { virtualKeyId: string; organizationId: string; }): Promise<ConnectService[]>;
+```
+
+#### `findManagedKeyLicense`
+
+The active license behind one managed key in one organization, as the hosted routes check it: one entry naming its entitled services (possibly none), or empty where no active license of that organization holds the key.
+
+```typescript
+findManagedKeyLicense(input: { virtualKeyId: string; organizationId: string; }): Promise<{ services: ConnectService[] }[]>;
 ```
 
 #### `issueActivationCode`
@@ -418,10 +410,10 @@ revokeActivationCode(input: { id: string; operatorId: string }): Promise<Activat
 
 #### `redeemActivationCode`
 
-One install presenting one code as its bearer, answered with one license, once.
+Claims the code the door found redeemable, answered with one license, once.
 
 ```typescript
-redeemActivationCode(input: ConnectPresentedCredential): Promise<ActivationAnswer>;
+redeemActivationCode(input: ConnectActivationCaller): Promise<ActivationAnswer>;
 ```
 
 #### `recordUsageReport`
@@ -450,14 +442,14 @@ getSelfHostedInstance(input: { id: string }): Promise<SelfHostedInstanceDetail>;
 
 |             |                                         |
 | ----------- | --------------------------------------- |
-| Declared at | `src/transport/connect-host.rest.ts:29` |
+| Declared at | `src/transport/connect-host.rest.ts:47` |
 | Base URL    | none: each route's path is its address  |
 | Addressing  | literal                                 |
-| Credential  | project                                 |
+| Credential  | licence_token                           |
 
 #### `POST /api/connect/v1/license/sync` · `recordLicenseSync`
 
-Public: a self-hosted install presents its license token or activation code as the bearer; no gateway and no session stand in front of the connect host. Hidden from the OpenAPI document. Declared at `src/transport/connect-host.rest.ts:34`.
+Authenticated: a self-hosted install presents its license token or activation code as the bearer; the door verifies it and no permission names a licence holder. Credential `licence_token`. Hidden from the OpenAPI document. Declared at `src/transport/connect-host.rest.ts:53`.
 
 Answers at `/api/connect/v1/license/sync`.
 
@@ -470,8 +462,7 @@ interface Body {
     liteMembers: number;
   };
 }
-type Headers = z.infer<typeof connectHostHeadersSchema>; // ../contract/src/license-sync.ts:31
-// Response: connectSyncAnswerSchema, ../contract/src/connect-install.ts:25
+// Response: connectSyncAnswerSchema, ../contract/src/connect-install.ts:31
 interface Response {
   services: string[];
   license?: string;
@@ -480,73 +471,20 @@ interface Response {
 
 #### `POST /api/connect/v1/license/activate` · `redeemActivationCode`
 
-Public: a self-hosted install presents its license token or activation code as the bearer; no gateway and no session stand in front of the connect host. Hidden from the OpenAPI document. Declared at `src/transport/connect-host.rest.ts:49`.
+Authenticated: a self-hosted install presents its license token or activation code as the bearer; the door verifies it and no permission names a licence holder. Credential `licence_token`. Hidden from the OpenAPI document. Declared at `src/transport/connect-host.rest.ts:62`.
 
 Answers at `/api/connect/v1/license/activate`.
 
 ```typescript
-// Body: connectActivationRequestSchema, ../contract/src/license-sync.ts:37
+// Body: connectActivationRequestSchema, ../contract/src/license-sync.ts:31
 type Body = Record<string, unknown>;
-type Headers = z.infer<typeof connectHostHeadersSchema>; // ../contract/src/license-sync.ts:31
-// Response: connectActivationAnswerSchema, ../contract/src/connect-install.ts:34
+// Response: connectActivationAnswerSchema, ../contract/src/connect-install.ts:40
 interface Response {
   license: string;
   planType: string;
   maxMembers: number;
   expiresAt: string;
   services: string[];
-}
-```
-
-### `connectHostedRest`
-
-|             |                                           |
-| ----------- | ----------------------------------------- |
-| Declared at | `src/transport/connect-hosted.rest.ts:42` |
-| Base URL    | none: each route's path is its address    |
-| Addressing  | literal                                   |
-| Credential  | internal_secret                           |
-
-#### `POST /api/internal/gateway/connect/instant-evals-classify` · `classifyForHostedCaller`
-
-Authenticated: the Go data plane signs every call with the deployment's own gateway secret, and the hosted Connect door verifies it under this family's paths before any route runs. Hidden from the OpenAPI document. Declared at `src/transport/connect-hosted.rest.ts:48`.
-
-Answers at `/api/internal/gateway/connect/instant-evals-classify`.
-
-```typescript
-// Body: hostedServiceEnvelopeSchema, ../contract/src/connect-hosted.ts:25
-interface Body {
-  virtual_key_id: string;
-  organization_id: string;
-  project_id: string;
-  payload: unknown;
-}
-type Response = z.infer<typeof hostedClassifyAnswerSchema>; // ../contract/src/connect-hosted.ts:107
-```
-
-#### `POST /api/internal/gateway/connect/usage` · `getHostedUsage`
-
-Authenticated: the Go data plane signs every call with the deployment's own gateway secret, and the hosted Connect door verifies it under this family's paths before any route runs. Hidden from the OpenAPI document. Declared at `src/transport/connect-hosted.rest.ts:61`.
-
-Answers at `/api/internal/gateway/connect/usage`.
-
-```typescript
-type Body = z.infer<typeof hostedServiceEnvelopeSchema>; // ../contract/src/connect-hosted.ts:25
-type Response = z.infer<typeof hostedUsageAnswerSchema>; // ../contract/src/connect-hosted.ts:83
-```
-
-#### `POST /api/internal/gateway/connect/budget` · `setHostedBudgetCap`
-
-Authenticated: the Go data plane signs every call with the deployment's own gateway secret, and the hosted Connect door verifies it under this family's paths before any route runs. Hidden from the OpenAPI document. Declared at `src/transport/connect-hosted.rest.ts:68`.
-
-Answers at `/api/internal/gateway/connect/budget`.
-
-```typescript
-type Body = z.infer<typeof hostedServiceEnvelopeSchema>; // ../contract/src/connect-hosted.ts:25
-// Response: hostedCapAnswerSchema, ../contract/src/connect-hosted.ts:115
-interface Response {
-  cap_usd: number;
-  maximum_cap_usd: number;
 }
 ```
 
@@ -568,7 +506,7 @@ Contract `../contract/src/connect.trpc.ts:18`, router `src/transport/connect.trp
 interface Input {
   organizationId: string;
 }
-type Output = z.infer<typeof connectStatusSchema>; // ../contract/src/connect-install.ts:177
+type Output = z.infer<typeof connectStatusSchema>; // ../contract/src/connect-install.ts:183
 
 // connect.setService
 // Input: inline, ../contract/src/connect.trpc.ts:25
@@ -577,7 +515,7 @@ interface Input {
   service: "instant_evals" | "managed_models";
   enabled: boolean;
 }
-// Output: connectServicesSetSchema, ../contract/src/connect-install.ts:192
+// Output: connectServicesSetSchema, ../contract/src/connect-install.ts:198
 interface Output {
   enabledServices: ("instant_evals" | "managed_models")[];
 }
@@ -588,7 +526,7 @@ interface Input {
   organizationId: string;
   capUsd: number;
 }
-// Output: connectCapSetSchema, ../contract/src/connect-install.ts:196
+// Output: connectCapSetSchema, ../contract/src/connect-install.ts:202
 interface Output {
   capUsd: number;
   maximumCapUsd: number;
@@ -614,12 +552,12 @@ Contract `../contract/src/licensing.trpc.ts:22`, router `src/transport/licensing
 interface Input {
   organizationId: string;
 }
-type Output = z.infer<typeof licenseStatusSchema>; // ../contract/src/license.ts:219
+type Output = z.infer<typeof licenseStatusSchema>; // ../contract/src/license.ts:222
 
 // license.getSsoGateStatus
 // Input: inline, ../contract/src/licensing.trpc.ts:31
 type Input = Record<string, unknown>;
-// Output: ssoGateStatusSchema, ../contract/src/license.ts:250
+// Output: ssoGateStatusSchema, ../contract/src/license.ts:253
 interface Output {
   configuredProvider: string | null;
   licensed: boolean;
@@ -632,7 +570,7 @@ interface Input {
   organizationId: string;
   licenseKey: string;
 }
-type Output = z.infer<typeof licenseUploadedSchema>; // ../contract/src/license.ts:266
+type Output = z.infer<typeof licenseUploadedSchema>; // ../contract/src/license.ts:269
 
 // license.activate
 // Input: inline, ../contract/src/licensing.trpc.ts:40
@@ -640,11 +578,11 @@ interface Input {
   organizationId: string;
   code: string;
 }
-type Output = z.infer<typeof licenseUploadedSchema>; // ../contract/src/license.ts:266
+type Output = z.infer<typeof licenseUploadedSchema>; // ../contract/src/license.ts:269
 
 // license.remove
 type Input = z.infer<typeof licenseOrganizationQuerySchema>; // ../contract/src/licensing.trpc.ts:17
-// Output: licenseRemovedSchema, ../contract/src/license.ts:271
+// Output: licenseRemovedSchema, ../contract/src/license.ts:274
 interface Output {
   success: true;
   removed: true;
@@ -652,7 +590,7 @@ interface Output {
 
 // license.refresh
 type Input = z.infer<typeof licenseOrganizationQuerySchema>; // ../contract/src/licensing.trpc.ts:17
-// Output: licenseRefreshOutcomeSchema, ../contract/src/connect-install.ts:201
+// Output: licenseRefreshOutcomeSchema, ../contract/src/connect-install.ts:207
 type Output =
   | {
       outcome: "unchanged";
@@ -681,11 +619,24 @@ Declared at `src/eventing/license-sync.pipeline.ts:57`.
 
 ### Pipeline `licensing_customer` (aggregate `licensing_customer`)
 
-Declared at `src/eventing/licensing-customer.pipeline.ts:29`. Events: `selfHostedCustomerLicensedEventSchema`.
+Declared at `src/eventing/licensing-customer.pipeline.ts:112`. Events: `selfHostedCustomerLicensedEventSchema`, `connectServiceSwitchedEventSchema`, `licenseSyncFinishedEventSchema`, `licenseStoredEventSchema`, `licenseClearedEventSchema`, `managedKeyRetiredEventSchema`, `managedKeyInvalidatedEventSchema`, `managedKeyLicenseSetEventSchema`, `managedKeyServicesSetEventSchema`, `connectUpstreamSetEventSchema`, `connectUpstreamClearedEventSchema`, `connectCredentialIssuedEventSchema`, `contractTermsChangedEventSchema`.
 
-| Kind    | Name                               | Handles | Declared at                                      |
-| ------- | ---------------------------------- | ------- | ------------------------------------------------ |
-| command | `recordSelfHostedCustomerLicensed` | –       | `src/eventing/licensing-customer.pipeline.ts:34` |
+| Kind            | Name                               | Handles                                                                                    | Declared at                                       |
+| --------------- | ---------------------------------- | ------------------------------------------------------------------------------------------ | ------------------------------------------------- |
+| command         | `recordSelfHostedCustomerLicensed` | –                                                                                          | `src/eventing/licensing-customer.pipeline.ts:131` |
+| command         | `recordConnectServiceSwitched`     | –                                                                                          | `src/eventing/licensing-customer.pipeline.ts:132` |
+| command         | `recordLicenseSyncFinished`        | –                                                                                          | `src/eventing/licensing-customer.pipeline.ts:133` |
+| command         | `recordLicenseStored`              | –                                                                                          | `src/eventing/licensing-customer.pipeline.ts:134` |
+| command         | `recordLicenseCleared`             | –                                                                                          | `src/eventing/licensing-customer.pipeline.ts:135` |
+| command         | `recordManagedKeyRetired`          | –                                                                                          | `src/eventing/licensing-customer.pipeline.ts:136` |
+| command         | `recordManagedKeyInvalidated`      | –                                                                                          | `src/eventing/licensing-customer.pipeline.ts:137` |
+| command         | `recordManagedKeyLicenseSet`       | –                                                                                          | `src/eventing/licensing-customer.pipeline.ts:138` |
+| command         | `recordManagedKeyServicesSet`      | –                                                                                          | `src/eventing/licensing-customer.pipeline.ts:139` |
+| command         | `recordConnectUpstreamSet`         | –                                                                                          | `src/eventing/licensing-customer.pipeline.ts:140` |
+| command         | `recordConnectUpstreamCleared`     | –                                                                                          | `src/eventing/licensing-customer.pipeline.ts:141` |
+| command         | `recordConnectCredentialIssued`    | –                                                                                          | `src/eventing/licensing-customer.pipeline.ts:142` |
+| command         | `recordContractTermsChanged`       | –                                                                                          | `src/eventing/licensing-customer.pipeline.ts:143` |
+| peer subscriber | `licensingManagedKeyProvisioned`   | `lw.gateway.managed_key_provisioned` from [gateway](../../../../modules/gateway/README.md) | `src/eventing/licensing-customer.pipeline.ts:145` |
 
 ### Tasks
 
@@ -699,8 +650,8 @@ Run by the tasks process, before serve.
 
 | Kind   | Leaf                     | Environment variable                 | Declared at                              |
 | ------ | ------------------------ | ------------------------------------ | ---------------------------------------- |
-| secret | `instanceLicenseKey`     | `LANGWATCH_LICENSE_KEY`              | `src/app/licensing.app.ts:185`           |
-| secret | `licensePrivateKey`      | `LANGWATCH_LICENSE_PRIVATE_KEY`      | `src/app/licensing.app.ts:186`           |
+| secret | `instanceLicenseKey`     | `LANGWATCH_LICENSE_KEY`              | `src/app/licensing.app.ts:166`           |
+| secret | `licensePrivateKey`      | `LANGWATCH_LICENSE_PRIVATE_KEY`      | `src/app/licensing.app.ts:167`           |
 | config | `publicKey`              | `LANGWATCH_LICENSE_PUBLIC_KEY`       | `../contract/src/licensing.config.ts:45` |
 | config | `connectDisabled`        | `LANGWATCH_CONNECT_DISABLED`         | `../contract/src/licensing.config.ts:52` |
 | config | `connectGatewayEndpoint` | `LANGWATCH_CONNECT_GATEWAY_ENDPOINT` | `../contract/src/licensing.config.ts:53` |

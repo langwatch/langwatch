@@ -5,7 +5,11 @@ import { ProjectInvalidCredentialsError, ProjectMissingCredentialsError } from "
  * all required members are read and refusals answer correctly.
  */
 import type { ResolvedApiKeyCredential } from "@langwatch/api-key-contract";
-import { bindRestMiddleware, canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
+import {
+  bindMiddlewareContext,
+  canonicalErrorResponse,
+  createRestRuntime,
+} from "@langwatch/api/rest";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import type { PlanProvider } from "@langwatch/entitlement-contract";
@@ -13,11 +17,12 @@ import type { ProjectApi } from "@langwatch/project-contract";
 import type { ShareApi } from "@langwatch/share-contract";
 import type { StoredObjectApi } from "@langwatch/stored-object-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { MemoryTraceEvaluationRunsRepository } from "../../repositories/memory/memory.trace-evaluation-runs.repository.ts";
 import type { TraceSpanCostSuggestion } from "../../features/span/services/span-cost-suggestion.service.ts";
+import { MemoryTraceEvaluationRunsRepository } from "../../repositories/memory/memory.trace-evaluation-runs.repository.ts";
 import { TraceViewerProtectionService } from "../../services/trace-viewer-protection.service.ts";
 import type { TraceLegacyRead } from "../../services/trace-viewer.service.ts";
 import type { TraceService as TraceTreeService } from "../../services/trace.service.ts";
@@ -41,6 +46,7 @@ const PROJECT = {
   organizationId: "organization-1",
   isPersonal: false,
   ownerUserId: null,
+  kind: "application",
 };
 
 const LEGACY_PROJECT_KEY: ResolvedApiKeyCredential = {
@@ -117,6 +123,8 @@ function bootTraceApp(options: {
 
   // The project door as the process opens it: absent and unresolvable keys are its refusals.
   const runtime = createRestRuntime({
+    audit: { record: () => {} },
+    authorization: restTestAuthorization(),
     identity: {
       authenticate: ({ request }) => {
         const token = request.headers.get("x-auth-token");
@@ -134,7 +142,7 @@ function bootTraceApp(options: {
   const family = runtime.mount(traceLegacyRest.router(), {
     app: () => app,
     onError: canonicalErrorResponse,
-    facts: [bindRestMiddleware(tracesRestCredential, () => ({ principal: null }))],
+    middlewareContext: [bindMiddlewareContext(tracesRestCredential, () => ({ principal: null }))],
   });
 
   return { family, findById };

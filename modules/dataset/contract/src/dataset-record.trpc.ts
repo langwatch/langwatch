@@ -4,7 +4,7 @@
  * binds a permission and a handler to a name declared here.
  */
 
-import { defineTrpcContract } from "@langwatch/module";
+import { defineTrpcContract, type Named } from "@langwatch/module";
 import { z } from "zod";
 
 import { datasetRecordEditorReadSchema, datasetRecordHeadReadSchema } from "./dataset.responses.ts";
@@ -22,7 +22,12 @@ import {
 } from "./dataset.ts";
 
 /** What a batch delete answers: how many entries it removed. */
-export const datasetRecordsDeletedSchema = z.object({ count: z.number() }).strict();
+const datasetRecordsDeletedSchemaDefinition = z.object({ count: z.number() }).strict();
+export interface DatasetRecordsDeletedSchema extends Named<
+  typeof datasetRecordsDeletedSchemaDefinition
+> {}
+export const datasetRecordsDeletedSchema: DatasetRecordsDeletedSchema =
+  datasetRecordsDeletedSchemaDefinition;
 
 export const datasetRecordTrpc = defineTrpcContract("datasetRecord")
   /** New entries appended to a dataset. */

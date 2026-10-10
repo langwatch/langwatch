@@ -7,7 +7,7 @@
 
 import type { ModuleApiMap, RouterFromMap } from "@langwatch/api/web";
 import type { UiAuthClient } from "@langwatch/auth-contract";
-import { useUiCapabilities } from "@langwatch/browser-host/capabilities";
+import { useUiHostServices } from "@langwatch/browser-host/capabilities";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { createUiFeatureShell } from "@langwatch/browser/feature-shell";
 import type { UiFeatureApiTransport } from "@langwatch/browser/transport";
@@ -20,9 +20,9 @@ import { observable } from "@trpc/server/observable";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { loadUiRootCapabilities } from "../ui-root-capabilities";
+import { loadUiRootHostServices } from "../ui-root-host-services";
 
-const root = await loadUiRootCapabilities();
+const root = await loadUiRootHostServices();
 
 const JANE = "user-jane";
 const JOHN = "user-john";
@@ -40,7 +40,7 @@ const ACME: readonly UiScopeOrganization[] = [
   { id: "org-acme", slug: "acme", members: [{ role: "ADMIN" }], teams: [SHARED_TEAM] },
 ];
 
-/** The deployment's grants procedure, as the session capability asks it. */
+/** The deployment's grants procedure, as the session host service asks it. */
 const PERMISSIONS_PROCEDURE = "authz.effectivePermissions";
 
 /** Who the session endpoint says is signed in, until the test says otherwise. */
@@ -126,14 +126,14 @@ function mountShell({
       });
       return {
         session,
-        scope: root.scope.createBrowserUiScope({ reading: scopeReading, session }),
+        scope: root.scope.createBrowserUiScope({ reading: scopeReading }),
       };
     },
   });
 
   function Probe() {
-    const { session } = useUiCapabilities();
-    const { project, organization, hasPermission } = useOrganizationTeamProject();
+    const { session } = useUiHostServices();
+    const { project, organization } = useOrganizationTeamProject();
     const userId = session.currentUser()?.id;
     const can = session.hasPermission("annotations:update");
     return (
@@ -142,7 +142,6 @@ function mountShell({
         <span data-testid="project">{project?.id ?? "none"}</span>
         <span data-testid="organization">{organization?.id ?? "none"}</span>
         <span data-testid="can">{String(can)}</span>
-        <span data-testid="legacy-can">{String(hasPermission("annotations:update"))}</span>
       </div>
     );
   }
@@ -196,7 +195,6 @@ describe("given the first user has resolved an organization and project grants",
       await waitFor(() => expect(view.getByTestId("project").textContent).toBe("none"));
       expect(view.getByTestId("organization").textContent).toBe("none");
       expect(view.getByTestId("can").textContent).toBe("false");
-      expect(view.getByTestId("legacy-can").textContent).toBe("false");
     });
   });
 });

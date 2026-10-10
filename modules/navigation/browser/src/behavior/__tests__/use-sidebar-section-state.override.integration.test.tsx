@@ -5,7 +5,7 @@
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { sidebarCapability } from "../sidebar-capability.ts";
+import { sidebarHostService } from "../sidebar-host-service.ts";
 import {
   getSidebarSectionStorageKey,
   useSidebarSectionState,
@@ -17,7 +17,7 @@ const hook = () =>
 describe("sidebar section override", () => {
   beforeEach(() => {
     window.localStorage.clear();
-    sidebarCapability.restoreAll();
+    sidebarHostService.restoreAll();
   });
 
   describe("given the user had the group expanded", () => {
@@ -27,13 +27,13 @@ describe("sidebar section override", () => {
       const { result } = hook();
       expect(result.current.isExpanded).toBe(true);
 
-      act(() => sidebarCapability.collapseGroup("library"));
+      act(() => sidebarHostService.collapseGroup("library"));
       expect(result.current.isExpanded).toBe(false);
 
-      act(() => sidebarCapability.expandGroup("library"));
+      act(() => sidebarHostService.expandGroup("library"));
       expect(result.current.isExpanded).toBe(true);
 
-      act(() => sidebarCapability.restoreAll());
+      act(() => sidebarHostService.restoreAll());
       expect(result.current.isExpanded).toBe(true);
       expect(window.localStorage.getItem(getSidebarSectionStorageKey("library"))).toBe("true");
     });
@@ -45,10 +45,10 @@ describe("sidebar section override", () => {
       const { result } = hook();
       expect(result.current.isExpanded).toBe(false);
 
-      act(() => sidebarCapability.expandGroup("library"));
+      act(() => sidebarHostService.expandGroup("library"));
       expect(result.current.isExpanded).toBe(true);
 
-      act(() => sidebarCapability.restoreAll());
+      act(() => sidebarHostService.restoreAll());
       expect(result.current.isExpanded).toBe(false);
       expect(window.localStorage.getItem(getSidebarSectionStorageKey("library"))).toBeNull();
     });

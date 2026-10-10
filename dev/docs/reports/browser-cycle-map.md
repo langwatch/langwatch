@@ -295,7 +295,7 @@ separate programme and should be budgeted as one.
   the best found and was reached from many independent starts; it is not proven optimal, but a
   smaller cut is unlikely.
 - Costs via `tsc -p <project> --incremental false --extendedDiagnostics`, wall time and RSS via
-  `/usr/bin/time -l`, serialised through `haven slot run`.
+  `/usr/bin/time -l`, serialised through `haven machine slot run`.
 - **Caveat:** the machine was shared and loaded throughout (load average 20–90 on 10 cores).
   Instantiation and type counts are deterministic and are what the conclusions rest on; wall
   times vary up to 2x between repeats and are reported only where the comparison is like-for-like.

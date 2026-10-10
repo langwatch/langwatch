@@ -86,16 +86,16 @@ describe("given the Instant Evals REST family", () => {
       expect(
         declaration.routes.map((route) => ({
           operation: route.operation,
-          facts: (route.middleware ?? []).map((middleware) => middleware.name),
+          middlewareContext: (route.middleware ?? []).map((middleware) => middleware.name),
         })),
       ).toEqual([
-        { operation: "createInstantEvalRun", facts: ["instantEvalRestCredential"] },
-        { operation: "estimateInstantEvalRun", facts: ["instantEvalRestCredential"] },
-        { operation: "listInstantEvalRuns", facts: [] },
-        { operation: "getInstantEvalRun", facts: [] },
-        { operation: "cancelInstantEvalRun", facts: [] },
-        { operation: "listInstantEvalRunResults", facts: [] },
-        { operation: "sampleInstantEvalRun", facts: ["instantEvalRestCredential"] },
+        { operation: "createInstantEvalRun", middlewareContext: ["instantEvalRestCredential"] },
+        { operation: "estimateInstantEvalRun", middlewareContext: ["instantEvalRestCredential"] },
+        { operation: "listInstantEvalRuns", middlewareContext: [] },
+        { operation: "getInstantEvalRun", middlewareContext: [] },
+        { operation: "cancelInstantEvalRun", middlewareContext: [] },
+        { operation: "listInstantEvalRunResults", middlewareContext: [] },
+        { operation: "sampleInstantEvalRun", middlewareContext: ["instantEvalRestCredential"] },
       ]);
     });
   });

@@ -2,7 +2,12 @@ import { randomBytes } from "node:crypto";
 // SPDX-License-Identifier: Apache-2.0
 
 import { createLogger } from "@langwatch/observability";
-import type { Prisma, PrismaClient, WebhookEndpoint } from "@langwatch/prisma-client/generated";
+import { skipTenantCheck } from "@langwatch/prisma-client";
+import {
+  Prisma,
+  type PrismaClient,
+  type WebhookEndpoint,
+} from "@langwatch/prisma-client/generated";
 import { prismaTables } from "@langwatch/prisma-client/ownership";
 import { fromDate, nowInstant, toDate, type Instant } from "@langwatch/time";
 import {
@@ -186,8 +191,10 @@ export class PrismaWebhookEndpointRepository implements WebhookEndpointRepositor
     maxBatchSize?: number;
     maxBatchDelayMs?: number;
     maxInFlight?: number;
+    allowSelfSignedCertificate?: boolean;
     signatureScheme?: WebhookSignatureScheme;
     sharedSecret?: string;
+    idempotencyKey?: string;
   }): Promise<{ endpoint: WebhookEndpointView; secret: string }> {
     const destinationKind = params.destinationKind ?? "http";
     const destination = PrismaWebhookEndpointRepository.storedDestination(
@@ -212,14 +219,34 @@ export class PrismaWebhookEndpointRepository implements WebhookEndpointRepositor
     if (params.maxInFlight !== undefined) {
       data.maxInFlight = params.maxInFlight;
     }
+    if (params.allowSelfSignedCertificate !== undefined) {
+      data.allowSelfSignedCertificate = params.allowSelfSignedCertificate;
+    }
     if (params.signatureScheme !== undefined) {
       data.signatureScheme = params.signatureScheme;
       data.maxBatchSize = 1;
     }
-    const endpoint = await this.prisma.webhookEndpoint.create({
-      data,
-    });
-    return { endpoint: PrismaWebhookEndpointRepository.toView(endpoint), secret };
+    if (params.idempotencyKey !== undefined) {
+      data.idempotencyKey = params.idempotencyKey;
+    }
+    try {
+      const endpoint = await this.prisma.webhookEndpoint.create({ data });
+      return { endpoint: PrismaWebhookEndpointRepository.toView(endpoint), secret };
+    } catch (error) {
+      const repeated =
+        params.idempotencyKey !== undefined &&
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2002";
+      if (!repeated) throw error;
+      // The unique (organizationId, idempotencyKey) index chose a winner: answer it.
+      const winner = await this.prisma.webhookEndpoint.findFirstOrThrow({
+        where: { organizationId: params.organizationId, idempotencyKey: params.idempotencyKey },
+      });
+      return {
+        endpoint: PrismaWebhookEndpointRepository.toView(winner),
+        secret: this.deps.secrets.decrypt(winner.secretEncrypted),
+      };
+    }
   }
 
   async findAll(params: { organizationId: string }): Promise<WebhookEndpointView[]> {
@@ -250,6 +277,7 @@ export class PrismaWebhookEndpointRepository implements WebhookEndpointRepositor
     maxBatchSize?: number;
     maxBatchDelayMs?: number;
     maxInFlight?: number;
+    allowSelfSignedCertificate?: boolean;
   }): Promise<WebhookEndpointView> {
     const endpoint = await this.getEndpoint(params);
     const sqsUpdate =
@@ -277,6 +305,9 @@ export class PrismaWebhookEndpointRepository implements WebhookEndpointRepositor
     }
     if (params.maxInFlight !== undefined) {
       data.maxInFlight = params.maxInFlight;
+    }
+    if (params.allowSelfSignedCertificate !== undefined) {
+      data.allowSelfSignedCertificate = params.allowSelfSignedCertificate;
     }
     const updated = await this.prisma.webhookEndpoint.update({
       where: { id: endpoint.id },
@@ -362,7 +393,7 @@ export class PrismaWebhookEndpointRepository implements WebhookEndpointRepositor
     const endpoint = await this.getEndpoint(params);
     await this.prisma.webhookEndpoint.update({
       where: { id: endpoint.id },
-      data: { archivedAt: new Date(), status: "DISABLED" },
+      data: { archivedAt: new Date(), status: "DISABLED", idempotencyKey: null },
     });
   }
 
@@ -427,6 +458,7 @@ export class PrismaWebhookEndpointRepository implements WebhookEndpointRepositor
     return httpDestinationConfig({
       url: endpoint.url ?? "",
       signatureScheme: endpoint.signatureScheme,
+      allowSelfSignedCertificate: endpoint.allowSelfSignedCertificate,
     });
   }
 
@@ -557,7 +589,10 @@ export class PrismaWebhookEndpointRepository implements WebhookEndpointRepositor
       FROM "WebhookEndpoint"
       WHERE "status" = 'ACTIVE'::"WebhookEndpointStatus"
         AND "archivedAt" IS NULL
-      -- @tenancy: webhook delivery sweep entry point (system-owned worker)
+      ${skipTenantCheck({
+        // Webhook delivery sweep entry point (system-owned worker)
+        SKIP_TENANT_CHECK: true,
+      })}
     `;
     return rows.map((r) => r.organizationId);
   }
@@ -884,6 +919,7 @@ export class PrismaWebhookEndpointRepository implements WebhookEndpointRepositor
       maxBatchSize: endpoint.maxBatchSize,
       maxBatchDelayMs: endpoint.maxBatchDelayMs,
       maxInFlight: endpoint.maxInFlight,
+      allowSelfSignedCertificate: endpoint.allowSelfSignedCertificate,
       createdAt: endpoint.createdAt,
       updatedAt: endpoint.updatedAt,
     };

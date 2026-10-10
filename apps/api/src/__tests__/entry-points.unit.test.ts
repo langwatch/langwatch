@@ -1,6 +1,6 @@
 /**
- * Every entry point runs the one preparation script (`pnpm task upgrade`) once
- * before anything serves, read from the files that define them.
+ * No entry point migrates before serving: the worker runs `pnpm task upgrade`; only
+ * the serialised Helm Job and the local launchers run the preparation script.
  * Spec: specs/upgrade/entry-points.feature.
  */
 import { readFileSync } from "node:fs";
@@ -46,44 +46,86 @@ describe("the entry points", () => {
   });
 
   describe("given the chart's pre-roll Job", () => {
-    /** @scenario "The Helm pre-roll Job runs the upgrade on the new image" */
-    it("runs the preparation script as a pre-upgrade hook only", () => {
+    /** @scenario "The Helm pre-roll Job renders only when upgrades are serialised" */
+    it("renders only with serializeUpgrades active, as a pre-upgrade hook running the preparation script", () => {
       const job = readFromRoot("charts/langwatch/templates/app/migrate-pre-roll-job.yaml");
       const lines = uncommented(job.replace(/\{\{\/\*[\s\S]*?\*\/\}\}/g, ""));
 
+      expect(lines).toContain(
+        '{{- if and $preRoll (eq (include "langwatch.storedObjects.serializeUpgradesActive" .) "true") }}',
+      );
       expect(lines).toContain("    helm.sh/hook: pre-upgrade");
       expect(lines).toContain(`          args: ["-s", "run", "${PREPARE}"]`);
       expect(lines).toContain("          workingDir: /app/apps/api");
       expect(lines.filter((line) => /pre-install|pre-rollback/.test(line))).toEqual([]);
     });
+
+    /** @scenario "A Helm upgrade without serialised upgrades renders no pre-roll Job; the new workers run the upgrade" */
+    it("treats serialised upgrades as off when the knob is off or a dataplane is configured", () => {
+      const helpers = uncommented(readFromRoot("charts/langwatch/templates/_helpers.tpl"));
+
+      expect(helpers).toContain(
+        "{{- if and .Values.app.storedObjects.localFilesystem.enabled (not .Values.app.dataplane.enabled) -}}",
+      );
+      expect(helpers).toContain(
+        '{{- if and (eq (include "langwatch.storedObjects.localFilesystemIsActive" .) "true") .Values.workers.enabled .Values.app.storedObjects.localFilesystem.serializeUpgrades -}}',
+      );
+    });
+  });
+
+  describe("given the chart without workers", () => {
+    /** @scenario "A release without workers runs the worker as a sidecar in the app pods" */
+    it("adds the worker container to the app pod and takes the longer grace period", () => {
+      const helpers = readFromRoot("charts/langwatch/templates/_helpers.tpl");
+      const container = helpers.slice(
+        helpers.indexOf('{{- define "langwatch.workersContainer" -}}'),
+      );
+      const app = readFromRoot("charts/langwatch/templates/app/deployment.yaml");
+
+      expect(container).toMatch(
+        /^\{\{- define "langwatch\.workersContainer" -\}\}\n- name: \{\{ \.Release\.Name \}\}-workers\n[^]*?workingDir: \/app\/apps\/worker\n {2}command: \['pnpm'\]\n {2}args: \['run', 'start'\]/,
+      );
+      expect(app).toContain(
+        '{{- if not .Values.workers.enabled }}\n        {{- include "langwatch.workersContainer" . | nindent 8 }}',
+      );
+      expect(app).toContain(
+        '{{- $grace = max $grace (int (include "langwatch.terminationGracePeriod" (dict "component" .Values.workers "name" "workers"))) }}',
+      );
+      expect(helpers).not.toContain("workersRequiredGuard");
+    });
   });
 
   describe("given the self-hosted compose file", () => {
-    /** @scenario "The compose stack runs a one-shot migrate service the app and workers wait for" */
-    it("runs a migrate service the app and the workers wait on", () => {
+    /** @scenario "The compose stack has no migrate service; the app and workers wait only for their stores" */
+    it("has no migrate service, and the app and the workers depend only on their stores", () => {
       const text = readFromRoot("infra/compose.yml");
-      const migrate = composeService({ text, name: "migrate" });
 
-      expect(migrate).toContain(`command: ["pnpm", "--silent", "run", "${PREPARE}"]`);
-      expect(migrate).toContain("working_dir: /app/apps/api");
-      expect(migrate).toContain('restart: "no"');
+      expect(text).not.toContain(PREPARE);
+      expect(text).not.toMatch(/^ {2}migrate:$/m);
       for (const name of ["app", "workers"]) {
         const service = composeService({ text, name });
-        expect(service).toMatch(/migrate:\n\s+condition: service_completed_successfully/);
+        const dependsOn = service.slice(service.indexOf("depends_on:"));
+        const dependencies = [...dependsOn.matchAll(/^ {6}(\S+):$/gm)].map((match) => match[1]);
+        expect(dependencies).toEqual(["postgres", "redis", "clickhouse"]);
         expect(service).not.toMatch(OLD_TASKS);
       }
     });
   });
 
   describe("given the npx server", () => {
-    /** @scenario "The npx server runs the upgrade once before its services" */
-    it("runs upgrade, then the system-migrations pass, and no migration task of its own", () => {
-      const code = uncommented(readFromRoot("apps/server/src/services/migrate.ts")).join("\n");
+    /** @scenario "The npx server starts its services with no migration phase" */
+    it("starts the api and the worker with no migration phase, and lets the worker upgrade", () => {
+      const runtime = uncommented(readFromRoot("apps/server/src/services/runtime.ts")).join("\n");
+      const workers = uncommented(
+        readFromRoot("apps/server/src/services/langwatch-workers.ts"),
+      ).join("\n");
 
-      expect(code).toMatch(
-        /\["migrate:upgrade", "upgrade"\],\s+\["migrate:system-migrations", "system-migrations-pass"\]/,
+      expect(runtime).not.toMatch(/runMigrations|migrate\.ts|task upgrade/);
+      expect(runtime).toMatch(/startLangwatch\(/);
+      expect(runtime).toMatch(/startLangwatchWorkers\(/);
+      expect(workers).not.toMatch(
+        /SKIP_PRISMA_MIGRATE|SKIP_CLICKHOUSE_MIGRATE|SKIP_LWQL_PROVISION/,
       );
-      expect(code).not.toMatch(OLD_TASKS);
     });
   });
 

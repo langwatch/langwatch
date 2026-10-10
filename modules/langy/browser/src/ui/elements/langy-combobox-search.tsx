@@ -26,7 +26,7 @@ export function LangyComboboxSearch({ placeholder }: { placeholder: string }) {
         color="fg.subtle"
         transition="background 130ms ease, border-color 130ms ease, box-shadow 130ms ease"
         _focusWithin={{
-          background: "bg.surface/86",
+          background: "bg.card/86",
           borderColor: "border.emphasized",
           boxShadow: "0 0 0 2px var(--chakra-colors-bg-muted)",
           color: "fg.muted",

@@ -6,6 +6,7 @@ import {
 import { generate } from "@langwatch/ksuid";
 import { PrismaDriverAdapterService } from "@langwatch/prisma-client";
 import { PrismaClient } from "@langwatch/prisma-client/generated";
+import { mintTestAuthorization } from "@langwatch/test-harness/trpc-members";
 /**
  * The worker records a span with the content its organization's privacy rule drops already gone.
  * The worker booted wholly live over the test Postgres, Redis and ClickHouse (§7); spans go in
@@ -119,7 +120,13 @@ async function recordedSpanKeys(
   const traces = application.service(TraceApi);
   await traces.recordSpan(data);
 
-  const stored = () => traces.findNormalizedSpansByTraceId({ tenantId: projectId, traceId });
+  const authorization = await mintTestAuthorization({
+    actor: { type: "internal", codePath: "worker-trace-content-drop.test" },
+    permission: "traces:view",
+    projectId,
+    purpose: { kind: "operator", entry: "worker-trace-content-drop.test" },
+  });
+  const stored = () => traces.findNormalizedSpansByTraceId({ authorization, traceId });
   await expect.poll(async () => (await stored()).length, { timeout: 60_000 }).toBe(1);
   const [span] = await stored();
   return Object.keys(span?.spanAttributes ?? {});

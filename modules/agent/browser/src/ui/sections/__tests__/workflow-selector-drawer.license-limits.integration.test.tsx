@@ -62,7 +62,6 @@ vi.mock("../workflow/optimization_studio/properties/modals/emoji-picker-modal.ts
   EmojiPickerModal: () => null,
 }));
 
-vi.mock("../workflow/code/render-code.tsx", () => ({ RenderCode: () => null }));
 vi.mock("../../elements/workflow/code/workflow-code-editor.tsx", () => ({
   WorkflowCodeEditorModal: () => null,
 }));
@@ -111,6 +110,8 @@ beforeEach(() => {
   toasts.length = 0;
   setUiFeedbackHost({
     succeeded: () => undefined,
+    warned: () => undefined,
+    informed: () => undefined,
     failed: (failure) => void toasts.push(failure.fallbackTitle ?? ""),
   });
   calls.createWorkflow.mockResolvedValue({ workflow: { id: "workflow_new" } });

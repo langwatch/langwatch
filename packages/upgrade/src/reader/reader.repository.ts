@@ -43,6 +43,7 @@ const stepRowSchema = z.object({
   updated_at: instant,
   owner: nullable(z.string()),
   description: nullable(z.string()),
+  finish_by: nullable(z.string()),
 });
 export type LedgerStepRow = z.infer<typeof stepRowSchema>;
 
@@ -78,6 +79,24 @@ const targetRowSchema = z.object({
 });
 export type LedgerTargetRow = z.infer<typeof targetRowSchema>;
 
+const runFactSchema = z.object({
+  kind: z.string(),
+  outcome: nullable(z.string()),
+  release: nullable(z.string()),
+  floor: nullable(z.string()),
+  started_at: z.date(),
+  plan: jsonObject,
+});
+export type LedgerRunFact = z.infer<typeof runFactSchema>;
+
+const targetSummaryRowSchema = z.object({
+  target: z.string(),
+  version: nullable(z.string()),
+  outstanding: z.number().int(),
+  last_error: nullable(z.string()),
+});
+export type LedgerTargetSummaryRow = z.infer<typeof targetSummaryRowSchema>;
+
 const leaseRowSchema = z.object({
   name: nullable(z.string()),
   owner: nullable(z.string()),
@@ -89,11 +108,21 @@ const leaseRowSchema = z.object({
 });
 export type LedgerLeaseRow = z.infer<typeof leaseRowSchema>;
 
+const rosterRowSchema = z.object({
+  role: z.string(),
+  image: z.string(),
+  release: nullable(z.string()),
+  steps: z.array(z.string()),
+  heartbeat_at: instant,
+});
+export type LedgerRosterRow = z.infer<typeof rosterRowSchema>;
+
 export interface LedgerTables {
   step: boolean;
   run: boolean;
   lease: boolean;
   target: boolean;
+  roster: boolean;
 }
 
 const jsonRows = z.array(z.object({ row: z.unknown() }));
@@ -131,7 +160,8 @@ export class UpgradeReaderRepository {
       (t) => `SELECT to_regclass('${t.step}') IS NOT NULL AS "step",
               to_regclass('${t.run}') IS NOT NULL AS "run",
               to_regclass('${t.lease}') IS NOT NULL AS "lease",
-              to_regclass('${t.target}') IS NOT NULL AS "target"`,
+              to_regclass('${t.target}') IS NOT NULL AS "target",
+              to_regclass('${t.roster}') IS NOT NULL AS "roster"`,
     );
     const row = rows[0];
     return {
@@ -139,6 +169,7 @@ export class UpgradeReaderRepository {
       run: row?.run ?? false,
       lease: row?.lease ?? false,
       target: row?.target ?? false,
+      roster: row?.roster ?? false,
     };
   }
 
@@ -216,6 +247,25 @@ export class UpgradeReaderRepository {
     return rows.map((row) => leaseRowSchema.parse(row));
   }
 
+  /** Serving processes that heartbeated within `staleAfterMs` of the database clock. */
+  async findLiveRoster({
+    tables,
+    staleAfterMs,
+  }: {
+    tables: LedgerTables;
+    staleAfterMs: number;
+  }): Promise<LedgerRosterRow[]> {
+    if (!tables.roster) return [];
+    const rows = await this.queryRows({
+      text: (t) => `SELECT to_jsonb(entry) AS "row" FROM ${t.roster} entry
+              WHERE entry."heartbeat_at" >= (now() AT TIME ZONE 'UTC')
+                    - ($1::double precision * interval '1 millisecond')
+              ORDER BY entry."process_id"`,
+      values: [staleAfterMs],
+    });
+    return rows.map((row) => rosterRowSchema.parse(row));
+  }
+
   async findLatestRun({ tables }: { tables: LedgerTables }): Promise<LedgerRunRow | null> {
     if (!tables.run) return null;
     const rows = await this.queryRows({
@@ -226,12 +276,13 @@ export class UpgradeReaderRepository {
     return row === undefined ? null : runRowSchema.parse(row);
   }
 
-  /** The newest run that succeeded and recorded a release: where the installation stands. */
+  /** The newest succeeded run that recorded a release, or an upgrade by an unreleased image. */
   async findLatestSucceededRun({ tables }: { tables: LedgerTables }): Promise<LedgerRunRow | null> {
     if (!tables.run) return null;
     const rows = await this.queryRows({
       text: (t) => `SELECT to_jsonb(run) - 'plan' - 'report' AS "row" FROM ${t.run} run
-              WHERE run."outcome" = 'succeeded' AND run."release" IS NOT NULL
+              WHERE run."outcome" = 'succeeded'
+                AND (run."release" IS NOT NULL OR run."kind" = 'upgrade')
               ORDER BY run."started_at" DESC, run."id" DESC LIMIT 1`,
     });
     const row = rows[0];
@@ -284,6 +335,36 @@ export class UpgradeReaderRepository {
       values: [after?.startedAt ?? null, after?.id ?? null, limit],
     });
     return rows.map((row) => runRowSchema.parse(row));
+  }
+
+  /** What planning reads of every run; one row per upgrade, so few. pg hands back the Date. */
+  async findRunFacts({ tables }: { tables: LedgerTables }): Promise<LedgerRunFact[]> {
+    if (!tables.run) return [];
+    const { rows } = await this.query<object>(
+      (t) => `SELECT run."kind", run."outcome", run."release",
+          to_jsonb(run) ->> 'floor' AS "floor", to_jsonb(run) -> 'plan' AS "plan",
+          run."started_at" FROM ${t.run} run`,
+    );
+    return rows.map((row) => runFactSchema.parse(row));
+  }
+
+  /** Per target: the latest done version, steps not yet done, and the latest failure's error. */
+  async findTargetSummaries({
+    tables,
+  }: {
+    tables: LedgerTables;
+  }): Promise<LedgerTargetSummaryRow[]> {
+    if (!tables.target) return [];
+    const { rows } = await this.query<object>(
+      (t) => `SELECT entry."target" AS "target",
+          (array_agg(entry."version" ORDER BY entry."updated_at" DESC)
+            FILTER (WHERE entry."status" = 'done'))[1] AS "version",
+          count(*) FILTER (WHERE entry."status" <> 'done')::int AS "outstanding",
+          (array_agg(entry."last_error" ORDER BY entry."updated_at" DESC)
+            FILTER (WHERE entry."status" = 'failed'))[1] AS "last_error"
+        FROM ${t.target} entry GROUP BY entry."target" ORDER BY entry."target"`,
+    );
+    return rows.map((row) => targetSummaryRowSchema.parse(row));
   }
 
   async findRunById({ tables, id }: { tables: LedgerTables; id: string }): Promise<LedgerRunRow[]> {

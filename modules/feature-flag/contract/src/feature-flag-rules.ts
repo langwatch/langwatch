@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { toEpochMs, type Instant } from "@langwatch/time";
 import { z } from "zod";
 
@@ -45,18 +46,22 @@ const featureFlagRuleMatchSchema = z
   // condition never silently matches everything.
   .passthrough();
 
-export const featureFlagRuleSchema = z.object({
+const featureFlagRuleSchemaDefinition = z.object({
   match: featureFlagRuleMatchSchema,
   enabled: z.boolean(),
 });
+export interface FeatureFlagRuleSchema extends Named<typeof featureFlagRuleSchemaDefinition> {}
+export const featureFlagRuleSchema: FeatureFlagRuleSchema = featureFlagRuleSchemaDefinition;
 
-export const featureFlagRulesSchema = z.array(featureFlagRuleSchema);
+const featureFlagRulesSchemaDefinition = z.array(featureFlagRuleSchema);
+export interface FeatureFlagRulesSchema extends Named<typeof featureFlagRulesSchemaDefinition> {}
+export const featureFlagRulesSchema: FeatureFlagRulesSchema = featureFlagRulesSchemaDefinition;
 
 /**
  * Rules operators can write; narrower set than what we read to prevent dead
  * rules (blank/padded ids or unparseable dates).
  */
-export const featureFlagRulesWriteSchema = featureFlagRulesSchema
+const featureFlagRulesWriteSchemaDefinition = featureFlagRulesSchema
   .max(50)
   .refine(
     (rules) =>
@@ -104,6 +109,11 @@ export const featureFlagRulesWriteSchema = featureFlagRulesSchema
       message: "An email domain rule needs one or more lowercase domains without the @",
     },
   );
+export interface FeatureFlagRulesWriteSchema extends Named<
+  typeof featureFlagRulesWriteSchemaDefinition
+> {}
+export const featureFlagRulesWriteSchema: FeatureFlagRulesWriteSchema =
+  featureFlagRulesWriteSchemaDefinition;
 
 /** The domains an `emailDomain` condition names, one or several, as a list. */
 export function emailDomainsOf(emailDomain: string | string[] | undefined): string[] {

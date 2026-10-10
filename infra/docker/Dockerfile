@@ -21,7 +21,21 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
     --mount=type=cache,target=/go/pkg/mod \
     CGO_ENABLED=0 go build -o /out/devscripts ./cmd/devscripts
 
-# ── Stage 1: build ──────────────────────────────────────────────────
+# ── Stage 1: workspace manifests ───────────────────────────────────
+# Every member's package.json and nothing else. This stage re-runs on any
+# source edit, but its output changes only when a manifest does, so the
+# install layer below stays cached across source-only commits.
+FROM node:24-alpine AS manifests
+WORKDIR /src
+COPY mcp/typescript ./mcp/typescript
+COPY packages ./packages
+COPY modules ./modules
+COPY enterprise ./enterprise
+COPY skills ./skills
+COPY sdks/typescript ./sdks/typescript
+RUN find . ! -type d ! -name package.json -delete && find . -depth -type d -empty -delete
+
+# ── Stage 2: build ──────────────────────────────────────────────────
 FROM node:24-alpine AS builder
 RUN apk --no-cache add curl python3 make gcc g++ openssl bash
 RUN npm install -g pnpm@12.6.0
@@ -44,12 +58,41 @@ RUN ARCH=$(uname -m) && \
   mv /tmp/goose /usr/local/bin/goose && \
   chmod +x /usr/local/bin/goose
 
+
 WORKDIR /app
 
-# mcp/typescript is a workspace member — copy it early so pnpm install can
-# link it. `@langwatch/hosted-mcp-process` depends on it, so its build runs as
-# part of the API's dependency build below.
+# The pnpm store sits in a BuildKit cache mount at this path on every install,
+# so a lockfile change downloads only what is new. A fresh CI runner starts
+# with the mount empty; there the cached install layer is what saves the work.
+ENV pnpm_config_store_dir=/root/.local/share/pnpm/store
+
+# Install inputs only (ADR-076: one workspace, installed from /app). Nothing
+# here may change on a source-only edit, or the install below re-runs.
+COPY pnpm-workspace.yaml pnpm-lock.yaml package.json .npmrc ./
+# patchedDependencies reads patches/; the lockfile resolves @langwatch/scenario to vendor/.
+COPY patches ./patches
+COPY vendor ./vendor
+COPY --from=manifests /src/ ./
+# Manifest-only members: `--frozen-lockfile` and `pnpm prune` need them, never their source.
+COPY dev/tests/agentic-e2e/package.json ./dev/tests/agentic-e2e/
+COPY dev/tests/e2e-stack/package.json ./dev/tests/e2e-stack/
+COPY tools/seedgen/runner/package.json ./tools/seedgen/runner/
+COPY apps/worker/package.json ./apps/worker/package.json
+COPY apps/api/package.json ./apps/api/package.json
+COPY apps/ui/package.json ./apps/ui/package.json
+COPY apps/tasks/package.json ./apps/tasks/package.json
+COPY apps/scenario-child/package.json ./apps/scenario-child/package.json
+# Four filters: the four applications are four dependency subtrees and none is
+# a subset of another. apps/server and the SDK's e2e suites stay out. No
+# workspace member has an install lifecycle script, so no source is needed yet.
+RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
+    CI=true pnpm install --frozen-lockfile --filter "@langwatch/platform-api..." --filter "@langwatch/worker..." --filter "@langwatch/ui..." --filter "@langwatch/tasks..."
+
+# Source, after the install. The app imports the SDK and mcp/typescript as
+# workspace copies and builds them; the SDK's prebuild (copy-types.sh) reads
+# packages/, the langevals catalogue, feature-map.json and skills/.
 COPY mcp/typescript ./mcp/typescript
+COPY sdks/typescript ./sdks/typescript
 COPY services/langevals/ts-integration/evaluators.generated.ts ./services/langevals/ts-integration/evaluators.generated.ts
 COPY packages ./packages
 COPY modules ./modules
@@ -57,70 +100,8 @@ COPY enterprise ./enterprise
 COPY skills ./skills
 COPY infra/docker/Dockerfile.langyagent ./infra/docker/Dockerfile.langyagent
 COPY feature-map.json ./feature-map.json
-
-# Since ADR-076 the repo is a SINGLE pnpm workspace: the lockfile, the
-# workspace definition and the hoist settings all live at the root, and the
-# three deployable applications — apps/api, apps/worker and apps/ui — are three
-# of its members. The install runs from /app and is narrowed with a filter so
-# the TypeScript SDK's e2e suites, the skills compiler and apps/server (the npx
-# self-host CLI, which is published separately) never enter the image.
-COPY pnpm-workspace.yaml pnpm-lock.yaml package.json .npmrc ./
-# The lockfile resolves @langwatch/scenario to a vendored tarball.
 # Every package tsconfig extends the root ones, and build:types builds tsconfig.build.json.
 COPY tsconfig.base.json tsconfig.shared.json tsconfig.build.json tsconfig.emit.json ./
-COPY vendor ./vendor
-# Every workspace member's manifest must be present or `--frozen-lockfile`
-# has nothing to check the lockfile against. This one carries no source into
-# the image — only the manifest the workspace needs to stay coherent.
-COPY dev/tests/agentic-e2e/package.json ./dev/tests/agentic-e2e/
-# agentic-e2e depends on @langwatch/e2e-stack (workspace:*), so `pnpm prune`
-# needs that manifest too.
-COPY dev/tests/e2e-stack/package.json ./dev/tests/e2e-stack/
-# The SDK, in full, because the app declares `langwatch: workspace:*` and so
-# imports THIS copy rather than a published release. Manifest-only was enough
-# while the app resolved the registry tarball; now the app's bundle cannot be
-# built without the SDK's own build output.
-COPY sdks/typescript ./sdks/typescript
-# The SDK's `pnpm run generate` (its `prebuild`) runs copy-types.sh, which
-# GENERATES the SDK's types from first-party source. Every input it still reads
-# is already in the image at this point: the trace, evaluator and
-# model-provider contracts and packages/redaction arrive with `COPY packages`
-# above, the langevals catalogue and feature-map.json with their own lines, and
-# the skills bundle with `COPY skills`. The REST client is committed source
-# (src/internal/generated/openapi/api-client.ts), so the build reads no OpenAPI
-# document.
-#
-# The four monolith source files that used to be copied here are gone from the
-# tree, and so are the two generators that read them — their output was imported
-# by nothing in the SDK. See copy-types.sh.
-# The `packages/*` workspace members (e.g. @langwatch/observability, @langwatch/api)
-# are consumed as source, so pnpm install must see their package.json to link them
-# and install their own dependencies (pino, pino-pretty, ...) into
-# packages/*/node_modules. Without this the app bundle build fails to resolve those
-# deps (e.g. "Rolldown failed to resolve import 'pino'"). Same reason mcp/typescript
-# is copied early above — and why `COPY packages` above brings the whole tree, now
-# that all nine members live there. node_modules is dockerignored, so only source
-# is copied here.
-#
-# The three applications are copied manifest-first for the same reason
-# (https://stackoverflow.com/questions/70154568/pnpm-equivalent-command-for-npm-ci):
-# the install layer must not be invalidated by a source edit.
-COPY apps/worker/package.json ./apps/worker/package.json
-# The interactive API process. It also owns the OpenAPI document generator; the
-# goose runner and TTL reconciler moved to packages/clickhouse-migrations, and
-# the rest (Prisma, LangWatchQL) moved to apps/tasks.
-COPY apps/api/package.json ./apps/api/package.json
-# The browser bundle. `@langwatch/ui` is a Vite build rather than a process:
-# it emits dist/client, which the API process serves.
-COPY apps/ui/package.json ./apps/ui/package.json
-# The boot-chain task runner: prisma-migrate, clickhouse-migrate,
-# lwql-provision, and every other feature-owned task.
-COPY apps/tasks/package.json ./apps/tasks/package.json
-# The scenario child program, a workspace dependency of the api and the worker.
-COPY apps/scenario-child/package.json ./apps/scenario-child/package.json
-# Four filters, because the four applications are four dependency subtrees
-# and none is a subset of the others.
-RUN CI=true pnpm install --frozen-lockfile --filter "@langwatch/platform-api..." --filter "@langwatch/worker..." --filter "@langwatch/ui..." --filter "@langwatch/tasks..."
 COPY apps/worker ./apps/worker
 COPY apps/api ./apps/api
 COPY apps/ui ./apps/ui
@@ -147,6 +128,15 @@ COPY dev/tsconfig.web-declarations.json ./dev/tsconfig.web-declarations.json
 # `pnpm exec` on a TypeScript tree (the --prod
 # install below drops it, so the bundle is the only supported path in an image).
 # @see specs/scenarios/pre-compiled-child-process.feature
+# Release stamp: release builds verify licences against the embedded LangWatch key only, so the
+# image rewrites packages/config/src/release-build.ts here and runtime env cannot undo it. A
+# dev-stamped image (upgradelab's licensed shape) builds with LANGWATCH_RELEASE_BUILD=false.
+ARG LANGWATCH_RELEASE_BUILD=true
+RUN if [ "$LANGWATCH_RELEASE_BUILD" = "true" ]; then \
+      sed -i 's/^export const isReleaseBuild: boolean = false;$/export const isReleaseBuild: boolean = true;/' packages/config/src/release-build.ts \
+      && grep -q '^export const isReleaseBuild: boolean = true;$' packages/config/src/release-build.ts; \
+    fi
+
 # `build:types` first: the module contracts' declarations now come from one
 # `tsc -b` over the generated root solution rather than a compiler process per
 # package, so the filtered application builds below find their dependencies'
@@ -175,7 +165,8 @@ RUN pnpm start:prepare:files && pnpm ensure:built \
 # lifecycle script that ran here could need a devDependency this very command
 # is removing. Nothing needs regenerating at this point; the dist was built in the step above, and
 # the Prisma client is regenerated explicitly after the prune below.
-RUN CI=true pnpm install --frozen-lockfile --prod --ignore-scripts --filter "@langwatch/platform-api..." --filter "@langwatch/worker..." --filter "@langwatch/ui..." --filter "@langwatch/tasks..."
+RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
+    CI=true pnpm install --frozen-lockfile --prod --ignore-scripts --filter "@langwatch/platform-api..." --filter "@langwatch/worker..." --filter "@langwatch/ui..." --filter "@langwatch/tasks..."
 
 # ...and then actually reclaim the disk. The step above rewrites each member's
 # node_modules — the devDependency symlinks go — but it does NOT touch the
@@ -193,9 +184,10 @@ RUN CI=true pnpm install --frozen-lockfile --prod --ignore-scripts --filter "@la
 # generated first-party source that the build above inlines into the dist
 # bundles, so prune cannot drop it. The runtime stage still needs the `prisma`
 # CLI (a prod dep) for `migrate deploy` at boot.
-RUN CI=true pnpm prune --prod
+RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
+    CI=true pnpm prune --prod
 
-# ── Stage 2: runtime ───────────────────────────────────────────────
+# ── Stage 3: runtime ───────────────────────────────────────────────
 FROM node:24-alpine
 RUN apk --no-cache add curl openssl bash
 RUN npm install -g pnpm@12.6.0
@@ -286,31 +278,31 @@ ENV CHECKPOINT_DISABLE=1
 # Every tiktoken encoding file, so token counting reads it from disk instead of
 # downloading it from openaipublic.blob.core.windows.net at runtime (about 8 MB).
 # The script resolves tiktoken from the working directory, so it runs in the
-# worker app, which depends on it.
+# package that depends on it (the trace module's process half, not apps/worker).
 ENV TIKTOKENS_PATH=/app/tiktoken
 COPY dev/scripts/download-tiktoken-encodings.mjs ./dev/scripts/download-tiktoken-encodings.mjs
-RUN cd apps/worker && node ../../dev/scripts/download-tiktoken-encodings.mjs "$TIKTOKENS_PATH"
+RUN cd modules/trace/process && node ../../../dev/scripts/download-tiktoken-encodings.mjs "$TIKTOKENS_PATH"
 
 EXPOSE 5560
 
 # Set bash as the default shell
 SHELL ["/bin/bash", "-c"]
 
-# Serving never migrates (specs/upgrade/entry-points.feature). `pnpm --silent run
-# start` runs the api alone: it reads the upgrade ledger at boot and refuses by
-# name, with the command to run, when a blocking step of this image is not done.
-# The one exception is a first install (an empty ledger on an empty schema), where
-# the api runs the upgrade once itself (Q10), so a Helm first install converges.
+# One image, three roles, chosen by working directory and command (no rebuild):
+#   api     (default) cd /app/apps/api    && pnpm --silent run start
+#           REST, tRPC, SSE and the browser bundle from /app/apps/ui/dist/client.
+#           Probes on API_PORT: startup and liveness /api/health, readiness /readyz.
+#   worker  cd /app/apps/worker && pnpm --silent run start
+#           Probes on WORKER_METRICS_PORT (2999): startup and liveness /healthz, readiness /readyz.
+#   task    cd /app/apps/tasks  && pnpm --silent task <name>   (e.g. `upgrade status`)
 #
-# The upgrade is a one-shot step BEFORE the serving containers, run on this image:
-#   cd /app/apps/api && pnpm --silent run start:prepare:db
-# which is `pnpm task upgrade` (Postgres, ClickHouse, LangWatchQL, under one lease).
-# The chart's pre-roll Job, the compose
-# `migrate` service and the npx server run it; it is written once, in apps/api,
-# so this file holds no copy of it.
-#
-# The API process serves the REST, tRPC and SSE families AND the browser bundle
-# it finds at /app/apps/ui/dist/client, so this one container is the whole
-# interactive tier. The worker deployment runs the same image from
-# /app/apps/worker, whose start script runs the worker alone, behind the same gate.
+# The api never runs an upgrade step: behind its ledger it serves every route (a
+# schema it is not ready for answers 503 upgrade_in_progress with Retry-After) and
+# stays not ready until the ledger is current (NO-HOLDS). The worker
+# runs `pnpm task upgrade` at boot under the runner's lease (UPGRADE-IN-WORKER,
+# dev/docs/runbooks/upgrade-on-deploy.md), so several workers are safe.
+# Docker's own check, for compose and `docker run`; Kubernetes uses the probes above.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=40m --retries=3 \
+  CMD curl -fsS -o /dev/null "http://127.0.0.1:${API_PORT}/api/health" \
+   || curl -fsS -o /dev/null "http://127.0.0.1:${WORKER_METRICS_PORT:-2999}/healthz"
 CMD cd /app/apps/api && pnpm --silent run start

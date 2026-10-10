@@ -19,3 +19,9 @@ Feature: The eventing member holds one process store in every role
     Given a process whose eventing has no event log, or no eventing at all
     When a repository reads one event through the event read seat member
     Then the read is refused naming the event read seat, and building the member never fails
+
+  @unit
+  Scenario: The consuming role stamps each event_log row with its retention class
+    Given the consuming role built with the worker's event-log retention classifier
+    When it appends a control-plane fact and a trace event
+    Then the fact is stamped to keep forever and the trace event ages with the retention default

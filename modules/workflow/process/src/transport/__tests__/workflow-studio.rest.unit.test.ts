@@ -1,9 +1,11 @@
 /** @vitest-environment node */
 import { SurfaceUnverifiedError } from "@langwatch/api";
+import type { Authorize } from "@langwatch/api/access";
 import type { RestCaller } from "@langwatch/api/hosting";
 import { canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
 import { resolveRequestBound } from "@langwatch/plans";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { testAuthorizeDefaults } from "@langwatch/test-harness/trpc-members";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 
@@ -16,14 +18,24 @@ function mount({
   app,
   caller,
   granted = ["workflows:manage"],
+  kind = "application",
 }: {
   app: Partial<WorkflowApi>;
   caller: RestCaller | null;
   granted?: readonly string[];
+  kind?: string;
 }) {
+  const projects: Authorize = {
+    ...testAuthorizeDefaults,
+    getDecision: async () => ({ permitted: true, organizationRole: "ADMIN" }),
+    getProjectAnyDecision: async () => ({ permitted: true, organizationRole: "ADMIN" }),
+    checkScopeLineage: async () => ({ kind: "consistent" }),
+    organizationOf: async () => "org_1",
+    projectKindOf: async () => kind,
+  };
   const authorize = vi.fn(({ permission }: { permission: string }) => ({
     permitted: granted.includes(permission),
-    organizationRole: null,
+    organizationRole: "ADMIN" as const,
   }));
   const runtime = createRestRuntime({
     identity: {
@@ -38,6 +50,7 @@ function mount({
       identifyOptional: () => caller,
       authorize,
     },
+    authorization: { forRequest: () => projects },
   });
 
   const hono = runtime.mount(workflowStudioRest.router(), {
@@ -69,6 +82,69 @@ describe("the Studio editor's doors", () => {
 
     expect(response.status).toBe(200);
     expect(streamStudioEvent).toHaveBeenCalledWith(expect.objectContaining({ userId: "user_1" }));
+  });
+
+  const isAlive = JSON.stringify({
+    projectId: "project_1",
+    event: { type: "is_alive", payload: {} },
+  });
+  const post = (body: string): RequestInit => ({
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body,
+  });
+
+  /** @scenario "The Studio event door asks workflows:manage at the project the event names" */
+  it("asks workflows:manage at the event's project at the door and refuses 403 without it", async () => {
+    const streamStudioEvent = vi.fn();
+    const { hono, authorize } = mount({
+      app: { streamStudioEvent },
+      caller: signedIn,
+      granted: [],
+    });
+
+    const response = await hono.request("/api/workflows/post_event", post(isAlive));
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toMatchObject({ code: "permission_denied" });
+    expect(authorize).toHaveBeenCalledWith(
+      expect.objectContaining({
+        permission: "workflows:manage",
+        target: expect.objectContaining({ tier: "project", id: "project_1" }),
+      }),
+    );
+    expect(streamStudioEvent).not.toHaveBeenCalled();
+  });
+
+  /** @scenario "The Studio event door asks workflows:manage at the project the event names" */
+  it("refuses a malformed event 400 and one naming no project 422 before asking", async () => {
+    const streamStudioEvent = vi.fn();
+    const { hono, authorize } = mount({ app: { streamStudioEvent }, caller: signedIn });
+
+    const malformed = await hono.request("/api/workflows/post_event", post("{not json"));
+    const unnamed = await hono.request(
+      "/api/workflows/post_event",
+      post(JSON.stringify({ event: { type: "is_alive", payload: {} } })),
+    );
+
+    expect(malformed.status).toBe(400);
+    expect(await malformed.json()).toMatchObject({ code: "malformed_request" });
+    expect(unnamed.status).toBe(422);
+    expect(await unnamed.json()).toMatchObject({ code: "validation_error" });
+    expect(authorize).not.toHaveBeenCalled();
+    expect(streamStudioEvent).not.toHaveBeenCalled();
+  });
+
+  /** @scenario "The Studio event door refuses an event posted to an aggregate project" */
+  it("refuses an event posted to an aggregate project as read only", async () => {
+    const streamStudioEvent = vi.fn();
+    const { hono } = mount({ app: { streamStudioEvent }, caller: signedIn, kind: "aggregate" });
+
+    const response = await hono.request("/api/workflows/post_event", post(isAlive));
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toMatchObject({ code: "aggregate_project_is_read_only" });
+    expect(streamStudioEvent).not.toHaveBeenCalled();
   });
 
   it("refuses a posted event past its cap at 413 before the app reads it", async () => {

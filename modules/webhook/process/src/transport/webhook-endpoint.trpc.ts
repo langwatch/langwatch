@@ -66,6 +66,7 @@ export const webhookEndpointTrpcTransport: TrpcRouterDeclaration<
       maxBatchSize: input.maxBatchSize,
       maxBatchDelayMs: input.maxBatchDelayMs,
       maxInFlight: input.maxInFlight,
+      allowSelfSignedCertificate: input.allowSelfSignedCertificate,
     });
   })
 
@@ -95,6 +96,7 @@ export const webhookEndpointTrpcTransport: TrpcRouterDeclaration<
       maxBatchSize: input.maxBatchSize,
       maxBatchDelayMs: input.maxBatchDelayMs,
       maxInFlight: input.maxInFlight,
+      allowSelfSignedCertificate: input.allowSelfSignedCertificate,
     });
   })
 

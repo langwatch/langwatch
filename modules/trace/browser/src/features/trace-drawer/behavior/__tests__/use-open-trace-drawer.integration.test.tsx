@@ -3,7 +3,7 @@
 import { renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { drawerChrome } from "../../../../behavior/drawer-chrome.store.ts";
+import { useDrawerChrome } from "../../../../behavior/drawer-chrome.store.ts";
 import { NO_TRACE_EVENTS, type TraceListItem } from "../../../../behavior/explorer/types/trace.ts";
 import { previewTraceId } from "../../../../model/preview-trace-id.ts";
 
@@ -97,7 +97,7 @@ describe("useOpenTraceDrawer", () => {
   beforeEach(() => {
     seen.calls = [];
     seen.projectId = "project-1";
-    drawerChrome.setState(drawerChrome.getInitialState(), true);
+    useDrawerChrome.setState(useDrawerChrome.getInitialState(), true);
   });
 
   it("prefetches the heavy reads then opens the drawer, without writing the row as the header", () => {
@@ -109,7 +109,7 @@ describe("useOpenTraceDrawer", () => {
   it("hands the row's span count to the drawer for the trace it opens", () => {
     open(trace({ spanCount: 4 }));
 
-    expect(drawerChrome.getState().expectedSpan).toEqual({ traceId: "trace-1", count: 4 });
+    expect(useDrawerChrome.getState().expectedSpan).toEqual({ traceId: "trace-1", count: 4 });
   });
 
   it("only opens the drawer when no project is selected", () => {

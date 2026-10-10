@@ -1,12 +1,22 @@
+import { type ContractApiMap, createModuleApi, type ModuleApi } from "@langwatch/api/web";
 import {
   getModelMetadataForFrontend,
   hasEnabledModelProvider,
+  type llmModelCostTrpc,
   mergeCustomModelMetadata,
   type ModelMetadataForFrontend,
+  type modelProviderTrpc,
+  type translateTrpc,
 } from "@langwatch/model-provider-contract";
 import { useMemo } from "react";
 
-import { modelProviderClient } from "./model-provider-client.ts";
+type ModelProviderClientMap = ContractApiMap<typeof modelProviderTrpc> &
+  ContractApiMap<typeof llmModelCostTrpc> &
+  ContractApiMap<typeof translateTrpc>;
+
+/** The hooks Model provider's own contract generates. */
+export const modelProviderClient: ModuleApi<ModelProviderClientMap> =
+  createModuleApi<ModelProviderClientMap>();
 
 export type { ModelMetadataForFrontend };
 

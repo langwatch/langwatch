@@ -679,9 +679,7 @@ describe("CLICKHOUSE_STATEMENT_RETRY_MESSAGE_FRAGMENTS", () => {
     });
 
     it("stays RECOVERABLE for the group queue, which re-stages the job later", () => {
-      expect(classifyClickHouseError(memoryError)).toBe(
-        ErrorCategory.RECOVERABLE,
-      );
+      expect(classifyClickHouseError(memoryError)).toBe(ErrorCategory.RECOVERABLE);
     });
   });
 

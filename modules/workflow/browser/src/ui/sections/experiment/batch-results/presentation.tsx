@@ -29,17 +29,6 @@ export type RenderTracePeek = (input: { traceId: string }) => ReactNode;
 
 export type RenderDatasetImage = (input: { src: string }) => ReactNode;
 
-export const RUN_COLORS = [
-  "#3b82f6",
-  "#dd6b20",
-  "#38a169",
-  "#d53f8c",
-  "#805ad5",
-  "#e53e3e",
-  "#319795",
-  "#718096",
-] as const;
-
 export const formatScore = (score: number | null): string =>
   score === null ? "-" : score.toFixed(2);
 
@@ -159,7 +148,7 @@ export const getColorForString = (_set: "colors", value: string) => {
   for (const char of value) sum += char.charCodeAt(0);
 
   const color = COLOR_NAMES[sum % COLOR_NAMES.length] ?? "gray";
-  return { background: `${color}.subtle`, color: `${color}.emphasized` };
+  return { background: `${color}.subtle`, color: `${color}.fg` };
 };
 
 export const disambiguateNames = (names: string[]): string[] => {
@@ -222,16 +211,16 @@ export const useInteractiveTooltip = (closeDelay = 150) => {
 };
 
 export const getPassRateGradientColor = (passRate: number | null): string => {
-  if (passRate === null) return "gray.400";
+  if (passRate === null) return "fg.subtle";
 
   const rate = Math.max(0, Math.min(100, passRate));
   if (rate <= 50) {
     const ratio = rate / 50;
-    return `rgb(${Math.round(239 + 6 * ratio)}, ${Math.round(68 + 90 * ratio)}, ${Math.round(68 - 57 * ratio)})`;
+    return `color-mix(in srgb, var(--chakra-colors-yellow-fg) ${ratio * 100}%, var(--chakra-colors-red-fg))`;
   }
 
   const ratio = (rate - 50) / 50;
-  return `rgb(${Math.round(245 - 211 * ratio)}, ${Math.round(158 + 39 * ratio)}, ${Math.round(11 + 83 * ratio)})`;
+  return `color-mix(in srgb, var(--chakra-colors-green-fg) ${ratio * 100}%, var(--chakra-colors-yellow-fg))`;
 };
 
 export const PassRateCircle = ({

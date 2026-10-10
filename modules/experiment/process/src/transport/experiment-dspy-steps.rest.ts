@@ -89,6 +89,7 @@ export const experimentDspyStepsRest = defineRestRouter(ExperimentApi)
   .post("/log_steps", "postApiDspyLogSteps")
   .withInput(dSPyLogStepsBodySchema, { as: "steps" })
   .withPermission("experiments:manage")
+  .withoutAudit("ingestion")
   .withOutput(dSPyLogStepsResponseSchema)
   .withBodyLimit({ maxBytes: MAX_BODY_BYTES, onExceeded: () => new PayloadTooLargeError() })
   .withDocs({

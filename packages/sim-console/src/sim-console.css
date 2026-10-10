@@ -30,6 +30,22 @@
   --sim-accent: var(--moss);
 }
 
+.sim-console[data-sim="outbound"] {
+  --sim-accent: var(--amber);
+}
+
+.sim-console[data-sim="payment"] {
+  --sim-accent: var(--brand-deep);
+}
+
+.sim-console[data-sim="telemetry"] {
+  --sim-accent: var(--rust);
+}
+
+.sim-console[data-sim="lambda"] {
+  --sim-accent: var(--amber);
+}
+
 .sim-console .ds-topbar-mark {
   background: var(--sim-accent);
 }

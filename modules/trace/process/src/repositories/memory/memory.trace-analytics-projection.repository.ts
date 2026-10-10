@@ -1,3 +1,5 @@
+import { type Authorization, projectIdsReadBy } from "@langwatch/authorization";
+
 import {
   TraceAnalyticsProjectionRepository,
   type TraceAnalyticsProjectionEntry,
@@ -28,10 +30,14 @@ export class MemoryTraceAnalyticsRepository extends TraceAnalyticsProjectionRepo
   }
 
   async findByTraceId(input: {
-    tenantId: string;
+    authorization: Authorization;
     traceId: string;
   }): Promise<TraceAnalyticsProjectionRead | null> {
-    return this.rows.get(keyOf(input.tenantId, input.traceId)) ?? null;
+    for (const tenantId of projectIdsReadBy(input.authorization)) {
+      const read = this.rows.get(keyOf(tenantId, input.traceId));
+      if (read) return read;
+    }
+    return null;
   }
 }
 

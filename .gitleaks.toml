@@ -619,3 +619,16 @@ paths = [
   '''^apps/api/src/app/__tests__/api-billing-webhook\.composition\.unit\.test\.ts$''',
   '''^packages/enterprise/features/billing/server/src/adapters/__tests__/stripe\.usage-reporting\.adapter\.unit\.test\.ts$''',
 ]
+
+# Fixture keys for the local payment simulator (paymentsim). Not issued by
+# Stripe. Scoped to `stripe-access-token` and to the exact files that carry them.
+[[allowlists]]
+description = "Fixture Stripe keys for the paymentsim simulator"
+targetRules = ["stripe-access-token"]
+paths = [
+  '''^\.claude/skills/paymentsim/SKILL\.md$''',
+  '''^tools/thuishaven/README\.md$''',
+  '''^tools/thuishaven/domain/overlay\.go$''',
+  '''^services/paymentsim/paymentsim_test\.go$''',
+  '''^enterprise/modules/billing/process/src/__tests__/billing-paymentsim\.integration\.test\.ts$''',
+]

@@ -416,3 +416,31 @@ func TestSelectLogServicesFindsTheSimulatorsInTheSimsLane(t *testing.T) {
 		t.Fatalf("lines = %v, want only analyticssim's line", lines)
 	}
 }
+
+// @scenario "The one-process lane's logs are captured per application"
+func TestSelectLogServicesReadsTheSplitCapture(t *testing.T) {
+	dir := t.TempDir()
+	base := time.Date(2026, 10, 10, 10, 0, 0, 0, time.UTC)
+	launcher := stamp(base) + ` {"level":"info","msg":"backend ready"}`
+	writeLog(t, dir, "ui", stamp(base.Add(-time.Second))+" built in 812ms")
+	writeLog(t, dir, "api", launcher, stamp(base.Add(time.Second))+` {"service":"langwatch-api","msg":"listening"}`)
+	writeLog(t, dir, "worker", launcher, stamp(base.Add(2*time.Second))+` {"service":"langwatch-worker","msg":"drained"}`)
+
+	worker, err := selectLogServices(dir, []string{"worker"})
+	if err != nil {
+		t.Fatalf("selectLogServices: %v", err)
+	}
+	if lines, _, _ := readLogTails(dir, worker); len(lines) != 2 || !strings.Contains(lines[1].text, "drained") {
+		t.Errorf("worker = %v, want the launcher line and its own", lines)
+	}
+	all, err := selectLogServices(dir, []string{"app"})
+	if err != nil {
+		t.Fatalf("`haven logs app` is no longer an alias: %v", err)
+	}
+	if got := len(all); got != 3 {
+		t.Errorf("app selects %d sources, want ui, api and worker", got)
+	}
+	if names := logSelectableNames(capturedServices(dir)); strings.Join(names, ",") != "api,ui,worker" {
+		t.Errorf("selectable = %v, want api, ui and worker once each", names)
+	}
+}

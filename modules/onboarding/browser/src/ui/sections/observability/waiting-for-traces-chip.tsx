@@ -10,8 +10,8 @@ import { api } from "../../../behavior/onboarding-api.ts";
 import { useActiveProject } from "../active-project-context.tsx";
 
 export function WaitingForTracesChip(): React.ReactElement {
-  const accent = useColorRawValue("orange.400");
-  const success = useColorRawValue("green.400");
+  const accent = useColorRawValue("orange.fg");
+  const success = useColorRawValue("green.fg");
   const router = useRouter();
   const { project } = useActiveProject();
 
@@ -89,8 +89,8 @@ export function WaitingForTracesChip(): React.ReactElement {
           bg="bg.panel/50"
           backdropFilter="blur(24px) saturate(1.4)"
           borderWidth="1px"
-          borderColor="gray.200"
-          boxShadow="0 4px 30px rgba(0,0,0,0.08)"
+          borderColor="border"
+          boxShadow="0 4px 30px color-mix(in srgb, var(--chakra-colors-bg-scrim) 8%, transparent)"
           borderRadius="full"
           px={4}
           py={2}

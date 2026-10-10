@@ -172,13 +172,13 @@ export function QuietHeadline() {
           fontSize="12.5px"
           fontWeight="600"
           whiteSpace="nowrap"
-          color="white"
+          color="orange.contrast"
           background="orange.solid"
           borderRadius="8px"
           paddingX={3.5}
           paddingY="7px"
           cursor="pointer"
-          boxShadow="0 1px 2px rgba(0,0,0,0.12)"
+          boxShadow="sm"
           transition="opacity 130ms ease, transform 130ms ease"
           _hover={{ opacity: 0.92, transform: "translateY(-1px)" }}
           _active={{ transform: "translateY(0)" }}

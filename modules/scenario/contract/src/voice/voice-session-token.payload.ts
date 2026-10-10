@@ -1,6 +1,7 @@
 // Claims a signed voice session token carries between mint and finish: only ids and project scope.
 // Signed and verified server-side (@langwatch/scenario-process). Short-lived: call budget + grace.
 
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import { VOICE_TRANSPORTS, type VoiceTransport } from "./voice-transport.ts";
@@ -23,7 +24,7 @@ export interface VoiceSessionTokenPayload {
   exp: number;
 }
 
-export const voiceSessionTokenPayloadSchema = z.object({
+const voiceSessionTokenPayloadSchemaDefinition = z.object({
   sessionId: z.string().min(1),
   projectId: z.string().min(1),
   agentId: z.string().min(1).nullable(),
@@ -31,3 +32,8 @@ export const voiceSessionTokenPayloadSchema = z.object({
   transport: z.enum(VOICE_TRANSPORTS),
   exp: z.number(),
 });
+export interface VoiceSessionTokenPayloadSchema extends Named<
+  typeof voiceSessionTokenPayloadSchemaDefinition
+> {}
+export const voiceSessionTokenPayloadSchema: VoiceSessionTokenPayloadSchema =
+  voiceSessionTokenPayloadSchemaDefinition;

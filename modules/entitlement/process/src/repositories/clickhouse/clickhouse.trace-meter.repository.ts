@@ -76,7 +76,8 @@ export class TraceMeterClickHouseRepository extends TraceMeterRepository {
         month: `${start.toString()}-01`,
         previousMonth: `${start.subtract({ months: 1 }).toString()}-01`,
       },
-      unscoped: { reason: "The organization's meter counts every project the organization owns." },
+      // The organization's meter counts every project the organization owns.
+      SKIP_TENANT_CHECK: true,
     });
     return totalOf(result.rows);
   }
@@ -115,7 +116,8 @@ export class TraceMeterClickHouseRepository extends TraceMeterRepository {
         month: `${start.toString()}-01`,
         previousMonth: `${start.subtract({ months: 1 }).toString()}-01`,
       },
-      unscoped: { reason: "The organization's meter counts every project the organization owns." },
+      // The organization's meter counts every project the organization owns.
+      SKIP_TENANT_CHECK: true,
     });
     return result.rows.map((row) => ({ projectId: row.projectId, count: totalOf([row]) }));
   }

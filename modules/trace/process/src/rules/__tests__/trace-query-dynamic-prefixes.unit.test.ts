@@ -2,13 +2,11 @@ import { describe, expect, it } from "vitest";
 
 import { traceQueryTranslation } from "../../services/__tests__/fixtures/trace-query-services.fixtures.ts";
 
-const TENANT = "project_test";
 const TIME_RANGE = { from: 1714435200000, to: 1715040000000 };
 
 function translate(query: string) {
   return traceQueryTranslation.translateFilter({
     queryText: query,
-    tenantId: TENANT,
     timeRange: TIME_RANGE,
   });
 }
@@ -51,9 +49,7 @@ describe("dynamic attribute prefix translation", () => {
       expect(result!.sql).toContain("SpanAttributes[{");
       // Time predicate gets folded into the subquery's WHERE so the
       // partition-prune kicks in. Cheap proof: param names exist.
-      expect(Object.keys(result!.params)).toEqual(
-        expect.arrayContaining(["timeFrom", "timeTo", "tenantId"]),
-      );
+      expect(Object.keys(result!.params)).toEqual(expect.arrayContaining(["timeFrom", "timeTo"]));
     });
 
     it("rejects an empty key", () => {

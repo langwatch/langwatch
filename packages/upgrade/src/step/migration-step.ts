@@ -2,6 +2,7 @@ import type { SystemMigration } from "@langwatch/system-migrations";
 import { z } from "zod";
 
 import { upgradeStepKindSchema, upgradeStepModeSchema } from "../ledger.ts";
+import { releaseVersionSchema } from "../manifest/manifest.ts";
 import type { CodeStepId } from "./code-step-ids.generated.ts";
 
 /**
@@ -31,6 +32,8 @@ export const migrationStepDeclarationSchema = z.object({
   needsOldWritersGone: z.boolean().optional(),
   /** The background steps this one runs after, by id; declared as the step values themselves. */
   after: z.array(z.string().regex(MIGRATION_STEP_ID)).optional(),
+  /** The release a background step must have finished by; the ledger keeps it for the reader. */
+  finishBy: releaseVersionSchema.optional(),
 });
 export type MigrationStepDeclaration = z.infer<typeof migrationStepDeclarationSchema>;
 
@@ -38,7 +41,8 @@ export type MigrationStepDeclaration = z.infer<typeof migrationStepDeclarationSc
 export const tenantAxisSchema = z.enum(["organization", "project", "user"]);
 export type TenantAxis = z.infer<typeof tenantAxisSchema>;
 
-const { id, mode, description, needsOldWritersGone } = migrationStepDeclarationSchema.shape;
+const { id, mode, description, needsOldWritersGone, finishBy } =
+  migrationStepDeclarationSchema.shape;
 
 /** A tenant step's pacing, flat on its declaration and on no other kind (S6-4, 2026-10-09). */
 export const tenantMigrationStepDeclarationSchema = z.object({
@@ -47,6 +51,7 @@ export const tenantMigrationStepDeclarationSchema = z.object({
   mode,
   description,
   needsOldWritersGone,
+  finishBy,
   tenants: tenantAxisSchema,
   title: z.string().trim().min(1),
   requiresOperatorConfirmation: z.boolean(),
@@ -82,7 +87,8 @@ export type MigrationStepRefusal =
   | "malformed_id"
   | "missing_description"
   | "blocking_not_data"
-  | "after_not_background";
+  | "after_not_background"
+  | "finish_by_not_background";
 
 /**
  * What a module writes: `after` names step values or, across modules, a generated `CodeStepId`
@@ -146,6 +152,13 @@ export function defineMigrationStep(
       detail: `it is blocking but of kind "${step.kind}"; only a data step blocks (frozen SQL).`,
     });
   }
+  if (step.finishBy !== undefined && step.mode !== "background") {
+    throw new MigrationStepDeclarationError({
+      step: step.id,
+      refusal: "finish_by_not_background",
+      detail: `it names finishBy ${step.finishBy} but runs ${step.mode}; only a background step has one.`,
+    });
+  }
   if (step.kind === "tenant") {
     const declared = tenantMigrationStepDeclarationSchema.parse(step);
     const candidates = step.candidateTenants ? { candidateTenants: step.candidateTenants } : {};
@@ -179,6 +192,13 @@ export function isTenantMigrationStep(value: unknown): value is TenantMigrationS
   if (!("migrateTenant" in value) || typeof value.migrateTenant !== "function") return false;
   const declared = tenantMigrationStepDeclarationSchema.safeParse(value);
   return declared.success && declared.data.mode !== "blocking";
+}
+
+/** Either declared shape, as worker boot collects them: run steps and tenant steps. */
+export function isDeclaredMigrationStep(
+  value: unknown,
+): value is MigrationStep | TenantMigrationStep {
+  return isMigrationStep(value) || isTenantMigrationStep(value);
 }
 
 function moduleOf(step: string): string {

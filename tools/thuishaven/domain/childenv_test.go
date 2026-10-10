@@ -30,7 +30,7 @@ func TestNodeOptionsEnv_KeepsWhatTheShellSet(t *testing.T) {
 	}
 }
 
-// TestNodeOptionsEnv_DoesNotRepeatItself pins idempotence: a nested haven run
+// TestNodeOptionsEnv_DoesNotRepeatItself pins idempotence: a nested haven machine run
 // must not stack the same flag twice.
 //
 /** @scenario "A Node lane does not announce the flag it always runs with" */

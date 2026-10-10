@@ -7,6 +7,7 @@
 import { AutomationApi } from "@langwatch/automation-contract";
 import { startTestClickHouseEndpoints } from "@langwatch/clickhouse-client/testing";
 import { ClickHouseMigrateTask } from "@langwatch/clickhouse-migrations";
+import { classifyEventLogRowRetention } from "@langwatch/data-retention-contract/event-log-retention-policy";
 import { EvaluationApi } from "@langwatch/evaluation-contract";
 import { generate } from "@langwatch/ksuid";
 import { OrganizationApi } from "@langwatch/organization-contract";
@@ -68,7 +69,9 @@ async function bootWorker({ clickhouse }: { clickhouse: string }) {
     .withProcessOwnership(false)
     .withSecrets((_config, secrets) => secrets.withEnv())
     .start();
-  const application = await server.container("worker").boot();
+  const application = await server
+    .container("worker")
+    .boot({ classifyEventLogRetention: classifyEventLogRowRetention });
   await server.run(application);
   return { server, application };
 }

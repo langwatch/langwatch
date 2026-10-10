@@ -20,6 +20,7 @@ export function PersonalFeatureGateDialog({ state }: { state: PersonalFeatureGat
       size="sm"
     >
       <Dialog.Content>
+        <Dialog.CloseTrigger />
         <Dialog.Header>
           <Dialog.Title>Enable advanced features?</Dialog.Title>
         </Dialog.Header>
@@ -37,12 +38,17 @@ export function PersonalFeatureGateDialog({ state }: { state: PersonalFeatureGat
         </Dialog.Body>
         <Dialog.Footer>
           <HStack gap={2}>
-            <Button variant="ghost" size="sm" onClick={state.onCancel} disabled={state.isEnabling}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={state.onCancel}
+              disabled={state.isEnabling}
+            >
               Cancel
             </Button>
             <Button
               size="sm"
-              colorPalette="blue"
+              colorPalette="orange"
               onClick={state.onConfirm}
               loading={state.isEnabling}
             >

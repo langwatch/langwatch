@@ -69,6 +69,19 @@ Feature: Authentication settings - every way in, in one place, with the guards v
     Then "Connect GitHub" and "Connect single sign-on" are offered on the same row as adding an address
     And "Connect Google" is not offered
 
+  @integration
+  Scenario: A deployment with no federated providers offers no connect buttons
+    Given the deployment offers no federated provider
+    When the authentication settings are shown
+    Then no "Connect" button is offered
+
+  @unit
+  Scenario: The browser is told which providers the deployment offers
+    Given AUTH_PROVIDER is "auth0" and Google and GitHub client ids are set
+    When the page's configuration is read
+    Then the federated providers are "auth0", "google" and "github"
+    And with no provider named the list is empty
+
   # ── One way in, said before it is too late ─────────────────────────────
 
   # The detach guard's own reasoning, read forwards. The guard refuses to
@@ -409,3 +422,11 @@ Feature: Authentication settings - every way in, in one place, with the guards v
     When "sam" confirms unlinking it
     Then the confirmation said another way in becomes primary first
     And the unlink completes as one action
+
+  @integration
+  Scenario: The page is a narrow column of divided sections with bordered rows
+    Given "sam" holds a linked account
+    When the authentication settings are shown
+    Then the page column is no wider than 820px
+    And each section has a hairline divider above it
+    And each row of a section has its own border

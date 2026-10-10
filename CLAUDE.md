@@ -31,8 +31,9 @@ touching git.
 ## Layout
 
 ```
-apps/           ui (Vite SPA :5560) · api (tRPC+REST+SSE :6560) · worker (queues, projections,
-                subscribers) · tasks (migrations/backfills, run before serve) · server (npx CLI)
+apps/           ui (Vite-built SPA the api serves; Vite dev server only under --hmr)
+                · api (tRPC+REST+SSE :6560) · worker (queues, projections, subscribers)
+                · tasks (migrations/backfills, run before serve) · server (npx CLI)
                 · scenario-child. An app is main.ts + config.ts; no product code.
 modules/<name>/ one feature: contract/ · process/ · browser/ · client/ (+ specs/, adrs/)
 modules/catalogue.json   the one map of subject -> owning module
@@ -72,7 +73,7 @@ Path-scoped rules in `.claude/rules/` load the details when you open those files
 6. **A route's authorization is declared, never hand-rolled.** Name the
    permission with `.withPermission(...)`; the door asks it before the handler
    runs. `.withAccess(anyAuthenticated(...))` followed by a permission check in
-   a middleware fact, the handler or the `*Api` is a bypass. When the library
+   a middleware context, the handler or the `*Api` is a bypass. When the library
    cannot express the check, extend `packages/api` and the door; don't route
    around them. The application asks only what depends on the loaded row.
 7. **Product analytics and lifecycle messaging belong to nurturing.** A module
@@ -115,7 +116,8 @@ pnpm install                        # root only; one lockfile. Narrow: --filter 
 pnpm start:prepare:files            # generated files (Prisma client, etc.); fixes "Cannot find module"
 pnpm generate:modules               # after editing modules/catalogue.json
 pnpm sync:references                # after adding/removing a workspace package
-pnpm test:affected / typecheck:affected   # Nx: only packages this change reached, cached
+pnpm test:affected                  # Nx: only packages this change reached, cached
+pnpm typecheck                      # one root tsc -b; incremental, rechecks only what changed
 pnpm start:prepare:db                # upgrade + system-migrations pass; the api refuses until it ran
 make go-lint-changed                # Go: lints your uncommitted edits (never raw golangci-lint)
 ```
@@ -127,7 +129,7 @@ Nx (ADR-150) sits beside the root scripts, not in front of them: prefer the
 
 `make haven up` starts this worktree's stack at
 `app.<slug>.langwatch.localhost` (UI; `/api` for the API). `haven status`,
-`haven logs api|ui|go -t`; add `--agent` when driving haven as an agent. Plain
+`haven logs api|ui|go -f`; add `--agent` when driving haven as an agent. Plain
 `pnpm dev` also works (ports derive from `PORT`, default 5560). Full reference,
 including the no-container setup: `dev/docs/LOCAL_STACK.md`; when it won't come
 up, the `haven` skill (`troubleshooting.md`).

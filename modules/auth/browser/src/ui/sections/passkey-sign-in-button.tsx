@@ -6,7 +6,12 @@ import { authClient, navigate, safeRedirectTarget } from "../../behavior/auth-cl
 import { endPasskeyCeremony, startPasskeyCeremony } from "../../behavior/passkey-ceremony.store.ts";
 import { rememberLastUsedMethod } from "../../model/last-used-method.ts";
 import { signInMethodActionLabel } from "../../model/method-labels.ts";
-import { passkeyFailure } from "../../model/passkey-failure.ts";
+import {
+  isCeremonyAbandoned,
+  passkeyFailure,
+  passkeyFailureFrom,
+  readPasskeyErrorCode,
+} from "../../model/passkey-failure.ts";
 import { MethodButton } from "../elements/method-button.tsx";
 import { SignInMethodIcon } from "../elements/sign-in-method-icon.tsx";
 
@@ -82,9 +87,8 @@ export function PasskeySignInButton({
       // A cancelled prompt is not a failure worth shouting about: the person
       // closed it, and the other methods are still on the screen behind this.
       if (result?.error) {
-        if (result.error.status !== 0) {
-          onError(passkeyFailure(result.error.status));
-        }
+        const abandoned = isCeremonyAbandoned({ code: readPasskeyErrorCode(result.error) });
+        if (result.error.status !== 0 && !abandoned) onError(passkeyFailureFrom(result.error));
         onDeclined?.();
         return;
       }

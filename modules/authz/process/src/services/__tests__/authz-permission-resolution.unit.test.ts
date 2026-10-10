@@ -116,7 +116,7 @@ describe("given a project-scoped permission check", () => {
       const decision = await onProject(authzFor(), "workflows:view");
 
       expect(decision.permitted).toBe(false);
-      expect(decision.denialReason).toBe("no-binding");
+      expect(decision.denialReason).toBe("no-grant");
     });
   });
 

@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import { langyMessagePartSchema } from "./json.ts";
@@ -6,10 +7,12 @@ import { langyConversationListCursorSchema } from "./langy.dtos.ts";
 import { langyEgressAllowlistSchema } from "./langy.ts";
 
 /** One chat message on the wire - role + opaque parts (bounded downstream). */
-export const langyTurnMessageSchema = z.object({
+const langyTurnMessageSchemaDefinition = z.object({
   role: z.enum(["user", "assistant", "system"]),
   parts: z.array(langyMessagePartSchema).default([]),
 });
+export interface LangyTurnMessageSchema extends Named<typeof langyTurnMessageSchemaDefinition> {}
+export const langyTurnMessageSchema: LangyTurnMessageSchema = langyTurnMessageSchemaDefinition;
 
 /**
  * Per-send model override from the sidebar picker. Shape-validated here; the value is checked
@@ -29,51 +32,81 @@ export const langyAdoptableConversationIdSchema = z
   .regex(/^[A-Za-z0-9_-]{6,120}$/, "conversationId must be 6-120 characters from [A-Za-z0-9_-]");
 
 /** The `langyEgress.get` and `langyEgress.set` answer: the allowlist plus enforcement state. */
-export const langyEgressStateSchema = z
+const langyEgressStateSchemaDefinition = z
   .object({ allowlist: langyEgressAllowlistSchema, enforcing: z.boolean() })
   .strict();
+export interface LangyEgressStateSchema extends Named<typeof langyEgressStateSchemaDefinition> {}
+export const langyEgressStateSchema: LangyEgressStateSchema = langyEgressStateSchemaDefinition;
 
 /** The `langyEgress.get` input. */
-export const langyEgressGetInputSchema = z.object({ projectId: z.string() });
+const langyEgressGetInputSchemaDefinition = z.object({ projectId: z.string() });
+export interface LangyEgressGetInputSchema extends Named<
+  typeof langyEgressGetInputSchemaDefinition
+> {}
+export const langyEgressGetInputSchema: LangyEgressGetInputSchema =
+  langyEgressGetInputSchemaDefinition;
 
 /** The `langyEgress.set` input. */
-export const langyEgressSetInputSchema = z.object({
+const langyEgressSetInputSchemaDefinition = z.object({
   projectId: z.string(),
   allowlist: langyEgressAllowlistSchema,
 });
+export interface LangyEgressSetInputSchema extends Named<
+  typeof langyEgressSetInputSchemaDefinition
+> {}
+export const langyEgressSetInputSchema: LangyEgressSetInputSchema =
+  langyEgressSetInputSchemaDefinition;
 
 const projectScope = { projectId: z.string() } as const;
 
-export const langyProjectInputSchema = z.object(projectScope);
+const langyProjectInputSchemaDefinition = z.object(projectScope);
+export interface LangyProjectInputSchema extends Named<typeof langyProjectInputSchemaDefinition> {}
+export const langyProjectInputSchema: LangyProjectInputSchema = langyProjectInputSchemaDefinition;
 
-export const langyPanelConversationInputSchema = z.object({
+const langyPanelConversationInputSchemaDefinition = z.object({
   ...projectScope,
   conversationId: z.string(),
 });
+export interface LangyPanelConversationInputSchema extends Named<
+  typeof langyPanelConversationInputSchemaDefinition
+> {}
+export const langyPanelConversationInputSchema: LangyPanelConversationInputSchema =
+  langyPanelConversationInputSchemaDefinition;
 
-export const langyListInputSchema = z.object({
+const langyListInputSchemaDefinition = z.object({
   ...projectScope,
   limit: z.number().int().min(1).max(100).default(30),
   cursor: langyConversationListCursorSchema.optional(),
   query: z.string().trim().max(200).optional(),
 });
+export interface LangyListInputSchema extends Named<typeof langyListInputSchemaDefinition> {}
+export const langyListInputSchema: LangyListInputSchema = langyListInputSchemaDefinition;
 
-export const langyEventsAfterInputSchema = z.object({
+const langyEventsAfterInputSchemaDefinition = z.object({
   ...projectScope,
   conversationId: z.string(),
   after: z.object({ acceptedAt: z.number().int().nonnegative(), eventId: z.string() }),
 });
+export interface LangyEventsAfterInputSchema extends Named<
+  typeof langyEventsAfterInputSchemaDefinition
+> {}
+export const langyEventsAfterInputSchema: LangyEventsAfterInputSchema =
+  langyEventsAfterInputSchemaDefinition;
 
-export const langyRenameInputSchema = z.object({
+const langyRenameInputSchemaDefinition = z.object({
   ...projectScope,
   conversationId: z.string().min(1),
   title: z.string().trim().min(1).max(200),
 });
+export interface LangyRenameInputSchema extends Named<typeof langyRenameInputSchemaDefinition> {}
+export const langyRenameInputSchema: LangyRenameInputSchema = langyRenameInputSchemaDefinition;
 
-export const langyForkInputSchema = z.object({
+const langyForkInputSchemaDefinition = z.object({
   ...projectScope,
   conversationId: z.string().min(1),
 });
+export interface LangyForkInputSchema extends Named<typeof langyForkInputSchemaDefinition> {}
+export const langyForkInputSchema: LangyForkInputSchema = langyForkInputSchemaDefinition;
 
 /** Inputs shared by create + continue (the SAME turn-start operation). */
 const turnShape = {
@@ -90,29 +123,49 @@ const turnShape = {
 } as const;
 
 /** `createConversation`: the conversation a panel-open warm booted is adopted when named. */
-export const langyPanelCreateConversationInputSchema = z.object({
+const langyPanelCreateConversationInputSchemaDefinition = z.object({
   ...turnShape,
   conversationId: langyAdoptableConversationIdSchema.optional(),
 });
+export interface LangyPanelCreateConversationInputSchema extends Named<
+  typeof langyPanelCreateConversationInputSchemaDefinition
+> {}
+export const langyPanelCreateConversationInputSchema: LangyPanelCreateConversationInputSchema =
+  langyPanelCreateConversationInputSchemaDefinition;
 
-export const langyContinueConversationInputSchema = z.object({
+const langyContinueConversationInputSchemaDefinition = z.object({
   ...turnShape,
   conversationId: z.string().min(1),
 });
+export interface LangyContinueConversationInputSchema extends Named<
+  typeof langyContinueConversationInputSchemaDefinition
+> {}
+export const langyContinueConversationInputSchema: LangyContinueConversationInputSchema =
+  langyContinueConversationInputSchemaDefinition;
 
-export const langyStopTurnPanelInputSchema = z.object({
+const langyStopTurnPanelInputSchemaDefinition = z.object({
   ...projectScope,
   conversationId: z.string().min(1),
   turnId: z.string().min(1),
 });
+export interface LangyStopTurnPanelInputSchema extends Named<
+  typeof langyStopTurnPanelInputSchemaDefinition
+> {}
+export const langyStopTurnPanelInputSchema: LangyStopTurnPanelInputSchema =
+  langyStopTurnPanelInputSchemaDefinition;
 
-export const langyClaimUiActionInputSchema = z.object({
+const langyClaimUiActionInputSchemaDefinition = z.object({
   ...projectScope,
   conversationId: z.string(),
   actionId: z.string(),
 });
+export interface LangyClaimUiActionInputSchema extends Named<
+  typeof langyClaimUiActionInputSchemaDefinition
+> {}
+export const langyClaimUiActionInputSchema: LangyClaimUiActionInputSchema =
+  langyClaimUiActionInputSchemaDefinition;
 
-export const langyCompleteUiActionInputSchema = z.object({
+const langyCompleteUiActionInputSchemaDefinition = z.object({
   ...projectScope,
   conversationId: z.string(),
   actionId: z.string(),
@@ -120,15 +173,25 @@ export const langyCompleteUiActionInputSchema = z.object({
   result: z.unknown().optional(),
   errorCode: z.string().max(200).optional(),
 });
+export interface LangyCompleteUiActionInputSchema extends Named<
+  typeof langyCompleteUiActionInputSchemaDefinition
+> {}
+export const langyCompleteUiActionInputSchema: LangyCompleteUiActionInputSchema =
+  langyCompleteUiActionInputSchemaDefinition;
 
-export const langyAnswerLocalPermissionInputSchema = z.object({
+const langyAnswerLocalPermissionInputSchemaDefinition = z.object({
   ...projectScope,
   conversationId: z.string(),
   waitId: z.string(),
   decision: z.enum(["allow_once", "allow_pattern", "deny"]),
 });
+export interface LangyAnswerLocalPermissionInputSchema extends Named<
+  typeof langyAnswerLocalPermissionInputSchemaDefinition
+> {}
+export const langyAnswerLocalPermissionInputSchema: LangyAnswerLocalPermissionInputSchema =
+  langyAnswerLocalPermissionInputSchemaDefinition;
 
-export const langyAnswerQuestionInputSchema = z.object({
+const langyAnswerQuestionInputSchemaDefinition = z.object({
   ...projectScope,
   conversationId: z.string(),
   waitId: z.string(),
@@ -143,25 +206,45 @@ export const langyAnswerQuestionInputSchema = z.object({
     .min(1)
     .max(4),
 });
+export interface LangyAnswerQuestionInputSchema extends Named<
+  typeof langyAnswerQuestionInputSchemaDefinition
+> {}
+export const langyAnswerQuestionInputSchema: LangyAnswerQuestionInputSchema =
+  langyAnswerQuestionInputSchemaDefinition;
 
-export const langySetLocalPolicyInputSchema = z.object({
+const langySetLocalPolicyInputSchemaDefinition = z.object({
   ...projectScope,
   conversationId: z.string(),
   skipPermissions: z.boolean(),
 });
+export interface LangySetLocalPolicyInputSchema extends Named<
+  typeof langySetLocalPolicyInputSchemaDefinition
+> {}
+export const langySetLocalPolicyInputSchema: LangySetLocalPolicyInputSchema =
+  langySetLocalPolicyInputSchemaDefinition;
 
-export const langySetCodeAccessPreferenceInputSchema = z.object({
+const langySetCodeAccessPreferenceInputSchemaDefinition = z.object({
   ...projectScope,
   preference: z.enum(["github"]).nullable(),
 });
+export interface LangySetCodeAccessPreferenceInputSchema extends Named<
+  typeof langySetCodeAccessPreferenceInputSchemaDefinition
+> {}
+export const langySetCodeAccessPreferenceInputSchema: LangySetCodeAccessPreferenceInputSchema =
+  langySetCodeAccessPreferenceInputSchemaDefinition;
 
-export const langyWarmWorkerInputSchema = z.object({
+const langyWarmWorkerInputSchemaDefinition = z.object({
   ...projectScope,
   conversationId: langyAdoptableConversationIdSchema.optional(),
   modelOverride: langyModelOverrideSchema.optional(),
 });
+export interface LangyWarmWorkerInputSchema extends Named<
+  typeof langyWarmWorkerInputSchemaDefinition
+> {}
+export const langyWarmWorkerInputSchema: LangyWarmWorkerInputSchema =
+  langyWarmWorkerInputSchemaDefinition;
 
-export const langyRecordFeedbackInputSchema = z.object({
+const langyRecordFeedbackInputSchemaDefinition = z.object({
   ...projectScope,
   conversationId: z.string().optional(),
   messageId: z.string().optional(),
@@ -172,22 +255,54 @@ export const langyRecordFeedbackInputSchema = z.object({
   comment: z.string().max(2000).optional(),
   shareConversationConsent: z.boolean().optional(),
 });
+export interface LangyRecordFeedbackInputSchema extends Named<
+  typeof langyRecordFeedbackInputSchemaDefinition
+> {}
+export const langyRecordFeedbackInputSchema: LangyRecordFeedbackInputSchema =
+  langyRecordFeedbackInputSchemaDefinition;
 
-export const langyFeedbackPromptShownInputSchema = z.object({
+const langyFeedbackPromptShownInputSchemaDefinition = z.object({
   ...projectScope,
   conversationId: z.string().min(1),
 });
+export interface LangyFeedbackPromptShownInputSchema extends Named<
+  typeof langyFeedbackPromptShownInputSchemaDefinition
+> {}
+export const langyFeedbackPromptShownInputSchema: LangyFeedbackPromptShownInputSchema =
+  langyFeedbackPromptShownInputSchemaDefinition;
 
-export const langyTurnStreamInputSchema = z.object({
+const langyTurnStreamInputSchemaDefinition = z.object({
   ...projectScope,
   conversationId: z.string(),
   turnId: z.string(),
 });
+export interface LangyTurnStreamInputSchema extends Named<
+  typeof langyTurnStreamInputSchemaDefinition
+> {}
+export const langyTurnStreamInputSchema: LangyTurnStreamInputSchema =
+  langyTurnStreamInputSchemaDefinition;
 
-export const langyLocalAnsweredSchema = z.object({ answered: z.literal(true) });
-export const langyLocalPolicySchema = z.object({ skipPermissions: z.boolean() });
-export const langyLocalDisconnectedSchema = z.object({ disconnected: z.boolean() });
-export const langyControlRequestRenewedSchema = z.object({ expiresAt: z.string() });
+const langyLocalAnsweredSchemaDefinition = z.object({ answered: z.literal(true) });
+export interface LangyLocalAnsweredSchema extends Named<
+  typeof langyLocalAnsweredSchemaDefinition
+> {}
+export const langyLocalAnsweredSchema: LangyLocalAnsweredSchema =
+  langyLocalAnsweredSchemaDefinition;
+const langyLocalPolicySchemaDefinition = z.object({ skipPermissions: z.boolean() });
+export interface LangyLocalPolicySchema extends Named<typeof langyLocalPolicySchemaDefinition> {}
+export const langyLocalPolicySchema: LangyLocalPolicySchema = langyLocalPolicySchemaDefinition;
+const langyLocalDisconnectedSchemaDefinition = z.object({ disconnected: z.boolean() });
+export interface LangyLocalDisconnectedSchema extends Named<
+  typeof langyLocalDisconnectedSchemaDefinition
+> {}
+export const langyLocalDisconnectedSchema: LangyLocalDisconnectedSchema =
+  langyLocalDisconnectedSchemaDefinition;
+const langyControlRequestRenewedSchemaDefinition = z.object({ expiresAt: z.string() });
+export interface LangyControlRequestRenewedSchema extends Named<
+  typeof langyControlRequestRenewedSchemaDefinition
+> {}
+export const langyControlRequestRenewedSchema: LangyControlRequestRenewedSchema =
+  langyControlRequestRenewedSchemaDefinition;
 
 /** The signed-in person behind a panel call; the session a turn's credentials are minted for. */
 export type LangyPanelCaller = Readonly<{

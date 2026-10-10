@@ -9,7 +9,7 @@ import (
 	"strings"
 )
 
-// The SCIM, legacy-provider and Auth0-webhook verbs of `haven idp`.
+// The SCIM, legacy-provider and Auth0-webhook verbs of `haven sim idp`.
 
 // scimReceiver is the body that points a push, pull, sync or event at a SCIM
 // service provider other than the tenant's own connection; empty keeps the connection.
@@ -36,7 +36,7 @@ func idpSCIMTargetSet(c idpCall) error {
 		return err
 	}
 	if !c.inv.has("--url") || token == "" {
-		return errors.New("usage: haven idp scim target set <tenant> --url <scim-base> --token-env <VAR>")
+		return errors.New("usage: haven sim idp scim target set <tenant> --url <scim-base> --token-env <VAR>")
 	}
 	return c.put("/control/t/"+t+"/scim-target", map[string]string{"baseUrl": c.inv.value("--url"), "token": token})
 }
@@ -181,7 +181,7 @@ func idpTamper(c idpCall) error {
 func idpSkew(c idpCall) error {
 	seconds, err := strconv.Atoi(c.rest[1])
 	if err != nil {
-		return fmt.Errorf("usage: haven idp skew <tenant> <seconds>, got %q", c.rest[1])
+		return fmt.Errorf("usage: haven sim idp skew <tenant> <seconds>, got %q", c.rest[1])
 	}
 	return c.postTenant("config", map[string]int{"skewSeconds": seconds})
 }
@@ -202,7 +202,7 @@ func idpUserActive(c idpCall, active bool) error {
 // idpSAMLUnsolicited asks for an IdP-initiated response and prints the form fields to post.
 func idpSAMLUnsolicited(c idpCall) error {
 	if c.inv.value("--acs-url") == "" || c.inv.value("--email") == "" {
-		return fmt.Errorf("usage: haven idp saml unsolicited <tenant> --acs-url <url> --email <e>")
+		return fmt.Errorf("usage: haven sim idp saml unsolicited <tenant> --acs-url <url> --email <e>")
 	}
 	return c.postTenant("saml/unsolicited", map[string]string{
 		"acsUrl": c.inv.value("--acs-url"), "email": c.inv.value("--email"),
@@ -222,7 +222,7 @@ func idpAuth0Webhook(c idpCall) error {
 		return err
 	}
 	if secret == "" || !c.inv.has("--target") || !c.inv.has("--event") || !c.inv.has("--user") {
-		return errors.New("usage: haven idp auth0-webhook <tenant> --event create|deactivate --user <u> --target <stack-url> --secret-env <VAR>")
+		return errors.New("usage: haven sim idp auth0-webhook <tenant> --event create|deactivate --user <u> --target <stack-url> --secret-env <VAR>")
 	}
 	return c.postTenant("auth0-webhook", map[string]string{
 		"target": c.inv.value("--target"), "secret": secret, "token": token,

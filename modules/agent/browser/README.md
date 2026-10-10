@@ -20,7 +20,7 @@ A URL marked (route table) is joined from `apps/ui/src/shell/ui-route-table.ts`;
 
 | Drawer                      | Opens                                                                 | Opened from                    |
 | --------------------------- | --------------------------------------------------------------------- | ------------------------------ |
-| `agentList`                 | `src/ui/sections/agent-list-drawer.tsx`                               | experiment                     |
+| `agentList`                 | `src/ui/sections/routed-agent-drawers.tsx`                            | experiment                     |
 | `agentHistory`              | `src/ui/sections/agent-history-drawer.tsx`                            | –                              |
 | `agentTypeSelector`         | `src/ui/sections/agent-type-selector-drawer.tsx`                      | navigation, scenario, workflow |
 | `agentCodeEditor`           | `src/ui/sections/routed-agent-drawers.tsx`                            | –                              |

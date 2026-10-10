@@ -1,19 +1,21 @@
 import {
   AuthzEngine,
+  bindingRoleKeyOf,
   collectedBindingSchema,
+  type AuthzApi,
+  type AuthzAttachBindingsInput,
+  type AuthzDefineRoleInput,
   type AuthzScopeRef,
   type CollectedGrants,
 } from "@langwatch/authz-contract";
-import type { Prisma } from "@langwatch/prisma-client/generated";
-import { Temporal } from "@langwatch/time";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
-  adminGrantBindings,
-  privateTokenGrantBinding,
-  publicTokenGrantBinding,
-  grantRowFor,
-  roleRowFor,
+  adminGrants,
+  attachSeedGrants,
+  privateTokenGrant,
+  publicTokenGrant,
+  type SeedGrant,
 } from "../seed-authz.ts";
 
 const organizationId = "local-dev-organization";
@@ -23,44 +25,29 @@ const userId = "local-dev-admin-user";
 const privateKeyId = "private-key";
 const publicKeyId = "public-key";
 const publicRoleId = "local-dev-public-ingestion-role";
-const occurredAt = Temporal.Instant.from("2026-09-25T00:00:00Z");
+const publicRolePermissions = ["traces:create"];
 
-const grantRows = [
-  ...adminGrantBindings({ organizationId, teamId, userId }),
-  privateTokenGrantBinding({ organizationId, apiKeyId: privateKeyId }),
-  publicTokenGrantBinding({
-    organizationId,
-    projectId,
-    apiKeyId: publicKeyId,
-    roleId: publicRoleId,
-  }),
-].map((binding) => grantRowFor({ binding, occurredAt }));
+const seedGrants: SeedGrant[] = [
+  ...adminGrants({ organizationId, teamId, userId }),
+  privateTokenGrant({ organizationId, apiKeyId: privateKeyId }),
+  publicTokenGrant({ projectId, apiKeyId: publicKeyId, roleId: publicRoleId }),
+];
 
-const publicRoleProjection = {
-  id: publicRoleId,
-  organizationId,
-  name: "local-dev-public-ingestion",
-  description: null,
-  permissions: ["traces:create"],
-  kind: "system_api_key",
-} as const satisfies Parameters<typeof roleRowFor>[0]["role"];
-const publicRole = roleRowFor({ role: publicRoleProjection, occurredAt });
+function principalIdOf({ principal }: SeedGrant): string {
+  if ("userId" in principal) return principal.userId;
+  if ("apiKeyId" in principal) return principal.apiKeyId;
+  return principal.groupId;
+}
 
-/** The binding list the engine's reader builds from live `Grant` rows for one principal. */
-function bindingsHeldBy({
-  principalType,
-  principalId,
-}: {
-  principalType: Prisma.GrantUncheckedCreateInput["principalType"];
-  principalId: string;
-}) {
-  return grantRows
-    .filter((row) => row.principalType === principalType && row.principalId === principalId)
-    .map((row) =>
+/** The binding list the engine's reader builds from the projected grants of one principal. */
+function bindingsHeldBy({ principalId }: { principalId: string }) {
+  return seedGrants
+    .filter((grant) => principalIdOf(grant) === principalId)
+    .map((grant) =>
       collectedBindingSchema.parse({
-        roleKey: row.roleKey,
-        scopeType: row.scopeType,
-        scopeId: row.scopeId,
+        roleKey: bindingRoleKeyOf({ role: grant.role, customRoleId: grant.customRoleId }),
+        scopeType: grant.scopeType,
+        scopeId: grant.scopeId,
       }),
     );
 }
@@ -78,7 +65,7 @@ function keyGrants({
     organizationRole: null,
     isOrgMember: false,
     membershipDisabled: false,
-    bindings: bindingsHeldBy({ principalType: "API_KEY", principalId: apiKeyId }),
+    bindings: bindingsHeldBy({ principalId: apiKeyId }),
     customRolePermissions,
   };
 }
@@ -89,7 +76,7 @@ const ownerGrants: CollectedGrants = {
   organizationRole: "ADMIN",
   isOrgMember: true,
   membershipDisabled: false,
-  bindings: bindingsHeldBy({ principalType: "USER", principalId: userId }),
+  bindings: bindingsHeldBy({ principalId: userId }),
   customRolePermissions: new Map(),
 };
 
@@ -122,7 +109,7 @@ describe("given the grants the local-dev seed writes", () => {
   describe("when the public ingestion token asks", () => {
     const grants = keyGrants({
       apiKeyId: publicKeyId,
-      customRolePermissions: new Map([[publicRole.id, publicRoleProjection.permissions]]),
+      customRolePermissions: new Map([[publicRoleId, publicRolePermissions]]),
     });
 
     /** @scenario "The seeded public ingestion token stays restricted to trace ingestion" */
@@ -148,5 +135,45 @@ describe("given the grants the local-dev seed writes", () => {
 
       expect(decision.allowed).toBe(true);
     });
+  });
+});
+
+describe("given the fixed local identity is seeded", () => {
+  /** @scenario "The fixed local identity's grants come from real commands" */
+  it("defines the role, then attaches every grant through the authz API", async () => {
+    const calls: string[] = [];
+    const authz: Pick<AuthzApi, "defineRole" | "attachBindings"> = {
+      defineRole: vi.fn(async ({ roleId }: AuthzDefineRoleInput) => {
+        calls.push(`defineRole ${roleId}`);
+      }),
+      attachBindings: vi.fn(async ({ bindings }: AuthzAttachBindingsInput) => {
+        calls.push("attachBindings");
+        return { attached: bindings.map((binding) => binding.bindingId), duplicates: [] };
+      }),
+    };
+    const role = {
+      roleId: publicRoleId,
+      name: "local-dev-public-ingestion",
+      permissions: publicRolePermissions,
+      kind: "system_api_key",
+    } as const;
+
+    await attachSeedGrants({ authz, organizationId, roles: [role], grants: seedGrants });
+
+    expect(calls).toEqual([`defineRole ${publicRoleId}`, "attachBindings"]);
+    expect(authz.defineRole).toHaveBeenCalledWith(
+      expect.objectContaining({ ...role, organizationId, actor: { type: "system", id: null } }),
+    );
+    const [attach] = vi.mocked(authz.attachBindings).mock.calls[0] ?? [];
+    expect(attach).toMatchObject({
+      organizationId,
+      caller: { type: "system" },
+      onDuplicate: "skip",
+      requireProjection: false,
+    });
+    expect(attach?.bindings).toEqual(
+      seedGrants.map((grant) => ({ ...grant, bindingId: expect.any(String) })),
+    );
+    expect(new Set(attach?.bindings.map((binding) => binding.bindingId)).size).toBe(4);
   });
 });

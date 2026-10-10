@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { fromDate, type Instant, Temporal } from "@langwatch/time";
 import { z } from "zod";
 
@@ -5,7 +6,7 @@ const identifierSchema = z.string().trim().min(1);
 const moneySchema = z.union([z.number().finite(), z.string().trim().min(1)]);
 
 /** The request-time preflight check used by the Gateway and compatibility APIs. */
-export const gatewayBudgetCheckInputSchema = z
+const gatewayBudgetCheckInputSchemaDefinition = z
   .object({
     organizationId: identifierSchema,
     teamId: identifierSchema.nullable(),
@@ -18,6 +19,11 @@ export const gatewayBudgetCheckInputSchema = z
     providerKey: identifierSchema.nullable().optional(),
   })
   .strict();
+export interface GatewayBudgetCheckInputSchema extends Named<
+  typeof gatewayBudgetCheckInputSchemaDefinition
+> {}
+export const gatewayBudgetCheckInputSchema: GatewayBudgetCheckInputSchema =
+  gatewayBudgetCheckInputSchemaDefinition;
 
 export type GatewayBudgetCheckInput = z.infer<typeof gatewayBudgetCheckInputSchema>;
 
@@ -50,7 +56,7 @@ const budgetScopeSpendSchema = z
   })
   .strict();
 
-export const gatewayBudgetCheckResultSchema = z
+const gatewayBudgetCheckResultSchemaDefinition = z
   .object({
     decision: z.enum(["allow", "soft_warn", "hard_block"]),
     warnings: z.array(budgetWarningSchema),
@@ -59,6 +65,11 @@ export const gatewayBudgetCheckResultSchema = z
     scopes: z.array(budgetScopeSpendSchema),
   })
   .strict();
+export interface GatewayBudgetCheckResultSchema extends Named<
+  typeof gatewayBudgetCheckResultSchemaDefinition
+> {}
+export const gatewayBudgetCheckResultSchema: GatewayBudgetCheckResultSchema =
+  gatewayBudgetCheckResultSchemaDefinition;
 
 export type GatewayBudgetCheckResult = z.infer<typeof gatewayBudgetCheckResultSchema>;
 
@@ -371,7 +382,7 @@ const dateOrIsoSchema = z.union([
     .transform((value) => Temporal.Instant.from(value)),
 ]);
 
-export const createGatewayBudgetInputSchema = z
+const createGatewayBudgetInputSchemaDefinition = z
   .object({
     organizationId: identifierSchema,
     scope: gatewayBudgetScopeSchema,
@@ -389,8 +400,13 @@ export const createGatewayBudgetInputSchema = z
     actorUserId: identifierSchema,
   })
   .strict();
+export interface CreateGatewayBudgetInputSchema extends Named<
+  typeof createGatewayBudgetInputSchemaDefinition
+> {}
+export const createGatewayBudgetInputSchema: CreateGatewayBudgetInputSchema =
+  createGatewayBudgetInputSchemaDefinition;
 
-export const updateGatewayBudgetInputSchema = z
+const updateGatewayBudgetInputSchemaDefinition = z
   .object({
     id: identifierSchema,
     organizationId: identifierSchema,
@@ -404,8 +420,13 @@ export const updateGatewayBudgetInputSchema = z
     actorUserId: identifierSchema,
   })
   .strict();
+export interface UpdateGatewayBudgetInputSchema extends Named<
+  typeof updateGatewayBudgetInputSchemaDefinition
+> {}
+export const updateGatewayBudgetInputSchema: UpdateGatewayBudgetInputSchema =
+  updateGatewayBudgetInputSchemaDefinition;
 
-export const resetGatewayBudgetInputSchema = z
+const resetGatewayBudgetInputSchemaDefinition = z
   .object({
     id: identifierSchema,
     organizationId: identifierSchema,
@@ -414,6 +435,11 @@ export const resetGatewayBudgetInputSchema = z
     reason: z.string().nullable().optional(),
   })
   .strict();
+export interface ResetGatewayBudgetInputSchema extends Named<
+  typeof resetGatewayBudgetInputSchemaDefinition
+> {}
+export const resetGatewayBudgetInputSchema: ResetGatewayBudgetInputSchema =
+  resetGatewayBudgetInputSchemaDefinition;
 
 export type GatewayBudgetPageInput = {
   organizationId: string;
@@ -449,18 +475,33 @@ const gatewayBudgetApiScopeSchema = z.discriminatedUnion("kind", [
 ]);
 
 /** One organization, for the reads scoped to a whole tenant. */
-export const gatewayBudgetApiOrganizationInputSchema = z.object({ organizationId: z.string() });
+const gatewayBudgetApiOrganizationInputSchemaDefinition = z.object({ organizationId: z.string() });
+export interface GatewayBudgetApiOrganizationInputSchema extends Named<
+  typeof gatewayBudgetApiOrganizationInputSchemaDefinition
+> {}
+export const gatewayBudgetApiOrganizationInputSchema: GatewayBudgetApiOrganizationInputSchema =
+  gatewayBudgetApiOrganizationInputSchemaDefinition;
 
 /** One project, for the read a project's own screens make. */
-export const gatewayBudgetApiProjectInputSchema = z.object({ projectId: z.string() });
+const gatewayBudgetApiProjectInputSchemaDefinition = z.object({ projectId: z.string() });
+export interface GatewayBudgetApiProjectInputSchema extends Named<
+  typeof gatewayBudgetApiProjectInputSchemaDefinition
+> {}
+export const gatewayBudgetApiProjectInputSchema: GatewayBudgetApiProjectInputSchema =
+  gatewayBudgetApiProjectInputSchemaDefinition;
 
 /** One budget inside one organization. */
-export const gatewayBudgetApiBudgetInputSchema = z.object({
+const gatewayBudgetApiBudgetInputSchemaDefinition = z.object({
   organizationId: z.string(),
   id: z.string(),
 });
+export interface GatewayBudgetApiBudgetInputSchema extends Named<
+  typeof gatewayBudgetApiBudgetInputSchemaDefinition
+> {}
+export const gatewayBudgetApiBudgetInputSchema: GatewayBudgetApiBudgetInputSchema =
+  gatewayBudgetApiBudgetInputSchemaDefinition;
 
-export const gatewayBudgetApiCreateInputSchema = z.object({
+const gatewayBudgetApiCreateInputSchemaDefinition = z.object({
   organizationId: z.string(),
   scope: gatewayBudgetApiScopeSchema,
   name: z.string().min(1).max(128),
@@ -490,8 +531,13 @@ export const gatewayBudgetApiCreateInputSchema = z.object({
   // will use it is legitimate, so the guardrail is not a prohibition.
   allowUnreachable: z.boolean().optional(),
 });
+export interface GatewayBudgetApiCreateInputSchema extends Named<
+  typeof gatewayBudgetApiCreateInputSchemaDefinition
+> {}
+export const gatewayBudgetApiCreateInputSchema: GatewayBudgetApiCreateInputSchema =
+  gatewayBudgetApiCreateInputSchemaDefinition;
 
-export const gatewayBudgetApiUpdateInputSchema = z.object({
+const gatewayBudgetApiUpdateInputSchemaDefinition = z.object({
   organizationId: z.string(),
   id: z.string(),
   name: z.string().min(1).max(128).optional(),
@@ -500,13 +546,23 @@ export const gatewayBudgetApiUpdateInputSchema = z.object({
   onBreach: z.enum(["BLOCK", "WARN"]).optional(),
   timezone: z.string().nullable().optional(),
 });
+export interface GatewayBudgetApiUpdateInputSchema extends Named<
+  typeof gatewayBudgetApiUpdateInputSchemaDefinition
+> {}
+export const gatewayBudgetApiUpdateInputSchema: GatewayBudgetApiUpdateInputSchema =
+  gatewayBudgetApiUpdateInputSchemaDefinition;
 
-export const gatewayBudgetApiResetInputSchema = z.object({
+const gatewayBudgetApiResetInputSchemaDefinition = z.object({
   organizationId: z.string(),
   id: z.string(),
   endUserId: z.string().optional(),
   reason: z.string().max(500).optional(),
 });
+export interface GatewayBudgetApiResetInputSchema extends Named<
+  typeof gatewayBudgetApiResetInputSchemaDefinition
+> {}
+export const gatewayBudgetApiResetInputSchema: GatewayBudgetApiResetInputSchema =
+  gatewayBudgetApiResetInputSchemaDefinition;
 
 export type GatewayBudgetApiOrganizationInput = z.infer<
   typeof gatewayBudgetApiOrganizationInputSchema

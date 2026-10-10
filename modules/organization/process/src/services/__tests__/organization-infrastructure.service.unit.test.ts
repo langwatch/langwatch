@@ -189,6 +189,10 @@ class StubRepository extends OrganizationRepository {
     throw new OrganizationNotFoundError();
   }
 
+  async findLicensingLicenseKeys(): Promise<string[]> {
+    return [];
+  }
+
   async findFirstAdministratorEmail(): Promise<string | null> {
     return null;
   }
@@ -322,6 +326,12 @@ class RecordingGrants extends AuthzGrantsService {
   readonly changeGrantRole = unsupported<AuthzGrantsService["changeGrantRole"]>();
   readonly revokeGrant = unsupported<AuthzGrantsService["revokeGrant"]>();
   readonly invalidateOrganization = unsupported<AuthzGrantsService["invalidateOrganization"]>();
+  readonly findLiveSharedProjectGrants =
+    unsupported<AuthzGrantsService["findLiveSharedProjectGrants"]>();
+  readonly attachSharedProjectGrant = unsupported<AuthzGrantsService["attachSharedProjectGrant"]>();
+  readonly awaitSharedProjectGrants = unsupported<AuthzGrantsService["awaitSharedProjectGrants"]>();
+  readonly revokeSharedProjectGrants =
+    unsupported<AuthzGrantsService["revokeSharedProjectGrants"]>();
 
   constructor(private readonly failure?: Error) {
     super();

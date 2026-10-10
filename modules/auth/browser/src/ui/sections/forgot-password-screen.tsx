@@ -10,7 +10,7 @@ import { forgetCarriedEmail, readCarriedEmail } from "../../model/carried-email.
 import { AuthCard } from "../../ui/elements/auth-card.tsx";
 import { CheckYourEmail } from "../../ui/elements/check-your-email.tsx";
 import { FIELD_FOCUS, FIELD_SURFACE, FrontDoorField } from "../../ui/elements/front-door-field.tsx";
-import { SecondaryActionLink } from "../../ui/elements/secondary-action-link.tsx";
+import { FrontDoorLinkButton } from "../../ui/elements/front-door-link-button.tsx";
 import { FrontDoorPrimaryButton } from "../elements/front-door-primary-button.tsx";
 import { FrontDoorShell } from "./front-door-shell.tsx";
 
@@ -146,5 +146,5 @@ function ForgotPasswordForm() {
 }
 
 function BackToSignInLink() {
-  return <SecondaryActionLink href="/auth/signin" label="Back to sign in" />;
+  return <FrontDoorLinkButton href="/auth/signin" label="Back to sign in" tone="secondary" />;
 }

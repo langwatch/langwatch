@@ -31,7 +31,6 @@ import { MemoryGatewaySpendEventsRepository } from "./memory.gateway-spend-event
 import { MemoryGatewaySpendScopeRepository } from "./memory.gateway-spend-scope.repository.ts";
 import { MemoryGatewayTraceDestinationReportRepository } from "./memory.gateway-trace-destination-report.repository.ts";
 import { MemoryGatewayTraceExportKeyRepository } from "./memory.gateway-trace-export-key.repository.ts";
-import { MemoryGatewayVirtualKeyConfigBackfillRepository } from "./memory.gateway-virtual-key-config-backfill.repository.ts";
 import { MemoryVirtualKeyDirectBudgetRepository } from "./memory.gateway-virtual-key-direct-budget.repository.ts";
 import { MemoryGatewayVirtualKeyRepository } from "./memory.gateway-virtual-key.repository.ts";
 import { MemoryGatewayStore } from "./memory.gateway.store.ts";
@@ -83,7 +82,6 @@ export class MemoryGatewayRepositories {
       internalStore: MemoryGatewayInternalStoreRepository.create(),
       traceExportKeys: MemoryGatewayTraceExportKeyRepository.create(),
       traceDestinationReport: MemoryGatewayTraceDestinationReportRepository.create(store),
-      virtualKeyConfigBackfill: MemoryGatewayVirtualKeyConfigBackfillRepository.create(store),
       budgetSpend,
       principalSpend: MemoryGatewayPrincipalSpendRepository.create(),
       spendEvents,

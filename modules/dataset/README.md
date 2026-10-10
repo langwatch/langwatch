@@ -19,8 +19,8 @@ Datasets and their records: creating, naming, mapping and reading them by slug o
 | Kind            | Name                        | Declared at                                                                     |
 | --------------- | --------------------------- | ------------------------------------------------------------------------------- |
 | Postgres table  | `BatchEvaluation`           | `process/src/repositories/prisma/prisma.batch-evaluation.repository.ts:19`      |
-| Postgres table  | `Dataset`                   | `process/src/repositories/prisma/prisma.dataset-content.repository.ts:60`       |
-| Postgres table  | `DatasetRecord`             | `process/src/repositories/prisma/prisma.dataset-content.repository.ts:60`       |
+| Postgres table  | `Dataset`                   | `process/src/repositories/prisma/prisma.dataset-content.repository.ts:61`       |
+| Postgres table  | `DatasetRecord`             | `process/src/repositories/prisma/prisma.dataset-content.repository.ts:61`       |
 | Postgres table  | `Dataset`                   | `process/src/repositories/prisma/prisma.dataset-count.repository.ts:8`          |
 | Postgres table  | `DatasetRecord`             | `process/src/repositories/prisma/prisma.dataset-count.repository.ts:8`          |
 | Postgres table  | `BatchEvaluation`           | `process/src/repositories/prisma/prisma.dataset-count.repository.ts:8`          |

@@ -92,6 +92,35 @@ describe("the voicesim console", () => {
     expect(timeline.textContent).toContain("conversation_initiation_metadata");
   });
 
+  /** @scenario "An operator clears the call log from the console" */
+  it("clears the call log behind a confirmation and shows both base URLs", async () => {
+    let logged: unknown[] = calls;
+    const fetch = vi.fn(async (input: string, init?: RequestInit) => {
+      const url = new URL(input, "http://voice.test");
+      if (url.pathname === "/_sim/api/calls" && init?.method === "DELETE") {
+        logged = [];
+        return new Response(null, { status: 204 });
+      }
+      if (url.pathname === "/_sim/api/status") return json({ body: status });
+      if (url.pathname === "/_sim/api/calls") return json({ body: { calls: logged } });
+      return json({ body: { error: "not_found" }, status: 404 });
+    });
+    vi.stubGlobal("fetch", fetch);
+    render(<CallsConsole />);
+
+    await waitFor(() => expect(screen.getAllByTestId("call-row")).toHaveLength(2));
+    expect(
+      await screen.findByTitle(/OpenAI at http:\/\/127\.0\.0\.1:5591\/v1/u, {}, { timeout: 5000 }),
+    ).toBeTruthy();
+    const clear = screen.getByText("Clear calls").closest("button");
+    if (!clear) throw new Error("no Clear calls button");
+    fireEvent.click(clear);
+    fireEvent.click(clear);
+
+    await waitFor(() => expect(screen.queryAllByTestId("call-row")).toHaveLength(0));
+    expect(fetch).toHaveBeenCalledWith("/_sim/api/calls", { method: "DELETE" });
+  });
+
   it("shows the sim's refusal when the calls cannot be read", async () => {
     vi.stubGlobal(
       "fetch",

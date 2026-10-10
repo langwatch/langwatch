@@ -237,7 +237,7 @@ export function CacheRuleForm({ state, onChange, complaint }: FormProps) {
           <Field.Label>
             Priority
             <FieldInfoTooltip
-              description="Higher number wins first. Rules are evaluated priority DESC, first-match-wins. Ties break by createdAt ascending."
+              description="Lower number is checked first, and the first rule that matches wins. Rules with the same number go oldest first."
               docHref="/ai-gateway/cache-control#cache-rules"
             />
           </Field.Label>
@@ -252,16 +252,16 @@ export function CacheRuleForm({ state, onChange, complaint }: FormProps) {
             <Field.ErrorText>{complaintFor("priority")}</Field.ErrorText>
           ) : (
             <Field.HelperText>
-              Evaluated highest-first. Conflicting rules: higher number wins.
+              Checked lowest number first. Conflicting rules: the lower number wins.
             </Field.HelperText>
           )}
         </Field.Root>
         <Field.Root>
           <Field.Label>Enabled</Field.Label>
           <Switch.Root
+            colorPalette="accent"
             checked={state.enabled}
             onCheckedChange={(v) => set("enabled", v.checked)}
-            colorPalette="orange"
           >
             <Switch.HiddenInput />
             <Switch.Control />

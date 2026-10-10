@@ -4,6 +4,7 @@
  * moves with it.
  */
 
+import type { Named } from "@langwatch/module";
 import type { Instant } from "@langwatch/time";
 import { z } from "zod";
 
@@ -61,7 +62,7 @@ const bugReportInstantSchema = z.custom<Instant>((value) => value !== null && va
  * `sessionData` is the whole session a reporter attached, and carrying every
  * transcript on a page would be the listing's whole payload.
  */
-export const bugReportRowSchema = z.object({
+const bugReportRowSchemaDefinition = z.object({
   id: z.string(),
   createdAt: bugReportInstantSchema,
   source: z.string(),
@@ -75,42 +76,60 @@ export const bugReportRowSchema = z.object({
   linkedProjectId: z.string().nullable(),
   metadata: z.unknown(),
 });
+export interface BugReportRowSchema extends Named<typeof bugReportRowSchemaDefinition> {}
+export const bugReportRowSchema: BugReportRowSchema = bugReportRowSchemaDefinition;
 
 /** One report in full, as opening it answers. */
-export const bugReportSchema = z.object({
+const bugReportSchemaDefinition = z.object({
   ...bugReportRowSchema.shape,
   sessionData: z.string().nullable(),
 });
+export interface BugReportSchema extends Named<typeof bugReportSchemaDefinition> {}
+export const bugReportSchema: BugReportSchema = bugReportSchemaDefinition;
 
 /** One page of the inbox, with the count the pager renders. */
-export const bugReportListingSchema = z.object({
+const bugReportListingSchemaDefinition = z.object({
   reports: bugReportRowSchema.array(),
   total: z.number(),
 });
+export interface BugReportListingSchema extends Named<typeof bugReportListingSchemaDefinition> {}
+export const bugReportListingSchema: BugReportListingSchema = bugReportListingSchemaDefinition;
 export type BugReportListing = z.infer<typeof bugReportListingSchema>;
 
 /** One page of the inbox, newest first, optionally narrowed by a search term. */
-export const listBugReportsInputSchema = z.object({
+const listBugReportsInputSchemaDefinition = z.object({
   page: z.number().int().min(0).default(0),
   pageSize: z.number().int().min(1).max(100).default(50),
   search: z.string().max(200).optional(),
 });
+export interface ListBugReportsInputSchema extends Named<
+  typeof listBugReportsInputSchemaDefinition
+> {}
+export const listBugReportsInputSchema: ListBugReportsInputSchema =
+  listBugReportsInputSchemaDefinition;
 export type ListBugReportsInput = z.infer<typeof listBugReportsInputSchema>;
 
-export const bugReportIdInputSchema = z.object({ id: z.string() });
+const bugReportIdInputSchemaDefinition = z.object({ id: z.string() });
+export interface BugReportIdInputSchema extends Named<typeof bugReportIdInputSchemaDefinition> {}
+export const bugReportIdInputSchema: BugReportIdInputSchema = bugReportIdInputSchemaDefinition;
 export type BugReportIdInput = z.infer<typeof bugReportIdInputSchema>;
 
 /** The one header the intake reads: the proxy chain its rate-limit bucket comes from. */
-export const bugReportIntakeHeadersSchema = z.object({
+const bugReportIntakeHeadersSchemaDefinition = z.object({
   "x-forwarded-for": z.string().optional(),
 });
+export interface BugReportIntakeHeadersSchema extends Named<
+  typeof bugReportIntakeHeadersSchemaDefinition
+> {}
+export const bugReportIntakeHeadersSchema: BugReportIntakeHeadersSchema =
+  bugReportIntakeHeadersSchemaDefinition;
 
 /**
  * The report a customer's coding agent posts, parsed by the intake route
  * so a rejection answers the bespoke body released CLI/MCP builds read.
  * Oversized is refused, not truncated into something unreadable.
  */
-export const submitBugReportSchema = z
+const submitBugReportSchemaDefinition = z
   .object({
     source: z.enum(["cli", "mcp"]),
     kind: z.enum(["summary", "full_session"]),
@@ -129,4 +148,6 @@ export const submitBugReportSchema = z
     (body) => (body.summary?.trim().length ?? 0) > 0 || (body.sessionData?.trim().length ?? 0) > 0,
     { message: "either summary or sessionData is required" },
   );
+export interface SubmitBugReportSchema extends Named<typeof submitBugReportSchemaDefinition> {}
+export const submitBugReportSchema: SubmitBugReportSchema = submitBugReportSchemaDefinition;
 export type SubmitBugReport = z.infer<typeof submitBugReportSchema>;

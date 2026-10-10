@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import type { AgentCallSignal } from "./connected-agent.connection.ts";
@@ -8,7 +9,7 @@ import {
   paramsSchema,
 } from "./connected-agent.protocol.ts";
 
-export const relayCallBodySchema = z.object({
+const relayCallBodySchemaDefinition = z.object({
   messages: z.array(messageSchema).describe("The whole conversation so far, OpenAI style."),
   newMessages: z
     .array(messageSchema)
@@ -35,8 +36,10 @@ export const relayCallBodySchema = z.object({
     .describe("The W3C trace context the agent adopts, so its spans join this turn's trace."),
   run: callRunSchema.optional().describe("The simulation run this turn belongs to, if any."),
 });
+export interface RelayCallBodySchema extends Named<typeof relayCallBodySchemaDefinition> {}
+export const relayCallBodySchema: RelayCallBodySchema = relayCallBodySchemaDefinition;
 
-export const relayCallResponseSchema = z.object({
+const relayCallResponseSchemaDefinition = z.object({
   output: outputSchema.describe(
     "What the function answered: text, one message, or a list of messages.",
   ),
@@ -50,6 +53,8 @@ export const relayCallResponseSchema = z.object({
   }),
   durationMs: z.number(),
 });
+export interface RelayCallResponseSchema extends Named<typeof relayCallResponseSchemaDefinition> {}
+export const relayCallResponseSchema: RelayCallResponseSchema = relayCallResponseSchemaDefinition;
 
 export type AgentCallInput = z.infer<typeof relayCallBodySchema> & {
   id: string;

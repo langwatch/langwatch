@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"errors"
 	"fmt"
 	"net/url"
 	"strings"
@@ -143,15 +144,16 @@ func (s Stack) OverlayEnv() []string {
 			env = append(env, fmt.Sprintf("SSO_DOMAIN_PROOF_DNS_SERVERS=127.0.0.1:%d", idp.DNSPort))
 		}
 	}
-	// The ui lane holds each developer tool's port and starts the tool on the first
-	// visit (apps/ui/vite/dormant-dev-tool.ts). Naming haven's ports here puts that
-	// listener behind design-system.<slug> and mail-room.<slug>.
-	if sb := s.svc(DesignSystemService); sb.Port != 0 {
-		env = append(env, fmt.Sprintf("LANGWATCH_STORYBOOK_PORT=%d", sb.Port))
+	// Haven serves the built Storybook itself (the design-system lane), so the ui
+	// lane only frames it at /design-system and never starts `storybook dev`.
+	if sb := s.svc(DesignSystemService); sb.Port != 0 && sb.URL != "" {
+		env = append(env, "LANGWATCH_STORYBOOK_URL="+sb.URL)
+	} else {
+		env = append(env, "LANGWATCH_SKIP_STORYBOOK=1")
 	}
-	if mr := s.svc(MailRoomService); mr.Port != 0 {
-		env = append(env, fmt.Sprintf("LANGWATCH_MAIL_PREVIEW_PORT=%d", mr.Port))
-	}
+	// Haven serves the mail studio rendered at build time (the mail-room lane), so
+	// the ui lane never starts its dev server, whatever the UI mode.
+	env = append(env, "LANGWATCH_SKIP_MAIL_PREVIEW=1")
 	// The evaluator service, when this stack runs one (or falls back to a
 	// baseline's). Without it the app keeps .env's value, where nothing listens.
 	if lev := s.svc(LangevalsService); lev.Port != 0 {
@@ -198,9 +200,8 @@ func (s Stack) OverlayEnv() []string {
 		"LANGWATCH_ADMIN_PASSWORD="+DefaultAdminPassword,
 		"LANGWATCH_PRIVATE_ACCESS_TOKEN="+DefaultPrivateAccessToken,
 		"LANGWATCH_PUBLIC_ACCESS_TOKEN="+DefaultPublicAccessToken,
-		// ee/admin/isAdmin.ts gates platform-admin (impersonation etc.) on this
-		// comma-separated list. The seeded admin needs to be in it, or logging in
-		// as DefaultAdminEmail gets a normal user, not a platform admin.
+		// Feeds only ops's one-time platform-operator seed (skipped when IS_SAAS
+		// is on); the seed shell grants the seeded admin the role directly.
 		"ADMIN_EMAILS="+DefaultAdminEmail,
 	)
 	// langyagent (the worker manager): the control plane dials it at its loopback
@@ -301,8 +302,8 @@ func (s Stack) observabilityEnv() []string {
 	env := []string{
 		"OTEL_EXPORTER_OTLP_ENDPOINT=" + otlp,   // official name — TS app AND Go services (their own telemetry)
 		"OTEL_DEBUG_COLLECTOR_ENDPOINT=" + otlp, // Go OTLP logs ride this; span/metric export dedupes when equal to the official endpoint
-		"PINO_OTEL_ENABLED=true",
-		"OTEL_METRICS_ENABLED=true",
+		"OTEL_LOGS_EXPORTER=otlp",
+		"OTEL_METRICS_EXPORTER=otlp",
 		"LOG_OTEL_LEVEL=debug",
 		"OTEL_RESOURCE_ATTRIBUTES=" + ObservabilityWorktreeAttr + "=" + s.Slug,
 		// Browser telemetry (ADR-058). Tied to the collector rather than flagged
@@ -311,6 +312,8 @@ func (s Stack) observabilityEnv() []string {
 		// forward to. The frontend half of a trace is exactly what a developer
 		// debugging their own worktree wants, so it is on whenever the stack is.
 		"RUM_ENABLED=true",
+		// Named explicitly so the rum module does not fall back to the deprecated OTEL endpoint and warn.
+		"RUM_COLLECTOR_ENDPOINT=" + otlp,
 	}
 	// The Grafana base URL, so the app can build clickable trace/log deep links.
 	// The proxied hostname when the portless proxy carries the route (stable,
@@ -392,6 +395,20 @@ func MailSMTPEnv(resolved map[string]string, smtpPort int) []string {
 	}
 }
 
+// NoMailKnob is the per-run variable `haven up --no-mail` sets.
+const NoMailKnob = "HAVEN_NO_MAIL"
+
+// NoMailEnv blanks every mail setting for `haven up --no-mail`: an empty
+// variable beats the root .env under node --env-file, so the app sees no
+// provider. A key only 1Password holds is out of its reach.
+func NoMailEnv() []string {
+	env := []string{"SENDGRID_API_KEY=", "RESEND_API_KEY="}
+	for _, key := range MailProviderEnvVars {
+		env = append(env, key+"=")
+	}
+	return env
+}
+
 // StorageProviderEnvVars are the env keys that mean a developer chose where
 // objects go: a named backend, a bucket, an endpoint, or a filesystem root.
 // Any one set means haven points nothing at storagesim.
@@ -468,6 +485,77 @@ func AnalyticsProviderEnv(resolved map[string]string, endpoint string) []string 
 	return env
 }
 
+// OutboundProviderEnv points the product's four internal Slack channel settings
+// and its Slack Web API and webhook addresses at outboundsim's haven route, and
+// admits local webhook URLs, each only when the resolved environment leaves it unset.
+func OutboundProviderEnv(resolved map[string]string, endpoint string) []string {
+	var env []string
+	for _, c := range []struct{ key, bucket string }{
+		{"SLACK_CHANNEL_SIGNUPS", "B0SIGNUPS"},
+		{"SLACK_PLAN_LIMIT_CHANNEL", "B0PLANLIMIT"},
+		{"SLACK_CHANNEL_SUBSCRIPTIONS", "B0SUBSCRIPTIONS"},
+		{"SLACK_CHANNEL_SELF_HOSTED", "B0SELFHOSTED"},
+	} {
+		if resolved[c.key] == "" {
+			env = append(env, c.key+"="+endpoint+"/services/T0SIM/"+c.bucket+"/x")
+		}
+	}
+	for _, a := range [][2]string{{"SLACK_API_BASE", endpoint + "/api"}, {"SLACK_WEBHOOK_BASE", endpoint}} {
+		if resolved[a[0]] == "" {
+			env = append(env, a[0]+"="+a[1])
+		}
+	}
+	if resolved["WEBHOOKS_UNSAFE_ALLOW_LOCAL_URLS"] == "" {
+		env = append(env, "WEBHOOKS_UNSAFE_ALLOW_LOCAL_URLS=1")
+	}
+	return env
+}
+
+// PaymentSimSecretKey and PaymentSimWebhookSecret are the dev-only pair haven
+// gives billing when it points Stripe at paymentsim.
+const (
+	PaymentSimSecretKey     = "sk_test_paymentsim"
+	PaymentSimWebhookSecret = "whsec_paymentsim"
+)
+
+// HasOwnStripe reports whether .env or the shell names any Stripe setting.
+func HasOwnStripe(resolved map[string]string) bool {
+	return resolved["STRIPE_SECRET_KEY"] != "" || resolved["STRIPE_WEBHOOK_SECRET"] != "" || resolved["STRIPE_API_BASE"] != ""
+}
+
+// PaymentProviderEnv points billing's Stripe client at paymentsim, only when the
+// resolved environment names neither Stripe credential: billing refuses half a
+// pair, and a developer's own Stripe test account is never rewired.
+func PaymentProviderEnv(resolved map[string]string, endpoint string) []string {
+	if HasOwnStripe(resolved) {
+		return nil
+	}
+	return []string{"STRIPE_API_BASE=" + endpoint, "STRIPE_SECRET_KEY=" + PaymentSimSecretKey, "STRIPE_WEBHOOK_SECRET=" + PaymentSimWebhookSecret}
+}
+
+// RefuseLiveStripe refuses a dev stack a live Stripe key: it names the variable,
+// never the value. Webhook secrets (whsec_) carry no live/test mark, so the key decides.
+func RefuseLiveStripe(resolved map[string]string) error {
+	key := resolved["STRIPE_SECRET_KEY"]
+	if strings.HasPrefix(key, "sk_live_") || strings.HasPrefix(key, "rk_live_") {
+		return errors.New("haven refuses a live Stripe key in STRIPE_SECRET_KEY: use a test key (sk_test_) or remove it to get paymentsim")
+	}
+	return nil
+}
+
+// StripeNotice is the line `haven up` prints: which Stripe billing talks to.
+func StripeNotice(resolved map[string]string, isPaymentSimOn bool) string {
+	switch {
+	case resolved["STRIPE_API_BASE"] != "":
+		return "Stripe: custom base " + resolved["STRIPE_API_BASE"]
+	case HasOwnStripe(resolved):
+		return "Stripe: your test key from .env"
+	case isPaymentSimOn:
+		return "Stripe: paymentsim"
+	}
+	return "Stripe: none, billing is off (`haven up +payment` starts paymentsim)"
+}
+
 // llmProbeProviders are the providers whose credential probe the model-provider
 // module aims at the API root named by <PROVIDER>_BASE_URL. They get the base URL
 // only: a dummy key would seed an organization-level row for each one.
@@ -502,6 +590,9 @@ func LLMProviderEnv(resolved map[string]string, port int) []string {
 		env = append(env, p.url+"="+p.value)
 		if resolved[p.key] == "" {
 			env = append(env, p.key+"=llmsim")
+		}
+		if p.url == "OPENAI_BASE_URL" {
+			env = append(env, "HAVEN_SEED_LLMSIM_MODELS=1") // the seed adds error-429/500 models
 		}
 	}
 	return env

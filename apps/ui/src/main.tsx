@@ -5,11 +5,14 @@ import { createBrowserUiAnalytics } from "@langwatch/browser-host/browser-analyt
 import type {
   UiDeployment,
   UiFeedback,
-  UiSessionCapabilities,
+  UiSessionHostServices,
 } from "@langwatch/browser-host/capabilities";
 import type { UiDrawerRegistry } from "@langwatch/browser-host/drawer";
-import { BrowserUiFeedback, resolveUiFailureCopy } from "@langwatch/browser-host/feedback";
-import { registerChunkReloadListener } from "@langwatch/browser-host/navigation";
+import { BrowserUiFeedback } from "@langwatch/browser-host/feedback";
+import {
+  registerChunkReloadListener,
+  reloadOnBundleSwap,
+} from "@langwatch/browser-host/navigation";
 import { SessionVersionWatch, sessionVersionFetch } from "@langwatch/browser-host/session-version";
 import {
   createUiApplication,
@@ -24,7 +27,6 @@ import { installedModuleApis } from "@langwatch/browser/module-apis";
 import { installedModuleDrawers } from "@langwatch/browser/module-drawers";
 import { installedModuleHostMounts, type UiModuleHostMount } from "@langwatch/browser/module-hosts";
 import { installedModuleScreens, type UiModuleScreens } from "@langwatch/browser/module-screens";
-import { UiPageFailure } from "@langwatch/browser/page-fallbacks";
 import { readPublicAppConfig } from "@langwatch/browser/public-config";
 import { UiRuntime } from "@langwatch/browser/runtime";
 import { UiShell } from "@langwatch/browser/shell";
@@ -39,20 +41,22 @@ import { applyFeatureFlagOverridesFromSearch } from "@langwatch/feature-flag-cli
 import { configureDocsRuntime } from "@langwatch/handled-error/docs-url";
 import posthog from "posthog-js";
 import type { ReactNode } from "react";
-import type { FallbackProps } from "react-error-boundary";
+import { ErrorBoundary } from "react-error-boundary";
 import { useLocation } from "react-router";
 
 import { browserModules } from "./browser-modules.generated.ts";
 import { installedUiDeclarations } from "./shell/ui-declarations";
+import { uiErrorPages, type UiErrorPages } from "./shell/ui-error-page";
 import {
   composeUiDesignSystem,
-  loadUiRootCapabilities,
-  type UiRootCapabilities,
-} from "./shell/ui-root-capabilities";
+  loadUiRootHostServices,
+  type UiRootHostServices,
+} from "./shell/ui-root-host-services";
 import { uiRouteTable } from "./shell/ui-route-table";
 import { UiSaasFooter } from "./shell/ui-saas-footer";
 import { uiShellLayouts } from "./shell/ui-shell-layouts";
 import { uiUnservedPageLoaders } from "./shell/ui-unserved-pages";
+import { hasInjectedPublicConfig, UiWaitingForApiShell } from "./shell/ui-waiting-for-api-page";
 import { lentFirstTouchAttribution } from "./shell/use-analytics-identity";
 import {
   uiDeploymentOf,
@@ -84,19 +88,7 @@ function UiAttributionCapture({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
-/**
- * A page that threw, said properly: this renders inside the providers, so the
- * words come from the code-keyed registry rather than `error.message`.
- */
-function UiPageError({ error }: FallbackProps) {
-  return (
-    <UiPageFailure
-      copy={resolveUiFailureCopy({ error, fallbackTitle: "This page did not load" })}
-    />
-  );
-}
-
-/** The last resort: plain, because it must render when nothing else loaded. */
+/** The last resort: plain, for when even the branded error page cannot draw. */
 function UiBootPageError() {
   return (
     <div role="alert" style={{ padding: "3rem", textAlign: "center" }}>
@@ -107,22 +99,22 @@ function UiBootPageError() {
 }
 
 /**
- * Where the two capabilities meet, and the only place they do — in the order
+ * Where the two host services meet, and the only place they do — in the order
  * record 10.1 rules. `auth` and `organization` never import each other.
  */
-function browserUiCapabilitiesHook({
+function browserUiHostServicesHook({
   session: auth,
   scope: organization,
   copyTargets: lending,
   traceFilters: filtering,
-}: UiRootCapabilities) {
-  return function useBrowserUiCapabilities({
+}: UiRootHostServices) {
+  return function useBrowserUiHostServices({
     transport,
     feedback,
   }: {
     transport: UiFeatureApiTransport;
     feedback: UiFeedback;
-  }): UiSessionCapabilities {
+  }): UiSessionHostServices {
     const { pathname, search } = useLocation();
     const isPublicRoute = organization.isUiPublicRoute(pathname);
     const sessionReading = auth.useUiSessionReading({ feedback, isPublicRoute });
@@ -140,7 +132,7 @@ function browserUiCapabilitiesHook({
       userId: sessionReading.user?.id,
     });
 
-    const scope = organization.createBrowserUiScope({ reading: scopeReading, session });
+    const scope = organization.createBrowserUiScope({ reading: scopeReading });
     const traceFilters = filtering.useUiTraceFiltersReading({
       search,
       projectId: scope.activeScope().projectId ?? void 0,
@@ -167,7 +159,7 @@ class BrowserUiShell extends UiShell {
     sessionVersions,
     hosts,
     failures,
-    rootCapabilities,
+    rootHostServices,
     hostServices,
   }: {
     config: UiFeatureConfig;
@@ -180,13 +172,15 @@ class BrowserUiShell extends UiShell {
     sessionVersions: SessionVersionWatch;
     hosts: readonly UiModuleHostMount[];
     failures: readonly UiFailureInterceptor[];
-    rootCapabilities: UiRootCapabilities;
+    rootHostServices: UiRootHostServices;
     hostServices: UiRenderResult["hostServices"];
   }): BrowserUiShell {
     const telemetry = uiTelemetryOf(config);
-    return new BrowserUiShell(
-      createUiApplication({
-        sessionQueryKey: rootCapabilities.session.UI_SESSION_QUERY_KEY,
+    const errorPages = uiErrorPages({ isDevelopment });
+    return new BrowserUiShell({
+      errorPages,
+      application: createUiApplication({
+        sessionQueryKey: rootHostServices.session.UI_SESSION_QUERY_KEY,
         drawers,
         features: {
           loaders: screens.loaders,
@@ -198,7 +192,7 @@ class BrowserUiShell extends UiShell {
           sessionVersions,
           // Without these the shell resolves the REFUSING defaults, so the first
           // session read throws instead of answering. See ARCHITECTURE.md 10.1.
-          session: browserUiCapabilitiesHook(rootCapabilities),
+          session: browserUiHostServicesHook(rootHostServices),
           hostServices,
           footer: UiSaasFooter,
           capabilities: {
@@ -222,7 +216,7 @@ class BrowserUiShell extends UiShell {
           session: UiPendingProvider,
           transport: UiPendingProvider,
           graphicsQuality: GraphicsQualityProvider,
-          designSystem: composeUiDesignSystem(rootCapabilities),
+          designSystem: composeUiDesignSystem(rootHostServices),
           commandBar: UiPendingProvider,
           toaster: UiErrorToaster,
           usePublicAppConfig: () => ({ data: telemetry }),
@@ -231,15 +225,17 @@ class BrowserUiShell extends UiShell {
         pages: {
           loaders: uiUnservedPageLoaders,
           table: uiRouteTable,
-          shellLayouts: uiShellLayouts({ root: rootCapabilities, config }),
-          errorFallback: UiPageError,
-          rootErrorBoundary: UiBootPageError,
+          shellLayouts: uiShellLayouts({ root: rootHostServices, config }),
+          errorFallback: errorPages.page,
+          rootErrorBoundary: errorPages.route,
         },
       }),
-    );
+    });
   }
 
-  private constructor(private readonly application: UiApplication) {
+  private constructor(
+    private readonly parts: { application: UiApplication; errorPages: UiErrorPages },
+  ) {
     super();
   }
 
@@ -247,14 +243,21 @@ class BrowserUiShell extends UiShell {
     // Before the first render, so a `?ff_` link opens straight onto the screen it names.
     applyFeatureFlagOverridesFromSearch(window.location.search);
     registerChunkReloadListener();
+    // Only a page a `haven up --ui=watch` stack served polls; every other returns at once.
+    reloadOnBundleSwap();
   }
 
   render(): ReactNode {
+    const { application, errorPages } = this.parts;
     return (
-      <UiApplicationShell
-        outerProvider={this.application.outerProvider}
-        router={this.application.router}
-      />
+      <ErrorBoundary FallbackComponent={UiBootPageError}>
+        <ErrorBoundary FallbackComponent={errorPages.application}>
+          <UiApplicationShell
+            outerProvider={application.outerProvider}
+            router={application.router}
+          />
+        </ErrorBoundary>
+      </ErrorBoundary>
     );
   }
 }
@@ -265,6 +268,9 @@ class BrowserUiShell extends UiShell {
  * mounts over what it returns. Installing a module edits the catalogue.
  */
 export async function startUi(): Promise<void> {
+  if (!hasInjectedPublicConfig(document)) {
+    return UiRuntime.create({ document, shell: new UiWaitingForApiShell() }).start();
+  }
   const served = readPublicAppConfig(document);
   // The framework's own slice: the transport is built before the supply renders.
   const process = readUiProcessConfig(served);
@@ -276,7 +282,7 @@ export async function startUi(): Promise<void> {
     fetch: sessionVersionFetch({ watch: sessionVersions }),
     isDevelopment: process.mode === "development",
   });
-  const rootCapabilities = await loadUiRootCapabilities();
+  const rootHostServices = await loadUiRootHostServices();
   const installed = await createUi({ document, mount: "root" })
     .withModules(browserModules)
     .withTransport(transport)
@@ -298,7 +304,7 @@ export async function startUi(): Promise<void> {
       sessionVersions,
       hosts: installedModuleHostMounts(installed.modules),
       failures: installedModuleFailures(installed.modules),
-      rootCapabilities,
+      rootHostServices,
       hostServices: installed.hostServices,
     }),
   }).start();

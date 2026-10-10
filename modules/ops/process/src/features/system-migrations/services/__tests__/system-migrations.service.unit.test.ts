@@ -1125,7 +1125,7 @@ describe("SystemMigrationsService and a migration enrolled automatically", () =>
   });
 
   describe("given the ops page reads the overview", () => {
-    /** @scenario "The migrations page is told there is nothing to enroll" */
+    /** @scenario "The tenant migrations tab is told there is nothing to enroll" */
     it("says the migration is automatic and reports no enrollment gauge", async () => {
       const { service } = serviceWith({
         record: null,

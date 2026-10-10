@@ -1,3 +1,5 @@
+import { ListTable } from "@langwatch/design-system/list-table";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import {
   Badge,
   Center,
@@ -67,26 +69,24 @@ export function SchedulerContentView({
 
   if (jobs.length === 0) {
     return (
-      <Center paddingY={20}>
-        <EmptyState.Root>
-          <EmptyState.Content>
-            <EmptyState.Indicator>
-              <CalendarClock />
-            </EmptyState.Indicator>
-            <EmptyState.Title>No scheduled jobs</EmptyState.Title>
-            <EmptyState.Description>
-              Nothing is on the calendar scheduler yet.
-            </EmptyState.Description>
-          </EmptyState.Content>
-        </EmptyState.Root>
-      </Center>
+      <NoDataInfoBlock
+        icon={<CalendarClock />}
+        title="No scheduled jobs"
+        description="Nothing is on the calendar scheduler yet."
+      />
     );
   }
 
   return (
     <>
       <SchedulerHeader counts={counts} loopHealthy={loop.healthy} lastFiredAt={loop.lastFiredAt} />
-      <Table.Root variant="line" size="sm">
+      <ListTable
+        density="compact"
+        columnRules={false}
+        containerProps={{ overflowX: "auto" }}
+        variant="line"
+        size="sm"
+      >
         <Table.Header>
           <Table.Row>
             <Table.ColumnHeader>Target</Table.ColumnHeader>
@@ -108,7 +108,7 @@ export function SchedulerContentView({
             />
           ))}
         </Table.Body>
-      </Table.Root>
+      </ListTable>
       <SchedulerRecentActions entries={recentActions} />
     </>
   );

@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import {
@@ -36,25 +37,40 @@ const eventSchema = z.object({
   idempotencyKey: z.string().optional(),
 });
 
-export const spanFactsContributedEventSchema = z.object({
+const spanFactsContributedEventSchemaDefinition = z.object({
   ...eventSchema.shape,
   type: z.literal(SPAN_FACTS_CONTRIBUTED_EVENT_TYPE),
   data: spanFactsContributionSchema,
 });
+export interface SpanFactsContributedEventSchema extends Named<
+  typeof spanFactsContributedEventSchemaDefinition
+> {}
+export const spanFactsContributedEventSchema: SpanFactsContributedEventSchema =
+  spanFactsContributedEventSchemaDefinition;
 export type SpanFactsContributedEvent = z.infer<typeof spanFactsContributedEventSchema>;
 
-export const logFactsContributedEventSchema = z.object({
+const logFactsContributedEventSchemaDefinition = z.object({
   ...eventSchema.shape,
   type: z.literal(LOG_FACTS_CONTRIBUTED_EVENT_TYPE),
   data: logFactsContributionSchema,
 });
+export interface LogFactsContributedEventSchema extends Named<
+  typeof logFactsContributedEventSchemaDefinition
+> {}
+export const logFactsContributedEventSchema: LogFactsContributedEventSchema =
+  logFactsContributedEventSchemaDefinition;
 export type LogFactsContributedEvent = z.infer<typeof logFactsContributedEventSchema>;
 
-export const metricFactsContributedEventSchema = z.object({
+const metricFactsContributedEventSchemaDefinition = z.object({
   ...eventSchema.shape,
   type: z.literal(METRIC_FACTS_CONTRIBUTED_EVENT_TYPE),
   data: metricFactsContributionSchema,
 });
+export interface MetricFactsContributedEventSchema extends Named<
+  typeof metricFactsContributedEventSchemaDefinition
+> {}
+export const metricFactsContributedEventSchema: MetricFactsContributedEventSchema =
+  metricFactsContributedEventSchemaDefinition;
 export type MetricFactsContributedEvent = z.infer<typeof metricFactsContributedEventSchema>;
 
 export type CodingAgentProcessingEvent =
@@ -64,7 +80,7 @@ export type CodingAgentProcessingEvent =
 
 // Staged queue payload (ADR-069) mirroring event envelope fields for rolling
 // deploy compatibility; durable record is span_facts_contributed.
-export const spanFactsLiftedPayloadSchema = z.object({
+const spanFactsLiftedPayloadSchemaDefinition = z.object({
   id: z.string(),
   aggregateId: z.string(),
   aggregateType: aggregateTypeSchema,
@@ -77,6 +93,11 @@ export const spanFactsLiftedPayloadSchema = z.object({
   metadata: eventMetadataSchema.optional(),
   idempotencyKey: z.string().optional(),
 });
+export interface SpanFactsLiftedPayloadSchema extends Named<
+  typeof spanFactsLiftedPayloadSchemaDefinition
+> {}
+export const spanFactsLiftedPayloadSchema: SpanFactsLiftedPayloadSchema =
+  spanFactsLiftedPayloadSchemaDefinition;
 export type SpanFactsLiftedPayload = z.infer<typeof spanFactsLiftedPayloadSchema>;
 
 // Discriminate on type first; returns null for non-lifted payloads, throws for

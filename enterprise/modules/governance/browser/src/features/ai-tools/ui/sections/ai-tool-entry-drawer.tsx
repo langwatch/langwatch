@@ -19,7 +19,7 @@ import {
 import { Switch } from "@langwatch/design-system/switch";
 import type { AiToolEntry } from "@langwatch/enterprise-governance-contract";
 import { Bot, Wrench } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { api } from "../../../../behavior/governance-api.ts";
 import {
@@ -407,10 +407,7 @@ export function AiToolEntryDrawer({ organizationId, state, onClose }: Props) {
   // entry means org-wide (empty department set); DEPARTMENT entries map
   // back to ids. ORGANIZATION and DEPARTMENT are mutually exclusive in the
   // picker (collapseRedundantScopes enforces it), so this is unambiguous.
-  const departmentIds = useMemo(
-    () => scopes.filter((s) => s.scopeType === "DEPARTMENT").map((s) => s.scopeId),
-    [scopes],
-  );
+  const departmentIds = scopes.filter((s) => s.scopeType === "DEPARTMENT").map((s) => s.scopeId);
 
   // When the user changes the assistantKind picker on a coding_assistant
   // tile, auto-update iconAsset to the corresponding preset (unless they
@@ -463,7 +460,7 @@ export function AiToolEntryDrawer({ organizationId, state, onClose }: Props) {
 
   const isPending = createMutation.isPending || updateMutation.isPending;
 
-  const canSave = useMemo(() => canSaveForm({ form, iconAsset }), [form, iconAsset]);
+  const canSave = canSaveForm({ form, iconAsset });
 
   const onSave = () => {
     if (!canSave || !state) return;
@@ -526,7 +523,7 @@ export function AiToolEntryDrawer({ organizationId, state, onClose }: Props) {
                 <Text fontSize="xs" color="fg.muted">
                   No departments yet. The tool stays visible to every member. Create departments
                   under{" "}
-                  <Link href="/governance/people" color="blue.600">
+                  <Link href="/governance/people" color="blue.fg">
                     Governance → People
                   </Link>{" "}
                   to scope tools to a group of people.
@@ -606,7 +603,7 @@ function RadioCard({
   return (
     <Box
       borderWidth="1px"
-      borderColor={checked ? "blue.500" : "border.muted"}
+      borderColor={checked ? "blue.fg" : "border.muted"}
       backgroundColor={checked ? "blue.subtle" : "transparent"}
       borderRadius="sm"
       paddingX={3}
@@ -825,6 +822,7 @@ function CostAttributionSection({
           </Text>
         </VStack>
         <Switch
+          colorPalette="accent"
           checked={form.bundledPlan}
           onCheckedChange={({ checked }) => setForm({ ...form, bundledPlan: checked })}
         />
@@ -860,6 +858,7 @@ function CliPathsSection({
             </Text>
           </VStack>
           <Switch
+            colorPalette="accent"
             checked={form.allowVk}
             onCheckedChange={({ checked }) => setForm({ ...form, allowVk: checked })}
           />
@@ -874,6 +873,7 @@ function CliPathsSection({
             </Text>
           </VStack>
           <Switch
+            colorPalette="accent"
             checked={cursorOnly ? false : form.allowOtelDirect}
             disabled={cursorOnly}
             onCheckedChange={({ checked }) => setForm({ ...form, allowOtelDirect: checked })}
@@ -932,7 +932,7 @@ function ModelProviderFields({
               <Alert.Description>
                 This provider has no enabled credential yet. Tiles will publish but VK issuance will
                 502 until you{" "}
-                <Link href="/settings/model-providers" color="orange.600">
+                <Link href="/settings/model-providers" color="orange.fg">
                   configure it
                 </Link>
                 .
@@ -1010,7 +1010,7 @@ function ExternalToolFields({
                   type="button"
                   variant="outline"
                   onClick={() => onIconAssetChange(value)}
-                  borderColor={selected ? "blue.500" : "border.muted"}
+                  borderColor={selected ? "blue.fg" : "border.muted"}
                   backgroundColor={selected ? "blue.subtle" : "transparent"}
                   borderRadius="sm"
                   paddingX={3}

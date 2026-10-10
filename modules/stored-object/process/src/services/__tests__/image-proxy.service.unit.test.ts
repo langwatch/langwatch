@@ -38,6 +38,16 @@ describe("ImageProxyService.proxy", () => {
     });
   });
 
+  describe("given an upstream host that answers with a scriptable picture type", () => {
+    describe("when a browser loads that image through the proxy", () => {
+      it("relays the bytes as an opaque download", async () => {
+        const response = await proxied("https://host.test/logo.svg", "image/svg+xml");
+
+        expect(response.headers.get("content-type")).toBe("application/octet-stream");
+      });
+    });
+  });
+
   describe("given a requested URL whose last path segment carries quotes and separators", () => {
     describe("when a browser loads that image through the proxy", () => {
       /** @scenario "A proxied filename cannot inject a response header" */

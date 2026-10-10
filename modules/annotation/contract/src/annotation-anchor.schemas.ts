@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 export const annotationAnchorKindSchema = z.enum(["span", "field", "message"]);
@@ -36,13 +37,18 @@ export function refineAnnotationAnchorColumns(
   }
 }
 
-export const annotationAnchorColumnsSchema = z
+const annotationAnchorColumnsSchemaDefinition = z
   .object({
     anchorKind: annotationAnchorKindSchema.optional().nullable(),
     anchorId: z.string().min(1).optional().nullable(),
     anchorPath: z.string().min(1).optional().nullable(),
   })
   .superRefine(refineAnnotationAnchorColumns);
+export interface AnnotationAnchorColumnsSchema extends Named<
+  typeof annotationAnchorColumnsSchemaDefinition
+> {}
+export const annotationAnchorColumnsSchema: AnnotationAnchorColumnsSchema =
+  annotationAnchorColumnsSchemaDefinition;
 export type AnnotationAnchorColumns = z.infer<typeof annotationAnchorColumnsSchema>;
 
 export const annotationAnchorScopeSchema = z.enum(["trace", "all"]);

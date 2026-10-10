@@ -1,14 +1,13 @@
+import { useUiSupportChat } from "@langwatch/browser-host/capabilities";
+import { setFlowCallbacks, useDrawer } from "@langwatch/browser-host/drawer";
 import { Link } from "@langwatch/browser-host/link";
 import { toaster } from "@langwatch/browser-host/toaster";
-import { setFlowCallbacks, useDrawer } from "@langwatch/browser-host/use-drawer";
 import {
   useColorMode,
   useColorModeValue,
   useColorRawValue,
 } from "@langwatch/design-system/color-mode";
 import { LogoIcon } from "@langwatch/design-system/logo-icon";
-
-import "@xyflow/react/dist/style.css";
 import {
   Box,
   Button,
@@ -19,6 +18,8 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+
+import "@xyflow/react/dist/style.css";
 import { titleCase } from "@langwatch/design-system/string-casing";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { DEFAULT_MODEL } from "@langwatch/model-provider-contract";
@@ -34,15 +35,14 @@ import {
 import {
   Background,
   BackgroundVariant,
-  Controls,
   ReactFlow,
   type ReactFlowProps,
   ReactFlowProvider,
 } from "@xyflow/react";
-import { type RefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { BarChart2 } from "lucide-react";
+import { type RefObject, useEffect, useRef, useState } from "react";
 import { DndProvider, useDrop } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
-import { BarChart2 } from "react-feather";
 import {
   type ImperativePanelHandle,
   Panel,
@@ -51,7 +51,6 @@ import {
 } from "react-resizable-panels";
 import { useShallow } from "zustand/react/shallow";
 
-import { assertCrispChatHidden } from "../../../behavior/crisp-bubble-policy.ts";
 import { LLMModelDisplay } from "../../../behavior/lent-model-provider.tsx";
 import { useComponentVersion } from "../../../behavior/optimization_studio/use-component-version.tsx";
 import { useGetDatasetData } from "../../../behavior/optimization_studio/use-get-dataset-data.ts";
@@ -78,6 +77,7 @@ import { publishedComponentsSchema } from "../../../model/published-workflow.ts"
 import { DatasetImagePreviewTable } from "../../blocks/dataset/dataset-image-preview-table.tsx";
 import Head from "../../elements/compat/next-head.tsx";
 import { EvaluationProgressBar } from "../../elements/experiment/BatchEvaluationV2/evaluation-progress-bar.tsx";
+import { WorkflowCanvasControls } from "../../elements/workflow-canvas-controls.tsx";
 import { ComponentIcon } from "../../elements/workflow-icons.tsx";
 import { WorkflowNodeHostProvider } from "../../elements/workflow-node.host.tsx";
 import { HoverableBigText } from "../hoverable-big-text.tsx";
@@ -234,12 +234,13 @@ export default function OptimizationStudio() {
     [],
   );
 
-  // The Crisp bubble policy keeps the support bubble hidden app-wide unless
+  // The support chat keeps its bubble hidden app-wide unless
   // deliberately opened; re-assert on entering the studio so it can never
   // cover the canvas controls even if Crisp booted mid-navigation.
+  const supportChat = useUiSupportChat();
   useEffect(() => {
-    assertCrispChatHidden();
-  }, []);
+    supportChat?.hide();
+  }, [supportChat]);
 
   useAskBeforeLeaving();
 
@@ -365,16 +366,11 @@ export default function OptimizationStudio() {
                               maxZoom: 1.2,
                             }}
                           >
-                            <Controls
-                              position="bottom-left"
-                              orientation="horizontal"
-                              style={{
-                                marginLeft: controlsMarginLeft({
-                                  nodeSelectionPanelIsOpen,
-                                  isResultsPanelCollapsed,
-                                }),
-                                marginBottom: "15px",
-                              }}
+                            <WorkflowCanvasControls
+                              marginLeft={controlsMarginLeft({
+                                nodeSelectionPanelIsOpen,
+                                isResultsPanelCollapsed,
+                              })}
                             />
                           </OptimizationStudioCanvas>
                         </DragDropArea>
@@ -423,12 +419,8 @@ export default function OptimizationStudio() {
 }
 
 function ReactFlowBackground() {
-  const bgColor = useColorModeValue(useColorRawValue("gray.100"), useColorRawValue("gray.900"));
-  // Hardcoded to the pre-redesign grays (old gray.300 in light, a subtle dark
-  // in dark). The theme gray scale shifted to darker Chakra v3 defaults, which
-  // turned the canvas dots into a heavy grid; pin them so the texture stays the
-  // light, subtle one it was for years rather than tracking the token.
-  const dotColor = useColorModeValue("#E5E7EB", "#2d2d3d");
+  const bgColor = useColorRawValue("bg.page");
+  const dotColor = useColorRawValue("border");
 
   return (
     <Background
@@ -453,9 +445,9 @@ function controlsMarginLeft({
 }
 
 function statusCircleColor({ status }: { status: string }): string {
-  if (status === "connected") return "green.500";
-  if (status === "disconnected") return "red.300";
-  return "yellow.500";
+  if (status === "connected") return "green.fg";
+  if (status === "disconnected") return "red.fg";
+  return "yellow.fg";
 }
 
 function StatusCircle({ status, tooltip }: { status: string; tooltip?: string | React.ReactNode }) {
@@ -491,8 +483,8 @@ export function OptimizationStudioCanvas({
   defaultZoom?: number;
   yAdjust?: number;
 } & ReactFlowProps) {
-  const nodeTypes = useMemo(() => workflowNodeComponents, []);
-  const edgeTypes = useMemo(() => ({ default: WorkflowEdge }), []);
+  const nodeTypes = workflowNodeComponents;
+  const edgeTypes = { default: WorkflowEdge };
   const { colorMode } = useColorMode();
 
   return (
@@ -529,7 +521,7 @@ function StudioWorkflowNodeSelectionPanel({
   const { project } = useOrganizationTeamProject();
   const workflowId = useWorkflowStore((state) => state.workflow_id);
   const { openDrawer, closeDrawer } = useDrawer();
-  const pickers = useMemo(() => {
+  const pickers = (() => {
     const openList = (list: "agentList" | "evaluatorList") => () => {
       setTimeout(() => openDrawer(list, void 0, { resetStack: true }), 0);
     };
@@ -564,7 +556,7 @@ function StudioWorkflowNodeSelectionPanel({
         close: closeDrawer,
       } satisfies AgentPicker,
     };
-  }, [closeDrawer, openDrawer]);
+  })();
   const { handlePromptDragEnd } = useWorkflowPromptPickerFlow(pickers.prompt);
   const { handleEvaluatorDragEnd } = useWorkflowEvaluatorPickerFlow(pickers.evaluator);
   const { handleAgentDragEnd } = useWorkflowAgentPickerFlow(pickers.agent);
@@ -579,7 +571,7 @@ function StudioWorkflowNodeSelectionPanel({
     },
   );
 
-  const customComponents = useMemo(() => {
+  const customComponents = (() => {
     const parsedComponents = publishedComponentsSchema.safeParse(components.data ?? []);
     const componentList = parsedComponents.success ? parsedComponents.data : [];
 
@@ -611,7 +603,7 @@ function StudioWorkflowNodeSelectionPanel({
         },
       ];
     });
-  }, [components.data]);
+  })();
 
   return (
     <WorkflowNodeSelectionPanel
@@ -631,21 +623,24 @@ function StudioWorkflowAutosave() {
   const { workflow } = useLoadWorkflow();
   const autosave = workflowApi.workflow.autosave.useMutation();
   const trpc = workflowApi.useUtils();
-  const onSave = useCallback(
-    ({ dsl, setAsLatestVersion }: { dsl: StudioWorkflow; setAsLatestVersion: boolean }) => {
-      if (!project || !workflow.data) {
-        return Promise.reject(new Error("Workflow is not ready to autosave"));
-      }
-      return autosave.mutateAsync({
-        projectId: project.id,
-        workflowId: workflow.data.id,
-        dsl: studioWorkflowWireSchema.parse(dsl),
-        setAsLatestVersion,
-      });
-    },
-    [autosave, project, workflow.data],
-  );
-  const onRefreshVersions = useCallback(async () => {
+  const onSave = ({
+    dsl,
+    setAsLatestVersion,
+  }: {
+    dsl: StudioWorkflow;
+    setAsLatestVersion: boolean;
+  }) => {
+    if (!project || !workflow.data) {
+      return Promise.reject(new Error("Workflow is not ready to autosave"));
+    }
+    return autosave.mutateAsync({
+      projectId: project.id,
+      workflowId: workflow.data.id,
+      dsl: studioWorkflowWireSchema.parse(dsl),
+      setAsLatestVersion,
+    });
+  };
+  const onRefreshVersions = async () => {
     if (!project || !workflow.data) {
       return;
     }
@@ -654,7 +649,7 @@ function StudioWorkflowAutosave() {
       projectId: project.id,
       returnDSL: "previousVersion",
     });
-  }, [project, trpc.workflow.getVersions, workflow.data]);
+  };
 
   return (
     <WorkflowAutosave

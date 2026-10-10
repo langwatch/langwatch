@@ -27,7 +27,11 @@ import {
 } from "./refused-organizations.process.ts";
 import { TRACE_METER_EVENT, TraceMeterProjection } from "./trace-meter.projection.ts";
 import { usageMeterCountSubscriber } from "./usage-meter-count.subscriber.ts";
-import { CountMonthCommand, RecordLimitDecisionCommand } from "./usage.commands.ts";
+import {
+  CountMonthCommand,
+  RecordLimitDecisionCommand,
+  RecordUsageWarningCommand,
+} from "./usage.commands.ts";
 import {
   type CountMonthCommandData,
   countMonthCommandDataSchema,
@@ -36,8 +40,10 @@ import {
   monthCountedEventSchema,
   type RecordLimitDecisionCommandData,
   recordLimitDecisionCommandDataSchema,
+  type RecordUsageWarningCommandData,
   USAGE_AGGREGATE_TYPE,
   type UsageEvent,
+  usageThresholdCrossedEventSchema,
 } from "./usage.events.ts";
 
 export type UsagePipelineDefinition = StaticPipelineDefinition<
@@ -45,11 +51,13 @@ export type UsagePipelineDefinition = StaticPipelineDefinition<
   Record<string, Projection>,
   | { name: "countMonth"; payload: CountMonthCommandData }
   | { name: "recordLimitDecision"; payload: RecordLimitDecisionCommandData }
+  | { name: "recordUsageWarning"; payload: RecordUsageWarningCommandData }
 >;
 
 export type UsageSenders = Readonly<{
   countMonth: (data: CountMonthCommandData) => Promise<void>;
   recordLimitDecision: (data: RecordLimitDecisionCommandData) => Promise<void>;
+  recordUsageWarning: (data: RecordUsageWarningCommandData) => Promise<void>;
 }>;
 
 /**
@@ -73,7 +81,12 @@ export function buildUsagePipeline({
     name: USAGE_PIPELINE_NAME,
     aggregate: defineAggregate({ type: USAGE_AGGREGATE_TYPE }),
   })
-    .withEvents([monthCountedEventSchema, limitReachedEventSchema, limitClearedEventSchema])
+    .withEvents([
+      monthCountedEventSchema,
+      limitReachedEventSchema,
+      limitClearedEventSchema,
+      usageThresholdCrossedEventSchema,
+    ])
     // Usage's stored names (Alex, 2026-10-06); jobs queued under `usage:` drain into these lanes.
     .withUpcasts({
       events: [
@@ -105,6 +118,7 @@ export function buildUsagePipeline({
       },
     })
     .withCommand("recordLimitDecision", RecordLimitDecisionCommand)
+    .withCommand("recordUsageWarning", RecordUsageWarningCommand)
     .withPeerMapProjection({
       events: [TRACE_METER_EVENT] as const,
       map: TraceMeterProjection.create(traceMeter).build(),

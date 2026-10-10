@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 export const FIELD_TYPES = [
@@ -22,7 +23,7 @@ export const FIELD_TYPES = [
   "code",
 ] as const;
 
-export const fieldSchema = z.object({
+const fieldSchemaDefinition = z.object({
   identifier: z.string(),
   type: z.enum(FIELD_TYPES),
   optional: z.boolean().optional(),
@@ -32,10 +33,12 @@ export const fieldSchema = z.object({
   hidden: z.boolean().optional(),
   json_schema: z.object({}).passthrough().optional(),
 });
+export interface FieldSchema extends Named<typeof fieldSchemaDefinition> {}
+export const fieldSchema: FieldSchema = fieldSchemaDefinition;
 
 export type Field = z.infer<typeof fieldSchema>;
 
-export const agentInputBindingSchema = z.discriminatedUnion("type", [
+const agentInputBindingSchemaDefinition = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("source"),
     sourceId: z.string(),
@@ -43,5 +46,7 @@ export const agentInputBindingSchema = z.discriminatedUnion("type", [
   }),
   z.object({ type: z.literal("value"), value: z.string() }),
 ]);
+export interface AgentInputBindingSchema extends Named<typeof agentInputBindingSchemaDefinition> {}
+export const agentInputBindingSchema: AgentInputBindingSchema = agentInputBindingSchemaDefinition;
 
 export type AgentInputBinding = z.infer<typeof agentInputBindingSchema>;

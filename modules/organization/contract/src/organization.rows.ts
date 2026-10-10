@@ -84,9 +84,6 @@ export type Organization = {
   stripeCustomerId: string | null;
   currency: OrganizationCurrency;
   pricingModel: PricingModel;
-  license: string | null;
-  licenseExpiresAt: Instant | null;
-  licenseLastValidatedAt: Instant | null;
 };
 
 export type OrganizationInvite = {

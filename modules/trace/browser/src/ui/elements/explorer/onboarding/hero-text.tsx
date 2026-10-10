@@ -57,7 +57,7 @@ const AuroraTextShimmer: React.FC<{ children: React.ReactNode }> = ({ children }
     display="inline-block"
     css={{
       backgroundImage:
-        "linear-gradient(90deg, #7dd3fc, #3b82f6, #6366f1, #22d3ee, #818cf8, #7dd3fc)",
+        "linear-gradient(90deg, var(--chakra-colors-cyan-fg), var(--chakra-colors-blue-fg), var(--chakra-colors-purple-fg), var(--chakra-colors-cyan-fg), var(--chakra-colors-purple-fg), var(--chakra-colors-cyan-fg))",
       backgroundSize: "300% 100%",
       WebkitBackgroundClip: "text",
       backgroundClip: "text",

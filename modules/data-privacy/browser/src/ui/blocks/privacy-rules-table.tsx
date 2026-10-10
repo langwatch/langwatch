@@ -78,7 +78,7 @@ function RuleActions({
         <Menu.Item value="edit" onClick={() => onEdit(rule)}>
           Edit
         </Menu.Item>
-        <Menu.Item value="delete" color="red.500" onClick={() => onRemove(rule)}>
+        <Menu.Item value="delete" color="red.fg" onClick={() => onRemove(rule)}>
           Delete
         </Menu.Item>
       </Menu.Content>

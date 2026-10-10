@@ -183,3 +183,27 @@ describe("AutomationPublicApiService.getFireHistory()", () => {
     expect(page.nextCursor).toBeNull();
   });
 });
+
+describe("AutomationPublicApiService.create() with a webhook destination", () => {
+  const input = {
+    name: "local hook",
+    action: TriggerAction.SEND_WEBHOOK,
+    actionParams: { url: "http://127.0.0.1:9100/hook" },
+    filters: { "traces.error": ["true"] },
+  } as Parameters<ReturnType<typeof createPublicApiRig>["service"]["create"]>[0]["input"];
+  const create = (rig: ReturnType<typeof createPublicApiRig>) =>
+    rig.service.create({ projectId: "project_1", actorId: "user_1", input });
+
+  /** @scenario "A webhook automation refuses any URL but https on port 443 in production" */
+  it("refuses a non-https URL when the dev switch is off", async () => {
+    await expect(create(createPublicApiRig())).rejects.toMatchObject({
+      code: "invalid_action_params",
+    });
+  });
+
+  /** @scenario "The local-URL dev switch admits an http or ported webhook URL" */
+  it("accepts it when the dev switch is on", async () => {
+    const saved = await create(createPublicApiRig({ allowInsecureLocalUrls: true }));
+    expect(saved.action).toBe(TriggerAction.SEND_WEBHOOK);
+  });
+});

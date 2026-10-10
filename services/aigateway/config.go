@@ -14,7 +14,9 @@ import (
 
 // Config is the top-level service configuration.
 type Config struct {
-	Environment                   string                    `env:"ENVIRONMENT"`
+	Environment string `env:"ENVIRONMENT"`
+	// MetricsAPIKey is METRICS_API_KEY, the pull door's scrape bearer (ADR-175).
+	MetricsAPIKey                 string                    `env:"METRICS_API_KEY"`
 	BlockLocalHTTPCalls           bool                      `env:"BLOCK_LOCAL_HTTP_CALLS"`
 	RequireHTTPSCustomerEndpoints bool                      `env:"REQUIRE_HTTPS_CUSTOM_ENDPOINTS"`
 	AllowedProxyHosts             string                    `env:"ALLOWED_PROXY_HOSTS"`

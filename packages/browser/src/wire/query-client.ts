@@ -6,7 +6,7 @@
 
 import { PERSISTED_QUERY_MAX_AGE } from "@langwatch/browser-host/cache-tiers";
 import { showErrorToast } from "@langwatch/browser-host/errors";
-import { shouldRetryQuery } from "@langwatch/browser-host/query-retry";
+import { queryRetryDelay, shouldRetryQuery } from "@langwatch/browser-host/query-retry";
 import { isForbiddenAnswer } from "@langwatch/browser-host/session-version";
 import { hashKey, MutationCache, QueryCache, QueryClient, type Query } from "@tanstack/react-query";
 
@@ -41,6 +41,7 @@ export function createUiQueryClient({
       // read is mirrored, so each stays in memory as long as its mirror. ARCHITECTURE.md §10.2.
       queries: {
         retry: shouldRetryQuery,
+        retryDelay: queryRetryDelay,
         staleTime: 5 * 60_000,
         gcTime: PERSISTED_QUERY_MAX_AGE,
         refetchOnWindowFocus: false,

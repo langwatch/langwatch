@@ -62,3 +62,30 @@ describe("the front door at /", () => {
     });
   });
 });
+
+describe("a settings address opened by a reader with no organization", () => {
+  /** @scenario A disabled member cannot act through any permission path */
+  it("leaves the waiting screen for the front door", async () => {
+    const replace = vi.fn();
+    renderWithDesignSystem(
+      <WithStubNavigationHost
+        readings={{
+          organizations: [],
+          organization: undefined,
+          team: undefined,
+          project: undefined,
+          currentUser: { id: "user_1", name: "Ada", email: "ada@acme.test", image: null },
+          isLoading: false,
+          pathname: "/settings/directory",
+          waiting: <div data-testid="waiting" />,
+        }}
+        actions={{ replace }}
+      >
+        <NavigationShell>
+          <div />
+        </NavigationShell>
+      </WithStubNavigationHost>,
+    );
+    await waitFor(() => expect(replace).toHaveBeenCalledWith("/"));
+  });
+});

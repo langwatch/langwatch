@@ -16,7 +16,7 @@ export {
   type UnknownVariable,
   type VariableInfo,
 } from "./behavior/liquid-monaco.ts";
-export { monacoBackgroundFor, trapEscapeInsideEditor } from "./behavior/monaco-editor-chrome.ts";
+export { trapEscapeInsideEditor } from "./behavior/monaco-editor-chrome.ts";
 export { useMonacoTheme } from "./behavior/use-monaco-theme.ts";
 export * from "./model/alert-variables.ts";
 export * from "./model/monaco-schemas.ts";

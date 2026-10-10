@@ -1,5 +1,6 @@
 import { GrantScopeTier, type AuthzBindingForSynthesis } from "@langwatch/authz-contract";
 import type { ScopeGraphOrganization, ScopeGraphTeam } from "@langwatch/organization-contract";
+import { projectKindsHiddenFrom } from "@langwatch/project-contract";
 
 import { userCanOpenTeam } from "./team-visibility.rules.ts";
 
@@ -24,10 +25,16 @@ export function narrowScopeGraphToViewer({
   );
   const members = adminByBinding ? [{ role: "ADMIN" }] : organization.members;
   const organizationRole = members[0]?.role;
+  // An aggregate reads other people's personal projects: admins only (ADR-177 decision 5).
+  const hidden: readonly string[] = projectKindsHiddenFrom(organizationRole);
 
   const teams = organization.teams
     .map((team) => withBindingMember({ team, userId, bindings: own }))
-    .filter((team) => userCanOpenTeam({ team, userId, organizationRole }));
+    .filter((team) => userCanOpenTeam({ team, userId, organizationRole }))
+    .map((team) => ({
+      ...team,
+      projects: team.projects.filter((project) => !hidden.includes(project.kind)),
+    }));
 
   return { ...organization, members, teams };
 }

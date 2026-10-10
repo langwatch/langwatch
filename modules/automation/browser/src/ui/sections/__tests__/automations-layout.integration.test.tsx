@@ -29,7 +29,7 @@ describe("given the Automations workspace", () => {
       const nav = screen.getByRole("navigation", { name: "Automations navigation" });
       const links = Array.from(nav.querySelectorAll("a")).map((link) => link.textContent);
 
-      expect(links).toEqual(["Overview", "Automations", "Reports"]);
+      expect(links).toEqual(["Overview", "Rules", "Reports"]);
     });
 
     it("puts the page's own content in the content column", () => {
@@ -45,7 +45,7 @@ describe("given the Automations workspace", () => {
       expect(screen.getByRole("link", { name: "Reports" }).getAttribute("aria-current")).toBe(
         "page",
       );
-      fireEvent.click(screen.getByRole("link", { name: "Automations" }));
+      fireEvent.click(screen.getByRole("link", { name: "Rules" }));
 
       expect(host.recording.navigations).toEqual(["/demo/automations/automations"]);
     });

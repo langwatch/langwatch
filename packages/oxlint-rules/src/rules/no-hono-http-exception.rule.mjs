@@ -1,6 +1,6 @@
 import { defineRule } from "../define-rule.mjs";
 
-// A module answers with a HandledError, never a hand-built HTTPException (W-02 G3c, Alex 2026-10-08).
+// A module answers with a HandledError, never a hand-built HTTPException (W-02 G3c).
 
 const HONO_EXCEPTION = "hono/http-exception";
 

@@ -6,6 +6,7 @@
 import { sharedFiltersInputSchema } from "@langwatch/analytics-contract";
 import { flexibleDateSchema } from "@langwatch/api/dates";
 import { principalRefSchema } from "@langwatch/authorization";
+import type { Named } from "@langwatch/module";
 import { Temporal, toEpochMs } from "@langwatch/time";
 import { z } from "zod";
 
@@ -105,15 +106,22 @@ const traceSearchFilterSchema = z.object({
 });
 
 /** The whole trace, as `GET /:traceId` answers it: too open a shape to enumerate. */
-export const traceDetailResponseSchema = z.object({}).passthrough();
+const traceDetailResponseSchemaDefinition = z.object({}).passthrough();
+export interface TraceDetailResponseSchema extends Named<
+  typeof traceDetailResponseSchemaDefinition
+> {}
+export const traceDetailResponseSchema: TraceDetailResponseSchema =
+  traceDetailResponseSchemaDefinition;
 
 /** The v1 search body: the filter vocabulary, the flexible dates, the additive half last. */
-export const traceSearchBodySchema = z.object({
+const traceSearchBodySchemaDefinition = z.object({
   ...traceSearchFilterSchema.shape,
   startDate: flexibleDateSchema,
   endDate: flexibleDateSchema,
   ...traceSearchBodyExtensions,
 });
+export interface TraceSearchBodySchema extends Named<typeof traceSearchBodySchemaDefinition> {}
+export const traceSearchBodySchema: TraceSearchBodySchema = traceSearchBodySchemaDefinition;
 
 /** Shape of a caller's `POST /search` request; deployment provides filter vocabulary. */
 export type TraceSearchBody = ProjectionRequest &
@@ -134,14 +142,24 @@ export type TraceSearchBody = ProjectionRequest &
  * {@link traceIdParamsSchema} because the superseded family spells the
  * parameter `id`, and it must match the path exactly.
  */
-export const traceLegacyIdParamsSchema = z.object({
+const traceLegacyIdParamsSchemaDefinition = z.object({
   id: z.string().min(1).describe("The trace ID."),
 });
+export interface TraceLegacyIdParamsSchema extends Named<
+  typeof traceLegacyIdParamsSchemaDefinition
+> {}
+export const traceLegacyIdParamsSchema: TraceLegacyIdParamsSchema =
+  traceLegacyIdParamsSchemaDefinition;
 
 /** The `:threadId` segment of the deprecated `/api/thread/:threadId` read. */
-export const traceLegacyThreadParamsSchema = z.object({
+const traceLegacyThreadParamsSchemaDefinition = z.object({
   threadId: z.string().min(1).describe("The thread ID."),
 });
+export interface TraceLegacyThreadParamsSchema extends Named<
+  typeof traceLegacyThreadParamsSchemaDefinition
+> {}
+export const traceLegacyThreadParamsSchema: TraceLegacyThreadParamsSchema =
+  traceLegacyThreadParamsSchemaDefinition;
 
 /**
  * The deprecated family's trace, under the component names the generated clients name their
@@ -166,28 +184,48 @@ const legacyTraceSchema = traceSchema
   .meta({ id: "Trace" });
 
 /** `GET /api/trace/:id` in json format: the trace, its evaluations, the span tree as text. */
-export const traceLegacyReadResponseSchema = legacyTraceSchema.safeExtend({
+const traceLegacyReadResponseSchemaDefinition = legacyTraceSchema.safeExtend({
   ascii_tree: z.string(),
 });
+export interface TraceLegacyReadResponseSchema extends Named<
+  typeof traceLegacyReadResponseSchemaDefinition
+> {}
+export const traceLegacyReadResponseSchema: TraceLegacyReadResponseSchema =
+  traceLegacyReadResponseSchemaDefinition;
 
 /** `POST /api/trace/search`: the page of traces and the scroll to the next one. */
-export const traceLegacySearchResponseSchema = z
+const traceLegacySearchResponseSchemaDefinition = z
   .object({
     traces: z.array(legacyTraceSchema),
     pagination: z.object({ totalHits: z.number(), scrollId: z.string().nullish() }),
   })
   .meta({ id: "SearchResponse" });
+export interface TraceLegacySearchResponseSchema extends Named<
+  typeof traceLegacySearchResponseSchemaDefinition
+> {}
+export const traceLegacySearchResponseSchema: TraceLegacySearchResponseSchema =
+  traceLegacySearchResponseSchemaDefinition;
 
 /** `POST /api/trace/:id/share`: the public path the trace now answers at. */
-export const traceLegacyShareResponseSchema = z.object({
+const traceLegacyShareResponseSchemaDefinition = z.object({
   status: z.literal("success"),
   path: z.string(),
 });
+export interface TraceLegacyShareResponseSchema extends Named<
+  typeof traceLegacyShareResponseSchemaDefinition
+> {}
+export const traceLegacyShareResponseSchema: TraceLegacyShareResponseSchema =
+  traceLegacyShareResponseSchemaDefinition;
 
 /** `POST /api/trace/:id/unshare`: the public path is gone. */
-export const traceLegacyUnshareResponseSchema = z.object({ status: z.literal("success") });
+const traceLegacyUnshareResponseSchemaDefinition = z.object({ status: z.literal("success") });
+export interface TraceLegacyUnshareResponseSchema extends Named<
+  typeof traceLegacyUnshareResponseSchemaDefinition
+> {}
+export const traceLegacyUnshareResponseSchema: TraceLegacyUnshareResponseSchema =
+  traceLegacyUnshareResponseSchemaDefinition;
 
-export const traceIdParamsSchema = z.object({
+const traceIdParamsSchemaDefinition = z.object({
   traceId: z
     .string()
     .min(1)
@@ -195,16 +233,25 @@ export const traceIdParamsSchema = z.object({
       "The trace ID — either the full 32-char ID or a unique prefix (≥ 8 chars). Prefix lookup is scoped to the authenticated project.",
     ),
 });
+export interface TraceIdParamsSchema extends Named<typeof traceIdParamsSchemaDefinition> {}
+export const traceIdParamsSchema: TraceIdParamsSchema = traceIdParamsSchemaDefinition;
 
-export const traceFormatQuerySchema = z.object({
+const traceFormatQuerySchemaDefinition = z.object({
   format: z
     .string()
     .optional()
     .describe("Output format: 'digest' (AI-readable) or 'json' (full raw data, default)"),
   llmMode: z.string().optional().describe("Deprecated: use format=digest instead"),
 });
+export interface TraceFormatQuerySchema extends Named<typeof traceFormatQuerySchemaDefinition> {}
+export const traceFormatQuerySchema: TraceFormatQuerySchema = traceFormatQuerySchemaDefinition;
 
-export const traceMetadataResponseSchema = z.object({ traceId: z.string() });
+const traceMetadataResponseSchemaDefinition = z.object({ traceId: z.string() });
+export interface TraceMetadataResponseSchema extends Named<
+  typeof traceMetadataResponseSchemaDefinition
+> {}
+export const traceMetadataResponseSchema: TraceMetadataResponseSchema =
+  traceMetadataResponseSchemaDefinition;
 
 const traceMetadataValueSchema = z.union([
   z.string().max(4096),
@@ -214,7 +261,7 @@ const traceMetadataValueSchema = z.union([
   z.record(z.string(), z.unknown()),
 ]);
 
-export const traceMetadataUpdateSchema = z
+const traceMetadataUpdateSchemaDefinition = z
   .record(z.string(), traceMetadataValueSchema)
   .refine((metadata) => Object.keys(metadata).length > 0, {
     message: "metadata must contain at least one key",
@@ -222,14 +269,26 @@ export const traceMetadataUpdateSchema = z
   .refine((metadata) => JSON.stringify(metadata).length <= 32768, {
     message: "total metadata payload must not exceed 32KB",
   });
+export interface TraceMetadataUpdateSchema extends Named<
+  typeof traceMetadataUpdateSchemaDefinition
+> {}
+export const traceMetadataUpdateSchema: TraceMetadataUpdateSchema =
+  traceMetadataUpdateSchemaDefinition;
 
 export type TraceMetadataUpdate = z.infer<typeof traceMetadataUpdateSchema>;
 
-export const traceMetadataBodySchema = z.object({ metadata: traceMetadataUpdateSchema });
+const traceMetadataBodySchemaDefinition = z.object({ metadata: traceMetadataUpdateSchema });
+export interface TraceMetadataBodySchema extends Named<typeof traceMetadataBodySchemaDefinition> {}
+export const traceMetadataBodySchema: TraceMetadataBodySchema = traceMetadataBodySchemaDefinition;
 
-export const trackEventResponseSchema = z.object({
+const trackEventResponseSchemaDefinition = z.object({
   message: z.literal("Event tracked"),
 });
+export interface TrackEventResponseSchema extends Named<
+  typeof trackEventResponseSchemaDefinition
+> {}
+export const trackEventResponseSchema: TrackEventResponseSchema =
+  trackEventResponseSchemaDefinition;
 
 const transcriptResponseSchema = z.object({
   agent: z.string(),
@@ -245,9 +304,14 @@ const transcriptResponseSchema = z.object({
 });
 
 /** The transcript route's own output: unknown top-level keys pass through unchanged. */
-export const transcriptRestResponseSchema = transcriptResponseSchema.passthrough();
+const transcriptRestResponseSchemaDefinition = transcriptResponseSchema.passthrough();
+export interface TranscriptRestResponseSchema extends Named<
+  typeof transcriptRestResponseSchemaDefinition
+> {}
+export const transcriptRestResponseSchema: TranscriptRestResponseSchema =
+  transcriptRestResponseSchemaDefinition;
 
-export const traceSearchResponseSchema = z.object({
+const traceSearchResponseSchemaDefinition = z.object({
   traces: z.array(z.any()),
   pagination: z.object({
     totalHits: z.number(),
@@ -283,17 +347,34 @@ export const traceSearchResponseSchema = z.object({
         "collection — so callers can pre-allocate a typed reader.",
     ),
 });
+export interface TraceSearchResponseSchema extends Named<
+  typeof traceSearchResponseSchemaDefinition
+> {}
+export const traceSearchResponseSchema: TraceSearchResponseSchema =
+  traceSearchResponseSchemaDefinition;
 
-export const traceNotFoundBodySchema = z.object({ message: z.string() });
-export const traceAmbiguousPrefixBodySchema = z.object({
+const traceNotFoundBodySchemaDefinition = z.object({ message: z.string() });
+export interface TraceNotFoundBodySchema extends Named<typeof traceNotFoundBodySchemaDefinition> {}
+export const traceNotFoundBodySchema: TraceNotFoundBodySchema = traceNotFoundBodySchemaDefinition;
+const traceAmbiguousPrefixBodySchemaDefinition = z.object({
   message: z.string(),
   candidateTraceIds: z.array(z.string()),
 });
+export interface TraceAmbiguousPrefixBodySchema extends Named<
+  typeof traceAmbiguousPrefixBodySchemaDefinition
+> {}
+export const traceAmbiguousPrefixBodySchema: TraceAmbiguousPrefixBodySchema =
+  traceAmbiguousPrefixBodySchemaDefinition;
 
 /** The credential a v1 trace route reads: an API key's id and the member it acts as, if any. */
-export const tracesRestCredentialSchema = z.object({
+const tracesRestCredentialSchemaDefinition = z.object({
   principal: principalRefSchema.nullable(),
 });
+export interface TracesRestCredentialSchema extends Named<
+  typeof tracesRestCredentialSchemaDefinition
+> {}
+export const tracesRestCredentialSchema: TracesRestCredentialSchema =
+  tracesRestCredentialSchemaDefinition;
 
 /** Values per page when a facets caller names a field and no limit. */
 const DEFAULT_FACET_VALUE_LIMIT = 50;
@@ -329,7 +410,7 @@ const facetWindowBoundSchema = z
   );
 
 /** `GET /api/v1/traces/facets`: with `field`, one field's values, paged. */
-export const traceFacetsQuerySchema = z.object({
+const traceFacetsQuerySchemaDefinition = z.object({
   field: z.string().min(1).max(512).optional(),
   prefix: z.string().max(512).optional(),
   limit: z.coerce.number().int().min(1).max(1000).default(DEFAULT_FACET_VALUE_LIMIT),
@@ -337,24 +418,36 @@ export const traceFacetsQuerySchema = z.object({
   startDate: facetWindowBoundSchema.optional(),
   endDate: facetWindowBoundSchema.optional(),
 });
+export interface TraceFacetsQuerySchema extends Named<typeof traceFacetsQuerySchemaDefinition> {}
+export const traceFacetsQuerySchema: TraceFacetsQuerySchema = traceFacetsQuerySchemaDefinition;
 
 export type TraceFacetsQuery = z.infer<typeof traceFacetsQuerySchema>;
 
 /** One facet's values, paged, as `GET /facets?field=...` answers them. */
-export const traceFacetValuesResponseSchema = z.object({
+const traceFacetValuesResponseSchemaDefinition = z.object({
   values: z.array(z.object({ value: z.string(), label: z.string().optional(), count: z.number() })),
   total: z.number().describe("Distinct values the field holds in the window, before paging."),
   hasMore: z.boolean(),
 });
+export interface TraceFacetValuesResponseSchema extends Named<
+  typeof traceFacetValuesResponseSchemaDefinition
+> {}
+export const traceFacetValuesResponseSchema: TraceFacetValuesResponseSchema =
+  traceFacetValuesResponseSchemaDefinition;
 
 /**
  * `GET /facets` answers one of two shapes depending on `field`, which the route's output
  * validator cannot name as one object; the union below is what its docs publish.
  */
-export const traceFacetsResponseSchema = z.object({}).passthrough();
+const traceFacetsResponseSchemaDefinition = z.object({}).passthrough();
+export interface TraceFacetsResponseSchema extends Named<
+  typeof traceFacetsResponseSchemaDefinition
+> {}
+export const traceFacetsResponseSchema: TraceFacetsResponseSchema =
+  traceFacetsResponseSchemaDefinition;
 
 /** `GET /facets`: the discovery payload without `field`, one field's paged values with it. */
-export const traceFacetsAnswerSchema = z.union([
+const traceFacetsAnswerSchemaDefinition = z.union([
   z.object({
     ...discoverResultSchema.shape,
     pending: z
@@ -365,5 +458,7 @@ export const traceFacetsAnswerSchema = z.union([
   }),
   traceFacetValuesResponseSchema,
 ]);
+export interface TraceFacetsAnswerSchema extends Named<typeof traceFacetsAnswerSchemaDefinition> {}
+export const traceFacetsAnswerSchema: TraceFacetsAnswerSchema = traceFacetsAnswerSchemaDefinition;
 
 export type TraceFacetsAnswer = z.infer<typeof traceFacetsAnswerSchema>;

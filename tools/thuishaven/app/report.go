@@ -116,7 +116,11 @@ func (o *Orchestrator) serverHealth(ctx context.Context) map[string]health {
 func (o *Orchestrator) colimaHealth(ctx context.Context) health {
 	needs := domain.ContainerNeeds(o.containerNeedInputs())
 	if len(needs) == 0 {
-		return health{OK: true, Detail: "not needed (ClickHouse and observability run natively)"}
+		detail := "not needed (ClickHouse and observability run natively)"
+		if rt, ok := o.container.(idleStoppable); ok && rt.StoppedByHaven() {
+			detail += "; stopped by haven"
+		}
+		return health{OK: true, Detail: detail}
 	}
 	state := "stopped"
 	isRunning := o.container.IsRunning(ctx)
@@ -151,6 +155,7 @@ func (o *Orchestrator) printStacks(r statusReport) {
 			ram = "  ~" + domain.HumanBytes(int64(treeRSS))
 		}
 		fmt.Printf("%-18s %-6s %s  (%s)%s\n", s.Slug, o.liveness(s), s.Branch, s.WorktreeDir, ram)
+		fmt.Printf("  refresh %s\n", s.Refresh.Name())
 		if s.Mode != "" {
 			fmt.Printf("  mode %s\n", s.EffectiveMode)
 		}
@@ -160,6 +165,9 @@ func (o *Orchestrator) printStacks(r statusReport) {
 				dot = "●"
 			}
 			fmt.Printf("  %s %-10s %s\n", dot, svc.Name, svc.URL)
+		}
+		if line := o.SeedStatusLine(s.Slug); line != "" {
+			fmt.Printf("  %s\n", line)
 		}
 	}
 }
@@ -256,6 +264,8 @@ type stackStatus struct {
 	// metrics port, so a reader asking "is this stack actually running the
 	// whole application" had nowhere to look for it.
 	Lanes []laneStatus `json:"lanes"`
+	// Refresh shadows the record's to always name the mode: still, watch or hmr.
+	Refresh string `json:"refresh"`
 }
 
 // laneStatus is one supervised Node lane plus whether its port answers.
@@ -289,6 +299,7 @@ func (o *Orchestrator) stackStatuses(stacks []domain.Stack) []stackStatus {
 		}
 		out = append(out, stackStatus{
 			Stack:    s,
+			Refresh:  s.Refresh.Name(),
 			Live:     s.LauncherPID != 0 && o.sys.ProcessAlive(s.LauncherPID),
 			Services: svcs,
 			Lanes:    lanes,

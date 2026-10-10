@@ -224,7 +224,7 @@ function PlanRowMenu({
         {suiteId ? (
           <Menu.Item
             value="archive"
-            color="red.600"
+            color="red.fg"
             onClick={(event) => {
               event.stopPropagation();
               onRequestArchive(plan);

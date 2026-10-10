@@ -28,7 +28,9 @@ let pool: Pool | undefined;
 function getPool(): Pool {
   pool ??= new Pool({
     connectionString: DATABASE_URL,
-    ...(schema ? { options: `-c search_path="${schema}"` } : {}),
+    ...(schema
+      ? { options: `-c search_path="${schema}" -c TimeZone=UTC` }
+      : { options: "-c TimeZone=UTC" }),
     max: 2,
   });
   return pool;
@@ -53,7 +55,7 @@ export async function findSignUpVerificationToken(email: string): Promise<string
 
 /**
  * The id of the account registered under `email`, if any — what better-auth's
- * reset token is keyed by (`redis.ts`), and the one thing `user.register`
+ * reset token is keyed by (`redis.ts`), and the one thing `auth.register`
  * does not hand back.
  */
 export async function findUserIdByEmail(email: string): Promise<string | null> {

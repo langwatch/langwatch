@@ -1,0 +1,35 @@
+{
+  "name": "@langwatch/clickhouse-markers",
+  "version": "0.0.1",
+  "private": true,
+  "description": "The tenant markers a ClickHouse statement carries where its tenant predicate went, as pure string builders the authorized reader expands into the proof's fence.",
+  "keywords": [
+    "clickhouse",
+    "langwatch",
+    "tenancy"
+  ],
+  "license": "MIT",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc -b",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "langwatch": {
+    "group": "data"
+  }
+}

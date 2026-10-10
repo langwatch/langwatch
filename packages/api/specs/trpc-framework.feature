@@ -25,12 +25,12 @@ Feature: tRPC framework boundary
     And a process whose runtime has no anonymous procedure is refused at the mount, naming the procedure
 
   @unit
-  Scenario: A tRPC procedure reads a fact its mount resolved, never the request
+  Scenario: A tRPC procedure reads middleware context its mount resolved, never the request
     Given a procedure that needs the address a caller reached us at, and one that needs the browser session it arrived on
-    When each declares the facts it needs and the process binds one value for each at the mount
-    Then each handler is handed the facts it declared, parsed, after its own arguments and in the order it declared them
+    When each declares the middleware context it needs and the process binds one value for each at the mount
+    Then each handler is handed the values it declared, parsed, after its own arguments and in the order it declared them
     And where an address comes from is the mount's answer, so the header a deployment trusts is named once, by it
-    And a mount that bound no value for a declared fact is refused, naming the fact and the procedure
+    And a mount that bound no value for a declared middleware context is refused, naming it and the procedure
 
   @unit
   Scenario: A procedure may require several permissions together
@@ -83,6 +83,19 @@ Feature: tRPC framework boundary
     When the stream is being served
     Then the error frame carries the handled database_busy, marked retryable
     And the failure is logged with that handled code as a platform fault
+
+  @unit
+  Scenario: A live subscription the client closed is not logged as a failure
+    Given a subscription whose stream rejects with an abort once its client disconnects
+    When the client closes the stream
+    Then nothing is logged as an SSE handler error
+
+  @unit
+  Scenario: A live subscription whose own signal aborted is the stream closing, not a failure
+    Given a subscription whose request signal aborted before its stream rejected with an abort
+    When the stream is being served
+    Then nothing is logged as an SSE handler error
+    And a genuine failure on a live signal is still logged as an SSE handler error
 
   @unit
   Scenario: A slow call is raised without burying the log
@@ -189,6 +202,20 @@ Feature: tRPC framework boundary
     Then the row its audit trail writes names the organization that holds the project as its organization and its target, beside the project
     And a declaration naming a field its input does not carry, made on a query, or made twice, is refused where it is written
     And a process that cannot say which organization holds a project is refused at the mount, naming the procedure
+
+  @unit
+  Scenario: A recorded mutation keeps where it came from and who really made it
+    Given a signed-in caller's mutation is answered through the tRPC door
+    When its audit row is written
+    Then the row carries the address the door resolved for the request and the caller's user agent, as on main
+    And under an impersonation the operator is named in the row's actor column as well as its metadata
+
+  @unit
+  Scenario: A mutation that audits itself is recorded once
+    Given a mutation whose handler writes its own audit row with the value it replaced, such as an organization's joining setting
+    When it is answered
+    Then the generic audit row stands down, as main's self-audited paths did, so the change is not recorded twice
+    And every other mutation still writes the generic row
 
   @unit
   Scenario: A procedure chooses its permission from its parsed input

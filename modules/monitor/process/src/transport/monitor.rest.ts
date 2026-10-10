@@ -8,7 +8,8 @@ import {
   defineRestRouter,
   documentedResponses,
   MANAGEMENT_API_VERSION,
-  projectRestFacts,
+  projectRequestContext,
+  type RestDoorCredential,
   type RestTransportDeclaration,
 } from "@langwatch/api/rest";
 import {
@@ -62,7 +63,11 @@ function monitorWire(params: {
 export function createMonitorsRest(): Readonly<{
   protocol: "rest";
   namespace: string;
-  router: () => RestTransportDeclaration<MonitorApi>;
+  router: () => RestTransportDeclaration<
+    MonitorApi,
+    RestDoorCredential,
+    typeof projectRequestContext
+  >;
 }> {
   return (
     defineRestRouter(MonitorApi)
@@ -76,7 +81,7 @@ export function createMonitorsRest(): Readonly<{
         tags: ["Monitors"],
         description: "List all online evaluation monitors for the project",
       })
-      .withMiddleware(projectRestFacts)
+      .withMiddlewareContext(projectRequestContext)
       .handle(async ({ app, scope }, project) =>
         (await app.list({ projectId: scope.id })).map((monitor) =>
           monitorWire({ app, projectSlug: project.projectSlug, monitor }),
@@ -92,7 +97,7 @@ export function createMonitorsRest(): Readonly<{
         description: "Get a monitor by its ID",
         responses: notFound,
       })
-      .withMiddleware(projectRestFacts)
+      .withMiddlewareContext(projectRequestContext)
       .handle(async ({ app, input, scope }, project) =>
         monitorWire({
           app,
@@ -106,6 +111,7 @@ export function createMonitorsRest(): Readonly<{
       // hierarchy, so no existing caller loses access. Deletion stays on
       // `:manage` below, where the destructive line sits.
       .post("/", "postApiMonitors")
+      .withAudit("monitors.create")
       .withInput(monitorRestCreateInputSchema)
       .withPermission("evaluations:create")
       .withOutput(monitorRestResponseSchema)
@@ -114,7 +120,7 @@ export function createMonitorsRest(): Readonly<{
         tags: ["Monitors"],
         description: "Create a new online evaluation monitor",
       })
-      .withMiddleware(projectRestFacts)
+      .withMiddlewareContext(projectRequestContext)
       .handle(async ({ app, input, scope }, project) =>
         monitorWire({
           app,
@@ -138,6 +144,7 @@ export function createMonitorsRest(): Readonly<{
       )
 
       .patch("/:id", "patchApiMonitorsById")
+      .withAudit("monitors.update")
       .withParams(monitorRestIdParamsSchema)
       .withInput(monitorRestUpdateInputSchema)
       .withPermission("evaluations:update")
@@ -147,7 +154,7 @@ export function createMonitorsRest(): Readonly<{
         description: "Update a monitor (name, enabled state, settings, etc.)",
         responses: notFound,
       })
-      .withMiddleware(projectRestFacts)
+      .withMiddlewareContext(projectRequestContext)
       .handle(async ({ app, input, scope }, project) => {
         const { id, ...changes } = input;
 
@@ -160,6 +167,7 @@ export function createMonitorsRest(): Readonly<{
 
       // Enabling or disabling changes the monitor that already exists — an `:update`.
       .post("/:id/toggle", "postApiMonitorsByIdToggle")
+      .withAudit("monitors.toggle")
       .withParams(monitorRestIdParamsSchema)
       .withInput(monitorRestToggleInputSchema)
       .withPermission("evaluations:update")
@@ -177,6 +185,7 @@ export function createMonitorsRest(): Readonly<{
 
       // Destruction deliberately stays at `:manage`.
       .delete("/:id", "deleteApiMonitorsById")
+      .withAudit("monitors.delete")
       .withParams(monitorRestIdParamsSchema)
       .withPermission("evaluations:manage")
       .withOutput(monitorRestDeletedSchema)

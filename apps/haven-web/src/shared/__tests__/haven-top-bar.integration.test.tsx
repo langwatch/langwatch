@@ -53,7 +53,17 @@ describe("<HavenTopBar/>", () => {
 
     it("puts the answering simulators in Sims and the dev tools in Tools", () => {
       renderHome();
-      expect(menuItems({ menu: "Sims" })).toEqual(["Mail", "IdP", "Storage", "LLM", "Analytics"]);
+      expect(menuItems({ menu: "Sims" })).toEqual([
+        "Mail",
+        "IdP",
+        "Storage",
+        "LLM",
+        "Analytics",
+        "Outbound",
+        "Payment",
+        "Telemetry",
+        "Lambda",
+      ]);
       expect(menuItems({ menu: "Tools" })).toEqual(["Grafana"]);
     });
   });

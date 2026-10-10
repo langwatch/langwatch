@@ -1,8 +1,10 @@
+import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import type {
   EventingCommandSender,
   EventingParticipation,
   ProcessStore,
+  RetentionPolicyResolver,
 } from "@langwatch/eventing";
 import { GatewayApi } from "@langwatch/gateway-contract";
 /**
@@ -33,7 +35,10 @@ import type { WebhookEndpointRepository } from "../repositories/webhook-endpoint
 import type { WebhookRepositories } from "../repositories/webhook.repositories.ts";
 import type { WebhookDispatchResult as DeliveryDispatchResult } from "../rules/webhook-delivery-contract.rules.ts";
 import type { WebhookDestinationConfig } from "../rules/webhook-destination.rules.ts";
-import { webhookEndpointConfiguration } from "../rules/webhook-endpoint-policy.rules.ts";
+import {
+  webhookEndpointConfiguration,
+  type WebhookEndpointConfiguration,
+} from "../rules/webhook-endpoint-policy.rules.ts";
 import { WebhookAccessService } from "../services/webhook-access.service.ts";
 import { WebhookDeliveryMaintenanceService } from "../services/webhook-delivery-maintenance.service.ts";
 import { WebhookDeliveryRequestService } from "../services/webhook-delivery-request.service.ts";
@@ -140,6 +145,8 @@ export interface WebhookAppDependencies {
   endpointStream?: WebhookEndpointStreamService;
   /** One attempt to a customer URL for another module's outbox (ADR-167 step 1). */
   requests?: WebhookRequestService;
+  /** The operator's admission switches, read from config; strict when absent. */
+  configuration?: WebhookEndpointConfiguration;
 }
 
 type WebhookSetup = FeatureSetup<
@@ -155,6 +162,7 @@ type WebhookDeliveryParts = Readonly<{
   retention: WebhookRepositories["retention"];
   getPlan: WebhookDeliveryProcessDeps["getPlan"];
   dispatch: () => WebhookDeliveryProcessDeps["dispatch"];
+  tenantRetention: RetentionPolicyResolver;
 }>;
 
 export class WebhookModule implements WebhookApiContract, WebhookSpendReplayDoorApi {
@@ -165,6 +173,8 @@ export class WebhookModule implements WebhookApiContract, WebhookSpendReplayDoor
     entitlement: EntitlementApi,
     gateway: GatewayApi,
     projects: ProjectApi,
+    /** Each tenant's retention, which the delivery event rows are stamped with. */
+    retention: DataRetentionApi,
   };
   static readonly config = webhookConfig;
 
@@ -187,6 +197,7 @@ export class WebhookModule implements WebhookApiContract, WebhookSpendReplayDoor
 
     const app = new WebhookModule({
       endpoints: input.repositories.endpoints,
+      configuration: webhookEndpointConfiguration(input.config),
       events: WebhookEventsService.create({
         projects: input.dependencies.projects,
         spend: input.dependencies.gateway,
@@ -208,6 +219,10 @@ export class WebhookModule implements WebhookApiContract, WebhookSpendReplayDoor
       retention: input.repositories.retention,
       getPlan: (organizationId) => entitlement.getActivePlan({ organizationId }),
       dispatch: () => deliver,
+      tenantRetention: {
+        resolve: (tenantId) =>
+          input.dependencies.retention.getResolvedForProject({ projectId: tenantId }),
+      },
     };
     return app;
   }
@@ -232,7 +247,8 @@ export class WebhookModule implements WebhookApiContract, WebhookSpendReplayDoor
         endpointStream: WebhookEndpointStreamService.create({ processStore }),
       };
     }
-    if (participation === "produce" || !parts) return buildWebhookDeliveryPipeline({});
+    const retention = parts?.tenantRetention;
+    if (participation === "produce" || !parts) return buildWebhookDeliveryPipeline({ retention });
     const deps = {
       processStore,
       endpoints: parts.endpoints,
@@ -242,6 +258,7 @@ export class WebhookModule implements WebhookApiContract, WebhookSpendReplayDoor
       getPlan: parts.getPlan,
     };
     return buildWebhookDeliveryPipeline({
+      retention,
       deliveryProcess: WebhookDeliveryService.create(deps).processManager(),
       governanceProcess: WebhookGovernanceDeliveryService.create(deps).processManager(),
       gatewayEvents: (request) => this.requestGatewayEventDelivery(request),
@@ -403,7 +420,7 @@ export class WebhookModule implements WebhookApiContract, WebhookSpendReplayDoor
   get #endpointSaves(): WebhookEndpointService {
     return WebhookEndpointService.create({
       endpoints: this.#dependencies.endpoints,
-      configuration: webhookEndpointConfiguration(),
+      configuration: this.#dependencies.configuration ?? webhookEndpointConfiguration(),
     });
   }
 

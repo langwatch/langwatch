@@ -188,7 +188,7 @@ describe("clickHouseFilterConditions", () => {
 
         expect(result.sql).toContain("EXISTS (");
         const whereClause = result.sql.slice(result.sql.indexOf("WHERE"));
-        const tenantIndex = whereClause.indexOf("es.TenantId = ts.TenantId");
+        const tenantIndex = whereClause.indexOf("es.TenantId = {tenantId:String}");
         const traceIdIndex = whereClause.indexOf("assumeNotNull(es.TraceId) = ts.TraceId");
         expect(tenantIndex).toBeGreaterThanOrEqual(0);
         expect(traceIdIndex).toBeGreaterThan(tenantIndex);
@@ -208,7 +208,7 @@ describe("clickHouseFilterConditions", () => {
         const result = builder!({ values: [...values], paramId: "f0", key });
 
         const whereClause = result.sql.slice(result.sql.indexOf("WHERE"));
-        const tenantIndex = whereClause.indexOf("es.TenantId = ts.TenantId");
+        const tenantIndex = whereClause.indexOf("es.TenantId = {tenantId:String}");
         const traceIdIndex = whereClause.indexOf("assumeNotNull(es.TraceId) = ts.TraceId");
         expect(tenantIndex).toBeGreaterThanOrEqual(0);
         expect(traceIdIndex).toBeGreaterThan(tenantIndex);

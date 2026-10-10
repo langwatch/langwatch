@@ -61,9 +61,6 @@ export function FlameBlock({
   if (widthPct < 0.05 && totalSpanCount > 200) return null;
 
   const color = getSpanColor(span.type);
-  // gray.solid lacks saturation; at 85% alpha, white text dissolves into
-  // pale grey (unreadable on small bars).
-  const isLowContrastPalette = color === "gray.solid";
   // Sub-label-width blocks render calmer: softer fill, no border noise,
   // a 1px right gap and pill ends so a dense strip of adjacent tiny spans
   // reads as discrete events rather than one broken bar. Hover/selection
@@ -146,10 +143,7 @@ export function FlameBlock({
       >
         <Text
           textStyle="xs"
-          // White text in both modes for the saturated palettes
-          // (blue/green/purple/teal/orange/pink/cyan) — `lightBgAlphaPct` keeps the
-          // fill saturated enough that white reads cleanly.
-          color={isLowContrastPalette ? { base: "fg", _dark: "white" } : "white"}
+          color={color.replace(".solid", ".contrast")}
           truncate
           lineHeight={1}
           // Dark drop-shadow lifts white text off the saturated fills.
@@ -157,8 +151,8 @@ export function FlameBlock({
           // instead, where this same shadow would double-print the
           // glyphs into bold-ish noise — drop it on that branch.
           textShadow={{
-            base: isLowContrastPalette ? "none" : "0 1px 1px rgba(0,0,0,0.45)",
-            _dark: "0 1px 1px rgba(0,0,0,0.45)",
+            base: "0 1px 1px color-mix(in srgb, var(--chakra-colors-bg-scrim) 45%, transparent)",
+            _dark: "0 1px 1px color-mix(in srgb, var(--chakra-colors-bg-scrim) 45%, transparent)",
           }}
         >
           <BlockLabel

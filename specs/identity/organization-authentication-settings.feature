@@ -19,6 +19,13 @@ Feature: Organization authentication settings
       And where the connection stands is said in words, never as a state name
 
     @integration
+    Scenario: The sign-on card says up front that single sign-on needs an Enterprise plan
+      Given "acme" is not on an Enterprise plan
+      When "ana" opens the authentication page
+      Then the sign-on card says single sign-on is an Enterprise feature
+      And it offers no way to prove a domain or set it up
+
+    @integration
     Scenario: A domain whose record has gone says so on the overview
       Given "acme" proved "acme.com" and its published record has been missing
       for two days

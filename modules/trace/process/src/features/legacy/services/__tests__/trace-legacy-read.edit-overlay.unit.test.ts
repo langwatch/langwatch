@@ -1,3 +1,4 @@
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { Protections, Trace, TraceCanonicalisationService } from "@langwatch/trace-contract";
 /**
  * @vitest-environment node
@@ -23,11 +24,15 @@ vi.mock("langwatch", () => ({
   }),
 }));
 
+import { ownProof } from "../../../../__tests__/support/authorization-proofs.fixture.ts";
 import { MemoryTraceEditOverlayRepository } from "../../../../repositories/memory/memory.trace-edit-overlay.repository.ts";
 import { TraceEditOverlayService } from "../../../edit-overlay/services/trace-edit-overlay.service.ts";
+import type { TraceLegacyReadRepository } from "../../repositories/trace-legacy-read.repository.ts";
+import type { LegacyTraceMappingService } from "../legacy-trace-mapping.service.ts";
 import { TraceLegacyReadService } from "../trace-legacy-read.service.ts";
 
 const PROJECT_ID = "project_test";
+const OWN_READ = ownProof({ projectId: PROJECT_ID });
 
 const protections: Protections = {
   canSeeCosts: true,
@@ -72,18 +77,26 @@ function makeService(): TraceLegacyReadService {
   vi.spyOn(editOverlay, "getPatchesByTraceIds").mockImplementation(mockGetPatchesByTraceIds);
   return TraceLegacyReadService.create({
     traceCanonicalisation: {} as TraceCanonicalisationService,
-    traceRead: {
-      findTracesWithSpans: mockGetTracesWithSpans,
-      findTracesWithSpansByThreadIds: mockGetTracesWithSpansByThreadIds,
-      resolveTraceIdByPrefix: vi.fn().mockResolvedValue([]),
-      listAllTracesForProject: vi.fn(),
-      findTraceSummaries: vi.fn(),
-      findTracesByThreadId: vi.fn(),
-      findCustomersAndLabels: vi.fn(),
-      findDistinctFieldNames: vi.fn(),
-      findTopicCounts: vi.fn(),
-      findSpanForPromptStudio: vi.fn(),
-    },
+    traceRead: createApiFixture<TraceLegacyReadRepository>(
+      {
+        resolveTraceIdByPrefix: vi.fn().mockResolvedValue([]),
+        findTraceSummaries: vi.fn(),
+        findCustomersAndLabels: vi.fn(),
+        findDistinctFieldNames: vi.fn(),
+        findTopicCounts: vi.fn(),
+        findSpanForPromptStudio: vi.fn(),
+      },
+      "trace read store",
+    ),
+    mapping: createApiFixture<LegacyTraceMappingService>(
+      {
+        findTracesWithSpans: mockGetTracesWithSpans,
+        findTracesWithSpansByThreadIds: mockGetTracesWithSpansByThreadIds,
+        listAllTracesForProject: vi.fn(),
+        findTracesByThreadId: vi.fn(),
+      },
+      "legacy trace mapping",
+    ),
     editOverlay,
     evaluationRuns: refusingEvaluations(),
   });
@@ -103,6 +116,7 @@ describe("TraceService withEditOverlay", () => {
       );
 
       const result = await makeService().findById({
+        authorization: OWN_READ,
         projectId: PROJECT_ID,
         traceId: "trace-1",
         protections,
@@ -124,6 +138,7 @@ describe("TraceService withEditOverlay", () => {
       );
 
       const result = await makeService().findById({
+        authorization: OWN_READ,
         projectId: PROJECT_ID,
         traceId: "trace-1",
         protections,
@@ -146,6 +161,7 @@ describe("TraceService withEditOverlay", () => {
       );
 
       const traces = await makeService().getTracesWithSpansByThreadIds({
+        authorization: OWN_READ,
         projectId: PROJECT_ID,
         threadIds: ["thread-1"],
         protections,
@@ -165,6 +181,7 @@ describe("TraceService withEditOverlay", () => {
       );
 
       const traces = await makeService().getTracesWithSpans({
+        authorization: OWN_READ,
         projectId: PROJECT_ID,
         traceIds: ["trace-1"],
         protections,

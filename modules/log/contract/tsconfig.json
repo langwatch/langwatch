@@ -22,6 +22,9 @@
     },
     {
       "path": "../../../packages/otlp/tsconfig.build.json"
+    },
+    {
+      "path": "../../trace/contract/tsconfig.build.json"
     }
   ]
 }

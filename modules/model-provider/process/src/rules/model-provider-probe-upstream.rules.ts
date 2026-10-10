@@ -27,7 +27,7 @@ export const unchecked = (
 export const MAX_UPSTREAM_DETAIL_LENGTH = 300;
 
 /** What a Google `ErrorInfo` reason says about the key; the probe service maps it to an error. */
-export type GeminiRefusalKind = "key_invalid" | "service_disabled" | "key_restricted" | "unmapped";
+type GeminiRefusalKind = "key_invalid" | "service_disabled" | "key_restricted" | "unmapped";
 
 const GEMINI_REASON_KINDS = new Map<string, GeminiRefusalKind>([
   ["API_KEY_INVALID", "key_invalid"],

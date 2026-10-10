@@ -36,6 +36,7 @@ import {
   type OrganizationInviteExtended,
   type OrganizationInviteResent,
   type OrganizationListedInvite,
+  type InviteLanding,
   type OrganizationInviteAccepted,
   type OrganizationPendingInviteApplied,
   type OrganizationJoinOrigin,
@@ -112,21 +113,22 @@ import {
   type PricingModel,
   type OrganizationCurrency,
   type PendingInvitationForCaller,
+  type PendingInvitationsByEmail,
   type PendingInvitationsForCaller,
   type SignUpVerdict,
   type SignInSecurityPolicy,
   type OrganizationApiSeatCheckoutInput,
   type OrganizationSeatCheckoutRedirect,
+  type OrganizationAdmission,
 } from "@langwatch/organization-contract";
 import type * as organizationContractModule from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
+import { projectKindsHiddenFrom } from "@langwatch/project-contract";
 import { RoleApi } from "@langwatch/role-contract";
 import { internalSlackSignupsWebhook } from "@langwatch/secrets";
 import type { Instant } from "@langwatch/time";
-import { UserApi } from "@langwatch/user-contract";
 
-import { organizationInviteMailChannels } from "../channels/organization-invite-mail-channels.registry.ts";
-import { signupAnnouncementChannels } from "../channels/signup-announcement-channels.registry.ts";
+import type { OrganizationChannels } from "../channels/organization.channels.ts";
 import type { RecordAuditCommandData } from "../eventing/organization-audit.commands.ts";
 import type { OrganizationAuditSender } from "../eventing/organization-audit.intent.ts";
 import {
@@ -201,7 +203,7 @@ type OrganizationMemberWithUser = OrganizationWithMembersAndTheirTeams["members"
 // ---------------------------------------------------------------------------
 
 /** Who a write is attributed to. */
-export interface OrganizationCaller {
+interface OrganizationCaller {
   readonly id: string;
   /** The session's address, where the transport read one; the sign-up policy matches it. */
   readonly email?: string | null;
@@ -210,7 +212,7 @@ export interface OrganizationCaller {
 }
 
 /** What the process composes this feature's application from. */
-export interface ServerOrganizationAppDependencies {
+interface ServerOrganizationAppDependencies {
   organizations: OrganizationEntityService;
   signInPolicies: OrganizationSignInPolicyService;
   membership: OrganizationMembershipService;
@@ -225,10 +227,11 @@ const logger = createLogger("langwatch:organization");
 type OrganizationSetup = FeatureSetup<
   typeof OrganizationModule.dependencies,
   OrganizationServerConfig,
-  OrganizationRepositories
+  OrganizationRepositories,
+  OrganizationChannels
 >;
 
-export type OrganizationInfrastructure = Readonly<{
+type OrganizationInfrastructure = Readonly<{
   identities: PersonalWorkspaceIdentity;
   teamIdentities: TeamIdentity;
   groupIdentities: GroupIdentity;
@@ -276,7 +279,6 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
   static readonly contract = OrganizationApi;
   static readonly dependencies = {
     permissions: AuthzApi,
-    users: UserApi,
     /** Identity application that answers for the caller's verified addresses. */
     identity: IdentityApi,
     /**
@@ -299,15 +301,11 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
   #dependencies: ServerOrganizationAppDependencies;
 
   static async create(setup: OrganizationSetup): Promise<OrganizationModule> {
-    const signupAnnouncements = await setup.secrets.into(
-      OrganizationModule.secrets.internalSlackSignupsWebhook,
-      (webhookUrl) =>
-        SignupAnnouncementService.create({
-          channel: webhookUrl ? signupAnnouncementChannels.live.create({ webhookUrl }) : undefined,
-          publicBaseUrl: setup.config.publicBaseUrl,
-          logger,
-        }),
-    );
+    const signupAnnouncements = SignupAnnouncementService.create({
+      channel: setup.channels.signupAnnouncements,
+      publicBaseUrl: setup.config.publicBaseUrl,
+      logger,
+    });
     const infrastructure = OrganizationModule.#composeInfrastructure({
       setup,
       signupAnnouncements,
@@ -330,6 +328,7 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
       repository: membershipRepository,
       creations: infrastructure.lifecycle,
       workspaceNotices: infrastructure.lifecycle,
+      memberNotices: infrastructure.lifecycle,
       seats: infrastructure.seats,
       seatNotices: infrastructure.lifecycle,
       grantCache: AuthzApiOrganizationGrantCache.create(setup.dependencies.permissions),
@@ -396,7 +395,6 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
     application.#signUpPolicy = SignUpPolicyService.create({
       settings: setup.config.signUp,
       repository: setup.repositories.signUpPolicy,
-      users: setup.dependencies.users,
       authorization: setup.dependencies.permissions,
       // The addresses accepting an invitation takes; an account identity has not resolved yet
       // answers with none, and the caller's session address stands in.
@@ -433,9 +431,7 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
       roles: dependencies.roles,
       throttle,
       baseHost,
-      mail: organizationInviteMailChannels.ses.create({
-        notifications: dependencies.notifications,
-      }),
+      mail: setup.channels.inviteMail,
     });
 
     return {
@@ -544,7 +540,9 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
   }
 
   /** Whether this address may create a new account here. */
-  async checkSignUp(input: Readonly<{ email: string }>): Promise<SignUpVerdict> {
+  async checkSignUp(
+    input: Readonly<{ email: string; hasAnyAccount: boolean }>,
+  ): Promise<SignUpVerdict> {
     return this.#signUpPolicy?.checkSignUp(input) ?? { allowed: true, via: "open" };
   }
 
@@ -553,6 +551,13 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
     by: OrganizationCaller,
   ): Promise<PendingInvitationsForCaller> {
     return this.#invitationDoor.listPendingForCaller({ userId: by.id });
+  }
+
+  /** Every pending invitation on one address, in any organization: the operator's lookup. */
+  async findPendingInvitationsByEmail(
+    input: Readonly<{ email: string }>,
+  ): Promise<PendingInvitationsByEmail> {
+    return this.#invitationDoor.findPendingByEmail(input);
   }
 
   /** The invitation waiting for a caller who belongs to no organization yet. */
@@ -820,7 +825,7 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
       seat?: "MEMBER" | "DEVELOPER";
       origin?: OrganizationJoinOrigin;
     }>,
-  ): Promise<{ outcome: "created" | "already-present"; seat: "MEMBER" | "DEVELOPER" }> {
+  ): Promise<OrganizationAdmission> {
     return this.#dependencies.membership.createMembership(input);
   }
 
@@ -917,6 +922,7 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
     {
       userId: string;
       departmentId: string | null;
+      disabledAt: Instant | null;
       user: { name: string | null; email: string | null };
     }[]
   > {
@@ -1104,15 +1110,17 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
     return this.#dependencies.organizations.updateConnectSyncOutcome(input);
   }
 
+  /** Licensing's stored licence, applied from its fact; the key is read from licensing's row. */
   setLicense(input: {
     organizationId: string;
-    licenseKey: string;
+    licenseKeyFingerprint: string;
     expiresAt: Instant;
     validatedAt: Instant | null;
   }): Promise<void> {
     return this.#dependencies.organizations.setLicense(input);
   }
 
+  /** Licensing's cleared licence, applied from its fact by the lifecycle subscriber. */
   clearLicense(input: { organizationId: string }): Promise<void> {
     return this.#dependencies.organizations.clearLicense(input);
   }
@@ -1513,7 +1521,45 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
 
   /** organization_lifecycle: the same in every role, since its peers react from their side (§9). */
   lifecyclePipeline(): OrganizationLifecycleDefinition {
-    return buildOrganizationLifecyclePipeline({ billingFacts: this, licensingFacts: this });
+    return buildOrganizationLifecyclePipeline({
+      billingFacts: this,
+      licensingFacts: this,
+      memberFacts: this,
+    });
+  }
+
+  /**
+   * Authz's proven offboarding took the seat. The fact's moment keys the removal, so a
+   * redelivered fact records it once; a deleted organisation throws OrganizationNotFoundError.
+   */
+  async recordMemberOffboarded(input: {
+    organizationId: string;
+    userId: string;
+    offboardedByUserId: string | null;
+    occurredAt: number;
+  }): Promise<void> {
+    await this.getWithAdministrators({ organizationId: input.organizationId });
+    await this.#infrastructure.lifecycle.memberRemoved({
+      organizationId: input.organizationId,
+      userId: input.userId,
+      removedByUserId: input.offboardedByUserId,
+      occurredAt: input.occurredAt,
+    });
+  }
+
+  /** User erased an account it held in this organisation: recorded once, by nobody; gone throws. */
+  async recordMemberErased(input: {
+    organizationId: string;
+    userId: string;
+    occurredAt: number;
+  }): Promise<void> {
+    await this.getWithAdministrators({ organizationId: input.organizationId });
+    await this.#infrastructure.lifecycle.memberRemoved({
+      organizationId: input.organizationId,
+      userId: input.userId,
+      removedByUserId: null,
+      occurredAt: input.occurredAt,
+    });
   }
 
   /** Records one organization's stored presence switch, for the backfill task. */
@@ -1579,6 +1625,14 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
     by: OrganizationCaller,
   ): Promise<OrganizationInviteAccepted> {
     return this.#invitationDoor.accept(input, by);
+  }
+
+  async getInviteLanding(input: Readonly<{ inviteCode: string }>): Promise<InviteLanding> {
+    return this.#invitationDoor.landing(input);
+  }
+
+  async requestFreshInvite(input: Readonly<{ inviteCode: string }>): Promise<void> {
+    return this.#invitationDoor.requestFresh(input);
   }
 
   async applyPendingInvite(
@@ -1679,6 +1733,10 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
       this.listTeamsWithMembers({ organizationId: input.organizationId, callerCanManage }, by),
       this.#dependencies.organizations.listProjects({
         organizationId: input.organizationId,
+        hiddenKinds: await this.#projectKindsHiddenFrom({
+          organizationId: input.organizationId,
+          userId: by.id,
+        }),
         limit: TEAM_PROJECT_LIMIT,
       }),
     ]);
@@ -1692,9 +1750,15 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
   /** The access matrix an administrator edits: who holds what, and through what. */
   async listTeamAccessMatrix(
     input: Readonly<{ organizationId: string }>,
+    by: OrganizationCaller,
   ): Promise<OrganizationTeamAccess[]> {
+    // organization:manage can come from a custom role, so it does not make the caller an admin.
     const projects = await this.#dependencies.organizations.listProjects({
       organizationId: input.organizationId,
+      hiddenKinds: await this.#projectKindsHiddenFrom({
+        organizationId: input.organizationId,
+        userId: by.id,
+      }),
       limit: TEAM_PROJECT_LIMIT,
     });
 
@@ -1713,6 +1777,7 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
     const projects = await this.listProjectsByTeam({
       organizationId: input.organizationId,
       teamId: team.id,
+      callerUserId: by.id,
     });
 
     return { ...team, projects: projects.map(teamProjectOf) };
@@ -1903,12 +1968,34 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
     });
   }
 
-  /** The projects that live in one team. */
-  listProjectsByTeam(input: {
+  /** The projects that live in one team, as this caller may see them; a null caller is no admin. */
+  async listProjectsByTeam(input: {
     organizationId: string;
     teamId: string;
+    callerUserId: string | null;
   }): Promise<OrganizationTeamProject[]> {
-    return this.#dependencies.organizations.listProjects(input);
+    return this.#dependencies.organizations.listProjects({
+      organizationId: input.organizationId,
+      teamId: input.teamId,
+      hiddenKinds: await this.#projectKindsHiddenFrom({
+        organizationId: input.organizationId,
+        userId: input.callerUserId,
+      }),
+    });
+  }
+
+  /** Only an organisation admin sees an aggregate project (ADR-177 decision 5). */
+  async #projectKindsHiddenFrom(input: {
+    organizationId: string;
+    userId: string | null;
+  }): Promise<string[]> {
+    const role = input.userId
+      ? await this.#dependencies.membership.findOrganizationRole({
+          organizationId: input.organizationId,
+          userId: input.userId,
+        })
+      : null;
+    return projectKindsHiddenFrom(role);
   }
 }
 

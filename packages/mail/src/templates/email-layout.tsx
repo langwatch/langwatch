@@ -111,7 +111,7 @@ const MESH = {
  * Light wordmark (raster) for all clients; dark wordmark (SVG) for clients supporting
  * prefers-color-scheme.
  */
-const WORDMARK_LIGHT = "https://app.langwatch.ai/images/logo.png";
+const WORDMARK_LIGHT = "https://app.langwatch.ai/images/logo-wordmark.png";
 const WORDMARK_DARK = "https://app.langwatch.ai/images/logo-full-darktheme.svg";
 
 /**

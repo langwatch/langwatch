@@ -33,7 +33,7 @@ export interface SourceBadge {
 }
 
 export const SOURCE_STATUS_META: Record<string, SourceBadge> = {
-  active: { icon: CircleCheck, label: "Active", color: "green.500" },
+  active: { icon: CircleCheck, label: "Active", color: "green.fg" },
   awaiting_first_event: {
     icon: CircleDashed,
     label: "Awaiting first event",
@@ -45,7 +45,7 @@ export const SOURCE_STATUS_META: Record<string, SourceBadge> = {
 export const SOURCE_UNHEALTHY_META: SourceBadge = {
   icon: CircleAlert,
   label: "Pulls failing",
-  color: "red.500",
+  color: "red.fg",
 };
 
 /**

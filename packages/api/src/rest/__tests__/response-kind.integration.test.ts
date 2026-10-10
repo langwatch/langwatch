@@ -9,6 +9,7 @@ import { generateSpecs } from "hono-openapi";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
+import { authorizationPort } from "../../__tests__/api-double.ts";
 import { publicRoute } from "../../access/access.ts";
 import { createErrorHandler } from "../../errors.ts";
 import { defineRestRouter } from "../declaration.ts";
@@ -137,6 +138,7 @@ const objects = defineRestRouter(ObjectApi)
   .withRawBody("text")
   .withAccess(publicRoute({ reason: "SCIM presents its own bearer token" }))
   .withResponse("protocol", { produces: "application/scim+json", because: SCIM_REASON })
+  .withoutAudit("test route")
   .handle(({ raw, response }) =>
     response.write({
       status: 201,
@@ -175,6 +177,7 @@ const proxies = defineRestRouter(ObjectApi)
 
 function objectsApp(): Hono {
   const runtime = createRestRuntime({
+    authorization: authorizationPort,
     identity: { authenticate: () => ({ actor: null, scope: null }) },
   });
 
@@ -187,6 +190,7 @@ function objectsApp(): Hono {
 
 function proxyApp(): Hono {
   const runtime = createRestRuntime({
+    authorization: authorizationPort,
     identity: { authenticate: () => ({ actor: null, scope: null }) },
   });
 

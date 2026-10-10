@@ -1,4 +1,4 @@
-import { moduleApi } from "@langwatch/module";
+import { moduleApi, type Named } from "@langwatch/module";
 import { z } from "zod";
 
 /**
@@ -37,42 +37,67 @@ export type PlatformHealthStatus = z.infer<typeof platformHealthStatusSchema>;
  * prose, a hostname, a variable name or a tenant identifier: the body goes to
  * whoever holds the monitoring key, and a health answer is not a log line.
  */
-export const platformHealthCheckSchema = z.strictObject({
+const platformHealthCheckSchemaDefinition = z.strictObject({
   name: platformHealthCheckNameSchema,
   status: platformHealthCheckStatusSchema,
   durationMs: z.number().int().nonnegative(),
   detail: z.string().optional(),
 });
+export interface PlatformHealthCheckSchema extends Named<
+  typeof platformHealthCheckSchemaDefinition
+> {}
+export const platformHealthCheckSchema: PlatformHealthCheckSchema =
+  platformHealthCheckSchemaDefinition;
 
 export type PlatformHealthCheck = z.infer<typeof platformHealthCheckSchema>;
 
-export const platformHealthReportSchema = z.strictObject({
+const platformHealthReportSchemaDefinition = z.strictObject({
   status: platformHealthStatusSchema,
   checkedAt: z.string(),
   checks: z.array(platformHealthCheckSchema),
 });
+export interface PlatformHealthReportSchema extends Named<
+  typeof platformHealthReportSchemaDefinition
+> {}
+export const platformHealthReportSchema: PlatformHealthReportSchema =
+  platformHealthReportSchemaDefinition;
 
 export type PlatformHealthReport = z.infer<typeof platformHealthReportSchema>;
 
 /** What a monitor may narrow a report to, where it asks for one subsystem. */
-export const platformHealthQuerySchema = z.object({
+const platformHealthQuerySchemaDefinition = z.object({
   triggerId: z.string().optional(),
   workflowId: z.string().optional(),
 });
+export interface PlatformHealthQuerySchema extends Named<
+  typeof platformHealthQuerySchemaDefinition
+> {}
+export const platformHealthQuerySchema: PlatformHealthQuerySchema =
+  platformHealthQuerySchemaDefinition;
 
 export type PlatformHealthQuery = z.infer<typeof platformHealthQuerySchema>;
 
 /** The headers a project-keyed `/api/health/*` probe reads its caller's key from. */
-export const healthProbeHeadersSchema = z.object({
+const healthProbeHeadersSchemaDefinition = z.object({
   "x-auth-token": z.string().optional(),
   authorization: z.string().optional(),
   "x-project-id": z.string().optional(),
 });
+export interface HealthProbeHeadersSchema extends Named<
+  typeof healthProbeHeadersSchemaDefinition
+> {}
+export const healthProbeHeadersSchema: HealthProbeHeadersSchema =
+  healthProbeHeadersSchemaDefinition;
 
 export type HealthProbeHeaders = z.infer<typeof healthProbeHeadersSchema>;
 
 /** `/api/health/scenarios` names the run plan, by id or slug, it launches one run of. */
-export const scenarioCanaryQuerySchema = z.object({ runPlanId: z.string().optional() });
+const scenarioCanaryQuerySchemaDefinition = z.object({ runPlanId: z.string().optional() });
+export interface ScenarioCanaryQuerySchema extends Named<
+  typeof scenarioCanaryQuerySchemaDefinition
+> {}
+export const scenarioCanaryQuerySchema: ScenarioCanaryQuerySchema =
+  scenarioCanaryQuerySchemaDefinition;
 
 /** One project-keyed probe: which subsystem or canary, and what the caller presented. */
 export type ProjectKeyedProbeRequest =

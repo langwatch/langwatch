@@ -185,7 +185,7 @@ export const TokenValuePicker: React.FC<TokenValuePickerProps> = ({ anchor, onCl
       zIndex={2050}
       minWidth={`${POPOVER_WIDTH}px`}
       bg="bg.panel"
-      boxShadow="0 0 0 1px var(--chakra-colors-border), 0 0 0 4px color-mix(in oklab, var(--chakra-colors-blue-solid) 14%, transparent), 0 18px 40px -12px color-mix(in oklab, #000 40%, transparent)"
+      boxShadow="0 0 0 1px var(--chakra-colors-border), 0 0 0 4px color-mix(in oklab, var(--chakra-colors-blue-solid) 14%, transparent), 0 18px 40px -12px color-mix(in oklab, var(--chakra-colors-bg-scrim) 40%, transparent)"
       animation="token-value-picker-fade 120ms ease-out"
       css={{
         "@keyframes token-value-picker-fade": {

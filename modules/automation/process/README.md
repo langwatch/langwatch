@@ -6,7 +6,7 @@ The server half of [automation](../README.md). Automations: triggers and their f
 
 ## Installation
 
-`defineProcessModule("automation").withRepositories(automationRepositories).withChannels(automationChannels).withApi(AutomationModule).withTransports(…, automationTrpcTransport, emailSuppressionTrpcTransport, slackAutomationRest, unsubscribeRest).withTasks(…).withMigrations(…).withEventing(automationsEventing)`, `src/automation.module.ts:35`.
+`defineProcessModule("automation").withRepositories(automationRepositories).withChannels(automationChannels).withApi(AutomationModule).withTransports(…, automationTrpcTransport, emailSuppressionTrpcTransport, slackAutomationRest, unsubscribeRest).provideMiddlewareContext(…).withTasks(…).withMigrations(…).withEventing(automationsEventing)`, `src/automation.module.ts:23`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 Callable automation capability shared by transports and process peers.
 
-Peers call these through the token, declared at `../contract/src/automation.api.ts:71`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/automation.api.ts:72`; nothing else in this package is public.
 
 #### `getAllForProject`
 
@@ -134,14 +134,6 @@ getRecentWebhookDeliveries(input: { projectId: string; triggerId: string; limit:
 
 ```typescript
 getReportSchedules(input: { projectId: string }): Promise<ReportSchedule[]>;
-```
-
-#### `registeredMigrations`
-
-The ORGANIZATION-rooted migrations automation registers (the Slack connection move).
-
-```typescript
-registeredMigrations(): readonly SystemMigration[];
 ```
 
 #### `listSlackChannels`
@@ -384,6 +376,14 @@ The authoring drawer's test-fire button, throttled and self-addressed.
 sendTestFire(input: AutomationApiTestFireInput, author: AutomationTestFireAuthor): Promise<TestFireResult>;
 ```
 
+#### `previewTriggerEmail`
+
+Renders the email an authoring draft would send, without delivering it.
+
+```typescript
+previewTriggerEmail(input: AutomationApiPreviewEmailInput): Promise<AutomationEmailPreview>;
+```
+
 #### `findUnsubscribeView`
 
 ```typescript
@@ -456,7 +456,7 @@ countUsage(input: { projectIds: readonly string[]; since?: number; }): Promise<A
 
 |             |                                          |
 | ----------- | ---------------------------------------- |
-| Declared at | `src/transport/automation.rest.ts:118`   |
+| Declared at | `src/transport/automation.rest.ts:123`   |
 | Base URL    | `/api/triggers`, twin `/api/v1/triggers` |
 | Addressing  | dated                                    |
 | Credential  | project                                  |
@@ -466,19 +466,19 @@ countUsage(input: { projectIds: readonly string[]; since?: number; }): Promise<A
 
 List the project's automations, newest first. Paused automations are included.
 
-Permission `triggers:view`. Declared at `src/transport/automation.rest.ts:122`.
+Permission `triggers:view`. Declared at `src/transport/automation.rest.ts:127`.
 
 Answers at `/api/triggers`, `/api/v1/triggers`; also, undocumented, `/api/triggers/2026-08-07`, `/api/v1/triggers/2026-08-07`, `/api/triggers/latest`, `/api/v1/triggers/latest`.
 
 ```typescript
-// Response: z.array(automationRestResponseSchema) (inline, src/transport/automation.rest.ts:124)
+// Response: z.array(automationRestResponseSchema) (inline, src/transport/automation.rest.ts:129)
 ```
 
 #### `GET /:triggerId` · `getApiTriggersById`
 
 Get a trigger by its ID
 
-Permission `triggers:view`. Declared at `src/transport/automation.rest.ts:139`.
+Permission `triggers:view`. Declared at `src/transport/automation.rest.ts:144`.
 
 Answers at `/api/triggers/:triggerId`, `/api/v1/triggers/:triggerId`; also, undocumented, `/api/triggers/2026-08-07/:triggerId`, `/api/v1/triggers/2026-08-07/:triggerId`, `/api/triggers/latest/:triggerId`, `/api/v1/triggers/latest/:triggerId`.
 
@@ -493,7 +493,7 @@ interface Params {
 
 What this automation has done: its fires, newest first. Metadata only (no trace ids and no trace content). Send `nextCursor` back as `cursor` to read the page after this one.
 
-Permission `triggers:view`. Declared at `src/transport/automation.rest.ts:157`.
+Permission `triggers:view`. Declared at `src/transport/automation.rest.ts:162`.
 
 Answers at `/api/triggers/:triggerId/fires`, `/api/v1/triggers/:triggerId/fires`; also, undocumented, `/api/triggers/2026-08-07/:triggerId/fires`, `/api/v1/triggers/2026-08-07/:triggerId/fires`, `/api/triggers/latest/:triggerId/fires`, `/api/v1/triggers/latest/:triggerId/fires`.
 
@@ -510,7 +510,7 @@ interface Query {
 
 Create an automation. Send `customGraphId` + `graphAlert` for an alert on a metric, `report` for a scheduled report, or conditions for a trace automation. The delivery channel is fixed at creation.
 
-Permission `triggers:create`. Declared at `src/transport/automation.rest.ts:182`.
+Permission `triggers:create`. Declared at `src/transport/automation.rest.ts:187`.
 
 Answers at `/api/triggers`, `/api/v1/triggers`; also, undocumented, `/api/triggers/2026-08-07`, `/api/v1/triggers/2026-08-07`, `/api/triggers/latest`, `/api/v1/triggers/latest`.
 
@@ -523,7 +523,7 @@ type Response = z.infer<typeof automationRestResponseSchema>; // ../contract/src
 
 Update an automation. Every field is optional and what is left out is left alone, except `actionParams`, which replaces the delivery configuration as a whole. The delivery channel and an alert's graph cannot be changed.
 
-Permission `triggers:update`. Declared at `src/transport/automation.rest.ts:206`.
+Permission `triggers:update`. Declared at `src/transport/automation.rest.ts:211`.
 
 Answers at `/api/triggers/:triggerId`, `/api/v1/triggers/:triggerId`; also, undocumented, `/api/triggers/2026-08-07/:triggerId`, `/api/v1/triggers/2026-08-07/:triggerId`, `/api/triggers/latest/:triggerId`, `/api/v1/triggers/latest/:triggerId`.
 
@@ -536,7 +536,7 @@ type Body = z.infer<typeof automationRestUpdateInputSchema>; // ../contract/src/
 
 Resume a paused automation. A report goes back on its schedule; the pause record is cleared.
 
-Permission `triggers:update`. Declared at `src/transport/automation.rest.ts:236`.
+Permission `triggers:update`. Declared at `src/transport/automation.rest.ts:241`.
 
 Answers at `/api/triggers/:triggerId/enable`, `/api/v1/triggers/:triggerId/enable`; also, undocumented, `/api/triggers/2026-08-07/:triggerId/enable`, `/api/v1/triggers/2026-08-07/:triggerId/enable`, `/api/triggers/latest/:triggerId/enable`, `/api/v1/triggers/latest/:triggerId/enable`.
 
@@ -550,7 +550,7 @@ type Body = Record<string, unknown>;
 
 Pause an automation. A report stops claiming its schedule.
 
-Permission `triggers:update`. Declared at `src/transport/automation.rest.ts:260`.
+Permission `triggers:update`. Declared at `src/transport/automation.rest.ts:265`.
 
 Answers at `/api/triggers/:triggerId/disable`, `/api/v1/triggers/:triggerId/disable`; also, undocumented, `/api/triggers/2026-08-07/:triggerId/disable`, `/api/v1/triggers/2026-08-07/:triggerId/disable`, `/api/triggers/latest/:triggerId/disable`, `/api/v1/triggers/latest/:triggerId/disable`.
 
@@ -563,7 +563,7 @@ type Body = z.infer<typeof automationRestNoBodySchema>; // ../contract/src/autom
 
 Send this automation's message to the destination it is configured with, so you can confirm it arrives. Nothing is recorded as a fire.
 
-Permission `triggers:update`. Declared at `src/transport/automation.rest.ts:285`.
+Permission `triggers:update`. Declared at `src/transport/automation.rest.ts:290`.
 
 Answers at `/api/triggers/:triggerId/test-fire`, `/api/v1/triggers/:triggerId/test-fire`; also, undocumented, `/api/triggers/2026-08-07/:triggerId/test-fire`, `/api/v1/triggers/2026-08-07/:triggerId/test-fire`, `/api/triggers/latest/:triggerId/test-fire`, `/api/v1/triggers/latest/:triggerId/test-fire`.
 
@@ -576,7 +576,7 @@ type Body = z.infer<typeof automationRestNoBodySchema>; // ../contract/src/autom
 
 Delete (soft-delete) a trigger
 
-Permission `triggers:manage`. Declared at `src/transport/automation.rest.ts:308`.
+Permission `triggers:manage`. Declared at `src/transport/automation.rest.ts:313`.
 
 Answers at `/api/triggers/:triggerId`, `/api/v1/triggers/:triggerId`; also, undocumented, `/api/triggers/2026-08-07/:triggerId`, `/api/v1/triggers/2026-08-07/:triggerId`, `/api/triggers/latest/:triggerId`, `/api/v1/triggers/latest/:triggerId`.
 
@@ -653,7 +653,7 @@ interface Response {
 
 ### `automation`
 
-Contract `../contract/src/automation.trpc.ts:41`, router `src/transport/automation.trpc.ts:18`.
+Contract `../contract/src/automation.trpc.ts:43`, router `src/transport/automation.trpc.ts:25`.
 
 | Procedure                         | Kind     | Gate                         | Input                                          | Output                           |
 | --------------------------------- | -------- | ---------------------------- | ---------------------------------------------- | -------------------------------- |
@@ -675,6 +675,7 @@ Contract `../contract/src/automation.trpc.ts:41`, router `src/transport/automati
 | `automation.listSlackChannels`    | mutation | Permission `triggers:update` | `automationApiListSlackChannelsInputSchema`    | `slackChannelListingSchema`      |
 | `automation.updateTriggerFilters` | mutation | Permission `triggers:update` | `automationApiUpdateTriggerFiltersInputSchema` | `triggerSchema`                  |
 | `automation.testFireTemplate`     | mutation | Permission `triggers:update` | `automationApiTestFireInputSchema`             | `testFireResultSchema`           |
+| `automation.previewTriggerEmail`  | query    | Permission `triggers:update` | `automationApiPreviewEmailInputSchema`         | `automationEmailPreviewSchema`   |
 | `automation.upsert`               | mutation | Permission `triggers:update` | `automationApiUpsertInputSchema`               | `triggerSchema`                  |
 
 ```typescript
@@ -688,7 +689,7 @@ interface Input {
   projectId: string;
   triggerId: string;
 }
-// Output: automationDeletedSchema, ../contract/src/automation.responses.ts:35
+// Output: automationDeletedSchema, ../contract/src/automation.responses.ts:46
 interface Output {
   success: boolean;
 }
@@ -698,18 +699,18 @@ interface Output {
 interface Input {
   projectId: string;
 }
-// Output: automationListRowSchema.array() (inline, ../contract/src/automation.trpc.ts:52)
+// Output: automationListRowSchema.array() (inline, ../contract/src/automation.trpc.ts:54)
 
 // automation.getDailyCap
 type Input = z.infer<typeof automationApiProjectScopeSchema>; // ../contract/src/automation.trpc-schemas.ts:22
-// Output: automationDailyCapSchema, ../contract/src/automation.responses.ts:25
+// Output: automationDailyCapSchema, ../contract/src/automation.responses.ts:36
 interface Output {
   cap: number;
 }
 
 // automation.getDailyCapStatus
 type Input = z.infer<typeof automationApiProjectScopeSchema>; // ../contract/src/automation.trpc-schemas.ts:22
-// Output: automationDailyCapStatusSchema, ../contract/src/automation.responses.ts:28
+// Output: automationDailyCapStatusSchema, ../contract/src/automation.responses.ts:39
 interface Output {
   cap: number;
   counts: Record<
@@ -723,7 +724,7 @@ interface Output {
 
 // automation.getTriggerStats
 type Input = z.infer<typeof automationApiProjectScopeSchema>; // ../contract/src/automation.trpc-schemas.ts:22
-// Output: inline, ../contract/src/automation.trpc.ts:69
+// Output: inline, ../contract/src/automation.trpc.ts:71
 type Output = {
   triggerId: string;
   lastFiredAt: unknown | null;
@@ -738,7 +739,7 @@ interface Input {
   triggerId: string;
   limit?: number;
 }
-// Output: inline, ../contract/src/automation.trpc.ts:73
+// Output: inline, ../contract/src/automation.trpc.ts:75
 type Output = {
   id: string;
   triggerId: string;
@@ -754,10 +755,10 @@ interface Input {
   triggerId: string;
   limit?: number;
 }
-// Output: webhookDeliveryRowSchema.array() (inline, ../contract/src/automation.trpc.ts:78)
+// Output: webhookDeliveryRowSchema.array() (inline, ../contract/src/automation.trpc.ts:80)
 
 // automation.getFireHistory
-// Input: automationApiFireHistoryTrpcInputSchema, ../contract/src/automation.trpc-schemas.ts:292
+// Input: automationApiFireHistoryTrpcInputSchema, ../contract/src/automation.trpc-schemas.ts:312
 interface Input {
   projectId: string;
   triggerId: string;
@@ -767,11 +768,11 @@ interface Input {
     id: string;
   } | null;
 }
-type Output = z.infer<typeof triggerFirePageSchema>; // ../contract/src/automation.trpc-schemas.ts:276
+type Output = z.infer<typeof triggerFirePageSchema>; // ../contract/src/automation.trpc-schemas.ts:296
 
 // automation.getLatestEvaluation
 type Input = z.infer<typeof automationApiTriggerScopeSchema>; // ../contract/src/automation.trpc-schemas.ts:26
-// Output: inline, ../contract/src/automation.trpc.ts:88
+// Output: inline, ../contract/src/automation.trpc.ts:90
 type Output = {
   triggerId: string;
   projectId: string;
@@ -786,7 +787,7 @@ type Output = {
 
 // automation.getNextFiring
 type Input = z.infer<typeof automationApiTriggerScopeSchema>; // ../contract/src/automation.trpc-schemas.ts:26
-type Output = z.infer<typeof nextFiringSchema>; // ../contract/src/automation.trpc-schemas.ts:318
+type Output = z.infer<typeof nextFiringSchema>; // ../contract/src/automation.trpc-schemas.ts:338
 
 // automation.getRecentActivity
 // Input: automationApiRecentActivityInputSchema, ../contract/src/automation.trpc-schemas.ts:140
@@ -794,7 +795,7 @@ interface Input {
   projectId: string;
   limit?: number;
 }
-// Output: inline, ../contract/src/automation.trpc.ts:97
+// Output: inline, ../contract/src/automation.trpc.ts:99
 type Output = {
   id: string;
   triggerId: string;
@@ -805,7 +806,7 @@ type Output = {
 
 // automation.getReportSchedules
 type Input = z.infer<typeof automationApiProjectScopeSchema>; // ../contract/src/automation.trpc-schemas.ts:22
-// Output: inline, ../contract/src/automation.trpc.ts:105
+// Output: inline, ../contract/src/automation.trpc.ts:107
 type Output = {
   triggerId: string;
   nextRunAt: unknown | null;
@@ -824,7 +825,7 @@ type Output = z.infer<typeof triggerSchema>; // ../contract/src/trigger.ts:55
 
 // automation.getTriggerById
 type Input = z.infer<typeof automationApiTriggerScopeSchema>; // ../contract/src/automation.trpc-schemas.ts:26
-// Output: triggerSchema.nullable() (inline, ../contract/src/automation.trpc.ts:113)
+// Output: triggerSchema.nullable() (inline, ../contract/src/automation.trpc.ts:115)
 
 // automation.listSlackChannels
 // Input: automationApiListSlackChannelsInputSchema, ../contract/src/automation.trpc-schemas.ts:156
@@ -832,7 +833,7 @@ interface Input {
   projectId: string;
   slackIntegrationId: string;
 }
-// Output: slackChannelListingSchema, ../contract/src/automation.responses.ts:52
+// Output: slackChannelListingSchema, ../contract/src/automation.responses.ts:63
 interface Output {
   channels: {
     id: string;
@@ -867,8 +868,19 @@ interface Output {
   httpStatus?: number;
 }
 
+// automation.previewTriggerEmail
+type Input = z.infer<typeof automationApiPreviewEmailInputSchema>; // ../contract/src/automation.trpc-schemas.ts:246
+// Output: automationEmailPreviewSchema, ../contract/src/automation.trpc-schemas.ts:255
+interface Output {
+  subject: string;
+  html: string;
+  usedDefault: boolean;
+  missingVariables: string[];
+  errors: string[];
+}
+
 // automation.upsert
-type Input = z.infer<typeof automationApiUpsertInputSchema>; // ../contract/src/automation.trpc-schemas.ts:244
+type Input = z.infer<typeof automationApiUpsertInputSchema>; // ../contract/src/automation.trpc-schemas.ts:264
 type Output = z.infer<typeof triggerSchema>; // ../contract/src/trigger.ts:55
 ```
 
@@ -939,49 +951,51 @@ None: this module declares no websocket, rawsocket or rawhttp door.
 
 ### Pipeline `automations` (aggregate `trigger`)
 
-Declared at `src/eventing/automation.pipeline.ts:182`. Events: `triggerMatchRecordedEventSchema`, `...reportScheduleEventSchemas`.
+Declared at `src/eventing/automation.pipeline.ts:181`. Events: `triggerMatchRecordedEventSchema`, `...reportScheduleEventSchemas`.
 
 | Kind            | Name                               | Handles                                                                                                                                       | Declared at                               |
 | --------------- | ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
-| command         | `recordTriggerMatch`               | –                                                                                                                                             | `src/eventing/automation.pipeline.ts:189` |
-| command         | `configureReportSchedule`          | –                                                                                                                                             | `src/eventing/automation.pipeline.ts:196` |
-| command         | `pauseReportSchedule`              | –                                                                                                                                             | `src/eventing/automation.pipeline.ts:197` |
-| command         | `resumeReportSchedule`             | –                                                                                                                                             | `src/eventing/automation.pipeline.ts:198` |
-| command         | `requestReportRun`                 | –                                                                                                                                             | `src/eventing/automation.pipeline.ts:199` |
-| command         | `settleReportRun`                  | –                                                                                                                                             | `src/eventing/automation.pipeline.ts:200` |
-| process manager | `triggerSettlement`                | intents `logOverflow`, `persistMatch`, `notifyDigest`, `persistMatch`, `notifyDigest`, `logOverflow`, `notifyDigest`, `persistMatch` (outbox) | `src/eventing/automation.pipeline.ts:201` |
-| process manager | `reportSchedule`                   | intents `dispatchReport` (outbox)                                                                                                             | `src/eventing/automation.pipeline.ts:299` |
-| process manager | `automationAudit`                  | every 1 d (`AUTOMATION_AUDIT_PRUNE_INTERVAL_MS = 24 * 60 * 60 * 1000`); intents `pruneAudit`, `recordAudit` (outbox)                          | `src/eventing/automation.pipeline.ts:315` |
-| process manager | `graphAlertSweep`                  | every 30 s (`GRAPH_ALERT_SWEEP_INTERVAL_MS`); intents `evaluateGraph`                                                                         | `src/eventing/automation.pipeline.ts:332` |
-| peer subscriber | `traceSpanTriggerMatch`            | `lw.obs.trace.span_received` from [trace](../../trace/README.md)                                                                              | `src/eventing/automation.pipeline.ts:343` |
-| peer subscriber | `traceOriginTriggerMatch`          | `lw.obs.trace.origin_resolved` from [trace](../../trace/README.md)                                                                            | `src/eventing/automation.pipeline.ts:360` |
-| peer subscriber | `evaluationCompletedTriggerMatch`  | `lw.evaluation.completed` from [evaluation](../../evaluation/README.md)                                                                       | `src/eventing/automation.pipeline.ts:376` |
+| command         | `recordTriggerMatch`               | –                                                                                                                                             | `src/eventing/automation.pipeline.ts:188` |
+| command         | `configureReportSchedule`          | –                                                                                                                                             | `src/eventing/automation.pipeline.ts:195` |
+| command         | `pauseReportSchedule`              | –                                                                                                                                             | `src/eventing/automation.pipeline.ts:196` |
+| command         | `resumeReportSchedule`             | –                                                                                                                                             | `src/eventing/automation.pipeline.ts:197` |
+| command         | `requestReportRun`                 | –                                                                                                                                             | `src/eventing/automation.pipeline.ts:198` |
+| command         | `settleReportRun`                  | –                                                                                                                                             | `src/eventing/automation.pipeline.ts:199` |
+| process manager | `triggerSettlement`                | intents `logOverflow`, `persistMatch`, `notifyDigest`, `persistMatch`, `notifyDigest`, `logOverflow`, `notifyDigest`, `persistMatch` (outbox) | `src/eventing/automation.pipeline.ts:200` |
+| process manager | `reportSchedule`                   | intents `dispatchReport` (outbox)                                                                                                             | `src/eventing/automation.pipeline.ts:298` |
+| process manager | `automationAudit`                  | every 1 d (`AUTOMATION_AUDIT_PRUNE_INTERVAL_MS = 24 * 60 * 60 * 1000`); intents `pruneAudit`, `recordAudit` (outbox)                          | `src/eventing/automation.pipeline.ts:314` |
+| process manager | `graphAlertSweep`                  | every 30 s (`GRAPH_ALERT_SWEEP_INTERVAL_MS`); intents `evaluateGraph`                                                                         | `src/eventing/automation.pipeline.ts:331` |
+| peer subscriber | `traceSpanTriggerMatch`            | `lw.obs.trace.span_received` from [trace](../../trace/README.md)                                                                              | `src/eventing/automation.pipeline.ts:342` |
+| peer subscriber | `traceOriginTriggerMatch`          | `lw.obs.trace.origin_resolved` from [trace](../../trace/README.md)                                                                            | `src/eventing/automation.pipeline.ts:359` |
+| peer subscriber | `evaluationCompletedTriggerMatch`  | `lw.evaluation.completed` from [evaluation](../../evaluation/README.md)                                                                       | `src/eventing/automation.pipeline.ts:375` |
 | peer subscriber | `evaluationReportedTriggerMatch`   | `lw.evaluation.reported` from [evaluation](../../evaluation/README.md)                                                                        | `src/eventing/automation.pipeline.ts:392` |
-| peer subscriber | `traceSpanGraphActivity`           | `lw.obs.trace.span_received` from [trace](../../trace/README.md)                                                                              | `src/eventing/automation.pipeline.ts:409` |
-| peer subscriber | `traceOriginGraphActivity`         | `lw.obs.trace.origin_resolved` from [trace](../../trace/README.md)                                                                            | `src/eventing/automation.pipeline.ts:419` |
-| peer subscriber | `evaluationCompletedGraphActivity` | `lw.evaluation.completed` from [evaluation](../../evaluation/README.md)                                                                       | `src/eventing/automation.pipeline.ts:429` |
-| peer subscriber | `evaluationReportedGraphActivity`  | `lw.evaluation.reported` from [evaluation](../../evaluation/README.md)                                                                        | `src/eventing/automation.pipeline.ts:439` |
-| lane aliases    | `≈ MAIN_TRIGGER_LANE_ALIASES`      | –                                                                                                                                             | `src/eventing/automation.pipeline.ts:449` |
+| peer subscriber | `traceSpanGraphActivity`           | `lw.obs.trace.span_received` from [trace](../../trace/README.md)                                                                              | `src/eventing/automation.pipeline.ts:410` |
+| peer subscriber | `traceOriginGraphActivity`         | `lw.obs.trace.origin_resolved` from [trace](../../trace/README.md)                                                                            | `src/eventing/automation.pipeline.ts:420` |
+| peer subscriber | `evaluationCompletedGraphActivity` | `lw.evaluation.completed` from [evaluation](../../evaluation/README.md)                                                                       | `src/eventing/automation.pipeline.ts:430` |
+| peer subscriber | `evaluationReportedGraphActivity`  | `lw.evaluation.reported` from [evaluation](../../evaluation/README.md)                                                                        | `src/eventing/automation.pipeline.ts:440` |
+| lane aliases    | `≈ MAIN_TRIGGER_LANE_ALIASES`      | –                                                                                                                                             | `src/eventing/automation.pipeline.ts:450` |
+| retention       | `≈ deps.tenantRetention`           | –                                                                                                                                             | `src/eventing/automation.pipeline.ts:451` |
 
 ### Tasks
 
 Run by the tasks process, before serve.
 
-| Task                       | Class                        | Declared at                                     |
-| -------------------------- | ---------------------------- | ----------------------------------------------- |
-| `slack-alert`              | `SlackAlertTask`             | `src/tasks/slack-alert.task.ts:9`               |
-| `report-schedule-backfill` | `ReportScheduleBackfillTask` | `src/tasks/report-schedule-backfill.task.ts:12` |
+| Task          | Class            | Declared at                       |
+| ------------- | ---------------- | --------------------------------- |
+| `slack-alert` | `SlackAlertTask` | `src/tasks/slack-alert.task.ts:9` |
 
 ## Configuration
 
 | Kind   | Leaf                        | Environment variable                   | Declared at                               |
 | ------ | --------------------------- | -------------------------------------- | ----------------------------------------- |
-| secret | `unsubscribe`               | `NEXTAUTH_SECRET`                      | `src/app/automation.app.ts:403`           |
-| config | `emailHourlyCap`            | `TRIGGER_EMAIL_HOURLY_CAP`             | `../contract/src/automation.config.ts:11` |
-| config | `tenantDailyCap`            | `TRIGGER_EMAIL_TENANT_DAILY_CAP`       | `../contract/src/automation.config.ts:12` |
-| config | `persistDailyCapFree`       | `TRIGGER_PERSIST_DAILY_CAP_FREE`       | `../contract/src/automation.config.ts:13` |
-| config | `persistDailyCapPaid`       | `TRIGGER_PERSIST_DAILY_CAP_PAID`       | `../contract/src/automation.config.ts:14` |
-| config | `persistDailyCapEnterprise` | `TRIGGER_PERSIST_DAILY_CAP_ENTERPRISE` | `../contract/src/automation.config.ts:15` |
-| config | `publicBaseUrl`             | `BASE_HOST`                            | `../contract/src/automation.config.ts:20` |
+| secret | `unsubscribe`               | `NEXTAUTH_SECRET`                      | `src/app/automation.app.ts:408`           |
+| config | `emailHourlyCap`            | `TRIGGER_EMAIL_HOURLY_CAP`             | `../contract/src/automation.config.ts:17` |
+| config | `tenantDailyCap`            | `TRIGGER_EMAIL_TENANT_DAILY_CAP`       | `../contract/src/automation.config.ts:18` |
+| config | `persistDailyCapFree`       | `TRIGGER_PERSIST_DAILY_CAP_FREE`       | `../contract/src/automation.config.ts:19` |
+| config | `persistDailyCapPaid`       | `TRIGGER_PERSIST_DAILY_CAP_PAID`       | `../contract/src/automation.config.ts:20` |
+| config | `persistDailyCapEnterprise` | `TRIGGER_PERSIST_DAILY_CAP_ENTERPRISE` | `../contract/src/automation.config.ts:21` |
+| config | `publicBaseUrl`             | `BASE_HOST`                            | `../contract/src/automation.config.ts:26` |
+| config | `slackApiBase`              | `SLACK_API_BASE`                       | `../contract/src/automation.config.ts:28` |
+| config | `slackWebhookBase`          | `SLACK_WEBHOOK_BASE`                   | `../contract/src/automation.config.ts:29` |
 
 <!-- readme:generated:end -->

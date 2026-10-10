@@ -27,6 +27,8 @@ export type GatewayProject = {
   name: string;
   slug: string;
   teamId: string;
+  /** The project's kind (`application`, `aggregate`, ...), once the shell has read it. */
+  kind?: string;
 };
 
 /** Who is signed in, as a key's ownership needs to know them. */

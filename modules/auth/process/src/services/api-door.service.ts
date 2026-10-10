@@ -1,6 +1,7 @@
 import type { Entitlements } from "@langwatch/api/access";
 import type {
   ApiDoor,
+  RestAuditRow,
   RestAuditSink,
   RestCaller,
   RestIdentity,
@@ -8,13 +9,19 @@ import type {
 } from "@langwatch/api/hosting";
 import {
   ForbiddenError,
+  OWNERLESS_PROJECT_KEY_PROOF_CODE_PATH,
   recordKeyCredential,
   recordOrganizationCredential,
   recordProjectCredential,
 } from "@langwatch/api/rest";
 import { recordAuditLogCommandSchema, type AuditLogApi } from "@langwatch/audit-log-contract";
 import type { AuthApi } from "@langwatch/auth-contract";
-import { AuthzScopeNotFoundError, type AuthzApi } from "@langwatch/authz-contract";
+import { PermissionDeniedError, type Actor, type Authorization } from "@langwatch/authorization";
+import {
+  AuthzScopeNotFoundError,
+  type AuthzApi,
+  type AuthzPrincipalRef,
+} from "@langwatch/authz-contract";
 import {
   EnterprisePlanRequiredError,
   isEnterpriseTier,
@@ -50,7 +57,12 @@ export type ApiDoorPeers = Readonly<{
   /** Where a project-bound CLI access token is read back to its person and project. */
   cliProjects: ApiRestCredentialPeers["cliProjects"];
   /** The decisions both transports authorize through, and the key ceilings the key doors ask. */
-  authz: ApiDoor["authz"] & ApiRestCredentialPeers["authz"] & Pick<AuthzApi, "getScope" | "can">;
+  authz: Pick<
+    ApiDoor["authz"],
+    "getDecision" | "getProjectAnyDecision" | "checkScopeLineage" | "getSessionVersion"
+  > &
+    ApiRestCredentialPeers["authz"] &
+    Pick<AuthzApi, "getScope" | "can" | "authorize" | "authorizeInternal">;
   organizations: Pick<
     OrganizationApi,
     "getSettings" | "getOrganizationIdByTeamId" | "findPersonalTeamOwners"
@@ -101,7 +113,7 @@ export class ApiDoorService {
   }
 
   /** The decisions both transports ask, and the platform grant asked of the operator (E4). */
-  #authorize(): ApiDoor["authz"] {
+  #authorize(): Required<ApiDoor["authz"]> {
     const authz = this.#peers.authz;
 
     return {
@@ -124,8 +136,45 @@ export class ApiDoorService {
         });
         return resolved?.type === scope.tier ? resolved.organizationId : null;
       },
+      projectKindOf: (projectId) => this.#projectKindOf(projectId),
+      authorization: (input) => this.#mintProof(input),
       assertSecondFactor: (input) => this.#assertSecondFactor(input),
     };
+  }
+
+  /** A project's kind, read with its scope (ADR-177); an unknown project has none. */
+  async #projectKindOf(projectId: string): Promise<string | null> {
+    const resolved = await this.#peers.authz.getScope({ projectId }).catch((error: unknown) => {
+      if (AuthzScopeNotFoundError.is(error)) return null;
+      throw error;
+    });
+
+    return resolved?.type === "project" ? (resolved.kind ?? null) : null;
+  }
+
+  /** The route's sealed proof, minted by AuthzApi.authorize after the door admitted the call. */
+  async #mintProof({
+    actor,
+    permission,
+    projectId,
+    purpose,
+  }: Parameters<NonNullable<ApiDoor["authz"]["authorization"]>>[0]): Promise<Authorization> {
+    const { authz } = this.#peers;
+    if (actor.type === "internal" && actor.codePath === OWNERLESS_PROJECT_KEY_PROOF_CODE_PATH) {
+      return authz.authorizeInternal({ actor, projectId, permission, purpose });
+    }
+    const scope = await authz.getScope({ projectId });
+    if (scope.type !== "project") throw new Error(`${projectId} resolved to no project`);
+
+    const { authorization } = await authz.authorize({
+      principal: proofPrincipalOf({ actor, permission, projectId }),
+      permission,
+      scope,
+      proof: { actor, purpose },
+    });
+    if (!authorization) throw new Error("authz minted no proof for a project read");
+
+    return authorization;
   }
 
   /**
@@ -347,18 +396,55 @@ export class ApiDoorService {
 
     return {
       record: async (row) => {
+        const { organizationId, projectId } = await this.#auditScopeOf(row);
+        const metadata: Record<string, string> = { channel: "api" };
+        if (row.impersonatorId) metadata.impersonatorId = row.impersonatorId;
+        if (row.actorId && row.apiKeyId) metadata.apiKeyId = row.apiKeyId;
         await audit.record({
-          userId: row.actorId ?? "anonymous",
+          userId: auditUserIdOf(row),
           action: row.action,
           args: { ...row.params, scope: row.scope },
-          projectId: typeof row.params.projectId === "string" ? row.params.projectId : void 0,
-          organizationId:
-            typeof row.params.organizationId === "string" ? row.params.organizationId : void 0,
+          projectId,
+          organizationId,
           targetId: row.resultId || void 0,
           error: row.errorCode,
+          metadata,
+          ...(row.impersonatorId ? { actorUserId: row.impersonatorId } : {}),
+          ...(row.ipAddress ? { ipAddress: row.ipAddress } : {}),
+          ...(row.userAgent ? { userAgent: row.userAgent } : {}),
         });
       },
     };
+  }
+
+  /** E11: a REST row's organization and project come from its declared scope, else its path. */
+  async #auditScopeOf(
+    row: RestAuditRow,
+  ): Promise<{ organizationId: string | undefined; projectId: string | undefined }> {
+    const param = (name: string) =>
+      typeof row.params[name] === "string" ? (row.params[name] as string) : void 0;
+    const { scope } = row;
+    if (scope?.tier === "organization") {
+      return { organizationId: scope.id, projectId: param("projectId") };
+    }
+    if (scope?.tier === "project" || scope?.tier === "team") {
+      const organizationId =
+        (await this.#organizationOf({ tier: scope.tier, id: scope.id })) ?? param("organizationId");
+      const projectId = scope.tier === "project" ? scope.id : param("projectId");
+      return { organizationId, projectId };
+    }
+
+    return { organizationId: param("organizationId"), projectId: param("projectId") };
+  }
+
+  /** The organization holding a project or team; null where authz resolves no such scope. */
+  async #organizationOf(scope: { tier: "project" | "team"; id: string }): Promise<string | null> {
+    const ids = scope.tier === "project" ? { projectId: scope.id } : { teamId: scope.id };
+    const resolved = await this.#peers.authz.getScope(ids).catch((error: unknown) => {
+      if (AuthzScopeNotFoundError.is(error)) return null;
+      throw error;
+    });
+    return resolved?.type === scope.tier ? resolved.organizationId : null;
   }
 
   #trpcAudit(): TrpcAuditSink {
@@ -378,21 +464,26 @@ export class ApiDoorService {
             error: entry.error?.toString(),
             targetKind: entry.targetKind,
             targetId: entry.targetId,
-            metadata: entry.metadata,
+            metadata: { ...entry.metadata, channel: "app" },
+            actorUserId: entry.actorUserId,
+            ipAddress: entry.ipAddress,
+            userAgent: entry.userAgent,
           }),
         );
       },
-      /** The organization holding a project or team; null where authz resolves no such scope. */
-      organizationOf: async (scope) => {
-        const ids = scope.tier === "project" ? { projectId: scope.id } : { teamId: scope.id };
-        const resolved = await this.#peers.authz.getScope(ids).catch((error: unknown) => {
-          if (AuthzScopeNotFoundError.is(error)) return null;
-          throw error;
-        });
-        return resolved?.type === scope.tier ? resolved.organizationId : null;
-      },
+      organizationOf: (scope) => this.#organizationOf(scope),
     };
   }
+}
+
+/**
+ * Whom a REST row names (E11): its person, a key acting as nobody as `apikey:<id>` (main's
+ * spelling, `managementActor`), else no one.
+ */
+function auditUserIdOf(row: RestAuditRow): string {
+  if (row.actorId) return row.actorId;
+
+  return row.apiKeyId ? `apikey:${row.apiKeyId}` : "anonymous";
 }
 
 function projectCaller(request: Request, credential: ApiProjectCredential): RestCaller {
@@ -435,4 +526,26 @@ function ownedCaller({
   markUsed: () => void;
 }): RestCaller {
   return { actor: userId ? { type: "user", id: userId } : null, scope, markUsed };
+}
+
+/** Whom a door-minted proof is asked for: the person (impersonated, as decided) or the key. */
+function proofPrincipalOf({
+  actor,
+  permission,
+  projectId,
+}: {
+  actor: Actor;
+  permission: string;
+  projectId: string;
+}): AuthzPrincipalRef {
+  if (actor.type === "user") return { type: "user", id: actor.id };
+  if (actor.type === "api_key") return { type: "apiKey", id: actor.id };
+  if (actor.type === "system") {
+    throw new PermissionDeniedError({
+      permission,
+      scope: { type: "project", id: projectId },
+      denialReason: "no-grant",
+    });
+  }
+  throw new Error(`a ${actor.type} actor reached a door that mints a route proof`);
 }

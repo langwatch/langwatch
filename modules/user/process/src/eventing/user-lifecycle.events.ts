@@ -7,6 +7,7 @@ import {
   USER_REACTIVATED_EVENT_TYPE,
   USER_REGISTERED_EVENT_TYPE,
   userCreatedEventDataSchema,
+  userErasedEventDataSchema,
   userLifecycleEventDataSchema,
   userRegisteredEventDataSchema,
 } from "@langwatch/user-contract";
@@ -24,6 +25,8 @@ export const recordUserRegisteredCommandDataSchema = userRegisteredEventDataSche
 export type RecordUserRegisteredCommandData = z.infer<typeof recordUserRegisteredCommandDataSchema>;
 export const recordUserCreatedCommandDataSchema = userCreatedEventDataSchema;
 export type RecordUserCreatedCommandData = z.infer<typeof recordUserCreatedCommandDataSchema>;
+export const recordUserErasedCommandDataSchema = userErasedEventDataSchema;
+export type RecordUserErasedCommandData = z.infer<typeof recordUserErasedCommandDataSchema>;
 
 export const userDeactivatedEventSchema = z.object({
   ...EventSchema.shape,
@@ -61,6 +64,6 @@ export const userErasedEventSchema = z.object({
   ...EventSchema.shape,
   type: z.literal(USER_ERASED_EVENT_TYPE),
   version: z.literal(USER_LIFECYCLE_EVENT_VERSION),
-  data: userLifecycleEventDataSchema,
+  data: userErasedEventDataSchema,
 });
 export type UserErasedEvent = z.infer<typeof userErasedEventSchema>;

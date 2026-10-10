@@ -404,7 +404,7 @@ export function VizPlaceholder({
     >
       <Box
         overflow="hidden"
-        bg={{ base: "bg.surface", _dark: "bg.panel" }}
+        bg={"bg.card"}
         flex={fillParent ? 1 : undefined}
         display={fillParent ? "flex" : undefined}
         flexDirection={fillParent ? "column" : undefined}
@@ -420,7 +420,7 @@ export function VizPlaceholder({
           paddingX={2}
           borderBottomWidth={viz.isMinimized ? "0px" : "1px"}
           borderColor="border"
-          bg={{ base: "bg.surface", _dark: "bg.panel" }}
+          bg={"bg.card"}
           flexShrink={0}
           minHeight="38px"
           data-spotlight="viz-tabs"

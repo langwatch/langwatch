@@ -9,13 +9,13 @@ import {
   type Event,
   type EventStore,
   type EventingParticipation,
+  type EventReadSeat,
   PipelineEventStore,
   type StateProjectionStore,
 } from "@langwatch/eventing";
 import {
   EXPIRE_JOIN_COMMAND_TYPE,
   IDENTIFIER_ATTACHED_EVENT_TYPE,
-  IDENTITY_PIPELINE_NAME,
   JOIN_REQUEST_AGGREGATE_TYPE,
   JOIN_REQUEST_PIPELINE_NAME,
   type JoinRequestCommand,
@@ -186,20 +186,20 @@ describe("given identity's pipelines are built over their own event stores", () 
       data: { identifierId: "idf_1", provider: "email", value: "sam@acme.com" },
     });
 
-    /** @scenario "Identity appends and reads its own aggregates through each pipeline's own event store" */
-    it("reads the user_identity log in the person's own tenant, MFA facts included", async () => {
-      const stores = IdentityEventStores.create();
-      const { eventStore, asked } = ownStore({
-        pipeline: IDENTITY_PIPELINE_NAME,
-        aggregateType: USER_IDENTITY_AGGREGATE_TYPE,
-        events: [
-          fact({ id: "evt_1", type: IDENTIFIER_ATTACHED_EVENT_TYPE, occurredAt: T0 }),
-          fact({ id: "evt_2", type: MFA_ENROLLED_EVENT_TYPE, occurredAt: T0 + 1 }),
-        ],
-      });
-      stores.keep({ pipeline: IDENTITY_PIPELINE_NAME, participation: "produce", eventStore });
+    /** @scenario "Identity's history is read through eventing's read seat on a process that only produces" */
+    it("reads the user_identity stream through the read seat in the person's own tenant, MFA facts included", async () => {
+      const asked: Parameters<EventReadSeat["findAggregateEvents"]>[0][] = [];
       const history = EventingIdentityHistoryRepository.create({
-        eventStore: stores.of({ pipeline: IDENTITY_PIPELINE_NAME }),
+        eventReadSeat: {
+          findAggregateEvents: async (input) => {
+            asked.push(input);
+            return [
+              fact({ id: "evt_1", type: IDENTIFIER_ATTACHED_EVENT_TYPE, occurredAt: T0 }),
+              fact({ id: "evt_2", type: MFA_ENROLLED_EVENT_TYPE, occurredAt: T0 + 1 }),
+              fact({ id: "evt_other", type: "lw.other.unrelated", occurredAt: T0 + 2 }),
+            ];
+          },
+        },
       });
 
       const entries = await history.findHistory({ userId: SAM, limit: 10 });
@@ -210,14 +210,16 @@ describe("given identity's pipelines are built over their own event stores", () 
       ]);
     });
 
-    /** @scenario "A ledger or history whose pipeline this process never built refuses by name" */
-    it("refuses rather than reading as empty where the process never built the pipeline", async () => {
+    /** @scenario "Identity's history is read through eventing's read seat on a process that only produces" */
+    it("refuses rather than reading as empty where the seat has no event log", async () => {
       const history = EventingIdentityHistoryRepository.create({
-        eventStore: IdentityEventStores.create().of({ pipeline: IDENTITY_PIPELINE_NAME }),
+        eventReadSeat: {
+          findAggregateEvents: () => Promise.reject(new Error("eventReadSeat is not configured")),
+        },
       });
 
       await expect(history.findHistory({ userId: SAM, limit: 10 })).rejects.toThrow(
-        /identity pipeline cannot read/,
+        /eventReadSeat/,
       );
     });
   });

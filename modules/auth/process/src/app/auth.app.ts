@@ -22,7 +22,6 @@ import {
   type CliAccessSession,
   type CliSessionTokens,
   type CliTokenRecordEntry,
-  type InviteLanding,
   type LegacySsoAccessQuery,
   type ReleaseHeldAccountResult,
   type SaveSignInSecurityInput,
@@ -64,15 +63,13 @@ import {
   type SsoArrivalAdmission,
   type SsoArrivalApi,
 } from "@langwatch/identity-contract";
-import type { MailSender } from "@langwatch/mail";
 import { NotificationService } from "@langwatch/notification-contract";
 import { createLogger, type Logger } from "@langwatch/observability";
-import { OrganizationApi } from "@langwatch/organization-contract";
+import { OrganizationApi, type InviteLanding } from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
 import { ProjectApi } from "@langwatch/project-contract";
 import {
   internalSlackSignupsWebhook,
-  Secret,
   sessionSecret,
   signInProviderSecrets,
 } from "@langwatch/secrets";
@@ -81,6 +78,7 @@ import {
   UserApi,
   type ChangeOwnPasswordInput,
   type SetOwnFirstPasswordInput,
+  type UnlinkUserAccountInput,
   type CreatedUser,
   type RegisterCredentialAccountInput,
   type UpdateUserEmailInput,
@@ -90,7 +88,7 @@ import {
 } from "@langwatch/user-contract";
 
 import type { AuthChannels } from "../channels/auth.channels.ts";
-import { auth0PasswordChannels } from "../channels/auth0-password-channels.registry.ts";
+import { auth0ManagementSecret } from "../channels/auth0-password.channel.ts";
 import {
   BetterAuthAnnouncements,
   BetterAuthFederation,
@@ -98,6 +96,7 @@ import {
   type BetterAuthAccountPin,
   type BetterAuthAccountRow,
 } from "../channels/better-auth.channel.ts";
+import type { SignUpPolicy } from "../channels/http/http.better-auth-hooks.channel.ts";
 import {
   createBetterAuthTransport,
   type BetterAuthTransport,
@@ -112,18 +111,27 @@ import {
 } from "../channels/http/http.passkey-sign-up.channel.ts";
 import { SignInRouterShadow } from "../channels/http/http.sign-in-router-shadow.channel.ts";
 import { type SignUpAddressConfirmation } from "../channels/http/http.sign-up-confirmation.channel.ts";
-import { passwordResetMailChannels } from "../channels/password-reset-mail-channels.registry.ts";
 import type { PasswordResetMailChannel } from "../channels/password-reset-mail.channel.ts";
-import { signUpVerificationMailChannels } from "../channels/sign-up-verification-mail-channels.registry.ts";
-import { signupAnnouncementChannels } from "../channels/signup-announcement-channels.registry.ts";
+import type { SignUpVerificationMailChannel } from "../channels/sign-up-verification-mail.channel.ts";
 import {
   type AuthLifecycleDefinition,
   buildAuthLifecyclePipeline,
 } from "../eventing/auth-lifecycle.pipeline.ts";
+import type { CliDeviceApprovalFrame } from "../features/cli-device/services/cli-device-approval.service.ts";
+import { CliDeviceDirectoryService } from "../features/cli-device/services/cli-device-directory.service.ts";
+import {
+  CliDeviceFlowService,
+  type CliBrowserSession,
+  type CliDeviceCodeLookup,
+  type CliDeviceFlowAnswer,
+  type CliDeviceFlowCollaborators,
+} from "../features/cli-device/services/cli-device-flow.service.ts";
+import { CliDeviceSessionService } from "../features/cli-device/services/cli-device-session.service.ts";
 import type { AuthRateLimitRepository } from "../repositories/auth-rate-limit.repository.ts";
 import type { AuthRepositories } from "../repositories/auth.repositories.ts";
 import type { AuthSessionPoll } from "../rules/auth-session-poll.rules.ts";
 import { mountedSocialMethodIds } from "../rules/mounted-social-methods.rules.ts";
+import { providerAccountIssuer } from "../rules/provider-account-issuer.rules.ts";
 import { queryCacheKeyDeriver } from "../rules/query-cache-key.rules.ts";
 import { keyedIdentifierHasher } from "../rules/sign-in-identifier-hash.rules.ts";
 import { buildSignUpVerificationUrl } from "../rules/signup-verification-link.rules.ts";
@@ -138,16 +146,6 @@ import {
 } from "../services/auth-lifecycle-notice.service.ts";
 import { AuthProviderService } from "../services/auth-provider.service.ts";
 import { BrowserSessionService } from "../services/browser-session.service.ts";
-import type { CliDeviceApprovalFrame } from "../services/cli-device-approval.service.ts";
-import { CliDeviceDirectoryService } from "../services/cli-device-directory.service.ts";
-import {
-  CliDeviceFlowService,
-  type CliBrowserSession,
-  type CliDeviceCodeLookup,
-  type CliDeviceFlowAnswer,
-  type CliDeviceFlowCollaborators,
-} from "../services/cli-device-flow.service.ts";
-import { CliDeviceSessionService } from "../services/cli-device-session.service.ts";
 import { CredentialRegistrationService } from "../services/credential-registration.service.ts";
 import { CredentialSignInPolicyService } from "../services/credential-sign-in-policy.service.ts";
 import { FederatedAccountReadsService } from "../services/federated-account-reads.service.ts";
@@ -157,7 +155,8 @@ import {
   type LegacySsoAccessConnections,
   type LegacySsoAccessMemberships,
 } from "../services/legacy-sso-access.service.ts";
-import { OwnPasswordService } from "../services/own-password.service.ts";
+import { type CredentialAccounts, OwnPasswordService } from "../services/own-password.service.ts";
+import { OwnSignInMethodService } from "../services/own-sign-in-method.service.ts";
 import { PriorSessionService } from "../services/prior-session.service.ts";
 import { ProjectAuthTokenService } from "../services/project-auth-token.service.ts";
 import {
@@ -194,9 +193,9 @@ const logger = createLogger("langwatch:auth");
 type AuthAppPeers = Readonly<{
   apiKeys: ApiKeyApi;
   featureFlags: FeatureFlagApi;
-  identity: Pick<IdentityApi, "routeSignIn" | "sendOwnAddressConfirmation">;
-  /** Whether the installation's sign-up policy admits an address, before its proof is spent. */
-  organizations: Pick<OrganizationApi, "checkSignUp">;
+  identity: Pick<IdentityApi, "routeSignIn" | "sendOwnAddressConfirmation" | "resolveEmail">;
+  /** The sign-up policy, and the invitation an invite link lands on (organization's). */
+  organizations: SignUpPolicy & Pick<OrganizationApi, "getInviteLanding" | "requestFreshInvite">;
   /** The account writes auth's lifecycle doors run before ending credentials. */
   users: Pick<
     UserApi,
@@ -206,8 +205,6 @@ type AuthAppPeers = Readonly<{
     | "recordDeactivated"
     | "isOperator"
     | "hasPassword"
-    | "setFirstPassword"
-    | "rotatePassword"
     | "registerCredentialAccount"
   >;
 }>;
@@ -277,8 +274,8 @@ export class AuthModule implements AuthApiContract {
   static readonly secrets = {
     session: sessionSecret,
     ...signInProviderSecrets,
-    /** The Auth0 Management app's secret; absent, the login app's stands in, as main's did. */
-    auth0ManagementSecret: Secret.load("AUTH0_MGMT_CLIENT_SECRET", { optional: true }),
+    /** Read by the live channel tier, which scopes to this module's declared secrets. */
+    auth0ManagementSecret,
     /** LangWatch's own sign-ups Slack webhook, shared with organization, billing and identity. */
     internalSlackSignupsWebhook,
   } as const;
@@ -318,10 +315,11 @@ export class AuthModule implements AuthApiContract {
   /** The account writes that end credentials: deactivation and an address change. */
   readonly #accounts: AccountLifecycleService;
   readonly #ownPasswords: OwnPasswordService;
+  readonly #ownSignInMethods: OwnSignInMethodService;
   readonly #registrations: CredentialRegistrationService;
   /** This deployment's sign-in mode, set once the provider secrets resolve. */
   #authProviders: AuthProviderService | null = null;
-  /** The Auth0 tenant's password change; set once the provider secrets resolve. */
+  /** The Auth0 tenant's password change; set by {@link AuthModule.create}. */
   #federatedPasswords: FederatedPasswordService | null = null;
   /**
    * Composes the deployment's ONE Better Auth instance on first use (it asks
@@ -454,10 +452,16 @@ export class AuthModule implements AuthApiContract {
         revokeCliTokens: (input) => this.revokeCliTokens(input),
       },
     });
+    const credentialAccounts = betterAuthCredentialAccounts(() => this.betterAuth());
     this.#ownPasswords = OwnPasswordService.create({
       users: dependencies.users,
+      credentials: credentialAccounts,
       auth: this,
       issuesOwnPasswords: () => this.#issuesOwnPasswords,
+    });
+    this.#ownSignInMethods = OwnSignInMethodService.create({
+      credentials: credentialAccounts,
+      identity: dependencies.identity,
     });
     this.#registrations = CredentialRegistrationService.create({
       users: dependencies.users,
@@ -478,7 +482,8 @@ export class AuthModule implements AuthApiContract {
       betterAuth: () => this.betterAuth(),
       baseUrl: () => this.baseUrl(),
       verifyBrowserSession: (input) => this.verifyBrowserSession(input),
-      resolveBrowserSession: (input) => this.resolveBrowserSession(input),
+      resolveBrowserSession: (input) =>
+        this.#sessions.resolveBrowserSession({ ...input, fresh: true }),
       revokeBrowserSession: (input) => this.revokeBrowserSession(input),
       idTokenIssuerRefusals: this.#idTokenIssuerRefusals,
       connectionIssuers,
@@ -497,10 +502,14 @@ export class AuthModule implements AuthApiContract {
   static async create(setup: AuthSetup): Promise<AuthModule> {
     const { repositories, channels, dependencies, config } = setup;
     const processName = setup.role ?? "this process";
-    /** Every mail auth sends goes out through notification, which owns the gateway. */
-    const mailer: MailSender = { send: (content) => dependencies.notifications.sendEmail(content) };
     const now = nowInstant;
     const accountRows = repositories.betterAuthHooks;
+    /** Every sign-up door's verdict: whether any account exists, then organization's policy. */
+    const checkSignUp = async ({ email }: Readonly<{ email: string }>) =>
+      dependencies.organizations.checkSignUp({
+        email,
+        hasAnyAccount: await dependencies.users.hasAnyAccount(),
+      });
 
     const sessions = BrowserSessionService.create({
       sessions: repositories.sessions,
@@ -512,6 +521,7 @@ export class AuthModule implements AuthApiContract {
         activity: repositories.sessions,
         now,
       }),
+      operators: dependencies.authz,
       now,
     });
 
@@ -547,7 +557,8 @@ export class AuthModule implements AuthApiContract {
         sessions: () => cliSessions,
         directory: () => cliDeviceDirectory,
         apiKeys: () => dependencies.apiKeys,
-        ensurePersonalWorkspace: (input) => dependencies.users.ensurePersonalWorkspace(input),
+        ensurePersonalWorkspace: (input) =>
+          dependencies.organizations.ensurePersonalWorkspace(input),
         canViewProject: ({ userId, projectId }) =>
           dependencies.authz.hasProjectPermission({
             userId,
@@ -559,12 +570,12 @@ export class AuthModule implements AuthApiContract {
       },
       signUp: buildSignUpVerification({
         publicBaseUrl: config.publicBaseUrl,
-        mailer,
+        mail: channels.signUpVerificationMail,
         repositories,
         now,
         users: dependencies.users,
         route: (input) => dependencies.identity.routeSignIn(input),
-        checkSignUp: (input) => dependencies.organizations.checkSignUp(input),
+        checkSignUp,
         isWithinBudget: (input) => app.isWithinBudget(input),
         revokeAllBrowserSessions: (input) => app.revokeAllBrowserSessions(input),
         isEmailUnconfigured: async () => {
@@ -578,7 +589,11 @@ export class AuthModule implements AuthApiContract {
         apiKeys: dependencies.apiKeys,
         featureFlags: dependencies.featureFlags,
         identity: dependencies.identity,
-        organizations: dependencies.organizations,
+        organizations: {
+          checkSignUp,
+          getInviteLanding: (input) => dependencies.organizations.getInviteLanding(input),
+          requestFreshInvite: (input) => dependencies.organizations.requestFreshInvite(input),
+        },
         users: dependencies.users,
       },
       legacySsoAccess: LegacySsoAccessService.create({
@@ -612,7 +627,7 @@ export class AuthModule implements AuthApiContract {
         resolveDefaultMethods,
         passwordIsAllowed: async () =>
           (await app.resolveAuthProvider()) === "email" || config.localPasswords,
-        checkSignUp: (input) => dependencies.organizations.checkSignUp(input),
+        checkSignUp,
       }),
       resolveDefaultMethods,
       addressConfirmation: AddressConfirmationService.create({
@@ -649,17 +664,9 @@ export class AuthModule implements AuthApiContract {
       baseUrl: config.sessionUrl ?? "",
     });
     app.#mountedSocialMethodIds = mountedSocialMethodIds({ configuration: signInProviders });
-    const auth0ManagementSecret = await setup.secrets.into(
-      AuthModule.secrets.auth0ManagementSecret,
-      (value) => value,
-    );
     app.#federatedPasswords = FederatedPasswordService.create({
       accounts: accountRows,
-      auth0: auth0PasswordChannels.http.create({
-        issuer: config.signInProviders.auth0Issuer,
-        mgmtClientId: config.auth0ManagementClientId ?? config.signInProviders.auth0ClientId,
-        mgmtClientSecret: auth0ManagementSecret ?? signInProviders.auth0ClientSecret,
-      }),
+      auth0: channels.auth0Passwords,
     });
     app.#authProviders = AuthProviderService.create({
       configuredProvider: configuredAuthProvider(config.signInProviders).provider,
@@ -667,15 +674,11 @@ export class AuthModule implements AuthApiContract {
       platformSsoAllowed: () => dependencies.licensing.isPlatformSsoLicensed(),
     });
 
-    const signupAnnouncements = await setup.secrets.into(
-      AuthModule.secrets.internalSlackSignupsWebhook,
-      (webhookUrl) =>
-        SignupAnnouncementService.create({
-          channel: webhookUrl ? signupAnnouncementChannels.live.create({ webhookUrl }) : undefined,
-          publicBaseUrl: config.publicBaseUrl,
-          logger,
-        }),
-    );
+    const signupAnnouncements = SignupAnnouncementService.create({
+      channel: channels.signupAnnouncements,
+      publicBaseUrl: config.publicBaseUrl,
+      logger,
+    });
 
     return setup.secrets.into(AuthModule.secrets.session, (sessionSecret) => {
       assertAuthServerConfig(config, sessionSecret);
@@ -727,8 +730,9 @@ export class AuthModule implements AuthApiContract {
             auth: app,
             grants: dependencies.authz,
             organizations: dependencies.organizations,
+            signUpPolicy: { checkSignUp },
             sendResetPassword: AuthModule.passwordResetSender({
-              mail: passwordResetMailChannels.ses.create({ mailer }),
+              mail: channels.passwordResetMail,
               publicBaseUrl: config.publicBaseUrl,
               processName,
             }),
@@ -1065,6 +1069,10 @@ export class AuthModule implements AuthApiContract {
     return this.#ownPasswords.change(input);
   }
 
+  unlinkOwnAccount(input: UnlinkUserAccountInput): Promise<void> {
+    return this.#ownSignInMethods.unlink(input);
+  }
+
   registerCredentialAccount(input: RegisterCredentialAccountInput): Promise<CreatedUser> {
     return this.#registrations.register(input);
   }
@@ -1198,13 +1206,13 @@ export class AuthModule implements AuthApiContract {
     await context.internalAdapter.createAccount(row);
   }
 
-  /** No process composes the invitation reads yet; see policies-DS-2d Risks. */
-  async readInviteLanding(_input: Readonly<{ inviteCode: string }>): Promise<InviteLanding> {
-    throw this.#invitesUnavailable();
+  /** Invitations are organization's; the code is the authorization. */
+  readInviteLanding(input: Readonly<{ inviteCode: string }>): Promise<InviteLanding> {
+    return this.#dependencies.organizations.getInviteLanding(input);
   }
 
-  async requestFreshInvite(_input: Readonly<{ inviteCode: string }>): Promise<void> {
-    throw this.#invitesUnavailable();
+  requestFreshInvite(input: Readonly<{ inviteCode: string }>): Promise<void> {
+    return this.#dependencies.organizations.requestFreshInvite(input);
   }
 
   resolveAuthProvider(): Promise<string> {
@@ -1229,20 +1237,12 @@ export class AuthModule implements AuthApiContract {
 
     return this.#signUp;
   }
-
-  #invitesUnavailable(): AuthUnavailableError {
-    return new AuthUnavailableError({
-      capability:
-        "invitation service, so it cannot ask this organization's admins to reissue the invitation",
-      processName: this.#processName,
-    });
-  }
 }
 
 /** The ceremony this process can run, or nothing where it has no public base URL to link to. */
 function buildSignUpVerification({
   publicBaseUrl,
-  mailer,
+  mail,
   repositories,
   now,
   users,
@@ -1253,7 +1253,7 @@ function buildSignUpVerification({
   isEmailUnconfigured,
 }: {
   publicBaseUrl: string | undefined;
-  mailer: MailSender;
+  mail: SignUpVerificationMailChannel;
   repositories: AuthRepositories;
   now: () => Instant;
   users: UserApi;
@@ -1267,7 +1267,7 @@ function buildSignUpVerification({
 
   return SignUpVerificationService.create({
     tokens: repositories.signUpTokens,
-    mailer: signUpVerificationMailChannels.ses.create({ mailer }),
+    mailer: mail,
     users,
     route,
     checkSignUp,
@@ -1278,6 +1278,41 @@ function buildSignUpVerification({
     isEmailUnconfigured,
     now,
   });
+}
+
+/** Better Auth's account storage, the way its own change- and set-password endpoints write. */
+function betterAuthCredentialAccounts(
+  betterAuth: () => Promise<BetterAuthTransport>,
+): CredentialAccounts {
+  const context = async () => (await betterAuth()).$context;
+  return {
+    findCredential: async ({ userId }) => {
+      const account = await (await context()).internalAdapter.findCredentialAccount(userId);
+      return account ? { id: account.id, passwordHash: account.password ?? null } : null;
+    },
+    listAccountIds: async ({ userId }) =>
+      (await (await context()).internalAdapter.findAccounts(userId)).map((account) => account.id),
+    writePassword: async ({ accountId, passwordHash }) => {
+      await (await context()).internalAdapter.updateAccount(accountId, { password: passwordHash });
+    },
+    linkPassword: async ({ userId, passwordHash }) => {
+      await (
+        await context()
+      ).internalAdapter.linkAccount({
+        userId,
+        providerId: "credential",
+        issuer: providerAccountIssuer({ connectionIssuer: undefined, provider: "credential" }),
+        accountId: userId,
+        password: passwordHash,
+      });
+    },
+    deleteAccount: async ({ accountId }) => {
+      await (await context()).internalAdapter.deleteAccount(accountId);
+    },
+    hashPassword: async ({ password }) => (await context()).password.hash(password),
+    passwordMatches: async ({ password, hash }) =>
+      (await context()).password.verify({ password, hash }),
+  };
 }
 
 /** The two-factor plugin on the deployment's one Better Auth instance (main's protocol adapter). */
@@ -1577,17 +1612,17 @@ type BuildBetterAuthOptions = Readonly<{
   /** The grants ledger an SSO domain auto-join writes its organization binding to. */
   grants: AuthzGrantsService;
   /**
-   * Where a domain auto-join applies the pending invite an address already
-   * holds, and who the installation lets create an account.
+   * Where a domain auto-join applies the pending invite an address already holds.
    */
   organizations: Pick<
     OrganizationApi,
     | "applyPendingInvite"
-    | "checkSignUp"
     | "findBySsoDomain"
     | "createSsoDomainMembership"
     | "countMembershipsForUser"
   >;
+  /** Who the installation lets create an account: the app's composed sign-up verdict. */
+  signUpPolicy: SignUpPolicy;
   /** Sends a requested reset link; see {@link passwordResetSender}. */
   sendResetPassword: (reset: { email: string; token: string }) => Promise<void>;
   /** The same user directory the rest of this process serves from. */
@@ -1749,7 +1784,7 @@ async function buildBetterAuth(options: BuildBetterAuthOptions): Promise<BetterA
           : [{ connectionId: method.connectionId, methodId: method.id }],
       );
     },
-    signUpPolicy: options.organizations,
+    signUpPolicy: options.signUpPolicy,
     passkeySignUpEligibility: options.passkeySignUpEligibility,
     credentialGuard: CredentialSessionGuard.create(
       CredentialSignInPolicyService.create({

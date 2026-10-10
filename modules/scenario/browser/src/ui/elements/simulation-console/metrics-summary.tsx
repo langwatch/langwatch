@@ -22,13 +22,13 @@ export function MetricsSummary({ results, durationInMs }: MetricsSummaryProps) {
   return (
     <VStack align="start" gap={1} mb={3}>
       <HStack>
-        <Text color="white">Success Criteria:</Text>
+        <Text color="fg">Success Criteria:</Text>
         <Text color={metCount > 0 ? CONSOLE_COLORS.successColor : CONSOLE_COLORS.failureColor}>
           {metCount}/{totalCriteria}
         </Text>
       </HStack>
       <HStack>
-        <Text color="white">Success Rate:</Text>
+        <Text color="fg">Success Rate:</Text>
         <Text
           color={
             parseFloat(successRate) > 50 ? CONSOLE_COLORS.successColor : CONSOLE_COLORS.failureColor
@@ -38,7 +38,7 @@ export function MetricsSummary({ results, durationInMs }: MetricsSummaryProps) {
         </Text>
       </HStack>
       <HStack>
-        <Text color="white">Duration:</Text>
+        <Text color="fg">Duration:</Text>
         <Text color={CONSOLE_COLORS.consoleText}>{duration}s</Text>
       </HStack>
     </VStack>

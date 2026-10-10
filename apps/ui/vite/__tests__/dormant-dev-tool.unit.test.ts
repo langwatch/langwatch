@@ -9,6 +9,7 @@ import { setTimeout as delay } from "timers/promises";
 import { afterEach, describe, expect, it } from "vitest";
 
 import {
+  devToolPort,
   freeLoopbackPort,
   idleBoundMs,
   isListening,
@@ -226,5 +227,37 @@ describe("dormant developer tool", () => {
 
       expect(tool.state()).toBe("ready");
     }, 15_000);
+  });
+});
+
+describe("devToolPort", () => {
+  it("takes the port the stack names", async () => {
+    const port = await devToolPort({
+      explicit: "46006",
+      appPort: 44000,
+      offset: 5,
+      env: { LANGWATCH_PORTLESS: "1" },
+    });
+    expect(port).toBe(46006);
+  });
+
+  describe("given haven named no port", () => {
+    it("takes a free loopback port instead of the app port plus offset", async () => {
+      const port = await devToolPort({
+        explicit: undefined,
+        appPort: 44000,
+        offset: 5,
+        env: { LANGWATCH_PORTLESS: "1" },
+      });
+      expect(port).not.toBe(44005);
+      expect(port).toBeGreaterThan(0);
+    });
+  });
+
+  describe("given plain pnpm dev", () => {
+    it("derives the port from the app port", async () => {
+      const port = await devToolPort({ explicit: undefined, appPort: 5560, offset: 6, env: {} });
+      expect(port).toBe(5566);
+    });
   });
 });

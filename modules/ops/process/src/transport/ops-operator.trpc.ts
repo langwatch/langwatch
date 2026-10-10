@@ -3,14 +3,17 @@
  * declares `ops:view` or `ops:manage` at the platform tier. This file names the person a
  * handler reads beyond that, and the one probe that answers rather than refuses.
  */
-import { defineTrpcFact } from "@langwatch/api/trpc";
+import { defineMiddlewareContext } from "@langwatch/api/trpc";
 import { opsOperatorSchema } from "@langwatch/ops-contract";
 
 /**
  * The signed-in person behind the request, including the impersonator where one is present:
  * the handlers that record or refuse by who is acting (audit names, destructive writes) read it.
  */
-export const opsOperatorFact = defineTrpcFact("opsOperator", opsOperatorSchema.nullable());
+export const opsOperatorContext = defineMiddlewareContext(
+  "opsOperator",
+  opsOperatorSchema.nullable(),
+);
 
 /**
  * The status probe. Answers `{ kind: "none" }` for a non-operator rather

@@ -10,6 +10,7 @@ import {
   type SessionImpersonationState,
   type VerifiedBrowserSession,
 } from "@langwatch/auth-contract";
+import type { AuthzApi } from "@langwatch/authz-contract";
 import {
   signedInWithFor,
   signInMethodLabelFor,
@@ -52,6 +53,9 @@ interface BrowserSessionDeps {
   /** The organization's browser-session window (GAC-10), asked here because
    *  this is where a session becomes an identity and the row is already read. */
   sessionBound: SessionBoundService;
+  /** Re-asks the operator's platform grant on every impersonated read, so a revoked one lapses.
+   *  shortcut: optional until auth.app.ts passes `dependencies.authz`; then make it required. */
+  operators?: Pick<AuthzApi, "can">;
   now(): Instant;
 }
 
@@ -73,8 +77,10 @@ export class BrowserSessionService {
     return this.deps.sessions.countSignedInUsersAmong(input);
   }
 
+  /** `fresh` re-reads the person: the browser's session poll follows the user's own save. */
   async resolveBrowserSession(input: {
     verified: VerifiedBrowserSession;
+    fresh?: boolean;
   }): Promise<BrowserSessionResolution> {
     const verified = verifiedBrowserSessionSchema.parse(input.verified);
 
@@ -83,7 +89,10 @@ export class BrowserSessionService {
 
     if (await this.pastItsWindow({ stored })) return { kind: "anonymous" };
 
-    const { user, identityEmail } = await this.person({ userId: verified.user.id });
+    const { user, identityEmail } = await this.person({
+      userId: verified.user.id,
+      fresh: input.fresh ?? false,
+    });
     // Name and photo come from the stored person: Better Auth's cached copy of
     // the user is written at sign-in and never told when the user module saves.
     const session = browserSessionSchema.parse({
@@ -109,10 +118,10 @@ export class BrowserSessionService {
    * The stored person behind a session, remembered briefly: a page load asks once per request,
    * and none of it decides access. Revocation stays with the session row, read every time.
    */
-  private person({ userId }: { userId: string }): Promise<SessionPerson> {
+  private person({ userId, fresh }: { userId: string; fresh: boolean }): Promise<SessionPerson> {
     const nowMs = this.deps.now().epochMilliseconds;
     const remembered = this.#people.get(userId);
-    if (remembered && remembered.until > nowMs) return remembered.value;
+    if (!fresh && remembered && remembered.until > nowMs) return remembered.value;
 
     const value = Promise.all([
       this.deps.users.findById({ id: userId }),
@@ -149,10 +158,21 @@ export class BrowserSessionService {
       now: this.deps.now(),
     });
     if (state.kind === "none") return session;
-    const { subjectUserId } = state.impersonation;
+    const { actorUserId, subjectUserId } = state.impersonation;
+    const grant = { permission: "ops:manage", scope: { type: "platform" } } as const;
+    const operators = this.deps.operators;
+    if (
+      operators &&
+      !(await operators.can({ principal: { type: "user", id: actorUserId }, ...grant }))
+    ) {
+      return session;
+    }
 
     // The subject is read fresh, never copied at start: a retired subject is not acted for.
-    const { user: subject, identityEmail } = await this.person({ userId: subjectUserId });
+    const { user: subject, identityEmail } = await this.person({
+      userId: subjectUserId,
+      fresh: false,
+    });
     if (!subject || subject.deactivatedAt !== null) return session;
 
     return browserSessionSchema.parse({

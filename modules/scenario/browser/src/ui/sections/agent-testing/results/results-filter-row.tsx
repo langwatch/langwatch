@@ -59,6 +59,12 @@ export function ResultsFilterRow({
   return (
     <HStack gap={1.5} flexWrap="wrap" data-testid="agent-testing-results-filter-row">
       <GroupByTabs grouping={grouping} onGroupingChange={onGroupingChange} />
+      <AgentTestingPeriodPicker
+        period={period}
+        periodMode={periodMode}
+        setPeriod={setPeriod}
+        setRelativePeriod={setRelativePeriod}
+      />
 
       <Box width="1px" height="20px" background="border" marginX={1} />
 
@@ -108,15 +114,6 @@ export function ResultsFilterRow({
         <ChartColumn size={13} />
         Charts
       </ToggleButton>
-
-      <Box flex={1} minWidth={2} />
-
-      <AgentTestingPeriodPicker
-        period={period}
-        periodMode={periodMode}
-        setPeriod={setPeriod}
-        setRelativePeriod={setRelativePeriod}
-      />
     </HStack>
   );
 }

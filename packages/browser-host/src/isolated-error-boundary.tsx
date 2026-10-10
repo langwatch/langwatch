@@ -1,6 +1,6 @@
-import { Box, Button, HStack, Icon, Text, VStack } from "@langwatch/design-system/primitives";
+import { Alert, Button, Icon } from "@langwatch/design-system/primitives";
 import { explainAnyError } from "@langwatch/handled-error/presentation";
-import { AlertTriangle, RotateCcw } from "lucide-react";
+import { RotateCcw } from "lucide-react";
 import type * as React from "react";
 import { ErrorBoundary, type FallbackProps } from "react-error-boundary";
 
@@ -69,35 +69,15 @@ const InlineError: React.FC<FallbackProps & { scope?: string }> = ({
   const rawMessage = error instanceof Error ? error.message : String(error);
 
   return (
-    <Box
-      role="alert"
-      paddingX={4}
-      paddingY={3}
-      margin={3}
-      borderWidth="1px"
-      borderColor="red.muted"
-      borderRadius="md"
-      bg="red.subtle"
-      maxWidth="full"
-    >
-      <VStack align="stretch" gap={2}>
-        <HStack gap={2}>
-          <Icon color="red.fg" boxSize="14px">
-            <AlertTriangle />
-          </Icon>
-          <Text textStyle="xs" fontWeight="semibold" color="red.fg">
-            {heading}
-          </Text>
-        </HStack>
+    <Alert.Root status="error" size="sm" margin={3} maxWidth="full">
+      <Alert.Indicator />
+      <Alert.Content gap={2}>
+        <Alert.Title>{heading}</Alert.Title>
         {explanation.description && (
-          <Text textStyle="2xs" color="fg.muted">
-            {explanation.description}
-          </Text>
+          <Alert.Description>{explanation.description}</Alert.Description>
         )}
         {isDev && (
-          <Text
-            textStyle="2xs"
-            color="fg.muted"
+          <Alert.Description
             fontFamily="mono"
             maxHeight="120px"
             overflowY="auto"
@@ -105,17 +85,21 @@ const InlineError: React.FC<FallbackProps & { scope?: string }> = ({
             wordBreak="break-word"
           >
             {rawMessage || "No error message"}
-          </Text>
+          </Alert.Description>
         )}
-        <HStack justify="flex-end">
-          <Button size="xs" variant="outline" colorPalette="red" onClick={resetErrorBoundary}>
-            <Icon boxSize="12px">
-              <RotateCcw />
-            </Icon>
-            Try again
-          </Button>
-        </HStack>
-      </VStack>
-    </Box>
+        <Button
+          size="xs"
+          variant="outline"
+          colorPalette="red"
+          alignSelf="end"
+          onClick={resetErrorBoundary}
+        >
+          <Icon boxSize="12px">
+            <RotateCcw />
+          </Icon>
+          Try again
+        </Button>
+      </Alert.Content>
+    </Alert.Root>
   );
 };

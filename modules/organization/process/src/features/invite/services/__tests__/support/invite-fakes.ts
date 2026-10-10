@@ -30,6 +30,7 @@ import type { OrganizationInviteMail } from "../../../../../channels/organizatio
 import type { OrganizationInviteRateLimitRepository } from "../../../../../repositories/organization-invite-rate-limit.repository.ts";
 import type {
   InviteWithOrganization,
+  InviteWithOrganizationAndRequester,
   InviteWithRequester,
   OrganizationInviteRepository,
   WriteInviteInput,
@@ -112,6 +113,21 @@ export class FakeAuthzGrantsService implements AuthzGrantsService {
   }
 
   async findDirectoryCausedChanges(): Promise<[]> {
+    return [];
+  }
+
+  /** Unreached here: this fake's ledger holds no shared-project grants. */
+  async findLiveSharedProjectGrants(): Promise<[]> {
+    return [];
+  }
+
+  async attachSharedProjectGrant(): Promise<never> {
+    throw new Error("shared-project grants are not used by the invite scenarios");
+  }
+
+  async awaitSharedProjectGrants(): Promise<void> {}
+
+  async revokeSharedProjectGrants(): Promise<string[]> {
     return [];
   }
 
@@ -403,6 +419,15 @@ export class FakeOrganizationInviteRepository implements OrganizationInviteRepos
     return { ...invite, organization: this.organizations.get(invite.organizationId) ?? null };
   }
 
+  async getInviteLandingByCode({
+    inviteCode,
+  }: {
+    inviteCode: string;
+  }): Promise<InviteWithOrganizationAndRequester> {
+    const invite = await this.getInviteByCodeWithOrganization({ inviteCode });
+    return { ...invite, requestedByUser: null };
+  }
+
   async findAdminEmails({ organizationId }: { organizationId: string }): Promise<string[]> {
     return this.adminEmailsByOrganization.get(organizationId) ?? [];
   }
@@ -482,6 +507,9 @@ export class FakeOrganizationInviteRepository implements OrganizationInviteRepos
   findProjectSlugsInOrganization = unsupported<
     OrganizationInviteRepository["findProjectSlugsInOrganization"]
   >("findProjectSlugsInOrganization");
+  findPendingInvitesForAddress = unsupported<
+    OrganizationInviteRepository["findPendingInvitesForAddress"]
+  >("findPendingInvitesForAddress");
   findOldestPendingInviteForAddress = unsupported<
     OrganizationInviteRepository["findOldestPendingInviteForAddress"]
   >("findOldestPendingInviteForAddress");

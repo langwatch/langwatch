@@ -5,7 +5,7 @@
  */
 import { publicRoute } from "@langwatch/api/access";
 import {
-  callerAddressFact,
+  callerAddressContext,
   defineTrpcRouter,
   type TrpcRouterDeclaration,
 } from "@langwatch/api/trpc";
@@ -26,7 +26,7 @@ export const emailSuppressionTrpcTransport: TrpcRouterDeclaration<
    * tampered or orphaned token with the one code both halves share.
    */
   .procedure("resolveUnsubscribeToken")
-  .withFacts(callerAddressFact)
+  .withMiddlewareContext(callerAddressContext)
   .withAccess(publicRoute({ reason: TOKEN_IS_THE_AUTHORIZATION }))
   .handle(({ app, input }, callerAddress) =>
     app.resolveUnsubscribeView({ token: input.token, callerAddress }),
@@ -34,7 +34,7 @@ export const emailSuppressionTrpcTransport: TrpcRouterDeclaration<
 
   /** Public button confirm. Idempotent - the suppression upsert collapses duplicates. */
   .procedure("confirmUnsubscribe")
-  .withFacts(callerAddressFact)
+  .withMiddlewareContext(callerAddressContext)
   .withAccess(publicRoute({ reason: TOKEN_IS_THE_AUTHORIZATION }))
   .handle(async ({ app, input }, callerAddress) => {
     await app.acceptUnsubscribe({

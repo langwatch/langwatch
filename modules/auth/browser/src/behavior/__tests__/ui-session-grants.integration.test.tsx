@@ -7,11 +7,6 @@
 
 import { trpcQueryKey } from "@langwatch/api/web";
 import type { UiActiveScopeReading, UiSessionReading } from "@langwatch/browser-host/session";
-import {
-  createUiScopeHost,
-  UiScopeHostProvider,
-  useOrganizationTeamProject,
-} from "@langwatch/browser-host/use-organization-team-project";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
@@ -40,6 +35,13 @@ const ON_PERSONAL: UiActiveScopeReading = {
   project: { id: "proj-personal", slug: "personal-jane", name: "Personal" },
 };
 
+const ON_AGGREGATE: UiActiveScopeReading = {
+  status: "ready",
+  organization: { id: "org-acme" },
+  team: { id: "team-shared" },
+  project: { id: "proj-all", slug: "acme-all", name: "ACME All", kind: "aggregate" },
+};
+
 const RESOLVING: UiActiveScopeReading = {
   status: "loading",
   organization: void 0,
@@ -55,11 +57,6 @@ function deferred<T>() {
   return { promise, resolve };
 }
 
-function LegacyReader() {
-  const { hasPermission } = useOrganizationTeamProject();
-  return <span data-testid="legacy-can">{String(hasPermission("annotations:update"))}</span>;
-}
-
 function GrantProbe({
   transport,
   scope,
@@ -69,24 +66,13 @@ function GrantProbe({
 }) {
   const session = useBrowserUiSession({ transport, session: JANE, scope, isPublicRoute: false });
   const { permissions } = session.snapshot();
-  const legacyHost = createUiScopeHost({
-    project: () => scope.project,
-    organization: () => scope.organization,
-    team: () => scope.team,
-    organizationRole: () => void 0,
-    hasPermission: permissions.can,
-    hasOrganizationPermission: permissions.canInOrganization,
-    isLoading: () => permissions.isLoading,
-  });
   return (
     <div>
       <span data-testid="can-project">{String(permissions.can("annotations:update"))}</span>
+      <span data-testid="can-manage">{String(permissions.can("project:update"))}</span>
       <span data-testid="can-org">
         {String(permissions.canInOrganization("annotations:update"))}
       </span>
-      <UiScopeHostProvider value={legacyHost}>
-        <LegacyReader />
-      </UiScopeHostProvider>
     </div>
   );
 }
@@ -115,6 +101,22 @@ function renderGrants({
   dispose = () => view.unmount();
   return { ...view, client, moveTo: (next: UiActiveScopeReading) => view.rerender(tree(next)) };
 }
+
+describe("given an aggregate project", () => {
+  /** @scenario "The app marks the aggregate and offers no way to add data to it" */
+  it("refuses a write under the project while managing it and organisation checks stay open", async () => {
+    const view = renderGrants({
+      scope: ON_AGGREGATE,
+      transport: answeringTransport(() =>
+        Promise.resolve({ permissions: ["annotations:update", "project:update"] }),
+      ),
+    });
+
+    await waitFor(() => expect(view.getByTestId("can-manage").textContent).toBe("true"));
+    expect(view.getByTestId("can-project").textContent).toBe("false");
+    expect(view.getByTestId("can-org").textContent).toBe("true");
+  });
+});
 
 describe("given grants answered for the scope the reader is standing in", () => {
   /** @scenario "Organization permissions follow the active project's grant" */
@@ -199,7 +201,6 @@ describe("given grants answered for the scope the reader is standing in", () => 
       });
       await waitFor(() => expect(view.getByTestId("can-project").textContent).toBe("true"));
       await waitFor(() => expect(view.getByTestId("can-org").textContent).toBe("true"));
-      expect(view.getByTestId("legacy-can").textContent).toBe("true");
 
       refuse = true;
       await view.client.refetchQueries({
@@ -208,7 +209,6 @@ describe("given grants answered for the scope the reader is standing in", () => 
 
       await waitFor(() => expect(view.getByTestId("can-project").textContent).toBe("false"));
       expect(view.getByTestId("can-org").textContent).toBe("false");
-      expect(view.getByTestId("legacy-can").textContent).toBe("false");
     });
   });
 });

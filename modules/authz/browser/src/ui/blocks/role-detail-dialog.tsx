@@ -25,7 +25,7 @@ export function RoleDetailDialog({
 
   return (
     <Dialog.Root open={open} onOpenChange={({ open: isOpen }) => !isOpen && onClose()}>
-      <Dialog.Content bg="bg" maxWidth="640px" maxHeight="80vh" overflowY="auto">
+      <Dialog.Content maxWidth="640px" maxHeight="80vh" overflowY="auto">
         <Dialog.Header>
           <Dialog.Title>{title}</Dialog.Title>
         </Dialog.Header>

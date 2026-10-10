@@ -31,6 +31,7 @@ export abstract class BetterAuthHooksRepository {
   /** Throws `UserNotFoundError`. */
   abstract getUserForHooks(input: { userId: string }): Promise<BetterAuthHookUser>;
   abstract countAccountsForUser(input: { userId: string }): Promise<number>;
+  abstract countPasskeysForUser(input: { userId: string }): Promise<number>;
   /**
    * The federated accounts this person holds, credential rows excluded. Read
    * for a peer that decides something about them and owns no `Account` row

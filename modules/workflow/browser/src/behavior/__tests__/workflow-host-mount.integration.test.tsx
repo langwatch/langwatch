@@ -1,12 +1,13 @@
 import {
-  UiCapabilityContextProvider,
+  UiHostServicesContextProvider,
   UiCopyTargets,
   UiScope,
+  UiSession,
   type UiActiveScope,
-  type UiCapabilities,
+  type UiHostServices,
   type UiCopyTarget,
 } from "@langwatch/browser-host/capabilities";
-import { createUiCapabilitiesFromHost } from "@langwatch/browser-host/testing";
+import { createUiHostServicesFromHost } from "@langwatch/browser-host/testing";
 import {
   createUiScopeHost,
   type UiScopeHost,
@@ -54,6 +55,21 @@ class TestScope extends UiScope {
 
   scopeHost(): UiScopeHost {
     return this.host;
+  }
+}
+
+/** A signed-in reader whose grants have answered. */
+class SettledSession extends UiSession {
+  currentUser() {
+    return null;
+  }
+
+  hasPermission(): boolean {
+    return true;
+  }
+
+  isSettled(): boolean {
+    return true;
   }
 }
 
@@ -108,21 +124,23 @@ async function renderUnderMount(
     project: () => ({ id: "proj-1", slug: "demo", name: "Demo" }),
     organization: () => ({ id: "org-1" }),
     team: () => ({ id: "team-1" }),
-    hasPermission: () => true,
   });
-  const capabilities: UiCapabilities = {
-    ...createUiCapabilitiesFromHost({
-      route: () => ({ params: { project: "demo" }, query: {}, pathname: "/demo/workflows" }),
-      navigate: navigated,
-    }),
+  const capabilities: UiHostServices = {
+    ...createUiHostServicesFromHost(
+      {
+        route: () => ({ params: { project: "demo" }, query: {}, pathname: "/demo/workflows" }),
+        navigate: navigated,
+      },
+      new SettledSession(),
+    ),
     scope: new TestScope(scopeHost),
     copyTargets,
   };
 
   renderWithDesignSystem(
-    <UiCapabilityContextProvider value={capabilities}>
+    <UiHostServicesContextProvider value={capabilities}>
       <Mount>{children}</Mount>
-    </UiCapabilityContextProvider>,
+    </UiHostServicesContextProvider>,
   );
 }
 

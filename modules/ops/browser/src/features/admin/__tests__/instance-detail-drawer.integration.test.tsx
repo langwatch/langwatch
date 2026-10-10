@@ -73,14 +73,15 @@ describe("InstanceDetailDrawer", () => {
       renderDrawer(instance());
 
       expect(screen.getByText("Created a project")).toBeTruthy();
-      expect(
-        screen.getByText(new Date("2026-01-02T00:00:00.000Z").toLocaleDateString()),
-      ).toBeTruthy();
+      const reachedRung = screen.getByText("Created a project").parentElement;
+      expect(reachedRung?.querySelector("time")?.getAttribute("datetime")).toBe(
+        "2026-01-02T00:00:00Z",
+      );
       expect(screen.getByText("Added a second member")).toBeTruthy();
       expect(screen.getAllByText("never reached").length).toBeGreaterThan(0);
       expect(screen.getByText("acme.test")).toBeTruthy();
       expect(screen.getByText("8 users")).toBeTruthy();
-      expect(screen.getByText((1200).toLocaleString())).toBeTruthy();
+      expect(screen.getByText("1.2K")).toBeTruthy();
     });
   });
 });

@@ -22,11 +22,8 @@ import {
   type LwqlSelfProvisionRequest,
 } from "../../features/provisioning/services/langwatch-ql-self-provisioning.service.ts";
 import { ClickHouseLangWatchQLProvisioningRepository } from "../../repositories/clickhouse/clickhouse.langwatch-ql-provisioning.repository.ts";
-import {
-  convergeLwqlAccessModel,
-  type LwqlConvergencePlan,
-  type LwqlProvisioningDatabase,
-} from "../lwql-provision.task.ts";
+import type { LwqlProvisioningDatabase } from "../../repositories/langwatch-ql-postgres.repository.ts";
+import { convergeLwqlAccessModel, type LwqlConvergencePlan } from "../lwql-provision.task.ts";
 
 class AllowTestQueries extends PrismaQueryGuard {
   execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {

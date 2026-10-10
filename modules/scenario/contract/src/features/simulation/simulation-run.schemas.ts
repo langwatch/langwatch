@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import { scenarioCriterionResultSchema } from "../../scenario-criterion-result.ts";
@@ -6,7 +7,7 @@ import { scenarioLegacyErrorBodySchema } from "../../scenario-rest.schemas.ts";
 
 export { scenarioLegacyErrorBodySchema };
 
-export const scenarioRunRestResponseSchema = z.object({
+const scenarioRunRestResponseSchemaDefinition = z.object({
   scenarioId: z.string(),
   batchRunId: z.string(),
   scenarioRunId: z.string(),
@@ -75,13 +76,23 @@ export const scenarioRunRestResponseSchema = z.object({
       "The version of the scenario at the moment the run was queued. Null on runs recorded before versions existed.",
     ),
 });
+export interface ScenarioRunRestResponseSchema extends Named<
+  typeof scenarioRunRestResponseSchemaDefinition
+> {}
+export const scenarioRunRestResponseSchema: ScenarioRunRestResponseSchema =
+  scenarioRunRestResponseSchemaDefinition;
 
-export const scenarioRunRestResponseWithPlatformUrlSchema = z.object({
+const scenarioRunRestResponseWithPlatformUrlSchemaDefinition = z.object({
   ...scenarioRunRestResponseSchema.shape,
   platformUrl: z.string().url(),
 });
+export interface ScenarioRunRestResponseWithPlatformUrlSchema extends Named<
+  typeof scenarioRunRestResponseWithPlatformUrlSchemaDefinition
+> {}
+export const scenarioRunRestResponseWithPlatformUrlSchema: ScenarioRunRestResponseWithPlatformUrlSchema =
+  scenarioRunRestResponseWithPlatformUrlSchemaDefinition;
 
-export const simulationBatchSummaryRestSchema = z.object({
+const simulationBatchSummaryRestSchemaDefinition = z.object({
   batchRunId: z.string(),
   totalCount: z.number(),
   passCount: z.number(),
@@ -108,8 +119,13 @@ export const simulationBatchSummaryRestSchema = z.object({
       "One short line saying why the batch was run, as given when it was queued. Null on a batch run without one.",
     ),
 });
+export interface SimulationBatchSummaryRestSchema extends Named<
+  typeof simulationBatchSummaryRestSchemaDefinition
+> {}
+export const simulationBatchSummaryRestSchema: SimulationBatchSummaryRestSchema =
+  simulationBatchSummaryRestSchemaDefinition;
 
-export const simulationRunListQuerySchema = z.object({
+const simulationRunListQuerySchemaDefinition = z.object({
   scenarioSetId: z.string().optional(),
   batchRunId: z.string().optional(),
   limit: z.coerce.number().int().positive().max(100).optional().default(20),
@@ -121,27 +137,54 @@ export const simulationRunListQuerySchema = z.object({
       "Pass `messages` to read whole conversations instead of the first few messages of each run. The page size is capped at 20 runs when set, and ends on a batch boundary.",
     ),
 });
+export interface SimulationRunListQuerySchema extends Named<
+  typeof simulationRunListQuerySchemaDefinition
+> {}
+export const simulationRunListQuerySchema: SimulationRunListQuerySchema =
+  simulationRunListQuerySchemaDefinition;
 
-export const simulationBatchQuerySchema = z.object({
+const simulationBatchQuerySchemaDefinition = z.object({
   scenarioSetId: z.string(),
   limit: z.coerce.number().int().positive().max(50).optional().default(10),
   cursor: z.string().optional(),
 });
+export interface SimulationBatchQuerySchema extends Named<
+  typeof simulationBatchQuerySchemaDefinition
+> {}
+export const simulationBatchQuerySchema: SimulationBatchQuerySchema =
+  simulationBatchQuerySchemaDefinition;
 
-export const scenarioRunIdParamsSchema = z.object({ scenarioRunId: z.string().min(1) });
-export const batchRunIdParamsSchema = z.object({ batchRunId: z.string().min(1) });
+const scenarioRunIdParamsSchemaDefinition = z.object({ scenarioRunId: z.string().min(1) });
+export interface ScenarioRunIdParamsSchema extends Named<
+  typeof scenarioRunIdParamsSchemaDefinition
+> {}
+export const scenarioRunIdParamsSchema: ScenarioRunIdParamsSchema =
+  scenarioRunIdParamsSchemaDefinition;
+const batchRunIdParamsSchemaDefinition = z.object({ batchRunId: z.string().min(1) });
+export interface BatchRunIdParamsSchema extends Named<typeof batchRunIdParamsSchemaDefinition> {}
+export const batchRunIdParamsSchema: BatchRunIdParamsSchema = batchRunIdParamsSchemaDefinition;
 
-export const simulationRunListResponseSchema = z.object({
+const simulationRunListResponseSchemaDefinition = z.object({
   runs: z.array(scenarioRunRestResponseWithPlatformUrlSchema),
   hasMore: z.boolean().optional(),
   nextCursor: z.string().optional(),
 });
+export interface SimulationRunListResponseSchema extends Named<
+  typeof simulationRunListResponseSchemaDefinition
+> {}
+export const simulationRunListResponseSchema: SimulationRunListResponseSchema =
+  simulationRunListResponseSchemaDefinition;
 
-export const simulationBatchListResponseSchema = z.object({
+const simulationBatchListResponseSchemaDefinition = z.object({
   batches: z.array(simulationBatchSummaryRestSchema),
   hasMore: z.boolean().optional(),
   nextCursor: z.string().optional(),
 });
+export interface SimulationBatchListResponseSchema extends Named<
+  typeof simulationBatchListResponseSchemaDefinition
+> {}
+export const simulationBatchListResponseSchema: SimulationBatchListResponseSchema =
+  simulationBatchListResponseSchemaDefinition;
 
 export type SimulationRunRestResponse = z.infer<
   typeof scenarioRunRestResponseWithPlatformUrlSchema

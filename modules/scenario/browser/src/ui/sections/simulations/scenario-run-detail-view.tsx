@@ -287,8 +287,8 @@ export function RunDetailView({
                     value={formatResultsForCopy(scenarioState.results)}
                     label="Results"
                     size="2xs"
-                    color="gray.500"
-                    _hover={{ color: "gray.200", bg: "gray.800" }}
+                    color="fg.subtle"
+                    _hover={{ color: "fg.subtle", bg: "bg.panel" }}
                   />
                 ) : undefined
               }

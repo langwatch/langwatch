@@ -101,11 +101,13 @@ const input = {
 };
 
 describe("DefaultGovernanceAdminWorkspaceViewAuditService", () => {
+  /** @scenario "Audit rows for personal and team workspace views are unchanged" */
   it("records the scoped view and mirrors it under the audit identifier", async () => {
     const repository = new RecordingAuditLog();
     const teams = new StubTeams();
     const ocsf = new StubOcsf();
     const service = DefaultGovernanceAdminWorkspaceViewAuditService.create({
+      targets: stubProjects(),
       auditLog: repository,
       teams: teams.api(),
       projects: stubProjects(),
@@ -124,6 +126,7 @@ describe("DefaultGovernanceAdminWorkspaceViewAuditService", () => {
       targetId: "team",
       metadata: { kind: "personal", workspaceLabel: "Owner workspace" },
     });
+    expect(repository.record).toHaveBeenCalledTimes(1);
     expect(ocsf.insertEvent).toHaveBeenCalledWith(
       expect.objectContaining({
         tenantId: "governance-project",
@@ -141,6 +144,7 @@ describe("DefaultGovernanceAdminWorkspaceViewAuditService", () => {
     const teams = new StubTeams();
     teams.target = null;
     const service = DefaultGovernanceAdminWorkspaceViewAuditService.create({
+      targets: stubProjects(),
       auditLog: repository,
       teams: teams.api(),
     });
@@ -167,6 +171,7 @@ describe("DefaultGovernanceAdminWorkspaceViewAuditService", () => {
     const teams = new StubTeams();
     teams.target = { ...ownerWorkspace, isPersonal: false, name: "Shared workspace" };
     const service = DefaultGovernanceAdminWorkspaceViewAuditService.create({
+      targets: stubProjects(),
       auditLog: repository,
       teams: teams.api(),
     });
@@ -188,6 +193,7 @@ describe("DefaultGovernanceAdminWorkspaceViewAuditService", () => {
     const teams = new StubTeams();
     repository.recent = true;
     const service = DefaultGovernanceAdminWorkspaceViewAuditService.create({
+      targets: stubProjects(),
       auditLog: repository,
       teams: teams.api(),
       clock: () => 1_700_000_000_000,
@@ -208,6 +214,7 @@ describe("DefaultGovernanceAdminWorkspaceViewAuditService", () => {
     ocsf.insertEvent.mockRejectedValueOnce(new Error("ClickHouse unavailable"));
     const diagnostics = { warn: vi.fn() };
     const service = DefaultGovernanceAdminWorkspaceViewAuditService.create({
+      targets: stubProjects(),
       auditLog: repository,
       teams: teams.api(),
       projects: stubProjects(),

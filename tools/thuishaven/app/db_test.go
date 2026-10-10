@@ -3,8 +3,10 @@ package app
 import (
 	"context"
 	"errors"
+	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"go.uber.org/zap"
 
@@ -162,6 +164,22 @@ func TestDBReset(t *testing.T) {
 		}
 	})
 
+	t.Run("given the seed run also grants the seeded admin the platform-operator role", func(t *testing.T) {
+		sup := &fakeSupervisor{}
+		o := dbOrchestrator(sup, &fakeStore{}, &fakeSystem{}, &fakeDBServer{}, &fakeDBServer{})
+		if err := o.DBReset(context.Background(), params, ""); err != nil {
+			t.Fatalf("DBReset: %v", err)
+		}
+		shell := sup.shells[1]
+		want := `task grant-platform-operator "${LANGWATCH_ADMIN_EMAIL:-` + domain.DefaultAdminEmail + `}"`
+		if !strings.Contains(shell, want) {
+			t.Errorf("shell = %q, want the recovery task for the seeded admin", shell)
+		}
+		if !strings.Contains(shell, `platform-operator grant skipped (continuing)"; }`) {
+			t.Errorf("shell = %q, want the grant to be best-effort", shell)
+		}
+	})
+
 	t.Run("given a database drop fails", func(t *testing.T) {
 		sup := &fakeSupervisor{}
 		ch := &fakeDBServer{dropErr: errors.New("ch boom")}
@@ -311,6 +329,49 @@ func TestDBReset(t *testing.T) {
 			}
 			if len(sup.shells) != 0 {
 				t.Errorf("nothing may run, got %v", sup.shells)
+			}
+		})
+	})
+}
+
+// @scenario "A reset migrates and seeds exactly the databases it dropped"
+func TestDBResetChildEnvNamesTheDroppedDatabases(t *testing.T) {
+	params := UpParams{ExplicitSlug: "feat-x", WorktreeDir: "/wt/feat-x"}
+	wantCH := "CLICKHOUSE_URL=http://" + domain.ClickHouseUser + ":" + domain.ClickHousePassword + "@127.0.0.1:1/lw_feat_x"
+	wantPG := "DATABASE_URL=postgresql://" + domain.PostgresRole + ":" + domain.PostgresRolePassword + "@127.0.0.1:1/lw_feat_x"
+
+	t.Run("given a stack registered against a ClickHouse server haven no longer runs", func(t *testing.T) {
+		store := liveStackStore()
+		store.stacks[0].ClickHouseHTTPPort, store.stacks[0].ClickHouseDatabase = 64561, "lw_feat_x"
+		store.stacks[0].PostgresPort = 5999
+		sup := &fakeSupervisor{}
+		o := dbOrchestrator(sup, store, &fakeSystem{}, &fakeDBServer{}, &fakeDBServer{})
+
+		t.Run("when resetting, prepare and seed dial the servers it dropped on", func(t *testing.T) {
+			if err := o.DBReset(context.Background(), params, ""); err != nil {
+				t.Fatalf("DBReset: %v", err)
+			}
+			for i, env := range sup.envs {
+				if !slices.Contains(env, wantCH) || !slices.Contains(env, wantPG) {
+					t.Errorf("child %d env = %v, want %q and %q", i, env, wantCH, wantPG)
+				}
+			}
+		})
+	})
+
+	t.Run("given no stack is registered", func(t *testing.T) {
+		sup := &fakeSupervisor{}
+		o := dbOrchestrator(sup, &fakeStore{}, &fakeSystem{}, &fakeDBServer{}, &fakeDBServer{})
+
+		t.Run("when resetting, the children carry the app origin up would give", func(t *testing.T) {
+			if err := o.DBReset(context.Background(), params, ""); err != nil {
+				t.Fatalf("DBReset: %v", err)
+			}
+			wantAuth := "NEXTAUTH_URL=" + o.cfg.Naming.URL("app", "feat-x", "https", 443)
+			for i, env := range sup.envs {
+				if !slices.Contains(env, wantAuth) || !slices.Contains(env, wantCH) || !slices.Contains(env, wantPG) {
+					t.Errorf("child %d env = %v, want %q, %q and %q", i, env, wantAuth, wantCH, wantPG)
+				}
 			}
 		})
 	})
@@ -498,6 +559,48 @@ func TestDBResetFlushesOnlyTheStacksRedisDB(t *testing.T) {
 		}
 		if len(sup.shells) != 0 {
 			t.Fatalf("shells = %v, want none after a failed flush", sup.shells)
+		}
+	})
+}
+
+// @scenario "The keeper seeds once the api reports ready"
+func TestKeeperSeedsOnlyOnceTheAPIReportsReady(t *testing.T) {
+	seed := KeeperSeed{
+		Job:      onceJob{Slug: "feat-x", WorktreeDir: t.TempDir(), Name: "seed", Shell: "pnpm --silent run prisma:seed"},
+		ReadyURL: "http://127.0.0.1:6560/readyz",
+		Since:    time.Now(),
+	}
+	t.Run("given the api reports ready, the seed runs after the readiness wait", func(t *testing.T) {
+		sup := &fakeSupervisor{}
+		o := &Orchestrator{sup: sup, sys: &fakeSystem{}, log: zap.NewNop()}
+		o.seedWhenReady(context.Background(), seed)
+		if len(sup.waited) != 1 || sup.waited[0] != seed.ReadyURL {
+			t.Errorf("waited on %v, want the api's readiness probe", sup.waited)
+		}
+		if len(sup.shells) != 1 || !strings.Contains(sup.shells[0], "prisma:seed") {
+			t.Errorf("ran %v, want the seed once", sup.shells)
+		}
+	})
+	t.Run("given the wait, it names backend readiness, never an upgrade it cannot see", func(t *testing.T) {
+		o := &Orchestrator{sup: &fakeSupervisor{}, sys: &fakeSystem{}, log: zap.NewNop()}
+		out := captureStdout(t, func() { o.seedWhenReady(context.Background(), seed) })
+		for _, want := range []string{readyWaitPhase, readyDonePhase} {
+			if !strings.Contains(out, want) {
+				t.Errorf("output lacks %q:\n%s", want, out)
+			}
+		}
+		for _, phase := range []string{out, readyStillPhase} {
+			if strings.Contains(strings.ToLower(phase), "upgrade") {
+				t.Errorf("the readiness wait claims an upgrade: %q", phase)
+			}
+		}
+	})
+	t.Run("given the keeper stops before the api is ready, nothing is seeded", func(t *testing.T) {
+		sup := &fakeSupervisor{notReady: true}
+		o := &Orchestrator{sup: sup, sys: &fakeSystem{}, log: zap.NewNop()}
+		o.seedWhenReady(context.Background(), seed)
+		if len(sup.shells) != 0 {
+			t.Errorf("ran %v before the api was ready", sup.shells)
 		}
 	})
 }

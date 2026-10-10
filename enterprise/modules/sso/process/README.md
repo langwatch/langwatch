@@ -396,8 +396,8 @@ interface Input {
 // Output: ssoSetupMigrationSchema.nullable() (inline, ../contract/src/sso-connection.trpc.ts:48)
 
 // ssoConnections.startLegacyMigration
-type Input = z.infer<typeof ssoSetupStartMigrationSchema>; // ../contract/src/sso-setup.contract.ts:446
-// Output: ssoSetupRegisteredSchema, ../contract/src/sso-setup.contract.ts:356
+type Input = z.infer<typeof ssoSetupStartMigrationSchema>; // ../contract/src/sso-setup.contract.ts:450
+// Output: ssoSetupRegisteredSchema, ../contract/src/sso-setup.contract.ts:359
 interface Output {
   connectionId: string;
 }
@@ -520,14 +520,14 @@ Contract `../contract/src/sso-setup.trpc.ts:40`, router `src/transport/sso-setup
 
 ```typescript
 // ssoSetup.getSetup
-// Input: ssoSetupOrganizationSchema, ../contract/src/sso-setup.contract.ts:21
+// Input: ssoSetupOrganizationSchema, ../contract/src/sso-setup.contract.ts:22
 interface Input {
   organizationId: string;
 }
-type Output = z.infer<typeof ssoSetupPageViewSchema>; // ../contract/src/sso-setup.contract.ts:195
+type Output = z.infer<typeof ssoSetupPageViewSchema>; // ../contract/src/sso-setup.contract.ts:196
 
 // ssoSetup.getMigrationProgress
-// Input: ssoSetupMigrationProgressSchema, ../contract/src/sso-setup.contract.ts:433
+// Input: ssoSetupMigrationProgressSchema, ../contract/src/sso-setup.contract.ts:437
 interface Input {
   organizationId: string;
   connectionId: string;
@@ -537,7 +537,7 @@ interface Input {
 // Output: ssoSetupMigrationSchema.nullable() (inline, ../contract/src/sso-setup.trpc.ts:60)
 
 // ssoSetup.getHistory
-// Input: ssoSetupConnectionSchema, ../contract/src/sso-setup.contract.ts:13
+// Input: ssoSetupConnectionSchema, ../contract/src/sso-setup.contract.ts:14
 interface Input {
   organizationId: string;
   connectionId: string;
@@ -551,20 +551,20 @@ type Output = {
 }[];
 
 // ssoSetup.onHistoryActivity
-type Input = z.infer<typeof ssoSetupConnectionSchema>; // ../contract/src/sso-setup.contract.ts:13
-// Output: ssoHistoryActivitySchema, ../contract/src/sso-setup.contract.ts:261
+type Input = z.infer<typeof ssoSetupConnectionSchema>; // ../contract/src/sso-setup.contract.ts:14
+// Output: ssoHistoryActivitySchema, ../contract/src/sso-setup.contract.ts:262
 interface Output {
   connectionId: string;
 }
 
 // ssoSetup.claimDomain
-// Input: ssoSetupDomainSchema, ../contract/src/sso-setup.contract.ts:267
+// Input: ssoSetupDomainSchema, ../contract/src/sso-setup.contract.ts:268
 interface Input {
   organizationId: string;
   connectionId: string;
   domain: string;
 }
-// Output: ssoDomainClaimOutcomeSchema, ../contract/src/sso-setup.contract.ts:279
+// Output: ssoDomainClaimOutcomeSchema, ../contract/src/sso-setup.contract.ts:280
 interface Output {
   waitsForReview: boolean;
   disputed: boolean;
@@ -572,35 +572,35 @@ interface Output {
 }
 
 // ssoSetup.proveDomain
-type Input = z.infer<typeof ssoSetupDomainSchema>; // ../contract/src/sso-setup.contract.ts:267
-type Output = z.infer<typeof ssoDomainProofSchema>; // ../contract/src/sso-setup.contract.ts:302
+type Input = z.infer<typeof ssoSetupDomainSchema>; // ../contract/src/sso-setup.contract.ts:268
+type Output = z.infer<typeof ssoDomainProofSchema>; // ../contract/src/sso-setup.contract.ts:303
 
 // ssoSetup.removeDomain
-type Input = z.infer<typeof ssoSetupDomainSchema>; // ../contract/src/sso-setup.contract.ts:267
+type Input = z.infer<typeof ssoSetupDomainSchema>; // ../contract/src/sso-setup.contract.ts:268
 // Output: inline, ../contract/src/sso-setup.trpc.ts:86
 type Output = unknown;
 
 // ssoSetup.checkDomainRecord
-type Input = z.infer<typeof ssoSetupDomainSchema>; // ../contract/src/sso-setup.contract.ts:267
-// Output: ssoDomainProvedSchema, ../contract/src/sso-setup.contract.ts:310
+type Input = z.infer<typeof ssoSetupDomainSchema>; // ../contract/src/sso-setup.contract.ts:268
+// Output: ssoDomainProvedSchema, ../contract/src/sso-setup.contract.ts:311
 interface Output {
   proved: true;
 }
 
 // ssoSetup.checkDomainFile
-type Input = z.infer<typeof ssoSetupDomainSchema>; // ../contract/src/sso-setup.contract.ts:267
-type Output = z.infer<typeof ssoDomainProvedSchema>; // ../contract/src/sso-setup.contract.ts:310
+type Input = z.infer<typeof ssoSetupDomainSchema>; // ../contract/src/sso-setup.contract.ts:268
+type Output = z.infer<typeof ssoDomainProvedSchema>; // ../contract/src/sso-setup.contract.ts:311
 
 // ssoSetup.register
-type Input = z.infer<typeof ssoSetupRegisterSchema>; // ../contract/src/sso-setup.contract.ts:346
-type Output = z.infer<typeof ssoSetupRegisteredSchema>; // ../contract/src/sso-setup.contract.ts:356
+type Input = z.infer<typeof ssoSetupRegisterSchema>; // ../contract/src/sso-setup.contract.ts:349
+type Output = z.infer<typeof ssoSetupRegisteredSchema>; // ../contract/src/sso-setup.contract.ts:359
 
 // ssoSetup.startLegacyMigration
-type Input = z.infer<typeof ssoSetupStartMigrationSchema>; // ../contract/src/sso-setup.contract.ts:446
-type Output = z.infer<typeof ssoSetupRegisteredSchema>; // ../contract/src/sso-setup.contract.ts:356
+type Input = z.infer<typeof ssoSetupStartMigrationSchema>; // ../contract/src/sso-setup.contract.ts:450
+type Output = z.infer<typeof ssoSetupRegisteredSchema>; // ../contract/src/sso-setup.contract.ts:359
 
 // ssoSetup.selectMigrationRoute
-// Input: ssoSetupMigrationRouteSchema, ../contract/src/sso-setup.contract.ts:456
+// Input: ssoSetupMigrationRouteSchema, ../contract/src/sso-setup.contract.ts:460
 interface Input {
   organizationId: string;
   connectionId: string;
@@ -610,12 +610,12 @@ interface Input {
 type Output = unknown;
 
 // ssoSetup.finalizeLegacyMigration
-type Input = z.infer<typeof ssoSetupConnectionSchema>; // ../contract/src/sso-setup.contract.ts:13
+type Input = z.infer<typeof ssoSetupConnectionSchema>; // ../contract/src/sso-setup.contract.ts:14
 // Output: inline, ../contract/src/sso-setup.trpc.ts:132
 type Output = unknown;
 
 // ssoSetup.rename
-// Input: ssoSetupRenameSchema, ../contract/src/sso-setup.contract.ts:464
+// Input: ssoSetupRenameSchema, ../contract/src/sso-setup.contract.ts:468
 interface Input {
   organizationId: string;
   connectionId: string;
@@ -625,16 +625,16 @@ interface Input {
 type Output = unknown;
 
 // ssoSetup.identityProvider
-type Input = z.infer<typeof ssoSetupConnectionSchema>; // ../contract/src/sso-setup.contract.ts:13
+type Input = z.infer<typeof ssoSetupConnectionSchema>; // ../contract/src/sso-setup.contract.ts:14
 // Output: ssoSetupIdentityProviderViewSchema.nullable() (inline, ../contract/src/sso-setup.trpc.ts:148)
 
 // ssoSetup.updateIdentityProvider
-type Input = z.infer<typeof ssoSetupUpdateIdentityProviderSchema>; // ../contract/src/sso-setup.contract.ts:378
+type Input = z.infer<typeof ssoSetupUpdateIdentityProviderSchema>; // ../contract/src/sso-setup.contract.ts:381
 // Output: inline, ../contract/src/sso-setup.trpc.ts:157
 type Output = unknown;
 
 // ssoSetup.setArrivals
-// Input: ssoSetupArrivalsSchema, ../contract/src/sso-setup.contract.ts:415
+// Input: ssoSetupArrivalsSchema, ../contract/src/sso-setup.contract.ts:419
 interface Input {
   organizationId: string;
   connectionId: string;
@@ -644,16 +644,16 @@ interface Input {
 type Output = unknown;
 
 // ssoSetup.activate
-type Input = z.infer<typeof ssoSetupConnectionSchema>; // ../contract/src/sso-setup.contract.ts:13
+type Input = z.infer<typeof ssoSetupConnectionSchema>; // ../contract/src/sso-setup.contract.ts:14
 // Output: inline, ../contract/src/sso-setup.trpc.ts:172
 type Output = unknown;
 
 // ssoSetup.breakGlassBindings
-type Input = z.infer<typeof ssoSetupOrganizationSchema>; // ../contract/src/sso-setup.contract.ts:21
+type Input = z.infer<typeof ssoSetupOrganizationSchema>; // ../contract/src/sso-setup.contract.ts:22
 // Output: ssoBreakGlassGrantSchema.array() (inline, ../contract/src/sso-setup.trpc.ts:182)
 
 // ssoSetup.breakGlassCandidates
-type Input = z.infer<typeof ssoSetupOrganizationSchema>; // ../contract/src/sso-setup.contract.ts:21
+type Input = z.infer<typeof ssoSetupOrganizationSchema>; // ../contract/src/sso-setup.contract.ts:22
 // Output: inline, ../contract/src/sso-setup.trpc.ts:189
 type Output = {
   userId: string;
@@ -662,13 +662,13 @@ type Output = {
 }[];
 
 // ssoSetup.grantBreakGlass
-// Input: ssoBreakGlassGrantInputSchema, ../contract/src/sso-setup.contract.ts:531
+// Input: ssoBreakGlassGrantInputSchema, ../contract/src/sso-setup.contract.ts:535
 interface Input {
   organizationId: string;
   userId: string;
   expiresAtMs: number;
 }
-// Output: ssoBreakGlassBindingSchema, ../contract/src/sso-setup.contract.ts:512
+// Output: ssoBreakGlassBindingSchema, ../contract/src/sso-setup.contract.ts:516
 interface Output {
   bindingId: string;
   organizationId: string;
@@ -682,29 +682,29 @@ interface Output {
 }
 
 // ssoSetup.renewBreakGlass
-// Input: ssoBreakGlassRenewalInputSchema, ../contract/src/sso-setup.contract.ts:540
+// Input: ssoBreakGlassRenewalInputSchema, ../contract/src/sso-setup.contract.ts:544
 interface Input {
   organizationId: string;
   bindingId: string;
   expiresAtMs: number;
 }
-type Output = z.infer<typeof ssoBreakGlassRenewalSchema>; // ../contract/src/sso-setup.contract.ts:557
+type Output = z.infer<typeof ssoBreakGlassRenewalSchema>; // ../contract/src/sso-setup.contract.ts:561
 
 // ssoSetup.revokeBreakGlass
-// Input: ssoBreakGlassBindingInputSchema, ../contract/src/sso-setup.contract.ts:549
+// Input: ssoBreakGlassBindingInputSchema, ../contract/src/sso-setup.contract.ts:553
 interface Input {
   organizationId: string;
   bindingId: string;
 }
-type Output = z.infer<typeof ssoBreakGlassBindingSchema>; // ../contract/src/sso-setup.contract.ts:512
+type Output = z.infer<typeof ssoBreakGlassBindingSchema>; // ../contract/src/sso-setup.contract.ts:516
 
 // ssoSetup.discardConnection
-type Input = z.infer<typeof ssoSetupConnectionSchema>; // ../contract/src/sso-setup.contract.ts:13
+type Input = z.infer<typeof ssoSetupConnectionSchema>; // ../contract/src/sso-setup.contract.ts:14
 // Output: inline, ../contract/src/sso-setup.trpc.ts:216
 type Output = unknown;
 
 // ssoSetup.removeConnection
-// Input: ssoSetupRemovalSchema, ../contract/src/sso-setup.contract.ts:424
+// Input: ssoSetupRemovalSchema, ../contract/src/sso-setup.contract.ts:428
 interface Input {
   organizationId: string;
   connectionId: string;
@@ -727,23 +727,23 @@ None: sso declares no pipeline, process manager, subscriber or task.
 | Kind   | Leaf               | Environment variable   | Declared at                                               |
 | ------ | ------------------ | ---------------------- | --------------------------------------------------------- |
 | secret | `–`                | `GOOGLE_CLIENT_SECRET` | `src/app/sso.app.ts:329`                                  |
-| config | `authProvider`     | `AUTH_PROVIDER`        | `../../../../packages/config/src/deployment-facts.ts:238` |
-| config | `legacyProvider`   | `NEXTAUTH_PROVIDER`    | `../../../../packages/config/src/deployment-facts.ts:240` |
-| config | `googleClientId`   | `GOOGLE_CLIENT_ID`     | `../../../../packages/config/src/deployment-facts.ts:241` |
-| config | `githubClientId`   | `GITHUB_CLIENT_ID`     | `../../../../packages/config/src/deployment-facts.ts:242` |
-| config | `gitlabClientId`   | `GITLAB_CLIENT_ID`     | `../../../../packages/config/src/deployment-facts.ts:243` |
-| config | `azureAdClientId`  | `AZURE_AD_CLIENT_ID`   | `../../../../packages/config/src/deployment-facts.ts:244` |
-| config | `azureAdTenantId`  | `AZURE_AD_TENANT_ID`   | `../../../../packages/config/src/deployment-facts.ts:245` |
-| config | `auth0ClientId`    | `AUTH0_CLIENT_ID`      | `../../../../packages/config/src/deployment-facts.ts:246` |
-| config | `auth0Issuer`      | `AUTH0_ISSUER`         | `../../../../packages/config/src/deployment-facts.ts:247` |
-| config | `oktaClientId`     | `OKTA_CLIENT_ID`       | `../../../../packages/config/src/deployment-facts.ts:248` |
-| config | `oktaIssuer`       | `OKTA_ISSUER`          | `../../../../packages/config/src/deployment-facts.ts:249` |
-| config | `cognitoClientId`  | `COGNITO_CLIENT_ID`    | `../../../../packages/config/src/deployment-facts.ts:250` |
-| config | `cognitoIssuer`    | `COGNITO_ISSUER`       | `../../../../packages/config/src/deployment-facts.ts:251` |
-| config | `oneLoginClientId` | `ONELOGIN_CLIENT_ID`   | `../../../../packages/config/src/deployment-facts.ts:252` |
-| config | `oneLoginIssuer`   | `ONELOGIN_ISSUER`      | `../../../../packages/config/src/deployment-facts.ts:253` |
-| config | `oidcClientId`     | `OIDC_CLIENT_ID`       | `../../../../packages/config/src/deployment-facts.ts:254` |
-| config | `oidcIssuer`       | `OIDC_ISSUER`          | `../../../../packages/config/src/deployment-facts.ts:255` |
+| config | `authProvider`     | `AUTH_PROVIDER`        | `../../../../packages/config/src/deployment-facts.ts:266` |
+| config | `legacyProvider`   | `NEXTAUTH_PROVIDER`    | `../../../../packages/config/src/deployment-facts.ts:268` |
+| config | `googleClientId`   | `GOOGLE_CLIENT_ID`     | `../../../../packages/config/src/deployment-facts.ts:269` |
+| config | `githubClientId`   | `GITHUB_CLIENT_ID`     | `../../../../packages/config/src/deployment-facts.ts:270` |
+| config | `gitlabClientId`   | `GITLAB_CLIENT_ID`     | `../../../../packages/config/src/deployment-facts.ts:271` |
+| config | `azureAdClientId`  | `AZURE_AD_CLIENT_ID`   | `../../../../packages/config/src/deployment-facts.ts:272` |
+| config | `azureAdTenantId`  | `AZURE_AD_TENANT_ID`   | `../../../../packages/config/src/deployment-facts.ts:273` |
+| config | `auth0ClientId`    | `AUTH0_CLIENT_ID`      | `../../../../packages/config/src/deployment-facts.ts:274` |
+| config | `auth0Issuer`      | `AUTH0_ISSUER`         | `../../../../packages/config/src/deployment-facts.ts:275` |
+| config | `oktaClientId`     | `OKTA_CLIENT_ID`       | `../../../../packages/config/src/deployment-facts.ts:276` |
+| config | `oktaIssuer`       | `OKTA_ISSUER`          | `../../../../packages/config/src/deployment-facts.ts:277` |
+| config | `cognitoClientId`  | `COGNITO_CLIENT_ID`    | `../../../../packages/config/src/deployment-facts.ts:278` |
+| config | `cognitoIssuer`    | `COGNITO_ISSUER`       | `../../../../packages/config/src/deployment-facts.ts:279` |
+| config | `oneLoginClientId` | `ONELOGIN_CLIENT_ID`   | `../../../../packages/config/src/deployment-facts.ts:280` |
+| config | `oneLoginIssuer`   | `ONELOGIN_ISSUER`      | `../../../../packages/config/src/deployment-facts.ts:281` |
+| config | `oidcClientId`     | `OIDC_CLIENT_ID`       | `../../../../packages/config/src/deployment-facts.ts:282` |
+| config | `oidcIssuer`       | `OIDC_ISSUER`          | `../../../../packages/config/src/deployment-facts.ts:283` |
 | config | `isSaas`           | `IS_SAAS`              | `../contract/src/sso.config.ts:12`                        |
 | config | `publicBaseUrl`    | `BASE_HOST`            | `../contract/src/sso.config.ts:12`                        |
 

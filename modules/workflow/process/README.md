@@ -6,7 +6,7 @@ The server half of [workflow](../README.md). Workflows: definitions, graph versi
 
 ## Installation
 
-`defineProcessModule("workflow").withRepositories(workflowRepositories).withChannels(workflowChannels).withApi(WorkflowModule).withTransports(…, workflowTrpcTransport, workflowOptimizationTrpcTransport, workflowRunRest, workflowStudioRest, workflowExecuteSyncRest).withEventing(workflowNlpLambdaCleanupEventing).withEventing(workflowLifecycleEventing).withEventing(workflowAgentArchiveCascadeEventing).withTasks(…).withMigrations(…).withTransportFacts(…)`, `src/workflow.module.ts:25`.
+`defineProcessModule("workflow").withRepositories(workflowRepositories).withChannels(workflowChannels).withApi(WorkflowModule).withTransports(…, workflowTrpcTransport, workflowOptimizationTrpcTransport, workflowRunRest, workflowStudioRest, workflowExecuteSyncRest).withEventing(workflowNlpLambdaCleanupEventing).withEventing(workflowLifecycleEventing).withEventing(workflowAgentArchiveCascadeEventing).withMigrations(…).provideMiddlewareContext(…)`, `src/workflow.module.ts:30`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -193,7 +193,7 @@ completeCode(input: { projectId: string; body: WorkflowRestEnvelope; }): Promise
 The Studio editor's posted event, checked and prepared, answered as the engine's events. A `done` keeps the stream open one more second so a trailing frame still reaches the editor.
 
 ```typescript
-streamStudioEvent(input: { body: string; /** Absent when no one is signed in, which is refused. */ userId: string | undefined; }): Promise<AsyncIterable<StudioServerEvent>>;
+streamStudioEvent(input: { body: string; /** The signed-in user the door admitted with workflows:manage at the body's project. */ userId: string; }): Promise<AsyncIterable<StudioServerEvent>>;
 ```
 
 #### `postStudioEvent`
@@ -463,14 +463,14 @@ type Response = z.infer<typeof workflowRunAnswerSchema>; // ../contract/src/work
 
 |             |                                            |
 | ----------- | ------------------------------------------ |
-| Declared at | `src/transport/workflow-studio.rest.ts:25` |
+| Declared at | `src/transport/workflow-studio.rest.ts:19` |
 | Base URL    | none: each route's path is its address     |
 | Addressing  | literal                                    |
 | Credential  | browser                                    |
 
 #### `POST /api/workflows/code-completion` · `completeWorkflowCode`
 
-Permission `workflows:manage`. Declared at `src/transport/workflow-studio.rest.ts:31`.
+Permission `workflows:manage`. Declared at `src/transport/workflow-studio.rest.ts:25`.
 
 Answers at `/api/workflows/code-completion`.
 
@@ -491,13 +491,13 @@ interface Response {
 
 #### `POST /api/workflows/post_event` · `postWorkflowStudioEvent`
 
-Optional credential: the event door answers an invalid body 400 before it asks who is calling, as main did; the project it asks workflows:manage at is inside that body, so the app asks it after the check. Declared at `src/transport/workflow-studio.rest.ts:42`.
+Permission `workflows:manage`. Declared at `src/transport/workflow-studio.rest.ts:36`.
 
 Answers at `/api/workflows/post_event`.
 
 ```typescript
-// Rawbody: "text" (inline, src/transport/workflow-studio.rest.ts:43)
-// Response: inline, src/transport/workflow-studio.rest.ts:46
+// Rawbody: "text" (inline, src/transport/workflow-studio.rest.ts:37)
+// Response: inline, src/transport/workflow-studio.rest.ts:44
 type Response = unknown;
 ```
 
@@ -505,7 +505,7 @@ type Response = unknown;
 
 |             |                                            |
 | ----------- | ------------------------------------------ |
-| Declared at | `src/transport/workflow.rest.ts:64`        |
+| Declared at | `src/transport/workflow.rest.ts:67`        |
 | Base URL    | `/api/workflows`, twin `/api/v1/workflows` |
 | Addressing  | dated                                      |
 | Credential  | project                                    |
@@ -515,12 +515,12 @@ type Response = unknown;
 
 List all non-archived workflows for the project
 
-Permission `workflows:view`. Declared at `src/transport/workflow.rest.ts:69`.
+Permission `workflows:view`. Declared at `src/transport/workflow.rest.ts:72`.
 
 Answers at `/api/workflows`, `/api/v1/workflows`; also, undocumented, `/api/workflows/2026-08-07`, `/api/v1/workflows/2026-08-07`, `/api/workflows/latest`, `/api/v1/workflows/latest`.
 
 ```typescript
-// Response: inline, src/transport/workflow.rest.ts:71
+// Response: inline, src/transport/workflow.rest.ts:74
 type Response = {
   id: string;
   name: string;
@@ -538,7 +538,7 @@ type Response = {
 
 Get a workflow by its ID
 
-Permission `workflows:view`. Declared at `src/transport/workflow.rest.ts:84`.
+Permission `workflows:view`. Declared at `src/transport/workflow.rest.ts:87`.
 
 Answers at `/api/workflows/:id`, `/api/v1/workflows/:id`; also, undocumented, `/api/workflows/2026-08-07/:id`, `/api/v1/workflows/2026-08-07/:id`, `/api/workflows/latest/:id`, `/api/v1/workflows/latest/:id`.
 
@@ -565,7 +565,7 @@ interface Response {
 
 Update a workflow's metadata (name, icon, description)
 
-Permission `workflows:update`. Declared at `src/transport/workflow.rest.ts:102`.
+Permission `workflows:update`. Declared at `src/transport/workflow.rest.ts:105`.
 
 Answers at `/api/workflows/:id`, `/api/v1/workflows/:id`; also, undocumented, `/api/workflows/2026-08-07/:id`, `/api/v1/workflows/2026-08-07/:id`, `/api/workflows/latest/:id`, `/api/v1/workflows/latest/:id`.
 
@@ -584,7 +584,7 @@ type Response = z.infer<typeof workflowRestDetailSchema>; // ../contract/src/wor
 
 Archive (soft-delete) a workflow
 
-Permission `workflows:manage`. Declared at `src/transport/workflow.rest.ts:122`.
+Permission `workflows:manage`. Declared at `src/transport/workflow.rest.ts:125`.
 
 Answers at `/api/workflows/:id`, `/api/v1/workflows/:id`; also, undocumented, `/api/workflows/2026-08-07/:id`, `/api/v1/workflows/2026-08-07/:id`, `/api/workflows/latest/:id`, `/api/v1/workflows/latest/:id`.
 
@@ -869,20 +869,13 @@ Declared at `src/eventing/workflow-nlp-lambda-cleanup.pipeline.ts:31`.
 | --------------- | -------------------------- | -------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
 | process manager | `workflowNlpLambdaCleanup` | every 1 d (`NLP_LAMBDA_CLEANUP_INTERVAL_MS = 24 * 60 * 60 * 1000`); intents `sweep` (outbox) | `src/eventing/workflow-nlp-lambda-cleanup.pipeline.ts:36` |
 
-### Tasks
-
-Run by the tasks process, before serve.
-
-| Task                                   | Class                                 | Declared at                                               |
-| -------------------------------------- | ------------------------------------- | --------------------------------------------------------- |
-| `backfill-http-credentials-to-secrets` | `WorkflowHttpCredentialsBackfillTask` | `src/tasks/workflow-http-credentials-backfill.task.ts:27` |
-
 ## Configuration
 
 | Kind   | Leaf                         | Environment variable                      | Declared at                             |
 | ------ | ---------------------------- | ----------------------------------------- | --------------------------------------- |
-| secret | `nlpLambdaFleet`             | `LANGWATCH_NLP_LAMBDA_CONFIG`             | `src/app/workflow.app.ts:493`           |
-| secret | `nlpInternal`                | `LANGWATCH_NLP_INTERNAL_SECRET`           | `src/app/workflow.app.ts:494`           |
+| secret | `nlpLambdaFleet`             | `LANGWATCH_NLP_LAMBDA_CONFIG`             | `src/app/workflow.app.ts:498`           |
+| secret | `nlpInternal`                | `LANGWATCH_NLP_INTERNAL_SECRET`           | `src/app/workflow.app.ts:499`           |
+| secret | `s3KeySalt`                  | `S3_KEY_SALT`                             | `src/app/workflow.app.ts:500`           |
 | config | `nlpServiceUrl`              | `LANGWATCH_NLP_SERVICE`                   | `../contract/src/workflow.config.ts:79` |
 | config | `stagingThresholdBytes`      | `LANGEVALS_STAGING_THRESHOLD_BYTES`       | `../contract/src/workflow.config.ts:81` |
 | config | `stagingTtlSeconds`          | `LANGEVALS_STAGING_TTL_SECONDS`           | `../contract/src/workflow.config.ts:82` |

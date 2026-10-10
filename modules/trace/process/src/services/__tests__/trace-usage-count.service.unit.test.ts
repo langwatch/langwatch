@@ -78,4 +78,36 @@ describe("TraceUsageCountService", () => {
       ).rejects.toBeInstanceOf(Error);
     });
   });
+
+  describe("given an aggregate project reading a member that holds traces", () => {
+    /** @scenario "Billing stays with the owning project" */
+    it("leaves the member's count unchanged and counts zero for the aggregate", async () => {
+      const usageCount = MemoryTraceUsageCountRepository.create();
+      for (const traceId of ["t1", "t2", "t3"]) {
+        usageCount.record({ tenantId: "member", traceId, createdAt: "2026-09-02 00:00:00.000" });
+      }
+      const service = TraceUsageCountService.create({
+        projects: createApiFixture<ProjectApi>({
+          listIdsByOrganization: async () => ["member", "aggregate"],
+        }),
+        usageCount,
+        now: () => NOW,
+      });
+
+      const before = await service.countByProjects({
+        organizationId: "org-1",
+        projectIds: ["member"],
+      });
+      const after = await service.countByProjects({
+        organizationId: "org-1",
+        projectIds: ["member", "aggregate"],
+      });
+
+      expect(before).toEqual([{ projectId: "member", count: 3 }]);
+      expect(after).toEqual([
+        { projectId: "member", count: 3 },
+        { projectId: "aggregate", count: 0 },
+      ]);
+    });
+  });
 });

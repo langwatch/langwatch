@@ -9,13 +9,19 @@ function Crashing(): never {
 }
 
 const meta = {
-  title: "Patterns/Studio dialog",
+  title: "Overlays/Studio dialog",
+  parameters: {
+    usage: {
+      use: "A dialog over the studio canvas, on its glass surface.",
+      avoid: "Outside the studio: use Dialog.",
+    },
+  },
   component: Dialog.Root,
   tags: ["autodocs"],
   args: { open: true, children: null },
   render: (args) => (
     <Dialog.Root {...args}>
-      <Dialog.Content bg="bg">
+      <Dialog.Content>
         <Dialog.CloseTrigger />
         <Dialog.Header>
           <Dialog.Title>Node settings</Dialog.Title>
@@ -49,7 +55,7 @@ export const Closed: Story = {
 export const BodyCrashed: Story = {
   render: (args) => (
     <Dialog.Root {...args}>
-      <Dialog.Content bg="bg" errorScope="Node settings">
+      <Dialog.Content errorScope="Node settings">
         <Dialog.Header>
           <Dialog.Title>Node settings</Dialog.Title>
         </Dialog.Header>
@@ -65,7 +71,7 @@ export const BodyCrashed: Story = {
 export const BodyCrashedInDevelopment: Story = {
   render: (args) => (
     <Dialog.Root {...args}>
-      <Dialog.Content bg="bg" errorScope="Node settings" isDevelopment>
+      <Dialog.Content errorScope="Node settings" isDevelopment>
         <Dialog.Header>
           <Dialog.Title>Node settings</Dialog.Title>
         </Dialog.Header>

@@ -43,12 +43,24 @@ dist/
 !/services/voicesim/web/dist/
 /services/voicesim/web/dist/*
 !/services/voicesim/web/dist/.gitkeep
+!/services/lambdasim/web/dist/
+/services/lambdasim/web/dist/*
+!/services/lambdasim/web/dist/.gitkeep
 !/services/llmsim/web/dist/
 /services/llmsim/web/dist/*
 !/services/llmsim/web/dist/.gitkeep
 !/services/analyticssim/web/dist/
 /services/analyticssim/web/dist/*
 !/services/analyticssim/web/dist/.gitkeep
+!/services/telemetrysim/web/dist/
+/services/telemetrysim/web/dist/*
+!/services/telemetrysim/web/dist/.gitkeep
+!/services/outboundsim/web/dist/
+/services/outboundsim/web/dist/*
+!/services/outboundsim/web/dist/.gitkeep
+!/services/paymentsim/web/dist/
+/services/paymentsim/web/dist/*
+!/services/paymentsim/web/dist/.gitkeep
 /dev/.cache/
 
 langwatch_server/
@@ -128,6 +140,7 @@ dev/tests/agentic-e2e/tests/seed.spec.ts
 dev/tests/agentic-e2e/node_modules/
 seed.spec.ts
 .playwright-mcp/
+.playwright-cli/
 .mcp.local.json
 
 # Browser-QA screenshot artifacts (published via the pr-screenshots repo, never committed here)

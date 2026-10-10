@@ -13,7 +13,6 @@ export type AutomationScopeReading = {
   organization: AutomationOrganization | undefined;
   project: AutomationProject | undefined;
   team: AutomationTeam | undefined;
-  hasPermission: (permission: string) => boolean;
 };
 
 export function useOrganizationTeamProject(): AutomationScopeReading {
@@ -23,7 +22,6 @@ export function useOrganizationTeamProject(): AutomationScopeReading {
       organization: host.organization(),
       project: host.project(),
       team: host.team(),
-      hasPermission: (permission: string) => host.hasPermission(permission),
     }),
     [host],
   );

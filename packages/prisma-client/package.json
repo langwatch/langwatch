@@ -1,6 +1,5 @@
 {
   "name": "@langwatch/prisma-client",
-  "langwatch": { "group": "data" },
   "version": "0.1.0",
   "private": true,
   "description": "Explicitly configured Prisma/Postgres construction and lifecycle services, the tenancy query guards every process composes its client with, plus the canonical LangWatch schema, migrations, and generated client.",
@@ -35,23 +34,26 @@
     "typecheck": "tsc -b",
     "test": "vitest run --exclude \"**/*.integration.test.ts\"",
     "test:integration": "vitest run --config vitest.integration.config.ts",
-    "db:seed": "pnpm --filter @langwatch/tasks task storage-seed"
+    "db:seed": "pnpm --silent --filter @langwatch/tasks task storage-seed"
   },
   "dependencies": {
     "@langwatch/observability": "workspace:*",
     "@langwatch/time": "workspace:*",
-    "@prisma/adapter-pg": "7.10.0",
+    "@prisma/adapter-pg": "catalog:",
     "@prisma/client": "catalog:",
     "lodash-es": "catalog:",
-    "pg": "^8.22.0",
+    "pg": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {
     "@types/lodash-es": "catalog:",
     "@types/node": "catalog:",
-    "@types/pg": "^8.20.3",
+    "@types/pg": "catalog:",
     "prisma": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
+  },
+  "langwatch": {
+    "group": "data"
   }
 }

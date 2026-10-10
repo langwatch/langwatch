@@ -34,12 +34,14 @@ describe("the project tRPC declarations", () => {
     it("keeps the namespace and the procedure names of each surface", () => {
       expect(projectTrpc.namespace).toBe("project");
       expect(Object.keys(projectTrpc.members).toSorted()).toEqual([
+        "aggregateMemberCandidates",
         "archiveById",
         "create",
         "getHasFirstMessage",
         "getLegacyKeyStatus",
         "revokeProjectApiKey",
         "update",
+        "updateAggregateRule",
       ]);
     });
 
@@ -67,6 +69,8 @@ describe("the project tRPC declarations", () => {
         revokeProjectApiKey: "mutation",
         update: "mutation",
         archiveById: "mutation",
+        updateAggregateRule: "mutation",
+        aggregateMemberCandidates: "query",
       });
     });
 
@@ -78,6 +82,7 @@ describe("the project tRPC declarations", () => {
   });
 
   describe("given the server half a process mounts", () => {
+    /** @scenario Editing an aggregate's rule asks organisation manage of the aggregate's organisation */
     it("keeps the gate each project procedure has always carried", () => {
       expect(declaredAccess(projectTrpcTransport)).toEqual({
         // The tier a create is judged at depends on what it asked for, so the
@@ -93,6 +98,15 @@ describe("the project tRPC declarations", () => {
         "project.revokeProjectApiKey": { kind: "permission", permission: "project:manage" },
         "project.update": { kind: "permission", permission: "project:update" },
         "project.archiveById": { kind: "permission", permission: "project:delete" },
+        "project.updateAggregateRule": {
+          kind: "permission",
+          permission: "organization:manage",
+          via: "projectId",
+        },
+        "project.aggregateMemberCandidates": {
+          kind: "permission",
+          permission: "organization:manage",
+        },
       });
     });
   });

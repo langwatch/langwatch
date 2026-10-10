@@ -8,6 +8,7 @@ import { type EntitlementApi, PlanLimitExceededError } from "@langwatch/entitlem
 import { LocalFeatureApis } from "@langwatch/process";
 import { createTestLogger } from "@langwatch/test-harness";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { TraceApi, type OtlpIngestCredential } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
@@ -16,7 +17,7 @@ import { TraceIngestAllowanceService } from "../../features/ingestion/services/t
 import type { TraceIngestCredentialService } from "../../features/ingestion/services/trace-ingest-credential.service.ts";
 import type { TraceIngestionService } from "../../features/ingestion/services/trace-ingestion.service.ts";
 import { CollectorApi, collectorRest } from "../collector.rest.ts";
-import { otlpIngestRest } from "../otlp-ingest.rest.ts";
+import { otlpIngestDoor, otlpIngestRest } from "../otlp-ingest.rest.ts";
 
 const PROJECT = { id: "project-1", teamId: "team-1", organizationId: "organization-1" };
 
@@ -98,6 +99,14 @@ function bootIngestDoors(assertWithinUsageLimit: EntitlementApi["assertWithinUsa
     }),
   });
   const runtime = createRestRuntime({
+    doors: {
+      otlp_ingest: otlpIngestDoor.open(
+        createApiFixture<TraceApi>({
+          otlpCredential: (input) => apis.reference(TraceApi).otlpCredential(input),
+        }),
+      ),
+    },
+    authorization: restTestAuthorization(),
     identity: { authenticate: () => ({ authenticated: false }) as never },
   });
   // The process hands every door the bound reference, never the bare module.
@@ -114,6 +123,7 @@ function bootIngestDoors(assertWithinUsageLimit: EntitlementApi["assertWithinUsa
   });
   const otlp = runtime.mount(otlpIngestRest.router(), {
     ...mounted,
+    credential: "otlp_ingest",
     app: () => apis.reference(TraceApi),
   });
   const headers = { "Content-Type": "application/json", "X-Auth-Token": "sk-lw-ingest" };

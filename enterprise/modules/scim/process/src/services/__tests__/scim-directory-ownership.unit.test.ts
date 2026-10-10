@@ -11,12 +11,20 @@ import { describe, expect, it, vi } from "vitest";
 
 import { GrantsFake } from "../../__tests__/support/grants-fake.ts";
 import { HeldConnectionsFake } from "../../__tests__/support/held-connections-fake.ts";
-import { OrganizationAdministrationFake } from "../../__tests__/support/organization-administration-fake.ts";
+import {
+  MembersFake,
+  OrganizationAdministrationFake,
+} from "../../__tests__/support/organization-administration-fake.ts";
 import { MemoryScimRepository } from "../../repositories/memory/memory.scim.repository.ts";
 import type { ScimCostCenterFacts } from "../scim-cost-center.service.ts";
 import type { ScimUserProvisioning } from "../scim-provisioning.service.ts";
 import { ScimService } from "../scim.service.ts";
 import { QuietScimSyncLifecycle } from "./support/quiet-scim-sync-lifecycle.ts";
+
+/** Every seat free, so these tests admit full members (seat-limit-at-provisioning.feature). */
+const openSeats = {
+  countMemberSeats: async () => ({ fullMembers: 0, liteMembers: 0, developers: 0 }),
+};
 
 const ACME = "org_acme";
 const GLOBEX = "org_globex";
@@ -47,6 +55,8 @@ function world() {
   const store = MemoryScimRepository.create();
   const writer = new GrantsFake();
   const connections = HeldConnectionsFake.of([OKTA, ENTRA, GLOBEX_OKTA]);
+  connections.hold({ connectionId: OKTA, verifiedDomains: ["acme.test"] });
+  connections.hold({ connectionId: GLOBEX_OKTA, verifiedDomains: ["shared.test"] });
   const users = {
     findById: vi.fn(async ({ id }) => store.users.get(id) ?? null),
     findByEmail: vi.fn(
@@ -75,6 +85,7 @@ function world() {
     recordCostCenterChanged: vi.fn(async () => undefined),
   } satisfies ScimCostCenterFacts;
   const service = ScimService.create({
+    members: new MembersFake(),
     prisma: store,
     writer,
     users,
@@ -84,6 +95,7 @@ function world() {
     lifecycle: new QuietScimSyncLifecycle(),
     provenOffboarding: false,
     tokenPepper: "scim-test-pepper",
+    seats: openSeats,
     connections,
   });
 

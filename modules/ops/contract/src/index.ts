@@ -126,4 +126,6 @@ export {
   usageReportAnswerSchema,
   type CheckupAnswer,
   type UsageReportAnswer,
+  type CheckupAnswerSchema,
+  type UsageReportAnswerSchema,
 } from "./features/checkup/checkup.trpc.ts";

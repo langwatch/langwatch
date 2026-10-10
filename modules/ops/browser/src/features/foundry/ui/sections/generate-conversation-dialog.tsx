@@ -81,7 +81,7 @@ export function GenerateConversationDialog() {
     >
       <PopoverTrigger asChild>
         <Button
-          size="xs"
+          size="sm"
           variant="outline"
           loading={isSending}
           loadingText="Sending…"
@@ -125,7 +125,7 @@ export function GenerateConversationDialog() {
                 {TURN_PRESETS.map((v) => (
                   <Button
                     key={v}
-                    size="xs"
+                    size="sm"
                     variant={turnCount === v ? "solid" : "ghost"}
                     colorPalette={turnCount === v ? "orange" : undefined}
                     onClick={() => setTurnCount(v)}
@@ -159,7 +159,7 @@ export function GenerateConversationDialog() {
 
             <Button
               size="sm"
-              colorPalette="orange"
+              colorPalette="accent"
               onClick={handleSend}
               w="full"
               disabled={!project}

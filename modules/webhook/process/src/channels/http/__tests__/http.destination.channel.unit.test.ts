@@ -225,7 +225,7 @@ describe("the live HTTP channel over the packaged fence", () => {
     it("refuses it permanently before any connection", async () => {
       mockedFetch.mockClear();
 
-      const error = (await HttpDestinationChannel.create({ tls: { rejectUnauthorized: true } })
+      const error = (await HttpDestinationChannel.create({ permitsSelfSignedOptIn: false })
         .send({
           url: "https://10.0.0.1/hooks/spend",
           body: "{}",

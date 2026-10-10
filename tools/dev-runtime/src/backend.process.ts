@@ -1,96 +1,91 @@
+import net from "node:net";
+
+import {
+  bootHalf,
+  drainBackend,
+  IDLE_WORKER,
+  startBackend,
+  type BackendHalves,
+  type BackendStartOptions,
+  type BootedBackend,
+} from "@langwatch/process/backend-host";
+
+import type { BootFailure } from "./boot-failure.ts";
+
 /**
- * The two halves of the backend process, each as its own app's start seam
- * answered: a server this launcher drains. Neither owns the process.
+ * A cold boot: both halves start together and `route` moves the port to the api as soon as its
+ * own start resolves, so a slow worker boot never hides it. A refused api is never routed.
+ * Spec: specs/setup/dev-process-topology.feature
  */
-export type BackendApiHalf = { close(): Promise<void> };
-export type BackendWorkerHalf = { close(): Promise<void> };
-
-export type BackendHalves = {
-  api: BackendApiHalf;
-  worker: BackendWorkerHalf;
-};
-
-/**
- * Drain the worker first because jobs call into the API graph during shutdown.
- * The `finally` prevents a worker failure from leaving the API listener open.
- */
-export async function drainBackend({ api, worker }: BackendHalves): Promise<void> {
-  try {
-    await worker.close();
-  } finally {
-    await api.close();
-  }
-}
-
-/** The record that says both halves are serving; the dev script's ready pattern names it. */
-export const BACKEND_READY_MSG = "backend ready";
-
-/** Which half a boot failure came from, so its fatal record names it, not the launcher. */
-export type BackendHalfName = "api" | "worker";
-
-/** The service name each half's own records carry. */
-export const BACKEND_HALF_SERVICE: Readonly<Record<BackendHalfName, string>> = Object.freeze({
-  api: "langwatch-api",
-  worker: "langwatch-worker",
-});
-
-const BACKEND_HALF = Symbol.for("langwatch.backend.half");
-
-/** The half whose boot threw this, when the launcher tagged it. */
-export function backendHalfOf(error: unknown): BackendHalfName | undefined {
-  if (typeof error !== "object" || error === null) return undefined;
-  const half = (error as Record<symbol, unknown>)[BACKEND_HALF];
-  return half === "api" || half === "worker" ? half : undefined;
+export function startFreshBackend({
+  startApi,
+  startWorker,
+  apiPort,
+  route,
+}: BackendStartOptions & {
+  apiPort: number;
+  route: (port: number) => void;
+}): Promise<BootedBackend> {
+  return startBackend({
+    startWorker,
+    startApi: async (options) => {
+      const api = await startApi({ ...options, port: apiPort });
+      route(apiPort);
+      return api;
+    },
+  });
 }
 
 /**
- * Tag the half onto the error it threw and rethrow it unchanged: the launcher
- * hosts both halves in one process, so without this every failure reads as the
- * launcher's and the half that actually refused is lost.
+ * A reload beside a serving generation: the next api boots on `apiPort`, `route` moves the port
+ * to it, the old one drains, the next worker starts. A refused api leaves the old one untouched.
+ * Spec: specs/setup/dev-process-topology.feature
  */
-async function bootHalf<T>(half: BackendHalfName, start: () => Promise<T>): Promise<T> {
-  try {
-    return await start();
-  } catch (error) {
-    if (typeof error === "object" && error !== null) {
-      Object.defineProperty(error, BACKEND_HALF, { value: half, configurable: true });
-    }
-    throw error;
-  }
-}
-
-/** How a hosted half is booted: never owning the process the launcher drains. */
-export type BackendHalfOptions = Readonly<{
-  ownsProcess: false;
-  ownsTelemetry: boolean;
-}>;
-
-/** What each hosted application is booted with, injectable for tests. */
-export type BackendStartOptions = {
-  startApi: (options: BackendHalfOptions) => Promise<BackendApiHalf>;
-  startWorker: (options: BackendHalfOptions) => Promise<BackendWorkerHalf>;
-};
-
-/**
- * Start the worker first so the API never accepts work without a consumer.
- * If API boot fails, drain the half-started worker before rethrowing.
- */
-export async function startBackend(options: BackendStartOptions): Promise<BackendHalves> {
-  // One graph per process: the worker sets the telemetry SDK up and the API
-  // joins it. A second setup is what prints "OpenTelemetry is already set up".
-  const worker = await bootHalf("worker", () =>
-    options.startWorker({ ownsProcess: false, ownsTelemetry: true }),
+export async function replaceBackend({
+  startApi,
+  startWorker,
+  apiPort,
+  route,
+  disposeOld,
+}: BackendStartOptions & {
+  apiPort: number;
+  route: (port: number) => void;
+  disposeOld: () => Promise<void>;
+}): Promise<BootedBackend> {
+  const api = await bootHalf("api", () =>
+    startApi({ ownsProcess: false, ownsTelemetry: false, port: apiPort }),
   );
+  route(apiPort);
+  await disposeOld();
   try {
-    const api = await bootHalf("api", () =>
-      options.startApi({ ownsProcess: false, ownsTelemetry: false }),
+    const worker = await bootHalf("worker", () =>
+      startWorker({ ownsProcess: false, ownsTelemetry: true }),
     );
-    return { api, worker };
-  } catch (error) {
-    await worker.close();
-    throw error;
+    return { halves: { api, worker } };
+  } catch (workerFailure) {
+    return { halves: { api, worker: IDLE_WORKER }, workerFailure };
   }
 }
+
+/** A port nothing on loopback holds right now, for the next api generation to bind. */
+export async function freeLoopbackPort(): Promise<number> {
+  const probe = net.createServer();
+  await new Promise<void>((resolve, reject) => {
+    probe.once("error", reject);
+    probe.listen(0, "127.0.0.1", resolve);
+  });
+  const address = probe.address();
+  await new Promise<void>((resolve) => probe.close(() => resolve()));
+  if (address === null || typeof address === "string") throw new Error("no loopback port bound");
+  return address.port;
+}
+
+/** The api's stable port: `route` moves it to a generation, `report` says why it is not whole. */
+export type PortForwarder = Readonly<{
+  route(port: number): void;
+  report(failure: BootFailure | undefined): void;
+  close(): Promise<void>;
+}>;
 
 /** A process listener, as `EventEmitter.listeners` hands it back. */
 type Listener = ReturnType<NodeJS.EventEmitter["listeners"]>[number];

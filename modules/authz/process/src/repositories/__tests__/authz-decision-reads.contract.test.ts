@@ -692,6 +692,7 @@ describe.each(backends)("given the decision reads on the $name backend", (backen
       await expect(fixture.repositories.read.findProjectLineage({ projectId })).resolves.toEqual({
         teamId,
         organizationId,
+        kind: "application",
       });
       await expect(fixture.repositories.read.findTeamOrganization({ teamId })).resolves.toEqual({
         organizationId,
@@ -723,6 +724,7 @@ describe.each(backends)("given the decision reads on the $name backend", (backen
       ).resolves.toEqual({
         teamId,
         organizationId: fixture.organizationId,
+        kind: "application",
       });
     });
   });

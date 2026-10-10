@@ -1,3 +1,5 @@
+import { ListTable } from "@langwatch/design-system/list-table";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import {
   Button,
   Center,
@@ -5,11 +7,11 @@ import {
   Input,
   Spinner,
   Table,
-  Text,
   VStack,
 } from "@langwatch/design-system/primitives";
 import { HandledErrorAlert } from "@langwatch/error-views";
 import type { OpsPlatformOperator } from "@langwatch/ops-contract";
+import { ShieldCheck } from "lucide-react";
 import { useState } from "react";
 
 import { api } from "../../../../behavior/ops-api.ts";
@@ -62,8 +64,9 @@ export function OperatorsContent() {
           if (email.trim()) grant.mutate({ email: email.trim() });
         }}
       >
-        <HStack gap={3}>
+        <HStack gap={3} wrap="wrap">
           <Input
+            size="sm"
             type="email"
             aria-label="Email address of an existing user"
             placeholder="Email address of an existing user"
@@ -71,13 +74,25 @@ export function OperatorsContent() {
             onChange={(event) => setEmail(event.target.value)}
             maxWidth="420px"
           />
-          <Button type="submit" size="sm" loading={grant.isPending} disabled={!email.trim()}>
+          <Button
+            type="submit"
+            colorPalette="accent"
+            size="sm"
+            loading={grant.isPending}
+            disabled={!email.trim()}
+          >
             Grant
           </Button>
         </HStack>
       </form>
 
-      <Table.Root variant="line" size="md">
+      <ListTable
+        density="compact"
+        columnRules={false}
+        containerProps={{ overflowX: "auto" }}
+        variant="line"
+        size="sm"
+      >
         <Table.Header>
           <Table.Row>
             <Table.ColumnHeader>Name</Table.ColumnHeader>
@@ -93,15 +108,21 @@ export function OperatorsContent() {
               <Table.Cell>{operator.email ?? operator.userId}</Table.Cell>
               <Table.Cell>{formatDateTime(operator.grantedAt)}</Table.Cell>
               <Table.Cell>
-                <Button size="xs" variant="outline" onClick={() => setRevoking(operator)}>
+                <Button size="sm" variant="outline" onClick={() => setRevoking(operator)}>
                   Revoke
                 </Button>
               </Table.Cell>
             </Table.Row>
           ))}
         </Table.Body>
-      </Table.Root>
-      {operators.length === 0 ? <Text color="fg.muted">No platform operators.</Text> : null}
+      </ListTable>
+      {operators.length === 0 ? (
+        <NoDataInfoBlock
+          icon={<ShieldCheck />}
+          title="No platform operators."
+          description="Grant operator access to an existing user by email."
+        />
+      ) : null}
 
       <ConfirmDialog
         open={revoking !== null}

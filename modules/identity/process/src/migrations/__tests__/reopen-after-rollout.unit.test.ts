@@ -78,7 +78,7 @@ describe("identity's after-rollout reopen step", () => {
     }
   });
 
-  /** @scenario "The after-rollout step makes the same sweep as the blocking step" */
+  /** @scenario "The after-rollout step sweeps unproven accounts back to the legacy path" */
   it("reports nothing reopened over an empty store, for a run and a dry run", async () => {
     const { runtime, step } = await stepOnFreshIdentity();
     const context = {

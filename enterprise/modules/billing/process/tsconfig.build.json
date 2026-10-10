@@ -36,6 +36,9 @@
       "path": "../contract/tsconfig.build.json"
     },
     {
+      "path": "../../connect/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../licensing/contract/tsconfig.build.json"
     },
     {
@@ -97,6 +100,9 @@
     },
     {
       "path": "../../../../modules/scenario/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/secrets/tsconfig.build.json"
     },
     {
       "path": "../../../../packages/task/tsconfig.build.json"

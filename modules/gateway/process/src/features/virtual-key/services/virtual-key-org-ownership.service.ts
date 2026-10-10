@@ -2,8 +2,9 @@
 import {
   GatewayGuardrailProjectMismatchError,
   GatewayScopeOrgMismatchError,
+  GatewayTraceProjectNotADestinationError,
 } from "@langwatch/gateway-contract";
-import type { ProjectApi } from "@langwatch/project-contract";
+import { isTraceDestinationRefused, type ProjectApi } from "@langwatch/project-contract";
 
 import type { VirtualKeyAuthorizationRepository } from "../../../repositories/virtual-key-authorization.repository.ts";
 
@@ -38,14 +39,14 @@ async function assertAllResolve(
 export class VirtualKeyOrgOwnershipService {
   static create(input: {
     directory: VirtualKeyAuthorizationRepository;
-    projects: Pick<ProjectApi, "listIdsByOrganization">;
+    projects: Pick<ProjectApi, "listIdsByOrganization" | "findTraceDestination">;
   }): VirtualKeyOrgOwnershipService {
     return new VirtualKeyOrgOwnershipService(input.directory, input.projects);
   }
 
   private constructor(
     private readonly directory: VirtualKeyAuthorizationRepository,
-    private readonly projects: Pick<ProjectApi, "listIdsByOrganization">,
+    private readonly projects: Pick<ProjectApi, "listIdsByOrganization" | "findTraceDestination">,
   ) {}
 
   /** Of the named projects, those inside this organization. */
@@ -148,6 +149,11 @@ export class VirtualKeyOrgOwnershipService {
     });
     if (found.length === 0) {
       throw new GatewayScopeOrgMismatchError("project");
+    }
+    // An aggregate owns no traces, so a key's traces and budget debits never land there.
+    const destination = await this.projects.findTraceDestination(traceProjectId);
+    if (isTraceDestinationRefused(destination?.kind)) {
+      throw new GatewayTraceProjectNotADestinationError();
     }
   }
 }

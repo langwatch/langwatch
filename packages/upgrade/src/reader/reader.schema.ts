@@ -25,6 +25,7 @@ export const installationReasonSchema = z.enum([
   "image-below-ledger-floor",
   "failed-step",
   "failed-target",
+  "failed-run",
   "run-in-progress",
   "no-upgrade-recorded",
   "image-newer",
@@ -53,6 +54,15 @@ export const upgradeTargetViewSchema = z.object({
 });
 export type UpgradeTargetView = z.infer<typeof upgradeTargetViewSchema>;
 
+/** One ledger target's roll-up for the Dataplanes tab (U6-U9-READER, W7 v1). */
+export const upgradeTargetSummarySchema = z.object({
+  target: z.string(),
+  version: z.string().nullable(),
+  outstanding: z.number().int(),
+  lastError: z.string().nullable(),
+});
+export type UpgradeTargetSummary = z.infer<typeof upgradeTargetSummarySchema>;
+
 /**
  * A step's progress, read from its checkpoint report's agreed keys `done` and `total`
  * (STEP-PROGRESS, Alex 2026-10-09); a report without both reads as no progress.
@@ -62,6 +72,15 @@ export const upgradeStepProgressSchema = z.object({
   total: z.number().int().positive(),
 });
 export type UpgradeStepProgress = z.infer<typeof upgradeStepProgressSchema>;
+
+/** A live serving process whose image does not know a step that waits on old writers. */
+export const upgradeWaitingWriterSchema = z.object({
+  role: z.string(),
+  image: z.string(),
+  release: z.string().nullable(),
+  lastSeenAt: isoInstant.nullable(),
+});
+export type UpgradeWaitingWriter = z.infer<typeof upgradeWaitingWriterSchema>;
 
 /** A ledger step, or a step the image declares and the ledger has no row for (`recorded` false). */
 export const upgradeStepViewSchema = z.object({
@@ -73,12 +92,15 @@ export const upgradeStepViewSchema = z.object({
   statusLabel: z.string(),
   owner: z.string().nullable(),
   description: z.string().nullable(),
+  /** The release a background step must finish by (STEP-FINISHBY); null when it names none. */
+  finishBy: z.string().nullable(),
   recorded: z.boolean(),
   inferred: z.boolean(),
   attempt: z.number().int(),
   lastError: z.string().nullable(),
   report: z.record(z.string(), z.unknown()).nullable(),
   progress: upgradeStepProgressSchema.nullable(),
+  waitingOn: z.array(upgradeWaitingWriterSchema),
   runId: z.string().nullable(),
   startedAt: isoInstant.nullable(),
   finishedAt: isoInstant.nullable(),
@@ -181,6 +203,8 @@ export const upgradeImageStepSchema = z.object({
   release: z.string().nullable().optional(),
   owner: z.string().nullable().optional(),
   description: z.string().nullable().optional(),
+  finishBy: z.string().nullable().optional(),
+  needsOldWritersGone: z.boolean().optional(),
 });
 export type UpgradeImageStep = z.infer<typeof upgradeImageStepSchema>;
 

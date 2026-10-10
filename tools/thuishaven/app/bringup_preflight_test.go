@@ -13,7 +13,7 @@ import (
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
 
-// The sandbox prep's own ordering. `up` and `haven play` share one child plan,
+// The sandbox prep's own ordering. `up` and `haven pr --throwaway` share one child plan,
 // and neither builds anything before it: the three Node lanes run their own
 // `dev` script through tsx/vite, so there is no production bundle to produce
 // and no MODULE_NOT_FOUND to prevent. What is still load-bearing is that a

@@ -39,6 +39,7 @@ describe("removeContextChip", () => {
   });
 
   describe("given a chip that is only page-derived", () => {
+    /** @scenario "A context chip can be removed" */
     it("dismisses it without touching the attachment list", () => {
       useLangyStore.getState().chooseChip(chip.id);
 

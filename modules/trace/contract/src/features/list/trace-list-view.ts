@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 /**
  * The trace list's read models: one row, one page, and the facet payloads the sidebar renders.
  * These live in the contract rather than beside the ClickHouse-backed service that builds them
@@ -16,8 +17,10 @@ import {
 /** Which half of the sidebar a facet is listed under. */
 const facetGroupSchema = z.enum(["trace", "evaluation", "span", "metadata", "prompt"]);
 
-export const traceListViewItemSchema = z.object({
+const traceListViewItemSchemaDefinition = z.object({
   traceId: z.string(),
+  /** The project that owns the trace; on an aggregate, the member it was read from (ADR-177). */
+  projectId: z.string(),
   timestamp: z.number(),
   name: z.string(),
   serviceName: z.string(),
@@ -71,16 +74,21 @@ export const traceListViewItemSchema = z.object({
   ttft: z.number().nullable(),
   traceName: z.string(),
   rootSpanType: z.string().nullable(),
+  /** The evaluations scored on this row's trace, matched by project and trace id together. */
+  evaluations: z.array(evaluationSummarySchema),
 });
+export interface TraceListViewItemSchema extends Named<typeof traceListViewItemSchemaDefinition> {}
+export const traceListViewItemSchema: TraceListViewItemSchema = traceListViewItemSchemaDefinition;
 
 export type TraceListItem = z.infer<typeof traceListViewItemSchema>;
 
-export const traceListPageSchema = z.object({
+const traceListPageSchemaDefinition = z.object({
   items: z.array(traceListViewItemSchema),
   totalHits: z.number(),
-  evaluations: z.record(z.string(), z.array(evaluationSummarySchema)),
   nextCursor: traceListCursorSchema.nullable(),
 });
+export interface TraceListPageSchema extends Named<typeof traceListPageSchemaDefinition> {}
+export const traceListPageSchema: TraceListPageSchema = traceListPageSchemaDefinition;
 
 export type TraceListPage = z.infer<typeof traceListPageSchema>;
 
@@ -144,7 +152,7 @@ const facetDescriptorSchema = z.union([
 
 export type FacetDescriptor = z.infer<typeof facetDescriptorSchema>;
 
-export const discoverResultSchema = z.object({
+const discoverResultSchemaDefinition = z.object({
   facets: z.array(facetDescriptorSchema),
   /**
    * True when the cache was cold and a background compute was kicked off. Callers should treat
@@ -153,13 +161,32 @@ export const discoverResultSchema = z.object({
    */
   pending: z.boolean(),
 });
+export interface DiscoverResultSchema extends Named<typeof discoverResultSchemaDefinition> {}
+export const discoverResultSchema: DiscoverResultSchema = discoverResultSchemaDefinition;
 
 export type DiscoverResult = z.infer<typeof discoverResultSchema>;
 
 /** One facet's values, paged, as the sidebar drilldown reads them. */
-export const facetValuesResultSchema = z.object({
+const facetValuesResultSchemaDefinition = z.object({
   values: z.array(z.object({ value: z.string(), label: z.string().optional(), count: z.number() })),
   totalDistinct: z.number(),
 });
+export interface FacetValuesResultSchema extends Named<typeof facetValuesResultSchemaDefinition> {}
+export const facetValuesResultSchema: FacetValuesResultSchema = facetValuesResultSchemaDefinition;
 
 export type FacetValuesResult = z.infer<typeof facetValuesResultSchema>;
+
+/**
+ * A listed trace's identity: its project and trace id together. On an aggregate
+ * two members may hold the same trace id (ADR-177), so the server reads that key
+ * a page and the list that looks each row up share this one key.
+ */
+export function listedTraceKey({
+  projectId,
+  traceId,
+}: {
+  projectId: string;
+  traceId: string;
+}): string {
+  return `${projectId}:${traceId}`;
+}

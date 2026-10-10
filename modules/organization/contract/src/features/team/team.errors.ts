@@ -16,9 +16,12 @@ export class TeamNotFoundError extends NotFoundError {
 export class TeamSlugConflictError extends HandledError {
   declare readonly code: "team_name_taken";
 
-  constructor() {
-    super("team_name_taken", "A team with this name already exists in the organization.", {
+  constructor(name: string) {
+    const message = `A team called ${name} already exists`;
+    super("team_name_taken", message, {
       httpStatus: 409,
+      fault: "customer",
+      meta: { name, fieldErrors: { name: message } },
     });
     this.name = "TeamSlugConflictError";
   }

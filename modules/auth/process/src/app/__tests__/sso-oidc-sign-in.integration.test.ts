@@ -108,7 +108,7 @@ async function composedBetterAuth(provider: ServedOidcProvider): Promise<BetterA
     }),
     dependencies: {
       projects: createApiFixture<ProjectApi>(),
-      users: new TestUserApi({}) as never,
+      users: new TestUserApi({ hasAnyAccount: async () => true }) as never,
       apiKeys: { findResolvedToken: async () => null } as never,
       featureFlags: {} as never,
       identity: identityFor(provider),
@@ -126,7 +126,9 @@ async function composedBetterAuth(provider: ServedOidcProvider): Promise<BetterA
         record: async () => ({ id: "audit", occurredAt: 0 }),
       }),
     },
-    channels: MemoryAuthChannels.create(),
+    channels: MemoryAuthChannels.create({
+      bound: { notifications: createApiFixture<NotificationService>() },
+    }),
     resources: { own: () => undefined } as never,
     secrets: new ScopedSecrets(async (handle, build) =>
       build({ NEXTAUTH_SECRET: "test-session-secret-test-session-secret" }[handle.id]),

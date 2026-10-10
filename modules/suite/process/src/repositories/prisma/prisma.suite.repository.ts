@@ -1,3 +1,4 @@
+import { skipTenantCheck } from "@langwatch/prisma-client";
 import { isUniqueConstraintError } from "@langwatch/prisma-client/errors";
 import { type Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
 import { parseEvaluatorAttachments, type EvaluatorAttachment } from "@langwatch/scenario-contract";
@@ -60,8 +61,10 @@ function slugify(value: string): string {
  */
 type SuiteDatabase = Pick<
   PrismaClient,
-  "scenario" | "simulationSuite" | "$transaction" | "$executeRaw"
+  "scenario" | "simulationSuite" | "$transaction" | "$executeRaw" | "$queryRaw"
 >;
+
+const projectIdRowsSchema = z.array(z.object({ projectId: z.string() }));
 
 /** The run plan a NAME joins. */
 function joinablePlanWhere(input: {
@@ -131,13 +134,16 @@ export class PrismaSuiteRepository extends SuiteRepository {
     return rows.map(mapSuite);
   }
 
+  /** Every project's id: the replay step walks them one tenant at a time. */
   async findProjectIdsHoldingSuites(): Promise<string[]> {
-    const rows = await this.database.simulationSuite.findMany({
-      distinct: ["projectId"],
-      select: { projectId: true },
-      orderBy: { projectId: "asc" },
-    });
-    return rows.map((row) => row.projectId);
+    const rows = await this.database.$queryRaw<unknown[]>`
+      SELECT DISTINCT "projectId" FROM "SimulationSuite" ORDER BY "projectId" ASC
+      ${skipTenantCheck({
+        // Suite replay walks every project holding suites (upgrade step, worker)
+        SKIP_TENANT_CHECK: true,
+      })}
+    `;
+    return projectIdRowsSchema.parse(rows).map((row) => row.projectId);
   }
 
   async resolveDynamicRunMembership(input: SuiteIdInput): Promise<string[]> {
@@ -260,7 +266,10 @@ export class PrismaSuiteRepository extends SuiteRepository {
       this.database.$transaction(
         async (transaction) => {
           const lockKey = `${PLAN_NAME_LOCK_PREFIX}${input.projectId}:${planNameKey(input.name)}`;
-          await transaction.$executeRaw`-- @tenancy: advisory lock only, the key is project-bounded
+          await transaction.$executeRaw` ${skipTenantCheck({
+            // Advisory lock only, the key is project-bounded.
+            SKIP_TENANT_CHECK: true,
+          })}
 SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`;
 
           const existing = await transaction.simulationSuite.findFirst({
@@ -352,7 +361,10 @@ SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`;
   }): Promise<Suite> {
     const row = await this.database.$transaction(async (transaction) => {
       const lockKey = `suite-managed:${input.projectId}:${input.label}`;
-      await transaction.$executeRaw`-- @tenancy: advisory lock only, the key is project-bounded
+      await transaction.$executeRaw` ${skipTenantCheck({
+        // Advisory lock only, the key is project-bounded.
+        SKIP_TENANT_CHECK: true,
+      })}
 SELECT pg_advisory_xact_lock(hashtext(${lockKey}))`;
 
       const existing = await transaction.simulationSuite.findFirst({

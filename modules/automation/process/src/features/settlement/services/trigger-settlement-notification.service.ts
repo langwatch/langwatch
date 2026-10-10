@@ -249,6 +249,10 @@ export class TriggerSettlementNotificationService {
         foldState,
       });
       if (!confirmed) {
+        logger.debug(
+          { projectId: input.projectId, triggerId: input.triggerId, traceId },
+          "Trace no longer matches the trigger at dispatch — skipping match",
+        );
         continue;
       }
 
@@ -258,6 +262,10 @@ export class TriggerSettlementNotificationService {
         projectId: input.projectId,
       });
       if (alreadySent) {
+        logger.debug(
+          { projectId: input.projectId, triggerId: input.triggerId, traceId },
+          "Trace already notified for this trigger — skipping match",
+        );
         continue;
       }
 

@@ -30,14 +30,15 @@ const columns: TableColumn<Surface>[] = [
     mono: true,
     hideOnNarrow: true,
     title: (surface) => surface.url || surface.hostname,
-    cell: (surface) =>
-      surface.url === "" ? (
-        surface.hostname || "no hostname"
-      ) : (
+    cell: (surface) => {
+      if (surface.status === "not-selected") return `off: haven up +${surface.name}`;
+      if (surface.url === "") return surface.hostname || "no hostname";
+      return (
         <Link href={surface.url} mono>
           {surface.hostname || surface.url}
         </Link>
-      ),
+      );
+    },
   },
   {
     key: "port",

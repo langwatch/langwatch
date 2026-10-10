@@ -9,7 +9,11 @@ export interface UserChannels {
    */
   readonly authReads: Pick<
     AuthApi,
-    "resolveAuthProvider" | "route" | "getSignedInWith" | "getSsoSetupStatus"
+    | "resolveAuthProvider"
+    | "route"
+    | "getSignedInWith"
+    | "listBrowserSessions"
+    | "getSsoSetupStatus"
   >;
 }
 

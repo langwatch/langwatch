@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/langwatch/langwatch/tools/internal/collate"
 )
@@ -128,154 +127,6 @@ func TestSyncReferencesMatchesTheNodeScript(t *testing.T) {
 	}
 }
 
-func ensureBuiltFixture(t testing.TB) string {
-	root := t.TempDir()
-	tree := map[string]string{}
-	for _, dir := range []string{"sdks/typescript", "mcp/typescript", "packages/ksuid", "packages/mail"} {
-		tree[dir+"/src/a.ts"] = "x"
-		tree[dir+"/node_modules/.keep"] = ""
-	}
-	writeTree(t, root, tree)
-	return root
-}
-
-func stampFresh(t testing.TB, root string) {
-	t.Helper()
-	future := time.Now().Add(time.Hour)
-	for _, target := range buildTargets {
-		entry := filepath.Join(root, target.dir, target.entry)
-		writeTree(t, root, map[string]string{filepath.Join(target.dir, target.entry): ""})
-		if err := os.Chtimes(entry, future, future); err != nil {
-			t.Fatal(err)
-		}
-	}
-}
-
-func fakePnpm(t testing.TB) string {
-	t.Helper()
-	bin := t.TempDir()
-	log := filepath.Join(bin, "calls")
-	script := "#!/bin/sh\necho \"$@\" >> " + log + "\nexit ${FAKE_EXIT:-0}\n"
-	if err := os.WriteFile(filepath.Join(bin, "pnpm"), []byte(script), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
-	return log
-}
-
-func TestEnsureBuilt(t *testing.T) {
-	t.Run("builds nothing when every entry is newer than its sources", func(t *testing.T) {
-		root, calls := ensureBuiltFixture(t), fakePnpm(t)
-		stampFresh(t, root)
-		if code := EnsureBuilt(root, nil, os.Stderr); code != 0 || exists(calls) {
-			t.Errorf("code %d, pnpm called: %v", code, exists(calls))
-		}
-	})
-	t.Run("builds a missing entry and its needs, in target order, then stamps and unlocks", func(t *testing.T) {
-		root, calls := ensureBuiltFixture(t), fakePnpm(t)
-		var stderr bytes.Buffer
-		if code := EnsureBuilt(root, []string{"@langwatch/mail"}, &stderr); code != 0 {
-			t.Fatalf("code %d: %s", code, stderr.String())
-		}
-		got, _ := os.ReadFile(calls)
-		if want := "--filter @langwatch/ksuid build\n--filter @langwatch/mail build\n"; string(got) != want {
-			t.Errorf("pnpm calls = %q, want %q", got, want)
-		}
-		if !strings.Contains(stderr.String(), "ensure-built: building @langwatch/ksuid (dist/index.d.ts missing or stale)") ||
-			!strings.Contains(stderr.String(), "could not stamp dist/index.js: ENOENT: no such file or directory, utime") {
-			t.Errorf("stderr = %q", stderr.String())
-		}
-		if exists(filepath.Join(root, "packages/mail/node_modules/.ensure-built.lock")) {
-			t.Error("lock left behind")
-		}
-	})
-	t.Run("asks Nx even when every entry is newer than src, since Nx hashes the inputs outside it", func(t *testing.T) {
-		root, calls := ensureBuiltFixture(t), fakePnpm(t)
-		writeTree(t, root, map[string]string{"node_modules/.bin/nx": ""})
-		stampFresh(t, root)
-		if code := EnsureBuilt(root, []string{"@langwatch/mail", "langwatch"}, &bytes.Buffer{}); code != 0 {
-			t.Fatalf("code %d", code)
-		}
-		got, _ := os.ReadFile(calls)
-		if want := "exec nx run-many -t build -p langwatch,@langwatch/ksuid,@langwatch/mail --outputStyle=static\n"; string(got) != want {
-			t.Errorf("pnpm calls = %q, want %q", got, want)
-		}
-		if exists(filepath.Join(root, "node_modules/.ensure-built.lock")) {
-			t.Error("lock left behind")
-		}
-	})
-	t.Run("fails and unlocks when the Nx build fails", func(t *testing.T) {
-		root := ensureBuiltFixture(t)
-		fakePnpm(t)
-		writeTree(t, root, map[string]string{"node_modules/.bin/nx": ""})
-		t.Setenv("FAKE_EXIT", "3")
-		if code := EnsureBuilt(root, nil, &bytes.Buffer{}); code != 1 {
-			t.Errorf("code %d", code)
-		}
-		if exists(filepath.Join(root, "node_modules/.ensure-built.lock")) {
-			t.Error("lock left behind")
-		}
-	})
-	t.Run("refuses an unknown target by name", func(t *testing.T) {
-		var stderr bytes.Buffer
-		if code := EnsureBuilt(t.TempDir(), []string{"nope", "@langwatch/mail", "bad"}, &stderr); code != 1 ||
-			stderr.String() != "ensure-built: no such target: nope, bad\n" {
-			t.Errorf("code %d, stderr %q", code, stderr.String())
-		}
-	})
-	t.Run("fails and unlocks when the build fails", func(t *testing.T) {
-		root := ensureBuiltFixture(t)
-		fakePnpm(t)
-		t.Setenv("FAKE_EXIT", "3")
-		if code := EnsureBuilt(root, []string{"@langwatch/mcp-server"}, &bytes.Buffer{}); code != 1 {
-			t.Errorf("code %d", code)
-		}
-		if exists(filepath.Join(root, "mcp/typescript/node_modules/.ensure-built.lock")) {
-			t.Error("lock left behind")
-		}
-	})
-}
-
-// @scenario "A fresh worktree prepares its databases without a manual bundle build"
-func TestEnsureBuiltSDKStaleness(t *testing.T) {
-	built := func(t *testing.T, root string, at time.Time) {
-		t.Helper()
-		entry := filepath.Join(root, "sdks", "typescript", "dist", "index.mjs")
-		writeTree(t, root, map[string]string{"sdks/typescript/dist/index.mjs": ""})
-		if err := os.Chtimes(entry, at, at); err != nil {
-			t.Fatal(err)
-		}
-	}
-	cases := []struct {
-		name      string
-		prepare   func(t *testing.T, root string)
-		wantBuild bool
-	}{
-		{"builds when the dist was never built", func(*testing.T, string) {}, true},
-		{"builds when the dist is older than its sources", func(t *testing.T, root string) {
-			t.Helper()
-			built(t, root, time.Now().Add(-time.Hour))
-		}, true},
-		{"builds nothing when the dist is newer than its sources", func(t *testing.T, root string) {
-			t.Helper()
-			built(t, root, time.Now().Add(time.Hour))
-		}, false},
-	}
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			root, calls := ensureBuiltFixture(t), fakePnpm(t)
-			c.prepare(t, root)
-			if code := EnsureBuilt(root, []string{"langwatch"}, &bytes.Buffer{}); code != 0 {
-				t.Fatalf("code %d", code)
-			}
-			got, _ := os.ReadFile(calls)
-			if built := string(got) == "--filter langwatch build\n"; built != c.wantBuild {
-				t.Errorf("pnpm calls = %q, want build %v", got, c.wantBuild)
-			}
-		})
-	}
-}
-
 func BenchmarkGenerateModules(b *testing.B) {
 	root := ensureRepoRoot(b)
 	b.ReportAllocs()
@@ -298,15 +149,6 @@ func BenchmarkSyncReferences(b *testing.B) {
 			text, _ := os.ReadFile(project.File)
 			RenderReferences(string(text), project.References)
 		}
-	}
-}
-
-func BenchmarkEnsureBuilt(b *testing.B) {
-	root := ensureBuiltFixture(b)
-	stampFresh(b, root)
-	b.ReportAllocs()
-	for range b.N {
-		EnsureBuilt(root, nil, os.Stderr)
 	}
 }
 

@@ -144,6 +144,7 @@ export class VirtualKeyStatusService {
   async setLicenseFactsInternal(input: {
     id: string;
     organizationId: string;
+    licenseId?: string;
     tokenHash: string;
     instanceId: string | null;
     expiresAt: Instant | null;

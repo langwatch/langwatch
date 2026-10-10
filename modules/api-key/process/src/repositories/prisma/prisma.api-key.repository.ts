@@ -4,7 +4,7 @@ import {
   RESERVED_SYSTEM_KEY_NAMES,
   type ApiKeyRevocationCause,
 } from "@langwatch/api-key-contract";
-import { prismaTables, type PrismaModelClient } from "@langwatch/prisma-client";
+import { type PrismaModelClient, prismaTables, skipTenantCheck } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { fromDate, nowInstant, toDate, type Instant } from "@langwatch/time";
 
@@ -103,14 +103,18 @@ export class PrismaApiKeyRepository implements ApiKeyRepository {
    * subquery, and a revoke parked on the row lock re-checks only the id, so
    * the later cause would overwrite the first one.
    */
-  async revoke(input: { id: string; cause: ApiKeyRevocationCause }): Promise<ApiKeyRow> {
+  async revoke(input: {
+    id: string;
+    organizationId: string;
+    cause: ApiKeyRevocationCause;
+  }): Promise<ApiKeyRow> {
     await this.database.$executeRaw`
-      -- @tenancy: addressed by the key's own id, which the caller resolved inside its organization.
       UPDATE "ApiKey"
          SET "revokedAt" = now(),
              "revocationCause" = ${input.cause},
              "updatedAt" = now()
        WHERE "id" = ${input.id}
+         AND "organizationId" = ${input.organizationId}
          AND "revokedAt" IS NULL
     `;
     return this.database.apiKey.findUniqueOrThrow({
@@ -185,7 +189,10 @@ export class PrismaApiKeyRepository implements ApiKeyRepository {
       input.systemManagedOnly === true || !HIDDEN_SYSTEM_KEY_NAMES.includes(input.name);
     const now = toDate(input.now);
     return this.database.$executeRaw`
-      -- @tenancy: fleet-wide sweep of one reserved system key name, bounded to elapsed rows.
+      ${skipTenantCheck({
+        // Fleet-wide sweep of one reserved system key name, bounded to elapsed rows.
+        SKIP_TENANT_CHECK: true,
+      })}
       UPDATE "ApiKey"
          SET "revokedAt" = ${now},
              "updatedAt" = now()
@@ -240,7 +247,10 @@ export class PrismaApiKeyRepository implements ApiKeyRepository {
     before: Instant;
   }): Promise<{ id: string; userId: string | null; organizationId: string }[]> {
     return this.database.$queryRaw<{ id: string; userId: string | null; organizationId: string }[]>`
-      -- @tenancy: fleet-wide sweep of CLI login keys; create refuses a customer key under the prefix.
+      ${skipTenantCheck({
+        // Fleet-wide sweep of CLI login keys; create refuses a customer key under the prefix.
+        SKIP_TENANT_CHECK: true,
+      })}
       SELECT "id", "userId", "organizationId"
         FROM "ApiKey"
        WHERE starts_with("name", ${CLI_LOGIN_KEY_NAME_PREFIX})

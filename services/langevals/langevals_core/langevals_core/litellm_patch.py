@@ -489,6 +489,40 @@ def request_credentials(kwargs: dict) -> None:
                 break
 
 
+class RequestEndpointWithoutKeyError(ValueError):
+    """A request named where a call goes without naming the credential sent there."""
+
+
+# The call arguments that choose where a model call is sent.
+ENDPOINT_ARGUMENTS = ("api_base", "base_url", "aws_bedrock_runtime_endpoint", "azure_endpoint")
+
+
+def _key_arguments(model: str) -> tuple:
+    provider = _model_provider(model)
+    if provider == "bedrock":
+        return ("aws_access_key_id", "aws_secret_access_key")
+    if provider == "vertex_ai":
+        return ("vertex_credentials",)
+    return ("api_key",)
+
+
+def refuse_request_endpoint_without_key(kwargs: dict, env: dict) -> None:
+    """The server's own credentials only ever go to endpoints the server chose."""
+    supplied = {value for value in env.values() if isinstance(value, str)}
+
+    def from_request(argument: str) -> bool:
+        value = kwargs.get(argument)
+        return isinstance(value, str) and value != "" and value in supplied
+
+    if not any(from_request(argument) for argument in ENDPOINT_ARGUMENTS):
+        return
+    if all(from_request(argument) for argument in _key_arguments(kwargs.get("model") or "")):
+        return
+    raise RequestEndpointWithoutKeyError(
+        "A request that sets the model endpoint must also supply the credential for it"
+    )
+
+
 def patch_litellm_params(kwargs):
     kwargs["drop_params"] = True
     # Caching on disk is timing out for some reason, disable it
@@ -525,6 +559,7 @@ def patch_litellm_params(kwargs):
 
     if "extra_headers" in kwargs and isinstance(kwargs["extra_headers"], str):
         kwargs["extra_headers"] = json.loads(kwargs["extra_headers"])
+    refuse_request_endpoint_without_key(kwargs, request_env)
 
     # Azure patches. Kept before the rewrite: a deployment name is arbitrary
     # ("prod-judge"), so after this block there is nothing left in the model
@@ -601,6 +636,7 @@ def patch_litellm_embedding_params(kwargs):
 
     if "extra_headers" in kwargs and isinstance(kwargs["extra_headers"], str):
         kwargs["extra_headers"] = json.loads(kwargs["extra_headers"])
+    refuse_request_endpoint_without_key(kwargs, request_env)
 
     return kwargs
 

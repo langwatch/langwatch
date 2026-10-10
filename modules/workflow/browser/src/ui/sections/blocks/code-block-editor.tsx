@@ -1,9 +1,8 @@
-import { useColorMode } from "@langwatch/design-system/color-mode";
+import { CodePreview } from "@langwatch/design-system/code-preview";
 import { Box, chakra, HStack, Text } from "@langwatch/design-system/primitives";
 import { Edit2 } from "lucide-react";
 import { useState } from "react";
 
-import { RenderCode } from "../code/render-code.tsx";
 import { CodeEditorModal } from "../optimization_studio/code/workflow-code-editor.transport.tsx";
 
 export interface CodeBlockField {
@@ -62,9 +61,6 @@ export function CodeBlockEditor({
   viewStateKey,
 }: CodeBlockEditorProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const { colorMode } = useColorMode();
-  const previewBg = colorMode === "dark" ? "#1E1E1E" : "#FFFFFF";
-  const previewBorder = colorMode === "dark" ? "#2D2D2D" : "#E5E5E5";
 
   const handleOpen = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -93,7 +89,7 @@ export function CodeBlockEditor({
         left={0}
         width="100%"
         height="100%"
-        background="rgba(0, 0, 0, 0.2)"
+        background="bg.scrim"
         zIndex={10}
         opacity={0}
         cursor="pointer"
@@ -106,8 +102,8 @@ export function CodeBlockEditor({
           gap={2}
           fontSize="18px"
           fontWeight="bold"
-          color="white"
-          background="rgba(0, 0, 0, .5)"
+          color="fg"
+          background="bg.card"
           paddingY={2}
           paddingX={4}
           borderRadius="6px"
@@ -118,21 +114,13 @@ export function CodeBlockEditor({
       </chakra.button>
 
       {/* Code preview */}
-      <RenderCode
+      <CodePreview
         code={code}
         language={language}
-        colorMode={colorMode}
-        style={{
-          width: "100%",
-          fontSize: "12px",
-          padding: "12px",
-          borderRadius: "8px",
-          backgroundColor: previewBg,
-          border: `1px solid ${previewBorder}`,
-          maxHeight: "200px",
-          overflowY: "hidden",
-          fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
-        }}
+        filename={`code.${language === "python" ? "py" : language}`}
+        maxHeight="200px"
+        lineNumbers
+        compact
       />
 
       {/* Editor modal - only render internally when not using external modal */}

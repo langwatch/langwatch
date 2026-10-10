@@ -1,5 +1,5 @@
 /**
- * The Navigation capability (record 10.1): the address bar, leaving the
+ * The Navigation host service (record 10.1): the address bar, leaving the
  * application, a stale chunk after a deploy, and an API that has not answered.
  */
 
@@ -16,6 +16,7 @@ import {
 } from "react-router";
 
 import { UiNavigation, UiRoute, type UiRouteReadingValues } from "./capabilities.ts";
+import { readUiStorage } from "./storage.ts";
 
 /**
  * A failure that never reached the server — not a refusal, not a bug. A
@@ -176,7 +177,7 @@ export function forceReloadOnce(): boolean {
 
 export function reloadOnChunkError(err: unknown): boolean {
   if (!isChunkLoadError(err)) return false;
-  forceReloadOnce();
+  reloadWhenIdle();
   return true;
 }
 
@@ -198,11 +199,59 @@ export async function warmChunk(load: () => Promise<unknown>): Promise<boolean> 
   }
 }
 
+/** A reload waits until nobody has touched the page this long; `haven-reload-idle-ms` overrides. */
+export const RELOAD_IDLE_MS = 60_000;
+export const RELOAD_IDLE_KEY = "haven-reload-idle-ms";
+const INPUT_EVENTS = ["pointerdown", "keydown", "wheel", "touchstart"] as const;
+
+let lastInputAt = Number.NEGATIVE_INFINITY;
+let isTrackingInput = false;
+let idleReload: ReturnType<typeof setTimeout> | undefined;
+
+function trackInput(): void {
+  if (isTrackingInput) return;
+  isTrackingInput = true;
+  for (const type of INPUT_EVENTS) {
+    window.addEventListener(type, () => (lastInputAt = nowInstant().epochMilliseconds), {
+      capture: true,
+      passive: true,
+    });
+  }
+}
+
+/** A page a `haven up --ui=watch` stack served: its api port marks the head. */
+function isWatchModePage(): boolean {
+  return document.querySelector('meta[name="haven-ui-watch"]') !== null;
+}
+
+function reloadIdleMs(): number {
+  const override = Number(readUiStorage(RELOAD_IDLE_KEY));
+  return Number.isFinite(override) && override > 0 ? override : RELOAD_IDLE_MS;
+}
+
+/**
+ * Reloads now, except on a watch-mode page someone is using (recent input, not
+ * hidden): that one reloads once they stop. True when it reloaded now.
+ */
+export function reloadWhenIdle(): boolean {
+  if (typeof window === "undefined") return false;
+  trackInput();
+  const remainingMs = lastInputAt + reloadIdleMs() - nowInstant().epochMilliseconds;
+  if (!isWatchModePage() || document.hidden || remainingMs <= 0) return forceReloadOnce();
+  if (idleReload) clearTimeout(idleReload);
+  idleReload = setTimeout(() => {
+    idleReload = void 0;
+    reloadWhenIdle();
+  }, remainingMs);
+  return false;
+}
+
 export function registerChunkReloadListener(): void {
   if (typeof window === "undefined") return;
+  trackInput();
   window.addEventListener("vite:preloadError", (event) => {
     if (warmupsInFlight === 0) {
-      if (forceReloadOnce()) event.preventDefault();
+      if (reloadWhenIdle()) event.preventDefault();
       return;
     }
 
@@ -210,9 +259,36 @@ export function registerChunkReloadListener(): void {
     setTimeout(() => {
       const claimed =
         typeof payload === "object" && payload !== null && warmupFailures.has(payload);
-      if (!claimed) forceReloadOnce();
+      if (!claimed) reloadWhenIdle();
     }, 0);
   });
+}
+
+const ENTRY_SCRIPT = /<script\b[^>]*\bsrc="([^"]*\/assets\/[^"]+\.js)"/;
+
+/**
+ * A rebuild swapped in under an open page of a `haven up --ui=watch` stack: polls
+ * the served index for a new entry chunk, then reloads once the reader is idle.
+ * Any other page (production, built, a Vite server) does nothing.
+ */
+export function reloadOnBundleSwap({ pollMs = 5_000 }: { pollMs?: number } = {}): void {
+  if (typeof window === "undefined") return;
+  const entry = document
+    .querySelector('script[type="module"][src*="/assets/"]')
+    ?.getAttribute("src");
+  if (!entry || !isWatchModePage()) return;
+  trackInput();
+  const poll = setInterval(() => {
+    void fetch("/", { cache: "no-store" })
+      .then((answer) => (answer.ok ? answer.text() : ""))
+      .then((html) => {
+        const served = ENTRY_SCRIPT.exec(html)?.[1];
+        if (!served || served === entry) return;
+        clearInterval(poll);
+        reloadWhenIdle();
+      })
+      .catch(() => void 0);
+  }, pollMs);
 }
 
 /**
@@ -374,7 +450,7 @@ export function useUiApiWait({
  * `ui/sections`); what's left here is the shape of the tree itself.
  */
 
-export type UiRouter = ReturnType<typeof createBrowserRouter>;
+export type UiBrowserRouter = ReturnType<typeof createBrowserRouter>;
 
 export type UiRouterOptions = {
   /** The application's routes, in match order. */
@@ -398,7 +474,7 @@ export function createUiRouter({
   routes,
   rootComponent,
   rootErrorBoundary,
-}: UiRouterOptions): UiRouter {
+}: UiRouterOptions): UiBrowserRouter {
   return createBrowserRouter([
     {
       Component: rootComponent,
@@ -410,7 +486,7 @@ export function createUiRouter({
 }
 
 /**
- * The navigation capability, over the router this package already owns —
+ * The navigation host service, over the router this package already owns —
  * `react-router` is sealed off from a frontend feature (ADR-004), so a
  * screen gets a `UiNavigation` instead, which a test can record.
  */
@@ -493,7 +569,7 @@ export function createUiRoute({
   return new RouterUiRoute(values, setQuery);
 }
 
-/** The route capability of the router this render is inside. */
+/** The route host service of the router this render is inside. */
 export function useRouterUiRoute(): UiRoute {
   const params = useParams();
   const { pathname } = useLocation();

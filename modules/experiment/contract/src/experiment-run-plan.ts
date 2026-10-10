@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 /**
  * The plan a run's `started` event carries (ARCHITECTURE §9, D4 and D5): everything a cell reads
  * from the run's fold to execute, fixed when the run starts.
@@ -27,7 +28,7 @@ const planEvaluatorSchema = z.custom<EvaluatorConfig>((value) =>
 export const experimentRunOriginSchema = z.enum(["workbench", "saved", "workflow"]);
 
 /** A phase-1 cell: one row against one target, then that target's evaluators in order. */
-export const experimentRunTargetCellSchema = z.object({
+const experimentRunTargetCellSchemaDefinition = z.object({
   ordinal: z.number().int().nonnegative(),
   phase: z.literal(1),
   rowIndex: z.number().int().nonnegative(),
@@ -38,15 +39,25 @@ export const experimentRunTargetCellSchema = z.object({
   skipTarget: z.boolean().optional(),
   traceId: z.string().optional(),
 });
+export interface ExperimentRunTargetCellSchema extends Named<
+  typeof experimentRunTargetCellSchemaDefinition
+> {}
+export const experimentRunTargetCellSchema: ExperimentRunTargetCellSchema =
+  experimentRunTargetCellSchemaDefinition;
 
 /** Why a comparison cannot be built for any row: known at start, from the configuration alone. */
-export const experimentRunComparisonSetupSkipSchema = z.object({
+const experimentRunComparisonSetupSkipSchemaDefinition = z.object({
   kind: z.enum(["too-few-variants", "golden-not-set", "variant-not-found"]),
   variantNames: z.array(z.string()),
 });
+export interface ExperimentRunComparisonSetupSkipSchema extends Named<
+  typeof experimentRunComparisonSetupSkipSchemaDefinition
+> {}
+export const experimentRunComparisonSetupSkipSchema: ExperimentRunComparisonSetupSkipSchema =
+  experimentRunComparisonSetupSkipSchemaDefinition;
 
 /** A phase-2 cell: one row's comparison, judged once every target cell has finished. */
-export const experimentRunComparisonCellSchema = z.object({
+const experimentRunComparisonCellSchemaDefinition = z.object({
   ordinal: z.number().int().nonnegative(),
   phase: z.literal(2),
   rowIndex: z.number().int().nonnegative(),
@@ -55,14 +66,24 @@ export const experimentRunComparisonCellSchema = z.object({
   evaluatorId: z.string(),
   setupSkip: experimentRunComparisonSetupSkipSchema.optional(),
 });
+export interface ExperimentRunComparisonCellSchema extends Named<
+  typeof experimentRunComparisonCellSchemaDefinition
+> {}
+export const experimentRunComparisonCellSchema: ExperimentRunComparisonCellSchema =
+  experimentRunComparisonCellSchemaDefinition;
 
-export const experimentRunPlanCellSchema = z.discriminatedUnion("phase", [
+const experimentRunPlanCellSchemaDefinition = z.discriminatedUnion("phase", [
   experimentRunTargetCellSchema,
   experimentRunComparisonCellSchema,
 ]);
+export interface ExperimentRunPlanCellSchema extends Named<
+  typeof experimentRunPlanCellSchemaDefinition
+> {}
+export const experimentRunPlanCellSchema: ExperimentRunPlanCellSchema =
+  experimentRunPlanCellSchemaDefinition;
 
 /** A target's prompt or workflow as resolved at start, so every cell runs the same one. */
-export const experimentRunPinnedVersionsSchema = z.object({
+const experimentRunPinnedVersionsSchemaDefinition = z.object({
   prompts: z.array(
     z.object({ targetId: z.string(), promptId: z.string(), version: z.number().int() }),
   ),
@@ -70,8 +91,13 @@ export const experimentRunPinnedVersionsSchema = z.object({
     z.object({ targetId: z.string(), workflowId: z.string(), versionId: z.string() }),
   ),
 });
+export interface ExperimentRunPinnedVersionsSchema extends Named<
+  typeof experimentRunPinnedVersionsSchemaDefinition
+> {}
+export const experimentRunPinnedVersionsSchema: ExperimentRunPinnedVersionsSchema =
+  experimentRunPinnedVersionsSchemaDefinition;
 
-export const experimentRunPlanSchema = z.object({
+const experimentRunPlanSchemaDefinition = z.object({
   concurrency: z.number().int().positive(),
   origin: experimentRunOriginSchema,
   persistResults: z.boolean(),
@@ -108,6 +134,8 @@ export const experimentRunPlanSchema = z.object({
     )
     .optional(),
 });
+export interface ExperimentRunPlanSchema extends Named<typeof experimentRunPlanSchemaDefinition> {}
+export const experimentRunPlanSchema: ExperimentRunPlanSchema = experimentRunPlanSchemaDefinition;
 
 export type ExperimentRunOrigin = z.infer<typeof experimentRunOriginSchema>;
 export type ExperimentRunTargetCell = z.infer<typeof experimentRunTargetCellSchema>;

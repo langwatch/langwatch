@@ -51,7 +51,7 @@ export function WebhookSecretDialog({
         }
       }}
     >
-      <Dialog.Content bg="bg" data-testid="webhook-secret-dialog">
+      <Dialog.Content data-testid="webhook-secret-dialog">
         <Dialog.Header>
           <Dialog.Title>Signing secret</Dialog.Title>
         </Dialog.Header>

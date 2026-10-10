@@ -53,9 +53,13 @@ export const useDebouncedTextarea = ({ value, onChange }: UseDebouncedTextareaPr
     [onChange],
   );
 
+  // Blur precedes a Save click, so pending keystrokes must reach the parent first.
+  const flushPendingChange = useCallback(() => debouncedOnChange.flush(), [debouncedOnChange]);
+
   return {
     localValue,
     handleValueChange,
     setValueImmediate,
+    flushPendingChange,
   };
 };

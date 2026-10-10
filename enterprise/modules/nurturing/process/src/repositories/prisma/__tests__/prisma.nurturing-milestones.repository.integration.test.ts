@@ -49,6 +49,25 @@ describe.skipIf(!databaseUrl)("given nurturing's organizations table", () => {
     });
   });
 
+  describe("when two events record one organization at once", () => {
+    /** @scenario "Concurrent events recording one organization leave one row and raise no error" */
+    it("resolves both and leaves one row", async () => {
+      const raced = `${organizationId}-raced`;
+      const input = { organizationId: raced, adminUserId: null, seeded: true };
+
+      await expect(
+        Promise.all(Array.from({ length: 5 }, () => repository.recordOrganization(input))),
+      ).resolves.toHaveLength(5);
+
+      await expect(
+        connection.client.nurturingOrganization.findMany({ where: { organizationId: raced } }),
+      ).resolves.toHaveLength(1);
+      await connection.client.nurturingOrganization.deleteMany({
+        where: { organizationId: raced },
+      });
+    });
+  });
+
   describe("when the organization is one nurturing never learned", () => {
     it("counts nothing", async () => {
       await expect(

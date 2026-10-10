@@ -1,10 +1,10 @@
 import type { AgentApi } from "@langwatch/agent-contract";
 import {
   principalOfCredential,
-  bindRestMiddleware,
+  bindMiddlewareContext,
   canonicalErrorResponse,
   createRestRuntime,
-  projectRestFacts,
+  projectRequestContext,
   type RestMountOptions,
 } from "@langwatch/api/rest";
 /**
@@ -29,6 +29,7 @@ import {
 } from "@langwatch/scenario-contract";
 import { suiteSchema, type Suite, type SuiteApi } from "@langwatch/suite-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { fromDate } from "@langwatch/time";
 
 import { CollapsingRunCommands } from "../../__tests__/support/collapsing-run-commands.ts";
@@ -36,7 +37,7 @@ import { SuiteModule } from "../../app/suite.app.ts";
 import { MemorySuiteDatabase } from "../../repositories/memory/memory.suite.database.ts";
 import { MemorySuiteRunProcessingRepository } from "../../repositories/memory/memory.suite.repositories.ts";
 import { MemorySuiteRepository } from "../../repositories/memory/memory.suite.repository.ts";
-import { suiteRunOriginFact } from "../../rules/suite-wire-v1.rules.ts";
+import { suiteRunOrigin } from "../../rules/suite-wire-v1.rules.ts";
 import { SuiteExecutionService } from "../../services/suite-execution.service.ts";
 import { createRunPlansRest } from "../run-plans.rest.ts";
 import { createSuitesAliasRest } from "../suites-alias.rest.ts";
@@ -51,6 +52,7 @@ export const TEST_PROJECT = {
   organizationId: "organization-1",
   isPersonal: false,
   ownerUserId: null,
+  kind: "application",
 } as const;
 
 const NOW = new Date("2026-01-01T00:00:00.000Z");
@@ -470,6 +472,8 @@ export function mountSuiteFamilies(
   });
 
   const runtime = createRestRuntime({
+    audit: { record: () => {} },
+    authorization: restTestAuthorization(),
     identity: {
       authenticate: () => ({
         actor: caller.userId ? { type: "user", id: caller.userId } : null,
@@ -481,14 +485,14 @@ export function mountSuiteFamilies(
     app: () => app,
     credential: "project",
     onError: canonicalErrorResponse,
-    facts: [
-      bindRestMiddleware(projectRestFacts, () => ({
+    middlewareContext: [
+      bindMiddlewareContext(projectRequestContext, () => ({
         projectSlug: TEST_PROJECT.slug,
         viewerUserId: caller.userId ?? null,
         actorId: caller.userId ?? "project-key-1",
       })),
-      bindRestMiddleware(suiteRunOriginFact, (context) => ({
-        surface: context.req.header("x-langwatch-surface") ?? null,
+      bindMiddlewareContext(suiteRunOrigin, (request) => ({
+        surface: request.headers.get("x-langwatch-surface") ?? null,
         callerKey:
           caller.apiKeyId === undefined
             ? null

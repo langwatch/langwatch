@@ -391,7 +391,7 @@ describe("starting a run of one scenario from the scenario table", () => {
     await confirmRowRun(user);
 
     expect(mockRouterPush).not.toHaveBeenCalled();
-    expect(screen.getByTestId("suite-rail-item-Refunds")).toHaveAttribute("aria-current", "true");
+    expect(screen.getByTestId("suite-rail-item-Refunds")).toHaveAttribute("aria-current", "page");
   });
 
   /** @scenario "The run detail drawer opens as soon as the run is queued" */

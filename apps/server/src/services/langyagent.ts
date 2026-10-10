@@ -2,25 +2,17 @@ import { mkdirSync } from "node:fs";
 import { delimiter, join } from "node:path";
 
 import { nowInstant } from "@langwatch/time";
-import { execa } from "execa";
 
 import type { RuntimeContext } from "../shared/runtime-contract.ts";
 import type { EventBus } from "./event-bus.ts";
+import { monobinaryOffers } from "./go-services.ts";
 import { httpGetCheck, pollUntilHealthy } from "./health.ts";
 import { servicePaths } from "./paths.ts";
 import { supervise, type SupervisedHandle } from "./spawn.ts";
 
 // Check if mono-binary supports langyagent subcommand.
-export async function monobinarySupportsLangyagent(binary: string): Promise<boolean> {
-  try {
-    const { stdout, stderr } = await execa(binary, [], {
-      reject: false,
-      timeout: 5_000,
-    });
-    return `${stdout}\n${stderr}`.includes("langyagent");
-  } catch {
-    return false;
-  }
+export function monobinarySupportsLangyagent(binary: string): Promise<boolean> {
+  return monobinaryOffers({ binary, command: "langyagent" });
 }
 
 // The manager only accepts running workers without per-worker isolation in a

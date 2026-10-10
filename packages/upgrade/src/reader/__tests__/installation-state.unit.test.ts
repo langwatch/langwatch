@@ -1,5 +1,6 @@
 /**
  * @see specs/upgrade/upgrade-reader.feature
+ * @see specs/upgrade/upgrade-stuck-states-gate.feature
  */
 import { describe, expect, it } from "vitest";
 
@@ -16,11 +17,20 @@ function facts(overrides: Partial<InstallationFacts> = {}): InstallationFacts {
     steps: [{ id: "prisma:1", status: "done" }],
     failedTargets: 0,
     holdsLease: false,
+    lastRunFailed: false,
     ...overrides,
   };
 }
 
 describe("computeInstallationState", () => {
+  /** @scenario "A failed last run with every step settled reads as needs attention" */
+  it("reads a failed last run as needs attention when every step is done", () => {
+    expect(computeInstallationState(facts({ lastRunFailed: true }))).toMatchObject({
+      state: "needs-attention",
+      reason: "failed-run",
+    });
+  });
+
   /** @scenario "An installation whose image and ledger agree is up to date" */
   it("reads an agreeing image and ledger as up to date", () => {
     expect(computeInstallationState(facts())).toMatchObject({

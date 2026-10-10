@@ -30,6 +30,7 @@ function identity({ id, name }: { id: string; name: string }): ProjectIdentity {
     organizationId: ORG,
     isPersonal: false,
     ownerUserId: null,
+    kind: "application",
   };
 }
 

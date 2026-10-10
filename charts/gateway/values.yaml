@@ -131,6 +131,18 @@ otel:
   batchTimeout: 5s
   maxQueueSize: 8192
 
+# Prometheus scrape listener. Off by default. When enabled the gateway
+# serves /metrics on its own port (not on the public :5563 listener),
+# and a scrape must send `Authorization: Bearer <METRICS_API_KEY>`. The key
+# is read from a Secret (existingSecretName falls back to
+# secrets.existingSecretName). Without the key the listener is not started.
+metrics:
+  enabled: false
+  port: 9464
+  apiKey:
+    existingSecretName: ""
+    secretKey: METRICS_API_KEY
+
 logging:
   level: info # debug|info|warn|error
 
@@ -336,12 +348,16 @@ networkPolicy:
   enabled: false
 
   # Who can talk TO the gateway (matched as a Kubernetes NetworkPolicy
-  # `from` list). Default = ingress-nginx controller + Prometheus.
-  # Override if you run a different ingress class or scraper.
+  # `from` list). Default = ingress-nginx controller.
+  # Override if you run a different ingress class.
   ingressFrom:
     - namespaceSelector:
         matchLabels:
           kubernetes.io/metadata.name: ingress-nginx
+
+  # Who can scrape the metrics port (used when metrics.enabled is true).
+  # Default = Prometheus in the monitoring namespace. Override for another scraper.
+  metricsFrom:
     - namespaceSelector:
         matchLabels:
           kubernetes.io/metadata.name: monitoring

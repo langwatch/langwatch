@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 export const STRIPE_PRICE_NAMES = [
@@ -78,12 +79,17 @@ export type StripePriceMap = Partial<Record<StripePriceName, string>> &
     string
   >;
 
-export const stripePriceRecurringSchema = z.object({
+const stripePriceRecurringSchemaDefinition = z.object({
   interval: z.enum(["day", "week", "month", "year"]),
   intervalCount: z.number(),
 });
+export interface StripePriceRecurringSchema extends Named<
+  typeof stripePriceRecurringSchemaDefinition
+> {}
+export const stripePriceRecurringSchema: StripePriceRecurringSchema =
+  stripePriceRecurringSchemaDefinition;
 
-export const stripePriceDetailSchema = z.object({
+const stripePriceDetailSchemaDefinition = z.object({
   id: z.string(),
   active: z.boolean(),
   livemode: z.boolean(),
@@ -96,6 +102,8 @@ export const stripePriceDetailSchema = z.object({
   lookupKey: z.string().nullable(),
   metadata: z.record(z.string(), z.string()),
 });
+export interface StripePriceDetailSchema extends Named<typeof stripePriceDetailSchemaDefinition> {}
+export const stripePriceDetailSchema: StripePriceDetailSchema = stripePriceDetailSchemaDefinition;
 
 export type StripePriceDetail = z.infer<typeof stripePriceDetailSchema>;
 
@@ -110,7 +118,7 @@ const stripeOptionalEnvironmentMappingSchema = z.object({
   live: z.string().optional(),
 });
 
-export const stripePriceMappingSchema = z.object(
+const stripePriceMappingSchemaDefinition = z.object(
   Object.fromEntries(
     STRIPE_PRICE_NAMES.map((key) => [
       key,
@@ -120,8 +128,13 @@ export const stripePriceMappingSchema = z.object(
     ]),
   ) as Record<StripePriceName, typeof stripeEnvironmentMappingSchema>,
 );
+export interface StripePriceMappingSchema extends Named<
+  typeof stripePriceMappingSchemaDefinition
+> {}
+export const stripePriceMappingSchema: StripePriceMappingSchema =
+  stripePriceMappingSchemaDefinition;
 
-export const stripeMeterMappingSchema = z.object(
+const stripeMeterMappingSchemaDefinition = z.object(
   Object.fromEntries(
     STRIPE_METER_NAMES.map((key) => [
       key,
@@ -131,11 +144,18 @@ export const stripeMeterMappingSchema = z.object(
     ]),
   ) as Record<StripeMeterName, typeof stripeEnvironmentMappingSchema>,
 );
+export interface StripeMeterMappingSchema extends Named<
+  typeof stripeMeterMappingSchemaDefinition
+> {}
+export const stripeMeterMappingSchema: StripeMeterMappingSchema =
+  stripeMeterMappingSchemaDefinition;
 
-export const stripePricesFileSchema = z.object({
+const stripePricesFileSchemaDefinition = z.object({
   schemaVersion: z.number(),
   updatedAt: z.string(),
   mapping: stripePriceMappingSchema,
   meters: stripeMeterMappingSchema,
   prices: z.record(z.string(), stripePriceDetailSchema),
 });
+export interface StripePricesFileSchema extends Named<typeof stripePricesFileSchemaDefinition> {}
+export const stripePricesFileSchema: StripePricesFileSchema = stripePricesFileSchemaDefinition;

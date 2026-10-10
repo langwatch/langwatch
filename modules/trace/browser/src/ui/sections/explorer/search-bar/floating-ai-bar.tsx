@@ -1,4 +1,5 @@
 import { Box, HStack, Icon, Text } from "@langwatch/design-system/primitives";
+import { isAggregateProjectKind } from "@langwatch/project-contract";
 import { Lightbulb } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import type React from "react";
@@ -7,6 +8,7 @@ import { createPortal } from "react-dom";
 
 import { useFilterStore } from "../../../../behavior/explorer.store.ts";
 import type { FloatRect } from "../../../../behavior/use-float-rect.ts";
+import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import { AiQueryComposer } from "./ai-query-composer.tsx";
 import { AiShaderBackdrop } from "./ai-shader-backdrop.tsx";
 import { FloatingAiErrorRow } from "./floating-ai-error-row.tsx";
@@ -19,22 +21,33 @@ interface FloatingAiBarProps {
   autoSubmit?: boolean;
 }
 
-const AI_TIPS = [
-  "Save the result as a lens with the + button next to your lenses.",
+const SAVE_AS_LENS_TIP = "Save the result as a lens with the + button next to your lenses.";
+
+const GENERAL_TIPS = [
   "Press Enter to apply, Esc to cancel.",
   "Don't know the syntax? AI's got your back. Just describe what you want.",
 ];
 
+/** Tips for a project that can save lenses: the "+" tip leads. */
+const TIPS_WITH_LENS_SAVE = [SAVE_AS_LENS_TIP, ...GENERAL_TIPS];
+
+/**
+ * Cycles the composer tips. An aggregate project has no "+" to save a lens
+ * (ADR-177), so its tips leave out the one that points to it.
+ */
 const useCyclingTip = (active: boolean): string => {
+  const { project } = useOrganizationTeamProject();
+  const canSaveLenses = !isAggregateProjectKind(project?.kind);
+  const tips = canSaveLenses ? TIPS_WITH_LENS_SAVE : GENERAL_TIPS;
   const [index, setIndex] = useState(0);
   useEffect(() => {
     if (!active) return;
     const id = setInterval(() => {
-      setIndex((i) => (i + 1) % AI_TIPS.length);
+      setIndex((i) => i + 1);
     }, 4200);
     return () => clearInterval(id);
   }, [active]);
-  return AI_TIPS[index] ?? AI_TIPS[0]!;
+  return tips[index % tips.length]!;
 };
 
 /**
@@ -64,7 +77,8 @@ export const FloatingAiBar: React.FC<FloatingAiBarProps> = ({
           zIndex: 30,
           minHeight: "38px",
           borderTopLeftRadius: "var(--chakra-radii-lg)",
-          boxShadow: "0 4px 12px rgba(237,137,38,0.12), 0 2px 6px rgba(0,0,0,0.06)",
+          boxShadow:
+            "0 4px 12px color-mix(in srgb, var(--chakra-colors-accent-solid) 12%, transparent), 0 2px 6px color-mix(in srgb, var(--chakra-colors-bg-scrim) 6%, transparent)",
         }}
         initial={{ opacity: 0, filter: "blur(10px)" }}
         animate={{ opacity: 1, filter: "blur(0px)" }}
@@ -78,7 +92,7 @@ export const FloatingAiBar: React.FC<FloatingAiBarProps> = ({
           left="1.5px"
           right="1.5px"
           bottom="1.5px"
-          bg="bg.surface/92"
+          bg="bg.card/92"
           borderTopLeftRadius="lg"
           borderTopRightRadius={0}
           borderBottomLeftRadius={0}
@@ -137,7 +151,7 @@ export const FloatingAiBar: React.FC<FloatingAiBarProps> = ({
                   borderRadius="md"
                   paddingX={2}
                   paddingY={1}
-                  boxShadow="0 2px 6px rgba(0,0,0,0.1)"
+                  boxShadow="0 2px 6px color-mix(in srgb, var(--chakra-colors-bg-scrim) 10%, transparent)"
                 >
                   <Icon color="yellow.fg" boxSize="11px" flexShrink={0}>
                     <Lightbulb />

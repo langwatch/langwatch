@@ -83,9 +83,9 @@ export function isBudgetNearLimit(item: BudgetOverviewItemView): boolean {
 }
 
 function barColor(item: BudgetOverviewItemView): string {
-  if (isBudgetBreached(item)) return "red.500";
-  if (isBudgetNearLimit(item)) return "yellow.500";
-  return "blue.400";
+  if (isBudgetBreached(item)) return "red.fg";
+  if (isBudgetNearLimit(item)) return "yellow.fg";
+  return "blue.fg";
 }
 
 export function BudgetOverviewList({ items }: { items: BudgetOverviewItemView[] }) {

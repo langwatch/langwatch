@@ -1,3 +1,4 @@
+import { projectRequestContextOf } from "@langwatch/api/rest";
 import type { EvaluatorApi, EvaluatorServerConfig } from "@langwatch/evaluator-contract";
 import { defineProcessModule, type PublishedProcessModule } from "@langwatch/process";
 
@@ -16,5 +17,6 @@ export const evaluatorProcessModule: PublishedProcessModule<
   .withRepositories(evaluatorRepositories)
   .withApi(EvaluatorModule)
   .withTransports(createEvaluatorRest(), evaluatorTrpcTransport)
+  .provideMiddlewareContext({ projectRequestContext: projectRequestContextOf })
   .withEventing(evaluatorLifecycleEventing)
   .withEventing(evaluatorWorkflowArchiveCascadeEventing);

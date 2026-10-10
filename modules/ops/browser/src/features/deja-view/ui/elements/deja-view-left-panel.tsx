@@ -72,7 +72,7 @@ export function LeftPanel({
                 onClick={() => onSelectProjection(isSelected ? null : proj.projectionName)}
               >
                 <HStack gap={2}>
-                  <Circle size={8} fill="currentColor" color="green.500" />
+                  <Circle size={8} fill="currentColor" color="var(--chakra-colors-green-fg)" />
                   <VStack align="start" gap={0}>
                     <Text textStyle="xs" fontWeight="medium">
                       {proj.projectionName}
@@ -120,7 +120,7 @@ export function LeftPanel({
               borderBottomColor="border"
             >
               <HStack gap={2}>
-                <Circle size={8} fill="currentColor" color="cyan.500" />
+                <Circle size={8} fill="currentColor" color="var(--chakra-colors-cyan-fg)" />
                 <VStack align="start" gap={0} minW={0}>
                   <Text textStyle="xs" fontWeight="medium">
                     {subscriber.subscriberName}

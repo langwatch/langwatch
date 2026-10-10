@@ -56,6 +56,28 @@ Feature: API keys v2 - the secret is shown once, and a project key is minted, ne
       When a trace is sent with that key in X-Auth-Token
       Then the key resolves to project "alpha"
 
+    # Alex 2026-10-09: keys created on main keep main's access.
+    @unit
+    Scenario: A legacy project key reads its own project's traces
+      Given project "alpha" holds the legacy key "sk-lw-<48 characters>" on the project itself
+      When a trace search is sent with that key
+      Then the traces of project "alpha" are read on an own-only proof
+      And a request naming another project still reads only project "alpha"
+
+    @unit
+    Scenario: An API key with no owner reads its own project's traces
+      Given an API key created on main for project "alpha" with no owner
+      When a trace search is sent with that key
+      Then the traces of project "alpha" are read on an own-only proof
+      And the same key naming another project is refused
+
+    @unit
+    Scenario: A run nobody started is refused a trace read cleanly
+      Given the key of a run nobody started, for project "alpha"
+      When a trace search is sent with that key
+      Then the answer is 403 "permission_denied"
+
+
     # Alex 2026-10-06: never built. The legacy key still lives on Project.apiKey; no ApiKey row is backfilled.
     @unit @unimplemented
     Scenario: The backfill stores no plaintext and is safe to run twice
@@ -89,6 +111,13 @@ Feature: API keys v2 - the secret is shown once, and a project key is minted, ne
       When "max" opens the API keys of project "alpha"
       Then the legacy key status is not read
       And no banner and no error is shown
+
+    @integration
+    Scenario: A project that never had a legacy key shows no banner
+      Given project "gamma" was created after project keys were retired, so it never had a legacy key
+      When "ada" opens the API keys of project "gamma"
+      Then the legacy key status answers absent
+      And no banner is shown
 
     @unimplemented
     Scenario: The banner offers to revoke the project key

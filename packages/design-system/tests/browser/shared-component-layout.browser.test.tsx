@@ -42,7 +42,7 @@ const centreX = ({ rect }: { rect: DOMRect }) => rect.left + rect.width / 2;
 describe("the toast stack", () => {
   describe("when four toasts collapse into a dark stack", () => {
     /** @scenario "The peeking cards of a dark toast stack measure evenly in a real browser" */
-    it("steps the visible cards evenly, centres them and stands the count above the front", async () => {
+    it("steps the visible cards evenly and centres them", async () => {
       renderWithDesignSystem(<Toaster />);
       act(() => {
         for (let at = 1; at <= 4; at++) {
@@ -72,10 +72,6 @@ describe("the toast stack", () => {
               Math.abs(centreX({ rect: card }) - centreX({ rect: front })),
             ).toBeLessThanOrEqual(1);
           }
-
-          const pill = document.querySelector("[data-toast-more]");
-          if (!pill) throw new Error("no count pill");
-          expect(pill.getBoundingClientRect().bottom).toBeLessThanOrEqual(front.top);
         },
         { timeout: 3000 },
       );

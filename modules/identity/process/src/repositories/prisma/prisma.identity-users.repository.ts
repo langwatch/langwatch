@@ -1,3 +1,4 @@
+import { skipTenantCheck } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { UserNotFoundError } from "@langwatch/user-contract";
 
@@ -28,7 +29,10 @@ export class PrismaIdentityUsersRepository implements IdentityUsersRepository {
     // As SQL so a mint parked on the row lock re-checks the committed row;
     // `updateMany`'s subquery would let the second writer overwrite the first.
     await this.database.$executeRaw`
-      -- @tenancy: User is an identity table, addressed by its own id.
+      ${skipTenantCheck({
+        // User is an identity table, addressed by its own id.
+        SKIP_TENANT_CHECK: true,
+      })}
       UPDATE "User"
          SET "userHashKey" = ${userHashKey},
              "updatedAt" = now()
@@ -61,7 +65,10 @@ export class PrismaIdentityUsersRepository implements IdentityUsersRepository {
     // Exact equality, not Prisma's insensitive `equals`: that compiles to ILIKE,
     // where an `_` in the address matches any character and counts a stranger.
     const [row] = await this.database.$queryRaw<{ holders: bigint }[]>`
-      -- @tenancy: an address names one account fleet-wide or it names nobody.
+      ${skipTenantCheck({
+        // An address names one account fleet-wide or it names nobody.
+        SKIP_TENANT_CHECK: true,
+      })}
       SELECT count(*) AS "holders" FROM "User" WHERE lower("email") = lower(${user.email})
     `;
     return {

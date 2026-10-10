@@ -1,4 +1,9 @@
-import { DEFAULT_PARTITION_WINDOW_MS, queryWindowed } from "@langwatch/clickhouse-client";
+import type { Authorization } from "@langwatch/authorization";
+import {
+  DEFAULT_PARTITION_WINDOW_MS,
+  ownProjectIdOf,
+  queryWindowed,
+} from "@langwatch/clickhouse-client";
 import { EventUtils } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import type { DerivedTraceEvent, NormalizedSpan } from "@langwatch/trace-contract";
@@ -114,11 +119,17 @@ export class TraceDerivationSpanClickHouseRepository {
 
   // Every span event of one trace, flattened. ARRAY JOIN outside dedup subquery
   // to avoid multiplying tuple comparisons by event count
-  async findDerivedEventsByTraceId(input: {
-    tenantId: string;
+  async findDerivedEventsByTraceId({
+    authorization,
+    ...rest
+  }: {
+    authorization: Authorization;
     traceId: string;
     occurredAtMs?: number;
   }): Promise<DerivedTraceEvent[]> {
+    // shortcut: this read still filters one TenantId, so it takes the proof's own project;
+    // fence it through AuthorizedClickHouse once an aggregate derives events.
+    const input = { ...rest, tenantId: ownProjectIdOf({ authorization, reads: "traces" }) };
     EventUtils.validateTenantId(
       { tenantId: input.tenantId },
       "TraceDerivationSpanClickHouseRepository.findDerivedEventsByTraceId",

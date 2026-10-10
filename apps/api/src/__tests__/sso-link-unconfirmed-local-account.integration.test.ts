@@ -129,7 +129,7 @@ const respond = (body: unknown): Response =>
     headers: { "content-type": "application/json" },
   });
 
-const requestUrl = (input: RequestInfo | URL): string => {
+const requestUrl = (input: Parameters<typeof fetch>[0]): string => {
   if (typeof input === "string") return input;
   return input instanceof URL ? input.toString() : input.url;
 };
@@ -168,7 +168,7 @@ const tokenResponse = () => ({
 /** The identity providers' side of every sign-in; everything else goes out as usual. */
 function stubIdentityProviders() {
   realFetch = globalThis.fetch;
-  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+  globalThis.fetch = (async (input: Parameters<typeof fetch>[0], init?: RequestInit) => {
     const url = requestUrl(input);
     if (url.startsWith(GRAPH_USERINFO)) return respond(graphUserInfo);
     if (url.startsWith(`${ENTRA_HOST}/`)) {
@@ -679,7 +679,7 @@ describe.skipIf(!liveStoresConfigured)("single sign-on onto an existing password
         });
         const dialed: string[] = [];
         const stubbed = globalThis.fetch;
-        globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+        globalThis.fetch = (async (input: Parameters<typeof fetch>[0], init?: RequestInit) => {
           dialed.push(requestUrl(input));
           return stubbed(input, init);
         }) as typeof globalThis.fetch;

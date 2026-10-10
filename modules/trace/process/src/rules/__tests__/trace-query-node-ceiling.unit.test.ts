@@ -15,7 +15,6 @@ import { traceQueryTranslation } from "../../services/__tests__/fixtures/trace-q
 const compile = (queryText: string) =>
   traceQueryTranslation.translateFilter({
     queryText,
-    tenantId: "project-1",
     timeRange: { from: 1_000, to: 2_000 },
   });
 

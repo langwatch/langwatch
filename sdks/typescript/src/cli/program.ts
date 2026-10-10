@@ -28,6 +28,7 @@ import {
   commandPath,
   PROJECT_FLAG_HELP,
   projectSelectorOf,
+  QUERY_PROJECT_FLAG_HELP,
 } from "./utils/projectOption";
 
 declare const __CLI_VERSION__: string;
@@ -1920,7 +1921,7 @@ function registerAgentCommands(program: Command): void {
       .option(
         "--param <key=value>",
         "A run parameter value for a connected agent, repeatable",
-        (value: string, previous: string[]) => [...previous, value],
+        (value: string, previous: string[] = []) => [...previous, value],
       )
       .option("--thread-id <id>", "Continue a conversation on a connected agent")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
@@ -2219,7 +2220,7 @@ function registerVirtualKeysCommands(program: Command): void {
       .option(
         "--scope <typeAndId>",
         "Scope row in type:id form (repeat the flag for several). Types: org | team | project. Defaults to the calling project when omitted. Example: --scope org:acme --scope team:platform",
-        (value: string, previous: string[]) => [...previous, value],
+        (value: string, previous: string[] = []) => [...previous, value],
       )
       .option(
         "--trace-project <id>",
@@ -2288,7 +2289,7 @@ function registerVirtualKeysCommands(program: Command): void {
       .option(
         "--scope <typeAndId>",
         "Replace the scope set (repeat the flag for several; supplies the full set). Same TYPE:id form as create.",
-        (value: string, previous: string[]) => [...previous, value],
+        (value: string, previous: string[] = []) => [...previous, value],
       )
       .option(
         "--trace-project <id>",
@@ -2957,7 +2958,7 @@ function registerQueryCommands(program: Command): void {
         "keyset: walk every page by rebinding the statement's {after_ts} and {after_id} parameters, without rewriting the statement",
       )
       .option("--out <file>", "Write the result to a file instead of stdout")
-      .option("--project <idOrSlug>", PROJECT_FLAG_HELP),
+      .option("--project <idOrSlug>", QUERY_PROJECT_FLAG_HELP),
     async (sql: string | undefined, options: Record<string, string>) => {
       const { runQueryCommand: impl } = await import("./commands/query/run.js");
       return impl(sql, options);

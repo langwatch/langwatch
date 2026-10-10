@@ -44,7 +44,8 @@ export function LangyExternalLinkDialog({
       initialFocusEl={() => stayRef.current}
     >
       {shown ? (
-        <Dialog.Content bg="bg" maxWidth="460px" errorScope="Langy link check">
+        <Dialog.Content maxWidth="460px" errorScope="Langy link check">
+          <Dialog.CloseTrigger />
           <Dialog.Header>
             <HStack gap={3} align="center">
               <ExternalLink size={18} />
@@ -104,7 +105,7 @@ export function LangyExternalLinkDialog({
           <Dialog.Footer>
             <HStack width="full">
               <Spacer />
-              <Button ref={stayRef} variant="ghost" onClick={onCancel}>
+              <Button ref={stayRef} variant="outline" onClick={onCancel}>
                 Stay here
               </Button>
               <Button colorPalette="orange" onClick={onConfirm}>

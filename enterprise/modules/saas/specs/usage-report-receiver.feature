@@ -1,7 +1,8 @@
 Feature: LangWatch Cloud receives the daily usage report
   A self-hosted install posts one anonymous usage report a day, to the app
   host's legacy address or to the connect host. Only LangWatch Cloud answers
-  it: the report lands in the install registry and in product analytics.
+  it: the report lands in the install registry and is recorded as a
+  `usage_report_received` fact, which nurturing sends on to product analytics.
 
   @unit
   Scenario: Cloud answers its own routes
@@ -33,13 +34,13 @@ Feature: LangWatch Cloud receives the daily usage report
     Given a report carrying a field this release has no name for
     When Cloud accepts it
     Then the install registry records the known fields and the count of unknown ones
-    And product analytics receives the same event against the install id
+    And a usage report received fact names the install id, the event, the known fields and the count of unknown ones
 
   @unit
-  Scenario: A memory install holds product analytics in-process
-    Given Cloud is installed over memory stores
-    When it accepts a report
-    Then the event is held in-process and ops is never asked for analytics targets
+  Scenario: A report whose fact cannot be recorded is still accepted
+    Given the received fact cannot be recorded
+    When Cloud accepts a report
+    Then the sender is still answered and the failure is logged
 
   @unit
   Scenario: A report the registry cannot store is still accepted

@@ -80,11 +80,7 @@ export function TwoStepChallengePanel({
       <Text fontSize="13.5px" lineHeight="1.65" color="fg.muted">
         {introFor(factor)}
       </Text>
-      <HandledErrorAlert
-        error={refusal}
-        fallbackTitle="Couldn't check that code"
-        className="lw-front-door-alert"
-      />
+      <HandledErrorAlert error={refusal} fallbackTitle="Couldn't check that code" />
       <form onSubmit={(event) => void onSubmit(event)} style={{ width: "100%" }}>
         <VStack width="full" align="stretch" gap="14px">
           <CodeField

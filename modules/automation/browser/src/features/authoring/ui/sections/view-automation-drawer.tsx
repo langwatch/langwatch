@@ -8,7 +8,6 @@ import {
   Badge,
   Button,
   Code,
-  Heading,
   HStack,
   Skeleton,
   Spacer,
@@ -128,7 +127,7 @@ export function ViewAutomationDrawer({ automationId, onClose, onEdit }: ViewAuto
             {triggerQuery.isLoading ? (
               <Skeleton height="24px" width="200px" />
             ) : (
-              <Heading size="md">{trigger?.name ?? (isSchedule ? "Report" : "Automation")}</Heading>
+              <Drawer.Title>{trigger?.name ?? (isSchedule ? "Report" : "Automation")}</Drawer.Title>
             )}
             <HStack gap={2}>
               {kindBadgeOf({ trigger, isGraphAlert, isSchedule })}

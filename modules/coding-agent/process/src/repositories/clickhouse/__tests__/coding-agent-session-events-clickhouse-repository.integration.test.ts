@@ -6,7 +6,7 @@
 import { randomUUID } from "node:crypto";
 
 import type { ClickHouseClient } from "@clickhouse/client";
-import { ClickHouseQueryClient, type QueryDriver } from "@langwatch/clickhouse-client";
+import { ClickHouseQueryClient, type QueryDriver, TenantGuard } from "@langwatch/clickhouse-client";
 import type { CodingAgentSessionEventRecord } from "@langwatch/coding-agent-contract";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -48,7 +48,7 @@ function queryClient(client: ClickHouseClient): ClickHouseQueryClient {
       });
     },
   };
-  return new ClickHouseQueryClient({ driver });
+  return new ClickHouseQueryClient({ tenantGuard: new TenantGuard(), driver });
 }
 
 const tag = randomUUID();

@@ -20,13 +20,12 @@ import { appRoot } from "./app-dir.ts";
 import type { EventBus } from "./event-bus.ts";
 
 /**
- * Workspace names of the four deployables, used to filter the install.
- * Renamed off plain `langwatch` per ADR-076 to avoid colliding with the
- * published SDK's package name.
+ * Workspace names of what an npx install runs, used to filter the install: the
+ * backend (api and worker in one process), the browser bundle it serves, and the
+ * task launcher. Named off plain `langwatch` (ADR-076), the published SDK's name.
  */
 export const APP_PACKAGE_NAMES = [
-  "@langwatch/platform-api",
-  "@langwatch/worker",
+  "@langwatch/backend",
   "@langwatch/ui",
   "@langwatch/tasks",
 ] as const;
@@ -42,7 +41,7 @@ export function workspaceInstallArgs(rootDir: string, { prod }: { prod: boolean 
     // One filter per deployable, each with the trailing `...` that pulls in
     // its workspace dependencies. Three, because the three dependency subtrees
     // are not subsets of one another: the browser bundle's build tooling is not
-    // in the API's closure, and the worker's queue stack is not in the UI's.
+    // in the backend's closure, and the backend's queue stack is not in the UI's.
     ...APP_PACKAGE_NAMES.flatMap((name) => ["--filter", `${name}...`]),
   ];
 }
@@ -73,12 +72,12 @@ export async function ensureLangwatchDeps(
   const workspacePath = join(rootDir, "pnpm-workspace.yaml");
   const hashFile = join(nodeModulesPath, ".install-hash");
 
-  // Only the browser bundle still needs a build step — apps/api and
-  // apps/worker run from source. index.html proves it landed whole: an
+  // Only the browser bundle still needs a build step: apps/backend runs the
+  // api and worker from source. index.html proves it landed whole: an
   // interrupted vite build leaves assets without one.
   const distAlreadyBuilt = existsSync(join(distPath, "client", "index.html"));
   // Install key from lockfile + workspace + package.json; seq5 forces re-run on old tree layouts.
-  const installKey = `${computeInstallKey(lockfilePath, workspacePath, join(apiDir, "package.json"))}|seq5-three-applications`;
+  const installKey = `${computeInstallKey(lockfilePath, workspacePath, join(apiDir, "package.json"))}|seq6-one-backend`;
 
   // Top-level symlinks are the strongest "install complete" signal: pnpm
   // populates `.pnpm/` before `.bin/`, so an interrupted install leaves
@@ -127,30 +126,15 @@ export async function ensureLangwatchDeps(
   // .github/workflows/npx-server-publish.yml); the build only runs for
   // local dogfood/dev checkouts where dist/ doesn't exist yet.
   if (!distAlreadyBuilt) {
-    // Full prod build, in the three steps the image runs: start:prepare:files
-    // (Prisma client, langevals evaluator types, the langy skill catalogue),
-    // ensure:built (the SDK and mcp-server bundles, which no --filter closure
-    // below reaches), then the browser bundle — without dist/client every
-    // browser route 404s. Neither Node process is built; both run from source.
-    for (const script of ["start:prepare:files", "ensure:built"]) {
-      await execAndPipe({
-        bus,
-        service: "prepare:langwatch",
-        bin: pnpm.command,
-        args: [...pnpm.args, "-C", rootDir, "run", script],
-      });
-    }
+    // The recipe the publish and smoke workflows run too (root `build:server`):
+    // generated files, the dist bundles, declarations, then the browser bundle.
+    // Without dist/client every browser route 404s.
     await execAndPipe({
       bus,
       service: "prepare:langwatch",
       bin: pnpm.command,
-      args: [...pnpm.args, "-C", rootDir, "--filter", "@langwatch/ui...", "run", "build"],
-      options: {
-        env: {
-          ...process.env,
-          NODE_ENV: "production",
-        },
-      },
+      args: [...pnpm.args, "-C", rootDir, "run", "build:server"],
+      options: { env: { ...process.env, NODE_ENV: "production" } },
     });
   }
 
@@ -363,18 +347,20 @@ export async function resolvePnpm(
   throw new Error("pnpm not found in <bin>/pnpm, on PATH, or via corepack");
 }
 
-// Locate deployable app directories (api, worker, ui, tasks) in relocated tree.
-function locateAppDir(name: "api" | "worker" | "ui" | "tasks"): string | null {
+// Locate app directories (api, backend, ui, tasks) in relocated tree.
+function locateAppDir(name: "api" | "backend" | "ui" | "tasks"): string | null {
   const dir = join(appRoot(), "apps", name);
   return existsSync(join(dir, "package.json")) ? dir : null;
 }
 
+/** apps/api's tree, where the install's Prisma links and install key live. */
 export function locateApiDir(): string | null {
   return locateAppDir("api");
 }
 
-export function locateWorkerDir(): string | null {
-  return locateAppDir("worker");
+/** The one Node process the CLI spawns: the api and the worker together. */
+export function locateBackendDir(): string | null {
+  return locateAppDir("backend");
 }
 
 export function locateUiDir(): string | null {

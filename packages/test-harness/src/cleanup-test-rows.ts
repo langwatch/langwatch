@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
+
 import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 
 /**
@@ -230,4 +233,22 @@ export async function cleanupTestRows(
         "sweeping the table.",
     );
   }
+}
+
+const MIGRATIONS_DIR = path.resolve(import.meta.dirname, "../../prisma-client/prisma/migrations");
+
+/**
+ * The down statement a Prisma migration documents under "-- Down, to roll back by hand:", read
+ * from the migration itself so a test runs what an operator would copy. Throws when it has none.
+ */
+export function documentedDownPath({ migration }: { migration: string }): string {
+  const lines = readFileSync(path.join(MIGRATIONS_DIR, migration, "migration.sql"), "utf8").split(
+    "\n",
+  );
+  const heading = lines.findIndex((line) => line.startsWith("-- Down, to roll back by hand:"));
+  const statement = lines[heading + 1]?.replace(/^--\s+/, "").trim();
+  if (heading < 0 || !statement?.startsWith("ALTER TABLE")) {
+    throw new Error(`${migration} no longer documents its down path`);
+  }
+  return statement;
 }

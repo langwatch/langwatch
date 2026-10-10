@@ -31,6 +31,13 @@ vi.mock("@langwatch/browser-host/drawer", async (importOriginal) => ({
   useDrawer: () => ({ openDrawer: openDrawerMock }),
 }));
 
+/** The project the page is on: a plain project, or an aggregate. */
+const page = vi.hoisted(() => ({ projectId: "project-plain" }));
+
+vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
+  useOrganizationTeamProject: () => ({ project: { id: page.projectId } }),
+}));
+
 // The expanded row's turns come from their own conversation-scoped query;
 // nothing here needs them to land, only whether the row asked to expand.
 vi.mock("../../../../../features/conversation/behavior/use-conversation-turns.ts", () => ({
@@ -42,6 +49,7 @@ const LAST_ACTIVITY_MS = 1_700_003_600_000;
 function conversationRow(overrides: Partial<SessionGroupPayloadItem> = {}): ConversationGroup {
   return mapSessionGroupToConversationGroup({
     conversationId: "conv-1",
+    projectId: "project-plain",
     traceCount: 4,
     totalCost: 1.5,
     totalTokens: 90_000,
@@ -92,6 +100,7 @@ const expandToggle = () => screen.getByRole("button", { name: /Expand turns|Coll
 beforeEach(() => {
   openDrawerMock.mockClear();
   setWindowAddress({ url: "/my-project/traces" });
+  page.projectId = "project-plain";
   // The open row outlives a remount now that it lives in the Explorer store.
   useExplorerStore.getState().setExpandedRows([]);
   // The virtualizer windows rows to the scroll element's height, and jsdom
@@ -124,6 +133,22 @@ describe("given the conversations lens is showing grouped rows", () => {
         t: String(LAST_ACTIVITY_MS),
       });
       expect(expandToggle()).toHaveAccessibleName("Expand turns");
+    });
+  });
+
+  describe("when the reader clicks a session row on an aggregate project", () => {
+    it("opens the drawer on the member the session belongs to, and names it in the link", async () => {
+      page.projectId = "project-aggregate";
+      const user = userEvent.setup();
+      renderBody([conversationRow({ projectId: "project-member" })]);
+
+      await user.click(firstRow());
+
+      expect(openDrawerMock).toHaveBeenCalledWith("traceV2Details", {
+        traceId: "trace-latest",
+        t: String(LAST_ACTIVITY_MS),
+        tenantId: "project-member",
+      });
     });
   });
 

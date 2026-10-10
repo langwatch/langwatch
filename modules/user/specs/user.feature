@@ -108,6 +108,12 @@ Feature: Canonical user lifecycle
     Then the mint fails and its transaction rolls back, leaving no account
 
   @unit
+  Scenario: A mint that loses a race for its address answers that the address is taken
+    Given another mint of the same address committed first
+    When the account is minted
+    Then the mint is refused as email_already_registered rather than failing
+
+  @unit
   Scenario: The fact outbox records each committed fact on user's pipeline
     Given created, registered or erased intents committed to user's fact outbox
     When the worker's outbox delivers them, however often the write appended them
@@ -125,6 +131,39 @@ Feature: Canonical user lifecycle
   Scenario: The seed step's dry run records nothing
     When the step runs as a dry run
     Then it reports how many accounts it would record, records no fact and saves no checkpoint
+
+  # Standing changes an old image made record no fact; ARCHITECTURE.md, "Platform operators are a grant".
+  @unit
+  Scenario: The standing step catches up a missed deactivation
+    Given an account an older image deactivated without recording the fact
+    When the background step "user:record-standing-facts" runs
+    Then the account is recorded deactivated at its stored deactivation time
+    And the step waits until no older image that changes standing without the fact still serves
+
+  @unit
+  Scenario: The standing step repairs a missed reactivation
+    Given an active account whose latest fact on user's own log is a deactivation
+    When the standing step runs
+    Then the account is recorded reactivated at the run's start
+    And an active account whose log ends in a reactivation, or holds no deactivation, records nothing
+
+  @unit
+  Scenario: Running the standing step twice records once
+    Given the standing step has run
+    When it runs again
+    Then no further deactivation or reactivation fact is recorded
+
+  @unit
+  Scenario: The standing step's dry run writes nothing
+    When the standing step runs as a dry run
+    Then it reports how many accounts it would re-state, records no fact and saves no checkpoint
+
+  @unit
+  Scenario: The standing step resumes after the saved user id
+    Given the standing step saved a checkpoint after a user id
+    When it resumes
+    Then it re-states only the accounts after that id
+    And it saves the last id of each page it finishes
 
   @unit
   Scenario: Changing an email stores the normalized address
@@ -312,3 +351,26 @@ Feature: Canonical user lifecycle
       Given a reader without "langy:create", or where Langy is not rolled out
       When the personal workspace host is asked whether the assistant can be asked
       Then it answers no
+
+  @integration
+  Scenario: A person whose organization's single sign-on governs sign-in is not offered a passkey
+    Given one of "ivy"'s confirmed addresses routes to "acme"'s single sign-on connection
+    When "ivy" opens her Passkeys settings, or the account-security offer appears after sign-in
+    Then neither offers to create a passkey
+    And each says "Your organization's single sign-on handles sign-in for this account."
+    And the offer still includes two-step verification when that is on offer
+
+  @integration
+  Scenario: A person whose organization's single sign-on governs sign-in is not offered a password
+    Given one of "ivy"'s confirmed addresses routes to "acme"'s single sign-on connection
+    And "ivy" holds no password
+    When "ivy" opens her Password settings
+    Then they do not offer to set a password
+    And say "Your organization's single sign-on handles sign-in for this account."
+
+  @integration
+  Scenario: An account its single sign-on created is governed through its own address
+    Given "ivy" signed up through "acme"'s single sign-on connection and has no address attached
+    And her account address routes to that connection
+    When "ivy" opens her Password settings
+    Then they do not offer to set a password

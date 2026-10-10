@@ -251,10 +251,11 @@ export class ModelProviderCustomKeysMissingError extends HandledError {
 export class ModelProviderInvalidError extends HandledError {
   declare readonly code: "model_provider_invalid";
 
-  constructor(message = "Invalid model provider") {
+  constructor(message = "Invalid model provider", reason?: "endpoint_not_allowed") {
     super("model_provider_invalid", message, {
       httpStatus: 400,
       fault: "customer",
+      ...(reason ? { meta: { reason } } : {}),
     });
     this.name = "ModelProviderInvalidError";
   }

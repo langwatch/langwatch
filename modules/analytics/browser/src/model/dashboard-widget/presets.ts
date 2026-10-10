@@ -45,7 +45,7 @@ export default function Widget() {
 
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
-      <div style={{ fontSize: "11px", color: "#666", marginBottom: 4, flexShrink: 0 }}>{status}</div>
+      <div style={{ fontSize: "11px", color: "var(--chakra-colors-fg-subtle)", marginBottom: 4, flexShrink: 0 }}>{status}</div>
       <div style={{ flex: 1, minHeight: 0 }}>
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={rows} margin={{ top: 6, right: 8, bottom: 0, left: 0 }}>
@@ -53,7 +53,7 @@ export default function Widget() {
             <XAxis dataKey="bucket" axisLine={false} tickLine={false} tick={{ fontSize: 10 }} />
             <YAxis allowDecimals={false} axisLine={false} tickLine={false} width={48} tick={{ fontSize: 11 }} />
             <Tooltip />
-            <Bar dataKey="events" fill="#f97316" />
+            <Bar dataKey="events" fill="var(--chakra-colors-chart-1)" />
           </BarChart>
         </ResponsiveContainer>
       </div>

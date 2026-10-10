@@ -64,11 +64,14 @@ async function bootAuth({
     })
     .withObservability((observability) => observability.withLogging(createTestLogger().logger))
     .provide({
-      user: createApiFixture<UserApi>({ findByEmail: async () => null }),
+      user: createApiFixture<UserApi>({
+        findByEmail: async () => null,
+        hasAnyAccount: async () => true,
+      }),
       "api-key": createApiFixture<ApiKeyApi>(),
       "feature-flag": createApiFixture<FeatureFlagApi>(),
       identity: createApiFixture<IdentityApi>({
-    createStorageAdapter: ({ legacyEngine }) => legacyEngine,
+        createStorageAdapter: ({ legacyEngine }) => legacyEngine,
         routeSignIn: async () => ({
           outcome: "route_to_signup",
           methodSet: [],

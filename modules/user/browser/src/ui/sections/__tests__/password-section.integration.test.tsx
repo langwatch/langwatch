@@ -19,6 +19,7 @@ const { state } = vi.hoisted(() => ({
     hasPassword: true,
     changeRejectsWith: void 0 as unknown,
     identifiers: [] as Record<string, unknown>[],
+    governedBySso: false,
   },
 }));
 
@@ -41,11 +42,18 @@ vi.mock("../../../behavior/personal-workspace-api.ts", () => {
       identity: { myIdentifiers: { invalidate: vi.fn() } },
     }),
     identity: {
+      mySignInGovernance: {
+        useQuery: () => ({ data: { governedBySso: state.governedBySso } }),
+      },
       myIdentifiers: {
         useQuery: () => ({ data: state.identifiers, isPending: false, error: null }),
       },
     },
     auth: {
+      unlinkAccount: mutation((input) => {
+        calls.unlinkAccount(input);
+        return { ok: true };
+      }),
       changePassword: mutation((input) => {
         calls.changePassword(input);
         if (state.changeRejectsWith) throw state.changeRejectsWith;
@@ -57,10 +65,6 @@ vi.mock("../../../behavior/personal-workspace-api.ts", () => {
       }),
     },
     user: {
-      unlinkAccount: mutation((input) => {
-        calls.unlinkAccount(input);
-        return { ok: true };
-      }),
       hasPassword: {
         useQuery: () => ({ data: { hasPassword: state.hasPassword }, isLoading: false }),
       },
@@ -77,6 +81,7 @@ beforeEach(() => {
   state.hasPassword = true;
   state.changeRejectsWith = void 0;
   state.identifiers = [];
+  state.governedBySso = false;
   calls.unlinkAccount.mockReset();
   calls.changePassword.mockReset();
   calls.setPassword.mockReset();
@@ -125,6 +130,7 @@ describe("given an email deployment", () => {
       renderSection();
 
       expect(screen.getByTestId("password-action")).toHaveTextContent("Change Password");
+      expect(screen.getByTestId("password-row")).toBeTruthy();
       expect(screen.queryByLabelText(/^New Password$/i)).toBeNull();
     });
 
@@ -243,6 +249,33 @@ describe("given an email deployment", () => {
         );
         expect(screen.getByLabelText(/^New Password$/i)).toBeTruthy();
       });
+
+      /** @scenario Wrong current password keeps the dialog open and shows an error */
+      it("puts invalid_credentials on the current password field, never the API key copy", async () => {
+        state.changeRejectsWith = {
+          message: "invalid_credentials",
+          data: {
+            code: "UNAUTHORIZED",
+            httpStatus: 401,
+            error: {
+              code: "invalid_credentials",
+              kind: "invalid_credentials",
+              httpStatus: 401,
+              fault: "customer",
+              meta: {},
+              tips: [],
+            },
+          },
+        };
+        const host = renderSection();
+
+        await openChangePassword();
+        await fillAndSubmit({ current: "wrong-pw" });
+
+        expect(await screen.findByText("Current password is incorrect")).toBeTruthy();
+        expect(host.recording.failures).toHaveLength(0);
+        expect(screen.getByLabelText(/^New Password$/i)).toBeTruthy();
+      });
     });
   });
 
@@ -253,6 +286,7 @@ describe("given an email deployment", () => {
       renderSection();
 
       expect(screen.getByTestId("password-action")).toHaveTextContent("Set a password");
+      expect(screen.getByTestId("password-empty")).toHaveTextContent("No password set");
 
       await userEvent.click(screen.getByTestId("password-action"));
 
@@ -384,5 +418,20 @@ describe("given a self-hosted deployment behind an enterprise provider", () => {
     renderSection();
 
     expect(screen.queryByTestId("password-section")).toBeNull();
+  });
+});
+
+describe("given an account whose organization's single sign-on governs sign-in", () => {
+  /** @scenario "A person whose organization's single sign-on governs sign-in is not offered a password" */
+  it("offers no password and says single sign-on handles sign-in", async () => {
+    state.hasPassword = false;
+    state.governedBySso = true;
+    renderSection();
+
+    expect(await screen.findByTestId("password-sso-governed")).toHaveTextContent(
+      "Your organization's single sign-on handles sign-in for this account.",
+    );
+    expect(screen.queryByTestId("password-action")).toBeNull();
+    expect(screen.getByTestId("password-empty")).not.toHaveTextContent("second way in");
   });
 });

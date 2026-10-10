@@ -115,7 +115,7 @@ export const NewTracesScrollUpIndicator: React.FC<NewTracesScrollUpIndicatorProp
         color="blue.contrast"
         borderWidth="1px"
         borderColor="blue.emphasized"
-        boxShadow="0 4px 14px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.18)"
+        boxShadow="0 4px 14px color-mix(in srgb, var(--chakra-colors-bg-scrim) 15%, transparent), inset 0 1px 0 color-mix(in srgb, var(--chakra-colors-fg-inverted) 18%, transparent)"
         transition="transform 120ms ease-out, filter 120ms ease-out"
         _hover={{ filter: "brightness(1.08)", transform: "translateY(-1px)" }}
         _active={{ transform: "translateY(0)" }}

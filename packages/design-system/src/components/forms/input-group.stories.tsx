@@ -5,7 +5,14 @@ import { Search } from "lucide-react";
 import { InputGroup } from "./input-group.tsx";
 
 const meta = {
-  title: "Primitives/Input group",
+  title: "Inputs and forms/Input group",
+  parameters: {
+    usage: {
+      use: "An input with an icon, prefix or action fixed inside its edges.",
+      avoid:
+        "A plain field: use Input from primitives. Search: use Search input, which is this already.",
+    },
+  },
   component: InputGroup,
   tags: ["autodocs"],
   args: {

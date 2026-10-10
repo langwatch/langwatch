@@ -54,7 +54,7 @@ describe("<RunMetricsSummary/>", () => {
       const pill = screen.getByTestId("run-metrics-summary");
       const percentage = within(pill).getByText("75%");
       expect(percentage.previousElementSibling).toHaveStyle({
-        background: "var(--chakra-colors-green-500)",
+        background: "var(--chakra-colors-green-fg)",
       });
       const latency = within(pill).getByText("3.2s");
       expect(latency.previousElementSibling?.tagName.toLowerCase()).toBe("svg");
@@ -89,7 +89,7 @@ describe("<RunMetricsSummary/>", () => {
       const percentage = within(pill).getByText("75%");
       expect(percentage).toBeInTheDocument();
       const circle = percentage.previousElementSibling;
-      expect(circle).toHaveStyle({ background: "var(--chakra-colors-green-500)" });
+      expect(circle).toHaveStyle({ background: "var(--chakra-colors-green-fg)" });
       expect(pill.querySelector("svg")).toBeNull();
       expect(pill.textContent).toBe("Pass75%");
     });

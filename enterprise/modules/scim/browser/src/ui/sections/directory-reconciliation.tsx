@@ -136,7 +136,13 @@ function NoConnectionYet({ maySetUp }: { maySetUp: boolean }) {
         After that your identity provider creates, updates and removes people here on its own.
       </Text>
       {maySetUp ? (
-        <Button asChild size="sm" colorPalette="orange" color="white" _hover={{ color: "white" }}>
+        <Button
+          asChild
+          size="sm"
+          colorPalette="orange"
+          color="orange.contrast"
+          _hover={{ color: "orange.contrast" }}
+        >
           <Link unstyled href="/settings/authentication">
             Set up single sign-on
           </Link>

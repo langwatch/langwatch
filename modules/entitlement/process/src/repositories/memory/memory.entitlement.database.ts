@@ -5,6 +5,8 @@ export type MemoryOrganizationUsage = Readonly<{
   organizationId: string;
   memberCount: number;
   membersLiteCount: number;
+  /** Developer seats (ADR-171); absent reads as none. */
+  developerCount?: number;
   currentMonthCost: number;
   /** The projects the organization owns, and what each has spent this month. */
   projectCosts: Readonly<Record<string, number>>;

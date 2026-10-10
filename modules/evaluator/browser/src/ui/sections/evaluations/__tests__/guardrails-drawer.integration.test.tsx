@@ -104,6 +104,19 @@ describe("GuardrailsDrawer", () => {
       });
     });
 
+    /** @scenario "Project-specific API endpoint" */
+    it("draws the cURL tab in the shared Shiki window with this install's own base URL", async () => {
+      const container = document.body;
+      await screen.findByText("Python (async)");
+      await user.selectOptions(container.querySelector("select")!, "bash");
+
+      await waitFor(() => expect(container.querySelector("pre.shiki")).not.toBeNull());
+      expect(container.textContent).toContain(
+        `${window.location.origin}/api/evaluations/pii-check-abc12/evaluate`,
+      );
+      expect(container.textContent).not.toContain("app.langwatch.ai");
+    });
+
     /** @scenario "API key placeholder in code" */
     it("includes a placeholder for the API key rather than a literal secret", async () => {
       await waitFor(() => {

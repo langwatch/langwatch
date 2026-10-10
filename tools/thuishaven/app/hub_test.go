@@ -137,7 +137,7 @@ func (f *fakeStore) AppendRunHistory(rec domain.RunRecord) error {
 }
 func (f *fakeStore) RunHistory() []domain.RunRecord { return f.runHistory }
 
-// fakeClaudeSettings records what `haven setup` asked to install.
+// fakeClaudeSettings records what `haven self setup` asked to install.
 type fakeClaudeSettings struct {
 	root    string
 	command string
@@ -150,7 +150,9 @@ func (f *fakeClaudeSettings) EnsureHook(repoRoot, command string) (bool, error) 
 
 type fakeSystem struct {
 	alive           map[int]bool
+	starts          map[int]string
 	terminated      []int
+	reloaded        []int
 	groupTerminated []int
 	groupKilled     []int
 	pidsByPort      map[int][]int
@@ -182,6 +184,7 @@ type spawnCall struct {
 func (f *fakeSystem) FreePorts(n int) ([]int, error) { return make([]int, n), nil }
 func (f *fakeSystem) PortInUse(port int) bool        { return f.portsInUse[port] }
 func (f *fakeSystem) ProcessAlive(pid int) bool      { return f.alive[pid] }
+func (f *fakeSystem) ProcessStart(pid int) string    { return f.starts[pid] }
 func (f *fakeSystem) Terminate(pid int) {
 	f.terminated = append(f.terminated, pid)
 	// A terminated launcher dies with its process group; reflect that so the
@@ -190,6 +193,7 @@ func (f *fakeSystem) Terminate(pid int) {
 		f.alive[pid] = false
 	}
 }
+func (f *fakeSystem) Reload(pid int)         { f.reloaded = append(f.reloaded, pid) }
 func (f *fakeSystem) TerminateGroup(pid int) { f.groupTerminated = append(f.groupTerminated, pid) }
 func (f *fakeSystem) KillGroup(pid int) {
 	f.groupKilled = append(f.groupKilled, pid)

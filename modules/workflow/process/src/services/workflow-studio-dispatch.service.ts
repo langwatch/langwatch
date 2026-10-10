@@ -68,9 +68,24 @@ export class WorkflowStudioDispatchService {
       throw asReachabilityError(error);
     }
 
+    const consumerFailures = new WeakSet<object>();
+    const watched: WorkflowStudioDispatchInput = {
+      ...input,
+      onEvent(event) {
+        try {
+          input.onEvent(event);
+        } catch (error) {
+          if (error instanceof Error) consumerFailures.add(error);
+          throw error;
+        }
+      },
+    };
+
     try {
-      await this.readStream(reader, input);
+      await this.readStream(reader, watched);
     } catch (error) {
+      // The watcher's own failure keeps its type and fields; only a broken stream becomes an event.
+      if (error instanceof Error && consumerFailures.has(error)) throw error;
       logger.error({ error }, "Error reading stream");
       reportAsStudioEvent(error, input);
     } finally {

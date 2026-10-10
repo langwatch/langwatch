@@ -193,6 +193,9 @@ describe("given the data privacy page", () => {
       await user.click(screen.getByRole("button", { name: "Actions for Platform privacy rule" }));
       await user.click(await screen.findByRole("menuitem", { name: "Delete" }));
 
+      expect(removeForScope).not.toHaveBeenCalled();
+      await user.click(await screen.findByRole("button", { name: "Delete rule" }));
+
       await waitFor(() => expect(removeForScope).toHaveBeenCalled());
       expect(host.successes.at(-1)?.title).toBe("Privacy rule removed");
       expect(invalidate).toHaveBeenCalled();
@@ -209,6 +212,7 @@ describe("given the data privacy page", () => {
 
       await user.click(screen.getByRole("button", { name: "Actions for Platform privacy rule" }));
       await user.click(await screen.findByRole("menuitem", { name: "Delete" }));
+      await user.click(await screen.findByRole("button", { name: "Delete rule" }));
 
       await waitFor(() => expect(host.failures).toHaveLength(1));
       expect(host.failures[0]).toEqual({

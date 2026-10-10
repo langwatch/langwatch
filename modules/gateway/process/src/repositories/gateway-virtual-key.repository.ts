@@ -176,6 +176,7 @@ export abstract class GatewayVirtualKeyRepository {
     input: {
       id: string;
       organizationId: string;
+      licenseId?: string;
       tokenHash: string;
       instanceId: string | null;
       expiresAt: Instant | null;
@@ -184,6 +185,11 @@ export abstract class GatewayVirtualKeyRepository {
   ): Promise<boolean>;
   /** The CONNECT key a license token resolves to, by the token's registry hash. */
   abstract findByLicenseTokenHash(tokenHash: string): Promise<GatewayLicensedKey | null>;
+  /** Unrevoked CONNECT keys of one licence in one organization, oldest first. */
+  abstract findConnectKeyIdsForLicense(input: {
+    organizationId: string;
+    licenseId: string;
+  }): Promise<string[]>;
   abstract recordUsage(
     id: string,
     at: Instant,

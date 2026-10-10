@@ -90,6 +90,33 @@ export class ScimReconciliationService {
     };
   }
 
+  /** Which of these members the organization's directories created, one row per person. */
+  async findDirectoryMembers({
+    organizationId,
+    userIds,
+  }: {
+    organizationId: string;
+    userIds: string[];
+  }): Promise<{ userId: string; providerId: string | null }[]> {
+    if (userIds.length === 0) return [];
+    const connections = await this.reads.connections.findHeldConnections({ organizationId });
+    if (connections.length === 0) return [];
+
+    const providerOf = new Map(connections.map((c) => [c.connectionId, c.providerId || null]));
+    // ponytail: reads every claim on the connections then filters; push userIds down if slow.
+    const ownership = await this.reads.directory.findDirectoryOwnership({
+      connectionIds: [...providerOf.keys()],
+    });
+    const asked = new Set(userIds);
+    const byUser = new Map<string, string | null>();
+    for (const { connectionId, userId } of ownership) {
+      if (asked.has(userId) && !byUser.has(userId)) {
+        byUser.set(userId, providerOf.get(connectionId) ?? null);
+      }
+    }
+    return [...byUser].map(([userId, providerId]) => ({ userId, providerId }));
+  }
+
   /** One connection's panel, built from this organization's list so another's never enters it. */
   async findById({
     organizationId,

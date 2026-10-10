@@ -74,6 +74,7 @@ export class PrismaJoinRequestProjectionRepository implements StateProjectionSto
       resolvedByType: state.resolvedByType,
       resolvedById: state.resolvedById,
       withdrawalCause: state.withdrawalCause,
+      connectionId: state.connectionId,
       occurredAt: new Date(projection.occurredAt),
       lastEventId: projection.cursor.eventId,
       acceptedAt: new Date(projection.cursor.acceptedAt),
@@ -112,6 +113,7 @@ export class PrismaJoinRequestProjectionRepository implements StateProjectionSto
       resolvedByType: (row.resolvedByType as JoinResolverType | null) ?? null,
       resolvedById: row.resolvedById,
       withdrawalCause: (row.withdrawalCause as JoinWithdrawalCause | null) ?? null,
+      connectionId: row.connectionId,
     };
   }
 }

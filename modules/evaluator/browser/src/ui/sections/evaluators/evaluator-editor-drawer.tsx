@@ -54,7 +54,7 @@ export function EvaluatorEditorDrawer(props: EvaluatorEditorDrawerProps) {
         <Drawer.Body display="flex" flexDirection="column" overflow="hidden" padding={0}>
           <EvaluatorEditorBody controller={controller} />
         </Drawer.Body>
-        <Drawer.Footer borderTopWidth="1px" borderColor="border">
+        <Drawer.Footer>
           <EvaluatorEditorFooter controller={controller} />
         </Drawer.Footer>
       </Drawer.Content>

@@ -47,7 +47,7 @@ describe.skipIf(!TEST_DATABASE_URL)("the license registry on Postgres", () => {
       recordSelfHostedCustomerLicensed: async () => undefined,
     },
     managedKeys: {
-      provision: async () => ({ id: `vk_${RUN}` }),
+      issue: async () => undefined,
       retire: async () => undefined,
       invalidate: async () => undefined,
       setConnectServices: async () => undefined,

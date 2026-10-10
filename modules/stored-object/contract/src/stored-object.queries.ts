@@ -1,4 +1,5 @@
 import type { AuthzPermission } from "@langwatch/authorization";
+import type { Named } from "@langwatch/module";
 import { z, type ZodTypeAny } from "zod";
 
 import { storedObjectDeliveryAudienceSchema } from "./audiences.ts";
@@ -20,18 +21,28 @@ export type StoredObjectsMetadataOutput = z.infer<typeof storedObjectsMetadataOu
 
 export const storedObjectsAvailabilityInputSchema = internalIdentitySchema;
 export type StoredObjectsAvailabilityInput = z.infer<typeof storedObjectsAvailabilityInputSchema>;
-export const storedObjectsAvailabilityOutputSchema = z
+const storedObjectsAvailabilityOutputSchemaDefinition = z
   .object({ status: storedObjectLifecycleStatusSchema })
   .strict();
+export interface StoredObjectsAvailabilityOutputSchema extends Named<
+  typeof storedObjectsAvailabilityOutputSchemaDefinition
+> {}
+export const storedObjectsAvailabilityOutputSchema: StoredObjectsAvailabilityOutputSchema =
+  storedObjectsAvailabilityOutputSchemaDefinition;
 export type StoredObjectsAvailabilityOutput = z.infer<typeof storedObjectsAvailabilityOutputSchema>;
 
-export const storedObjectsDeliveryInputSchema = z
+const storedObjectsDeliveryInputSchemaDefinition = z
   .object({
     projectId: storedObjectProjectIdSchema,
     id: storedObjectIdSchema,
     audience: storedObjectDeliveryAudienceSchema,
   })
   .strict();
+export interface StoredObjectsDeliveryInputSchema extends Named<
+  typeof storedObjectsDeliveryInputSchemaDefinition
+> {}
+export const storedObjectsDeliveryInputSchema: StoredObjectsDeliveryInputSchema =
+  storedObjectsDeliveryInputSchemaDefinition;
 export type StoredObjectsDeliveryInput = z.infer<typeof storedObjectsDeliveryInputSchema>;
 export const storedObjectsDeliveryOutputSchema = storedObjectDeliveryCapabilitySchema;
 export type StoredObjectsDeliveryOutput = z.infer<typeof storedObjectsDeliveryOutputSchema>;

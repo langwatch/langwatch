@@ -1,4 +1,6 @@
 import { spawn } from "node:child_process";
+import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { hostname } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -11,11 +13,17 @@ import {
   runMigrations,
   type GooseOptions,
 } from "@langwatch/clickhouse-migrations";
+import type { EventUpcastReader } from "@langwatch/eventing";
 import { READ_HINT_BROADCAST_CHANNEL } from "@langwatch/eventing/server";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
-import { imageSteps, type UpgradeClickHouse, type UpgradePostgres } from "@langwatch/upgrade";
-import { IMAGE_MIGRATION_DIRECTORIES, readImageTree } from "@langwatch/upgrade/gate";
+import {
+  imageSteps,
+  type UpcastStepInput,
+  type UpgradeClickHouse,
+  type UpgradePostgres,
+} from "@langwatch/upgrade";
+import { IMAGE_MIGRATION_DIRECTORIES, imageRelease, readImageTree } from "@langwatch/upgrade/gate";
 import {
   compareReleases,
   loadReleases,
@@ -40,12 +48,17 @@ import {
   upgradeReadHintMessage,
 } from "@langwatch/upgrade/runner";
 import { assertOldWritersGone, recordPreRosterRollback } from "@langwatch/upgrade/serving-roster";
-import { isMigrationStep, type MigrationStep } from "@langwatch/upgrade/step";
+import {
+  isDeclaredMigrationStep,
+  isMigrationStep,
+  type MigrationStep,
+  type TenantMigrationStep,
+} from "@langwatch/upgrade/step";
 import { applyRelease, SteppingError } from "@langwatch/upgrade/stepping";
 
 import type { TaskInput } from "./config.ts";
 import { lwqlProvision } from "./lwql-provision.ts";
-import { withTasksApp } from "./module-task.ts";
+import { runModuleTask, withTasksApp } from "./module-task.ts";
 
 /** Overrides for writers before the serving roster (Round 47 E2; ADR-173, amendment 2026-10-08). */
 const PRE_ROSTER_COMMANDS = ["old-writers-gone", "pre-roster-rollback"] as const;
@@ -217,10 +230,13 @@ export function clickHouseRunOptions({
   url,
   settings,
   upTo,
+  signal,
 }: {
   url: string;
   settings: Pick<GooseOptions, "clusterName" | "childEnvironment" | "waitSeconds"> | undefined;
   upTo: number | undefined;
+  /** The upgrade lease's signal: losing the lease kills goose. */
+  signal: AbortSignal | undefined;
 }): GooseOptions {
   return {
     connectionUrl: url,
@@ -228,6 +244,7 @@ export function clickHouseRunOptions({
     childEnvironment: settings?.childEnvironment,
     waitSeconds: settings?.waitSeconds,
     verbose: true,
+    signal,
     ...(upTo === undefined ? {} : { upTo }),
   };
 }
@@ -235,9 +252,11 @@ export function clickHouseRunOptions({
 async function migrateClickHouse({
   input,
   upTo,
+  signal,
 }: {
   input: TaskInput;
   upTo?: number;
+  signal: AbortSignal;
 }): Promise<SchemaTargetReport[]> {
   const { config, targets } = clickhouseTargets(input);
   const settings = config.settings;
@@ -245,7 +264,7 @@ async function migrateClickHouse({
   for (const target of targets) {
     let error: string | null = null;
     try {
-      await runMigrations(clickHouseRunOptions({ url: target.url, settings, upTo }));
+      await runMigrations(clickHouseRunOptions({ url: target.url, settings, upTo, signal }));
     } catch (failure) {
       error = String(failure instanceof Error ? failure.message : failure)
         .split(target.url)
@@ -262,15 +281,45 @@ async function migrateClickHouse({
   return reports;
 }
 
+/**
+ * Unreleased migrations rewritten in place (Alex, 2026-10-09). A local dev database that applied
+ * the old text gets the new checksum so `prisma migrate dev` does not ask for a reset.
+ * ponytail: delete this list once the next release ships; never extend it to a released migration.
+ */
+const REWRITTEN_UNRELEASED_MIGRATIONS = [
+  "20261006170507_virtual_key_license_facts",
+  "20261006170511_connected_seat_change_not_onboarded",
+] as const;
+
+/** Development only: production never rewrites a recorded checksum. */
+async function realignRewrittenChecksums({ input }: { input: TaskInput }): Promise<void> {
+  const sql = input.connections.database?.sql;
+  if (input.config.nodeEnvironment !== "development" || !sql) return;
+  const { rows } = await sql.query<{ present: boolean }>(
+    `SELECT to_regclass('_prisma_migrations') IS NOT NULL AS present`,
+  );
+  if (!rows[0]?.present) return;
+  for (const name of REWRITTEN_UNRELEASED_MIGRATIONS) {
+    const text = readFileSync(join(IMAGE_MIGRATION_DIRECTORIES.prisma, name, "migration.sql"));
+    const checksum = createHash("sha256").update(text).digest("hex");
+    await sql.query(
+      `UPDATE "_prisma_migrations" SET "checksum" = $1
+        WHERE "migration_name" = $2 AND "checksum" <> $1 AND "finished_at" IS NOT NULL`,
+      [checksum, name],
+    );
+  }
+}
+
 /** Today's applier: `prisma migrate deploy` and goose `up` apply everything at once. */
 function oneReleaseApplier({ input }: { input: TaskInput }): UpgradeSchemaApplier {
   let applied: readonly SchemaTargetReport[] | null = null;
   return {
     async apply({ lockTimeoutMs, signal }) {
       if (applied?.every((report) => report.ok)) return applied;
+      await realignRewrittenChecksums({ input });
       applied = [
         await deployPrisma({ input, lockTimeoutMs, signal }),
-        ...(await migrateClickHouse({ input })),
+        ...(await migrateClickHouse({ input, signal })),
       ];
       return applied;
     },
@@ -467,7 +516,7 @@ function stepSchemaTo({ input }: { input: TaskInput }): StepSchemaTo {
   return async ({ release, prismaFolders, gooseUpTo, lockTimeoutMs, signal }) => {
     const postgres = await stepPrisma({ input, release, prismaFolders, lockTimeoutMs, signal });
     if (!postgres.reports.every((report) => report.ok) || gooseUpTo === null) return postgres;
-    const clickhouse = await migrateClickHouse({ input, upTo: gooseUpTo });
+    const clickhouse = await migrateClickHouse({ input, upTo: gooseUpTo, signal });
     return { ...postgres, reports: [...postgres.reports, ...clickhouse] };
   };
 }
@@ -486,7 +535,12 @@ function reconcilers({ input }: { input: TaskInput }): UpgradeReconciler[] {
           verbose: true,
         }),
     })),
-    { name: "langwatchql", run: () => lwqlProvision(input) },
+    { name: "langwatchql", run: () => lwqlProvision({ ...input, failOnError: true }) },
+    {
+      name: "system-migrations-pass-request",
+      run: () =>
+        runModuleTask({ name: "request-system-migrations-pass", args: [], signal: input.signal }),
+    },
   ];
 }
 
@@ -575,19 +629,49 @@ function writeLine({
   logger[line.level](line.fields, line.message);
 }
 
-/** Hands `use` the steps the installed modules declare, then closes the process that built them. */
+/**
+ * Hands `use` the steps the installed modules declare and, where the process holds an event log,
+ * their upcasts; then closes the process that built them.
+ */
 export type DeclaredCodeSteps = <Result>(
-  use: (steps: readonly MigrationStep[]) => Promise<Result>,
+  use: (declared: {
+    steps: readonly (MigrationStep | TenantMigrationStep)[];
+    upcasts?: () => Promise<readonly UpcastStepInput[]>;
+  }) => Promise<Result>,
 ) => Promise<Result>;
 
-/** The tasks process's `.withMigrations` steps (round 14: the framework runs them). */
+/** The tasks process's `.withMigrations` steps (round 14) and event upcasts (Alex, 2026-10-09). */
 export const installedCodeSteps: DeclaredCodeSteps = (use) =>
-  withTasksApp({ use: (app) => use(app.migrationSteps(isMigrationStep)) });
+  withTasksApp({
+    use: (app) =>
+      use({ steps: app.migrationSteps(isDeclaredMigrationStep), upcasts: upcastStepsOf({ app }) }),
+  });
+
+/** The declared event upcasts as ledger rows (§9); none where the process holds no event log. */
+export function upcastStepsOf({
+  app,
+}: {
+  app: { upcastReader(): Pick<EventUpcastReader, "findActiveUpcasts"> | undefined };
+}): () => Promise<UpcastStepInput[]> {
+  return async () => {
+    const active = (await app.upcastReader()?.findActiveUpcasts()) ?? [];
+    return active.map(({ id, storedEvents, ...report }) => ({ id, storedEvents, report }));
+  };
+}
 
 /** A declared step as the image's tree names it: its owner is the module its id starts with. */
-export function codeStepOf(step: MigrationStep): ManifestStep {
-  const { id, kind, mode, description } = step;
-  return { id, kind, mode, owner: id.slice(0, id.indexOf(":")), description };
+export function codeStepOf(step: MigrationStep | TenantMigrationStep): ManifestStep {
+  const { id, kind, mode, description, finishBy, needsOldWritersGone } = step;
+  const owner = id.slice(0, id.indexOf(":"));
+  return {
+    id,
+    kind,
+    mode,
+    owner,
+    description,
+    ...(finishBy === undefined ? {} : { finishBy }),
+    ...(needsOldWritersGone === undefined ? {} : { needsOldWritersGone }),
+  };
 }
 
 /**
@@ -612,7 +696,9 @@ export async function runUpgradeCommand({
     if (!database) throw new Error("DATABASE_URL is required to upgrade");
     return runPreRosterCommand({ command: command.command, postgres: database.sql, write });
   }
-  return codeSteps((steps) => runWithCodeSteps({ command, input, write, steps }));
+  return codeSteps(({ steps, upcasts }) =>
+    runWithCodeSteps({ command, input, write, steps, upcasts }),
+  );
 }
 
 /** Records one override for writers before the roster; no lease and no module boot. Exit 0. */
@@ -650,16 +736,19 @@ async function runWithCodeSteps({
   input,
   write,
   steps,
+  upcasts,
 }: {
   command: UpgradeCommand;
   input: TaskInput;
   write: (text: string) => void;
-  steps: readonly MigrationStep[];
+  steps: readonly (MigrationStep | TenantMigrationStep)[];
+  upcasts: (() => Promise<readonly UpcastStepInput[]>) | undefined;
 }): Promise<number> {
   const database = input.connections.database;
   if (!database) throw new Error("DATABASE_URL is required to upgrade");
   const releases = loadReleases();
-  const newest = releases.manifests.at(-1)?.release ?? null;
+  const tree = readImageTree({ codeSteps: steps.map(codeStepOf) });
+  const release = imageRelease({ manifests: releases.manifests, tree });
   const { targets } = clickhouseTargets(input);
   const sharedUrl = targets.find((target) => target.name === "shared")?.url;
   const logger = createLogger("langwatch:tasks:upgrade");
@@ -673,25 +762,24 @@ async function runWithCodeSteps({
       postgres: database.sql,
       clickhouse: shared ? sqlReader({ client: shared }) : undefined,
       image: {
-        release: newest,
-        steps: imageSteps({
-          release: newest ?? "0.0.0",
-          tree: readImageTree({ codeSteps: steps.map(codeStepOf) }),
-        }),
+        release,
+        steps: imageSteps({ release: release ?? "0.0.0", tree }),
       },
-      codeSteps: steps,
+      // Registered on the ledger, run only here: tenant steps are ops' pass (S6-WIRE).
+      codeSteps: steps.filter(isMigrationStep),
       releases,
       applier: releaseSteppingApplier({
-        imageRelease: newest,
+        imageRelease: release,
         manifests: releases.manifests,
         onePass: oneReleaseApplier({ input }),
         stepTo: stepSchemaTo({ input }),
         say: (line) => writeLine({ logger, line }),
       }),
       reconcilers: reconcilers({ input }),
-      identity: { image: newest ?? "unreleased", host: hostname() },
+      identity: { image: release ?? "unreleased", host: hostname() },
       log: runnerLog(),
       hints: readHints({ input }),
+      ...(upcasts === undefined ? {} : { upcasts }),
     });
     if (command.command === "status") {
       const status = await runner.status();
@@ -699,7 +787,7 @@ async function runWithCodeSteps({
       return 0;
     }
     if (command.command === "plan") {
-      await printPlan({ command, runner, image: { release: newest }, write });
+      await printPlan({ command, runner, image: { release }, write });
       return 0;
     }
     const outcome = await runner.run({ signal: input.signal });
