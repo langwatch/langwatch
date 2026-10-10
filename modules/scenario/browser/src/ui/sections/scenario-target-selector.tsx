@@ -348,9 +348,9 @@ function ScenarioTargetAgentMark({ agent }: { agent: ScenarioTargetAgentOption }
     );
   }
   if (agent.type === "code") {
-    return <Code size={14} color="var(--chakra-colors-gray-500)" />;
+    return <Code size={14} color="var(--chakra-colors-fg-muted)" />;
   }
-  return <Globe size={14} color="var(--chakra-colors-gray-500)" />;
+  return <Globe size={14} color="var(--chakra-colors-fg-muted)" />;
 }
 
 /**
@@ -467,7 +467,7 @@ function ScenarioTargetPromptOptions({
             _hover={{ bg: "bg.subtle" }}
             onClick={() => onSelect({ type: "prompt", id: prompt.id })}
           >
-            <BookText size={14} color="var(--chakra-colors-gray-500)" />
+            <BookText size={14} color="var(--chakra-colors-fg-muted)" />
             <Text fontSize="sm" flex={1}>
               {prompt.handle ?? prompt.id}
             </Text>

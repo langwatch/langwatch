@@ -179,7 +179,7 @@ function AgentBlock({
         >
           <AgentIcon size={13} />
         </HStack>
-        {isActive && <Check size={14} color="var(--chakra-colors-blue-500)" />}
+        {isActive && <Check size={14} color="var(--chakra-colors-blue-fg)" />}
       </HStack>
       <Text
         fontSize="12.5px"

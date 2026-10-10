@@ -40,7 +40,7 @@ export function ScenarioTabConnectedBadge({ visible }: { visible: boolean }) {
           css={{
             "@keyframes connected-dot": {
               "0%, 100%": {
-                boxShadow: "0 0 0 0 var(--chakra-colors-green-300)",
+                boxShadow: "0 0 0 0 var(--chakra-colors-green-muted)",
               },
               "50%": { boxShadow: "0 0 0 3px transparent" },
             },

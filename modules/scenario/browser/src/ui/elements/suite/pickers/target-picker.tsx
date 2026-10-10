@@ -149,7 +149,7 @@ export function TargetPicker({
           data-testid="archived-targets-section"
         >
           <HStack gap={2}>
-            <AlertTriangle size={14} color="var(--chakra-colors-orange-500)" />
+            <AlertTriangle size={14} color="var(--chakra-colors-orange-fg)" />
             <Text fontSize="xs" color="orange.fg">
               {archivedTargets.length} archived target
               {archivedTargets.length > 1 ? "s" : ""} linked:
