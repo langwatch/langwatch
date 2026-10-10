@@ -12,7 +12,15 @@ import {
  * A connection's directory-sync log, read: newest first, tenant-scoped, ids only.
  * Corresponds to enterprise/modules/scim/specs/scim.feature.
  */
-import { type EventStore, PipelineEventStore, createTenantId } from "@langwatch/eventing";
+import {
+  EventLogReadSeat,
+  type EventReadSeat,
+  EventStoreProducerOnly,
+  PipelineEventStore,
+  createTenantId,
+  eventToRecord,
+} from "@langwatch/eventing";
+import { EventRepositoryMemory } from "@langwatch/eventing/testing";
 import { describe, expect, it } from "vitest";
 
 import type { ScimSyncEvent } from "../../../eventing/scim-sync-state.projection.ts";
@@ -80,25 +88,45 @@ function repositoryOver(eventsByTenant: Record<string, ScimSyncEvent[]>): {
   requestedTenants: string[];
 } {
   const requestedTenants: string[] = [];
-  const getEvents: EventStore["getEvents"] = async ({ aggregateId, context, aggregateType }) => {
-    requestedTenants.push(context.tenantId);
-    return (eventsByTenant[context.tenantId] ?? []).filter(
+  const getEvents: EventReadSeat["getEvents"] = async ({
+    tenantId,
+    aggregateId,
+    aggregateType,
+  }) => {
+    requestedTenants.push(tenantId);
+    return (eventsByTenant[tenantId] ?? []).filter(
       (event) => event.aggregateId === aggregateId && event.aggregateType === aggregateType,
     );
   };
-  const storeEvents: EventStore["storeEvents"] = () =>
-    Promise.reject(new Error("reading the activity appends nothing"));
-  // The scim_sync pipeline's own store, bound to the aggregate its definition declares.
-  const eventStore = PipelineEventStore.create({
+  return {
+    repository: EventingScimSyncActivityRepository.create({ eventReadSeat: { getEvents } }),
+    requestedTenants,
+  };
+}
+
+const API_PROCESS = "langwatch-api";
+
+function isAnyEvent(_event: unknown): _event is unknown {
+  return true;
+}
+
+/** What the api composes: a store refusing every read, and a read seat over the same log. */
+async function apiProcessOver(events: ScimSyncEvent[]) {
+  const log = EventRepositoryMemory.createForTesting();
+  await log.insertEventRecords(events.map((event) => eventToRecord(event)));
+  const refusingStore = EventStoreProducerOnly.create({ processName: API_PROCESS });
+  const ownStore = PipelineEventStore.create({
     pipeline: SCIM_SYNC_PIPELINE_NAME,
-    log: () => ({ getEvents, storeEvents }),
+    log: () => refusingStore,
   });
-  eventStore.bindTo(
+  ownStore.bindTo(
     composeScimSyncPipeline({ scimSyncs: MemoryScimSyncProjectionRepository.create() }),
   );
   return {
-    repository: EventingScimSyncActivityRepository.create({ eventStore }),
-    requestedTenants,
+    ownStore,
+    repository: EventingScimSyncActivityRepository.create({
+      eventReadSeat: EventLogReadSeat.create({ repository: log }),
+    }),
   };
 }
 
@@ -158,6 +186,39 @@ describe("given a connection the directory pushed to and then failed on", () => 
 
       expect(activity).toEqual([]);
       expect(requestedTenants).toEqual([GLOBEX]);
+    });
+  });
+
+  describe("when it is read in a process that only sends commands", () => {
+    /** @scenario "Directory activity is readable from a process that only sends commands" */
+    it("lists the facts newest first while the process's own store refuses the read", async () => {
+      const { repository, ownStore } = await apiProcessOver(events);
+
+      const activity = await repository.findActivity({
+        organizationId: ACME,
+        connectionId: CONNECTION,
+        limit: 25,
+      });
+
+      expect(activity.map((entry) => entry.eventId)).toEqual(["evt_3", "evt_2", "evt_1"]);
+      await expect(
+        ownStore.read({ tenantId: ACME, aggregateId: CONNECTION, accepts: isAnyEvent }),
+      ).rejects.toMatchObject({
+        name: "ConfigurationError",
+        context: { processName: API_PROCESS, operation: "getEvents" },
+      });
+    });
+
+    it("finds nothing for the same connection named under another organization's tenant", async () => {
+      const { repository } = await apiProcessOver(events);
+
+      const activity = await repository.findActivity({
+        organizationId: GLOBEX,
+        connectionId: CONNECTION,
+        limit: 25,
+      });
+
+      expect(activity).toEqual([]);
     });
   });
 });

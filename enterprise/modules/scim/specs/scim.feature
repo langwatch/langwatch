@@ -476,16 +476,17 @@ Feature: Enterprise SCIM package boundary
 
     @unit
     Scenario: Directory activity is refused by name where no sync log can be read
-      Given a process composed without an event stack
+      Given sync reads built over no sync log
       When a connection's activity is read
       Then the read is refused as an unavailable capability rather than answered empty
 
     @unit
-    Scenario: Directory activity reads the sync log through the sync pipeline's own event store
-      Given the process runs SCIM's directory-sync pipeline
-      When a connection's activity is read
-      Then it is read through the store that pipeline was handed, for that connection's sync in the organization's tenant
-      And a pipeline built only to be listed hands its store to nobody
+    Scenario: Directory activity is readable from a process that only sends commands
+      Given a process whose event store refuses every read, as the API's does
+      And a connection the directory pushed a user to
+      When that connection's activity is read
+      Then it is answered through the event read seat, for that connection's sync in the organization's tenant
+      And the same read through the sync pipeline's own event store is refused by name
 
     @unit
     Scenario: Recent directory activity is served in words under sso:view

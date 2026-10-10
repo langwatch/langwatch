@@ -95,7 +95,7 @@ describe("given an organization that has never synced", () => {
   });
 });
 
-describe("given a process composed without an event stack", () => {
+describe("given sync reads built over no sync log", () => {
   describe("when a connection's directory activity is read", () => {
     /** @scenario "Directory activity is refused by name where no sync log can be read" */
     it("refuses by name rather than reading as a quiet directory", async () => {
