@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import type { Instant } from "@langwatch/time";
 /**
  * Spend-event filter vocabulary and row shape shared by every reader of the
@@ -138,7 +139,7 @@ export type SpendEventRow = {
  * per-field defaults). audio/image_tokens are disjoint from text tokens;
  * image_count/reasoning_tokens are display-only; audio_ms /1000 at rating.
  */
-export const spendUsageSchema = z.object({
+const spendUsageSchemaDefinition = z.object({
   input_tokens: z.number().int().min(0).default(0),
   output_tokens: z.number().int().min(0).default(0),
   cache_read_input_tokens: z.number().int().min(0).default(0),
@@ -156,6 +157,8 @@ export const spendUsageSchema = z.object({
   /** Images the response carried. Observability only, never priced. */
   image_count: z.number().int().min(0).default(0),
 });
+export interface SpendUsageSchema extends Named<typeof spendUsageSchemaDefinition> {}
+export const spendUsageSchema: SpendUsageSchema = spendUsageSchemaDefinition;
 export type SpendUsage = z.infer<typeof spendUsageSchema>;
 
 /**
@@ -190,13 +193,18 @@ export interface GatewayPricedSpend {
 export type GatewayPricedSpendResult = { status: "recorded" } | { status: "unavailable" };
 
 /** One billing event in the canonical envelope shared by pull and webhook delivery. */
-export const gatewaySpendEnvelopeSchema = z.object({
+const gatewaySpendEnvelopeSchemaDefinition = z.object({
   id: z.string(),
   type: z.string(),
   created: z.string(),
   schema_version: z.string(),
   data: z.record(z.string(), z.unknown()),
 });
+export interface GatewaySpendEnvelopeSchema extends Named<
+  typeof gatewaySpendEnvelopeSchemaDefinition
+> {}
+export const gatewaySpendEnvelopeSchema: GatewaySpendEnvelopeSchema =
+  gatewaySpendEnvelopeSchemaDefinition;
 export type GatewaySpendEnvelope = z.infer<typeof gatewaySpendEnvelopeSchema>;
 
 const spendEventUsageSchema = z.object({
@@ -226,7 +234,7 @@ const spendEventCostSchema = z.object({
 });
 
 /** The pulled billing envelope, its `data` typed as the webhooks deliver it. */
-export const gatewaySpendEventEnvelopeSchema = z.object({
+const gatewaySpendEventEnvelopeSchemaDefinition = z.object({
   ...gatewaySpendEnvelopeSchema.shape,
   data: z.looseObject({
     event_id: z.string(),
@@ -246,4 +254,9 @@ export const gatewaySpendEventEnvelopeSchema = z.object({
     metadata: z.record(z.string(), z.unknown()),
   }),
 });
+export interface GatewaySpendEventEnvelopeSchema extends Named<
+  typeof gatewaySpendEventEnvelopeSchemaDefinition
+> {}
+export const gatewaySpendEventEnvelopeSchema: GatewaySpendEventEnvelopeSchema =
+  gatewaySpendEventEnvelopeSchemaDefinition;
 export type GatewaySpendEventEnvelope = z.infer<typeof gatewaySpendEventEnvelopeSchema>;

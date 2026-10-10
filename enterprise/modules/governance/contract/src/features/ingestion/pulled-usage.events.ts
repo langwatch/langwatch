@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import { governanceEventEnvelopeSchema } from "../../governance.ts";
@@ -39,7 +40,7 @@ export const PULLED_USAGE_DEFAULT_CURRENCY_CODE = "USD" as const;
 export const pulledUsageCostBasisSchema = z.enum(PULLED_USAGE_COST_BASIS);
 export const pulledUsageCostStatusSchema = z.enum(PULLED_USAGE_COST_STATUS);
 
-export const pulledUsageObservedEventDataSchema = z
+const pulledUsageObservedEventDataSchemaDefinition = z
   .object({
     itemKey: z.string().min(1),
     restatementKey: z.string().min(1),
@@ -82,20 +83,30 @@ export const pulledUsageObservedEventDataSchema = z
     observedAtMs: z.number().int().positive(),
   })
   .strict();
+export interface PulledUsageObservedEventDataSchema extends Named<
+  typeof pulledUsageObservedEventDataSchemaDefinition
+> {}
+export const pulledUsageObservedEventDataSchema: PulledUsageObservedEventDataSchema =
+  pulledUsageObservedEventDataSchemaDefinition;
 
-export const pulledUsageObservedEventSchema = governanceEventEnvelopeSchema.safeExtend({
+const pulledUsageObservedEventSchemaDefinition = governanceEventEnvelopeSchema.safeExtend({
   aggregateType: z.literal(PULLED_USAGE_AGGREGATE_TYPE),
   type: z.literal(PULLED_USAGE_EVENT_TYPES.OBSERVED),
   version: z.literal(PULLED_USAGE_EVENT_VERSIONS.OBSERVED),
   data: pulledUsageObservedEventDataSchema,
 });
+export interface PulledUsageObservedEventSchema extends Named<
+  typeof pulledUsageObservedEventSchemaDefinition
+> {}
+export const pulledUsageObservedEventSchema: PulledUsageObservedEventSchema =
+  pulledUsageObservedEventSchemaDefinition;
 
 /**
  * `PulledUsageRetracted` withdraws what one restatement key holds in its
  * cell (challenge settlement 9). `costNanoMinor` is zero rather than omitted
  * because `readPulledUsageMoney` falls back to `costNanoUsd` when absent.
  */
-export const pulledUsageRetractedEventDataSchema = z
+const pulledUsageRetractedEventDataSchemaDefinition = z
   .object({
     /** The dimension-only identity of the item being withdrawn. */
     restatementKey: z.string().min(1),
@@ -130,19 +141,29 @@ export const pulledUsageRetractedEventDataSchema = z
     observedAtMs: z.number().int().positive(),
   })
   .strict();
+export interface PulledUsageRetractedEventDataSchema extends Named<
+  typeof pulledUsageRetractedEventDataSchemaDefinition
+> {}
+export const pulledUsageRetractedEventDataSchema: PulledUsageRetractedEventDataSchema =
+  pulledUsageRetractedEventDataSchemaDefinition;
 
-export const pulledUsageRetractedEventSchema = governanceEventEnvelopeSchema.safeExtend({
+const pulledUsageRetractedEventSchemaDefinition = governanceEventEnvelopeSchema.safeExtend({
   aggregateType: z.literal(PULLED_USAGE_AGGREGATE_TYPE),
   type: z.literal(PULLED_USAGE_EVENT_TYPES.RETRACTED),
   version: z.literal(PULLED_USAGE_EVENT_VERSIONS.RETRACTED),
   data: pulledUsageRetractedEventDataSchema,
 });
+export interface PulledUsageRetractedEventSchema extends Named<
+  typeof pulledUsageRetractedEventSchemaDefinition
+> {}
+export const pulledUsageRetractedEventSchema: PulledUsageRetractedEventSchema =
+  pulledUsageRetractedEventSchemaDefinition;
 
 /**
  * One observation priced in the ledger's nano-dollars, scoped to its team or organization.
  * Governance decides the figure; gateway's ledger peer-subscribes and debits it (Alex, 2026-10-06).
  */
-export const pulledUsagePricedEventDataSchema = z
+const pulledUsagePricedEventDataSchemaDefinition = z
   .object({
     restatementKey: z.string().min(1),
     organizationId: z.string().min(1),
@@ -159,13 +180,23 @@ export const pulledUsagePricedEventDataSchema = z
     observedAtMs: z.number().int().positive(),
   })
   .strict();
+export interface PulledUsagePricedEventDataSchema extends Named<
+  typeof pulledUsagePricedEventDataSchemaDefinition
+> {}
+export const pulledUsagePricedEventDataSchema: PulledUsagePricedEventDataSchema =
+  pulledUsagePricedEventDataSchemaDefinition;
 
-export const pulledUsagePricedEventSchema = governanceEventEnvelopeSchema.safeExtend({
+const pulledUsagePricedEventSchemaDefinition = governanceEventEnvelopeSchema.safeExtend({
   aggregateType: z.literal(PULLED_USAGE_AGGREGATE_TYPE),
   type: z.literal(PULLED_USAGE_EVENT_TYPES.PRICED),
   version: z.literal(PULLED_USAGE_EVENT_VERSIONS.PRICED),
   data: pulledUsagePricedEventDataSchema,
 });
+export interface PulledUsagePricedEventSchema extends Named<
+  typeof pulledUsagePricedEventSchemaDefinition
+> {}
+export const pulledUsagePricedEventSchema: PulledUsagePricedEventSchema =
+  pulledUsagePricedEventSchemaDefinition;
 
 /**
  * Translates old events' costNanoUsd (the amount) to costNanoMinor, since this build

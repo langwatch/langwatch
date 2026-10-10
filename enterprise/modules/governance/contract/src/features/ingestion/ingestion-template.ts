@@ -1,4 +1,5 @@
 import { HandledError, NotFoundError, ValidationError } from "@langwatch/handled-error";
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import {
@@ -6,7 +7,7 @@ import {
   governanceCallSurfaceSchema,
 } from "../../admin-workspace-view-audit.ts";
 
-export const ingestionTemplateSchema = z
+const ingestionTemplateSchemaDefinition = z
   .object({
     id: z.string().min(1),
     slug: z.string().min(1),
@@ -21,11 +22,13 @@ export const ingestionTemplateSchema = z
     organizationId: z.string().nullable(),
   })
   .strict();
+export interface IngestionTemplateSchema extends Named<typeof ingestionTemplateSchemaDefinition> {}
+export const ingestionTemplateSchema: IngestionTemplateSchema = ingestionTemplateSchemaDefinition;
 export type IngestionTemplate = z.infer<typeof ingestionTemplateSchema>;
 
 export const ingestionTemplateSourceTypeSchema = z.string().regex(/^[a-z0-9_]{1,40}$/);
 
-export const createIngestionTemplateInputSchema = z
+const createIngestionTemplateInputSchemaDefinition = z
   .object({
     organizationId: z.string().min(1),
     callerUserId: z.string().min(1),
@@ -38,9 +41,14 @@ export const createIngestionTemplateInputSchema = z
     surface: governanceCallSurfaceSchema.optional(),
   })
   .strict();
+export interface CreateIngestionTemplateInputSchema extends Named<
+  typeof createIngestionTemplateInputSchemaDefinition
+> {}
+export const createIngestionTemplateInputSchema: CreateIngestionTemplateInputSchema =
+  createIngestionTemplateInputSchemaDefinition;
 export type CreateIngestionTemplateInput = z.infer<typeof createIngestionTemplateInputSchema>;
 
-export const updateIngestionTemplateOttlInputSchema = z
+const updateIngestionTemplateOttlInputSchemaDefinition = z
   .object({
     organizationId: z.string().min(1),
     callerUserId: z.string().min(1),
@@ -49,11 +57,16 @@ export const updateIngestionTemplateOttlInputSchema = z
     surface: governanceCallSurfaceSchema.optional(),
   })
   .strict();
+export interface UpdateIngestionTemplateOttlInputSchema extends Named<
+  typeof updateIngestionTemplateOttlInputSchemaDefinition
+> {}
+export const updateIngestionTemplateOttlInputSchema: UpdateIngestionTemplateOttlInputSchema =
+  updateIngestionTemplateOttlInputSchemaDefinition;
 export type UpdateIngestionTemplateOttlInput = z.infer<
   typeof updateIngestionTemplateOttlInputSchema
 >;
 
-export const archiveIngestionTemplateInputSchema = z
+const archiveIngestionTemplateInputSchemaDefinition = z
   .object({
     organizationId: z.string().min(1),
     callerUserId: z.string().min(1),
@@ -61,9 +74,14 @@ export const archiveIngestionTemplateInputSchema = z
     surface: governanceCallSurfaceSchema.optional(),
   })
   .strict();
+export interface ArchiveIngestionTemplateInputSchema extends Named<
+  typeof archiveIngestionTemplateInputSchemaDefinition
+> {}
+export const archiveIngestionTemplateInputSchema: ArchiveIngestionTemplateInputSchema =
+  archiveIngestionTemplateInputSchemaDefinition;
 export type ArchiveIngestionTemplateInput = z.infer<typeof archiveIngestionTemplateInputSchema>;
 
-export const cloneIngestionTemplateInputSchema = z
+const cloneIngestionTemplateInputSchemaDefinition = z
   .object({
     organizationId: z.string().min(1),
     callerUserId: z.string().min(1),
@@ -71,9 +89,14 @@ export const cloneIngestionTemplateInputSchema = z
     surface: governanceCallSurfaceSchema.optional(),
   })
   .strict();
+export interface CloneIngestionTemplateInputSchema extends Named<
+  typeof cloneIngestionTemplateInputSchemaDefinition
+> {}
+export const cloneIngestionTemplateInputSchema: CloneIngestionTemplateInputSchema =
+  cloneIngestionTemplateInputSchemaDefinition;
 export type CloneIngestionTemplateInput = z.infer<typeof cloneIngestionTemplateInputSchema>;
 
-export const platformIngestionTemplateSeedSchema = z
+const platformIngestionTemplateSeedSchemaDefinition = z
   .object({
     slug: z.string().min(1),
     sourceType: ingestionTemplateSourceTypeSchema,
@@ -84,15 +107,25 @@ export const platformIngestionTemplateSeedSchema = z
     ottlRules: z.string(),
   })
   .strict();
+export interface PlatformIngestionTemplateSeedSchema extends Named<
+  typeof platformIngestionTemplateSeedSchemaDefinition
+> {}
+export const platformIngestionTemplateSeedSchema: PlatformIngestionTemplateSeedSchema =
+  platformIngestionTemplateSeedSchemaDefinition;
 export type PlatformIngestionTemplateSeed = z.infer<typeof platformIngestionTemplateSeedSchema>;
 
-export const platformIngestionTemplateSyncResultSchema = z
+const platformIngestionTemplateSyncResultSchemaDefinition = z
   .object({
     created: z.number().int().nonnegative(),
     updated: z.number().int().nonnegative(),
     archived: z.number().int().nonnegative(),
   })
   .strict();
+export interface PlatformIngestionTemplateSyncResultSchema extends Named<
+  typeof platformIngestionTemplateSyncResultSchemaDefinition
+> {}
+export const platformIngestionTemplateSyncResultSchema: PlatformIngestionTemplateSyncResultSchema =
+  platformIngestionTemplateSyncResultSchemaDefinition;
 export type PlatformIngestionTemplateSyncResult = z.infer<
   typeof platformIngestionTemplateSyncResultSchema
 >;

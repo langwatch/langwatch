@@ -4,6 +4,7 @@
  * @see modules/instant-eval/specs/classifier.feature
  */
 
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import type {
@@ -79,13 +80,18 @@ const answerSchema = z.object({
   confidence: z.number().optional(),
 });
 
-export const classifierResponseSchema = z.object({
+const classifierResponseSchemaDefinition = z.object({
   model: z.string().optional(),
   answers: z.record(z.string(), answerSchema),
   usage: z
     .object({ input_tokens: z.number().optional(), output_tokens: z.number().optional() })
     .optional(),
 });
+export interface ClassifierResponseSchema extends Named<
+  typeof classifierResponseSchemaDefinition
+> {}
+export const classifierResponseSchema: ClassifierResponseSchema =
+  classifierResponseSchemaDefinition;
 
 type ClassifierResponse = z.infer<typeof classifierResponseSchema>;
 type ClassifierAnswer = z.infer<typeof answerSchema>;

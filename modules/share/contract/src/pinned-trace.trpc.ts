@@ -5,20 +5,32 @@
  */
 
 import { pinnedTraceSchema } from "@langwatch/data-retention-contract";
-import { defineTrpcContract } from "@langwatch/module";
+import { defineTrpcContract, type Named } from "@langwatch/module";
 import { z } from "zod";
 
-export const pinnedTraceScopeSchema = z.object({
+const pinnedTraceScopeSchemaDefinition = z.object({
   projectId: z.string(),
   traceId: z.string(),
 });
+export interface PinnedTraceScopeSchema extends Named<typeof pinnedTraceScopeSchemaDefinition> {}
+export const pinnedTraceScopeSchema: PinnedTraceScopeSchema = pinnedTraceScopeSchemaDefinition;
 
-export const pinnedTracePinInputSchema = z.object({
+const pinnedTracePinInputSchemaDefinition = z.object({
   ...pinnedTraceScopeSchema.shape,
   reason: z.string().optional(),
 });
+export interface PinnedTracePinInputSchema extends Named<
+  typeof pinnedTracePinInputSchemaDefinition
+> {}
+export const pinnedTracePinInputSchema: PinnedTracePinInputSchema =
+  pinnedTracePinInputSchemaDefinition;
 
-export const pinnedTraceProjectInputSchema = z.object({ projectId: z.string() });
+const pinnedTraceProjectInputSchemaDefinition = z.object({ projectId: z.string() });
+export interface PinnedTraceProjectInputSchema extends Named<
+  typeof pinnedTraceProjectInputSchemaDefinition
+> {}
+export const pinnedTraceProjectInputSchema: PinnedTraceProjectInputSchema =
+  pinnedTraceProjectInputSchemaDefinition;
 
 export const pinnedTraceTrpc = defineTrpcContract("pinnedTrace")
   .mutation("pin")

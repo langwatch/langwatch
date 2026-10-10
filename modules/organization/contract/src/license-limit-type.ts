@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 /**
@@ -13,7 +14,7 @@ export type LimitType = (typeof limitTypes)[number];
 export const limitTypeSchema = z.enum(limitTypes);
 
 /** Result of checking a limit */
-export const limitCheckResultSchema = z
+const limitCheckResultSchemaDefinition = z
   .object({
     /** Whether the organization can create another resource of this type */
     allowed: z.boolean(),
@@ -25,14 +26,18 @@ export const limitCheckResultSchema = z
     limitType: limitTypeSchema,
   })
   .strict();
+export interface LimitCheckResultSchema extends Named<typeof limitCheckResultSchemaDefinition> {}
+export const limitCheckResultSchema: LimitCheckResultSchema = limitCheckResultSchemaDefinition;
 export type LimitCheckResult = z.infer<typeof limitCheckResultSchema>;
 
 /** Every limit at once, keyed by type. Which limits exist is the app's answer. */
-export const allLimitChecksSchema = z.record(limitTypeSchema, limitCheckResultSchema);
+const allLimitChecksSchemaDefinition = z.record(limitTypeSchema, limitCheckResultSchema);
+export interface AllLimitChecksSchema extends Named<typeof allLimitChecksSchemaDefinition> {}
+export const allLimitChecksSchema: AllLimitChecksSchema = allLimitChecksSchemaDefinition;
 
 export const SEAT_LIMIT_REACHED_EVENT_TYPE = "lw.organization.seat_limit_reached" as const;
 /** One seat limit an organization ran into: a refused invite, role change or client pre-check. */
-export const seatLimitReachedEventDataSchema = z.object({
+const seatLimitReachedEventDataSchemaDefinition = z.object({
   tenantId: z.string().min(1),
   organizationId: z.string().min(1),
   limitType: limitTypeSchema,
@@ -40,4 +45,9 @@ export const seatLimitReachedEventDataSchema = z.object({
   max: z.number().int().nonnegative(),
   occurredAt: z.number().int().nonnegative(),
 });
+export interface SeatLimitReachedEventDataSchema extends Named<
+  typeof seatLimitReachedEventDataSchemaDefinition
+> {}
+export const seatLimitReachedEventDataSchema: SeatLimitReachedEventDataSchema =
+  seatLimitReachedEventDataSchemaDefinition;
 export type SeatLimitReachedEventData = z.infer<typeof seatLimitReachedEventDataSchema>;

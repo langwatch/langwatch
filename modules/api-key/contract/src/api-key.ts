@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import { API_KEY_REVOCATION_CAUSES } from "./api-key.revocation-cause.ts";
@@ -9,7 +10,7 @@ export type ApiKeyScopeType = z.infer<typeof apiKeyScopeTypeSchema>;
 export const apiKeyPermissionFormatSchema = z
   .string()
   .regex(/^[a-z][a-zA-Z0-9_-]*:[a-z][a-zA-Z0-9_-]*$/);
-export const apiKeyScopeSchema = z
+const apiKeyScopeSchemaDefinition = z
   .object({
     scopeType: apiKeyScopeTypeSchema,
     scopeId: z.string().min(1),
@@ -17,17 +18,21 @@ export const apiKeyScopeSchema = z
     customRoleId: z.string().min(1).nullable().optional(),
   })
   .strict();
+export interface ApiKeyScopeSchema extends Named<typeof apiKeyScopeSchemaDefinition> {}
+export const apiKeyScopeSchema: ApiKeyScopeSchema = apiKeyScopeSchemaDefinition;
 export type ApiKeyScope = z.infer<typeof apiKeyScopeSchema>;
-export const apiKeyBindingSchema = z
+const apiKeyBindingSchemaDefinition = z
   .object({ ...apiKeyScopeSchema.shape, id: z.string().min(1) })
   .strict();
+export interface ApiKeyBindingSchema extends Named<typeof apiKeyBindingSchemaDefinition> {}
+export const apiKeyBindingSchema: ApiKeyBindingSchema = apiKeyBindingSchemaDefinition;
 export type ApiKeyBinding = Omit<z.infer<typeof apiKeyBindingSchema>, "customRoleId"> & {
   customRoleId: string | null;
 };
 export const apiKeyPermissionModeSchema = z.enum(["all", "readonly", "restricted"]);
 export type ApiKeyPermissionMode = z.infer<typeof apiKeyPermissionModeSchema>;
 
-export const apiKeySchema = z
+const apiKeySchemaDefinition = z
   .object({
     id: z.string().min(1),
     name: z.string(),
@@ -62,6 +67,8 @@ export const apiKeySchema = z
     grants: z.array(apiKeyBindingSchema),
   })
   .strict();
+export interface ApiKeySchema extends Named<typeof apiKeySchemaDefinition> {}
+export const apiKeySchema: ApiKeySchema = apiKeySchemaDefinition;
 export type ApiKey = z.infer<typeof apiKeySchema>;
 
 const apiKeyMutationShape = {
@@ -87,9 +94,11 @@ const apiKeyMutationShape = {
   parentApiKeyId: z.string().min(1).nullable().optional(),
   isSystemManaged: z.boolean().optional(),
 };
-export const createApiKeyInputSchema = z.object(apiKeyMutationShape).strict();
+const createApiKeyInputSchemaDefinition = z.object(apiKeyMutationShape).strict();
+export interface CreateApiKeyInputSchema extends Named<typeof createApiKeyInputSchemaDefinition> {}
+export const createApiKeyInputSchema: CreateApiKeyInputSchema = createApiKeyInputSchemaDefinition;
 export type CreateApiKeyInput = z.input<typeof createApiKeyInputSchema>;
-export const updateApiKeyInputSchema = z
+const updateApiKeyInputSchemaDefinition = z
   .object({
     id: z.string().min(1),
     organizationId: z.string().min(1),
@@ -103,8 +112,10 @@ export const updateApiKeyInputSchema = z
     bindings: z.array(apiKeyScopeSchema).optional(),
   })
   .strict();
+export interface UpdateApiKeyInputSchema extends Named<typeof updateApiKeyInputSchemaDefinition> {}
+export const updateApiKeyInputSchema: UpdateApiKeyInputSchema = updateApiKeyInputSchemaDefinition;
 export type UpdateApiKeyInput = z.infer<typeof updateApiKeyInputSchema>;
-export const revokeApiKeyInputSchema = z
+const revokeApiKeyInputSchemaDefinition = z
   .object({
     id: z.string().min(1),
     organizationId: z.string().min(1),
@@ -125,14 +136,23 @@ export const revokeApiKeyInputSchema = z
     cascadeToChildren: z.boolean().optional(),
   })
   .strict();
+export interface RevokeApiKeyInputSchema extends Named<typeof revokeApiKeyInputSchemaDefinition> {}
+export const revokeApiKeyInputSchema: RevokeApiKeyInputSchema = revokeApiKeyInputSchemaDefinition;
 export type RevokeApiKeyInput = z.infer<typeof revokeApiKeyInputSchema>;
-export const apiKeyVerificationSchema = z
+const apiKeyVerificationSchemaDefinition = z
   .object({ ...apiKeySchema.shape, tokenType: z.literal("apiKey") })
   .strict();
+export interface ApiKeyVerificationSchema extends Named<
+  typeof apiKeyVerificationSchemaDefinition
+> {}
+export const apiKeyVerificationSchema: ApiKeyVerificationSchema =
+  apiKeyVerificationSchemaDefinition;
 export type ApiKeyVerification = z.infer<typeof apiKeyVerificationSchema>;
-export const apiKeyDetailSchema = z
+const apiKeyDetailSchemaDefinition = z
   .object({ ...apiKeySchema.shape, permissions: z.array(apiKeyPermissionFormatSchema) })
   .strict();
+export interface ApiKeyDetailSchema extends Named<typeof apiKeyDetailSchemaDefinition> {}
+export const apiKeyDetailSchema: ApiKeyDetailSchema = apiKeyDetailSchemaDefinition;
 export type ApiKeyDetail = z.infer<typeof apiKeyDetailSchema>;
 export type ApiKeyName = { name: string; revoked: boolean };
 export type ApiKeyUser = { id: string; name: string | null; email: string | null };
@@ -159,18 +179,25 @@ export type ApiKeyCreatorScope =
   | { type: "org"; id: string }
   | { type: "team"; id: string }
   | { type: "project"; id: string; teamId: string };
-export const cliKeyBindingSelectionSchema = z
+const cliKeyBindingSelectionSchemaDefinition = z
   .object({ scopeType: apiKeyScopeTypeSchema, scopeId: z.string().min(1) })
   .strict();
+export interface CliKeyBindingSelectionSchema extends Named<
+  typeof cliKeyBindingSelectionSchemaDefinition
+> {}
+export const cliKeyBindingSelectionSchema: CliKeyBindingSelectionSchema =
+  cliKeyBindingSelectionSchemaDefinition;
 export type CliKeyBindingSelection = z.infer<typeof cliKeyBindingSelectionSchema>;
-export const cliKeySelectionSchema = z
+const cliKeySelectionSchemaDefinition = z
   .object({
     bindings: z.array(cliKeyBindingSelectionSchema),
     permissions: z.array(apiKeyPermissionFormatSchema),
   })
   .strict();
+export interface CliKeySelectionSchema extends Named<typeof cliKeySelectionSchemaDefinition> {}
+export const cliKeySelectionSchema: CliKeySelectionSchema = cliKeySelectionSchemaDefinition;
 export type CliKeySelection = z.infer<typeof cliKeySelectionSchema>;
-export const cliKeyScopeSummarySchema = z
+const cliKeyScopeSummarySchemaDefinition = z
   .object({
     kind: z.enum(["organization", "projects"]),
     projectIds: z.array(z.string().min(1)),
@@ -182,6 +209,11 @@ export const cliKeyScopeSummarySchema = z
     permissions: z.array(z.string().min(1)),
   })
   .strict();
+export interface CliKeyScopeSummarySchema extends Named<
+  typeof cliKeyScopeSummarySchemaDefinition
+> {}
+export const cliKeyScopeSummarySchema: CliKeyScopeSummarySchema =
+  cliKeyScopeSummarySchemaDefinition;
 export type CliKeyScopeSummary = z.infer<typeof cliKeyScopeSummarySchema>;
 
 /** Input shapes of the ApiKeyApi operations. */

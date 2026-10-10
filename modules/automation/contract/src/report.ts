@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { fromDate, type Instant, nowInstant, toDate } from "@langwatch/time";
 import { Cron } from "croner";
 import { z } from "zod";
@@ -9,7 +10,7 @@ const CRON_FIELD_COUNT = 5;
 /** Stable scheduler target used for the durable report calendar row. */
 export const REPORT_SCHEDULER_TARGET_TYPE = "reportTrigger" as const;
 
-export const reportScheduleSchema = z
+const reportScheduleSchemaDefinition = z
   .object({
     cron: z.string().min(1).max(120),
     timezone: z.string().min(1).max(64),
@@ -61,8 +62,10 @@ export const reportScheduleSchema = z
       );
     }
   });
+export interface ReportScheduleSchema extends Named<typeof reportScheduleSchemaDefinition> {}
+export const reportScheduleSchema: ReportScheduleSchema = reportScheduleSchemaDefinition;
 
-export const reportSourceSchema = z.discriminatedUnion("kind", [
+const reportSourceSchemaDefinition = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("dashboard"), dashboardId: z.string().min(1) }),
   z.object({
     kind: z.literal("customGraph"),
@@ -75,12 +78,19 @@ export const reportSourceSchema = z.discriminatedUnion("kind", [
     topN: z.number().int().min(1).max(100).default(5),
   }),
 ]);
+export interface ReportSourceSchema extends Named<typeof reportSourceSchemaDefinition> {}
+export const reportSourceSchema: ReportSourceSchema = reportSourceSchemaDefinition;
 export type ReportSource = z.infer<typeof reportSourceSchema>;
-export const reportActionParamsSchema = z.object({
+const reportActionParamsSchemaDefinition = z.object({
   source: reportSourceSchema,
   schedule: reportScheduleSchema,
   compareToPrevious: z.boolean().default(false),
 });
+export interface ReportActionParamsSchema extends Named<
+  typeof reportActionParamsSchemaDefinition
+> {}
+export const reportActionParamsSchema: ReportActionParamsSchema =
+  reportActionParamsSchemaDefinition;
 export type ReportScheduleInput = z.infer<typeof reportScheduleSchema>;
 export type ReportActionParams = z.infer<typeof reportActionParamsSchema>;
 

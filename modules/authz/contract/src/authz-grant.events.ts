@@ -1,4 +1,5 @@
 import { grantConditionSchema, ledgerActorSchema } from "@langwatch/authorization";
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import { PROJECT_READER_ROLE_KEY } from "./roles.ts";
@@ -28,7 +29,7 @@ export const AUTHZ_GRANTS_EVENT_TYPES = [
 ] as const;
 export const AUTHZ_GRANTS_EVENT_VERSION_LATEST = "2026-08-20" as const;
 
-export const ledgerPrincipalSchema = z
+const ledgerPrincipalSchemaDefinition = z
   .object({
     type: z.enum(["user", "apiKey", "group", "team", "organization", "project", "anyone"]),
     id: z.string().nullable(),
@@ -38,18 +39,22 @@ export const ledgerPrincipalSchema = z
     message: "principal id is null for `anyone` and required for every other principal type",
     path: ["id"],
   });
+export interface LedgerPrincipalSchema extends Named<typeof ledgerPrincipalSchemaDefinition> {}
+export const ledgerPrincipalSchema: LedgerPrincipalSchema = ledgerPrincipalSchemaDefinition;
 export type LedgerPrincipal = z.infer<typeof ledgerPrincipalSchema>;
 export type LedgerPrincipalType = LedgerPrincipal["type"];
 
 export const legacyBindingRoleSchema = z.enum(["ADMIN", "MEMBER", "VIEWER", "CUSTOM"]);
 export type LegacyBindingRole = z.infer<typeof legacyBindingRoleSchema>;
 
-export const ledgerScopeSchema = z
+const ledgerScopeSchemaDefinition = z
   .object({
     type: z.enum(["ORGANIZATION", "TEAM", "PROJECT", "RESOURCE", "PLATFORM"]),
     id: z.string(),
   })
   .strict();
+export interface LedgerScopeSchema extends Named<typeof ledgerScopeSchemaDefinition> {}
+export const ledgerScopeSchema: LedgerScopeSchema = ledgerScopeSchemaDefinition;
 export type LedgerScope = z.infer<typeof ledgerScopeSchema>;
 export type LedgerScopeType = LedgerScope["type"];
 
@@ -65,7 +70,7 @@ export const GRANT_EVENT_SOURCES = [
 export const grantEventSourceSchema = z.enum(GRANT_EVENT_SOURCES);
 export type GrantEventSource = z.infer<typeof grantEventSourceSchema>;
 
-export const resourceGrantTermsSchema = z
+const resourceGrantTermsSchemaDefinition = z
   .object({
     kind: z.enum(["trace", "thread"]),
     projectId: z.string().min(1),
@@ -76,6 +81,11 @@ export const resourceGrantTermsSchema = z
     maxViews: z.number().int().nonnegative().optional(),
   })
   .strict();
+export interface ResourceGrantTermsSchema extends Named<
+  typeof resourceGrantTermsSchemaDefinition
+> {}
+export const resourceGrantTermsSchema: ResourceGrantTermsSchema =
+  resourceGrantTermsSchemaDefinition;
 export type ResourceGrantTerms = z.infer<typeof resourceGrantTermsSchema>;
 
 /**
@@ -124,7 +134,7 @@ export const grantShapeRefinement = {
   path: ["resource"] as const,
 };
 
-export const grantAttachedPayloadSchema = z
+const grantAttachedPayloadSchemaDefinition = z
   .object({
     grantId: z.string().min(1),
     principal: ledgerPrincipalSchema,
@@ -155,9 +165,14 @@ export const grantAttachedPayloadSchema = z
     message: "membershipBootstrap requires membershipStamp",
     path: ["membershipStamp"],
   });
+export interface GrantAttachedPayloadSchema extends Named<
+  typeof grantAttachedPayloadSchemaDefinition
+> {}
+export const grantAttachedPayloadSchema: GrantAttachedPayloadSchema =
+  grantAttachedPayloadSchemaDefinition;
 export type GrantAttachedPayload = z.infer<typeof grantAttachedPayloadSchema>;
 
-export const grantRoleChangedPayloadSchema = z
+const grantRoleChangedPayloadSchemaDefinition = z
   .object({
     grantId: z.string().min(1),
     from: z.string().min(1).nullable(),
@@ -165,18 +180,28 @@ export const grantRoleChangedPayloadSchema = z
     actor: ledgerActorSchema,
   })
   .strict();
+export interface GrantRoleChangedPayloadSchema extends Named<
+  typeof grantRoleChangedPayloadSchemaDefinition
+> {}
+export const grantRoleChangedPayloadSchema: GrantRoleChangedPayloadSchema =
+  grantRoleChangedPayloadSchemaDefinition;
 export type GrantRoleChangedPayload = z.infer<typeof grantRoleChangedPayloadSchema>;
 
-export const grantRevokedPayloadSchema = z
+const grantRevokedPayloadSchemaDefinition = z
   .object({
     grantId: z.string().min(1),
     reason: z.string().min(1).optional(),
     actor: ledgerActorSchema,
   })
   .strict();
+export interface GrantRevokedPayloadSchema extends Named<
+  typeof grantRevokedPayloadSchemaDefinition
+> {}
+export const grantRevokedPayloadSchema: GrantRevokedPayloadSchema =
+  grantRevokedPayloadSchemaDefinition;
 export type GrantRevokedPayload = z.infer<typeof grantRevokedPayloadSchema>;
 
-export const roleDefinedPayloadSchema = z
+const roleDefinedPayloadSchemaDefinition = z
   .object({
     roleId: z.string().min(1),
     name: z.string().min(1),
@@ -186,27 +211,42 @@ export const roleDefinedPayloadSchema = z
     actor: ledgerActorSchema,
   })
   .strict();
+export interface RoleDefinedPayloadSchema extends Named<
+  typeof roleDefinedPayloadSchemaDefinition
+> {}
+export const roleDefinedPayloadSchema: RoleDefinedPayloadSchema =
+  roleDefinedPayloadSchemaDefinition;
 export type RoleDefinedPayload = z.infer<typeof roleDefinedPayloadSchema>;
 
-export const rolePermissionsChangedPayloadSchema = z
+const rolePermissionsChangedPayloadSchemaDefinition = z
   .object({
     roleId: z.string().min(1),
     permissions: z.array(z.string().min(1)),
     actor: ledgerActorSchema,
   })
   .strict();
+export interface RolePermissionsChangedPayloadSchema extends Named<
+  typeof rolePermissionsChangedPayloadSchemaDefinition
+> {}
+export const rolePermissionsChangedPayloadSchema: RolePermissionsChangedPayloadSchema =
+  rolePermissionsChangedPayloadSchemaDefinition;
 export type RolePermissionsChangedPayload = z.infer<typeof rolePermissionsChangedPayloadSchema>;
 
-export const roleDeletedPayloadSchema = z
+const roleDeletedPayloadSchemaDefinition = z
   .object({
     roleId: z.string().min(1),
     actor: ledgerActorSchema,
   })
   .strict();
+export interface RoleDeletedPayloadSchema extends Named<
+  typeof roleDeletedPayloadSchemaDefinition
+> {}
+export const roleDeletedPayloadSchema: RoleDeletedPayloadSchema =
+  roleDeletedPayloadSchemaDefinition;
 export type RoleDeletedPayload = z.infer<typeof roleDeletedPayloadSchema>;
 
 /** Portable event type plus data only; Eventing owns the outer envelope. */
-export const authzGrantEventPayloadSchema = z.discriminatedUnion("type", [
+const authzGrantEventPayloadSchemaDefinition = z.discriminatedUnion("type", [
   z.object({
     type: z.literal(GRANT_ATTACHED_EVENT_TYPE),
     data: grantAttachedPayloadSchema,
@@ -232,9 +272,14 @@ export const authzGrantEventPayloadSchema = z.discriminatedUnion("type", [
     data: roleDeletedPayloadSchema,
   }),
 ]);
+export interface AuthzGrantEventPayloadSchema extends Named<
+  typeof authzGrantEventPayloadSchemaDefinition
+> {}
+export const authzGrantEventPayloadSchema: AuthzGrantEventPayloadSchema =
+  authzGrantEventPayloadSchemaDefinition;
 export type AuthzGrantEventPayload = z.infer<typeof authzGrantEventPayloadSchema>;
 
-export const grantFactSchema = z
+const grantFactSchemaDefinition = z
   .object({
     grantId: z.string().min(1),
     principal: ledgerPrincipalSchema,
@@ -255,9 +300,11 @@ export const grantFactSchema = z
     message: grantShapeRefinement.message,
     path: [...grantShapeRefinement.path],
   });
+export interface GrantFactSchema extends Named<typeof grantFactSchemaDefinition> {}
+export const grantFactSchema: GrantFactSchema = grantFactSchemaDefinition;
 export type GrantFact = z.infer<typeof grantFactSchema>;
 
-export const roleFactSchema = z
+const roleFactSchemaDefinition = z
   .object({
     roleId: z.string().min(1),
     name: z.string().min(1),
@@ -267,6 +314,8 @@ export const roleFactSchema = z
     occurredAtMs: z.number().int().nonnegative(),
   })
   .strict();
+export interface RoleFactSchema extends Named<typeof roleFactSchemaDefinition> {}
+export const roleFactSchema: RoleFactSchema = roleFactSchemaDefinition;
 export type RoleFact = z.infer<typeof roleFactSchema>;
 
 export const migrationTenantStatusSchema = z.enum([

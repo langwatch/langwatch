@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import { personalWorkspaceSchema } from "@langwatch/organization-contract";
 import { z } from "zod";
@@ -8,18 +9,23 @@ export type RoutingPolicyScopeType = z.infer<typeof routingPolicyScopeTypeSchema
 export const routingPolicyWireScopeSchema = z.enum(["organization", "team", "project"]);
 export type RoutingPolicyWireScope = z.infer<typeof routingPolicyWireScopeSchema>;
 
-export const routingPolicyScopeEntrySchema = z
+const routingPolicyScopeEntrySchemaDefinition = z
   .object({
     scopeType: routingPolicyScopeTypeSchema,
     scopeId: z.string().min(1),
   })
   .strict();
+export interface RoutingPolicyScopeEntrySchema extends Named<
+  typeof routingPolicyScopeEntrySchemaDefinition
+> {}
+export const routingPolicyScopeEntrySchema: RoutingPolicyScopeEntrySchema =
+  routingPolicyScopeEntrySchemaDefinition;
 export type RoutingPolicyScopeEntry = z.infer<typeof routingPolicyScopeEntrySchema>;
 
 const stringMapSchema = z.record(z.string(), z.string());
 const jsonObjectSchema = z.record(z.string(), z.unknown());
 
-export const routingPolicySchema = z
+const routingPolicySchemaDefinition = z
   .object({
     id: z.string().min(1),
     organizationId: z.string().min(1),
@@ -37,25 +43,37 @@ export const routingPolicySchema = z
     scopes: z.array(routingPolicyScopeEntrySchema),
   })
   .strict();
+export interface RoutingPolicySchema extends Named<typeof routingPolicySchemaDefinition> {}
+export const routingPolicySchema: RoutingPolicySchema = routingPolicySchemaDefinition;
 export type RoutingPolicy = z.infer<typeof routingPolicySchema>;
 
-export const listRoutingPoliciesInputSchema = z
+const listRoutingPoliciesInputSchemaDefinition = z
   .object({
     organizationId: z.string().min(1),
     selectableForScope: routingPolicyScopeEntrySchema.optional(),
   })
   .strict();
+export interface ListRoutingPoliciesInputSchema extends Named<
+  typeof listRoutingPoliciesInputSchemaDefinition
+> {}
+export const listRoutingPoliciesInputSchema: ListRoutingPoliciesInputSchema =
+  listRoutingPoliciesInputSchemaDefinition;
 export type ListRoutingPoliciesInput = z.infer<typeof listRoutingPoliciesInputSchema>;
 
-export const findRoutingPolicyInputSchema = z
+const findRoutingPolicyInputSchemaDefinition = z
   .object({
     id: z.string().min(1),
     organizationId: z.string().min(1),
   })
   .strict();
+export interface FindRoutingPolicyInputSchema extends Named<
+  typeof findRoutingPolicyInputSchemaDefinition
+> {}
+export const findRoutingPolicyInputSchema: FindRoutingPolicyInputSchema =
+  findRoutingPolicyInputSchemaDefinition;
 export type FindRoutingPolicyInput = z.infer<typeof findRoutingPolicyInputSchema>;
 
-export const createRoutingPolicyInputSchema = z
+const createRoutingPolicyInputSchemaDefinition = z
   .object({
     organizationId: z.string().min(1),
     scopes: z.array(routingPolicyScopeEntrySchema).min(1),
@@ -69,9 +87,14 @@ export const createRoutingPolicyInputSchema = z
     actorUserId: z.string().min(1),
   })
   .strict();
+export interface CreateRoutingPolicyInputSchema extends Named<
+  typeof createRoutingPolicyInputSchemaDefinition
+> {}
+export const createRoutingPolicyInputSchema: CreateRoutingPolicyInputSchema =
+  createRoutingPolicyInputSchemaDefinition;
 export type CreateRoutingPolicyInput = z.infer<typeof createRoutingPolicyInputSchema>;
 
-export const updateRoutingPolicyInputSchema = z
+const updateRoutingPolicyInputSchemaDefinition = z
   .object({
     id: z.string().min(1),
     organizationId: z.string().min(1),
@@ -84,31 +107,51 @@ export const updateRoutingPolicyInputSchema = z
     actorUserId: z.string().min(1),
   })
   .strict();
+export interface UpdateRoutingPolicyInputSchema extends Named<
+  typeof updateRoutingPolicyInputSchemaDefinition
+> {}
+export const updateRoutingPolicyInputSchema: UpdateRoutingPolicyInputSchema =
+  updateRoutingPolicyInputSchemaDefinition;
 export type UpdateRoutingPolicyInput = z.infer<typeof updateRoutingPolicyInputSchema>;
 
-export const setDefaultRoutingPolicyInputSchema = z
+const setDefaultRoutingPolicyInputSchemaDefinition = z
   .object({
     id: z.string().min(1),
     organizationId: z.string().min(1),
     actorUserId: z.string().min(1),
   })
   .strict();
+export interface SetDefaultRoutingPolicyInputSchema extends Named<
+  typeof setDefaultRoutingPolicyInputSchemaDefinition
+> {}
+export const setDefaultRoutingPolicyInputSchema: SetDefaultRoutingPolicyInputSchema =
+  setDefaultRoutingPolicyInputSchemaDefinition;
 export type SetDefaultRoutingPolicyInput = z.infer<typeof setDefaultRoutingPolicyInputSchema>;
 
-export const deleteRoutingPolicyInputSchema = z
+const deleteRoutingPolicyInputSchemaDefinition = z
   .object({
     id: z.string().min(1),
     organizationId: z.string().min(1),
   })
   .strict();
+export interface DeleteRoutingPolicyInputSchema extends Named<
+  typeof deleteRoutingPolicyInputSchemaDefinition
+> {}
+export const deleteRoutingPolicyInputSchema: DeleteRoutingPolicyInputSchema =
+  deleteRoutingPolicyInputSchemaDefinition;
 export type DeleteRoutingPolicyInput = z.infer<typeof deleteRoutingPolicyInputSchema>;
 
-export const resolveDefaultRoutingPolicyInputSchema = z
+const resolveDefaultRoutingPolicyInputSchemaDefinition = z
   .object({
     organizationId: z.string().min(1),
     personalTeamId: z.string().min(1).optional(),
   })
   .strict();
+export interface ResolveDefaultRoutingPolicyInputSchema extends Named<
+  typeof resolveDefaultRoutingPolicyInputSchemaDefinition
+> {}
+export const resolveDefaultRoutingPolicyInputSchema: ResolveDefaultRoutingPolicyInputSchema =
+  resolveDefaultRoutingPolicyInputSchemaDefinition;
 export type ResolveDefaultRoutingPolicyInput = z.infer<
   typeof resolveDefaultRoutingPolicyInputSchema
 >;
@@ -172,10 +215,12 @@ const personalContextWorkspaceSchema = personalWorkspaceSchema.safeExtend({
  * The caller's personal workspace inside one organization, plus the routing
  * policy it inherits by default. Null where the organization declares none.
  */
-export const personalContextSchema = z
+const personalContextSchemaDefinition = z
   .object({
     workspace: personalContextWorkspaceSchema,
     routingPolicy: z.object({ id: z.string(), name: z.string() }).strict().nullable(),
   })
   .strict();
+export interface PersonalContextSchema extends Named<typeof personalContextSchemaDefinition> {}
+export const personalContextSchema: PersonalContextSchema = personalContextSchemaDefinition;
 export type PersonalContext = z.infer<typeof personalContextSchema>;

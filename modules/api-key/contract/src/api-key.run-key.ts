@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 /** How long a run's key lives when no caller needs it to outlast a longer bound. */
@@ -13,11 +14,18 @@ export const RUN_KEY_MAX_REMAINING_MS = 60 * 60 * 1000;
 export const AGENT_SANDBOX_PERMISSIONS: readonly string[] = ["agentCache:manage"];
 
 /** The key a project's code agent runs share (specs/agent-cache/agent-cache.feature). */
-export const mintAgentSandboxKeyInputSchema = z.object({ projectId: z.string().min(1) }).strict();
+const mintAgentSandboxKeyInputSchemaDefinition = z
+  .object({ projectId: z.string().min(1) })
+  .strict();
+export interface MintAgentSandboxKeyInputSchema extends Named<
+  typeof mintAgentSandboxKeyInputSchemaDefinition
+> {}
+export const mintAgentSandboxKeyInputSchema: MintAgentSandboxKeyInputSchema =
+  mintAgentSandboxKeyInputSchemaDefinition;
 export type MintAgentSandboxKeyInput = z.infer<typeof mintAgentSandboxKeyInputSchema>;
 
 /** One run's key (ARCHITECTURE.md §10): the starter's, or nobody's when nobody started it. */
-export const mintRunKeyInputSchema = z
+const mintRunKeyInputSchemaDefinition = z
   .object({
     /** The member who started the run; null with no calling key acts as the system. */
     userId: z.string().min(1).nullable(),
@@ -29,4 +37,6 @@ export const mintRunKeyInputSchema = z
     minRemainingMs: z.number().int().positive().max(RUN_KEY_MAX_REMAINING_MS).optional(),
   })
   .strict();
+export interface MintRunKeyInputSchema extends Named<typeof mintRunKeyInputSchemaDefinition> {}
+export const mintRunKeyInputSchema: MintRunKeyInputSchema = mintRunKeyInputSchemaDefinition;
 export type MintRunKeyInput = z.infer<typeof mintRunKeyInputSchema>;

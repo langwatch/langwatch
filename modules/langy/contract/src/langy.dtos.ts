@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import { langyEventCursorSchema } from "./event-sourcing/contracts/cursor.ts";
@@ -19,7 +20,7 @@ export const langyConversationStatusSchema = z.enum([
 export type LangyConversationStatus = z.infer<typeof langyConversationStatusSchema>;
 
 /** The slim spine row the recent-chats list renders. No message content. */
-export const langyConversationListItemSchema = z.object({
+const langyConversationListItemSchemaDefinition = z.object({
   id: z.string(),
   title: z.string().nullable(),
   isShared: z.boolean().default(false),
@@ -27,20 +28,35 @@ export const langyConversationListItemSchema = z.object({
   messageCount: z.number().int().nonnegative().default(0),
   lastActivityAtMs: z.number().default(0),
 });
+export interface LangyConversationListItemSchema extends Named<
+  typeof langyConversationListItemSchemaDefinition
+> {}
+export const langyConversationListItemSchema: LangyConversationListItemSchema =
+  langyConversationListItemSchemaDefinition;
 export type LangyConversationListItemDto = z.infer<typeof langyConversationListItemSchema>;
 
 /** Opaque keyset cursor for fetching the next recent-conversations page. */
-export const langyConversationListCursorSchema = z.object({
+const langyConversationListCursorSchemaDefinition = z.object({
   lastActivityAtMs: z.number().nullable(),
   id: z.string(),
 });
+export interface LangyConversationListCursorSchema extends Named<
+  typeof langyConversationListCursorSchemaDefinition
+> {}
+export const langyConversationListCursorSchema: LangyConversationListCursorSchema =
+  langyConversationListCursorSchemaDefinition;
 export type LangyConversationListCursorDto = z.infer<typeof langyConversationListCursorSchema>;
 
 /** Detail read for an opened conversation. Adds lifecycle status. */
-export const langyConversationDetailSchema = z.object({
+const langyConversationDetailSchemaDefinition = z.object({
   ...langyConversationListItemSchema.shape,
   status: langyConversationStatusSchema.default("active"),
 });
+export interface LangyConversationDetailSchema extends Named<
+  typeof langyConversationDetailSchemaDefinition
+> {}
+export const langyConversationDetailSchema: LangyConversationDetailSchema =
+  langyConversationDetailSchemaDefinition;
 export type LangyConversationDetailDto = z.infer<typeof langyConversationDetailSchema>;
 
 /**
@@ -54,19 +70,21 @@ export type LangyMessageDtoRole = z.infer<typeof langyMessageRoleSchema>;
  * Vercel-AI part array stored verbatim by the map projection; the client
  * narrows it when rendering.
  */
-export const langyMessageDtoSchema = z.object({
+const langyMessageDtoSchemaDefinition = z.object({
   id: z.string(),
   role: langyMessageRoleSchema,
   parts: z.array(z.record(z.string(), z.unknown())).default([]),
   createdAtMs: z.number().default(0),
 });
+export interface LangyMessageDtoSchema extends Named<typeof langyMessageDtoSchemaDefinition> {}
+export const langyMessageDtoSchema: LangyMessageDtoSchema = langyMessageDtoSchemaDefinition;
 export type LangyMessageDto = z.infer<typeof langyMessageDtoSchema>;
 
 /**
  * The freshness signal pushed over SSE: OPERATIONAL fields only. Title and
  * message content NEVER ride it — tenant-wide broadcast, owner-private data.
  */
-export const langyConversationUpdateSignalSchema = z.object({
+const langyConversationUpdateSignalSchemaDefinition = z.object({
   event: z.literal("langy_conversation_updated"),
   conversationId: z.string(),
   status: langyConversationStatusSchema.optional(),
@@ -87,6 +105,11 @@ export const langyConversationUpdateSignalSchema = z.object({
     })
     .optional(),
 });
+export interface LangyConversationUpdateSignalSchema extends Named<
+  typeof langyConversationUpdateSignalSchemaDefinition
+> {}
+export const langyConversationUpdateSignalSchema: LangyConversationUpdateSignalSchema =
+  langyConversationUpdateSignalSchemaDefinition;
 export type LangyConversationUpdateSignal = z.infer<typeof langyConversationUpdateSignalSchema>;
 
 // ---------------------------------------------------------------------------
@@ -94,25 +117,35 @@ export type LangyConversationUpdateSignal = z.infer<typeof langyConversationUpda
 // ---------------------------------------------------------------------------
 
 /** `list`: one page of the recent-conversations spine. */
-export const langyConversationListPageDtoSchema = z.object({
+const langyConversationListPageDtoSchemaDefinition = z.object({
   items: z.array(langyConversationListItemSchema),
   nextCursor: langyConversationListCursorSchema.nullable(),
 });
+export interface LangyConversationListPageDtoSchema extends Named<
+  typeof langyConversationListPageDtoSchemaDefinition
+> {}
+export const langyConversationListPageDtoSchema: LangyConversationListPageDtoSchema =
+  langyConversationListPageDtoSchemaDefinition;
 export type LangyConversationListPageDto = z.infer<typeof langyConversationListPageDtoSchema>;
 
 /** `conversationEventsAfter`: the durable turn events strictly after a cursor. */
-export const langyConversationEventPageDtoSchema = z.object({
+const langyConversationEventPageDtoSchemaDefinition = z.object({
   events: z.array(langyConversationTurnEventSchema),
   cursor: langyEventCursorSchema,
   truncated: z.boolean(),
 });
+export interface LangyConversationEventPageDtoSchema extends Named<
+  typeof langyConversationEventPageDtoSchemaDefinition
+> {}
+export const langyConversationEventPageDtoSchema: LangyConversationEventPageDtoSchema =
+  langyConversationEventPageDtoSchemaDefinition;
 export type LangyConversationEventPageDto = z.infer<typeof langyConversationEventPageDtoSchema>;
 
 /**
  * `messages`: the on-demand transcript plus the durable turn state a reopened
  * panel needs — what is in flight, what it ran on, and where the fold is.
  */
-export const langyConversationMessagesDtoSchema = z.object({
+const langyConversationMessagesDtoSchemaDefinition = z.object({
   messages: z.array(langyMessageDtoSchema),
   /**
    * The last turn's failure, serialized (a domain-error kind + safe meta — never raw text).
@@ -146,39 +179,75 @@ export const langyConversationMessagesDtoSchema = z.object({
    */
   lastModel: z.string().nullable(),
 });
+export interface LangyConversationMessagesDtoSchema extends Named<
+  typeof langyConversationMessagesDtoSchemaDefinition
+> {}
+export const langyConversationMessagesDtoSchema: LangyConversationMessagesDtoSchema =
+  langyConversationMessagesDtoSchemaDefinition;
 export type LangyConversationMessagesDto = z.infer<typeof langyConversationMessagesDtoSchema>;
 
 /** `deleteConversation`: whether the archive command took effect. */
-export const langyConversationDeletedSchema = z.object({ success: z.boolean() });
+const langyConversationDeletedSchemaDefinition = z.object({ success: z.boolean() });
+export interface LangyConversationDeletedSchema extends Named<
+  typeof langyConversationDeletedSchemaDefinition
+> {}
+export const langyConversationDeletedSchema: LangyConversationDeletedSchema =
+  langyConversationDeletedSchemaDefinition;
 
 /** `createConversation` / `continueConversation`: the ids the client subscribes with. */
-export const langyTurnStartedSchema = z.object({
+const langyTurnStartedSchemaDefinition = z.object({
   conversationId: z.string(),
   turnId: z.string(),
 });
+export interface LangyTurnStartedSchema extends Named<typeof langyTurnStartedSchemaDefinition> {}
+export const langyTurnStartedSchema: LangyTurnStartedSchema = langyTurnStartedSchemaDefinition;
 
 /** `stopTurn`: the durable stop was recorded. */
-export const langyTurnStoppedSchema = z.object({ stopped: z.boolean() });
+const langyTurnStoppedSchemaDefinition = z.object({ stopped: z.boolean() });
+export interface LangyTurnStoppedSchema extends Named<typeof langyTurnStoppedSchemaDefinition> {}
+export const langyTurnStoppedSchema: LangyTurnStoppedSchema = langyTurnStoppedSchemaDefinition;
 
 /** `claimUiAction`: whether THIS tab won the claim. */
-export const langyUiActionClaimedSchema = z.object({ isClaimed: z.boolean() });
+const langyUiActionClaimedSchemaDefinition = z.object({ isClaimed: z.boolean() });
+export interface LangyUiActionClaimedSchema extends Named<
+  typeof langyUiActionClaimedSchemaDefinition
+> {}
+export const langyUiActionClaimedSchema: LangyUiActionClaimedSchema =
+  langyUiActionClaimedSchemaDefinition;
 
 /** `completeUiAction`: whether the completion was taken. */
-export const langyUiActionCompletedSchema = z.object({ isAccepted: z.boolean() });
+const langyUiActionCompletedSchemaDefinition = z.object({ isAccepted: z.boolean() });
+export interface LangyUiActionCompletedSchema extends Named<
+  typeof langyUiActionCompletedSchemaDefinition
+> {}
+export const langyUiActionCompletedSchema: LangyUiActionCompletedSchema =
+  langyUiActionCompletedSchemaDefinition;
 
 /** `warmWorker`: the id the first message should adopt, and whether a worker is warm. */
-export const langyWarmedWorkerSchema = z.object({
+const langyWarmedWorkerSchemaDefinition = z.object({
   conversationId: z.string().nullable(),
   warmed: z.boolean(),
 });
+export interface LangyWarmedWorkerSchema extends Named<typeof langyWarmedWorkerSchemaDefinition> {}
+export const langyWarmedWorkerSchema: LangyWarmedWorkerSchema = langyWarmedWorkerSchemaDefinition;
 
 /** `modelsAllowed`: the composer's allowlist, or null when every model is allowed. */
-export const langyModelsAllowedSchema = z.object({
+const langyModelsAllowedSchemaDefinition = z.object({
   modelsAllowed: z.array(z.string()).nullable(),
 });
+export interface LangyModelsAllowedSchema extends Named<
+  typeof langyModelsAllowedSchemaDefinition
+> {}
+export const langyModelsAllowedSchema: LangyModelsAllowedSchema =
+  langyModelsAllowedSchemaDefinition;
 
 /** `onConversationUpdate`: one freshness signal as the browser receives it. */
-export const langyConversationUpdateFrameSchema = z.object({
+const langyConversationUpdateFrameSchemaDefinition = z.object({
   event: z.unknown(),
   timestamp: z.number().optional(),
 });
+export interface LangyConversationUpdateFrameSchema extends Named<
+  typeof langyConversationUpdateFrameSchemaDefinition
+> {}
+export const langyConversationUpdateFrameSchema: LangyConversationUpdateFrameSchema =
+  langyConversationUpdateFrameSchemaDefinition;

@@ -1,4 +1,4 @@
-import { moduleApi } from "@langwatch/module";
+import { moduleApi, type Named } from "@langwatch/module";
 import { z } from "zod";
 
 export const AUDIT_LOG_FEATURE_ID = "audit-log" as const;
@@ -6,7 +6,7 @@ export const AUDIT_LOG_FEATURE_ID = "audit-log" as const;
 export const auditLogJsonValueSchema = z.json();
 export type AuditLogJsonValue = z.infer<typeof auditLogJsonValueSchema>;
 
-export const auditLogEntrySchema = z.object({
+const auditLogEntrySchemaDefinition = z.object({
   /** Whoever did it, when the log knows. Absent on a row about an actor
    *  nobody has identified — a lock taken against an address with no account
    *  is precisely the row an attack shows up in, and it still gets appended. */
@@ -27,6 +27,8 @@ export const auditLogEntrySchema = z.object({
   before: auditLogJsonValueSchema.optional(),
   after: auditLogJsonValueSchema.optional(),
 });
+export interface AuditLogEntrySchema extends Named<typeof auditLogEntrySchemaDefinition> {}
+export const auditLogEntrySchema: AuditLogEntrySchema = auditLogEntrySchemaDefinition;
 
 export type AuditLogEntry = z.infer<typeof auditLogEntrySchema>;
 
@@ -42,13 +44,18 @@ export type RecordedSinceInput = {
   sinceMs: number;
 };
 
-export const auditLogHistoryEntrySchema = z.object({
+const auditLogHistoryEntrySchemaDefinition = z.object({
   id: z.string(),
   userId: z.string().nullable(),
   action: z.string(),
   createdAt: z.date(),
   args: auditLogJsonValueSchema,
 });
+export interface AuditLogHistoryEntrySchema extends Named<
+  typeof auditLogHistoryEntrySchemaDefinition
+> {}
+export const auditLogHistoryEntrySchema: AuditLogHistoryEntrySchema =
+  auditLogHistoryEntrySchemaDefinition;
 
 export type AuditLogHistoryEntry = z.infer<typeof auditLogHistoryEntrySchema>;
 
@@ -61,12 +68,17 @@ export type ListAuditLogEntityHistoryInput = {
 };
 
 /** One trail's read: the newest entries recorded under a target kind (Alex, 2026-10-07, CD-3). */
-export const findAuditLogByTargetKindInputSchema = z
+const findAuditLogByTargetKindInputSchemaDefinition = z
   .object({ targetKind: z.string().min(1), limit: z.number().int().positive() })
   .strict();
+export interface FindAuditLogByTargetKindInputSchema extends Named<
+  typeof findAuditLogByTargetKindInputSchemaDefinition
+> {}
+export const findAuditLogByTargetKindInputSchema: FindAuditLogByTargetKindInputSchema =
+  findAuditLogByTargetKindInputSchemaDefinition;
 export type FindAuditLogByTargetKindInput = z.infer<typeof findAuditLogByTargetKindInputSchema>;
 
-export const auditLogTargetEntrySchema = z.object({
+const auditLogTargetEntrySchemaDefinition = z.object({
   id: z.string(),
   createdAt: z.date(),
   action: z.string(),
@@ -75,6 +87,11 @@ export const auditLogTargetEntrySchema = z.object({
   userId: z.string().nullable(),
   metadata: auditLogJsonValueSchema,
 });
+export interface AuditLogTargetEntrySchema extends Named<
+  typeof auditLogTargetEntrySchemaDefinition
+> {}
+export const auditLogTargetEntrySchema: AuditLogTargetEntrySchema =
+  auditLogTargetEntrySchemaDefinition;
 export type AuditLogTargetEntry = z.infer<typeof auditLogTargetEntrySchema>;
 
 /** Portable audit write capability. */
@@ -94,12 +111,21 @@ export const AuditLogApi = moduleApi<AuditLogApi>()("audit-log");
  * intent; the row stores it in its own unique column, so a repeat delivery writes nothing and
  * answers the first row (Alex, Q72; audit R2). The row's id stays the table's own.
  */
-export const recordAuditLogCommandSchema = z.object({
+const recordAuditLogCommandSchemaDefinition = z.object({
   ...auditLogEntrySchema.shape,
   idempotencyKey: z.string().min(1).optional(),
 });
+export interface RecordAuditLogCommandSchema extends Named<
+  typeof recordAuditLogCommandSchemaDefinition
+> {}
+export const recordAuditLogCommandSchema: RecordAuditLogCommandSchema =
+  recordAuditLogCommandSchemaDefinition;
 export type RecordAuditLogCommand = z.infer<typeof recordAuditLogCommandSchema>;
 
 /** The payload of a producer's audit intent: an entry its outbox records after commit. */
-export const auditLogIntentSchema = recordAuditLogCommandSchema.required({ idempotencyKey: true });
+const auditLogIntentSchemaDefinition = recordAuditLogCommandSchema.required({
+  idempotencyKey: true,
+});
+export interface AuditLogIntentSchema extends Named<typeof auditLogIntentSchemaDefinition> {}
+export const auditLogIntentSchema: AuditLogIntentSchema = auditLogIntentSchemaDefinition;
 export type AuditLogIntent = z.infer<typeof auditLogIntentSchema>;

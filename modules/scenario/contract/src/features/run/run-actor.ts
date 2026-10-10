@@ -2,6 +2,7 @@
  * reserved langwatch metadata namespace.
  */
 
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 /** The surfaces a person can start a run through. */
@@ -11,7 +12,7 @@ export type RunActorLabel = (typeof RUN_ACTOR_LABELS)[number];
 export const runActorLabelSchema = z.enum(RUN_ACTOR_LABELS);
 
 /** The person a run is recorded against, and how they reached it. */
-export const runActorSchema = z
+const runActorSchemaDefinition = z
   .object({
     /** The platform user id. */
     id: z.string().min(1),
@@ -20,6 +21,8 @@ export const runActorSchema = z
     apiKeyId: z.string().min(1).optional(),
   })
   .strict();
+export interface RunActorSchema extends Named<typeof runActorSchemaDefinition> {}
+export const runActorSchema: RunActorSchema = runActorSchemaDefinition;
 export type RunActor = z.infer<typeof runActorSchema>;
 
 /**

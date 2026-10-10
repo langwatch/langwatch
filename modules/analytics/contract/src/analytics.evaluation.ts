@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 const finiteNumberSchema = z.number().finite();
@@ -7,7 +8,7 @@ const nullableFiniteNumberSchema = finiteNumberSchema.nullable();
 const retentionDaysSchema = z.number().int().nonnegative().optional();
 
 /** Portable row written to the evaluation_analytics slim table. */
-export const analyticsEvaluationRowSchema = z.object({
+const analyticsEvaluationRowSchemaDefinition = z.object({
   tenantId: z.string().min(1),
   evaluationId: z.string().min(1),
   version: z.string().min(1),
@@ -34,11 +35,16 @@ export const analyticsEvaluationRowSchema = z.object({
   startedAtMs: nullableFiniteNumberSchema,
   completedAtMs: nullableFiniteNumberSchema,
 });
+export interface AnalyticsEvaluationRowSchema extends Named<
+  typeof analyticsEvaluationRowSchemaDefinition
+> {}
+export const analyticsEvaluationRowSchema: AnalyticsEvaluationRowSchema =
+  analyticsEvaluationRowSchemaDefinition;
 
 export type AnalyticsEvaluationRow = z.infer<typeof analyticsEvaluationRowSchema>;
 
 /** Portable row appended to the evaluation_analytics_rollup table. */
-export const analyticsEvaluationRollupRowSchema = z.object({
+const analyticsEvaluationRollupRowSchemaDefinition = z.object({
   tenantId: z.string().min(1),
   bucketStart: z.date(),
   evaluatorType: z.string(),
@@ -54,22 +60,37 @@ export const analyticsEvaluationRollupRowSchema = z.object({
   costSum: finiteNumberSchema,
   nonBilledCostSum: finiteNumberSchema,
 });
+export interface AnalyticsEvaluationRollupRowSchema extends Named<
+  typeof analyticsEvaluationRollupRowSchemaDefinition
+> {}
+export const analyticsEvaluationRollupRowSchema: AnalyticsEvaluationRollupRowSchema =
+  analyticsEvaluationRollupRowSchemaDefinition;
 
 export type AnalyticsEvaluationRollupRow = z.infer<typeof analyticsEvaluationRollupRowSchema>;
 
-export const analyticsEvaluationUpsertInputSchema = z.object({
+const analyticsEvaluationUpsertInputSchemaDefinition = z.object({
   row: analyticsEvaluationRowSchema,
   retentionDays: retentionDaysSchema,
   appliedEventIds: z.array(z.string()).optional(),
 });
+export interface AnalyticsEvaluationUpsertInputSchema extends Named<
+  typeof analyticsEvaluationUpsertInputSchemaDefinition
+> {}
+export const analyticsEvaluationUpsertInputSchema: AnalyticsEvaluationUpsertInputSchema =
+  analyticsEvaluationUpsertInputSchemaDefinition;
 
 export type AnalyticsEvaluationUpsertInput = z.infer<typeof analyticsEvaluationUpsertInputSchema>;
 
-export const analyticsEvaluationUpsertBatchInputSchema = z.array(
+const analyticsEvaluationUpsertBatchInputSchemaDefinition = z.array(
   analyticsEvaluationUpsertInputSchema,
 );
+export interface AnalyticsEvaluationUpsertBatchInputSchema extends Named<
+  typeof analyticsEvaluationUpsertBatchInputSchemaDefinition
+> {}
+export const analyticsEvaluationUpsertBatchInputSchema: AnalyticsEvaluationUpsertBatchInputSchema =
+  analyticsEvaluationUpsertBatchInputSchemaDefinition;
 
-export const analyticsEvaluationReadInputSchema = z.object({
+const analyticsEvaluationReadInputSchemaDefinition = z.object({
   tenantId: z.string().min(1),
   evaluationId: z.string().min(1),
   window: z
@@ -79,22 +100,37 @@ export const analyticsEvaluationReadInputSchema = z.object({
     })
     .optional(),
 });
+export interface AnalyticsEvaluationReadInputSchema extends Named<
+  typeof analyticsEvaluationReadInputSchemaDefinition
+> {}
+export const analyticsEvaluationReadInputSchema: AnalyticsEvaluationReadInputSchema =
+  analyticsEvaluationReadInputSchemaDefinition;
 
 export type AnalyticsEvaluationReadInput = z.infer<typeof analyticsEvaluationReadInputSchema>;
 
-export const analyticsEvaluationRollupAppendInputSchema = z.object({
+const analyticsEvaluationRollupAppendInputSchemaDefinition = z.object({
   row: analyticsEvaluationRollupRowSchema,
   retentionDays: retentionDaysSchema,
 });
+export interface AnalyticsEvaluationRollupAppendInputSchema extends Named<
+  typeof analyticsEvaluationRollupAppendInputSchemaDefinition
+> {}
+export const analyticsEvaluationRollupAppendInputSchema: AnalyticsEvaluationRollupAppendInputSchema =
+  analyticsEvaluationRollupAppendInputSchemaDefinition;
 
 export type AnalyticsEvaluationRollupAppendInput = z.infer<
   typeof analyticsEvaluationRollupAppendInputSchema
 >;
 
-export const analyticsEvaluationRollupAppendBatchInputSchema = z.object({
+const analyticsEvaluationRollupAppendBatchInputSchemaDefinition = z.object({
   rows: z.array(analyticsEvaluationRollupRowSchema),
   retentionDays: retentionDaysSchema,
 });
+export interface AnalyticsEvaluationRollupAppendBatchInputSchema extends Named<
+  typeof analyticsEvaluationRollupAppendBatchInputSchemaDefinition
+> {}
+export const analyticsEvaluationRollupAppendBatchInputSchema: AnalyticsEvaluationRollupAppendBatchInputSchema =
+  analyticsEvaluationRollupAppendBatchInputSchemaDefinition;
 
 export type AnalyticsEvaluationRollupAppendBatchInput = z.infer<
   typeof analyticsEvaluationRollupAppendBatchInputSchema

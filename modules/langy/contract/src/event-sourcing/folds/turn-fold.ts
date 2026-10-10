@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 /**
  * The Langy turn fold — the WHOLE reduction of a turn's events into its
  * render document, one pure module (ADR-059 §1). Server and browser both
@@ -116,7 +117,7 @@ export type LangyTurnWait = {
 };
 
 /** Wire/persistence schema for one card, in this package's own zod instance. */
-export const langyTurnWaitSchema = z.object({
+const langyTurnWaitSchemaDefinition = z.object({
   waitId: z.string(),
   kind: z.union([
     z.literal(LANGY_USER_WAIT_KINDS.PERMISSION),
@@ -158,13 +159,15 @@ export const langyTurnWaitSchema = z.object({
   answeredBy: z.string().nullable(),
   answeredAt: z.number().nullable(),
 });
+export interface LangyTurnWaitSchema extends Named<typeof langyTurnWaitSchemaDefinition> {}
+export const langyTurnWaitSchema: LangyTurnWaitSchema = langyTurnWaitSchemaDefinition;
 
 /**
  * Wire/persistence schema for one folded tool call. Lives HERE, in the
  * package's own zod instance: zod v3's `z.record` overload detection
  * instanceof-checks its argument and mis-parses across two zod copies.
  */
-export const langyTurnToolCallSchema = z.record(z.string(), langyJsonValueSchema).and(
+const langyTurnToolCallSchemaDefinition = z.record(z.string(), langyJsonValueSchema).and(
   z.object({
     toolCallId: z.string(),
     toolName: z.string(),
@@ -180,6 +183,8 @@ export const langyTurnToolCallSchema = z.record(z.string(), langyJsonValueSchema
     wait: langyTurnWaitSchema.optional(),
   }),
 );
+export interface LangyTurnToolCallSchema extends Named<typeof langyTurnToolCallSchemaDefinition> {}
+export const langyTurnToolCallSchema: LangyTurnToolCallSchema = langyTurnToolCallSchemaDefinition;
 
 /** A wait with no answer yet, from what the start event carried. */
 function pendingWait(data: LangyUserWaitStartedEventData): LangyTurnWait {

@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import { studioWorkflowSchema } from "./studio-workflow.ts";
@@ -16,15 +17,25 @@ import type {
  */
 
 /** One project. Every project-scoped procedure on the surface takes it. */
-export const workflowApiProjectInputSchema = z.object({
+const workflowApiProjectInputSchemaDefinition = z.object({
   projectId: z.string(),
 });
+export interface WorkflowApiProjectInputSchema extends Named<
+  typeof workflowApiProjectInputSchemaDefinition
+> {}
+export const workflowApiProjectInputSchema: WorkflowApiProjectInputSchema =
+  workflowApiProjectInputSchemaDefinition;
 
 /** One workflow inside one project. */
-export const workflowApiWorkflowInputSchema = z.object({
+const workflowApiWorkflowInputSchemaDefinition = z.object({
   projectId: z.string(),
   workflowId: z.string(),
 });
+export interface WorkflowApiWorkflowInputSchema extends Named<
+  typeof workflowApiWorkflowInputSchemaDefinition
+> {}
+export const workflowApiWorkflowInputSchema: WorkflowApiWorkflowInputSchema =
+  workflowApiWorkflowInputSchemaDefinition;
 
 /** `engineMode` names the project it asks about, and nothing else. */
 export const workflowApiEngineModeInputSchema = workflowApiProjectInputSchema;
@@ -32,70 +43,120 @@ export const workflowApiEngineModeInputSchema = workflowApiProjectInputSchema;
 /** `getById` names one workflow. */
 export const workflowApiGetByIdInputSchema = workflowApiWorkflowInputSchema;
 
-export const workflowApiGetVersionsInputSchema = z.object({
+const workflowApiGetVersionsInputSchemaDefinition = z.object({
   projectId: z.string(),
   workflowId: z.string(),
   returnDSL: z.union([z.boolean(), z.literal("previousVersion")]).optional(),
 });
+export interface WorkflowApiGetVersionsInputSchema extends Named<
+  typeof workflowApiGetVersionsInputSchemaDefinition
+> {}
+export const workflowApiGetVersionsInputSchema: WorkflowApiGetVersionsInputSchema =
+  workflowApiGetVersionsInputSchemaDefinition;
 
-export const workflowApiCreateInputSchema = z.object({
+const workflowApiCreateInputSchemaDefinition = z.object({
   projectId: z.string(),
   dsl: studioWorkflowSchema,
   commitMessage: z.string(),
   /** Auto-publish the first version (useful for evaluator workflows). */
   publish: z.boolean().optional(),
 });
+export interface WorkflowApiCreateInputSchema extends Named<
+  typeof workflowApiCreateInputSchemaDefinition
+> {}
+export const workflowApiCreateInputSchema: WorkflowApiCreateInputSchema =
+  workflowApiCreateInputSchemaDefinition;
 
-export const workflowApiCopyInputSchema = z.object({
+const workflowApiCopyInputSchemaDefinition = z.object({
   workflowId: z.string(),
   projectId: z.string(),
   sourceProjectId: z.string(),
   copyDatasets: z.boolean().optional(),
 });
+export interface WorkflowApiCopyInputSchema extends Named<
+  typeof workflowApiCopyInputSchemaDefinition
+> {}
+export const workflowApiCopyInputSchema: WorkflowApiCopyInputSchema =
+  workflowApiCopyInputSchemaDefinition;
 
-export const workflowApiRestoreVersionInputSchema = z.object({
+const workflowApiRestoreVersionInputSchemaDefinition = z.object({
   projectId: z.string(),
   versionId: z.string(),
 });
+export interface WorkflowApiRestoreVersionInputSchema extends Named<
+  typeof workflowApiRestoreVersionInputSchemaDefinition
+> {}
+export const workflowApiRestoreVersionInputSchema: WorkflowApiRestoreVersionInputSchema =
+  workflowApiRestoreVersionInputSchemaDefinition;
 
-export const workflowApiAutosaveInputSchema = z.object({
+const workflowApiAutosaveInputSchemaDefinition = z.object({
   projectId: z.string(),
   workflowId: z.string(),
   dsl: studioWorkflowSchema,
   setAsLatestVersion: z.boolean(),
 });
+export interface WorkflowApiAutosaveInputSchema extends Named<
+  typeof workflowApiAutosaveInputSchemaDefinition
+> {}
+export const workflowApiAutosaveInputSchema: WorkflowApiAutosaveInputSchema =
+  workflowApiAutosaveInputSchemaDefinition;
 
-export const workflowApiCommitVersionInputSchema = z.object({
+const workflowApiCommitVersionInputSchemaDefinition = z.object({
   projectId: z.string(),
   workflowId: z.string(),
   commitMessage: z.string(),
   dsl: studioWorkflowSchema,
 });
+export interface WorkflowApiCommitVersionInputSchema extends Named<
+  typeof workflowApiCommitVersionInputSchemaDefinition
+> {}
+export const workflowApiCommitVersionInputSchema: WorkflowApiCommitVersionInputSchema =
+  workflowApiCommitVersionInputSchemaDefinition;
 
-export const workflowApiPublishInputSchema = z.object({
+const workflowApiPublishInputSchemaDefinition = z.object({
   projectId: z.string(),
   workflowId: z.string(),
   versionId: z.string(),
 });
+export interface WorkflowApiPublishInputSchema extends Named<
+  typeof workflowApiPublishInputSchemaDefinition
+> {}
+export const workflowApiPublishInputSchema: WorkflowApiPublishInputSchema =
+  workflowApiPublishInputSchemaDefinition;
 
-export const workflowApiPushToCopiesInputSchema = z.object({
+const workflowApiPushToCopiesInputSchemaDefinition = z.object({
   projectId: z.string(),
   workflowId: z.string(),
   /** When present, only these copies are pushed to. */
   copyIds: z.array(z.string()).optional(),
 });
+export interface WorkflowApiPushToCopiesInputSchema extends Named<
+  typeof workflowApiPushToCopiesInputSchemaDefinition
+> {}
+export const workflowApiPushToCopiesInputSchema: WorkflowApiPushToCopiesInputSchema =
+  workflowApiPushToCopiesInputSchemaDefinition;
 
-export const workflowApiArchiveInputSchema = z.object({
+const workflowApiArchiveInputSchemaDefinition = z.object({
   projectId: z.string(),
   workflowId: z.string(),
   unarchive: z.boolean().optional(),
 });
+export interface WorkflowApiArchiveInputSchema extends Named<
+  typeof workflowApiArchiveInputSchemaDefinition
+> {}
+export const workflowApiArchiveInputSchema: WorkflowApiArchiveInputSchema =
+  workflowApiArchiveInputSchemaDefinition;
 
-export const workflowApiGenerateCommitMessageInputSchema = z.object({
+const workflowApiGenerateCommitMessageInputSchemaDefinition = z.object({
   projectId: z.string(),
   prevDsl: studioWorkflowSchema,
   newDsl: studioWorkflowSchema,
 });
+export interface WorkflowApiGenerateCommitMessageInputSchema extends Named<
+  typeof workflowApiGenerateCommitMessageInputSchemaDefinition
+> {}
+export const workflowApiGenerateCommitMessageInputSchema: WorkflowApiGenerateCommitMessageInputSchema =
+  workflowApiGenerateCommitMessageInputSchemaDefinition;
 
 export type WorkflowApiProjectInput = z.infer<typeof workflowApiProjectInputSchema>;
 export type WorkflowApiWorkflowInput = z.infer<typeof workflowApiWorkflowInputSchema>;
@@ -142,10 +203,15 @@ export type WorkflowApiPublishOutput = Workflow;
 export type WorkflowApiGenerateCommitMessageOutput = string;
 
 /** What the studio's flag writes answer with: the write landed. */
-export const workflowWriteAcknowledgedSchema = z.object({ success: z.boolean() }).strict();
+const workflowWriteAcknowledgedSchemaDefinition = z.object({ success: z.boolean() }).strict();
+export interface WorkflowWriteAcknowledgedSchema extends Named<
+  typeof workflowWriteAcknowledgedSchemaDefinition
+> {}
+export const workflowWriteAcknowledgedSchema: WorkflowWriteAcknowledgedSchema =
+  workflowWriteAcknowledgedSchemaDefinition;
 
 /** Where a workflow lives, as the copy lists render the path. */
-export const workflowProjectPathSchema = z.object({
+const workflowProjectPathSchemaDefinition = z.object({
   id: z.string(),
   name: z.string(),
   team: z.object({
@@ -154,11 +220,16 @@ export const workflowProjectPathSchema = z.object({
     organization: z.object({ id: z.string(), name: z.string() }),
   }),
 });
+export interface WorkflowProjectPathSchema extends Named<
+  typeof workflowProjectPathSchemaDefinition
+> {}
+export const workflowProjectPathSchema: WorkflowProjectPathSchema =
+  workflowProjectPathSchemaDefinition;
 
 /**
  * A listed workflow with its copy lineage redacted to what the caller may see.
  */
-export const workflowListRowSchema = z.object({
+const workflowListRowSchemaDefinition = z.object({
   ...workflowSchema.shape,
   copiedFrom: z
     .object({
@@ -170,9 +241,11 @@ export const workflowListRowSchema = z.object({
     .nullable(),
   _count: z.object({ copiedWorkflows: z.number() }),
 });
+export interface WorkflowListRowSchema extends Named<typeof workflowListRowSchemaDefinition> {}
+export const workflowListRowSchema: WorkflowListRowSchema = workflowListRowSchemaDefinition;
 
 /** One copy the caller may push to, with the path it lives under. */
-export const workflowCopyRowSchema = z.object({
+const workflowCopyRowSchemaDefinition = z.object({
   id: z.string(),
   name: z.string(),
   projectId: z.string(),
@@ -182,21 +255,33 @@ export const workflowCopyRowSchema = z.object({
   fullPath: z.string(),
   hasPermission: z.boolean(),
 });
+export interface WorkflowCopyRowSchema extends Named<typeof workflowCopyRowSchemaDefinition> {}
+export const workflowCopyRowSchema: WorkflowCopyRowSchema = workflowCopyRowSchemaDefinition;
 
 /** A workflow and the version a write created alongside it. */
-export const workflowWithNewVersionSchema = z.object({
+const workflowWithNewVersionSchemaDefinition = z.object({
   workflow: workflowSchema,
   version: workflowVersionSchema,
 });
+export interface WorkflowWithNewVersionSchema extends Named<
+  typeof workflowWithNewVersionSchemaDefinition
+> {}
+export const workflowWithNewVersionSchema: WorkflowWithNewVersionSchema =
+  workflowWithNewVersionSchemaDefinition;
 
 /** Which NLP engine is active, and whether Optimize is offered. */
-export const workflowEngineModeSchema = z.object({
+const workflowEngineModeSchemaDefinition = z.object({
   engineMode: z.literal("go"),
   optimizeEnabled: z.literal(false),
 });
+export interface WorkflowEngineModeSchema extends Named<
+  typeof workflowEngineModeSchemaDefinition
+> {}
+export const workflowEngineModeSchema: WorkflowEngineModeSchema =
+  workflowEngineModeSchemaDefinition;
 
 /** How far a push to the copies reached, and what each one wrote. */
-export const workflowPushToCopiesSchema = z.object({
+const workflowPushToCopiesSchemaDefinition = z.object({
   pushedTo: z.number(),
   totalCopies: z.number(),
   selectedCopies: z.number(),
@@ -204,17 +289,32 @@ export const workflowPushToCopiesSchema = z.object({
     z.object({ copyId: z.string(), copyName: z.string(), version: workflowVersionSchema }),
   ),
 });
+export interface WorkflowPushToCopiesSchema extends Named<
+  typeof workflowPushToCopiesSchemaDefinition
+> {}
+export const workflowPushToCopiesSchema: WorkflowPushToCopiesSchema =
+  workflowPushToCopiesSchemaDefinition;
 
 /** What archiving a workflow takes with it; its evaluators and monitors are their owners'. */
-export const workflowRelatedEntitiesSchema = z.object({
+const workflowRelatedEntitiesSchemaDefinition = z.object({
   agents: z.array(z.object({ id: z.string(), name: z.string() })),
 });
+export interface WorkflowRelatedEntitiesSchema extends Named<
+  typeof workflowRelatedEntitiesSchemaDefinition
+> {}
+export const workflowRelatedEntitiesSchema: WorkflowRelatedEntitiesSchema =
+  workflowRelatedEntitiesSchemaDefinition;
 
 /** What `cascadeArchive` archived at once; evaluators and their monitors follow after a lag. */
-export const workflowCascadeArchiveSchema = z.object({
+const workflowCascadeArchiveSchemaDefinition = z.object({
   workflow: workflowSchema,
   archivedAgentsCount: z.number(),
 });
+export interface WorkflowCascadeArchiveSchema extends Named<
+  typeof workflowCascadeArchiveSchemaDefinition
+> {}
+export const workflowCascadeArchiveSchema: WorkflowCascadeArchiveSchema =
+  workflowCascadeArchiveSchemaDefinition;
 
 export type WorkflowProjectPath = z.infer<typeof workflowProjectPathSchema>;
 export type WorkflowListRow = z.infer<typeof workflowListRowSchema>;

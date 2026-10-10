@@ -1,10 +1,11 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import { alertTypeSchema, triggerActionSchema, triggerKindSchema } from "./trigger.ts";
 
 const jsonObjectSchema = z.record(z.string(), z.unknown());
 
-export const createTriggerCommandSchema = z
+const createTriggerCommandSchemaDefinition = z
   .object({
     id: z.string().min(1).optional(),
     projectId: z.string().min(1),
@@ -28,9 +29,14 @@ export const createTriggerCommandSchema = z
     actorId: z.string().min(1).optional(),
   })
   .strict();
+export interface CreateTriggerCommandSchema extends Named<
+  typeof createTriggerCommandSchemaDefinition
+> {}
+export const createTriggerCommandSchema: CreateTriggerCommandSchema =
+  createTriggerCommandSchemaDefinition;
 export type CreateTriggerCommand = z.infer<typeof createTriggerCommandSchema>;
 
-export const updateTriggerCommandSchema = z
+const updateTriggerCommandSchemaDefinition = z
   .object({
     id: z.string().min(1),
     projectId: z.string().min(1),
@@ -61,4 +67,9 @@ export const updateTriggerCommandSchema = z
     emailBodyTemplate: z.string().nullable().optional(),
   })
   .strict();
+export interface UpdateTriggerCommandSchema extends Named<
+  typeof updateTriggerCommandSchemaDefinition
+> {}
+export const updateTriggerCommandSchema: UpdateTriggerCommandSchema =
+  updateTriggerCommandSchemaDefinition;
 export type UpdateTriggerCommand = z.infer<typeof updateTriggerCommandSchema>;

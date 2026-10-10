@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import { hasControlCharacters } from "./safe-media-types.ts";
@@ -13,23 +14,45 @@ function opaqueIdSchema(label: string): z.ZodString {
 }
 
 /** Authenticated project scope. It is never accepted as public RPC authority. */
-export const storedObjectProjectIdSchema = opaqueIdSchema("projectId");
+const storedObjectProjectIdSchemaDefinition = opaqueIdSchema("projectId");
+export interface StoredObjectProjectIdSchema extends Named<
+  typeof storedObjectProjectIdSchemaDefinition
+> {}
+export const storedObjectProjectIdSchema: StoredObjectProjectIdSchema =
+  storedObjectProjectIdSchemaDefinition;
 export type StoredObjectProjectId = z.infer<typeof storedObjectProjectIdSchema>;
 
 /** Stable content ID derived from authenticated project + SHA-256. */
-export const storedObjectIdSchema = opaqueIdSchema("storedObjectId");
+const storedObjectIdSchemaDefinition = opaqueIdSchema("storedObjectId");
+export interface StoredObjectIdSchema extends Named<typeof storedObjectIdSchemaDefinition> {}
+export const storedObjectIdSchema: StoredObjectIdSchema = storedObjectIdSchemaDefinition;
 export type StoredObjectId = z.infer<typeof storedObjectIdSchema>;
 
 /** One write attempt. Several write operations may target one content ID. */
-export const storedObjectOperationIdSchema = opaqueIdSchema("operationId");
+const storedObjectOperationIdSchemaDefinition = opaqueIdSchema("operationId");
+export interface StoredObjectOperationIdSchema extends Named<
+  typeof storedObjectOperationIdSchemaDefinition
+> {}
+export const storedObjectOperationIdSchema: StoredObjectOperationIdSchema =
+  storedObjectOperationIdSchemaDefinition;
 export type StoredObjectOperationId = z.infer<typeof storedObjectOperationIdSchema>;
 
 /** One logical-delete command, distinct from the content generation it removes. */
-export const storedObjectDeletionIdSchema = opaqueIdSchema("deletionId");
+const storedObjectDeletionIdSchemaDefinition = opaqueIdSchema("deletionId");
+export interface StoredObjectDeletionIdSchema extends Named<
+  typeof storedObjectDeletionIdSchemaDefinition
+> {}
+export const storedObjectDeletionIdSchema: StoredObjectDeletionIdSchema =
+  storedObjectDeletionIdSchemaDefinition;
 export type StoredObjectDeletionId = z.infer<typeof storedObjectDeletionIdSchema>;
 
 /** Identifies one short-lived service delivery capability without exposing its secret. */
-export const storedObjectCapabilityIdSchema = opaqueIdSchema("capabilityId");
+const storedObjectCapabilityIdSchemaDefinition = opaqueIdSchema("capabilityId");
+export interface StoredObjectCapabilityIdSchema extends Named<
+  typeof storedObjectCapabilityIdSchemaDefinition
+> {}
+export const storedObjectCapabilityIdSchema: StoredObjectCapabilityIdSchema =
+  storedObjectCapabilityIdSchemaDefinition;
 export type StoredObjectCapabilityId = z.infer<typeof storedObjectCapabilityIdSchema>;
 
 /** Monotonic lifecycle generation used to fence stale delivery and deletion work. */
@@ -46,10 +69,15 @@ export const storedObjectIdempotencyKeySchema = z
   });
 export type StoredObjectIdempotencyKey = z.infer<typeof storedObjectIdempotencyKeySchema>;
 
-export const storedObjectIdentitySchema = z
+const storedObjectIdentitySchemaDefinition = z
   .object({
     projectId: storedObjectProjectIdSchema,
     id: storedObjectIdSchema,
   })
   .strict();
+export interface StoredObjectIdentitySchema extends Named<
+  typeof storedObjectIdentitySchemaDefinition
+> {}
+export const storedObjectIdentitySchema: StoredObjectIdentitySchema =
+  storedObjectIdentitySchemaDefinition;
 export type StoredObjectIdentity = z.infer<typeof storedObjectIdentitySchema>;

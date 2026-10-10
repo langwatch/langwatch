@@ -27,7 +27,11 @@ export * from "./features/local-control/langy.local-control-protocol.ts";
 export * from "./credential.ts";
 export * from "./langy-conversation.ts";
 export * from "./langy.api.ts";
-export { langyStreamEntrySchema, type LangyStreamEntry } from "./langy.stream-entry.ts";
+export {
+  langyStreamEntrySchema,
+  type LangyStreamEntry,
+  type LangyStreamEntrySchema,
+} from "./langy.stream-entry.ts";
 export * from "./langy-kickoff.ts";
 export * from "./langy-shown-once.ts";
 export * from "./langy.commands.ts";

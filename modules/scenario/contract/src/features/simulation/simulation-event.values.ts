@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import { scenarioCriterionResultSchema } from "../../scenario-criterion-result.ts";
@@ -21,14 +22,19 @@ export type SimulationEventRunStatus = (typeof SIMULATION_EVENT_RUN_STATUSES)[nu
 export const SIMULATION_EVENT_VERDICTS = ["success", "failure", "inconclusive"] as const;
 export type SimulationEventVerdict = (typeof SIMULATION_EVENT_VERDICTS)[number];
 
-export const simulationEventMessageSchema = z
+const simulationEventMessageSchemaDefinition = z
   .object({
     trace_id: z.string().optional(),
   })
   .passthrough();
+export interface SimulationEventMessageSchema extends Named<
+  typeof simulationEventMessageSchemaDefinition
+> {}
+export const simulationEventMessageSchema: SimulationEventMessageSchema =
+  simulationEventMessageSchemaDefinition;
 export type SimulationEventMessage = z.infer<typeof simulationEventMessageSchema>;
 
-export const simulationEventResultsSchema = z.object({
+const simulationEventResultsSchemaDefinition = z.object({
   verdict: z.enum(SIMULATION_EVENT_VERDICTS),
   reasoning: z.string().optional(),
   metCriteria: z.array(z.string()).default([]),
@@ -41,4 +47,9 @@ export const simulationEventResultsSchema = z.object({
   /** Code-triggered runs send their evaluations with the finished event. */
   evaluations: z.array(scenarioEvaluationResultSchema).optional(),
 });
+export interface SimulationEventResultsSchema extends Named<
+  typeof simulationEventResultsSchemaDefinition
+> {}
+export const simulationEventResultsSchema: SimulationEventResultsSchema =
+  simulationEventResultsSchemaDefinition;
 export type SimulationEventResults = z.infer<typeof simulationEventResultsSchema>;

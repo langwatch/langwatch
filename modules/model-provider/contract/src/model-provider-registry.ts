@@ -1,4 +1,5 @@
 import { E164_PHONE_PATTERN } from "@langwatch/agent-contract";
+import type { Named } from "@langwatch/module";
 import { Temporal, type Instant } from "@langwatch/time";
 import { z } from "zod";
 
@@ -7,12 +8,22 @@ import type { CustomModelEntry } from "./custom-model.ts";
 import { codexTokenKeysSchema } from "./model-provider.ts";
 import type { ModelProviderScope } from "./model-provider.ts";
 
-export const parameterConstraintSchema = z
+const parameterConstraintSchemaDefinition = z
   .object({ min: z.number().optional(), max: z.number().optional() })
   .strict();
+export interface ParameterConstraintSchema extends Named<
+  typeof parameterConstraintSchemaDefinition
+> {}
+export const parameterConstraintSchema: ParameterConstraintSchema =
+  parameterConstraintSchemaDefinition;
 export type ParameterConstraint = z.infer<typeof parameterConstraintSchema>;
 
-export const parameterConstraintsSchema = z.record(z.string(), parameterConstraintSchema);
+const parameterConstraintsSchemaDefinition = z.record(z.string(), parameterConstraintSchema);
+export interface ParameterConstraintsSchema extends Named<
+  typeof parameterConstraintsSchemaDefinition
+> {}
+export const parameterConstraintsSchema: ParameterConstraintsSchema =
+  parameterConstraintsSchemaDefinition;
 export type ParameterConstraints = z.infer<typeof parameterConstraintsSchema>;
 
 export type ModelProviderDefinition = {
@@ -151,17 +162,24 @@ function elevenLabsBaseUrlKey({ allowLoopback }: { allowLoopback: boolean }) {
 }
 
 /** ElevenLabs' credential keys as the registry holds them: never the dev switch. */
-export const elevenLabsKeysSchema = z.object({
+const elevenLabsKeysSchemaDefinition = z.object({
   ELEVENLABS_API_KEY: z.string().min(1),
   ELEVENLABS_WEBHOOK_SECRET: z.string().nullable().optional(),
   ELEVENLABS_BASE_URL: elevenLabsBaseUrlKey({ allowLoopback: false }),
 });
+export interface ElevenLabsKeysSchema extends Named<typeof elevenLabsKeysSchemaDefinition> {}
+export const elevenLabsKeysSchema: ElevenLabsKeysSchema = elevenLabsKeysSchemaDefinition;
 
 /** The dev storage seed's form, admitting voicesim's loopback URL; nothing else parses with it. */
-export const elevenLabsLoopbackKeysSchema = z.object({
+const elevenLabsLoopbackKeysSchemaDefinition = z.object({
   ...elevenLabsKeysSchema.shape,
   ELEVENLABS_BASE_URL: elevenLabsBaseUrlKey({ allowLoopback: true }),
 });
+export interface ElevenLabsLoopbackKeysSchema extends Named<
+  typeof elevenLabsLoopbackKeysSchemaDefinition
+> {}
+export const elevenLabsLoopbackKeysSchema: ElevenLabsLoopbackKeysSchema =
+  elevenLabsLoopbackKeysSchemaDefinition;
 
 export const modelProviders = {
   custom: {

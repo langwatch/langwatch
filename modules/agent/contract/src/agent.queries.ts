@@ -1,29 +1,36 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import { agentResponseSchema } from "./agent-rest.schemas.ts";
 import { agentSchema, agentViewSchema, agentWithFieldsSchema } from "./agent.ts";
 import { agentTypeSchema } from "./config/index.ts";
 
-export const agentPaginationSchema = z.object({
+const agentPaginationSchemaDefinition = z.object({
   page: z.number().int().positive(),
   limit: z.number().int().positive(),
   total: z.number().int().nonnegative(),
   totalPages: z.number().int().nonnegative(),
 });
+export interface AgentPaginationSchema extends Named<typeof agentPaginationSchemaDefinition> {}
+export const agentPaginationSchema: AgentPaginationSchema = agentPaginationSchemaDefinition;
 
-export const agentPageSchema = z.object({
+const agentPageSchemaDefinition = z.object({
   data: z.array(agentSchema),
   pagination: agentPaginationSchema,
 });
+export interface AgentPageSchema extends Named<typeof agentPageSchemaDefinition> {}
+export const agentPageSchema: AgentPageSchema = agentPageSchemaDefinition;
 
-export const agentCopySchema = z.object({
+const agentCopySchemaDefinition = z.object({
   id: z.string(),
   name: z.string(),
   projectId: z.string(),
   fullPath: z.string(),
 });
+export interface AgentCopySchema extends Named<typeof agentCopySchemaDefinition> {}
+export const agentCopySchema: AgentCopySchema = agentCopySchemaDefinition;
 
-export const agentHistoryEntrySchema = z.object({
+const agentHistoryEntrySchemaDefinition = z.object({
   id: z.string(),
   action: z.string(),
   createdAt: z.date(),
@@ -36,12 +43,19 @@ export const agentHistoryEntrySchema = z.object({
     })
     .nullable(),
 });
+export interface AgentHistoryEntrySchema extends Named<typeof agentHistoryEntrySchemaDefinition> {}
+export const agentHistoryEntrySchema: AgentHistoryEntrySchema = agentHistoryEntrySchemaDefinition;
 
-export const relatedAgentEntitiesSchema = z.object({
+const relatedAgentEntitiesSchemaDefinition = z.object({
   workflow: z.object({ id: z.string(), name: z.string() }).nullable(),
 });
+export interface RelatedAgentEntitiesSchema extends Named<
+  typeof relatedAgentEntitiesSchemaDefinition
+> {}
+export const relatedAgentEntitiesSchema: RelatedAgentEntitiesSchema =
+  relatedAgentEntitiesSchemaDefinition;
 
-export const agentReferenceStateSchema = z.object({
+const agentReferenceStateSchemaDefinition = z.object({
   id: z.string(),
   archivedAt: z.date().nullable(),
   /** Present so suite runs can identify connected agents and apply ADR-128. */
@@ -50,43 +64,65 @@ export const agentReferenceStateSchema = z.object({
   ownerUserId: z.string().nullable().optional(),
   lastSeenAt: z.date().nullable().optional(),
 });
+export interface AgentReferenceStateSchema extends Named<
+  typeof agentReferenceStateSchemaDefinition
+> {}
+export const agentReferenceStateSchema: AgentReferenceStateSchema =
+  agentReferenceStateSchemaDefinition;
 
-export const agentNameSchema = z.object({
+const agentNameSchemaDefinition = z.object({
   id: z.string(),
   name: z.string(),
 });
+export interface AgentNameSchema extends Named<typeof agentNameSchemaDefinition> {}
+export const agentNameSchema: AgentNameSchema = agentNameSchemaDefinition;
 
 export const getAgentResultSchema = agentWithFieldsSchema;
 
-export const getAgentQuerySchema = z.object({
+const getAgentQuerySchemaDefinition = z.object({
   id: z.string(),
   projectId: z.string(),
 });
+export interface GetAgentQuerySchema extends Named<typeof getAgentQuerySchemaDefinition> {}
+export const getAgentQuerySchema: GetAgentQuerySchema = getAgentQuerySchemaDefinition;
 
-export const listAgentsQuerySchema = z.object({
+const listAgentsQuerySchemaDefinition = z.object({
   projectId: z.string(),
   page: z.coerce.number().int().positive().default(1),
   limit: z.coerce.number().int().positive().max(1000).default(50),
 });
+export interface ListAgentsQuerySchema extends Named<typeof listAgentsQuerySchemaDefinition> {}
+export const listAgentsQuerySchema: ListAgentsQuerySchema = listAgentsQuerySchemaDefinition;
 
-export const agentIdPathSchema = z.object({ id: z.string().min(1) });
+const agentIdPathSchemaDefinition = z.object({ id: z.string().min(1) });
+export interface AgentIdPathSchema extends Named<typeof agentIdPathSchemaDefinition> {}
+export const agentIdPathSchema: AgentIdPathSchema = agentIdPathSchemaDefinition;
 
-export const agentViewWithPlatformUrlSchema = z.intersection(
+const agentViewWithPlatformUrlSchemaDefinition = z.intersection(
   agentViewSchema,
   z.object({ platformUrl: z.string().url() }),
 );
+export interface AgentViewWithPlatformUrlSchema extends Named<
+  typeof agentViewWithPlatformUrlSchemaDefinition
+> {}
+export const agentViewWithPlatformUrlSchema: AgentViewWithPlatformUrlSchema =
+  agentViewWithPlatformUrlSchemaDefinition;
 
-export const agentListViewSchema = z.object({
+const agentListViewSchemaDefinition = z.object({
   data: z.array(agentViewWithPlatformUrlSchema),
   pagination: agentPaginationSchema,
 });
+export interface AgentListViewSchema extends Named<typeof agentListViewSchemaDefinition> {}
+export const agentListViewSchema: AgentListViewSchema = agentListViewSchemaDefinition;
 
-export const archivedAgentViewSchema = z.object({
+const archivedAgentViewSchemaDefinition = z.object({
   id: z.string(),
   name: z.string(),
   type: z.enum(["signature", "code", "workflow", "http", "connected", "voice"]),
   archivedAt: z.date(),
 });
+export interface ArchivedAgentViewSchema extends Named<typeof archivedAgentViewSchemaDefinition> {}
+export const archivedAgentViewSchema: ArchivedAgentViewSchema = archivedAgentViewSchemaDefinition;
 
 export type AgentPage = z.infer<typeof agentPageSchema>;
 export type AgentCopy = z.infer<typeof agentCopySchema>;
@@ -111,7 +147,7 @@ export type ConnectedAgentsInput = { projectId: string; name: string };
 export type ConnectedAgentsEnvironmentInput = ConnectedAgentsInput & { environment: string };
 
 /** One agent as the legacy tRPC reads render it, copy count included. */
-export const agentOverviewSchema = z.intersection(
+const agentOverviewSchemaDefinition = z.intersection(
   agentWithFieldsSchema,
   agentResponseSchema.omit({
     id: true,
@@ -123,40 +159,63 @@ export const agentOverviewSchema = z.intersection(
     platformUrl: true,
   }),
 );
+export interface AgentOverviewSchema extends Named<typeof agentOverviewSchemaDefinition> {}
+export const agentOverviewSchema: AgentOverviewSchema = agentOverviewSchemaDefinition;
 export type AgentOverview = z.infer<typeof agentOverviewSchema>;
-export const agentOverviewPageSchema = z.object({
+const agentOverviewPageSchemaDefinition = z.object({
   data: agentOverviewSchema.array(),
   pagination: agentPaginationSchema,
 });
+export interface AgentOverviewPageSchema extends Named<typeof agentOverviewPageSchemaDefinition> {}
+export const agentOverviewPageSchema: AgentOverviewPageSchema = agentOverviewPageSchemaDefinition;
 export type AgentOverviewPage = z.infer<typeof agentOverviewPageSchema>;
 
-export const agentWithLegacyCopyCountSchema = z.intersection(
+const agentWithLegacyCopyCountSchemaDefinition = z.intersection(
   agentOverviewSchema,
   z.object({ _count: z.object({ copiedAgents: z.number() }) }),
 );
+export interface AgentWithLegacyCopyCountSchema extends Named<
+  typeof agentWithLegacyCopyCountSchemaDefinition
+> {}
+export const agentWithLegacyCopyCountSchema: AgentWithLegacyCopyCountSchema =
+  agentWithLegacyCopyCountSchemaDefinition;
 
 /** What a cascade archive took with it. */
-export const agentCascadeArchiveSchema = z.object({
+const agentCascadeArchiveSchemaDefinition = z.object({
   agent: agentSchema,
   archivedWorkflow: z.object({ id: z.string() }).nullable(),
 });
+export interface AgentCascadeArchiveSchema extends Named<
+  typeof agentCascadeArchiveSchemaDefinition
+> {}
+export const agentCascadeArchiveSchema: AgentCascadeArchiveSchema =
+  agentCascadeArchiveSchemaDefinition;
 
 /** The agent a copy created, as the copy answers. */
-export const agentCopyCreatedSchema = z.object({
+const agentCopyCreatedSchemaDefinition = z.object({
   id: z.string(),
   projectId: z.string(),
   name: z.string(),
   copiedFromAgentId: z.string(),
 });
+export interface AgentCopyCreatedSchema extends Named<typeof agentCopyCreatedSchemaDefinition> {}
+export const agentCopyCreatedSchema: AgentCopyCreatedSchema = agentCopyCreatedSchemaDefinition;
 
 /** How far a push to the replicas reached. */
-export const agentPushToCopiesSchema = z.object({
+const agentPushToCopiesSchemaDefinition = z.object({
   pushedTo: z.number(),
   selectedCopies: z.number(),
 });
+export interface AgentPushToCopiesSchema extends Named<typeof agentPushToCopiesSchemaDefinition> {}
+export const agentPushToCopiesSchema: AgentPushToCopiesSchema = agentPushToCopiesSchemaDefinition;
 
 /** A copy pulled back into line with the agent it came from. */
-export const agentSyncFromSourceSchema = z.object({ ok: z.literal(true) });
+const agentSyncFromSourceSchemaDefinition = z.object({ ok: z.literal(true) });
+export interface AgentSyncFromSourceSchema extends Named<
+  typeof agentSyncFromSourceSchemaDefinition
+> {}
+export const agentSyncFromSourceSchema: AgentSyncFromSourceSchema =
+  agentSyncFromSourceSchemaDefinition;
 export type AgentCascadeArchive = z.infer<typeof agentCascadeArchiveSchema>;
 export type AgentCopyCreated = z.infer<typeof agentCopyCreatedSchema>;
 export type AgentPushToCopies = z.infer<typeof agentPushToCopiesSchema>;
@@ -166,23 +225,33 @@ export type AgentSyncFromSource = z.infer<typeof agentSyncFromSourceSchema>;
  * What a test turn answered: the adapter's output, how long it took, and the
  * connected instance that served it, when there was one.
  */
-export const agentTestTurnResultSchema = z.object({
+const agentTestTurnResultSchemaDefinition = z.object({
   output: z.unknown(),
   durationMs: z.number(),
   instance: z.object({ hostname: z.string(), label: z.string().nullable() }).nullable(),
 });
+export interface AgentTestTurnResultSchema extends Named<
+  typeof agentTestTurnResultSchemaDefinition
+> {}
+export const agentTestTurnResultSchema: AgentTestTurnResultSchema =
+  agentTestTurnResultSchemaDefinition;
 
 /** The ids a scheduled test run answers with. */
-export const agentTestRunResultSchema = z.object({
+const agentTestRunResultSchemaDefinition = z.object({
   scenarioRunId: z.string(),
   batchRunId: z.string(),
   setId: z.string(),
 });
+export interface AgentTestRunResultSchema extends Named<
+  typeof agentTestRunResultSchemaDefinition
+> {}
+export const agentTestRunResultSchema: AgentTestRunResultSchema =
+  agentTestRunResultSchemaDefinition;
 export type AgentTestTurnResult = z.infer<typeof agentTestTurnResultSchema>;
 export type AgentTestRunResult = z.infer<typeof agentTestRunResultSchema>;
 
 /** What the agent test panel renders for one HTTP run. */
-export const httpProxyResultSchema = z.object({
+const httpProxyResultSchemaDefinition = z.object({
   success: z.boolean(),
   error: z.string().optional(),
   /** The engine's stable failure code, which the panel presents copy from. */
@@ -198,4 +267,6 @@ export const httpProxyResultSchema = z.object({
   /** Template variables the body referenced but the test did not supply. */
   warnings: z.array(z.string()).optional(),
 });
+export interface HttpProxyResultSchema extends Named<typeof httpProxyResultSchemaDefinition> {}
+export const httpProxyResultSchema: HttpProxyResultSchema = httpProxyResultSchemaDefinition;
 export type HttpProxyResult = z.infer<typeof httpProxyResultSchema>;

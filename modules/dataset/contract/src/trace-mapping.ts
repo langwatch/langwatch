@@ -14,6 +14,7 @@ import { z } from "zod";
  * row would force every caller — including the browser — to hold one.
  */
 type AnnotationScore = Pick<StoredAnnotationScore, "id" | "name">;
+import type { Named } from "@langwatch/module";
 import {
   type Trace as BaseTrace,
   type DatasetSpan,
@@ -912,7 +913,7 @@ export type AllThreadMappingSources =
   | keyof typeof THREAD_MAPPINGS
   | (typeof SERVER_ONLY_THREAD_SOURCES)[number];
 
-export const mappingStateSchema = z.object({
+const mappingStateSchemaDefinition = z.object({
   mapping: z.record(
     z.string(),
     z.union([
@@ -946,6 +947,8 @@ export const mappingStateSchema = z.object({
   ),
   expansions: z.array(z.enum(Object.keys(TRACE_EXPANSIONS) as [keyof typeof TRACE_EXPANSIONS])),
 });
+export interface MappingStateSchema extends Named<typeof mappingStateSchemaDefinition> {}
+export const mappingStateSchema: MappingStateSchema = mappingStateSchemaDefinition;
 
 export type MappingState = z.infer<typeof mappingStateSchema>;
 

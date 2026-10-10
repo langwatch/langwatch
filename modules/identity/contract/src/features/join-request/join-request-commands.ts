@@ -1,4 +1,5 @@
 import { ledgerActorSchema } from "@langwatch/authorization";
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import {
@@ -67,7 +68,7 @@ function commandDataSchema<Shape extends z.ZodRawShape>(
   );
 }
 
-export const requestJoinCommandDataSchema = commandDataSchema({
+const requestJoinCommandDataSchemaDefinition = commandDataSchema({
   userId: z.string().min(1),
   /** Already normalized by the matcher; the guard normalizes again rather
    *  than trust a caller, and only the normalized form reaches a fact. */
@@ -81,29 +82,54 @@ export const requestJoinCommandDataSchema = commandDataSchema({
   /** The connection a single sign-on arrival came in through. */
   connectionId: z.string().min(1).nullable().default(null),
 });
+export interface RequestJoinCommandDataSchema extends Named<
+  typeof requestJoinCommandDataSchemaDefinition
+> {}
+export const requestJoinCommandDataSchema: RequestJoinCommandDataSchema =
+  requestJoinCommandDataSchemaDefinition;
 export type RequestJoinCommandData = z.infer<typeof requestJoinCommandDataSchema>;
 
-export const approveJoinCommandDataSchema = commandDataSchema({
+const approveJoinCommandDataSchemaDefinition = commandDataSchema({
   resolvedBy: joinResolverSchema,
 });
+export interface ApproveJoinCommandDataSchema extends Named<
+  typeof approveJoinCommandDataSchemaDefinition
+> {}
+export const approveJoinCommandDataSchema: ApproveJoinCommandDataSchema =
+  approveJoinCommandDataSchemaDefinition;
 export type ApproveJoinCommandData = z.infer<typeof approveJoinCommandDataSchema>;
 
-export const rejectJoinCommandDataSchema = commandDataSchema({
+const rejectJoinCommandDataSchemaDefinition = commandDataSchema({
   resolvedBy: joinResolverSchema,
 });
+export interface RejectJoinCommandDataSchema extends Named<
+  typeof rejectJoinCommandDataSchemaDefinition
+> {}
+export const rejectJoinCommandDataSchema: RejectJoinCommandDataSchema =
+  rejectJoinCommandDataSchemaDefinition;
 export type RejectJoinCommandData = z.infer<typeof rejectJoinCommandDataSchema>;
 
-export const withdrawJoinCommandDataSchema = commandDataSchema({
+const withdrawJoinCommandDataSchemaDefinition = commandDataSchema({
   cause: joinWithdrawalCauseSchema,
 });
+export interface WithdrawJoinCommandDataSchema extends Named<
+  typeof withdrawJoinCommandDataSchemaDefinition
+> {}
+export const withdrawJoinCommandDataSchema: WithdrawJoinCommandDataSchema =
+  withdrawJoinCommandDataSchemaDefinition;
 export type WithdrawJoinCommandData = z.infer<typeof withdrawJoinCommandDataSchema>;
 
-export const expireJoinCommandDataSchema = commandDataSchema({
+const expireJoinCommandDataSchemaDefinition = commandDataSchema({
   /** The slot the wake was scheduled for — business time for the command, so
    *  a lagged wake expires the request at the deadline it promised rather
    *  than whenever the worker got round to it. */
   scheduledFor: z.number().int().nonnegative(),
 });
+export interface ExpireJoinCommandDataSchema extends Named<
+  typeof expireJoinCommandDataSchemaDefinition
+> {}
+export const expireJoinCommandDataSchema: ExpireJoinCommandDataSchema =
+  expireJoinCommandDataSchemaDefinition;
 export type ExpireJoinCommandData = z.infer<typeof expireJoinCommandDataSchema>;
 
 export type JoinRequestCommand =

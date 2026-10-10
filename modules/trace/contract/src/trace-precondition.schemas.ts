@@ -1,4 +1,5 @@
 import { filterFieldsEnum } from "@langwatch/analytics-contract";
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 const checkPreconditionRuleSchema = z.enum(["contains", "not_contains", "matches_regex", "is"]);
@@ -26,6 +27,11 @@ const checkPreconditionSchema = z.object({
 
 export type CheckPrecondition = z.infer<typeof checkPreconditionSchema>;
 
-export const checkPreconditionsSchema = z.array(checkPreconditionSchema);
+const checkPreconditionsSchemaDefinition = z.array(checkPreconditionSchema);
+export interface CheckPreconditionsSchema extends Named<
+  typeof checkPreconditionsSchemaDefinition
+> {}
+export const checkPreconditionsSchema: CheckPreconditionsSchema =
+  checkPreconditionsSchemaDefinition;
 
 export type CheckPreconditions = z.infer<typeof checkPreconditionsSchema>;

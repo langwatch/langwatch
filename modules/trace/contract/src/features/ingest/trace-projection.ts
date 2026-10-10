@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 const spanInsertDataSchema = z.object({
@@ -50,7 +51,7 @@ const spanInsertDataSchema = z.object({
 
 export type SpanInsertData = z.infer<typeof spanInsertDataSchema>;
 
-export const traceSummaryDataSchema = z.object({
+const traceSummaryDataSchemaDefinition = z.object({
   traceId: z.string(),
   spanCount: z.number(),
   totalDurationMs: z.number(),
@@ -132,11 +133,15 @@ export const traceSummaryDataSchema = z.object({
   // by the plan's visibility window (never persisted).
   redactedByVisibilityWindow: z.boolean().optional(),
 });
+export interface TraceSummaryDataSchema extends Named<typeof traceSummaryDataSchemaDefinition> {}
+export const traceSummaryDataSchema: TraceSummaryDataSchema = traceSummaryDataSchemaDefinition;
 
 export type TraceSummaryData = z.infer<typeof traceSummaryDataSchema>;
 
 /** A summary as read: the fold plus the project it came from (an aggregate's member, ADR-177). */
-export const traceSummaryReadSchema = z.object({
+const traceSummaryReadSchemaDefinition = z.object({
   ...traceSummaryDataSchema.shape,
   tenantId: z.string(),
 });
+export interface TraceSummaryReadSchema extends Named<typeof traceSummaryReadSchemaDefinition> {}
+export const traceSummaryReadSchema: TraceSummaryReadSchema = traceSummaryReadSchemaDefinition;

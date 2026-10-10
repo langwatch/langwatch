@@ -4,6 +4,7 @@
  * plaintext value cannot join an answer by accident — it would fail the parse.
  */
 
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import {
@@ -14,7 +15,7 @@ import {
   type Secret,
 } from "./secret.ts";
 
-export const secretPublicSchema = z
+const secretPublicSchemaDefinition = z
   .object({
     id: secretIdSchema,
     projectId: z.string().min(1),
@@ -23,40 +24,74 @@ export const secretPublicSchema = z
     updatedAt: z.iso.datetime(),
   })
   .strict();
+export interface SecretPublicSchema extends Named<typeof secretPublicSchemaDefinition> {}
+export const secretPublicSchema: SecretPublicSchema = secretPublicSchemaDefinition;
 export type SecretPublic = z.infer<typeof secretPublicSchema>;
 
 /** Optional as on main, which read the project from the credential alone. */
-export const secretPublicListInputSchema = z
+const secretPublicListInputSchemaDefinition = z
   .object({ projectId: z.string().min(1).optional() })
   .strict();
+export interface SecretPublicListInputSchema extends Named<
+  typeof secretPublicListInputSchemaDefinition
+> {}
+export const secretPublicListInputSchema: SecretPublicListInputSchema =
+  secretPublicListInputSchemaDefinition;
 
 /** `/api/secrets` addresses a secret as `{id}`, the name main published it under. */
-export const secretPublicAliasParamsSchema = z.object({ id: secretIdSchema }).strict();
+const secretPublicAliasParamsSchemaDefinition = z.object({ id: secretIdSchema }).strict();
+export interface SecretPublicAliasParamsSchema extends Named<
+  typeof secretPublicAliasParamsSchemaDefinition
+> {}
+export const secretPublicAliasParamsSchema: SecretPublicAliasParamsSchema =
+  secretPublicAliasParamsSchemaDefinition;
 
 /**
  * The delete body, deliberately not `.strict()`: the id it addresses is in the
  * path, and a released client that also puts it in the body is not refused.
  */
-export const secretPublicDeleteInputSchema = z.object({ projectId: z.string().min(1).optional() });
+const secretPublicDeleteInputSchemaDefinition = z.object({
+  projectId: z.string().min(1).optional(),
+});
+export interface SecretPublicDeleteInputSchema extends Named<
+  typeof secretPublicDeleteInputSchemaDefinition
+> {}
+export const secretPublicDeleteInputSchema: SecretPublicDeleteInputSchema =
+  secretPublicDeleteInputSchemaDefinition;
 export type SecretPublicDeleteInput = z.infer<typeof secretPublicDeleteInputSchema>;
 
-export const secretPublicCreateInputSchema = z
+const secretPublicCreateInputSchemaDefinition = z
   .object({
     ...secretPublicListInputSchema.shape,
     name: secretNameSchema,
     value: secretValueSchema,
   })
   .strict();
+export interface SecretPublicCreateInputSchema extends Named<
+  typeof secretPublicCreateInputSchemaDefinition
+> {}
+export const secretPublicCreateInputSchema: SecretPublicCreateInputSchema =
+  secretPublicCreateInputSchemaDefinition;
 export type SecretPublicCreateInput = z.infer<typeof secretPublicCreateInputSchema>;
 
-export const secretPublicUpdateInputSchema = z
+const secretPublicUpdateInputSchemaDefinition = z
   .object({ ...secretPublicListInputSchema.shape, value: secretValueSchema })
   .strict();
+export interface SecretPublicUpdateInputSchema extends Named<
+  typeof secretPublicUpdateInputSchemaDefinition
+> {}
+export const secretPublicUpdateInputSchema: SecretPublicUpdateInputSchema =
+  secretPublicUpdateInputSchemaDefinition;
 export type SecretPublicUpdateInput = z.infer<typeof secretPublicUpdateInputSchema>;
 
-export const secretPublicDeleteOutputSchema = z
+const secretPublicDeleteOutputSchemaDefinition = z
   .object({ id: secretIdSchema, deleted: z.literal(true) })
   .strict();
+export interface SecretPublicDeleteOutputSchema extends Named<
+  typeof secretPublicDeleteOutputSchemaDefinition
+> {}
+export const secretPublicDeleteOutputSchema: SecretPublicDeleteOutputSchema =
+  secretPublicDeleteOutputSchemaDefinition;
 
 export function toSecretPublic(secret: Secret): SecretPublic {
   return secretPublicSchema.parse({

@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import { modelCatalogEntrySchema, getAllModels } from "./catalog/model-catalog.ts";
@@ -11,7 +12,7 @@ import {
 
 const extraHeaderSchema = z.object({ key: z.string(), value: z.string() }).strict();
 
-export const legacyModelProviderSchema = z
+const legacyModelProviderSchemaDefinition = z
   .object({
     id: z.string().optional(),
     organizationId: z.string().nullable().optional(),
@@ -47,9 +48,14 @@ export const legacyModelProviderSchema = z
     updatedAt: z.date().optional(),
   })
   .strict();
+export interface LegacyModelProviderSchema extends Named<
+  typeof legacyModelProviderSchemaDefinition
+> {}
+export const legacyModelProviderSchema: LegacyModelProviderSchema =
+  legacyModelProviderSchemaDefinition;
 export type LegacyModelProvider = z.infer<typeof legacyModelProviderSchema>;
 
-export const modelMetadataForFrontendSchema = modelCatalogEntrySchema
+const modelMetadataForFrontendSchemaDefinition = modelCatalogEntrySchema
   .pick({
     id: true,
     name: true,
@@ -65,25 +71,50 @@ export const modelMetadataForFrontendSchema = modelCatalogEntrySchema
   })
   .safeExtend({ parameterConstraints: parameterConstraintsSchema.optional() })
   .strict();
+export interface ModelMetadataForFrontendSchema extends Named<
+  typeof modelMetadataForFrontendSchemaDefinition
+> {}
+export const modelMetadataForFrontendSchema: ModelMetadataForFrontendSchema =
+  modelMetadataForFrontendSchemaDefinition;
 export type ModelMetadataForFrontend = z.infer<typeof modelMetadataForFrontendSchema>;
 
-export const legacyModelProviderMapSchema = z.record(z.string(), legacyModelProviderSchema);
-export const modelMetadataForFrontendMapSchema = z.record(
+const legacyModelProviderMapSchemaDefinition = z.record(z.string(), legacyModelProviderSchema);
+export interface LegacyModelProviderMapSchema extends Named<
+  typeof legacyModelProviderMapSchemaDefinition
+> {}
+export const legacyModelProviderMapSchema: LegacyModelProviderMapSchema =
+  legacyModelProviderMapSchemaDefinition;
+const modelMetadataForFrontendMapSchemaDefinition = z.record(
   z.string(),
   modelMetadataForFrontendSchema,
 );
-export const legacyModelProviderMapResponseSchema = z
+export interface ModelMetadataForFrontendMapSchema extends Named<
+  typeof modelMetadataForFrontendMapSchemaDefinition
+> {}
+export const modelMetadataForFrontendMapSchema: ModelMetadataForFrontendMapSchema =
+  modelMetadataForFrontendMapSchemaDefinition;
+const legacyModelProviderMapResponseSchemaDefinition = z
   .object({
     providers: legacyModelProviderMapSchema,
     modelMetadata: modelMetadataForFrontendMapSchema,
   })
   .strict();
-export const legacyModelProviderListResponseSchema = z
+export interface LegacyModelProviderMapResponseSchema extends Named<
+  typeof legacyModelProviderMapResponseSchemaDefinition
+> {}
+export const legacyModelProviderMapResponseSchema: LegacyModelProviderMapResponseSchema =
+  legacyModelProviderMapResponseSchemaDefinition;
+const legacyModelProviderListResponseSchemaDefinition = z
   .object({
     providers: z.array(legacyModelProviderSchema),
     modelMetadata: modelMetadataForFrontendMapSchema,
   })
   .strict();
+export interface LegacyModelProviderListResponseSchema extends Named<
+  typeof legacyModelProviderListResponseSchemaDefinition
+> {}
+export const legacyModelProviderListResponseSchema: LegacyModelProviderListResponseSchema =
+  legacyModelProviderListResponseSchemaDefinition;
 
 function scopeRank(scopeType: LegacyModelProvider["scopeType"]): number {
   if (scopeType === "PROJECT") return 3;

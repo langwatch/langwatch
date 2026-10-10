@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import type { Instant } from "@langwatch/time";
 import { z } from "zod";
 
@@ -23,10 +24,15 @@ const verifiedBrowserSessionUserSchema = z.object({
   pendingSsoSetup: z.boolean().optional(),
 });
 
-export const verifiedBrowserSessionSchema = z.object({
+const verifiedBrowserSessionSchemaDefinition = z.object({
   session: z.object({ id: z.string().min(1), expiresAt: z.coerce.date() }),
   user: verifiedBrowserSessionUserSchema,
 });
+export interface VerifiedBrowserSessionSchema extends Named<
+  typeof verifiedBrowserSessionSchemaDefinition
+> {}
+export const verifiedBrowserSessionSchema: VerifiedBrowserSessionSchema =
+  verifiedBrowserSessionSchemaDefinition;
 export type VerifiedBrowserSession = z.infer<typeof verifiedBrowserSessionSchema>;
 
 const browserSessionActorSchema = browserSessionUserSchema.pick({
@@ -36,7 +42,7 @@ const browserSessionActorSchema = browserSessionUserSchema.pick({
   image: true,
 });
 
-export const browserSessionSchema = z
+const browserSessionSchemaDefinition = z
   .object({
     user: browserSessionUserSchema.safeExtend({
       impersonator: browserSessionActorSchema.optional(),
@@ -45,6 +51,8 @@ export const browserSessionSchema = z
     sessionId: z.string().min(1),
   })
   .strict();
+export interface BrowserSessionSchema extends Named<typeof browserSessionSchemaDefinition> {}
+export const browserSessionSchema: BrowserSessionSchema = browserSessionSchemaDefinition;
 export type BrowserSession = z.infer<typeof browserSessionSchema>;
 
 /** Whether Better Auth accepts a session token; no token or no sign-in door reads as anonymous. */
@@ -78,7 +86,7 @@ export type SessionImpersonationState =
  * signed in and what that proved, never a token: the list is a reading of
  * live sessions, and nothing on it can be replayed.
  */
-export const browserSessionInventoryEntrySchema = z
+const browserSessionInventoryEntrySchemaDefinition = z
   .object({
     sessionId: z.string().min(1),
     /** Which sign-in method minted it; null on every session predating it. */
@@ -100,12 +108,27 @@ export const browserSessionInventoryEntrySchema = z
     current: z.boolean(),
   })
   .strict();
+export interface BrowserSessionInventoryEntrySchema extends Named<
+  typeof browserSessionInventoryEntrySchemaDefinition
+> {}
+export const browserSessionInventoryEntrySchema: BrowserSessionInventoryEntrySchema =
+  browserSessionInventoryEntrySchemaDefinition;
 export type BrowserSessionInventoryEntry = z.infer<typeof browserSessionInventoryEntrySchema>;
 
 /** Which of the caller's own browser sessions to end. */
-export const endBrowserSessionInputSchema = z.object({ sessionId: z.string().min(1) }).strict();
+const endBrowserSessionInputSchemaDefinition = z.object({ sessionId: z.string().min(1) }).strict();
+export interface EndBrowserSessionInputSchema extends Named<
+  typeof endBrowserSessionInputSchemaDefinition
+> {}
+export const endBrowserSessionInputSchema: EndBrowserSessionInputSchema =
+  endBrowserSessionInputSchemaDefinition;
 
 /** How many sessions an end request actually ended; zero is an ordinary answer. */
-export const browserSessionsEndedSchema = z
+const browserSessionsEndedSchemaDefinition = z
   .object({ ended: z.number().int().nonnegative() })
   .strict();
+export interface BrowserSessionsEndedSchema extends Named<
+  typeof browserSessionsEndedSchemaDefinition
+> {}
+export const browserSessionsEndedSchema: BrowserSessionsEndedSchema =
+  browserSessionsEndedSchemaDefinition;

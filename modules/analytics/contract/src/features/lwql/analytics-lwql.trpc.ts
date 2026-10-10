@@ -3,7 +3,7 @@
  * browser's cache key and the audit path both, and nothing here validates SQL.
  * @see modules/analytics/specs/analytics-lwql-workbench.feature
  */
-import { defineTrpcContract } from "@langwatch/module";
+import { defineTrpcContract, type Named } from "@langwatch/module";
 import { z } from "zod";
 
 import { lwqlStatementSchema } from "./analytics-lwql.schemas.ts";
@@ -19,13 +19,17 @@ import {
 } from "./langwatch-ql-violation.ts";
 
 /** The project every workbench question is asked about. */
-export const lwqlProjectScopeSchema = z.object({ projectId: z.string() });
+const lwqlProjectScopeSchemaDefinition = z.object({ projectId: z.string() });
+export interface LwqlProjectScopeSchema extends Named<typeof lwqlProjectScopeSchemaDefinition> {}
+export const lwqlProjectScopeSchema: LwqlProjectScopeSchema = lwqlProjectScopeSchemaDefinition;
 
 /** One statement, run for one project. */
-export const lwqlRunRequestSchema = z.object({
+const lwqlRunRequestSchemaDefinition = z.object({
   ...lwqlProjectScopeSchema.shape,
   ...lwqlStatementSchema.shape,
 });
+export interface LwqlRunRequestSchema extends Named<typeof lwqlRunRequestSchemaDefinition> {}
+export const lwqlRunRequestSchema: LwqlRunRequestSchema = lwqlRunRequestSchemaDefinition;
 
 /** One refusal, positioned where the parser or the policy found it. */
 export const lwqlViolationSchema: z.ZodType<LangWatchQLViolation> = z
@@ -44,9 +48,14 @@ export const lwqlViolationSchema: z.ZodType<LangWatchQLViolation> = z
   .strict();
 
 /** What the policy says of a statement: every refusal, none when it would be admitted. */
-export const lwqlValidationResultSchema = z.object({
+const lwqlValidationResultSchemaDefinition = z.object({
   violations: z.array(lwqlViolationSchema),
 });
+export interface LwqlValidationResultSchema extends Named<
+  typeof lwqlValidationResultSchemaDefinition
+> {}
+export const lwqlValidationResultSchema: LwqlValidationResultSchema =
+  lwqlValidationResultSchemaDefinition;
 
 export type LangWatchQLValidationResult = z.infer<typeof lwqlValidationResultSchema>;
 

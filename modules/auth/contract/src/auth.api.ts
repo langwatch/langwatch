@@ -3,7 +3,7 @@ import type {
   RoutingDecision,
   SignedInWith,
 } from "@langwatch/identity-contract";
-import { moduleApi } from "@langwatch/module";
+import { moduleApi, type Named } from "@langwatch/module";
 import type { InviteLanding } from "@langwatch/organization-contract";
 import type {
   UpdateUserEmailInput,
@@ -47,7 +47,7 @@ import type {
  * The subject carried by an unexpired CLI access bearer. The device-session
  * store remains Auth-owned; peers receive only the caller facts they need.
  */
-export const cliAccessSessionSchema = z.object({
+const cliAccessSessionSchemaDefinition = z.object({
   userId: z.string(),
   organizationId: z.string(),
   /** The one project the session is capped at; absent for a session bound to none. */
@@ -60,6 +60,8 @@ export const cliAccessSessionSchema = z.object({
     .object({ deviceLabel: z.string().optional(), hostname: z.string().optional() })
     .optional(),
 });
+export interface CliAccessSessionSchema extends Named<typeof cliAccessSessionSchemaDefinition> {}
+export const cliAccessSessionSchema: CliAccessSessionSchema = cliAccessSessionSchemaDefinition;
 export type CliAccessSession = Readonly<z.infer<typeof cliAccessSessionSchema>>;
 
 /** An access and refresh pair, with the seconds each lives. */

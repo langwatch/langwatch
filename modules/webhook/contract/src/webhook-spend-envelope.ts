@@ -1,4 +1,5 @@
 import { gatewaySpendEventSchema } from "@langwatch/gateway-contract";
+import type { Named } from "@langwatch/module";
 /**
  * One spend row rendered as the canonical billing envelope every webhook
  * destination receives. Pure formatting over a row shape, so a peer building
@@ -164,8 +165,13 @@ export const WEBHOOK_SPEND_DELIVERY_REQUESTED_EVENT_VERSION = "2026-09-25" as co
 export const REQUEST_SPEND_DELIVERY_COMMAND_TYPE = "lw.webhook.request_spend_delivery" as const;
 
 /** One committed gateway spend event as webhook delivery takes it, named by its event id. */
-export const webhookSpendDeliveryRequestSchema = z.object({
+const webhookSpendDeliveryRequestSchemaDefinition = z.object({
   sourceEventId: z.string().min(1),
   spend: gatewaySpendEventSchema,
 });
+export interface WebhookSpendDeliveryRequestSchema extends Named<
+  typeof webhookSpendDeliveryRequestSchemaDefinition
+> {}
+export const webhookSpendDeliveryRequestSchema: WebhookSpendDeliveryRequestSchema =
+  webhookSpendDeliveryRequestSchemaDefinition;
 export type WebhookSpendDeliveryRequest = z.infer<typeof webhookSpendDeliveryRequestSchema>;

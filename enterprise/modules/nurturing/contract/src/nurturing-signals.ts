@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * Every signal an owner records for nurturing: ids plus what the owner's event
@@ -40,7 +41,7 @@ export const selfHostedSignalEventSchema = z.enum([
 ]);
 
 /** The organization traits a self-hosted install's latest report reads as. */
-export const selfHostedOrgTraitsSchema = z.object({
+const selfHostedOrgTraitsSchemaDefinition = z.object({
   self_hosted: z.boolean(),
   self_hosted_version: z.string().optional(),
   self_hosted_install_method: z.string().optional(),
@@ -52,11 +53,16 @@ export const selfHostedOrgTraitsSchema = z.object({
   self_hosted_last_report_at: z.string().optional(),
   self_hosted_signals: z.string().optional(),
 });
+export interface SelfHostedOrgTraitsSchema extends Named<
+  typeof selfHostedOrgTraitsSchemaDefinition
+> {}
+export const selfHostedOrgTraitsSchema: SelfHostedOrgTraitsSchema =
+  selfHostedOrgTraitsSchemaDefinition;
 
 /** An organization-wide count taken by the owner when it recorded, this one included. */
 const countIncludingThis = z.number().int().positive();
 
-export const nurturingSignalSchema = z.discriminatedUnion("kind", [
+const nurturingSignalSchemaDefinition = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("scenario_created"),
     ...signalSource,
@@ -273,6 +279,8 @@ export const nurturingSignalSchema = z.discriminatedUnion("kind", [
     onboardingVariant: variant,
   }),
 ]);
+export interface NurturingSignalSchema extends Named<typeof nurturingSignalSchemaDefinition> {}
+export const nurturingSignalSchema: NurturingSignalSchema = nurturingSignalSchemaDefinition;
 export type NurturingSignal = z.infer<typeof nurturingSignalSchema>;
 export type NurturingSignalOf<Kind extends NurturingSignal["kind"]> = Extract<
   NurturingSignal,

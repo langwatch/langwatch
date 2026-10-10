@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 /** Portable graph-alert threshold vocabulary shared by authoring and dispatch. */
@@ -56,7 +57,7 @@ export function parseSeriesIndex(seriesName?: string | null): number {
   return Number.parseInt(indexStr ?? "0", 10);
 }
 
-export const graphSeriesCollectionSchema = z
+const graphSeriesCollectionSchemaDefinition = z
   .object({
     series: z.array(
       z
@@ -70,6 +71,11 @@ export const graphSeriesCollectionSchema = z
     ),
   })
   .passthrough();
+export interface GraphSeriesCollectionSchema extends Named<
+  typeof graphSeriesCollectionSchemaDefinition
+> {}
+export const graphSeriesCollectionSchema: GraphSeriesCollectionSchema =
+  graphSeriesCollectionSchemaDefinition;
 
 /** The persisted series key for a graph alert: `<index>/<metric>/<aggregation>`. */
 export function findSeriesIdentifier(graph: unknown, index: number): string | undefined {
@@ -95,7 +101,7 @@ export function findSeriesIdentifier(graph: unknown, index: number): string | un
 }
 
 export const graphAlertOperatorSchema = z.enum(GRAPH_ALERT_OPERATORS);
-export const graphAlertTimePeriodSchema = z.union([
+const graphAlertTimePeriodSchemaDefinition = z.union([
   z.literal(1),
   z.literal(5),
   z.literal(15),
@@ -103,14 +109,24 @@ export const graphAlertTimePeriodSchema = z.union([
   z.literal(60),
   z.literal(1440),
 ]);
+export interface GraphAlertTimePeriodSchema extends Named<
+  typeof graphAlertTimePeriodSchemaDefinition
+> {}
+export const graphAlertTimePeriodSchema: GraphAlertTimePeriodSchema =
+  graphAlertTimePeriodSchemaDefinition;
 
 /** Threshold fields are independent of the destination provider fields. */
-export const graphAlertActionParamsSchema = z.object({
+const graphAlertActionParamsSchemaDefinition = z.object({
   threshold: z.number().finite(),
   operator: graphAlertOperatorSchema,
   timePeriod: graphAlertTimePeriodSchema,
   seriesName: z.string().min(1, "Pick a series to monitor."),
 });
+export interface GraphAlertActionParamsSchema extends Named<
+  typeof graphAlertActionParamsSchemaDefinition
+> {}
+export const graphAlertActionParamsSchema: GraphAlertActionParamsSchema =
+  graphAlertActionParamsSchemaDefinition;
 
 export type GraphAlertActionParams = z.infer<typeof graphAlertActionParamsSchema>;
 

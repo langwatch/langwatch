@@ -1,4 +1,5 @@
 import { ledgerActorSchema } from "@langwatch/authorization";
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 export const USER_FEATURE_ID = "user" as const;
@@ -22,7 +23,7 @@ export function safeUserAvatarMediaType(mediaType: string): string {
   return userAvatarMediaTypeSchema.validate(mediaType) ? mediaType : "application/octet-stream";
 }
 
-export const userProfileSchema = z
+const userProfileSchemaDefinition = z
   .object({
     id: z.string().min(1),
     name: z.string().nullable(),
@@ -36,61 +37,97 @@ export const userProfileSchema = z
     deactivatedAt: z.date().nullable(),
   })
   .strict();
+export interface UserProfileSchema extends Named<typeof userProfileSchemaDefinition> {}
+export const userProfileSchema: UserProfileSchema = userProfileSchemaDefinition;
 export type UserProfile = z.infer<typeof userProfileSchema>;
 
-export const userFullProfileSchema = userProfileSchema
+const userFullProfileSchemaDefinition = userProfileSchema
   .safeExtend({
     lastHomePath: z.string().nullable(),
     tracesExplorerTourDismissedAt: z.date().nullable(),
   })
   .strict();
+export interface UserFullProfileSchema extends Named<typeof userFullProfileSchemaDefinition> {}
+export const userFullProfileSchema: UserFullProfileSchema = userFullProfileSchemaDefinition;
 export type UserFullProfile = z.infer<typeof userFullProfileSchema>;
 
-export const userIdInputSchema = z.object({ id: z.string().min(1) }).strict();
+const userIdInputSchemaDefinition = z.object({ id: z.string().min(1) }).strict();
+export interface UserIdInputSchema extends Named<typeof userIdInputSchemaDefinition> {}
+export const userIdInputSchema: UserIdInputSchema = userIdInputSchemaDefinition;
 export type UserIdInput = z.infer<typeof userIdInputSchema>;
 
 /** A deactivation or reactivation, and who made it. */
-export const userLifecycleChangeInputSchema = z
+const userLifecycleChangeInputSchemaDefinition = z
   .object({ id: z.string().min(1), actor: ledgerActorSchema })
   .strict();
+export interface UserLifecycleChangeInputSchema extends Named<
+  typeof userLifecycleChangeInputSchemaDefinition
+> {}
+export const userLifecycleChangeInputSchema: UserLifecycleChangeInputSchema =
+  userLifecycleChangeInputSchemaDefinition;
 export type UserLifecycleChangeInput = z.infer<typeof userLifecycleChangeInputSchema>;
 
-export const userProfilesInputSchema = z.object({ userIds: z.array(z.string().min(1)) }).strict();
+const userProfilesInputSchemaDefinition = z
+  .object({ userIds: z.array(z.string().min(1)) })
+  .strict();
+export interface UserProfilesInputSchema extends Named<typeof userProfilesInputSchemaDefinition> {}
+export const userProfilesInputSchema: UserProfilesInputSchema = userProfilesInputSchemaDefinition;
 export type UserProfilesInput = z.infer<typeof userProfilesInputSchema>;
 
 export const userEmailSchema = z.string().trim().pipe(z.email());
-export const userEmailInputSchema = z.object({ email: userEmailSchema }).strict();
+const userEmailInputSchemaDefinition = z.object({ email: userEmailSchema }).strict();
+export interface UserEmailInputSchema extends Named<typeof userEmailInputSchemaDefinition> {}
+export const userEmailInputSchema: UserEmailInputSchema = userEmailInputSchemaDefinition;
 export type UserEmailInput = z.infer<typeof userEmailInputSchema>;
 
-export const createUserInputSchema = z
+const createUserInputSchemaDefinition = z
   .object({ name: z.string(), email: userEmailSchema })
   .strict();
+export interface CreateUserInputSchema extends Named<typeof createUserInputSchemaDefinition> {}
+export const createUserInputSchema: CreateUserInputSchema = createUserInputSchemaDefinition;
 export type CreateUserInput = z.infer<typeof createUserInputSchema>;
 
-export const createCredentialUserInputSchema = z
+const createCredentialUserInputSchemaDefinition = z
   .object({
     name: z.string().nullable(),
     email: userEmailSchema,
     passwordHash: z.string().min(1),
   })
   .strict();
+export interface CreateCredentialUserInputSchema extends Named<
+  typeof createCredentialUserInputSchemaDefinition
+> {}
+export const createCredentialUserInputSchema: CreateCredentialUserInputSchema =
+  createCredentialUserInputSchemaDefinition;
 export type CreateCredentialUserInput = z.infer<typeof createCredentialUserInputSchema>;
 
-export const createPasskeyUserInputSchema = z.object({ email: userEmailSchema }).strict();
+const createPasskeyUserInputSchemaDefinition = z.object({ email: userEmailSchema }).strict();
+export interface CreatePasskeyUserInputSchema extends Named<
+  typeof createPasskeyUserInputSchemaDefinition
+> {}
+export const createPasskeyUserInputSchema: CreatePasskeyUserInputSchema =
+  createPasskeyUserInputSchemaDefinition;
 export type CreatePasskeyUserInput = z.infer<typeof createPasskeyUserInputSchema>;
 
-export const createdUserSchema = z.object({ id: z.string().min(1) }).strict();
+const createdUserSchemaDefinition = z.object({ id: z.string().min(1) }).strict();
+export interface CreatedUserSchema extends Named<typeof createdUserSchemaDefinition> {}
+export const createdUserSchema: CreatedUserSchema = createdUserSchemaDefinition;
 export type CreatedUser = z.infer<typeof createdUserSchema>;
 
-export const setFirstUserPasswordInputSchema = z
+const setFirstUserPasswordInputSchemaDefinition = z
   .object({ id: z.string().min(1), passwordHash: z.string().min(1) })
   .strict();
+export interface SetFirstUserPasswordInputSchema extends Named<
+  typeof setFirstUserPasswordInputSchemaDefinition
+> {}
+export const setFirstUserPasswordInputSchema: SetFirstUserPasswordInputSchema =
+  setFirstUserPasswordInputSchemaDefinition;
 export type SetFirstUserPasswordInput = z.infer<typeof setFirstUserPasswordInputSchema>;
 
 export const setFirstUserPasswordResultSchema = z.enum(["set", "already_set"]);
 export type SetFirstUserPasswordResult = z.infer<typeof setFirstUserPasswordResultSchema>;
 
-export const userPasskeyNudgeStatusSchema = z
+const userPasskeyNudgeStatusSchemaDefinition = z
   .object({
     hasPasskey: z.boolean(),
     /** Two-step verification is set up and confirmed on the account. */
@@ -100,24 +137,41 @@ export const userPasskeyNudgeStatusSchema = z
     accountCreatedAt: z.date(),
   })
   .strict();
+export interface UserPasskeyNudgeStatusSchema extends Named<
+  typeof userPasskeyNudgeStatusSchemaDefinition
+> {}
+export const userPasskeyNudgeStatusSchema: UserPasskeyNudgeStatusSchema =
+  userPasskeyNudgeStatusSchemaDefinition;
 export type UserPasskeyNudgeStatus = z.infer<typeof userPasskeyNudgeStatusSchema>;
 
-export const userCredentialAccountRowSchema = z
+const userCredentialAccountRowSchemaDefinition = z
   .object({ password: z.string().nullable() })
   .strict();
+export interface UserCredentialAccountRowSchema extends Named<
+  typeof userCredentialAccountRowSchemaDefinition
+> {}
+export const userCredentialAccountRowSchema: UserCredentialAccountRowSchema =
+  userCredentialAccountRowSchemaDefinition;
 
-export const userCredentialAccountSchema = userCredentialAccountRowSchema
+const userCredentialAccountSchemaDefinition = userCredentialAccountRowSchema
   .safeExtend({ id: z.string().min(1) })
   .strict();
+export interface UserCredentialAccountSchema extends Named<
+  typeof userCredentialAccountSchemaDefinition
+> {}
+export const userCredentialAccountSchema: UserCredentialAccountSchema =
+  userCredentialAccountSchemaDefinition;
 
 /** One sign-in method a person holds, as the settings list renders it. Never a secret. */
-export const userLinkedAccountSchema = z
+const userLinkedAccountSchemaDefinition = z
   .object({
     id: z.string().min(1),
     provider: z.string(),
     providerAccountId: z.string(),
   })
   .strict();
+export interface UserLinkedAccountSchema extends Named<typeof userLinkedAccountSchemaDefinition> {}
+export const userLinkedAccountSchema: UserLinkedAccountSchema = userLinkedAccountSchemaDefinition;
 export type UserLinkedAccount = z.infer<typeof userLinkedAccountSchema>;
 
 /**
@@ -149,45 +203,74 @@ export type AdoptUnconfirmedAccountOutcome = z.infer<typeof adoptUnconfirmedAcco
 export const unlinkUserAccountOutcomeSchema = z.enum(["unlinked", "last_account", "not_found"]);
 export type UnlinkUserAccountOutcome = z.infer<typeof unlinkUserAccountOutcomeSchema>;
 
-export const rotateUserPasswordInputSchema = z
+const rotateUserPasswordInputSchemaDefinition = z
   .object({
     userId: z.string().min(1),
     currentPassword: z.string().min(1),
     newPassword: z.string().min(1),
   })
   .strict();
+export interface RotateUserPasswordInputSchema extends Named<
+  typeof rotateUserPasswordInputSchemaDefinition
+> {}
+export const rotateUserPasswordInputSchema: RotateUserPasswordInputSchema =
+  rotateUserPasswordInputSchemaDefinition;
 export type RotateUserPasswordInput = z.infer<typeof rotateUserPasswordInputSchema>;
 
-export const unlinkUserAccountInputSchema = z
+const unlinkUserAccountInputSchemaDefinition = z
   .object({ userId: z.string().min(1), accountId: z.string().min(1) })
   .strict();
+export interface UnlinkUserAccountInputSchema extends Named<
+  typeof unlinkUserAccountInputSchemaDefinition
+> {}
+export const unlinkUserAccountInputSchema: UnlinkUserAccountInputSchema =
+  unlinkUserAccountInputSchemaDefinition;
 export type UnlinkUserAccountInput = z.infer<typeof unlinkUserAccountInputSchema>;
 
-export const updateUserProfileInputSchema = z
+const updateUserProfileInputSchemaDefinition = z
   .object({
     id: z.string().min(1),
     name: z.string().optional(),
   })
   .strict();
+export interface UpdateUserProfileInputSchema extends Named<
+  typeof updateUserProfileInputSchemaDefinition
+> {}
+export const updateUserProfileInputSchema: UpdateUserProfileInputSchema =
+  updateUserProfileInputSchemaDefinition;
 export type UpdateUserProfileInput = z.infer<typeof updateUserProfileInputSchema>;
 
-export const updateUserEmailInputSchema = z
+const updateUserEmailInputSchemaDefinition = z
   .object({ id: z.string().min(1), email: userEmailSchema })
   .strict();
+export interface UpdateUserEmailInputSchema extends Named<
+  typeof updateUserEmailInputSchemaDefinition
+> {}
+export const updateUserEmailInputSchema: UpdateUserEmailInputSchema =
+  updateUserEmailInputSchemaDefinition;
 export type UpdateUserEmailInput = z.infer<typeof updateUserEmailInputSchema>;
 
-export const userAccountInfoSchema = z.object({ createdAt: z.date() }).strict();
+const userAccountInfoSchemaDefinition = z.object({ createdAt: z.date() }).strict();
+export interface UserAccountInfoSchema extends Named<typeof userAccountInfoSchemaDefinition> {}
+export const userAccountInfoSchema: UserAccountInfoSchema = userAccountInfoSchemaDefinition;
 export type UserAccountInfo = z.infer<typeof userAccountInfoSchema>;
 
-export const userSsoStatusSchema = z.object({ pendingSsoSetup: z.boolean() }).strict();
+const userSsoStatusSchemaDefinition = z.object({ pendingSsoSetup: z.boolean() }).strict();
+export interface UserSsoStatusSchema extends Named<typeof userSsoStatusSchemaDefinition> {}
+export const userSsoStatusSchema: UserSsoStatusSchema = userSsoStatusSchemaDefinition;
 export type UserSsoStatus = z.infer<typeof userSsoStatusSchema>;
 
-export const userTourPreferenceSchema = z
+const userTourPreferenceSchemaDefinition = z
   .object({
     dismissed: z.boolean(),
     dismissedAt: z.date().nullable(),
   })
   .strict();
+export interface UserTourPreferenceSchema extends Named<
+  typeof userTourPreferenceSchemaDefinition
+> {}
+export const userTourPreferenceSchema: UserTourPreferenceSchema =
+  userTourPreferenceSchemaDefinition;
 export type UserTourPreference = z.infer<typeof userTourPreferenceSchema>;
 
 /**
@@ -202,60 +285,101 @@ export const userNotificationChoiceSchema = z.enum(["enabled", "declined"]);
 export type UserNotificationChoice = z.infer<typeof userNotificationChoiceSchema>;
 
 /** One topic's stored choice; `choice` is null while the person never answered. */
-export const userNotificationPreferenceSchema = z
+const userNotificationPreferenceSchemaDefinition = z
   .object({
     topic: userNotificationTopicSchema,
     choice: userNotificationChoiceSchema.nullable(),
   })
   .strict();
+export interface UserNotificationPreferenceSchema extends Named<
+  typeof userNotificationPreferenceSchemaDefinition
+> {}
+export const userNotificationPreferenceSchema: UserNotificationPreferenceSchema =
+  userNotificationPreferenceSchemaDefinition;
 export type UserNotificationPreference = z.infer<typeof userNotificationPreferenceSchema>;
 
-export const userNotificationTopicInputSchema = z
+const userNotificationTopicInputSchemaDefinition = z
   .object({ id: z.string().min(1), topic: userNotificationTopicSchema })
   .strict();
+export interface UserNotificationTopicInputSchema extends Named<
+  typeof userNotificationTopicInputSchemaDefinition
+> {}
+export const userNotificationTopicInputSchema: UserNotificationTopicInputSchema =
+  userNotificationTopicInputSchemaDefinition;
 export type UserNotificationTopicInput = z.infer<typeof userNotificationTopicInputSchema>;
 
-export const setUserNotificationPreferenceInputSchema = z
+const setUserNotificationPreferenceInputSchemaDefinition = z
   .object({
     id: z.string().min(1),
     topic: userNotificationTopicSchema,
     choice: userNotificationChoiceSchema,
   })
   .strict();
+export interface SetUserNotificationPreferenceInputSchema extends Named<
+  typeof setUserNotificationPreferenceInputSchemaDefinition
+> {}
+export const setUserNotificationPreferenceInputSchema: SetUserNotificationPreferenceInputSchema =
+  setUserNotificationPreferenceInputSchemaDefinition;
 export type SetUserNotificationPreferenceInput = z.infer<
   typeof setUserNotificationPreferenceInputSchema
 >;
 
-export const userTourPreferenceRowSchema = z
+const userTourPreferenceRowSchemaDefinition = z
   .object({ tracesExplorerTourDismissedAt: z.date().nullable() })
   .strict();
-export const userHomePathSchema = z.object({ lastHomePath: z.string().nullable() }).strict();
+export interface UserTourPreferenceRowSchema extends Named<
+  typeof userTourPreferenceRowSchemaDefinition
+> {}
+export const userTourPreferenceRowSchema: UserTourPreferenceRowSchema =
+  userTourPreferenceRowSchemaDefinition;
+const userHomePathSchemaDefinition = z.object({ lastHomePath: z.string().nullable() }).strict();
+export interface UserHomePathSchema extends Named<typeof userHomePathSchemaDefinition> {}
+export const userHomePathSchema: UserHomePathSchema = userHomePathSchemaDefinition;
 
-export const setUserHomePathInputSchema = z
+const setUserHomePathInputSchemaDefinition = z
   .object({
     id: z.string().min(1),
     path: z.string().min(1).max(1024).startsWith("/").nullable(),
   })
   .strict();
+export interface SetUserHomePathInputSchema extends Named<
+  typeof setUserHomePathInputSchemaDefinition
+> {}
+export const setUserHomePathInputSchema: SetUserHomePathInputSchema =
+  setUserHomePathInputSchemaDefinition;
 export type SetUserHomePathInput = z.infer<typeof setUserHomePathInputSchema>;
 
-export const setUserAvatarInputSchema = z
+const setUserAvatarInputSchemaDefinition = z
   .object({
     userId: z.string().min(1),
     organizationId: z.string().min(1),
     imageDataUrl: z.string().min(1),
   })
   .strict();
+export interface SetUserAvatarInputSchema extends Named<
+  typeof setUserAvatarInputSchemaDefinition
+> {}
+export const setUserAvatarInputSchema: SetUserAvatarInputSchema =
+  setUserAvatarInputSchemaDefinition;
 export type SetUserAvatarInput = z.infer<typeof setUserAvatarInputSchema>;
 
-export const removeUserAvatarInputSchema = z.object({ userId: z.string().min(1) }).strict();
+const removeUserAvatarInputSchemaDefinition = z.object({ userId: z.string().min(1) }).strict();
+export interface RemoveUserAvatarInputSchema extends Named<
+  typeof removeUserAvatarInputSchemaDefinition
+> {}
+export const removeUserAvatarInputSchema: RemoveUserAvatarInputSchema =
+  removeUserAvatarInputSchemaDefinition;
 export type RemoveUserAvatarInput = z.infer<typeof removeUserAvatarInputSchema>;
 
-export const userAvatarResultSchema = z.object({ image: z.string() }).strict();
+const userAvatarResultSchemaDefinition = z.object({ image: z.string() }).strict();
+export interface UserAvatarResultSchema extends Named<typeof userAvatarResultSchemaDefinition> {}
+export const userAvatarResultSchema: UserAvatarResultSchema = userAvatarResultSchemaDefinition;
 export type UserAvatarResult = z.infer<typeof userAvatarResultSchema>;
 
 /** A same-origin signed URL an uploaded avatar renders from; it lapses after a few minutes. */
-export const userAvatarUrlSchema = z.object({ url: z.string() }).strict();
+const userAvatarUrlSchemaDefinition = z.object({ url: z.string() }).strict();
+export interface UserAvatarUrlSchema extends Named<typeof userAvatarUrlSchemaDefinition> {}
+export const userAvatarUrlSchema: UserAvatarUrlSchema = userAvatarUrlSchemaDefinition;
 export type UserAvatarUrl = z.infer<typeof userAvatarUrlSchema>;
 
 /**
@@ -263,16 +387,18 @@ export type UserAvatarUrl = z.infer<typeof userAvatarUrlSchema>;
  * while an operator browses as them — and `operatorId` is whose preferences
  * and operator standing apply.
  */
-export const userCallerSchema = z
+const userCallerSchemaDefinition = z
   .object({
     id: z.string().min(1),
     operatorId: z.string().min(1),
     impersonated: z.boolean(),
   })
   .strict();
+export interface UserCallerSchema extends Named<typeof userCallerSchemaDefinition> {}
+export const userCallerSchema: UserCallerSchema = userCallerSchemaDefinition;
 export type UserCaller = z.infer<typeof userCallerSchema>;
 
-export const registerCredentialAccountInputSchema = z
+const registerCredentialAccountInputSchemaDefinition = z
   .object({
     name: z.string().nullable(),
     email: z.string().min(1),
@@ -286,10 +412,15 @@ export const registerCredentialAccountInputSchema = z
     referer: z.string().nullable(),
   })
   .strict();
+export interface RegisterCredentialAccountInputSchema extends Named<
+  typeof registerCredentialAccountInputSchemaDefinition
+> {}
+export const registerCredentialAccountInputSchema: RegisterCredentialAccountInputSchema =
+  registerCredentialAccountInputSchemaDefinition;
 export type RegisterCredentialAccountInput = z.infer<typeof registerCredentialAccountInputSchema>;
 
 /** An account auth's register door cleared; `addressConfirmed` is what its spent proof proved. */
-export const credentialAccountInputSchema = z
+const credentialAccountInputSchemaDefinition = z
   .object({
     name: z.string().nullable(),
     email: z.string().min(1),
@@ -297,6 +428,11 @@ export const credentialAccountInputSchema = z
     addressConfirmed: z.boolean(),
   })
   .strict();
+export interface CredentialAccountInputSchema extends Named<
+  typeof credentialAccountInputSchemaDefinition
+> {}
+export const credentialAccountInputSchema: CredentialAccountInputSchema =
+  credentialAccountInputSchemaDefinition;
 export type CredentialAccountInput = z.infer<typeof credentialAccountInputSchema>;
 
 /**
@@ -313,7 +449,7 @@ const keptBrowserSession = z.string().min(1).nullable();
  */
 const credentialWriteCaller = userCallerSchema;
 
-export const setOwnFirstPasswordInputSchema = z
+const setOwnFirstPasswordInputSchemaDefinition = z
   .object({
     userId: z.string().min(1),
     password: z.string().min(1),
@@ -321,9 +457,14 @@ export const setOwnFirstPasswordInputSchema = z
     caller: credentialWriteCaller,
   })
   .strict();
+export interface SetOwnFirstPasswordInputSchema extends Named<
+  typeof setOwnFirstPasswordInputSchemaDefinition
+> {}
+export const setOwnFirstPasswordInputSchema: SetOwnFirstPasswordInputSchema =
+  setOwnFirstPasswordInputSchemaDefinition;
 export type SetOwnFirstPasswordInput = z.infer<typeof setOwnFirstPasswordInputSchema>;
 
-export const changeOwnPasswordInputSchema = z
+const changeOwnPasswordInputSchemaDefinition = z
   .object({
     userId: z.string().min(1),
     currentPassword: z.string().min(1),
@@ -332,22 +473,29 @@ export const changeOwnPasswordInputSchema = z
     caller: credentialWriteCaller,
   })
   .strict();
+export interface ChangeOwnPasswordInputSchema extends Named<
+  typeof changeOwnPasswordInputSchemaDefinition
+> {}
+export const changeOwnPasswordInputSchema: ChangeOwnPasswordInputSchema =
+  changeOwnPasswordInputSchemaDefinition;
 export type ChangeOwnPasswordInput = z.infer<typeof changeOwnPasswordInputSchema>;
 
-export const setOwnAvatarInputSchema = z
+const setOwnAvatarInputSchemaDefinition = z
   .object({
     userId: z.string().min(1),
     organizationId: z.string().min(1),
     imageDataUrl: z.string().min(1),
   })
   .strict();
+export interface SetOwnAvatarInputSchema extends Named<typeof setOwnAvatarInputSchemaDefinition> {}
+export const setOwnAvatarInputSchema: SetOwnAvatarInputSchema = setOwnAvatarInputSchemaDefinition;
 export type SetOwnAvatarInput = z.infer<typeof setOwnAvatarInputSchema>;
 
 /**
  * The account-security offer (ADR-120, D06): whether to ask now, which halves
  * to offer, and how this session signed in — the screen asks only after a password.
  */
-export const userSecureAccountOfferSchema = z
+const userSecureAccountOfferSchemaDefinition = z
   .object({
     offer: z.boolean(),
     passkey: z.boolean(),
@@ -355,6 +503,11 @@ export const userSecureAccountOfferSchema = z
     signedInWith: z.enum(["password", "passkey", "federated", "unknown"]),
   })
   .strict();
+export interface UserSecureAccountOfferSchema extends Named<
+  typeof userSecureAccountOfferSchemaDefinition
+> {}
+export const userSecureAccountOfferSchema: UserSecureAccountOfferSchema =
+  userSecureAccountOfferSchemaDefinition;
 export type UserSecureAccountOffer = z.infer<typeof userSecureAccountOfferSchema>;
 
 /** A display name as the account accepts it: trimmed, then 1-120 characters. */

@@ -4,12 +4,17 @@
  * navigation and deletes nothing, and the owner is who may switch it.
  */
 
-import { defineTrpcContract } from "@langwatch/module";
+import { defineTrpcContract, type Named } from "@langwatch/module";
 import { z } from "zod";
 
 import { personalFeaturesSchema } from "./personal-workspace.ts";
 
-export const personalWorkspaceFeaturesScopeSchema = z.object({ projectId: z.string() });
+const personalWorkspaceFeaturesScopeSchemaDefinition = z.object({ projectId: z.string() });
+export interface PersonalWorkspaceFeaturesScopeSchema extends Named<
+  typeof personalWorkspaceFeaturesScopeSchemaDefinition
+> {}
+export const personalWorkspaceFeaturesScopeSchema: PersonalWorkspaceFeaturesScopeSchema =
+  personalWorkspaceFeaturesScopeSchemaDefinition;
 export type PersonalWorkspaceFeaturesScope = z.infer<typeof personalWorkspaceFeaturesScopeSchema>;
 
 export const personalWorkspaceFeaturesTrpc = defineTrpcContract("personalWorkspaceFeatures")

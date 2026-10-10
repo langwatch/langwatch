@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import {
   findWebhookUrlProblem,
   sanitizeWebhookHeaders,
@@ -43,7 +44,7 @@ export function webhookUrlSchema({
     });
 }
 
-export const webhookActionParamsSchema = z.object({
+const webhookActionParamsSchemaDefinition = z.object({
   url: webhookUrlSchema(),
   method: webhookMethodSchema.default("POST"),
   headers: z.record(z.string(), z.string()).default({}).transform(sanitizeWebhookHeaders),
@@ -58,6 +59,11 @@ export const webhookActionParamsSchema = z.object({
     .refine(isWebhookContentType, "Enter a media type, like application/json or text/plain."),
   signingSecret: z.string().trim().nullable().optional(),
 });
+export interface WebhookActionParamsSchema extends Named<
+  typeof webhookActionParamsSchemaDefinition
+> {}
+export const webhookActionParamsSchema: WebhookActionParamsSchema =
+  webhookActionParamsSchemaDefinition;
 export type WebhookActionParams = z.infer<typeof webhookActionParamsSchema>;
 
 export interface WebhookPreview extends PreviewEnvelope {

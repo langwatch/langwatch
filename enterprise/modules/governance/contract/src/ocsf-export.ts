@@ -1,6 +1,7 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
-export const governanceOcsfExportRowSchema = z.object({
+const governanceOcsfExportRowSchemaDefinition = z.object({
   eventId: z.string(),
   ocsfSchemaVersion: z.string(),
   traceId: z.string(),
@@ -20,18 +21,28 @@ export const governanceOcsfExportRowSchema = z.object({
   anomalyAlertId: z.string(),
   rawOcsfJson: z.string(),
 });
+export interface GovernanceOcsfExportRowSchema extends Named<
+  typeof governanceOcsfExportRowSchemaDefinition
+> {}
+export const governanceOcsfExportRowSchema: GovernanceOcsfExportRowSchema =
+  governanceOcsfExportRowSchemaDefinition;
 export type GovernanceOcsfExportRow = z.infer<typeof governanceOcsfExportRowSchema>;
 
-export const governanceOcsfExportPageSchema = z.object({
+const governanceOcsfExportPageSchemaDefinition = z.object({
   events: z.array(governanceOcsfExportRowSchema),
   nextCursor: z.number().int().nonnegative().nullable(),
   nextCursorCompound: z
     .object({ eventTimeMs: z.number().int().nonnegative(), eventId: z.string() })
     .nullable(),
 });
+export interface GovernanceOcsfExportPageSchema extends Named<
+  typeof governanceOcsfExportPageSchemaDefinition
+> {}
+export const governanceOcsfExportPageSchema: GovernanceOcsfExportPageSchema =
+  governanceOcsfExportPageSchemaDefinition;
 export type GovernanceOcsfExportPage = z.infer<typeof governanceOcsfExportPageSchema>;
 
-export const governanceOcsfExportInputSchema = z
+const governanceOcsfExportInputSchemaDefinition = z
   .object({
     organizationId: z.string().min(1),
     sinceMs: z.number().int().nonnegative(),
@@ -39,4 +50,9 @@ export const governanceOcsfExportInputSchema = z
     limit: z.number().int().min(1).max(1_000),
   })
   .strict();
+export interface GovernanceOcsfExportInputSchema extends Named<
+  typeof governanceOcsfExportInputSchemaDefinition
+> {}
+export const governanceOcsfExportInputSchema: GovernanceOcsfExportInputSchema =
+  governanceOcsfExportInputSchemaDefinition;
 export type GovernanceOcsfExportInput = z.infer<typeof governanceOcsfExportInputSchema>;

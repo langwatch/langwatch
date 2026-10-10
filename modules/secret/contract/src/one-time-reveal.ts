@@ -4,6 +4,7 @@
  * Spec: modules/secret/specs/one-time-reveal.feature.
  */
 
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 /** The prefix a reveal id carries, so an id in a log is legible as one. */
@@ -18,7 +19,7 @@ export const ONE_TIME_REVEAL_KINDS = ["virtual_key"] as const;
 export const oneTimeRevealKindSchema = z.enum(ONE_TIME_REVEAL_KINDS);
 export type OneTimeRevealKind = z.infer<typeof oneTimeRevealKindSchema>;
 
-export const stashRevealInputSchema = z
+const stashRevealInputSchemaDefinition = z
   .object({
     organizationId: z.string().min(1),
     kind: oneTimeRevealKindSchema,
@@ -31,17 +32,23 @@ export const stashRevealInputSchema = z
     recipientUserId: z.string().min(1),
   })
   .strict();
+export interface StashRevealInputSchema extends Named<typeof stashRevealInputSchemaDefinition> {}
+export const stashRevealInputSchema: StashRevealInputSchema = stashRevealInputSchemaDefinition;
 export type StashRevealInput = z.infer<typeof stashRevealInputSchema>;
 
-export const revealOnceInputSchema = z
+const revealOnceInputSchemaDefinition = z
   .object({ organizationId: z.string().min(1), revealId: z.string().min(1) })
   .strict();
+export interface RevealOnceInputSchema extends Named<typeof revealOnceInputSchemaDefinition> {}
+export const revealOnceInputSchema: RevealOnceInputSchema = revealOnceInputSchemaDefinition;
 export type RevealOnceInput = z.infer<typeof revealOnceInputSchema>;
 
-export const stashedRevealSchema = z.object({ revealId: z.string().min(1) }).strict();
+const stashedRevealSchemaDefinition = z.object({ revealId: z.string().min(1) }).strict();
+export interface StashedRevealSchema extends Named<typeof stashedRevealSchemaDefinition> {}
+export const stashedRevealSchema: StashedRevealSchema = stashedRevealSchemaDefinition;
 export type StashedReveal = z.infer<typeof stashedRevealSchema>;
 
-export const revealedSecretSchema = z
+const revealedSecretSchemaDefinition = z
   .object({
     kind: oneTimeRevealKindSchema,
     keyId: z.string().min(1),
@@ -49,4 +56,6 @@ export const revealedSecretSchema = z
     secret: z.string().min(1),
   })
   .strict();
+export interface RevealedSecretSchema extends Named<typeof revealedSecretSchemaDefinition> {}
+export const revealedSecretSchema: RevealedSecretSchema = revealedSecretSchemaDefinition;
 export type RevealedSecret = z.infer<typeof revealedSecretSchema>;

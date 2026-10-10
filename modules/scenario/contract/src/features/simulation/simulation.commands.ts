@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import { scenarioCriterionResultSchema } from "../../scenario-criterion-result.ts";
@@ -24,7 +25,7 @@ const simulationRunDetailsSchema = z.object({
   metadata: z.record(z.string(), z.unknown()).optional(),
 });
 
-export const simulationQueueRunSchema = z.object({
+const simulationQueueRunSchemaDefinition = z.object({
   ...simulationRunIdentitySchema.shape,
   ...simulationRunDetailsSchema.shape,
   secretParameters: z.record(z.string(), z.string()).optional(),
@@ -32,31 +33,51 @@ export const simulationQueueRunSchema = z.object({
   /** The evaluators the queuing owner pinned; absent, the run reads its own when queued. */
   evaluators: runEvaluatorsSchema.optional(),
 });
+export interface SimulationQueueRunSchema extends Named<
+  typeof simulationQueueRunSchemaDefinition
+> {}
+export const simulationQueueRunSchema: SimulationQueueRunSchema =
+  simulationQueueRunSchemaDefinition;
 export type SimulationQueueRun = z.infer<typeof simulationQueueRunSchema>;
 
-export const simulationStartRunSchema = z.object({
+const simulationStartRunSchemaDefinition = z.object({
   ...simulationRunIdentitySchema.shape,
   ...simulationRunDetailsSchema.shape,
 });
+export interface SimulationStartRunSchema extends Named<
+  typeof simulationStartRunSchemaDefinition
+> {}
+export const simulationStartRunSchema: SimulationStartRunSchema =
+  simulationStartRunSchemaDefinition;
 export type SimulationStartRun = z.infer<typeof simulationStartRunSchema>;
 
-export const simulationMessageSnapshotSchema = z.object({
+const simulationMessageSnapshotSchemaDefinition = z.object({
   ...simulationRunIdentitySchema.shape,
   messages: z.array(simulationMessageSchema),
   traceIds: z.array(z.string()).default([]),
   status: z.string().optional(),
 });
+export interface SimulationMessageSnapshotSchema extends Named<
+  typeof simulationMessageSnapshotSchemaDefinition
+> {}
+export const simulationMessageSnapshotSchema: SimulationMessageSnapshotSchema =
+  simulationMessageSnapshotSchemaDefinition;
 export type SimulationMessageSnapshot = z.infer<typeof simulationMessageSnapshotSchema>;
 
-export const simulationTextMessageStartSchema = z.object({
+const simulationTextMessageStartSchemaDefinition = z.object({
   ...simulationRunIdentitySchema.shape,
   messageId: z.string(),
   role: z.string(),
   messageIndex: z.number().optional(),
 });
+export interface SimulationTextMessageStartSchema extends Named<
+  typeof simulationTextMessageStartSchemaDefinition
+> {}
+export const simulationTextMessageStartSchema: SimulationTextMessageStartSchema =
+  simulationTextMessageStartSchemaDefinition;
 export type SimulationTextMessageStart = z.infer<typeof simulationTextMessageStartSchema>;
 
-export const simulationTextMessageEndSchema = z.object({
+const simulationTextMessageEndSchemaDefinition = z.object({
   ...simulationRunIdentitySchema.shape,
   messageId: z.string(),
   role: z.string(),
@@ -65,9 +86,14 @@ export const simulationTextMessageEndSchema = z.object({
   traceId: z.string().optional(),
   messageIndex: z.number().optional(),
 });
+export interface SimulationTextMessageEndSchema extends Named<
+  typeof simulationTextMessageEndSchemaDefinition
+> {}
+export const simulationTextMessageEndSchema: SimulationTextMessageEndSchema =
+  simulationTextMessageEndSchemaDefinition;
 export type SimulationTextMessageEnd = z.infer<typeof simulationTextMessageEndSchema>;
 
-export const simulationFinishRunSchema = z.object({
+const simulationFinishRunSchemaDefinition = z.object({
   ...simulationRunIdentitySchema.shape,
   results: z
     .object({
@@ -89,6 +115,11 @@ export const simulationFinishRunSchema = z.object({
   traceIds: z.array(z.string()).optional(),
   target: simulationTargetSchema.optional(),
 });
+export interface SimulationFinishRunSchema extends Named<
+  typeof simulationFinishRunSchemaDefinition
+> {}
+export const simulationFinishRunSchema: SimulationFinishRunSchema =
+  simulationFinishRunSchemaDefinition;
 export type SimulationFinishRun = z.infer<typeof simulationFinishRunSchema>;
 
 export const simulationCancelRunSchema = simulationRunIdentitySchema;
@@ -98,17 +129,22 @@ export const simulationDeleteRunSchema = simulationRunIdentitySchema;
 export type SimulationDeleteRun = z.infer<typeof simulationDeleteRunSchema>;
 
 /** The connected agent instance that answered a run, reported by the child. */
-export const simulationRecordAgentInstanceSchema = z.object({
+const simulationRecordAgentInstanceSchemaDefinition = z.object({
   ...simulationRunIdentitySchema.shape,
   agentInstance: z.object({ hostname: z.string(), label: z.string().nullable() }),
 });
+export interface SimulationRecordAgentInstanceSchema extends Named<
+  typeof simulationRecordAgentInstanceSchemaDefinition
+> {}
+export const simulationRecordAgentInstanceSchema: SimulationRecordAgentInstanceSchema =
+  simulationRecordAgentInstanceSchemaDefinition;
 export type SimulationRecordAgentInstance = z.infer<typeof simulationRecordAgentInstanceSchema>;
 
 /** A voice run LangWatch ended at the maximum call duration, reported by the child. */
 export const simulationRecordCutAtLimitSchema = simulationRunIdentitySchema;
 export type SimulationRecordCutAtLimit = z.infer<typeof simulationRecordCutAtLimitSchema>;
 
-export const simulationComputeRunMetricsSchema = z.object({
+const simulationComputeRunMetricsSchemaDefinition = z.object({
   ...simulationRunIdentitySchema.shape,
   traceId: z.string(),
   metrics: z
@@ -120,14 +156,24 @@ export const simulationComputeRunMetricsSchema = z.object({
     .optional(),
   retryCount: z.number().default(0),
 });
+export interface SimulationComputeRunMetricsSchema extends Named<
+  typeof simulationComputeRunMetricsSchemaDefinition
+> {}
+export const simulationComputeRunMetricsSchema: SimulationComputeRunMetricsSchema =
+  simulationComputeRunMetricsSchemaDefinition;
 export type SimulationComputeRunMetrics = z.infer<typeof simulationComputeRunMetricsSchema>;
 
-export const simulationArchiveSetSchema = z.object({
+const simulationArchiveSetSchemaDefinition = z.object({
   tenantId: z.string(),
   scenarioSetId: z.string(),
   scenarioRunIds: z.array(z.string()).min(1),
   occurredAt: z.number(),
 });
+export interface SimulationArchiveSetSchema extends Named<
+  typeof simulationArchiveSetSchemaDefinition
+> {}
+export const simulationArchiveSetSchema: SimulationArchiveSetSchema =
+  simulationArchiveSetSchemaDefinition;
 export type SimulationArchiveSet = z.infer<typeof simulationArchiveSetSchema>;
 
 export const queueRunCommandDataSchema = simulationQueueRunSchema;
@@ -154,10 +200,15 @@ export type ArchiveSetCommandData = SimulationArchiveSet;
  * identity and prior verdict are all read from the run's prior events by
  * RecordEvaluationsCommand, so the caller sends only the results.
  */
-export const recordEvaluationsCommandDataSchema = z.object({
+const recordEvaluationsCommandDataSchemaDefinition = z.object({
   tenantId: z.string(),
   scenarioRunId: z.string(),
   evaluations: z.array(scenarioEvaluationResultSchema),
   occurredAt: z.number(),
 });
+export interface RecordEvaluationsCommandDataSchema extends Named<
+  typeof recordEvaluationsCommandDataSchemaDefinition
+> {}
+export const recordEvaluationsCommandDataSchema: RecordEvaluationsCommandDataSchema =
+  recordEvaluationsCommandDataSchemaDefinition;
 export type RecordEvaluationsCommandData = z.infer<typeof recordEvaluationsCommandDataSchema>;

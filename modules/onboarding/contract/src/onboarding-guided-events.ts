@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import { guidedPathSchema } from "./onboarding-guided-paths.ts";
@@ -25,7 +26,7 @@ export type GuidedOnboardingRecordedEventName = z.infer<
 >;
 
 /** The state as far as a peer reads it: no conversation and no key reveal ride the event. */
-export const guidedOnboardingRecordedStateSchema = guidedOnboardingStateSchema.pick({
+const guidedOnboardingRecordedStateSchemaDefinition = guidedOnboardingStateSchema.pick({
   paths: true,
   currentPath: true,
   donePaths: true,
@@ -33,9 +34,14 @@ export const guidedOnboardingRecordedStateSchema = guidedOnboardingStateSchema.p
   tourCompletedAt: true,
   tourSkippedAt: true,
 });
+export interface GuidedOnboardingRecordedStateSchema extends Named<
+  typeof guidedOnboardingRecordedStateSchemaDefinition
+> {}
+export const guidedOnboardingRecordedStateSchema: GuidedOnboardingRecordedStateSchema =
+  guidedOnboardingRecordedStateSchemaDefinition;
 
 /** One signalling guided write, attributed to a person, with the state it left behind. */
-export const guidedOnboardingRecordedEventDataSchema = z.object({
+const guidedOnboardingRecordedEventDataSchemaDefinition = z.object({
   tenantId: z.string().min(1),
   occurredAt: z.number().int().nonnegative(),
   organizationId: z.string().min(1),
@@ -45,6 +51,11 @@ export const guidedOnboardingRecordedEventDataSchema = z.object({
   previousPaths: z.array(guidedPathSchema),
   state: guidedOnboardingRecordedStateSchema,
 });
+export interface GuidedOnboardingRecordedEventDataSchema extends Named<
+  typeof guidedOnboardingRecordedEventDataSchemaDefinition
+> {}
+export const guidedOnboardingRecordedEventDataSchema: GuidedOnboardingRecordedEventDataSchema =
+  guidedOnboardingRecordedEventDataSchemaDefinition;
 export type GuidedOnboardingRecordedEventData = z.infer<
   typeof guidedOnboardingRecordedEventDataSchema
 >;

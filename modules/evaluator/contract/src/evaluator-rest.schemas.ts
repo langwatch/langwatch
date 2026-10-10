@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import { AVAILABLE_EVALUATORS } from "./evaluators.ts";
@@ -8,7 +9,7 @@ const evaluatorWireFieldSchema = z.object({
   optional: z.boolean().optional(),
 });
 
-export const evaluatorWireSchema = z.object({
+const evaluatorWireSchemaDefinition = z.object({
   id: z.string(),
   projectId: z.string(),
   name: z.string(),
@@ -25,19 +26,33 @@ export const evaluatorWireSchema = z.object({
   workflowIcon: z.string().optional(),
   platformUrl: z.string().url(),
 });
+export interface EvaluatorWireSchema extends Named<typeof evaluatorWireSchemaDefinition> {}
+export const evaluatorWireSchema: EvaluatorWireSchema = evaluatorWireSchemaDefinition;
 
-export const evaluatorIdParamsSchema = z.object({
+const evaluatorIdParamsSchemaDefinition = z.object({
   id: z.string().min(1).describe("The evaluator id."),
 });
+export interface EvaluatorIdParamsSchema extends Named<typeof evaluatorIdParamsSchemaDefinition> {}
+export const evaluatorIdParamsSchema: EvaluatorIdParamsSchema = evaluatorIdParamsSchemaDefinition;
 
-export const evaluatorIdOrSlugParamsSchema = z.object({
+const evaluatorIdOrSlugParamsSchemaDefinition = z.object({
   idOrSlug: z.string().min(1).describe("The evaluator id or its project-unique slug."),
 });
+export interface EvaluatorIdOrSlugParamsSchema extends Named<
+  typeof evaluatorIdOrSlugParamsSchemaDefinition
+> {}
+export const evaluatorIdOrSlugParamsSchema: EvaluatorIdOrSlugParamsSchema =
+  evaluatorIdOrSlugParamsSchemaDefinition;
 
-export const archivedEvaluatorResponseSchema = z.object({ success: z.boolean() });
+const archivedEvaluatorResponseSchemaDefinition = z.object({ success: z.boolean() });
+export interface ArchivedEvaluatorResponseSchema extends Named<
+  typeof archivedEvaluatorResponseSchemaDefinition
+> {}
+export const archivedEvaluatorResponseSchema: ArchivedEvaluatorResponseSchema =
+  archivedEvaluatorResponseSchemaDefinition;
 
 /** An evaluator row as the `/api/evaluators` family reads it before it gains its `platformUrl`. */
-export const apiResponseEvaluatorSchema = z.object({
+const apiResponseEvaluatorSchemaDefinition = z.object({
   id: z.string(),
   projectId: z.string(),
   name: z.string(),
@@ -53,12 +68,17 @@ export const apiResponseEvaluatorSchema = z.object({
   workflowName: z.string().optional(),
   workflowIcon: z.string().optional(),
 });
+export interface ApiResponseEvaluatorSchema extends Named<
+  typeof apiResponseEvaluatorSchemaDefinition
+> {}
+export const apiResponseEvaluatorSchema: ApiResponseEvaluatorSchema =
+  apiResponseEvaluatorSchemaDefinition;
 
 export type ApiResponseEvaluator = z.infer<typeof apiResponseEvaluatorSchema>;
 
 const validEvaluatorTypes: readonly string[] = Object.keys(AVAILABLE_EVALUATORS);
 
-export const createEvaluatorInputSchema = z.object({
+const createEvaluatorInputSchemaDefinition = z.object({
   name: z.string().min(1).max(255),
   config: z.record(z.string(), z.unknown()).superRefine((config, ctx) => {
     const evaluatorType = config.evaluatorType;
@@ -87,8 +107,18 @@ export const createEvaluatorInputSchema = z.object({
     }
   }),
 });
+export interface CreateEvaluatorInputSchema extends Named<
+  typeof createEvaluatorInputSchemaDefinition
+> {}
+export const createEvaluatorInputSchema: CreateEvaluatorInputSchema =
+  createEvaluatorInputSchemaDefinition;
 
-export const updateEvaluatorInputSchema = z.object({
+const updateEvaluatorInputSchemaDefinition = z.object({
   name: z.string().min(1).max(255).optional(),
   config: z.record(z.string(), z.unknown()).optional(),
 });
+export interface UpdateEvaluatorInputSchema extends Named<
+  typeof updateEvaluatorInputSchemaDefinition
+> {}
+export const updateEvaluatorInputSchema: UpdateEvaluatorInputSchema =
+  updateEvaluatorInputSchemaDefinition;

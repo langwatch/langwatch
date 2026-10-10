@@ -1,8 +1,9 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import { PULLED_USAGE_COST_BASIS, PULLED_USAGE_COST_STATUS } from "./pulled-usage.events.ts";
 
-export const copilotStudioDataversePullConfigSchema = z.object({
+const copilotStudioDataversePullConfigSchemaDefinition = z.object({
   adapter: z.literal("copilot_studio_dataverse"),
   environmentUrl: z.string().url(),
   botIds: z.array(z.string().uuid()).default([]),
@@ -12,6 +13,11 @@ export const copilotStudioDataversePullConfigSchema = z.object({
   readSeats: z.boolean().default(true),
   readDirectory: z.boolean().default(true),
 });
+export interface CopilotStudioDataversePullConfigSchema extends Named<
+  typeof copilotStudioDataversePullConfigSchemaDefinition
+> {}
+export const copilotStudioDataversePullConfigSchema: CopilotStudioDataversePullConfigSchema =
+  copilotStudioDataversePullConfigSchemaDefinition;
 
 export type CopilotStudioDataversePullConfig = z.infer<
   typeof copilotStudioDataversePullConfigSchema
@@ -28,7 +34,7 @@ const copilotCursorHeldField = z.number().int().nonnegative().nullish();
  * every later field is optional, so older positions still parse; the cost screen reads the
  * cost half through it too.
  */
-export const copilotStudioStoredCursorSchema = z.object({
+const copilotStudioStoredCursorSchemaDefinition = z.object({
   createdon: z.string().datetime({ offset: true }).optional(),
   conversationtranscriptid: z.string().uuid().optional(),
   costPricedThroughDay: copilotCursorDayField,
@@ -40,10 +46,15 @@ export const copilotStudioStoredCursorSchema = z.object({
   directoryReportedThroughDay: copilotCursorDayField,
   directoryHeldSinceMs: copilotCursorHeldField,
 });
+export interface CopilotStudioStoredCursorSchema extends Named<
+  typeof copilotStudioStoredCursorSchemaDefinition
+> {}
+export const copilotStudioStoredCursorSchema: CopilotStudioStoredCursorSchema =
+  copilotStudioStoredCursorSchemaDefinition;
 
 export const DATABRICKS_GENIE_ADAPTER_ID = "databricks_genie" as const;
 
-export const databricksGeniePullConfigSchema = z.object({
+const databricksGeniePullConfigSchemaDefinition = z.object({
   adapter: z.literal(DATABRICKS_GENIE_ADAPTER_ID),
   /** Workspace base URL, e.g. `https://adb-1234567890.4.azuredatabricks.net`. */
   workspaceUrl: z.string().url(),
@@ -64,6 +75,11 @@ export const databricksGeniePullConfigSchema = z.object({
    */
   readPaidGenieBill: z.boolean().default(false),
 });
+export interface DatabricksGeniePullConfigSchema extends Named<
+  typeof databricksGeniePullConfigSchemaDefinition
+> {}
+export const databricksGeniePullConfigSchema: DatabricksGeniePullConfigSchema =
+  databricksGeniePullConfigSchemaDefinition;
 export type DatabricksGeniePullConfig = z.infer<typeof databricksGeniePullConfigSchema>;
 
 const COST_USD_PATTERN = /^[+-]?\d*(?:\.\d*)?(?:[eE][+-]?\d+)?$/;
@@ -82,7 +98,7 @@ const costUsdSchema = z
   })
   .optional();
 
-export const normalizedPullEventSchema = z
+const normalizedPullEventSchemaDefinition = z
   .object({
     source_event_id: z.string(),
     event_timestamp: z.string(),
@@ -100,6 +116,11 @@ export const normalizedPullEventSchema = z
     extra: z.record(z.string(), z.unknown()).optional(),
   })
   .strict();
+export interface NormalizedPullEventSchema extends Named<
+  typeof normalizedPullEventSchemaDefinition
+> {}
+export const normalizedPullEventSchema: NormalizedPullEventSchema =
+  normalizedPullEventSchemaDefinition;
 export type NormalizedPullEvent = z.infer<typeof normalizedPullEventSchema>;
 export type PullResult = {
   events: NormalizedPullEvent[];
@@ -159,7 +180,7 @@ export const ANTHROPIC_ADMIN_ADAPTER_ID = "anthropic_admin" as const;
  * NOT .strict()—the object carries encrypted credentials that validateConfig handles.
  * A strict schema would reject them as unrecognized_keys on every run.
  */
-export const anthropicAdminPullConfigSchema = z.object({
+const anthropicAdminPullConfigSchemaDefinition = z.object({
   adapter: z.literal(ANTHROPIC_ADMIN_ADAPTER_ID),
   /**
    * Which report this source pulls. Deliberately not a set: pulling both
@@ -173,6 +194,11 @@ export const anthropicAdminPullConfigSchema = z.object({
   startingAt: z.string().datetime().optional(),
   schedule: z.string().default("0 * * * *"),
 });
+export interface AnthropicAdminPullConfigSchema extends Named<
+  typeof anthropicAdminPullConfigSchemaDefinition
+> {}
+export const anthropicAdminPullConfigSchema: AnthropicAdminPullConfigSchema =
+  anthropicAdminPullConfigSchemaDefinition;
 export type AnthropicAdminPullConfig = z.infer<typeof anthropicAdminPullConfigSchema>;
 
 export const OPENAI_ADMIN_ADAPTER_ID = "openai_admin" as const;
@@ -181,7 +207,7 @@ export const OPENAI_ADMIN_ADAPTER_ID = "openai_admin" as const;
  * so the composer that writes one and the puller that reads it must agree.
  * Not `.strict()`, for the reason given on that sibling.
  */
-export const openaiAdminPullConfigSchema = z.object({
+const openaiAdminPullConfigSchemaDefinition = z.object({
   adapter: z.literal(OPENAI_ADMIN_ADAPTER_ID),
   /**
    * A single-value enum rather than a bare constant, so a second report could
@@ -193,11 +219,16 @@ export const openaiAdminPullConfigSchema = z.object({
   startingAt: z.string().datetime().optional(),
   schedule: z.string().default("0 * * * *"),
 });
+export interface OpenaiAdminPullConfigSchema extends Named<
+  typeof openaiAdminPullConfigSchemaDefinition
+> {}
+export const openaiAdminPullConfigSchema: OpenaiAdminPullConfigSchema =
+  openaiAdminPullConfigSchemaDefinition;
 export type OpenAiAdminPullConfig = z.infer<typeof openaiAdminPullConfigSchema>;
 
 export const PULLED_USAGE_HINT_KEY = "pulled_usage" as const;
 
-export const pulledUsageHintSchema = z
+const pulledUsageHintSchemaDefinition = z
   .object({
     costBasis: z.enum([
       PULLED_USAGE_COST_BASIS.PROVIDER_REPORTED,
@@ -244,9 +275,11 @@ export const pulledUsageHintSchema = z
       });
     }
   });
+export interface PulledUsageHintSchema extends Named<typeof pulledUsageHintSchemaDefinition> {}
+export const pulledUsageHintSchema: PulledUsageHintSchema = pulledUsageHintSchemaDefinition;
 export type PulledUsageHint = z.infer<typeof pulledUsageHintSchema>;
 
-export const pulledUsageSourceAttributionSchema = z
+const pulledUsageSourceAttributionSchemaDefinition = z
   .object({
     ingestionSourceId: z.string().min(1),
     sourceType: z.string().min(1),
@@ -256,4 +289,9 @@ export const pulledUsageSourceAttributionSchema = z
     createdAt: z.date(),
   })
   .strict();
+export interface PulledUsageSourceAttributionSchema extends Named<
+  typeof pulledUsageSourceAttributionSchemaDefinition
+> {}
+export const pulledUsageSourceAttributionSchema: PulledUsageSourceAttributionSchema =
+  pulledUsageSourceAttributionSchemaDefinition;
 export type PulledUsageSourceAttribution = z.infer<typeof pulledUsageSourceAttributionSchema>;

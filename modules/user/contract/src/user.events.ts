@@ -1,4 +1,5 @@
 import { ledgerActorSchema } from "@langwatch/authorization";
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 /** A user's lifecycle facts, which peers react to from their own side (§9). */
@@ -18,39 +19,59 @@ export const USER_LIFECYCLE_EVENT_VERSION = "2026-10-01" as const;
  * `tenantId` is the user's own id, as identity keys its user facts. `actor` is who made the
  * change; facts recorded before it existed have none.
  */
-export const userLifecycleEventDataSchema = z.object({
+const userLifecycleEventDataSchemaDefinition = z.object({
   tenantId: z.string().min(1),
   userId: z.string().min(1),
   occurredAt: z.number().int().nonnegative(),
   actor: ledgerActorSchema.optional(),
 });
+export interface UserLifecycleEventDataSchema extends Named<
+  typeof userLifecycleEventDataSchemaDefinition
+> {}
+export const userLifecycleEventDataSchema: UserLifecycleEventDataSchema =
+  userLifecycleEventDataSchemaDefinition;
 export type UserLifecycleEventData = z.infer<typeof userLifecycleEventDataSchema>;
 
 /**
  * A registration also names the credential row it opened, so identity can state its
  * identifier against that row. Optional: facts recorded before 2026-10-06 carry none.
  */
-export const userRegisteredEventDataSchema = z.object({
+const userRegisteredEventDataSchemaDefinition = z.object({
   ...userLifecycleEventDataSchema.shape,
   accountId: z.string().min(1).optional(),
   createdAtMs: z.number().int().nonnegative().optional(),
   email: z.string().min(1).optional(),
 });
+export interface UserRegisteredEventDataSchema extends Named<
+  typeof userRegisteredEventDataSchemaDefinition
+> {}
+export const userRegisteredEventDataSchema: UserRegisteredEventDataSchema =
+  userRegisteredEventDataSchemaDefinition;
 export type UserRegisteredEventData = z.infer<typeof userRegisteredEventDataSchema>;
 
 /** `backfilled` marks a fact the seed step recorded for an account older than the fact. */
-export const userCreatedEventDataSchema = z.object({
+const userCreatedEventDataSchemaDefinition = z.object({
   ...userLifecycleEventDataSchema.shape,
   backfilled: z.boolean().optional(),
 });
+export interface UserCreatedEventDataSchema extends Named<
+  typeof userCreatedEventDataSchemaDefinition
+> {}
+export const userCreatedEventDataSchema: UserCreatedEventDataSchema =
+  userCreatedEventDataSchemaDefinition;
 export type UserCreatedEventData = z.infer<typeof userCreatedEventDataSchema>;
 
 /**
  * `organizationIds` names the organisations whose seat the erasure took; sole-owned ones went
  * with it and are not named. Optional: facts recorded before 2026-10-09 carry none.
  */
-export const userErasedEventDataSchema = z.object({
+const userErasedEventDataSchemaDefinition = z.object({
   ...userLifecycleEventDataSchema.shape,
   organizationIds: z.array(z.string().min(1)).optional(),
 });
+export interface UserErasedEventDataSchema extends Named<
+  typeof userErasedEventDataSchemaDefinition
+> {}
+export const userErasedEventDataSchema: UserErasedEventDataSchema =
+  userErasedEventDataSchemaDefinition;
 export type UserErasedEventData = z.infer<typeof userErasedEventDataSchema>;

@@ -4,7 +4,7 @@
  * handler to each and repeats nothing.
  */
 
-import { defineTrpcContract } from "@langwatch/module";
+import { defineTrpcContract, type Named } from "@langwatch/module";
 import { traceFilterInputSchema } from "@langwatch/trace-contract";
 import { z } from "zod";
 
@@ -18,7 +18,9 @@ import {
 } from "./topic.ts";
 
 /** The project every topic read is scoped to. */
-export const topicProjectScopeSchema = z.object({ projectId: z.string() });
+const topicProjectScopeSchemaDefinition = z.object({ projectId: z.string() });
+export interface TopicProjectScopeSchema extends Named<typeof topicProjectScopeSchemaDefinition> {}
+export const topicProjectScopeSchema: TopicProjectScopeSchema = topicProjectScopeSchemaDefinition;
 
 export const topicTrpc = defineTrpcContract("topics")
   .query("getAll")

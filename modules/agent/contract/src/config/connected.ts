@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 /** SDK-declared configuration; runtime presence is stored separately (ADR-128). */
 import { z } from "zod";
 
@@ -6,7 +7,7 @@ import { baseAgentConfigSchema } from "./code.ts";
 const connectedParameterValueSchema = z.union([z.string(), z.number(), z.boolean()]);
 
 /** What a connected function declares about one of its parameters. */
-export const connectedParameterDefinitionSchema = z
+const connectedParameterDefinitionSchemaDefinition = z
   .object({
     name: z.string().min(1),
     description: z.string().optional(),
@@ -17,8 +18,13 @@ export const connectedParameterDefinitionSchema = z
     required: z.boolean().optional(),
   })
   .strict();
+export interface ConnectedParameterDefinitionSchema extends Named<
+  typeof connectedParameterDefinitionSchemaDefinition
+> {}
+export const connectedParameterDefinitionSchema: ConnectedParameterDefinitionSchema =
+  connectedParameterDefinitionSchemaDefinition;
 
-export const connectedAgentConfigSchema = z.object({
+const connectedAgentConfigSchemaDefinition = z.object({
   ...baseAgentConfigSchema.omit({ description: true }).shape,
   parameters: z.array(connectedParameterDefinitionSchema).default([]),
   /** Per-call budget in milliseconds, capped by the platform. */
@@ -33,5 +39,10 @@ export const connectedAgentConfigSchema = z.object({
     language: z.string(),
   }),
 });
+export interface ConnectedAgentConfigSchema extends Named<
+  typeof connectedAgentConfigSchemaDefinition
+> {}
+export const connectedAgentConfigSchema: ConnectedAgentConfigSchema =
+  connectedAgentConfigSchemaDefinition;
 
 export type ConnectedAgentConfig = z.infer<typeof connectedAgentConfigSchema>;

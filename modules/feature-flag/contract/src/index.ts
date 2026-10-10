@@ -34,6 +34,9 @@ export {
   parseRules,
   readNeedsOrganizationAge,
   resolveEffectiveForListing,
+  type FeatureFlagRuleSchema,
+  type FeatureFlagRulesSchema,
+  type FeatureFlagRulesWriteSchema,
 } from "./feature-flag-rules.ts";
 export type {
   AuthenticatedFeatureFlagTargetInput,
@@ -64,6 +67,8 @@ export {
   isExperimentVisibleToTarget,
   experimentTenantScopeSchema,
   resolveExperimentDecision,
+  type ExperimentCatalogueEntrySchema,
+  type ExperimentTenantScopeSchema,
 } from "./feature-flag-experiment.ts";
 export type { FeatureFlagRegistry, RegisteredExperiment } from "./feature-flag-registry.ts";
 export { createFeatureFlagRegistry, FEATURE_FLAG_REGISTRY } from "./feature-flag-registry.ts";
@@ -83,6 +88,9 @@ export {
   projectIdForTarget,
   ruleContextForTarget,
   SYSTEM_DISTINCT_ID,
+  type AuthenticatedFeatureFlagTargetInputSchema,
+  type AnonymousFeatureFlagTargetSchema,
+  type FeatureFlagTargetInputSchema,
 } from "./feature-flag-target.ts";
 export type {
   ExperimentEnrolmentForCaller,
@@ -107,6 +115,14 @@ export {
   operatorFeatureFlagFamilySchema,
   operatorFeatureFlagSchema,
   organizationFeatureFlagsInputSchema,
+  type ExperimentEnrolmentInputSchema,
+  type ExperimentTenantPolicyInputSchema,
+  type FeatureFlagReadInputSchema,
+  type FeatureFlagTargetRequestSchema,
+  type OperatorFeatureFlagCatalogueSchema,
+  type OperatorFeatureFlagFamilySchema,
+  type OperatorFeatureFlagSchema,
+  type OrganizationFeatureFlagsInputSchema,
 } from "./feature-flag.schemas.ts";
 export {
   enabledByOrganizationOutputSchema,
@@ -115,11 +131,17 @@ export {
   experimentWriteOutputSchema,
   featureFlagTrpc,
   resolvedFlagsOutputSchema,
+  type EnabledOutputSchema,
+  type ExperimentsOutputSchema,
+  type EnabledByOrganizationOutputSchema,
+  type ExperimentWriteOutputSchema,
+  type ResolvedFlagsOutputSchema,
 } from "./feature-flag.trpc.ts";
 export type { FrontendFeatureFlag } from "./frontend-feature-flags.ts";
 export {
   frontendFeatureFlagMapSchema,
   frontendFeatureFlagSchema,
+  type FrontendFeatureFlagMapSchema,
 } from "./frontend-feature-flags.ts";
 export type {
   PublicAnonymousFeatureFlag,
@@ -128,6 +150,7 @@ export type {
 export {
   PUBLIC_ANONYMOUS_FEATURE_FLAGS,
   publicAnonymousFlagMapSchema,
+  type PublicAnonymousFlagMapSchema,
 } from "./frontend-feature-flags.ts";
 export { FRONTEND_FEATURE_FLAGS, FrontendFlags } from "./frontend-feature-flags.ts";
 export { VOICE_AGENTS_DISABLED_MESSAGE, VOICE_AGENTS_FLAG_KEY } from "./voice-agents.ts";

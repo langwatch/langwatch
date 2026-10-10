@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import type { Instant } from "@langwatch/time";
 import { z } from "zod";
 
@@ -9,12 +10,17 @@ export const ORGANIZATION_KSUID_RESOURCE = "organization";
 export const organizationIntentSchema = z.enum(["AGENT_GOVERNANCE", "LLM_OPS"]);
 export type OrganizationIntent = z.infer<typeof organizationIntentSchema>;
 
-export const getOrganizationSettingsInputSchema = z
+const getOrganizationSettingsInputSchemaDefinition = z
   .object({ organizationId: organizationIdSchema })
   .strict();
+export interface GetOrganizationSettingsInputSchema extends Named<
+  typeof getOrganizationSettingsInputSchemaDefinition
+> {}
+export const getOrganizationSettingsInputSchema: GetOrganizationSettingsInputSchema =
+  getOrganizationSettingsInputSchemaDefinition;
 export type GetOrganizationSettingsInput = z.infer<typeof getOrganizationSettingsInputSchema>;
 
-export const updateOrganizationSettingsInputSchema = z
+const updateOrganizationSettingsInputSchemaDefinition = z
   .object({
     organizationId: organizationIdSchema,
     name: z.string().optional(),
@@ -28,9 +34,14 @@ export const updateOrganizationSettingsInputSchema = z
     s3Bucket: z.string().nullable().optional(),
   })
   .strict();
+export interface UpdateOrganizationSettingsInputSchema extends Named<
+  typeof updateOrganizationSettingsInputSchemaDefinition
+> {}
+export const updateOrganizationSettingsInputSchema: UpdateOrganizationSettingsInputSchema =
+  updateOrganizationSettingsInputSchemaDefinition;
 export type UpdateOrganizationSettingsInput = z.infer<typeof updateOrganizationSettingsInputSchema>;
 
-export const organizationSettingsSchema = z
+const organizationSettingsSchemaDefinition = z
   .object({
     id: organizationIdSchema,
     name: z.string(),
@@ -46,11 +57,21 @@ export const organizationSettingsSchema = z
     updatedAt: z.date(),
   })
   .strict();
+export interface OrganizationSettingsSchema extends Named<
+  typeof organizationSettingsSchemaDefinition
+> {}
+export const organizationSettingsSchema: OrganizationSettingsSchema =
+  organizationSettingsSchemaDefinition;
 export type OrganizationSettings = z.infer<typeof organizationSettingsSchema>;
 
-export const updateOrganizationSettingsResultSchema = z
+const updateOrganizationSettingsResultSchemaDefinition = z
   .object({ traceShareRevocationRequired: z.boolean() })
   .strict();
+export interface UpdateOrganizationSettingsResultSchema extends Named<
+  typeof updateOrganizationSettingsResultSchemaDefinition
+> {}
+export const updateOrganizationSettingsResultSchema: UpdateOrganizationSettingsResultSchema =
+  updateOrganizationSettingsResultSchemaDefinition;
 export type UpdateOrganizationSettingsResult = z.infer<
   typeof updateOrganizationSettingsResultSchema
 >;
@@ -60,39 +81,64 @@ export type UpdateOrganizationSettingsResult = z.infer<
  * and an ARCHIVED team's organization the same as a live one's — usage
  * metering and personal-workspace reads need a tenant regardless.
  */
-export const getOrganizationIdByTeamIdInputSchema = z
+const getOrganizationIdByTeamIdInputSchemaDefinition = z
   .object({ teamId: z.string().min(1) })
   .strict();
+export interface GetOrganizationIdByTeamIdInputSchema extends Named<
+  typeof getOrganizationIdByTeamIdInputSchemaDefinition
+> {}
+export const getOrganizationIdByTeamIdInputSchema: GetOrganizationIdByTeamIdInputSchema =
+  getOrganizationIdByTeamIdInputSchemaDefinition;
 export type GetOrganizationIdByTeamIdInput = z.infer<typeof getOrganizationIdByTeamIdInputSchema>;
 
-export const getOrganizationMembersInputSchema = z
+const getOrganizationMembersInputSchemaDefinition = z
   .object({
     organizationId: organizationIdSchema,
     userIds: z.array(z.string().min(1)),
   })
   .strict();
+export interface GetOrganizationMembersInputSchema extends Named<
+  typeof getOrganizationMembersInputSchemaDefinition
+> {}
+export const getOrganizationMembersInputSchema: GetOrganizationMembersInputSchema =
+  getOrganizationMembersInputSchemaDefinition;
 export type GetOrganizationMembersInput = z.infer<typeof getOrganizationMembersInputSchema>;
 
-export const getOldestTeamInputSchema = z.object({
+const getOldestTeamInputSchemaDefinition = z.object({
   organizationId: organizationIdSchema,
 });
+export interface GetOldestTeamInputSchema extends Named<
+  typeof getOldestTeamInputSchemaDefinition
+> {}
+export const getOldestTeamInputSchema: GetOldestTeamInputSchema =
+  getOldestTeamInputSchemaDefinition;
 
 export type GetOldestTeamInput = z.infer<typeof getOldestTeamInputSchema>;
 
-export const getOrganizationBillingProfileInputSchema = z
+const getOrganizationBillingProfileInputSchemaDefinition = z
   .object({ organizationId: organizationIdSchema })
   .strict();
+export interface GetOrganizationBillingProfileInputSchema extends Named<
+  typeof getOrganizationBillingProfileInputSchemaDefinition
+> {}
+export const getOrganizationBillingProfileInputSchema: GetOrganizationBillingProfileInputSchema =
+  getOrganizationBillingProfileInputSchemaDefinition;
 export type GetOrganizationBillingProfileInput = z.infer<
   typeof getOrganizationBillingProfileInputSchema
 >;
 
-export const organizationBillingProfileSchema = z
+const organizationBillingProfileSchemaDefinition = z
   .object({
     id: organizationIdSchema,
     name: z.string(),
     billingCustomerId: z.string().min(1).nullable(),
   })
   .strict();
+export interface OrganizationBillingProfileSchema extends Named<
+  typeof organizationBillingProfileSchemaDefinition
+> {}
+export const organizationBillingProfileSchema: OrganizationBillingProfileSchema =
+  organizationBillingProfileSchemaDefinition;
 export type OrganizationBillingProfile = z.infer<typeof organizationBillingProfileSchema>;
 
 /** Audit log row with resolved actor and project; nullable userId for system actors. */
@@ -135,7 +181,12 @@ export const auditChannelSchema = z.enum(["app", "api"]);
 export type AuditChannel = z.infer<typeof auditChannelSchema>;
 
 /** What the tRPC door writes into an impersonated audit row's metadata. */
-export const auditImpersonationMetadataSchema = z.object({ impersonatorId: z.string().min(1) });
+const auditImpersonationMetadataSchemaDefinition = z.object({ impersonatorId: z.string().min(1) });
+export interface AuditImpersonationMetadataSchema extends Named<
+  typeof auditImpersonationMetadataSchemaDefinition
+> {}
+export const auditImpersonationMetadataSchema: AuditImpersonationMetadataSchema =
+  auditImpersonationMetadataSchemaDefinition;
 
 /**
  * How colleagues on a matching domain get into an organization; identity's join ledger
@@ -143,13 +194,18 @@ export const auditImpersonationMetadataSchema = z.object({ impersonatorId: z.str
  * `modules/identity/contract/src/features/join-request/join-matching.ts`.
  */
 
-export const organizationJoinSettingSchema = z
+const organizationJoinSettingSchemaDefinition = z
   .object({
     domainJoin: z.enum(["off", "request", "auto"]),
     joinDomains: z.array(z.string()),
     joinerRole: z.enum(["MEMBER", "DEVELOPER"]),
   })
   .strict();
+export interface OrganizationJoinSettingSchema extends Named<
+  typeof organizationJoinSettingSchemaDefinition
+> {}
+export const organizationJoinSettingSchema: OrganizationJoinSettingSchema =
+  organizationJoinSettingSchemaDefinition;
 export type OrganizationJoinSetting = z.infer<typeof organizationJoinSettingSchema>;
 
 /** Where a join request was made (ADR-171 v6), written on a Developer admission's audit row. */
@@ -162,7 +218,7 @@ export type OrganizationJoinOrigin = z.infer<typeof organizationJoinOriginSchema
  * specs/identity/org-account-lockout.feature, specs/identity/org-session-lifetime.feature
  */
 
-export const signInSecurityPolicySchema = z.object({
+const signInSecurityPolicySchemaDefinition = z.object({
   /** Consecutive failures before a lock. 0 = never lock. */
   lockoutAfterFailedAttempts: z.number().int().min(0).max(20),
   /** How long a lock lasts, in minutes. */
@@ -172,6 +228,11 @@ export const signInSecurityPolicySchema = z.object({
   /** Minutes from sign-in after which a session ends regardless. 0 = no ceiling. */
   sessionMaxLifetimeMinutes: z.number().int().min(0).max(10080),
 });
+export interface SignInSecurityPolicySchema extends Named<
+  typeof signInSecurityPolicySchemaDefinition
+> {}
+export const signInSecurityPolicySchema: SignInSecurityPolicySchema =
+  signInSecurityPolicySchemaDefinition;
 export type SignInSecurityPolicy = z.infer<typeof signInSecurityPolicySchema>;
 
 /**

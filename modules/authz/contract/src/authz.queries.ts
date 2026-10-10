@@ -3,6 +3,7 @@ import {
   authzPermissionSchema,
   organizationRoleSchema,
 } from "@langwatch/authorization";
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import {
@@ -15,76 +16,117 @@ import {
   teamUserRoleSchema,
 } from "./authz.ts";
 
-export const authzCheckInputSchema = z
+const authzCheckInputSchemaDefinition = z
   .object({
     principal: authzPrincipalRefSchema,
     permission: authzPermissionSchema,
     scope: authzScopeRefSchema,
   })
   .strict();
+export interface AuthzCheckInputSchema extends Named<typeof authzCheckInputSchemaDefinition> {}
+export const authzCheckInputSchema: AuthzCheckInputSchema = authzCheckInputSchemaDefinition;
 export type AuthzCheckInput = z.infer<typeof authzCheckInputSchema>;
 /** `can` alone also answers at the platform, from PLATFORM-tier grants only. */
-export const authzCanInputSchema = z
+const authzCanInputSchemaDefinition = z
   .object({ ...authzCheckInputSchema.shape, scope: authzCanScopeRefSchema })
   .strict();
+export interface AuthzCanInputSchema extends Named<typeof authzCanInputSchemaDefinition> {}
+export const authzCanInputSchema: AuthzCanInputSchema = authzCanInputSchemaDefinition;
 export type AuthzCanInput = z.infer<typeof authzCanInputSchema>;
 export const authzCheckOutputSchema = authzDecisionSchema;
 export type AuthzCheckOutput = z.infer<typeof authzCheckOutputSchema>;
 export const authzCanOutputSchema = z.boolean();
 export type AuthzCanOutput = z.infer<typeof authzCanOutputSchema>;
 
-export const authzCheckDetailedOutputSchema = z
+const authzCheckDetailedOutputSchemaDefinition = z
   .object({ decision: authzDecisionSchema, grants: collectedGrantsSchema })
   .strict();
+export interface AuthzCheckDetailedOutputSchema extends Named<
+  typeof authzCheckDetailedOutputSchemaDefinition
+> {}
+export const authzCheckDetailedOutputSchema: AuthzCheckDetailedOutputSchema =
+  authzCheckDetailedOutputSchemaDefinition;
 export type AuthzCheckDetailedOutput = z.infer<typeof authzCheckDetailedOutputSchema>;
 
-export const authzEffectivePermissionsInputSchema = z
+const authzEffectivePermissionsInputSchemaDefinition = z
   .object({ principal: authzPrincipalRefSchema, scope: authzScopeRefSchema })
   .strict();
+export interface AuthzEffectivePermissionsInputSchema extends Named<
+  typeof authzEffectivePermissionsInputSchemaDefinition
+> {}
+export const authzEffectivePermissionsInputSchema: AuthzEffectivePermissionsInputSchema =
+  authzEffectivePermissionsInputSchemaDefinition;
 export type AuthzEffectivePermissionsInput = z.infer<typeof authzEffectivePermissionsInputSchema>;
-export const authzEffectivePermissionsOutputSchema = z.array(authzPermissionSchema);
+const authzEffectivePermissionsOutputSchemaDefinition = z.array(authzPermissionSchema);
+export interface AuthzEffectivePermissionsOutputSchema extends Named<
+  typeof authzEffectivePermissionsOutputSchemaDefinition
+> {}
+export const authzEffectivePermissionsOutputSchema: AuthzEffectivePermissionsOutputSchema =
+  authzEffectivePermissionsOutputSchemaDefinition;
 export type AuthzEffectivePermissionsOutput = z.infer<typeof authzEffectivePermissionsOutputSchema>;
 
-export const authzScopeIdsSchema = z
+const authzScopeIdsSchemaDefinition = z
   .object({
     projectId: z.string().optional(),
     teamId: z.string().optional(),
     organizationId: z.string().optional(),
   })
   .strict();
+export interface AuthzScopeIdsSchema extends Named<typeof authzScopeIdsSchemaDefinition> {}
+export const authzScopeIdsSchema: AuthzScopeIdsSchema = authzScopeIdsSchemaDefinition;
 export type AuthzScopeIds = z.infer<typeof authzScopeIdsSchema>;
 
 export const authzResolveScopeInputSchema = authzScopeIdsSchema;
 export type AuthzResolveScopeInput = AuthzScopeIds;
-export const authzResolveScopeOutputSchema = authzScopeRefSchema.nullable();
+const authzResolveScopeOutputSchemaDefinition = authzScopeRefSchema.nullable();
+export interface AuthzResolveScopeOutputSchema extends Named<
+  typeof authzResolveScopeOutputSchemaDefinition
+> {}
+export const authzResolveScopeOutputSchema: AuthzResolveScopeOutputSchema =
+  authzResolveScopeOutputSchemaDefinition;
 export type AuthzResolveScopeOutput = z.infer<typeof authzResolveScopeOutputSchema>;
 
-export const authzCheckByIdsInputSchema = authzScopeIdsSchema.safeExtend({
+const authzCheckByIdsInputSchemaDefinition = authzScopeIdsSchema.safeExtend({
   principal: authzPrincipalRefSchema,
   permission: authzPermissionSchema,
   ceiling: z.boolean().optional(),
 });
+export interface AuthzCheckByIdsInputSchema extends Named<
+  typeof authzCheckByIdsInputSchemaDefinition
+> {}
+export const authzCheckByIdsInputSchema: AuthzCheckByIdsInputSchema =
+  authzCheckByIdsInputSchemaDefinition;
 export type AuthzCheckByIdsInput = z.infer<typeof authzCheckByIdsInputSchema>;
 
-export const authzCheckByIdsOutputSchema = z
+const authzCheckByIdsOutputSchemaDefinition = z
   .object({
     allowed: z.boolean(),
     organizationRole: organizationRoleSchema.nullable(),
     denialReason: authzDenialReasonSchema.optional(),
   })
   .strict();
+export interface AuthzCheckByIdsOutputSchema extends Named<
+  typeof authzCheckByIdsOutputSchemaDefinition
+> {}
+export const authzCheckByIdsOutputSchema: AuthzCheckByIdsOutputSchema =
+  authzCheckByIdsOutputSchemaDefinition;
 export type AuthzCheckByIdsOutput = z.infer<typeof authzCheckByIdsOutputSchema>;
 
-export const authzCanAnyByIdsInputSchema = z
+const authzCanAnyByIdsInputSchemaDefinition = z
   .object({
     principal: authzPrincipalRefSchema,
     permissions: z.array(authzPermissionSchema).readonly(),
     projectId: z.string(),
   })
   .strict();
+export interface AuthzCanAnyByIdsInputSchema extends Named<
+  typeof authzCanAnyByIdsInputSchemaDefinition
+> {}
+export const authzCanAnyByIdsInputSchema: AuthzCanAnyByIdsInputSchema =
+  authzCanAnyByIdsInputSchemaDefinition;
 export type AuthzCanAnyByIdsInput = z.infer<typeof authzCanAnyByIdsInputSchema>;
 
-export const authzCanAnyByIdsOutputSchema = z
+const authzCanAnyByIdsOutputSchemaDefinition = z
   .object({
     allowed: z.boolean(),
     matchedPermission: authzPermissionSchema.optional(),
@@ -92,9 +134,14 @@ export const authzCanAnyByIdsOutputSchema = z
     denialReason: authzDenialReasonSchema.optional(),
   })
   .strict();
+export interface AuthzCanAnyByIdsOutputSchema extends Named<
+  typeof authzCanAnyByIdsOutputSchemaDefinition
+> {}
+export const authzCanAnyByIdsOutputSchema: AuthzCanAnyByIdsOutputSchema =
+  authzCanAnyByIdsOutputSchemaDefinition;
 export type AuthzCanAnyByIdsOutput = z.infer<typeof authzCanAnyByIdsOutputSchema>;
 
-export const authzCanBatchByIdsInputSchema = z
+const authzCanBatchByIdsInputSchemaDefinition = z
   .object({
     principal: authzPrincipalRefSchema,
     permission: authzPermissionSchema,
@@ -105,18 +152,28 @@ export const authzCanBatchByIdsInputSchema = z
       .readonly(),
   })
   .strict();
+export interface AuthzCanBatchByIdsInputSchema extends Named<
+  typeof authzCanBatchByIdsInputSchemaDefinition
+> {}
+export const authzCanBatchByIdsInputSchema: AuthzCanBatchByIdsInputSchema =
+  authzCanBatchByIdsInputSchemaDefinition;
 export type AuthzCanBatchByIdsInput = z.infer<typeof authzCanBatchByIdsInputSchema>;
 
-export const authzCanBatchByIdsOutputSchema = z
+const authzCanBatchByIdsOutputSchemaDefinition = z
   .object({
     teams: z.map(z.string(), z.boolean()),
     projects: z.map(z.string(), z.boolean()),
     organizationRole: organizationRoleSchema.nullable(),
   })
   .strict();
+export interface AuthzCanBatchByIdsOutputSchema extends Named<
+  typeof authzCanBatchByIdsOutputSchemaDefinition
+> {}
+export const authzCanBatchByIdsOutputSchema: AuthzCanBatchByIdsOutputSchema =
+  authzCanBatchByIdsOutputSchemaDefinition;
 export type AuthzCanBatchByIdsOutput = z.infer<typeof authzCanBatchByIdsOutputSchema>;
 
-export const authzCanBatchPermissionsByIdsInputSchema = z
+const authzCanBatchPermissionsByIdsInputSchemaDefinition = z
   .object({
     principal: authzPrincipalRefSchema,
     permissions: z.array(authzPermissionSchema).readonly(),
@@ -127,11 +184,16 @@ export const authzCanBatchPermissionsByIdsInputSchema = z
       .readonly(),
   })
   .strict();
+export interface AuthzCanBatchPermissionsByIdsInputSchema extends Named<
+  typeof authzCanBatchPermissionsByIdsInputSchemaDefinition
+> {}
+export const authzCanBatchPermissionsByIdsInputSchema: AuthzCanBatchPermissionsByIdsInputSchema =
+  authzCanBatchPermissionsByIdsInputSchemaDefinition;
 export type AuthzCanBatchPermissionsByIdsInput = z.infer<
   typeof authzCanBatchPermissionsByIdsInputSchema
 >;
 
-export const authzCanBatchPermissionsByIdsOutputSchema = z
+const authzCanBatchPermissionsByIdsOutputSchemaDefinition = z
   .object({
     byPermission: z.map(
       authzPermissionSchema,
@@ -143,16 +205,33 @@ export const authzCanBatchPermissionsByIdsOutputSchema = z
     organizationRole: organizationRoleSchema.nullable(),
   })
   .strict();
+export interface AuthzCanBatchPermissionsByIdsOutputSchema extends Named<
+  typeof authzCanBatchPermissionsByIdsOutputSchemaDefinition
+> {}
+export const authzCanBatchPermissionsByIdsOutputSchema: AuthzCanBatchPermissionsByIdsOutputSchema =
+  authzCanBatchPermissionsByIdsOutputSchemaDefinition;
 export type AuthzCanBatchPermissionsByIdsOutput = z.infer<
   typeof authzCanBatchPermissionsByIdsOutputSchema
 >;
 
-export const authzExplainDecisionInputSchema = z.object({ decision: authzDecisionSchema }).strict();
+const authzExplainDecisionInputSchemaDefinition = z
+  .object({ decision: authzDecisionSchema })
+  .strict();
+export interface AuthzExplainDecisionInputSchema extends Named<
+  typeof authzExplainDecisionInputSchemaDefinition
+> {}
+export const authzExplainDecisionInputSchema: AuthzExplainDecisionInputSchema =
+  authzExplainDecisionInputSchemaDefinition;
 export type AuthzExplainDecisionInput = z.infer<typeof authzExplainDecisionInputSchema>;
-export const authzExplainDecisionOutputSchema = z.array(z.string());
+const authzExplainDecisionOutputSchemaDefinition = z.array(z.string());
+export interface AuthzExplainDecisionOutputSchema extends Named<
+  typeof authzExplainDecisionOutputSchemaDefinition
+> {}
+export const authzExplainDecisionOutputSchema: AuthzExplainDecisionOutputSchema =
+  authzExplainDecisionOutputSchemaDefinition;
 export type AuthzExplainDecisionOutput = z.infer<typeof authzExplainDecisionOutputSchema>;
 
-export const authzPermissionByIdsInputSchema = z
+const authzPermissionByIdsInputSchemaDefinition = z
   .object({
     userId: z.string(),
     permission: authzPermissionSchema,
@@ -165,27 +244,42 @@ export const authzPermissionByIdsInputSchema = z
     (value) => [value.projectId, value.teamId, value.organizationId].filter(Boolean).length === 1,
     { message: "exactly one scope id is required" },
   );
+export interface AuthzPermissionByIdsInputSchema extends Named<
+  typeof authzPermissionByIdsInputSchemaDefinition
+> {}
+export const authzPermissionByIdsInputSchema: AuthzPermissionByIdsInputSchema =
+  authzPermissionByIdsInputSchemaDefinition;
 export type AuthzPermissionByIdsInput = z.infer<typeof authzPermissionByIdsInputSchema>;
 
-export const authzRequireProjectPermissionInputSchema = z
+const authzRequireProjectPermissionInputSchemaDefinition = z
   .object({
     userId: z.string(),
     projectId: z.string(),
     permission: authzPermissionSchema,
   })
   .strict();
+export interface AuthzRequireProjectPermissionInputSchema extends Named<
+  typeof authzRequireProjectPermissionInputSchemaDefinition
+> {}
+export const authzRequireProjectPermissionInputSchema: AuthzRequireProjectPermissionInputSchema =
+  authzRequireProjectPermissionInputSchemaDefinition;
 export type AuthzRequireProjectPermissionInput = z.infer<
   typeof authzRequireProjectPermissionInputSchema
 >;
 
-export const apiKeyPermissionScopeSchema = z.discriminatedUnion("type", [
+const apiKeyPermissionScopeSchemaDefinition = z.discriminatedUnion("type", [
   z.object({ type: z.literal("org"), id: z.string() }).strict(),
   z.object({ type: z.literal("team"), id: z.string() }).strict(),
   z.object({ type: z.literal("project"), id: z.string(), teamId: z.string() }).strict(),
 ]);
+export interface ApiKeyPermissionScopeSchema extends Named<
+  typeof apiKeyPermissionScopeSchemaDefinition
+> {}
+export const apiKeyPermissionScopeSchema: ApiKeyPermissionScopeSchema =
+  apiKeyPermissionScopeSchemaDefinition;
 export type ApiKeyPermissionScope = z.infer<typeof apiKeyPermissionScopeSchema>;
 
-export const apiKeyPermissionCheckSchema = z
+const apiKeyPermissionCheckSchemaDefinition = z
   .object({
     apiKeyId: z.string(),
     userId: z.string().nullable(),
@@ -194,9 +288,14 @@ export const apiKeyPermissionCheckSchema = z
     permission: authzPermissionSchema,
   })
   .strict();
+export interface ApiKeyPermissionCheckSchema extends Named<
+  typeof apiKeyPermissionCheckSchemaDefinition
+> {}
+export const apiKeyPermissionCheckSchema: ApiKeyPermissionCheckSchema =
+  apiKeyPermissionCheckSchemaDefinition;
 export type ApiKeyPermissionCheck = z.infer<typeof apiKeyPermissionCheckSchema>;
 
-export const authzGetApiKeyProjectDecisionInputSchema = z
+const authzGetApiKeyProjectDecisionInputSchemaDefinition = z
   .object({
     apiKeyId: z.string(),
     userId: z.string().nullable(),
@@ -205,28 +304,40 @@ export const authzGetApiKeyProjectDecisionInputSchema = z
     permission: authzPermissionSchema,
   })
   .strict();
+export interface AuthzGetApiKeyProjectDecisionInputSchema extends Named<
+  typeof authzGetApiKeyProjectDecisionInputSchemaDefinition
+> {}
+export const authzGetApiKeyProjectDecisionInputSchema: AuthzGetApiKeyProjectDecisionInputSchema =
+  authzGetApiKeyProjectDecisionInputSchemaDefinition;
 export type AuthzGetApiKeyProjectDecisionInput = z.infer<
   typeof authzGetApiKeyProjectDecisionInputSchema
 >;
 
-export const authzProjectScopeSchema = z
+const authzProjectScopeSchemaDefinition = z
   .object({
     projectId: z.string(),
     teamId: z.string(),
     organizationId: z.string(),
   })
   .strict();
+export interface AuthzProjectScopeSchema extends Named<typeof authzProjectScopeSchemaDefinition> {}
+export const authzProjectScopeSchema: AuthzProjectScopeSchema = authzProjectScopeSchemaDefinition;
 export type AuthzProjectScope = z.infer<typeof authzProjectScopeSchema>;
 
-export const apiKeyProjectDecisionSchema = z.discriminatedUnion("outcome", [
+const apiKeyProjectDecisionSchemaDefinition = z.discriminatedUnion("outcome", [
   z.object({ outcome: z.literal("project_not_found") }).strict(),
   z.object({ outcome: z.literal("denied") }).strict(),
   z.object({ outcome: z.literal("allowed"), scope: authzProjectScopeSchema }).strict(),
 ]);
+export interface ApiKeyProjectDecisionSchema extends Named<
+  typeof apiKeyProjectDecisionSchemaDefinition
+> {}
+export const apiKeyProjectDecisionSchema: ApiKeyProjectDecisionSchema =
+  apiKeyProjectDecisionSchemaDefinition;
 export type ApiKeyProjectDecision = z.infer<typeof apiKeyProjectDecisionSchema>;
 
 const nullableTextSchema = z.string().nullable();
-export const authzAccessUserSchema = z
+const authzAccessUserSchemaDefinition = z
   .object({
     id: z.string(),
     name: nullableTextSchema,
@@ -234,21 +345,29 @@ export const authzAccessUserSchema = z
     image: nullableTextSchema,
   })
   .passthrough();
+export interface AuthzAccessUserSchema extends Named<typeof authzAccessUserSchemaDefinition> {}
+export const authzAccessUserSchema: AuthzAccessUserSchema = authzAccessUserSchemaDefinition;
 export type AuthzAccessUser = z.infer<typeof authzAccessUserSchema>;
 
-export const authzAccessGroupSchema = z
+const authzAccessGroupSchemaDefinition = z
   .object({
     id: z.string(),
     name: z.string(),
     scimSource: nullableTextSchema,
   })
   .passthrough();
+export interface AuthzAccessGroupSchema extends Named<typeof authzAccessGroupSchemaDefinition> {}
+export const authzAccessGroupSchema: AuthzAccessGroupSchema = authzAccessGroupSchemaDefinition;
 export type AuthzAccessGroup = z.infer<typeof authzAccessGroupSchema>;
 
-export const authzAccessApiKeySchema = z.object({ id: z.string(), name: z.string() }).passthrough();
+const authzAccessApiKeySchemaDefinition = z
+  .object({ id: z.string(), name: z.string() })
+  .passthrough();
+export interface AuthzAccessApiKeySchema extends Named<typeof authzAccessApiKeySchemaDefinition> {}
+export const authzAccessApiKeySchema: AuthzAccessApiKeySchema = authzAccessApiKeySchemaDefinition;
 export type AuthzAccessApiKey = z.infer<typeof authzAccessApiKeySchema>;
 
-export const authzCustomRoleSchema = z
+const authzCustomRoleSchemaDefinition = z
   .object({
     id: z.string(),
     name: z.string(),
@@ -259,9 +378,11 @@ export const authzCustomRoleSchema = z
     updatedAt: z.date(),
   })
   .passthrough();
+export interface AuthzCustomRoleSchema extends Named<typeof authzCustomRoleSchemaDefinition> {}
+export const authzCustomRoleSchema: AuthzCustomRoleSchema = authzCustomRoleSchemaDefinition;
 export type AuthzCustomRole = z.infer<typeof authzCustomRoleSchema>;
 
-export const authzAccessBindingSchema = z
+const authzAccessBindingSchemaDefinition = z
   .object({
     id: z.string(),
     organizationId: z.string(),
@@ -280,9 +401,14 @@ export const authzAccessBindingSchema = z
     customRole: authzCustomRoleSchema.nullable(),
   })
   .strict();
+export interface AuthzAccessBindingSchema extends Named<
+  typeof authzAccessBindingSchemaDefinition
+> {}
+export const authzAccessBindingSchema: AuthzAccessBindingSchema =
+  authzAccessBindingSchemaDefinition;
 export type AuthzAccessBinding = z.infer<typeof authzAccessBindingSchema>;
 
-export const authzTeamMemberBindingSchema = z
+const authzTeamMemberBindingSchemaDefinition = z
   .object({
     userId: z.string(),
     role: teamUserRoleSchema,
@@ -293,9 +419,14 @@ export const authzTeamMemberBindingSchema = z
     customRole: authzCustomRoleSchema.nullable(),
   })
   .strict();
+export interface AuthzTeamMemberBindingSchema extends Named<
+  typeof authzTeamMemberBindingSchemaDefinition
+> {}
+export const authzTeamMemberBindingSchema: AuthzTeamMemberBindingSchema =
+  authzTeamMemberBindingSchemaDefinition;
 export type AuthzTeamMemberBinding = z.infer<typeof authzTeamMemberBindingSchema>;
 
-export const authzBindingForSynthesisSchema = z
+const authzBindingForSynthesisSchemaDefinition = z
   .object({
     organizationId: z.string(),
     scopeType: grantScopeTierSchema,
@@ -305,109 +436,194 @@ export const authzBindingForSynthesisSchema = z
     customRole: authzCustomRoleSchema.nullable(),
   })
   .strict();
+export interface AuthzBindingForSynthesisSchema extends Named<
+  typeof authzBindingForSynthesisSchemaDefinition
+> {}
+export const authzBindingForSynthesisSchema: AuthzBindingForSynthesisSchema =
+  authzBindingForSynthesisSchemaDefinition;
 export type AuthzBindingForSynthesis = z.infer<typeof authzBindingForSynthesisSchema>;
 
-export const authzListUserBindingsInputSchema = z
+const authzListUserBindingsInputSchemaDefinition = z
   .object({ organizationId: z.string(), userId: z.string() })
   .strict();
+export interface AuthzListUserBindingsInputSchema extends Named<
+  typeof authzListUserBindingsInputSchemaDefinition
+> {}
+export const authzListUserBindingsInputSchema: AuthzListUserBindingsInputSchema =
+  authzListUserBindingsInputSchemaDefinition;
 export type AuthzListUserBindingsInput = z.infer<typeof authzListUserBindingsInputSchema>;
 
-export const authzListOrganizationBindingsInputSchema = z
+const authzListOrganizationBindingsInputSchemaDefinition = z
   .object({ organizationId: z.string() })
   .strict();
+export interface AuthzListOrganizationBindingsInputSchema extends Named<
+  typeof authzListOrganizationBindingsInputSchemaDefinition
+> {}
+export const authzListOrganizationBindingsInputSchema: AuthzListOrganizationBindingsInputSchema =
+  authzListOrganizationBindingsInputSchemaDefinition;
 export type AuthzListOrganizationBindingsInput = z.infer<
   typeof authzListOrganizationBindingsInputSchema
 >;
 
 /** Asks for the members who administer an organisation and can still sign in to it. */
-export const authzFindActiveOrganizationAdministratorsInputSchema = z
+const authzFindActiveOrganizationAdministratorsInputSchemaDefinition = z
   .object({ organizationId: z.string() })
   .strict();
+export interface AuthzFindActiveOrganizationAdministratorsInputSchema extends Named<
+  typeof authzFindActiveOrganizationAdministratorsInputSchemaDefinition
+> {}
+export const authzFindActiveOrganizationAdministratorsInputSchema: AuthzFindActiveOrganizationAdministratorsInputSchema =
+  authzFindActiveOrganizationAdministratorsInputSchemaDefinition;
 export type AuthzFindActiveOrganizationAdministratorsInput = z.infer<
   typeof authzFindActiveOrganizationAdministratorsInputSchema
 >;
 
 /** The user ids of those administrators: organisation role ADMIN on a seat not disabled. */
-export const authzActiveOrganizationAdministratorsSchema = z.array(z.string());
+const authzActiveOrganizationAdministratorsSchemaDefinition = z.array(z.string());
+export interface AuthzActiveOrganizationAdministratorsSchema extends Named<
+  typeof authzActiveOrganizationAdministratorsSchemaDefinition
+> {}
+export const authzActiveOrganizationAdministratorsSchema: AuthzActiveOrganizationAdministratorsSchema =
+  authzActiveOrganizationAdministratorsSchemaDefinition;
 export type AuthzActiveOrganizationAdministrators = z.infer<
   typeof authzActiveOrganizationAdministratorsSchema
 >;
 
-export const authzListUserAndGroupBindingsInputSchema = z
+const authzListUserAndGroupBindingsInputSchemaDefinition = z
   .object({
     organizationId: z.string(),
     userId: z.string(),
     groupIds: z.array(z.string()).readonly(),
   })
   .strict();
+export interface AuthzListUserAndGroupBindingsInputSchema extends Named<
+  typeof authzListUserAndGroupBindingsInputSchemaDefinition
+> {}
+export const authzListUserAndGroupBindingsInputSchema: AuthzListUserAndGroupBindingsInputSchema =
+  authzListUserAndGroupBindingsInputSchemaDefinition;
 export type AuthzListUserAndGroupBindingsInput = z.infer<
   typeof authzListUserAndGroupBindingsInputSchema
 >;
 
-export const authzListScopeBindingsInputSchema = z
+const authzListScopeBindingsInputSchemaDefinition = z
   .object({
     organizationId: z.string(),
     scopeType: grantScopeTierSchema,
     scopeIds: z.array(z.string()).readonly(),
   })
   .strict();
+export interface AuthzListScopeBindingsInputSchema extends Named<
+  typeof authzListScopeBindingsInputSchemaDefinition
+> {}
+export const authzListScopeBindingsInputSchema: AuthzListScopeBindingsInputSchema =
+  authzListScopeBindingsInputSchemaDefinition;
 export type AuthzListScopeBindingsInput = z.infer<typeof authzListScopeBindingsInputSchema>;
 
 /** The bindings of keys the caller already loaded from this organization. */
-export const authzListApiKeyBindingsInputSchema = z
+const authzListApiKeyBindingsInputSchemaDefinition = z
   .object({
     organizationId: z.string(),
     apiKeyIds: z.array(z.string()).readonly(),
   })
   .strict();
+export interface AuthzListApiKeyBindingsInputSchema extends Named<
+  typeof authzListApiKeyBindingsInputSchemaDefinition
+> {}
+export const authzListApiKeyBindingsInputSchema: AuthzListApiKeyBindingsInputSchema =
+  authzListApiKeyBindingsInputSchemaDefinition;
 export type AuthzListApiKeyBindingsInput = z.infer<typeof authzListApiKeyBindingsInputSchema>;
 
-export const authzListGroupBindingsInputSchema = z
+const authzListGroupBindingsInputSchemaDefinition = z
   .object({ organizationId: z.string(), groupId: z.string() })
   .strict();
+export interface AuthzListGroupBindingsInputSchema extends Named<
+  typeof authzListGroupBindingsInputSchemaDefinition
+> {}
+export const authzListGroupBindingsInputSchema: AuthzListGroupBindingsInputSchema =
+  authzListGroupBindingsInputSchemaDefinition;
 export type AuthzListGroupBindingsInput = z.infer<typeof authzListGroupBindingsInputSchema>;
 
-export const authzListTeamMemberBindingsInputSchema = z
+const authzListTeamMemberBindingsInputSchemaDefinition = z
   .object({
     organizationId: z.string(),
     teamIds: z.array(z.string()).readonly(),
   })
   .strict();
+export interface AuthzListTeamMemberBindingsInputSchema extends Named<
+  typeof authzListTeamMemberBindingsInputSchemaDefinition
+> {}
+export const authzListTeamMemberBindingsInputSchema: AuthzListTeamMemberBindingsInputSchema =
+  authzListTeamMemberBindingsInputSchemaDefinition;
 export type AuthzListTeamMemberBindingsInput = z.infer<
   typeof authzListTeamMemberBindingsInputSchema
 >;
 
-export const authzListBindingsForSynthesisInputSchema = z
+const authzListBindingsForSynthesisInputSchemaDefinition = z
   .object({ orgIds: z.array(z.string()).readonly(), userId: z.string() })
   .strict();
+export interface AuthzListBindingsForSynthesisInputSchema extends Named<
+  typeof authzListBindingsForSynthesisInputSchemaDefinition
+> {}
+export const authzListBindingsForSynthesisInputSchema: AuthzListBindingsForSynthesisInputSchema =
+  authzListBindingsForSynthesisInputSchemaDefinition;
 export type AuthzListBindingsForSynthesisInput = z.infer<
   typeof authzListBindingsForSynthesisInputSchema
 >;
 
-export const authzAccessBindingsOutputSchema = z.array(authzAccessBindingSchema);
+const authzAccessBindingsOutputSchemaDefinition = z.array(authzAccessBindingSchema);
+export interface AuthzAccessBindingsOutputSchema extends Named<
+  typeof authzAccessBindingsOutputSchemaDefinition
+> {}
+export const authzAccessBindingsOutputSchema: AuthzAccessBindingsOutputSchema =
+  authzAccessBindingsOutputSchemaDefinition;
 export type AuthzAccessBindingsOutput = z.infer<typeof authzAccessBindingsOutputSchema>;
 
-export const authzTeamMemberBindingsOutputSchema = z.map(
+const authzTeamMemberBindingsOutputSchemaDefinition = z.map(
   z.string(),
   z.array(authzTeamMemberBindingSchema),
 );
+export interface AuthzTeamMemberBindingsOutputSchema extends Named<
+  typeof authzTeamMemberBindingsOutputSchemaDefinition
+> {}
+export const authzTeamMemberBindingsOutputSchema: AuthzTeamMemberBindingsOutputSchema =
+  authzTeamMemberBindingsOutputSchemaDefinition;
 export type AuthzTeamMemberBindingsOutput = z.infer<typeof authzTeamMemberBindingsOutputSchema>;
 
-export const authzBindingsForSynthesisOutputSchema = z.array(authzBindingForSynthesisSchema);
+const authzBindingsForSynthesisOutputSchemaDefinition = z.array(authzBindingForSynthesisSchema);
+export interface AuthzBindingsForSynthesisOutputSchema extends Named<
+  typeof authzBindingsForSynthesisOutputSchemaDefinition
+> {}
+export const authzBindingsForSynthesisOutputSchema: AuthzBindingsForSynthesisOutputSchema =
+  authzBindingsForSynthesisOutputSchemaDefinition;
 export type AuthzBindingsForSynthesisOutput = z.infer<typeof authzBindingsForSynthesisOutputSchema>;
 
-export const authzCustomRolesOutputSchema = z.array(authzCustomRoleSchema);
+const authzCustomRolesOutputSchemaDefinition = z.array(authzCustomRoleSchema);
+export interface AuthzCustomRolesOutputSchema extends Named<
+  typeof authzCustomRolesOutputSchemaDefinition
+> {}
+export const authzCustomRolesOutputSchema: AuthzCustomRolesOutputSchema =
+  authzCustomRolesOutputSchemaDefinition;
 export type AuthzCustomRolesOutput = z.infer<typeof authzCustomRolesOutputSchema>;
 
-export const authzFindRolePermissionsInputSchema = z
+const authzFindRolePermissionsInputSchemaDefinition = z
   .object({ organizationId: z.string(), roleIds: z.array(z.string()) })
   .strict();
+export interface AuthzFindRolePermissionsInputSchema extends Named<
+  typeof authzFindRolePermissionsInputSchemaDefinition
+> {}
+export const authzFindRolePermissionsInputSchema: AuthzFindRolePermissionsInputSchema =
+  authzFindRolePermissionsInputSchemaDefinition;
 export type AuthzFindRolePermissionsInput = z.infer<typeof authzFindRolePermissionsInputSchema>;
 
 /** One live role of any kind, a key's private role included, with its permission set. */
-export const authzRolePermissionsSchema = z
+const authzRolePermissionsSchemaDefinition = z
   .object({ id: z.string(), name: z.string(), permissions: z.array(z.string()) })
   .strict();
+export interface AuthzRolePermissionsSchema extends Named<
+  typeof authzRolePermissionsSchemaDefinition
+> {}
+export const authzRolePermissionsSchema: AuthzRolePermissionsSchema =
+  authzRolePermissionsSchemaDefinition;
 export type AuthzRolePermissions = z.infer<typeof authzRolePermissionsSchema>;
 
 /** The scope an own-standing read resolved to, by kind and id. */
@@ -428,12 +644,14 @@ const authzResolvedScopeSchema = z
  * or one that does not resolve at all — answers a null scope and the empty
  * set, which is the engine's no-default-access rather than a special case.
  */
-export const authzOwnStandingSchema = z
+const authzOwnStandingSchemaDefinition = z
   .object({
     scope: authzResolvedScopeSchema.nullable(),
     permissions: z.array(z.string()),
   })
   .strict();
+export interface AuthzOwnStandingSchema extends Named<typeof authzOwnStandingSchemaDefinition> {}
+export const authzOwnStandingSchema: AuthzOwnStandingSchema = authzOwnStandingSchemaDefinition;
 export type AuthzOwnStanding = z.infer<typeof authzOwnStandingSchema>;
 
 /**
@@ -441,8 +659,13 @@ export type AuthzOwnStanding = z.infer<typeof authzOwnStandingSchema>;
  * is checked: a scope the caller holds nothing in resolves to the empty set
  * rather than to anything about it.
  */
-export const authzOwnStandingInputSchema = z.object({
+const authzOwnStandingInputSchemaDefinition = z.object({
   projectId: z.string().optional(),
   organizationId: z.string().optional(),
 });
+export interface AuthzOwnStandingInputSchema extends Named<
+  typeof authzOwnStandingInputSchemaDefinition
+> {}
+export const authzOwnStandingInputSchema: AuthzOwnStandingInputSchema =
+  authzOwnStandingInputSchemaDefinition;
 export type AuthzOwnStandingInput = z.infer<typeof authzOwnStandingInputSchema>;

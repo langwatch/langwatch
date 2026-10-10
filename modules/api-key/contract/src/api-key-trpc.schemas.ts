@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 /**
  * The input parsers of the `apiKey.*` tRPC namespace, living in the contract
  * because the browser reads the same declaration the server binds.
@@ -25,14 +26,24 @@ const grantWriteSchema = z.object({
 export type ApiKeyTrpcGrant = z.infer<typeof grantWriteSchema>;
 
 /** Every read and write on the namespace is narrowed to one organization. */
-export const apiKeyTrpcOrganizationScopeSchema = z.object({ organizationId: z.string() });
+const apiKeyTrpcOrganizationScopeSchemaDefinition = z.object({ organizationId: z.string() });
+export interface ApiKeyTrpcOrganizationScopeSchema extends Named<
+  typeof apiKeyTrpcOrganizationScopeSchemaDefinition
+> {}
+export const apiKeyTrpcOrganizationScopeSchema: ApiKeyTrpcOrganizationScopeSchema =
+  apiKeyTrpcOrganizationScopeSchemaDefinition;
 
-export const apiKeyTrpcNameByIdInputSchema = z.object({
+const apiKeyTrpcNameByIdInputSchemaDefinition = z.object({
   organizationId: z.string(),
   apiKeyId: z.string(),
 });
+export interface ApiKeyTrpcNameByIdInputSchema extends Named<
+  typeof apiKeyTrpcNameByIdInputSchemaDefinition
+> {}
+export const apiKeyTrpcNameByIdInputSchema: ApiKeyTrpcNameByIdInputSchema =
+  apiKeyTrpcNameByIdInputSchemaDefinition;
 
-export const apiKeyTrpcCreateInputSchema = z
+const apiKeyTrpcCreateInputSchemaDefinition = z
   .object({
     organizationId: z.string(),
     name: z.string().min(1).max(100),
@@ -45,9 +56,14 @@ export const apiKeyTrpcCreateInputSchema = z
     bindings: z.array(grantWriteSchema).max(20),
   })
   .superRefine(refineRestrictedPermissions);
+export interface ApiKeyTrpcCreateInputSchema extends Named<
+  typeof apiKeyTrpcCreateInputSchemaDefinition
+> {}
+export const apiKeyTrpcCreateInputSchema: ApiKeyTrpcCreateInputSchema =
+  apiKeyTrpcCreateInputSchemaDefinition;
 export type ApiKeyTrpcCreateInput = z.infer<typeof apiKeyTrpcCreateInputSchema>;
 
-export const apiKeyTrpcUpdateInputSchema = z
+const apiKeyTrpcUpdateInputSchemaDefinition = z
   .object({
     organizationId: z.string(),
     apiKeyId: z.string(),
@@ -58,8 +74,18 @@ export const apiKeyTrpcUpdateInputSchema = z
     bindings: z.array(grantWriteSchema).min(1).max(20).optional(),
   })
   .superRefine(refineRestrictedPermissions);
+export interface ApiKeyTrpcUpdateInputSchema extends Named<
+  typeof apiKeyTrpcUpdateInputSchemaDefinition
+> {}
+export const apiKeyTrpcUpdateInputSchema: ApiKeyTrpcUpdateInputSchema =
+  apiKeyTrpcUpdateInputSchemaDefinition;
 
-export const apiKeyTrpcRevokeInputSchema = z.object({
+const apiKeyTrpcRevokeInputSchemaDefinition = z.object({
   organizationId: z.string(),
   apiKeyId: z.string(),
 });
+export interface ApiKeyTrpcRevokeInputSchema extends Named<
+  typeof apiKeyTrpcRevokeInputSchemaDefinition
+> {}
+export const apiKeyTrpcRevokeInputSchema: ApiKeyTrpcRevokeInputSchema =
+  apiKeyTrpcRevokeInputSchemaDefinition;

@@ -14,7 +14,7 @@ import {
   dashboardWidgetNameSchema,
   dashboardWidgetQueriesSchema,
 } from "@langwatch/analytics-contract/dashboard-widget-definition";
-import { defineTrpcContract } from "@langwatch/module";
+import { defineTrpcContract, type Named } from "@langwatch/module";
 import { z } from "zod";
 
 const projectScopeSchema = z.object({ projectId: z.string() });
@@ -38,7 +38,7 @@ const placementShape = {
 };
 
 /** A widget as main's `create` answered it: the definition already parsed. */
-export const dashboardWidgetTrpcSchema = z.object({
+const dashboardWidgetTrpcSchemaDefinition = z.object({
   id: z.string(),
   projectId: z.string(),
   name: z.string(),
@@ -47,9 +47,14 @@ export const dashboardWidgetTrpcSchema = z.object({
   updatedAt: z.date(),
   ...placementShape,
 });
+export interface DashboardWidgetTrpcSchema extends Named<
+  typeof dashboardWidgetTrpcSchemaDefinition
+> {}
+export const dashboardWidgetTrpcSchema: DashboardWidgetTrpcSchema =
+  dashboardWidgetTrpcSchemaDefinition;
 
 /** A widget as main's `list` answered it: the stored chart row, its definition under `graph`. */
-export const dashboardWidgetTrpcRowSchema = z.object({
+const dashboardWidgetTrpcRowSchemaDefinition = z.object({
   id: z.string(),
   projectId: z.string(),
   name: z.string(),
@@ -60,8 +65,18 @@ export const dashboardWidgetTrpcRowSchema = z.object({
   updatedAt: z.date(),
   ...placementShape,
 });
+export interface DashboardWidgetTrpcRowSchema extends Named<
+  typeof dashboardWidgetTrpcRowSchemaDefinition
+> {}
+export const dashboardWidgetTrpcRowSchema: DashboardWidgetTrpcRowSchema =
+  dashboardWidgetTrpcRowSchemaDefinition;
 
-export const dashboardWidgetTrpcSuccessSchema = z.object({ success: z.literal(true) });
+const dashboardWidgetTrpcSuccessSchemaDefinition = z.object({ success: z.literal(true) });
+export interface DashboardWidgetTrpcSuccessSchema extends Named<
+  typeof dashboardWidgetTrpcSuccessSchemaDefinition
+> {}
+export const dashboardWidgetTrpcSuccessSchema: DashboardWidgetTrpcSuccessSchema =
+  dashboardWidgetTrpcSuccessSchemaDefinition;
 
 export const dashboardWidgetTrpc = defineTrpcContract("dashboardWidgets")
   .query("list")

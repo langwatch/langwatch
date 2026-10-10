@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 // --------------------------------------------------------------------------- Tracer schemas
@@ -30,22 +31,26 @@ const toolCallSchema = z.object({
   function: functionCallSchema,
 });
 
-export const rAGChunkSchema = z.object({
+const rAGChunkSchemaDefinition = z.object({
   document_id: z.string().optional().nullable(),
   chunk_id: z.string().optional().nullable(),
   content: z.union([z.string(), z.record(z.string(), z.any()), z.array(z.any())]),
 });
+export interface RAGChunkSchema extends Named<typeof rAGChunkSchemaDefinition> {}
+export const rAGChunkSchema: RAGChunkSchema = rAGChunkSchemaDefinition;
 
 export type RAGChunk = z.infer<typeof rAGChunkSchema>;
 
-export const contextsSchema = z.object({
+const contextsSchemaDefinition = z.object({
   traceId: z.string(),
   contexts: z.array(rAGChunkSchema),
 });
+export interface ContextsSchema extends Named<typeof contextsSchemaDefinition> {}
+export const contextsSchema: ContextsSchema = contextsSchemaDefinition;
 
 export type Contexts = z.infer<typeof contextsSchema>;
 
-export const chatRichContentSchema = z.union([
+const chatRichContentSchemaDefinition = z.union([
   z.object({
     type: z.literal("text"),
     text: z.string().optional(),
@@ -166,10 +171,12 @@ export const chatRichContentSchema = z.union([
     }),
   }),
 ]);
+export interface ChatRichContentSchema extends Named<typeof chatRichContentSchemaDefinition> {}
+export const chatRichContentSchema: ChatRichContentSchema = chatRichContentSchemaDefinition;
 
 export type ChatRichContent = z.infer<typeof chatRichContentSchema>;
 
-export const chatMessageSchema = z.object({
+const chatMessageSchemaDefinition = z.object({
   role: chatRoleSchema.optional(),
   content: z
     .union([z.string(), z.array(chatRichContentSchema)])
@@ -183,6 +190,8 @@ export const chatMessageSchema = z.object({
   name: z.string().optional().nullable(),
   reasoning_content: z.string().optional().nullable(),
 });
+export interface ChatMessageSchema extends Named<typeof chatMessageSchemaDefinition> {}
+export const chatMessageSchema: ChatMessageSchema = chatMessageSchemaDefinition;
 
 export type ChatMessage = z.infer<typeof chatMessageSchema>;
 
@@ -204,21 +213,25 @@ const jSONSerializableSchema = z
   .union([z.string(), z.number(), z.boolean(), z.record(z.string(), z.any()), z.array(z.any())])
   .nullable();
 
-export const typedValueJsonSchema = z.object({
+const typedValueJsonSchemaDefinition = z.object({
   type: z.literal("json"),
   value: jSONSerializableSchema,
 });
+export interface TypedValueJsonSchema extends Named<typeof typedValueJsonSchemaDefinition> {}
+export const typedValueJsonSchema: TypedValueJsonSchema = typedValueJsonSchemaDefinition;
 
 export type TypedValueJson = z.infer<typeof typedValueJsonSchema>;
 
-export const moneySchema = z.object({
+const moneySchemaDefinition = z.object({
   currency: z.string(),
   amount: z.number(),
 });
+export interface MoneySchema extends Named<typeof moneySchemaDefinition> {}
+export const moneySchema: MoneySchema = moneySchemaDefinition;
 
 export type Money = z.infer<typeof moneySchema>;
 
-export const evaluationResultSchema = z.object({
+const evaluationResultSchemaDefinition = z.object({
   status: z.union([z.literal("processed"), z.literal("skipped"), z.literal("error")]),
   passed: z.boolean().optional().nullable(),
   score: z.number().optional().nullable(),
@@ -226,27 +239,44 @@ export const evaluationResultSchema = z.object({
   details: z.string().optional().nullable(),
   cost: moneySchema.optional().nullable(),
 });
+export interface EvaluationResultSchema extends Named<typeof evaluationResultSchemaDefinition> {}
+export const evaluationResultSchema: EvaluationResultSchema = evaluationResultSchemaDefinition;
 
 export type EvaluationResult = z.infer<typeof evaluationResultSchema>;
 
-export const typedValueGuardrailResultSchema = z.object({
+const typedValueGuardrailResultSchemaDefinition = z.object({
   type: z.literal("guardrail_result"),
   value: evaluationResultSchema,
 });
+export interface TypedValueGuardrailResultSchema extends Named<
+  typeof typedValueGuardrailResultSchemaDefinition
+> {}
+export const typedValueGuardrailResultSchema: TypedValueGuardrailResultSchema =
+  typedValueGuardrailResultSchemaDefinition;
 
 export type TypedValueGuardrailResult = z.infer<typeof typedValueGuardrailResultSchema>;
 
-export const typedValueEvaluationResultSchema = z.object({
+const typedValueEvaluationResultSchemaDefinition = z.object({
   type: z.literal("evaluation_result"),
   value: evaluationResultSchema,
 });
+export interface TypedValueEvaluationResultSchema extends Named<
+  typeof typedValueEvaluationResultSchemaDefinition
+> {}
+export const typedValueEvaluationResultSchema: TypedValueEvaluationResultSchema =
+  typedValueEvaluationResultSchemaDefinition;
 
 export type TypedValueEvaluationResult = z.infer<typeof typedValueEvaluationResultSchema>;
 
-export const typedValueChatMessagesSchema = z.object({
+const typedValueChatMessagesSchemaDefinition = z.object({
   type: z.literal("chat_messages"),
   value: z.array(chatMessageSchema),
 });
+export interface TypedValueChatMessagesSchema extends Named<
+  typeof typedValueChatMessagesSchemaDefinition
+> {}
+export const typedValueChatMessagesSchema: TypedValueChatMessagesSchema =
+  typedValueChatMessagesSchemaDefinition;
 
 export type TypedValueChatMessages = z.infer<typeof typedValueChatMessagesSchema>;
 
@@ -280,15 +310,17 @@ export const spanInputOutputSchema: z.ZodType<SpanInputOutput> = z
   )
   .meta({ id: "SpanInputOutput" });
 
-export const errorCaptureSchema = z.object({
+const errorCaptureSchemaDefinition = z.object({
   has_error: z.literal(true),
   message: z.string(),
   stacktrace: z.array(z.string()),
 });
+export interface ErrorCaptureSchema extends Named<typeof errorCaptureSchemaDefinition> {}
+export const errorCaptureSchema: ErrorCaptureSchema = errorCaptureSchemaDefinition;
 
 export type ErrorCapture = z.infer<typeof errorCaptureSchema>;
 
-export const spanMetricsSchema = z.object({
+const spanMetricsSchemaDefinition = z.object({
   prompt_tokens: z.number().optional().nullable(),
   completion_tokens: z.number().optional().nullable(),
   reasoning_tokens: z.number().optional().nullable(),
@@ -297,10 +329,12 @@ export const spanMetricsSchema = z.object({
   tokens_estimated: z.boolean().optional().nullable(),
   cost: z.number().optional().nullable(),
 });
+export interface SpanMetricsSchema extends Named<typeof spanMetricsSchemaDefinition> {}
+export const spanMetricsSchema: SpanMetricsSchema = spanMetricsSchemaDefinition;
 
 export type SpanMetrics = z.infer<typeof spanMetricsSchema>;
 
-export const reservedSpanParamsSchema = z.object({
+const reservedSpanParamsSchemaDefinition = z.object({
   frequency_penalty: z.number().optional().nullable(),
   logit_bias: z.record(z.string(), z.number()).optional().nullable(),
   logprobs: z.boolean().optional().nullable(),
@@ -326,23 +360,32 @@ export const reservedSpanParamsSchema = z.object({
   user: z.string().optional().nullable(),
   reasoning_effort: z.string().optional().nullable(),
 });
+export interface ReservedSpanParamsSchema extends Named<
+  typeof reservedSpanParamsSchemaDefinition
+> {}
+export const reservedSpanParamsSchema: ReservedSpanParamsSchema =
+  reservedSpanParamsSchemaDefinition;
 
 export type ReservedSpanParams = z.infer<typeof reservedSpanParamsSchema>;
 
-export const spanParamsSchema = reservedSpanParamsSchema.and(z.record(z.string(), z.any()));
+const spanParamsSchemaDefinition = reservedSpanParamsSchema.and(z.record(z.string(), z.any()));
+export interface SpanParamsSchema extends Named<typeof spanParamsSchemaDefinition> {}
+export const spanParamsSchema: SpanParamsSchema = spanParamsSchemaDefinition;
 
 export type SpanParams = z.infer<typeof spanParamsSchema>;
 
-export const spanTimestampsSchema = z.object({
+const spanTimestampsSchemaDefinition = z.object({
   ignore_timestamps_on_write: z.boolean().optional().nullable(),
   started_at: z.number(),
   first_token_at: z.number().optional().nullable(),
   finished_at: z.number(),
 });
+export interface SpanTimestampsSchema extends Named<typeof spanTimestampsSchemaDefinition> {}
+export const spanTimestampsSchema: SpanTimestampsSchema = spanTimestampsSchemaDefinition;
 
 export type SpanTimestamps = z.infer<typeof spanTimestampsSchema>;
 
-export const spanTypesSchema = z.union([
+const spanTypesSchemaDefinition = z.union([
   z.literal("span"),
   z.literal("llm"),
   z.literal("chain"),
@@ -365,6 +408,8 @@ export const spanTypesSchema = z.union([
   z.literal("task"), // openllmetry
   z.literal("unknown"),
 ]);
+export interface SpanTypesSchema extends Named<typeof spanTypesSchemaDefinition> {}
+export const spanTypesSchema: SpanTypesSchema = spanTypesSchemaDefinition;
 
 export type SpanTypes = z.infer<typeof spanTypesSchema>;
 
@@ -372,20 +417,30 @@ export type SpanTypes = z.infer<typeof spanTypesSchema>;
  * A verdict as legacy SDKs sent it, before `status` was required. Main's legacy span mapper
  * carried it through as-is, so the legacy span shape accepts any JSON value in its place.
  */
-export const typedValueLegacyVerdictSchema = z.object({
+const typedValueLegacyVerdictSchemaDefinition = z.object({
   type: z.union([z.literal("evaluation_result"), z.literal("guardrail_result")]),
   value: jSONSerializableSchema,
 });
+export interface TypedValueLegacyVerdictSchema extends Named<
+  typeof typedValueLegacyVerdictSchemaDefinition
+> {}
+export const typedValueLegacyVerdictSchema: TypedValueLegacyVerdictSchema =
+  typedValueLegacyVerdictSchemaDefinition;
 
 /** What a legacy span's input or output carries: the shared shape, or a legacy verdict. */
-export const legacySpanInputOutputSchema = z.union([
+const legacySpanInputOutputSchemaDefinition = z.union([
   spanInputOutputSchema,
   typedValueLegacyVerdictSchema,
 ]);
+export interface LegacySpanInputOutputSchema extends Named<
+  typeof legacySpanInputOutputSchemaDefinition
+> {}
+export const legacySpanInputOutputSchema: LegacySpanInputOutputSchema =
+  legacySpanInputOutputSchemaDefinition;
 
 export type LegacySpanInputOutput = z.infer<typeof legacySpanInputOutputSchema>;
 
-export const baseSpanSchema = z.object({
+const baseSpanSchemaDefinition = z.object({
   span_id: z.string(),
   parent_id: z.string().optional().nullable(),
   trace_id: z.string(),
@@ -398,28 +453,36 @@ export const baseSpanSchema = z.object({
   metrics: spanMetricsSchema.optional().nullable(),
   params: spanParamsSchema.optional().nullable(),
 });
+export interface BaseSpanSchema extends Named<typeof baseSpanSchemaDefinition> {}
+export const baseSpanSchema: BaseSpanSchema = baseSpanSchemaDefinition;
 
 export type BaseSpan = z.infer<typeof baseSpanSchema>;
 
-export const lLMSpanSchema = z.object({
+const lLMSpanSchemaDefinition = z.object({
   ...baseSpanSchema.shape,
   type: z.literal("llm"),
   // TODO: deprecate field, standardize on litellm model names
   vendor: z.string().optional().nullable(),
   model: z.string().optional().nullable(),
 });
+export interface LLMSpanSchema extends Named<typeof lLMSpanSchemaDefinition> {}
+export const lLMSpanSchema: LLMSpanSchema = lLMSpanSchemaDefinition;
 
 export type LLMSpan = z.infer<typeof lLMSpanSchema>;
 
-export const rAGSpanSchema = z.object({
+const rAGSpanSchemaDefinition = z.object({
   ...baseSpanSchema.shape,
   type: z.literal("rag"),
   contexts: z.array(rAGChunkSchema),
 });
+export interface RAGSpanSchema extends Named<typeof rAGSpanSchemaDefinition> {}
+export const rAGSpanSchema: RAGSpanSchema = rAGSpanSchemaDefinition;
 
 export type RAGSpan = z.infer<typeof rAGSpanSchema>;
 
-export const langWatchSpanSchema = z.union([lLMSpanSchema, rAGSpanSchema, baseSpanSchema]);
+const langWatchSpanSchemaDefinition = z.union([lLMSpanSchema, rAGSpanSchema, baseSpanSchema]);
+export interface LangWatchSpanSchema extends Named<typeof langWatchSpanSchemaDefinition> {}
+export const langWatchSpanSchema: LangWatchSpanSchema = langWatchSpanSchemaDefinition;
 
 export type Span = z.infer<typeof langWatchSpanSchema>;
 
@@ -429,7 +492,7 @@ const spanInputOutputValidatorSchema = spanInputOutputSchema.and(
   }),
 );
 
-export const spanValidatorSchema = z
+const spanValidatorSchemaDefinition = z
   .union([
     lLMSpanSchema.omit({ input: true, output: true, params: true }),
     rAGSpanSchema.omit({ input: true, output: true, params: true }),
@@ -442,6 +505,8 @@ export const spanValidatorSchema = z
       params: z.record(z.string(), z.any()).optional().nullable(),
     }),
   );
+export interface SpanValidatorSchema extends Named<typeof spanValidatorSchemaDefinition> {}
+export const spanValidatorSchema: SpanValidatorSchema = spanValidatorSchemaDefinition;
 
 export type SpanValidator = z.infer<typeof spanValidatorSchema>;
 
@@ -461,15 +526,19 @@ export type ElasticSearchSpan = Omit<
   timestamps: SpanTimestamps & { inserted_at: number; updated_at: number };
 };
 
-export const traceInputSchema = z.object({
+const traceInputSchemaDefinition = z.object({
   value: z.string(),
 });
+export interface TraceInputSchema extends Named<typeof traceInputSchemaDefinition> {}
+export const traceInputSchema: TraceInputSchema = traceInputSchemaDefinition;
 
 export type TraceInput = z.infer<typeof traceInputSchema>;
 
-export const traceOutputSchema = z.object({
+const traceOutputSchemaDefinition = z.object({
   value: z.string(),
 });
+export interface TraceOutputSchema extends Named<typeof traceOutputSchemaDefinition> {}
+export const traceOutputSchema: TraceOutputSchema = traceOutputSchemaDefinition;
 
 export type TraceOutput = z.infer<typeof traceOutputSchema>;
 
@@ -477,7 +546,7 @@ const primitiveTypeSchema = z
   .union([z.string(), z.number(), z.boolean(), z.undefined()])
   .nullable();
 
-export const reservedTraceMetadataSchema = z.object({
+const reservedTraceMetadataSchemaDefinition = z.object({
   thread_id: z.string().optional().nullable(),
   user_id: z.string().optional().nullable(),
   customer_id: z.string().optional().nullable(),
@@ -493,17 +562,27 @@ export const reservedTraceMetadataSchema = z.object({
   prompt_ids: z.array(z.string()).optional().nullable(),
   prompt_version_ids: z.array(z.string()).optional().nullable(),
 });
+export interface ReservedTraceMetadataSchema extends Named<
+  typeof reservedTraceMetadataSchemaDefinition
+> {}
+export const reservedTraceMetadataSchema: ReservedTraceMetadataSchema =
+  reservedTraceMetadataSchemaDefinition;
 
 export type ReservedTraceMetadata = z.infer<typeof reservedTraceMetadataSchema>;
 
-export const reservedTraceMetadataMappingSchema = z.record(
+const reservedTraceMetadataMappingSchemaDefinition = z.record(
   z.string(),
   reservedTraceMetadataSchema.keyof(),
 );
+export interface ReservedTraceMetadataMappingSchema extends Named<
+  typeof reservedTraceMetadataMappingSchemaDefinition
+> {}
+export const reservedTraceMetadataMappingSchema: ReservedTraceMetadataMappingSchema =
+  reservedTraceMetadataMappingSchemaDefinition;
 
 export type ReservedTraceMetadataMapping = z.infer<typeof reservedTraceMetadataMappingSchema>;
 
-export const customMetadataSchema = z.record(
+const customMetadataSchemaDefinition = z.record(
   z.string(),
   z.union([
     primitiveTypeSchema,
@@ -512,10 +591,14 @@ export const customMetadataSchema = z.record(
     z.record(z.string(), z.record(z.string(), primitiveTypeSchema)),
   ]),
 );
+export interface CustomMetadataSchema extends Named<typeof customMetadataSchemaDefinition> {}
+export const customMetadataSchema: CustomMetadataSchema = customMetadataSchemaDefinition;
 
 export type CustomMetadata = z.infer<typeof customMetadataSchema>;
 
-export const traceMetadataSchema = reservedTraceMetadataSchema.and(customMetadataSchema);
+const traceMetadataSchemaDefinition = reservedTraceMetadataSchema.and(customMetadataSchema);
+export interface TraceMetadataSchema extends Named<typeof traceMetadataSchemaDefinition> {}
+export const traceMetadataSchema: TraceMetadataSchema = traceMetadataSchemaDefinition;
 
 export type TraceMetadata = z.infer<typeof traceMetadataSchema>;
 
@@ -528,7 +611,7 @@ const eventMetricKeySchema = z.string().refine((key) => !key.includes("\x1f"), {
   message: "Metric key must not contain the ASCII unit separator (0x1F)",
 });
 
-export const langWatchEventSchema = z.object({
+const langWatchEventSchemaDefinition = z.object({
   event_id: z.string(),
   event_type: z.string(), // Type of event (e.g., 'thumbs_up_down', 'add_to_cart')
   project_id: z.string(),
@@ -541,10 +624,12 @@ export const langWatchEventSchema = z.object({
     updated_at: z.number(),
   }),
 });
+export interface LangWatchEventSchema extends Named<typeof langWatchEventSchemaDefinition> {}
+export const langWatchEventSchema: LangWatchEventSchema = langWatchEventSchemaDefinition;
 
 export type Event = z.infer<typeof langWatchEventSchema>;
 
-export const elasticSearchEventSchema = z.object({
+const elasticSearchEventSchemaDefinition = z.object({
   ...langWatchEventSchema.omit({ metrics: true, event_details: true }).shape,
   metrics: z.array(
     z.object({
@@ -559,6 +644,11 @@ export const elasticSearchEventSchema = z.object({
     }),
   ),
 });
+export interface ElasticSearchEventSchema extends Named<
+  typeof elasticSearchEventSchemaDefinition
+> {}
+export const elasticSearchEventSchema: ElasticSearchEventSchema =
+  elasticSearchEventSchemaDefinition;
 
 export type ElasticSearchEvent = z.infer<typeof elasticSearchEventSchema>;
 
@@ -575,7 +665,7 @@ const evaluationStatusSchema = z.union([
  * event. The SDKs write `null` for every field the caller left out, so each
  * optional field takes null as well as absence.
  */
-export const sdkEvaluationSchema = z.looseObject({
+const sdkEvaluationSchemaDefinition = z.looseObject({
   evaluation_id: z.string().nullish(),
   evaluator_id: z.string().nullish(),
   span_id: z.string().nullish(),
@@ -601,10 +691,12 @@ export const sdkEvaluationSchema = z.looseObject({
     })
     .nullish(),
 });
+export interface SdkEvaluationSchema extends Named<typeof sdkEvaluationSchemaDefinition> {}
+export const sdkEvaluationSchema: SdkEvaluationSchema = sdkEvaluationSchemaDefinition;
 
 export type SdkEvaluation = z.infer<typeof sdkEvaluationSchema>;
 
-export const evaluationSchema = z.object({
+const evaluationSchemaDefinition = z.object({
   evaluation_id: z.string(),
   evaluator_id: z.string(),
   span_id: z.string().optional().nullable(),
@@ -628,6 +720,8 @@ export const evaluationSchema = z.object({
     updated_at: z.number().optional().nullable(),
   }),
 });
+export interface EvaluationSchema extends Named<typeof evaluationSchemaDefinition> {}
+export const evaluationSchema: EvaluationSchema = evaluationSchemaDefinition;
 
 export type Evaluation = z.infer<typeof evaluationSchema>;
 
@@ -635,7 +729,7 @@ export const elasticSearchEvaluationSchema = evaluationSchema;
 
 export type ElasticSearchEvaluation = z.infer<typeof elasticSearchEvaluationSchema>;
 
-export const rESTEvaluationSchema = z.object({
+const rESTEvaluationSchemaDefinition = z.object({
   ...evaluationSchema.omit({
     evaluation_id: true,
     evaluator_id: true,
@@ -657,10 +751,12 @@ export const rESTEvaluationSchema = z.object({
     .optional()
     .nullable(),
 });
+export interface RESTEvaluationSchema extends Named<typeof rESTEvaluationSchemaDefinition> {}
+export const rESTEvaluationSchema: RESTEvaluationSchema = rESTEvaluationSchemaDefinition;
 
 export type RESTEvaluation = z.infer<typeof rESTEvaluationSchema>;
 
-export const tracePrivacySchema = z.object({
+const tracePrivacySchemaDefinition = z.object({
   // Content categories that a `drop` privacy policy stripped before the spans were stored,
   // derived at read time from the marker the drop stamps on each span. The content was never
   // stored and cannot be recovered, which is what distinguishes it from a read-time `restrict`
@@ -668,10 +764,12 @@ export const tracePrivacySchema = z.object({
   // Absent when nothing was dropped.
   droppedCategories: z.array(z.string()).optional(),
 });
+export interface TracePrivacySchema extends Named<typeof tracePrivacySchemaDefinition> {}
+export const tracePrivacySchema: TracePrivacySchema = tracePrivacySchemaDefinition;
 
 export type TracePrivacy = z.infer<typeof tracePrivacySchema>;
 
-export const traceSchema = z.object({
+const traceSchemaDefinition = z.object({
   trace_id: z.string(),
   project_id: z.string(),
   metadata: traceMetadataSchema,
@@ -714,10 +812,12 @@ export const traceSchema = z.object({
   // visibility window — the UI renders the upgrade CTA off this flag.
   redacted_by_visibility_window: z.boolean().optional(),
 });
+export interface TraceSchema extends Named<typeof traceSchemaDefinition> {}
+export const traceSchema: TraceSchema = traceSchemaDefinition;
 
 export type Trace = z.infer<typeof traceSchema>;
 
-export const lLMModeTraceSchema = z.object({
+const lLMModeTraceSchemaDefinition = z.object({
   ...traceSchema.omit({ timestamps: true, indexing_md5s: true }).shape,
   timestamps: z.object({
     started_at: z.string(),
@@ -726,6 +826,8 @@ export const lLMModeTraceSchema = z.object({
   }),
   ascii_tree: z.string(),
 });
+export interface LLMModeTraceSchema extends Named<typeof lLMModeTraceSchemaDefinition> {}
+export const lLMModeTraceSchema: LLMModeTraceSchema = lLMModeTraceSchemaDefinition;
 
 export type LLMModeTrace = z.infer<typeof lLMModeTraceSchema>;
 
@@ -746,7 +848,7 @@ export type ElasticSearchTrace = Omit<Trace, "metadata" | "timestamps" | "events
   retention_holdouts?: string[] | null;
 };
 
-export const collectorRESTParamsSchema = z.object({
+const collectorRESTParamsSchemaDefinition = z.object({
   trace_id: z.union([z.string(), z.undefined()]).optional().nullable(),
   spans: z.array(langWatchSpanSchema),
   metadata: z
@@ -766,16 +868,26 @@ export const collectorRESTParamsSchema = z.object({
   expected_output: z.string().optional().nullable(),
   evaluations: z.array(rESTEvaluationSchema).optional(),
 });
+export interface CollectorRESTParamsSchema extends Named<
+  typeof collectorRESTParamsSchemaDefinition
+> {}
+export const collectorRESTParamsSchema: CollectorRESTParamsSchema =
+  collectorRESTParamsSchemaDefinition;
 
 export type CollectorRESTParams = z.infer<typeof collectorRESTParamsSchema>;
 
-export const collectorRESTParamsValidatorSchema = collectorRESTParamsSchema.omit({
+const collectorRESTParamsValidatorSchemaDefinition = collectorRESTParamsSchema.omit({
   spans: true,
 });
+export interface CollectorRESTParamsValidatorSchema extends Named<
+  typeof collectorRESTParamsValidatorSchemaDefinition
+> {}
+export const collectorRESTParamsValidatorSchema: CollectorRESTParamsValidatorSchema =
+  collectorRESTParamsValidatorSchemaDefinition;
 
 export type CollectorRESTParamsValidator = z.infer<typeof collectorRESTParamsValidatorSchema>;
 
-export const trackEventRESTParamsValidatorSchema = z.object({
+const trackEventRESTParamsValidatorSchemaDefinition = z.object({
   ...langWatchEventSchema.omit({
     event_id: true,
     project_id: true,
@@ -786,6 +898,11 @@ export const trackEventRESTParamsValidatorSchema = z.object({
   event_details: z.record(z.string(), z.string().nullable()).optional(),
   timestamp: z.number().optional(), // The timestamp when the event occurred
 });
+export interface TrackEventRESTParamsValidatorSchema extends Named<
+  typeof trackEventRESTParamsValidatorSchemaDefinition
+> {}
+export const trackEventRESTParamsValidatorSchema: TrackEventRESTParamsValidatorSchema =
+  trackEventRESTParamsValidatorSchemaDefinition;
 
 export type TrackEventRESTParamsValidator = z.infer<typeof trackEventRESTParamsValidatorSchema>;
 
@@ -821,8 +938,10 @@ const omittedForDataset = {
  * The runtime validator for {@link DatasetSpan}: a trace span reduced to what a dataset row
  * carries.
  */
-export const datasetSpanSchema = z.union([
+const datasetSpanSchemaDefinition = z.union([
   z.object({ ...baseSpanSchema.omit(omittedForDataset).shape, ...datasetSpanShape }),
   z.object({ ...lLMSpanSchema.omit(omittedForDataset).shape, ...datasetSpanShape }),
   z.object({ ...rAGSpanSchema.omit(omittedForDataset).shape, ...datasetSpanShape }),
 ]);
+export interface DatasetSpanSchema extends Named<typeof datasetSpanSchemaDefinition> {}
+export const datasetSpanSchema: DatasetSpanSchema = datasetSpanSchemaDefinition;

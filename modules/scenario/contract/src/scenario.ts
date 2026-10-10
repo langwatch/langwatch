@@ -1,4 +1,5 @@
 import { generate } from "@langwatch/ksuid";
+import type { Named } from "@langwatch/module";
 import type { Instant } from "@langwatch/time";
 import { z } from "zod";
 
@@ -15,18 +16,20 @@ import { callerVoiceConfigSchema } from "./voice/caller-voice.config.ts";
 export const scenarioAuthorLabelSchema = z.enum(["user", "api", "cli", "langy"]);
 export type ScenarioAuthorLabel = z.infer<typeof scenarioAuthorLabelSchema>;
 
-export const scenarioActorSchema = z
+const scenarioActorSchemaDefinition = z
   .object({
     userId: z.string().min(1).nullable(),
     label: scenarioAuthorLabelSchema,
   })
   .strict();
+export interface ScenarioActorSchema extends Named<typeof scenarioActorSchemaDefinition> {}
+export const scenarioActorSchema: ScenarioActorSchema = scenarioActorSchemaDefinition;
 export type ScenarioActor = z.infer<typeof scenarioActorSchema>;
 
 export const jsonValueSchema = z.json();
 export type JsonValue = z.infer<typeof jsonValueSchema>;
 
-export const scenarioSchema = z
+const scenarioSchemaDefinition = z
   .object({
     id: z.string().min(1),
     projectId: z.string().min(1),
@@ -56,13 +59,15 @@ export const scenarioSchema = z
     updatedAt: z.date(),
   })
   .strict();
+export interface ScenarioSchema extends Named<typeof scenarioSchemaDefinition> {}
+export const scenarioSchema: ScenarioSchema = scenarioSchemaDefinition;
 export type Scenario = z.infer<typeof scenarioSchema>;
 
 /** A scenario read by id, archived rows included; a miss answers `found: false`. */
 export type ScenarioLookup = { found: true; scenario: Scenario } | { found: false };
 
 /** A Scenario-owned test suite backed by a `SimulationSuite` row of kind `test suite`. */
-export const scenarioTestSuiteSchema = z
+const scenarioTestSuiteSchemaDefinition = z
   .object({
     id: z.string().min(1),
     projectId: z.string().min(1),
@@ -84,9 +89,11 @@ export const scenarioTestSuiteSchema = z
     updatedAt: z.date(),
   })
   .strict();
+export interface ScenarioTestSuiteSchema extends Named<typeof scenarioTestSuiteSchemaDefinition> {}
+export const scenarioTestSuiteSchema: ScenarioTestSuiteSchema = scenarioTestSuiteSchemaDefinition;
 export type ScenarioTestSuite = z.infer<typeof scenarioTestSuiteSchema>;
 
-export const scenarioTestSuiteCreateInputSchema = z
+const scenarioTestSuiteCreateInputSchemaDefinition = z
   .object({
     projectId: z.string().min(1),
     name: z.string().trim().min(1),
@@ -94,19 +101,34 @@ export const scenarioTestSuiteCreateInputSchema = z
     evaluators: evaluatorAttachmentsSchema.optional(),
   })
   .strict();
+export interface ScenarioTestSuiteCreateInputSchema extends Named<
+  typeof scenarioTestSuiteCreateInputSchemaDefinition
+> {}
+export const scenarioTestSuiteCreateInputSchema: ScenarioTestSuiteCreateInputSchema =
+  scenarioTestSuiteCreateInputSchemaDefinition;
 export type ScenarioTestSuiteCreateInput = z.infer<typeof scenarioTestSuiteCreateInputSchema>;
 
-export const scenarioTestSuiteIdInputSchema = z
+const scenarioTestSuiteIdInputSchemaDefinition = z
   .object({ projectId: z.string().min(1), testSuiteId: z.string().min(1) })
   .strict();
+export interface ScenarioTestSuiteIdInputSchema extends Named<
+  typeof scenarioTestSuiteIdInputSchemaDefinition
+> {}
+export const scenarioTestSuiteIdInputSchema: ScenarioTestSuiteIdInputSchema =
+  scenarioTestSuiteIdInputSchemaDefinition;
 export type ScenarioTestSuiteIdInput = z.infer<typeof scenarioTestSuiteIdInputSchema>;
 
-export const scenarioTestSuiteRenameInputSchema = scenarioTestSuiteIdInputSchema
+const scenarioTestSuiteRenameInputSchemaDefinition = scenarioTestSuiteIdInputSchema
   .safeExtend({ name: z.string().trim().min(1) })
   .strict();
+export interface ScenarioTestSuiteRenameInputSchema extends Named<
+  typeof scenarioTestSuiteRenameInputSchemaDefinition
+> {}
+export const scenarioTestSuiteRenameInputSchema: ScenarioTestSuiteRenameInputSchema =
+  scenarioTestSuiteRenameInputSchemaDefinition;
 export type ScenarioTestSuiteRenameInput = z.infer<typeof scenarioTestSuiteRenameInputSchema>;
 
-export const scenarioTestSuiteUpdateInputSchema = scenarioTestSuiteIdInputSchema
+const scenarioTestSuiteUpdateInputSchemaDefinition = scenarioTestSuiteIdInputSchema
   .safeExtend({
     name: z.string().trim().min(1).optional(),
     description: z.string().nullable().optional(),
@@ -119,6 +141,11 @@ export const scenarioTestSuiteUpdateInputSchema = scenarioTestSuiteIdInputSchema
     evaluators: evaluatorAttachmentsSchema.optional(),
   })
   .strict();
+export interface ScenarioTestSuiteUpdateInputSchema extends Named<
+  typeof scenarioTestSuiteUpdateInputSchemaDefinition
+> {}
+export const scenarioTestSuiteUpdateInputSchema: ScenarioTestSuiteUpdateInputSchema =
+  scenarioTestSuiteUpdateInputSchemaDefinition;
 export type ScenarioTestSuiteUpdateInput = z.infer<typeof scenarioTestSuiteUpdateInputSchema>;
 
 export type ScenarioTestSuiteRunDefinition = {
@@ -126,9 +153,11 @@ export type ScenarioTestSuiteRunDefinition = {
   scenarioIds: string[];
 };
 
-export const scenarioIdInputSchema = z
+const scenarioIdInputSchemaDefinition = z
   .object({ id: z.string().min(1), projectId: z.string().min(1) })
   .strict();
+export interface ScenarioIdInputSchema extends Named<typeof scenarioIdInputSchemaDefinition> {}
+export const scenarioIdInputSchema: ScenarioIdInputSchema = scenarioIdInputSchemaDefinition;
 export type ScenarioIdInput = z.infer<typeof scenarioIdInputSchema>;
 
 // No defaults here: under `.partial()` Zod still applies a default, so an
@@ -153,7 +182,7 @@ const scenarioFieldsShape = {
   callerVoice: callerVoiceConfigSchema.optional(),
 };
 
-export const scenarioCreateInputSchema = z
+const scenarioCreateInputSchemaDefinition = z
   .object({
     ...scenarioFieldsShape,
     criteria: z.array(z.string()).default([]),
@@ -162,9 +191,14 @@ export const scenarioCreateInputSchema = z
     actor: scenarioActorSchema.optional(),
   })
   .strict();
+export interface ScenarioCreateInputSchema extends Named<
+  typeof scenarioCreateInputSchemaDefinition
+> {}
+export const scenarioCreateInputSchema: ScenarioCreateInputSchema =
+  scenarioCreateInputSchemaDefinition;
 export type ScenarioCreateInput = z.infer<typeof scenarioCreateInputSchema>;
 
-export const scenarioUpdateInputSchema = z
+const scenarioUpdateInputSchemaDefinition = z
   .object(scenarioFieldsShape)
   .partial()
   .safeExtend({
@@ -174,9 +208,14 @@ export const scenarioUpdateInputSchema = z
     changeDescription: z.string().min(1).optional(),
   })
   .strict();
+export interface ScenarioUpdateInputSchema extends Named<
+  typeof scenarioUpdateInputSchemaDefinition
+> {}
+export const scenarioUpdateInputSchema: ScenarioUpdateInputSchema =
+  scenarioUpdateInputSchemaDefinition;
 export type ScenarioUpdateInput = z.infer<typeof scenarioUpdateInputSchema>;
 
-export const scenarioRunConfigSchema = z
+const scenarioRunConfigSchemaDefinition = z
   .object({
     id: z.string().min(1),
     name: z.string(),
@@ -186,6 +225,8 @@ export const scenarioRunConfigSchema = z
     parameters: jsonValueSchema,
   })
   .strict();
+export interface ScenarioRunConfigSchema extends Named<typeof scenarioRunConfigSchemaDefinition> {}
+export const scenarioRunConfigSchema: ScenarioRunConfigSchema = scenarioRunConfigSchemaDefinition;
 export type ScenarioRunConfig = z.infer<typeof scenarioRunConfigSchema>;
 
 export type ScenarioReferenceState = {

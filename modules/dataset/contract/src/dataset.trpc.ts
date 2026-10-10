@@ -4,7 +4,7 @@
  * declared here; the browser reads the same names and schemas as types.
  */
 
-import { defineTrpcContract } from "@langwatch/module";
+import { defineTrpcContract, type Named } from "@langwatch/module";
 import { z } from "zod";
 
 import { datasetLimitsSchema } from "./dataset-limits.ts";
@@ -35,7 +35,9 @@ import {
 } from "./dataset.ts";
 
 /** What an archive or its undo answers. */
-export const datasetDeletedSchema = z.object({ success: z.literal(true) }).strict();
+const datasetDeletedSchemaDefinition = z.object({ success: z.literal(true) }).strict();
+export interface DatasetDeletedSchema extends Named<typeof datasetDeletedSchemaDefinition> {}
+export const datasetDeletedSchema: DatasetDeletedSchema = datasetDeletedSchemaDefinition;
 
 export const datasetTrpc = defineTrpcContract("dataset")
   /** Creates a dataset, or replaces an existing one's columns and entries. */

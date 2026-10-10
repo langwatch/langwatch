@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import { canonicalLogRecordSchema } from "./log-record.ts";
@@ -19,7 +20,7 @@ export const MAX_LOG_COMMAND_SHARDS = 128;
 export const LOG_MAP_COALESCE_MAX_BATCH = 256;
 export const LOG_COMMAND_COALESCE_MAX_BATCH = 256;
 
-export const logEventEnvelopeSchema = z.object({
+const logEventEnvelopeSchemaDefinition = z.object({
   id: z.string(),
   aggregateId: z.string(),
   aggregateType: z.string().trim().min(1),
@@ -32,12 +33,19 @@ export const logEventEnvelopeSchema = z.object({
   metadata: z.object({ processingTraceparent: z.string().optional() }).passthrough().optional(),
   idempotencyKey: z.string().optional(),
 });
+export interface LogEventEnvelopeSchema extends Named<typeof logEventEnvelopeSchemaDefinition> {}
+export const logEventEnvelopeSchema: LogEventEnvelopeSchema = logEventEnvelopeSchemaDefinition;
 
-export const canonicalLogRecordReceivedEventSchema = z.object({
+const canonicalLogRecordReceivedEventSchemaDefinition = z.object({
   ...logEventEnvelopeSchema.shape,
   type: z.literal(CANONICAL_LOG_RECORD_RECEIVED_EVENT_TYPE),
   data: canonicalLogRecordSchema,
 });
+export interface CanonicalLogRecordReceivedEventSchema extends Named<
+  typeof canonicalLogRecordReceivedEventSchemaDefinition
+> {}
+export const canonicalLogRecordReceivedEventSchema: CanonicalLogRecordReceivedEventSchema =
+  canonicalLogRecordReceivedEventSchemaDefinition;
 
 export type CanonicalLogRecordReceivedEvent = z.infer<typeof canonicalLogRecordReceivedEventSchema>;
 export type LogProcessingEvent = CanonicalLogRecordReceivedEvent;

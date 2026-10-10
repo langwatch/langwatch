@@ -4,9 +4,10 @@
  * @see modules/experiment/specs/experiment-dataset-evaluation.feature
  */
 import { singleEvaluationResultSchema } from "@langwatch/evaluator-contract";
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
-export const datasetEvaluationInputSchema = z.object({
+const datasetEvaluationInputSchemaDefinition = z.object({
   projectId: z.string(),
   /** The evaluator, as a monitor slug or an evaluator type. */
   evaluation: z.string(),
@@ -16,10 +17,15 @@ export const datasetEvaluationInputSchema = z.object({
   /** The entry the evaluator scores. */
   data: z.record(z.string(), z.unknown()),
 });
+export interface DatasetEvaluationInputSchema extends Named<
+  typeof datasetEvaluationInputSchemaDefinition
+> {}
+export const datasetEvaluationInputSchema: DatasetEvaluationInputSchema =
+  datasetEvaluationInputSchemaDefinition;
 
 export type DatasetEvaluationInput = z.infer<typeof datasetEvaluationInputSchema>;
 
-export const datasetEvaluationOutcomeSchema = z.discriminatedUnion("outcome", [
+const datasetEvaluationOutcomeSchemaDefinition = z.discriminatedUnion("outcome", [
   z.object({ outcome: z.literal("evaluated"), result: singleEvaluationResultSchema }),
   z.object({ outcome: z.literal("evaluator_not_found"), checkType: z.string() }),
   z.object({
@@ -30,5 +36,10 @@ export const datasetEvaluationOutcomeSchema = z.discriminatedUnion("outcome", [
   z.object({ outcome: z.literal("invalid_data"), sentence: z.string() }),
   z.object({ outcome: z.literal("dataset_not_found") }),
 ]);
+export interface DatasetEvaluationOutcomeSchema extends Named<
+  typeof datasetEvaluationOutcomeSchemaDefinition
+> {}
+export const datasetEvaluationOutcomeSchema: DatasetEvaluationOutcomeSchema =
+  datasetEvaluationOutcomeSchemaDefinition;
 
 export type DatasetEvaluationOutcome = z.infer<typeof datasetEvaluationOutcomeSchema>;

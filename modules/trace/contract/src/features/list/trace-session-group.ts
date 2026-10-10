@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import {
@@ -16,7 +17,7 @@ const sessionGroupPullRequestDtoSchema = z.object({
   title: z.string(),
 });
 
-export const sessionGroupCodingAgentDtoSchema = z.object({
+const sessionGroupCodingAgentDtoSchemaDefinition = z.object({
   modelCalls: z.number(),
   compactions: z.number(),
   peakContextTokens: z.number(),
@@ -31,10 +32,15 @@ export const sessionGroupCodingAgentDtoSchema = z.object({
   /** The pull request this session's work belongs to (tenure rule); null with no git context. */
   pullRequest: sessionGroupPullRequestDtoSchema.nullable(),
 });
+export interface SessionGroupCodingAgentDtoSchema extends Named<
+  typeof sessionGroupCodingAgentDtoSchemaDefinition
+> {}
+export const sessionGroupCodingAgentDtoSchema: SessionGroupCodingAgentDtoSchema =
+  sessionGroupCodingAgentDtoSchemaDefinition;
 
 export type SessionGroupCodingAgentDto = z.infer<typeof sessionGroupCodingAgentDtoSchema>;
 
-export const sessionGroupDtoSchema = z.object({
+const sessionGroupDtoSchemaDefinition = z.object({
   conversationId: z.string(),
   /** The project the session belongs to; on an aggregate, the member. */
   projectId: z.string(),
@@ -67,14 +73,21 @@ export const sessionGroupDtoSchema = z.object({
    */
   codingAgent: sessionGroupCodingAgentDtoSchema.nullable(),
 });
+export interface SessionGroupDtoSchema extends Named<typeof sessionGroupDtoSchemaDefinition> {}
+export const sessionGroupDtoSchema: SessionGroupDtoSchema = sessionGroupDtoSchemaDefinition;
 
 export type SessionGroupDto = z.infer<typeof sessionGroupDtoSchema>;
 
-export const sessionGroupsResultSchema = z.object({
+const sessionGroupsResultSchemaDefinition = z.object({
   sessions: z.array(sessionGroupDtoSchema),
   totalHits: z.number(),
   nextCursor: z.string().nullable(),
 });
+export interface SessionGroupsResultSchema extends Named<
+  typeof sessionGroupsResultSchemaDefinition
+> {}
+export const sessionGroupsResultSchema: SessionGroupsResultSchema =
+  sessionGroupsResultSchemaDefinition;
 
 export type SessionGroupsResult = z.infer<typeof sessionGroupsResultSchema>;
 

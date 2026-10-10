@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import { organizationIntentSchema } from "./organization.ts";
@@ -5,14 +6,24 @@ import { organizationIntentSchema } from "./organization.ts";
 /** Transport inputs: what callers must send to the tRPC surface. */
 
 /** The organization a call is about, and the only scope most of them carry. */
-export const organizationApiScopeSchema = z.object({ organizationId: z.string() });
+const organizationApiScopeSchemaDefinition = z.object({ organizationId: z.string() });
+export interface OrganizationApiScopeSchema extends Named<
+  typeof organizationApiScopeSchemaDefinition
+> {}
+export const organizationApiScopeSchema: OrganizationApiScopeSchema =
+  organizationApiScopeSchemaDefinition;
 export type OrganizationApiScope = z.infer<typeof organizationApiScopeSchema>;
 
 /** One member of one organization. */
-export const organizationApiMemberScopeSchema = z.object({
+const organizationApiMemberScopeSchemaDefinition = z.object({
   userId: z.string(),
   organizationId: z.string(),
 });
+export interface OrganizationApiMemberScopeSchema extends Named<
+  typeof organizationApiMemberScopeSchemaDefinition
+> {}
+export const organizationApiMemberScopeSchema: OrganizationApiMemberScopeSchema =
+  organizationApiMemberScopeSchemaDefinition;
 export type OrganizationApiMemberScope = z.infer<typeof organizationApiMemberScopeSchema>;
 
 /**
@@ -72,25 +83,40 @@ export function assignsOrganizationCustomRole(input: unknown): boolean {
  */
 export const organizationApiBuiltInTeamRoleSchema = z.enum(["ADMIN", "MEMBER", "VIEWER"]);
 
-export const organizationApiTeamRoleSchema = z.union([
+const organizationApiTeamRoleSchemaDefinition = z.union([
   organizationApiBuiltInTeamRoleSchema,
   organizationApiCustomTeamRoleSchema,
 ]);
+export interface OrganizationApiTeamRoleSchema extends Named<
+  typeof organizationApiTeamRoleSchemaDefinition
+> {}
+export const organizationApiTeamRoleSchema: OrganizationApiTeamRoleSchema =
+  organizationApiTeamRoleSchemaDefinition;
 export type OrganizationApiTeamRole = z.infer<typeof organizationApiTeamRoleSchema>;
 
-export const organizationApiSetMemberDisabledInputSchema = z.object({
+const organizationApiSetMemberDisabledInputSchemaDefinition = z.object({
   userId: z.string(),
   organizationId: z.string(),
   disabled: z.boolean(),
 });
+export interface OrganizationApiSetMemberDisabledInputSchema extends Named<
+  typeof organizationApiSetMemberDisabledInputSchemaDefinition
+> {}
+export const organizationApiSetMemberDisabledInputSchema: OrganizationApiSetMemberDisabledInputSchema =
+  organizationApiSetMemberDisabledInputSchemaDefinition;
 export type OrganizationApiSetMemberDisabledInput = z.infer<
   typeof organizationApiSetMemberDisabledInputSchema
 >;
 
-export const organizationApiGetAllInputSchema = z.object({ isDemo: z.boolean().optional() });
+const organizationApiGetAllInputSchemaDefinition = z.object({ isDemo: z.boolean().optional() });
+export interface OrganizationApiGetAllInputSchema extends Named<
+  typeof organizationApiGetAllInputSchemaDefinition
+> {}
+export const organizationApiGetAllInputSchema: OrganizationApiGetAllInputSchema =
+  organizationApiGetAllInputSchemaDefinition;
 export type OrganizationApiGetAllInput = z.infer<typeof organizationApiGetAllInputSchema>;
 
-export const organizationApiUpdateInputSchema = z
+const organizationApiUpdateInputSchemaDefinition = z
   .object({
     organizationId: z.string(),
     name: z.string(),
@@ -116,15 +142,25 @@ export const organizationApiUpdateInputSchema = z
         "S3 Endpoint and Access Key ID must be provided together; a blank Secret Access Key leaves the stored one unchanged",
     },
   );
+export interface OrganizationApiUpdateInputSchema extends Named<
+  typeof organizationApiUpdateInputSchemaDefinition
+> {}
+export const organizationApiUpdateInputSchema: OrganizationApiUpdateInputSchema =
+  organizationApiUpdateInputSchemaDefinition;
 export type OrganizationApiUpdateInput = z.infer<typeof organizationApiUpdateInputSchema>;
 
-export const organizationApiWithMembersInputSchema = z.object({
+const organizationApiWithMembersInputSchemaDefinition = z.object({
   organizationId: z.string(),
   includeDeactivated: z.boolean().optional(),
 });
+export interface OrganizationApiWithMembersInputSchema extends Named<
+  typeof organizationApiWithMembersInputSchemaDefinition
+> {}
+export const organizationApiWithMembersInputSchema: OrganizationApiWithMembersInputSchema =
+  organizationApiWithMembersInputSchemaDefinition;
 export type OrganizationApiWithMembersInput = z.infer<typeof organizationApiWithMembersInputSchema>;
 
-export const organizationApiCreateInvitesInputSchema = z.object({
+const organizationApiCreateInvitesInputSchemaDefinition = z.object({
   organizationId: z.string(),
   invites: z.array(
     z.object({
@@ -143,21 +179,31 @@ export const organizationApiCreateInvitesInputSchema = z.object({
     }),
   ),
 });
+export interface OrganizationApiCreateInvitesInputSchema extends Named<
+  typeof organizationApiCreateInvitesInputSchemaDefinition
+> {}
+export const organizationApiCreateInvitesInputSchema: OrganizationApiCreateInvitesInputSchema =
+  organizationApiCreateInvitesInputSchemaDefinition;
 export type OrganizationApiCreateInvitesInput = z.infer<
   typeof organizationApiCreateInvitesInputSchema
 >;
 
-export const organizationApiInviteScopeSchema = z.object({
+const organizationApiInviteScopeSchemaDefinition = z.object({
   inviteId: z.string(),
   organizationId: z.string(),
 });
+export interface OrganizationApiInviteScopeSchema extends Named<
+  typeof organizationApiInviteScopeSchemaDefinition
+> {}
+export const organizationApiInviteScopeSchema: OrganizationApiInviteScopeSchema =
+  organizationApiInviteScopeSchemaDefinition;
 export type OrganizationApiInviteScope = z.infer<typeof organizationApiInviteScopeSchema>;
 
 /**
  * A seat checkout and the invitations that motivated it, the wire billing's
  * `subscription.upgradeWithInvites` had; organization's invite door now holds it (C2 A).
  */
-export const organizationApiSeatCheckoutInputSchema = z.object({
+const organizationApiSeatCheckoutInputSchemaDefinition = z.object({
   organizationId: z.string(),
   baseUrl: z.string(),
   currency: z.enum(["USD", "EUR"]).optional(),
@@ -170,24 +216,39 @@ export const organizationApiSeatCheckoutInputSchema = z.object({
     }),
   ),
 });
+export interface OrganizationApiSeatCheckoutInputSchema extends Named<
+  typeof organizationApiSeatCheckoutInputSchemaDefinition
+> {}
+export const organizationApiSeatCheckoutInputSchema: OrganizationApiSeatCheckoutInputSchema =
+  organizationApiSeatCheckoutInputSchemaDefinition;
 export type OrganizationApiSeatCheckoutInput = z.infer<
   typeof organizationApiSeatCheckoutInputSchema
 >;
 
 /** Where the browser is sent to pay; none when the provider answered no page. */
-export const organizationSeatCheckoutRedirectSchema = z
+const organizationSeatCheckoutRedirectSchemaDefinition = z
   .object({ url: z.string().nullable() })
   .strict();
+export interface OrganizationSeatCheckoutRedirectSchema extends Named<
+  typeof organizationSeatCheckoutRedirectSchemaDefinition
+> {}
+export const organizationSeatCheckoutRedirectSchema: OrganizationSeatCheckoutRedirectSchema =
+  organizationSeatCheckoutRedirectSchemaDefinition;
 export type OrganizationSeatCheckoutRedirect = z.infer<
   typeof organizationSeatCheckoutRedirectSchema
 >;
 
-export const organizationApiAcceptInviteInputSchema = z.object({ inviteCode: z.string() });
+const organizationApiAcceptInviteInputSchemaDefinition = z.object({ inviteCode: z.string() });
+export interface OrganizationApiAcceptInviteInputSchema extends Named<
+  typeof organizationApiAcceptInviteInputSchemaDefinition
+> {}
+export const organizationApiAcceptInviteInputSchema: OrganizationApiAcceptInviteInputSchema =
+  organizationApiAcceptInviteInputSchemaDefinition;
 export type OrganizationApiAcceptInviteInput = z.infer<
   typeof organizationApiAcceptInviteInputSchema
 >;
 
-export const organizationApiUpdateMemberRoleInputSchema = z.object({
+const organizationApiUpdateMemberRoleInputSchemaDefinition = z.object({
   userId: z.string(),
   organizationId: z.string(),
   role: organizationApiMemberRoleSchema,
@@ -202,6 +263,11 @@ export const organizationApiUpdateMemberRoleInputSchema = z.object({
     )
     .optional(),
 });
+export interface OrganizationApiUpdateMemberRoleInputSchema extends Named<
+  typeof organizationApiUpdateMemberRoleInputSchemaDefinition
+> {}
+export const organizationApiUpdateMemberRoleInputSchema: OrganizationApiUpdateMemberRoleInputSchema =
+  organizationApiUpdateMemberRoleInputSchemaDefinition;
 export type OrganizationApiUpdateMemberRoleInput = z.infer<
   typeof organizationApiUpdateMemberRoleInputSchema
 >;
@@ -211,7 +277,7 @@ export type OrganizationApiUpdateMemberRoleInput = z.infer<
  * nothing else: the pairing is part of what a caller has to send, so it is
  * stated here rather than re-derived by whichever transport carries it.
  */
-export const organizationApiUpdateTeamMemberRoleInputSchema = z
+const organizationApiUpdateTeamMemberRoleInputSchemaDefinition = z
   .object({
     teamId: z.string(),
     userId: z.string(),
@@ -238,11 +304,16 @@ export const organizationApiUpdateTeamMemberRoleInputSchema = z
       });
     }
   });
+export interface OrganizationApiUpdateTeamMemberRoleInputSchema extends Named<
+  typeof organizationApiUpdateTeamMemberRoleInputSchemaDefinition
+> {}
+export const organizationApiUpdateTeamMemberRoleInputSchema: OrganizationApiUpdateTeamMemberRoleInputSchema =
+  organizationApiUpdateTeamMemberRoleInputSchemaDefinition;
 export type OrganizationApiUpdateTeamMemberRoleInput = z.infer<
   typeof organizationApiUpdateTeamMemberRoleInputSchema
 >;
 
-export const organizationApiAuditLogsInputSchema = z.object({
+const organizationApiAuditLogsInputSchemaDefinition = z.object({
   organizationId: z.string(),
   projectId: z.string().optional(),
   userId: z.string().optional(),
@@ -257,4 +328,9 @@ export const organizationApiAuditLogsInputSchema = z.object({
   targetKind: z.string().optional(),
   targetId: z.string().optional(),
 });
+export interface OrganizationApiAuditLogsInputSchema extends Named<
+  typeof organizationApiAuditLogsInputSchemaDefinition
+> {}
+export const organizationApiAuditLogsInputSchema: OrganizationApiAuditLogsInputSchema =
+  organizationApiAuditLogsInputSchemaDefinition;
 export type OrganizationApiAuditLogsInput = z.infer<typeof organizationApiAuditLogsInputSchema>;

@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 /**
  * ADR-177 block D: the scope rule an aggregate project stores on
  * `Project.aggregateRule`. The rule is data and never decides a read:
@@ -8,18 +9,20 @@ import { z } from "zod";
 /** The discriminator of `Project.aggregateRule`. */
 export const AGGREGATE_RULE_KINDS = ["all-personal", "personal-by-department", "explicit"] as const;
 
-export const aggregateRuleSchema = z.discriminatedUnion("kind", [
+const aggregateRuleSchemaDefinition = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("all-personal") }).strict(),
   z.object({ kind: z.literal("personal-by-department"), departmentId: z.string().min(1) }).strict(),
   z.object({ kind: z.literal("explicit"), projectIds: z.array(z.string().min(1)).min(1) }).strict(),
 ]);
+export interface AggregateRuleSchema extends Named<typeof aggregateRuleSchemaDefinition> {}
+export const aggregateRuleSchema: AggregateRuleSchema = aggregateRuleSchemaDefinition;
 export type AggregateRule = z.infer<typeof aggregateRuleSchema>;
 
 /** Preselected on creation: every personal project in the organisation. */
 export const AGGREGATE_DEFAULT_RULE = { kind: "all-personal" } as const satisfies AggregateRule;
 
 /** A project an aggregate may read, as the new-project form lists it. */
-export const aggregateMemberCandidateSchema = z
+const aggregateMemberCandidateSchemaDefinition = z
   .object({
     id: z.string().min(1),
     name: z.string(),
@@ -29,10 +32,15 @@ export const aggregateMemberCandidateSchema = z
     owner: z.object({ name: z.string().nullable(), email: z.string().nullable() }).nullable(),
   })
   .strict();
+export interface AggregateMemberCandidateSchema extends Named<
+  typeof aggregateMemberCandidateSchemaDefinition
+> {}
+export const aggregateMemberCandidateSchema: AggregateMemberCandidateSchema =
+  aggregateMemberCandidateSchemaDefinition;
 export type AggregateMemberCandidate = z.infer<typeof aggregateMemberCandidateSchema>;
 
 /** An aggregate project as the reconciler reads it: where it lives, and its rule. */
-export const storedAggregateProjectSchema = z
+const storedAggregateProjectSchemaDefinition = z
   .object({
     id: z.string().min(1),
     organizationId: z.string().min(1),
@@ -42,12 +50,19 @@ export const storedAggregateProjectSchema = z
     rule: aggregateRuleSchema.nullable(),
   })
   .strict();
+export interface StoredAggregateProjectSchema extends Named<
+  typeof storedAggregateProjectSchemaDefinition
+> {}
+export const storedAggregateProjectSchema: StoredAggregateProjectSchema =
+  storedAggregateProjectSchemaDefinition;
 export type StoredAggregateProject = z.infer<typeof storedAggregateProjectSchema>;
 
 /** A live aggregate and its organisation, for the sweep over every organisation. */
-export const liveAggregateSchema = z
+const liveAggregateSchemaDefinition = z
   .object({ id: z.string().min(1), organizationId: z.string().min(1) })
   .strict();
+export interface LiveAggregateSchema extends Named<typeof liveAggregateSchemaDefinition> {}
+export const liveAggregateSchema: LiveAggregateSchema = liveAggregateSchemaDefinition;
 export type LiveAggregate = z.infer<typeof liveAggregateSchema>;
 
 /**
@@ -55,7 +70,7 @@ export type LiveAggregate = z.infer<typeof liveAggregateSchema>;
  * reconciler runs after the answer (M8487-MEMBERS), so the rule's selected
  * members arrive as `pending` and main's four lists answer empty.
  */
-export const aggregateRuleMembersSchema = z
+const aggregateRuleMembersSchemaDefinition = z
   .object({
     attached: z.array(z.string()),
     revoked: z.array(z.string()),
@@ -64,4 +79,9 @@ export const aggregateRuleMembersSchema = z
     pending: z.array(z.string()),
   })
   .strict();
+export interface AggregateRuleMembersSchema extends Named<
+  typeof aggregateRuleMembersSchemaDefinition
+> {}
+export const aggregateRuleMembersSchema: AggregateRuleMembersSchema =
+  aggregateRuleMembersSchemaDefinition;
 export type AggregateRuleMembers = z.infer<typeof aggregateRuleMembersSchema>;

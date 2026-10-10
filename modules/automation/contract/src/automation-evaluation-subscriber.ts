@@ -1,43 +1,69 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
-export const automationEvaluationSubscriberEventSchema = z.object({
+const automationEvaluationSubscriberEventSchemaDefinition = z.object({
   occurredAt: z.number(),
   // Processing time; the stale guard reads it, since occurredAt may be the evaluated span's end
   createdAt: z.number().optional(),
 });
+export interface AutomationEvaluationSubscriberEventSchema extends Named<
+  typeof automationEvaluationSubscriberEventSchemaDefinition
+> {}
+export const automationEvaluationSubscriberEventSchema: AutomationEvaluationSubscriberEventSchema =
+  automationEvaluationSubscriberEventSchemaDefinition;
 
 export type AutomationEvaluationSubscriberEvent = z.infer<
   typeof automationEvaluationSubscriberEventSchema
 >;
 
-export const automationEvaluationSubscriberStateSchema = z.object({
+const automationEvaluationSubscriberStateSchemaDefinition = z.object({
   status: z.string(),
   traceId: z.string().nullable().optional(),
 });
+export interface AutomationEvaluationSubscriberStateSchema extends Named<
+  typeof automationEvaluationSubscriberStateSchemaDefinition
+> {}
+export const automationEvaluationSubscriberStateSchema: AutomationEvaluationSubscriberStateSchema =
+  automationEvaluationSubscriberStateSchemaDefinition;
 
 export type AutomationEvaluationSubscriberState = z.infer<
   typeof automationEvaluationSubscriberStateSchema
 >;
 
-export const automationEvaluationSubscriberContextSchema = z.object({
+const automationEvaluationSubscriberContextSchemaDefinition = z.object({
   tenantId: z.string(),
   state: automationEvaluationSubscriberStateSchema,
 });
+export interface AutomationEvaluationSubscriberContextSchema extends Named<
+  typeof automationEvaluationSubscriberContextSchemaDefinition
+> {}
+export const automationEvaluationSubscriberContextSchema: AutomationEvaluationSubscriberContextSchema =
+  automationEvaluationSubscriberContextSchemaDefinition;
 
 export type AutomationEvaluationSubscriberContext = z.infer<
   typeof automationEvaluationSubscriberContextSchema
 >;
 
-export const automationEvaluationActivityContextSchema = z.object({ tenantId: z.string() });
+const automationEvaluationActivityContextSchemaDefinition = z.object({ tenantId: z.string() });
+export interface AutomationEvaluationActivityContextSchema extends Named<
+  typeof automationEvaluationActivityContextSchemaDefinition
+> {}
+export const automationEvaluationActivityContextSchema: AutomationEvaluationActivityContextSchema =
+  automationEvaluationActivityContextSchemaDefinition;
 
 export type AutomationEvaluationActivityContext = z.infer<
   typeof automationEvaluationActivityContextSchema
 >;
 
-export const automationTraceSubscriberContextSchema = z.object({
+const automationTraceSubscriberContextSchemaDefinition = z.object({
   tenantId: z.string(),
   aggregateId: z.string().optional(),
 });
+export interface AutomationTraceSubscriberContextSchema extends Named<
+  typeof automationTraceSubscriberContextSchemaDefinition
+> {}
+export const automationTraceSubscriberContextSchema: AutomationTraceSubscriberContextSchema =
+  automationTraceSubscriberContextSchemaDefinition;
 
 export type AutomationTraceSubscriberContext = z.infer<
   typeof automationTraceSubscriberContextSchema

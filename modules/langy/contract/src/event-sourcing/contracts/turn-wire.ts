@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 /**
  * The WIRE contract of one turn event (ADR-059 §3): identity, cursor
  * coordinates, fold clock, typed payload — no tenant/aggregate/server-only
@@ -37,7 +38,7 @@ const turnWireEnvelope = {
   occurredAt: z.number().int().nonnegative(),
 } as const;
 
-export const langyConversationTurnEventSchema = z.discriminatedUnion("type", [
+const langyConversationTurnEventSchemaDefinition = z.discriminatedUnion("type", [
   z.object({
     ...turnWireEnvelope,
     type: z.literal(LANGY_CONVERSATION_EVENT_TYPES.AGENT_TURN_ACCEPTED),
@@ -84,4 +85,9 @@ export const langyConversationTurnEventSchema = z.discriminatedUnion("type", [
     data: langyUserWaitEndedEventDataSchema,
   }),
 ]);
+export interface LangyConversationTurnEventSchema extends Named<
+  typeof langyConversationTurnEventSchemaDefinition
+> {}
+export const langyConversationTurnEventSchema: LangyConversationTurnEventSchema =
+  langyConversationTurnEventSchemaDefinition;
 export type LangyConversationTurnWireEvent = z.infer<typeof langyConversationTurnEventSchema>;

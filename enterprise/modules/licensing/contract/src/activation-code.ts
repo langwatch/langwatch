@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * The short code a fresh install pastes instead of a license blob (ADR-156,
@@ -10,7 +11,7 @@ export const activationCodeStatusSchema = z.enum(["active", "redeemed", "expired
 export type ActivationCodeStatus = z.infer<typeof activationCodeStatusSchema>;
 
 /** A code as the admin console reads it, with the verdict already worked out. */
-export const activationCodeViewSchema = z.object({
+const activationCodeViewSchemaDefinition = z.object({
   id: z.string(),
   /** The last four characters, which is how two codes are told apart. */
   codeHint: z.string(),
@@ -35,22 +36,37 @@ export const activationCodeViewSchema = z.object({
   createdAt: z.string(),
   status: activationCodeStatusSchema,
 });
+export interface ActivationCodeViewSchema extends Named<
+  typeof activationCodeViewSchemaDefinition
+> {}
+export const activationCodeViewSchema: ActivationCodeViewSchema =
+  activationCodeViewSchemaDefinition;
 export type ActivationCodeView = z.infer<typeof activationCodeViewSchema>;
 
-export const activationCodePageSchema = z.object({
+const activationCodePageSchemaDefinition = z.object({
   codes: z.array(activationCodeViewSchema),
   total: z.number(),
 });
+export interface ActivationCodePageSchema extends Named<
+  typeof activationCodePageSchemaDefinition
+> {}
+export const activationCodePageSchema: ActivationCodePageSchema =
+  activationCodePageSchemaDefinition;
 export type ActivationCodePage = z.infer<typeof activationCodePageSchema>;
 
-export const listActivationCodesInputSchema = z.object({
+const listActivationCodesInputSchemaDefinition = z.object({
   page: z.number().int().min(0).default(0),
   pageSize: z.number().int().min(1).max(100).default(25),
   organizationId: z.string().min(1).optional(),
 });
+export interface ListActivationCodesInputSchema extends Named<
+  typeof listActivationCodesInputSchemaDefinition
+> {}
+export const listActivationCodesInputSchema: ListActivationCodesInputSchema =
+  listActivationCodesInputSchemaDefinition;
 
 /** What an operator supplies when minting a code from the admin console. */
-export const issueActivationCodeInputSchema = z.object({
+const issueActivationCodeInputSchemaDefinition = z.object({
   organizationId: z.string().min(1),
   organizationName: z.string().min(1),
   email: z.string().min(1),
@@ -63,17 +79,32 @@ export const issueActivationCodeInputSchema = z.object({
   expiresAt: z.string().min(1),
   reusable: z.boolean().optional(),
 });
+export interface IssueActivationCodeInputSchema extends Named<
+  typeof issueActivationCodeInputSchemaDefinition
+> {}
+export const issueActivationCodeInputSchema: IssueActivationCodeInputSchema =
+  issueActivationCodeInputSchemaDefinition;
 export type IssueActivationCodeInput = z.infer<typeof issueActivationCodeInputSchema> & {
   operatorId: string;
 };
 
-export const revokeActivationCodeInputSchema = z.object({ id: z.string().min(1) });
+const revokeActivationCodeInputSchemaDefinition = z.object({ id: z.string().min(1) });
+export interface RevokeActivationCodeInputSchema extends Named<
+  typeof revokeActivationCodeInputSchemaDefinition
+> {}
+export const revokeActivationCodeInputSchema: RevokeActivationCodeInputSchema =
+  revokeActivationCodeInputSchemaDefinition;
 
 /** The code in plain text, shown once, beside the row that will outlive it. */
-export const issuedActivationCodeSchema = z.object({
+const issuedActivationCodeSchemaDefinition = z.object({
   code: z.string(),
   row: activationCodeViewSchema,
 });
+export interface IssuedActivationCodeSchema extends Named<
+  typeof issuedActivationCodeSchemaDefinition
+> {}
+export const issuedActivationCodeSchema: IssuedActivationCodeSchema =
+  issuedActivationCodeSchemaDefinition;
 export type IssuedActivationCode = z.infer<typeof issuedActivationCodeSchema>;
 
 /** What an install gets back for a code it redeemed: one license, once. */

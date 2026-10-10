@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 /** A single HTTP request to a customer URL, one attempt at a time (ADR-167 step 1). */
@@ -96,14 +97,19 @@ export function findWebhookUrlProblemMessage(url: string): string | null {
 }
 
 /** Who asked for a request; it only groups ledger rows (automation reads its trigger's by it). */
-export const webhookRequestSourceSchema = z.object({
+const webhookRequestSourceSchemaDefinition = z.object({
   module: z.literal("automation"),
   ref: z.string(),
 });
+export interface WebhookRequestSourceSchema extends Named<
+  typeof webhookRequestSourceSchemaDefinition
+> {}
+export const webhookRequestSourceSchema: WebhookRequestSourceSchema =
+  webhookRequestSourceSchemaDefinition;
 export type WebhookRequestSource = z.infer<typeof webhookRequestSourceSchema>;
 
 /** One attempt: fenced, capped per project, signed, sent, classified and recorded. */
-export const webhookSendRequestSchema = z.object({
+const webhookSendRequestSchemaDefinition = z.object({
   projectId: z.string(),
   url: z.string(),
   method: webhookMethodSchema.optional(),
@@ -121,26 +127,41 @@ export const webhookSendRequestSchema = z.object({
   /** An author's test: marked by header, outside the cap and never filed in the ledger. */
   testFire: z.boolean().optional(),
 });
+export interface WebhookSendRequestSchema extends Named<
+  typeof webhookSendRequestSchemaDefinition
+> {}
+export const webhookSendRequestSchema: WebhookSendRequestSchema =
+  webhookSendRequestSchemaDefinition;
 export type WebhookSendRequest = z.infer<typeof webhookSendRequestSchema>;
 
-export const webhookSendRequestResultSchema = z.object({
+const webhookSendRequestResultSchemaDefinition = z.object({
   status: z.number().int(),
   dispatchId: z.string(),
 });
+export interface WebhookSendRequestResultSchema extends Named<
+  typeof webhookSendRequestResultSchemaDefinition
+> {}
+export const webhookSendRequestResultSchema: WebhookSendRequestResultSchema =
+  webhookSendRequestResultSchemaDefinition;
 export type WebhookSendRequestResult = z.infer<typeof webhookSendRequestResultSchema>;
 
 export const webhookRequestOutcomeSchema = z.enum(["success", "retryable", "terminal", "pending"]);
 
 /** The receiver's side of a failed attempt; the request itself is never kept. */
-export const webhookRequestFailureResponseSchema = z.object({
+const webhookRequestFailureResponseSchemaDefinition = z.object({
   body: z.string().optional(),
   headers: z.record(z.string(), z.string()).optional(),
   retryAfterMs: z.number().optional(),
 });
+export interface WebhookRequestFailureResponseSchema extends Named<
+  typeof webhookRequestFailureResponseSchemaDefinition
+> {}
+export const webhookRequestFailureResponseSchema: WebhookRequestFailureResponseSchema =
+  webhookRequestFailureResponseSchemaDefinition;
 export type WebhookRequestFailureResponse = z.infer<typeof webhookRequestFailureResponseSchema>;
 
 /** One recorded attempt of {@link webhookSendRequestSchema}, newest first. */
-export const webhookRequestDeliverySchema = z.object({
+const webhookRequestDeliverySchemaDefinition = z.object({
   id: z.string(),
   ref: z.string(),
   dispatchId: z.string(),
@@ -151,4 +172,9 @@ export const webhookRequestDeliverySchema = z.object({
   outcome: webhookRequestOutcomeSchema,
   firedAt: z.date(),
 });
+export interface WebhookRequestDeliverySchema extends Named<
+  typeof webhookRequestDeliverySchemaDefinition
+> {}
+export const webhookRequestDeliverySchema: WebhookRequestDeliverySchema =
+  webhookRequestDeliverySchemaDefinition;
 export type WebhookRequestDelivery = z.infer<typeof webhookRequestDeliverySchema>;

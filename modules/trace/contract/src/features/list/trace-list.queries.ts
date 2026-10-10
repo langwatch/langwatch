@@ -1,4 +1,5 @@
 import type { Authorization } from "@langwatch/authorization";
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 /**
@@ -81,11 +82,13 @@ export interface TraceListSort {
  * Keyset cursor: the repository normalizes the sort value to a finite number; tenant and trace id
  * together break ties, since two tenants of an aggregate may hold the same trace id (ADR-177).
  */
-export const traceListCursorSchema = z.object({
+const traceListCursorSchemaDefinition = z.object({
   sortValue: z.number(),
   tenantId: z.string(),
   traceId: z.string(),
 });
+export interface TraceListCursorSchema extends Named<typeof traceListCursorSchemaDefinition> {}
+export const traceListCursorSchema: TraceListCursorSchema = traceListCursorSchemaDefinition;
 
 export type TraceListCursor = z.infer<typeof traceListCursorSchema>;
 
@@ -123,7 +126,7 @@ export interface TraceListRepositoryPage {
  * sidebar drilldown can render verdict pills and a score range slider inline without firing a
  * second query per evaluator. Other facets leave this absent.
  */
-export const facetValueAggregatesSchema = z.object({
+const facetValueAggregatesSchemaDefinition = z.object({
   passedCount: z.number(),
   failedCount: z.number(),
   erroredCount: z.number(),
@@ -138,6 +141,11 @@ export const facetValueAggregatesSchema = z.object({
    *  the drilldown's clickable label-filter rows. Absent when none emitted. */
   labelValues: z.array(z.object({ value: z.string(), count: z.number() })).optional(),
 });
+export interface FacetValueAggregatesSchema extends Named<
+  typeof facetValueAggregatesSchemaDefinition
+> {}
+export const facetValueAggregatesSchema: FacetValueAggregatesSchema =
+  facetValueAggregatesSchemaDefinition;
 
 type FacetValueAggregates = z.infer<typeof facetValueAggregatesSchema>;
 
@@ -145,12 +153,14 @@ type FacetValueAggregates = z.infer<typeof facetValueAggregatesSchema>;
  * Per-event-name metric value tallies the event facet attaches so its sidebar drilldown
  * (thumbs_up_down → vote values) renders from the discover payload without a second query.
  */
-export const eventMetricValuesSchema = z.object({
+const eventMetricValuesSchemaDefinition = z.object({
   /** Full storage key, e.g. `event.metrics.vote` — the UI strips the
    *  prefix for display but filters on the full key. */
   key: z.string(),
   values: z.array(z.object({ value: z.string(), count: z.number() })),
 });
+export interface EventMetricValuesSchema extends Named<typeof eventMetricValuesSchemaDefinition> {}
+export const eventMetricValuesSchema: EventMetricValuesSchema = eventMetricValuesSchemaDefinition;
 
 export type EventMetricValues = z.infer<typeof eventMetricValuesSchema>;
 

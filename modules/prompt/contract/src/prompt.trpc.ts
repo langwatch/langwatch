@@ -3,7 +3,7 @@
  * cache keys. `demonstrations` is a workflow dataset, so both write shapes
  * take THIS contract's own `nodeDatasetSchema`, avoiding a contract cycle.
  */
-import { defineTrpcContract } from "@langwatch/module";
+import { defineTrpcContract, type Named } from "@langwatch/module";
 import { z } from "zod";
 
 import { PROMPT_CREATED_EVENT_TYPE } from "./prompt.commands.ts";
@@ -33,14 +33,24 @@ import {
 } from "./prompt.ts";
 
 /** What a browser sends to `prompts.create`. */
-export const promptCreateTrpcInputSchema = createPromptCreateTrpcInputSchema({
+const promptCreateTrpcInputSchemaDefinition = createPromptCreateTrpcInputSchema({
   demonstrationsSchema: nodeDatasetSchema,
 });
+export interface PromptCreateTrpcInputSchema extends Named<
+  typeof promptCreateTrpcInputSchemaDefinition
+> {}
+export const promptCreateTrpcInputSchema: PromptCreateTrpcInputSchema =
+  promptCreateTrpcInputSchemaDefinition;
 
 /** What a browser sends to `prompts.update`: a new version, so a message. */
-export const promptUpdateTrpcInputSchema = createPromptUpdateTrpcInputSchema({
+const promptUpdateTrpcInputSchemaDefinition = createPromptUpdateTrpcInputSchema({
   demonstrationsSchema: nodeDatasetSchema,
 });
+export interface PromptUpdateTrpcInputSchema extends Named<
+  typeof promptUpdateTrpcInputSchemaDefinition
+> {}
+export const promptUpdateTrpcInputSchema: PromptUpdateTrpcInputSchema =
+  promptUpdateTrpcInputSchemaDefinition;
 
 export type PromptCreateTrpcInput = z.infer<typeof promptCreateTrpcInputSchema>;
 export type PromptUpdateTrpcInput = z.infer<typeof promptUpdateTrpcInputSchema>;

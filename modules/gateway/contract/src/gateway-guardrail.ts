@@ -1,4 +1,5 @@
 import { HandledError } from "@langwatch/handled-error";
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 export const gatewayGuardrailDirectionSchema = z.enum(["PRE", "POST", "STREAM_CHUNK"]);
@@ -20,7 +21,7 @@ export const gatewayGuardrailFailureModeSchema = z.enum(["FAIL_OPEN", "FAIL_CLOS
 export type GatewayGuardrailDirection = z.infer<typeof gatewayGuardrailDirectionSchema>;
 export type GatewayGuardrailFailureMode = z.infer<typeof gatewayGuardrailFailureModeSchema>;
 
-export const gatewayGuardrailResourceSchema = z.object({
+const gatewayGuardrailResourceSchemaDefinition = z.object({
   id: z.string(),
   projectId: z.string(),
   name: z.string(),
@@ -34,10 +35,15 @@ export const gatewayGuardrailResourceSchema = z.object({
   createdAt: z.date(),
   updatedAt: z.date(),
 });
+export interface GatewayGuardrailResourceSchema extends Named<
+  typeof gatewayGuardrailResourceSchemaDefinition
+> {}
+export const gatewayGuardrailResourceSchema: GatewayGuardrailResourceSchema =
+  gatewayGuardrailResourceSchemaDefinition;
 
 export type GatewayGuardrailResource = z.infer<typeof gatewayGuardrailResourceSchema>;
 
-export const gatewayGuardrailBundleEntrySchema = z.object({
+const gatewayGuardrailBundleEntrySchemaDefinition = z.object({
   id: z.string(),
   name: z.string(),
   evaluatorId: z.string(),
@@ -45,10 +51,15 @@ export const gatewayGuardrailBundleEntrySchema = z.object({
   direction: z.enum(["pre", "post", "stream_chunk"]),
   failureMode: z.enum(["fail_open", "fail_closed"]),
 });
+export interface GatewayGuardrailBundleEntrySchema extends Named<
+  typeof gatewayGuardrailBundleEntrySchemaDefinition
+> {}
+export const gatewayGuardrailBundleEntrySchema: GatewayGuardrailBundleEntrySchema =
+  gatewayGuardrailBundleEntrySchemaDefinition;
 
 export type GatewayGuardrailBundleEntry = z.infer<typeof gatewayGuardrailBundleEntrySchema>;
 
-export const createGatewayGuardrailInputSchema = z.object({
+const createGatewayGuardrailInputSchemaDefinition = z.object({
   projectId: z.string(),
   name: z.string().min(1).max(128),
   description: z.string().max(512).nullable().optional(),
@@ -57,19 +68,34 @@ export const createGatewayGuardrailInputSchema = z.object({
   failureMode: gatewayGuardrailFailureModeSchema.optional(),
   actorUserId: z.string(),
 });
+export interface CreateGatewayGuardrailInputSchema extends Named<
+  typeof createGatewayGuardrailInputSchemaDefinition
+> {}
+export const createGatewayGuardrailInputSchema: CreateGatewayGuardrailInputSchema =
+  createGatewayGuardrailInputSchemaDefinition;
 
-export const updateGatewayGuardrailInputSchema = z.object({
+const updateGatewayGuardrailInputSchemaDefinition = z.object({
   ...createGatewayGuardrailInputSchema.partial().shape,
   id: z.string(),
   projectId: z.string(),
   actorUserId: z.string(),
 });
+export interface UpdateGatewayGuardrailInputSchema extends Named<
+  typeof updateGatewayGuardrailInputSchemaDefinition
+> {}
+export const updateGatewayGuardrailInputSchema: UpdateGatewayGuardrailInputSchema =
+  updateGatewayGuardrailInputSchemaDefinition;
 
-export const archiveGatewayGuardrailInputSchema = z.object({
+const archiveGatewayGuardrailInputSchemaDefinition = z.object({
   id: z.string(),
   projectId: z.string(),
   actorUserId: z.string(),
 });
+export interface ArchiveGatewayGuardrailInputSchema extends Named<
+  typeof archiveGatewayGuardrailInputSchemaDefinition
+> {}
+export const archiveGatewayGuardrailInputSchema: ArchiveGatewayGuardrailInputSchema =
+  archiveGatewayGuardrailInputSchemaDefinition;
 
 export type CreateGatewayGuardrailInput = z.infer<typeof createGatewayGuardrailInputSchema>;
 export type UpdateGatewayGuardrailInput = z.infer<typeof updateGatewayGuardrailInputSchema>;

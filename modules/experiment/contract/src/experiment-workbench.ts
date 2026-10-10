@@ -1,6 +1,7 @@
 import type { DatasetColumnType } from "@langwatch/dataset-contract";
 import type { EvaluatorTypes } from "@langwatch/evaluator-contract";
 import type { SerializedHandledError } from "@langwatch/handled-error";
+import type { Named } from "@langwatch/module";
 import {
   fieldSchema,
   HTTP_METHODS,
@@ -29,37 +30,46 @@ const sourceFieldMappingSchema = z.object({
   sourceField: z.string(),
 });
 
-export const fieldMappingSchema = z.discriminatedUnion("type", [
+const fieldMappingSchemaDefinition = z.discriminatedUnion("type", [
   sourceFieldMappingSchema,
   z.object({
     type: z.literal("value"),
     value: z.string(),
   }),
 ]);
+export interface FieldMappingSchema extends Named<typeof fieldMappingSchemaDefinition> {}
+export const fieldMappingSchema: FieldMappingSchema = fieldMappingSchemaDefinition;
 export type FieldMapping = z.infer<typeof fieldMappingSchema>;
 
 /**
  * An evaluator input's mapping as a run carries it: an author's typed text, or
  * a per-row value the run resolved itself (comparison candidates, costs).
  */
-export const evaluatorFieldMappingSchema = z.discriminatedUnion("type", [
+const evaluatorFieldMappingSchemaDefinition = z.discriminatedUnion("type", [
   sourceFieldMappingSchema,
   z.object({
     type: z.literal("value"),
     value: z.unknown(),
   }),
 ]);
+export interface EvaluatorFieldMappingSchema extends Named<
+  typeof evaluatorFieldMappingSchemaDefinition
+> {}
+export const evaluatorFieldMappingSchema: EvaluatorFieldMappingSchema =
+  evaluatorFieldMappingSchemaDefinition;
 export type EvaluatorFieldMapping = z.infer<typeof evaluatorFieldMappingSchema>;
 
 /**
  * Zod schema for dataset column validation.
  * Runtime validation is permissive (string), TypeScript type is strict.
  */
-export const datasetColumnSchema = z.object({
+const datasetColumnSchemaDefinition = z.object({
   id: z.string(),
   name: z.string(),
   type: z.string(), // Allow any string at runtime since DatasetColumnType has many values
 });
+export interface DatasetColumnSchema extends Named<typeof datasetColumnSchemaDefinition> {}
+export const datasetColumnSchema: DatasetColumnSchema = datasetColumnSchemaDefinition;
 // TypeScript type uses the strict DatasetColumnType
 export type DatasetColumn = {
   id: string;
@@ -70,10 +80,12 @@ export type DatasetColumn = {
 /**
  * Zod schema for inline dataset validation.
  */
-export const inlineDatasetSchema = z.object({
+const inlineDatasetSchemaDefinition = z.object({
   columns: z.array(datasetColumnSchema),
   records: z.record(z.string(), z.array(z.string())),
 });
+export interface InlineDatasetSchema extends Named<typeof inlineDatasetSchemaDefinition> {}
+export const inlineDatasetSchema: InlineDatasetSchema = inlineDatasetSchemaDefinition;
 export type InlineDataset = {
   columns: DatasetColumn[];
   records: Record<string, string[]>;
@@ -82,17 +94,19 @@ export type InlineDataset = {
 /**
  * Zod schema for saved record validation.
  */
-export const savedRecordSchema = z
+const savedRecordSchemaDefinition = z
   .object({
     id: z.string(),
   })
   .passthrough();
+export interface SavedRecordSchema extends Named<typeof savedRecordSchemaDefinition> {}
+export const savedRecordSchema: SavedRecordSchema = savedRecordSchemaDefinition;
 export type SavedRecord = { id: string } & Record<string, unknown>;
 
 /**
  * Zod schema for dataset reference validation.
  */
-export const datasetReferenceSchema = z.object({
+const datasetReferenceSchemaDefinition = z.object({
   id: z.string(),
   name: z.string(),
   type: z.enum(["inline", "saved"]),
@@ -107,6 +121,8 @@ export const datasetReferenceSchema = z.object({
     })
     .optional(),
 });
+export interface DatasetReferenceSchema extends Named<typeof datasetReferenceSchemaDefinition> {}
+export const datasetReferenceSchema: DatasetReferenceSchema = datasetReferenceSchemaDefinition;
 
 /** Set when the page loaded fewer rows of a saved dataset than it holds. */
 export type SavedRecordsCut = { loadedRows: number; totalRows: number };
@@ -130,15 +146,20 @@ export type { LocalPromptConfig };
  * Stores unsaved evaluator changes (name, settings) locally until the user clicks "Save".
  * Mirrors the localPromptConfig pattern for prompts.
  */
-export const localEvaluatorConfigSchema = z.object({
+const localEvaluatorConfigSchemaDefinition = z.object({
   name: z.string(),
   settings: z.record(z.string(), z.unknown()).optional(),
 });
+export interface LocalEvaluatorConfigSchema extends Named<
+  typeof localEvaluatorConfigSchemaDefinition
+> {}
+export const localEvaluatorConfigSchema: LocalEvaluatorConfigSchema =
+  localEvaluatorConfigSchemaDefinition;
 export type LocalEvaluatorConfig = z.infer<typeof localEvaluatorConfigSchema>;
 
 // Settings are fetched at execution time from DB, not from workbench state.
 // Mappings are per-dataset and per-target to allow different column names.
-export const pairwiseEvaluatorConfigSchema = z.object({
+const pairwiseEvaluatorConfigSchemaDefinition = z.object({
   variantA: z.string(),
   variantB: z.string(),
   /**
@@ -152,6 +173,11 @@ export const pairwiseEvaluatorConfigSchema = z.object({
   goldenField: z.string(),
   includeMetrics: z.array(z.enum(["cost", "duration"])).default([]),
 });
+export interface PairwiseEvaluatorConfigSchema extends Named<
+  typeof pairwiseEvaluatorConfigSchemaDefinition
+> {}
+export const pairwiseEvaluatorConfigSchema: PairwiseEvaluatorConfigSchema =
+  pairwiseEvaluatorConfigSchemaDefinition;
 export type PairwiseEvaluatorConfig = z.infer<typeof pairwiseEvaluatorConfigSchema>;
 
 // Single source of truth for whether goldenField is needed, checked by UI,
@@ -183,7 +209,7 @@ export const COMPARISON_COLUMN_REFUSAL =
   `Only the Comparison judge (${COMPARISON_EVALUATOR_TYPE}) can be a standalone comparison column. ` +
   `Omit "comparison" and this evaluator attaches to every target column as a score.`;
 
-export const comparisonEvaluatorConfigSchema = z.object({
+const comparisonEvaluatorConfigSchemaDefinition = z.object({
   variants: z.array(z.string()).default([]),
   variantOutputPaths: z.record(z.string(), z.array(z.string())).optional(),
   hasGoldenAnswer: z.boolean().default(false),
@@ -192,6 +218,11 @@ export const comparisonEvaluatorConfigSchema = z.object({
   includeMetrics: z.array(z.enum(["cost", "duration"])).default([]),
   randomizeOrder: z.boolean().default(true),
 });
+export interface ComparisonEvaluatorConfigSchema extends Named<
+  typeof comparisonEvaluatorConfigSchemaDefinition
+> {}
+export const comparisonEvaluatorConfigSchema: ComparisonEvaluatorConfigSchema =
+  comparisonEvaluatorConfigSchemaDefinition;
 export type ComparisonEvaluatorConfig = z.infer<typeof comparisonEvaluatorConfigSchema>;
 
 // Renders as a dedicated verdict column, not a chip on each target, so it
@@ -199,7 +230,7 @@ export type ComparisonEvaluatorConfig = z.infer<typeof comparisonEvaluatorConfig
 export const isComparisonEvaluator = (e: { pairwise?: unknown; comparison?: unknown }): boolean =>
   !!e.comparison || !!e.pairwise;
 
-export const evaluatorConfigSchema = z.object({
+const evaluatorConfigSchemaDefinition = z.object({
   id: z.string(),
   evaluatorType: z.string(),
   /** @deprecated Settings are fetched from DB at execution time, not from workbench state */
@@ -220,6 +251,8 @@ export const evaluatorConfigSchema = z.object({
   /** Set only for comparison evaluators — the one column-vs-column judge. */
   comparison: comparisonEvaluatorConfigSchema.optional(),
 });
+export interface EvaluatorConfigSchema extends Named<typeof evaluatorConfigSchemaDefinition> {}
+export const evaluatorConfigSchema: EvaluatorConfigSchema = evaluatorConfigSchemaDefinition;
 export type EvaluatorConfig = Omit<
   z.infer<typeof evaluatorConfigSchema>,
   "evaluatorType" | "inputs"
@@ -240,19 +273,21 @@ export type AgentTypeEnum = z.infer<typeof agentTypeEnum>;
  * HTTP config schema for HTTP agent targets: what the row shows. The saved
  * agent owns its credentials, read by agent id when the row runs.
  */
-export const httpConfigSchema = z.object({
+const httpConfigSchemaDefinition = z.object({
   url: z.string(),
   method: z.enum(HTTP_METHODS).default("POST"),
   bodyTemplate: z.string().optional(),
   outputPath: z.string().optional(),
   timeoutMs: z.number().positive().optional(),
 });
+export interface HttpConfigSchema extends Named<typeof httpConfigSchemaDefinition> {}
+export const httpConfigSchema: HttpConfigSchema = httpConfigSchemaDefinition;
 export type HttpConfig = z.infer<typeof httpConfigSchema>;
 
 // The target's base shape, exported so callers can .extend() it. Mappings
 // are per-dataset; evaluators apply to ALL targets but map differently per
 // target.
-export const targetConfigObjectSchema = z.object({
+const targetConfigObjectSchemaDefinition = z.object({
   id: z.string(),
   type: z.enum(["prompt", "agent", "evaluator", "workflow"]),
   icon: z.string().optional(),
@@ -314,9 +349,14 @@ export const targetConfigObjectSchema = z.object({
   // Per-dataset mappings: datasetId -> inputFieldName -> FieldMapping
   mappings: z.record(z.string(), z.record(z.string(), fieldMappingSchema)),
 });
+export interface TargetConfigObjectSchema extends Named<
+  typeof targetConfigObjectSchemaDefinition
+> {}
+export const targetConfigObjectSchema: TargetConfigObjectSchema =
+  targetConfigObjectSchemaDefinition;
 
 /** The target as it is validated on the way into stored state. */
-export const targetConfigSchema = targetConfigObjectSchema.superRefine((value, ctx) => {
+const targetConfigSchemaDefinition = targetConfigObjectSchema.superRefine((value, ctx) => {
   if (value.type === "workflow" && !value.workflowId) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
@@ -325,6 +365,8 @@ export const targetConfigSchema = targetConfigObjectSchema.superRefine((value, c
     });
   }
 });
+export interface TargetConfigSchema extends Named<typeof targetConfigSchemaDefinition> {}
+export const targetConfigSchema: TargetConfigSchema = targetConfigSchemaDefinition;
 export type TargetType = "prompt" | "agent" | "evaluator" | "workflow";
 export type TargetConfig = Omit<z.infer<typeof targetConfigSchema>, "inputs" | "outputs"> & {
   inputs: Field[];
@@ -341,7 +383,7 @@ export type EvaluationResultStatus = "idle" | "running" | "success" | "error" | 
  * Schema for per-row metadata for a target execution.
  * This is the source of truth - TypeScript type is derived from this.
  */
-export const targetRowMetadataSchema = z.object({
+const targetRowMetadataSchemaDefinition = z.object({
   cost: z.number().optional(),
   duration: z.number().optional(),
   traceId: z.string().optional(),
@@ -351,6 +393,8 @@ export const targetRowMetadataSchema = z.object({
     .custom<SerializedHandledError>((value) => typeof value === "object" && value !== null)
     .optional(),
 });
+export interface TargetRowMetadataSchema extends Named<typeof targetRowMetadataSchemaDefinition> {}
+export const targetRowMetadataSchema: TargetRowMetadataSchema = targetRowMetadataSchemaDefinition;
 
 /**
  * Per-row metadata for a target execution (cost, duration, trace info).

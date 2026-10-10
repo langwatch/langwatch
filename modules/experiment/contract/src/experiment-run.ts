@@ -2,13 +2,14 @@ import {
   serializedHandledErrorSchema as canonicalSerializedHandledErrorSchema,
   type SerializedHandledError,
 } from "@langwatch/handled-error";
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 export type { SerializedHandledError };
 
 const jsonRecordSchema = z.record(z.string(), z.unknown());
 
-export const experimentRunWorkflowVersionSchema = z
+const experimentRunWorkflowVersionSchemaDefinition = z
   .object({
     id: z.string(),
     version: z.string(),
@@ -16,17 +17,27 @@ export const experimentRunWorkflowVersionSchema = z
     author: z.object({ name: z.string().nullable(), image: z.string().nullable() }).nullable(),
   })
   .strict();
+export interface ExperimentRunWorkflowVersionSchema extends Named<
+  typeof experimentRunWorkflowVersionSchemaDefinition
+> {}
+export const experimentRunWorkflowVersionSchema: ExperimentRunWorkflowVersionSchema =
+  experimentRunWorkflowVersionSchemaDefinition;
 export type ExperimentRunWorkflowVersion = z.infer<typeof experimentRunWorkflowVersionSchema>;
 
-export const experimentRunEvaluationSummarySchema = z
+const experimentRunEvaluationSummarySchemaDefinition = z
   .object({
     name: z.string(),
     averageScore: z.number().nullable(),
     averagePassed: z.number().optional(),
   })
   .strict();
+export interface ExperimentRunEvaluationSummarySchema extends Named<
+  typeof experimentRunEvaluationSummarySchemaDefinition
+> {}
+export const experimentRunEvaluationSummarySchema: ExperimentRunEvaluationSummarySchema =
+  experimentRunEvaluationSummarySchemaDefinition;
 
-export const experimentRunSummarySchema = z
+const experimentRunSummarySchemaDefinition = z
   .object({
     datasetCost: z.number().optional(),
     evaluationsCost: z.number().optional(),
@@ -37,8 +48,13 @@ export const experimentRunSummarySchema = z
     evaluations: z.record(z.string(), experimentRunEvaluationSummarySchema),
   })
   .strict();
+export interface ExperimentRunSummarySchema extends Named<
+  typeof experimentRunSummarySchemaDefinition
+> {}
+export const experimentRunSummarySchema: ExperimentRunSummarySchema =
+  experimentRunSummarySchemaDefinition;
 
-export const experimentRunTimestampsSchema = z
+const experimentRunTimestampsSchemaDefinition = z
   .object({
     createdAt: z.number(),
     updatedAt: z.number(),
@@ -46,8 +62,13 @@ export const experimentRunTimestampsSchema = z
     stoppedAt: z.number().nullable().optional(),
   })
   .strict();
+export interface ExperimentRunTimestampsSchema extends Named<
+  typeof experimentRunTimestampsSchemaDefinition
+> {}
+export const experimentRunTimestampsSchema: ExperimentRunTimestampsSchema =
+  experimentRunTimestampsSchemaDefinition;
 
-export const experimentRunSchema = z
+const experimentRunSchemaDefinition = z
   .object({
     experimentId: z.string(),
     runId: z.string(),
@@ -58,19 +79,26 @@ export const experimentRunSchema = z
     summary: experimentRunSummarySchema,
   })
   .strict();
+export interface ExperimentRunSchema extends Named<typeof experimentRunSchemaDefinition> {}
+export const experimentRunSchema: ExperimentRunSchema = experimentRunSchemaDefinition;
 export type ExperimentRun = z.infer<typeof experimentRunSchema>;
 
-export const experimentRunAggregateSchema = z
+const experimentRunAggregateSchemaDefinition = z
   .object({
     runsCount: z.number().int().nonnegative(),
     lastRunAt: z.number().nullable(),
   })
   .strict();
+export interface ExperimentRunAggregateSchema extends Named<
+  typeof experimentRunAggregateSchemaDefinition
+> {}
+export const experimentRunAggregateSchema: ExperimentRunAggregateSchema =
+  experimentRunAggregateSchemaDefinition;
 export type ExperimentRunAggregate = z.infer<typeof experimentRunAggregateSchema>;
 
 export const serializedHandledErrorSchema = canonicalSerializedHandledErrorSchema;
 
-export const experimentRunTargetSchema = z
+const experimentRunTargetSchemaDefinition = z
   .object({
     id: z.string(),
     name: z.string(),
@@ -86,13 +114,18 @@ export const experimentRunTargetSchema = z
       .optional(),
   })
   .strict();
+export interface ExperimentRunTargetSchema extends Named<
+  typeof experimentRunTargetSchemaDefinition
+> {}
+export const experimentRunTargetSchema: ExperimentRunTargetSchema =
+  experimentRunTargetSchemaDefinition;
 
 /**
  * The eventing command shape intentionally retains Zod's default unknown-key
  * stripping behaviour. Existing event commands accepted this shape before the
  * canonical Experiment service owned it.
  */
-export const experimentRunCommandTargetSchema = z.object({
+const experimentRunCommandTargetSchemaDefinition = z.object({
   id: z.string(),
   name: z.string(),
   type: z.string(),
@@ -106,9 +139,14 @@ export const experimentRunCommandTargetSchema = z.object({
     .nullable()
     .optional(),
 });
+export interface ExperimentRunCommandTargetSchema extends Named<
+  typeof experimentRunCommandTargetSchemaDefinition
+> {}
+export const experimentRunCommandTargetSchema: ExperimentRunCommandTargetSchema =
+  experimentRunCommandTargetSchemaDefinition;
 export type ExperimentRunCommandTarget = z.infer<typeof experimentRunCommandTargetSchema>;
 
-export const startExperimentRunInputSchema = z.object({
+const startExperimentRunInputSchemaDefinition = z.object({
   tenantId: z.string(),
   runId: z.string(),
   experimentId: z.string(),
@@ -117,9 +155,14 @@ export const startExperimentRunInputSchema = z.object({
   targets: z.array(experimentRunCommandTargetSchema),
   occurredAt: z.number(),
 });
+export interface StartExperimentRunInputSchema extends Named<
+  typeof startExperimentRunInputSchemaDefinition
+> {}
+export const startExperimentRunInputSchema: StartExperimentRunInputSchema =
+  startExperimentRunInputSchemaDefinition;
 export type StartExperimentRunInput = z.infer<typeof startExperimentRunInputSchema>;
 
-export const recordTargetResultInputSchema = z.object({
+const recordTargetResultInputSchemaDefinition = z.object({
   tenantId: z.string(),
   runId: z.string(),
   experimentId: z.string(),
@@ -135,9 +178,14 @@ export const recordTargetResultInputSchema = z.object({
   targets: z.array(experimentRunCommandTargetSchema).optional(),
   occurredAt: z.number(),
 });
+export interface RecordTargetResultInputSchema extends Named<
+  typeof recordTargetResultInputSchemaDefinition
+> {}
+export const recordTargetResultInputSchema: RecordTargetResultInputSchema =
+  recordTargetResultInputSchemaDefinition;
 export type RecordTargetResultInput = z.infer<typeof recordTargetResultInputSchema>;
 
-export const recordEvaluatorResultInputSchema = z.object({
+const recordEvaluatorResultInputSchemaDefinition = z.object({
   tenantId: z.string(),
   runId: z.string(),
   experimentId: z.string(),
@@ -155,18 +203,28 @@ export const recordEvaluatorResultInputSchema = z.object({
   duration: z.number().nullable().optional(),
   occurredAt: z.number(),
 });
+export interface RecordEvaluatorResultInputSchema extends Named<
+  typeof recordEvaluatorResultInputSchemaDefinition
+> {}
+export const recordEvaluatorResultInputSchema: RecordEvaluatorResultInputSchema =
+  recordEvaluatorResultInputSchemaDefinition;
 export type RecordEvaluatorResultInput = z.infer<typeof recordEvaluatorResultInputSchema>;
 
 /** How many rows and verdicts a run reported in total, as its reporter counted them. */
-export const experimentRunExpectedCountsSchema = z
+const experimentRunExpectedCountsSchemaDefinition = z
   .object({
     dataset: z.number().int().nonnegative(),
     evaluations: z.number().int().nonnegative(),
   })
   .strict();
+export interface ExperimentRunExpectedCountsSchema extends Named<
+  typeof experimentRunExpectedCountsSchemaDefinition
+> {}
+export const experimentRunExpectedCountsSchema: ExperimentRunExpectedCountsSchema =
+  experimentRunExpectedCountsSchemaDefinition;
 export type ExperimentRunExpectedCounts = z.infer<typeof experimentRunExpectedCountsSchema>;
 
-export const completeExperimentRunInputSchema = z.object({
+const completeExperimentRunInputSchemaDefinition = z.object({
   tenantId: z.string(),
   runId: z.string(),
   experimentId: z.string(),
@@ -175,9 +233,14 @@ export const completeExperimentRunInputSchema = z.object({
   expected: experimentRunExpectedCountsSchema.optional(),
   occurredAt: z.number(),
 });
+export interface CompleteExperimentRunInputSchema extends Named<
+  typeof completeExperimentRunInputSchemaDefinition
+> {}
+export const completeExperimentRunInputSchema: CompleteExperimentRunInputSchema =
+  completeExperimentRunInputSchemaDefinition;
 export type CompleteExperimentRunInput = z.infer<typeof completeExperimentRunInputSchema>;
 
-export const experimentRunDatasetEntrySchema = z
+const experimentRunDatasetEntrySchemaDefinition = z
   .object({
     index: z.number().int(),
     targetId: z.string().nullable().optional(),
@@ -190,8 +253,13 @@ export const experimentRunDatasetEntrySchema = z
     traceId: z.string().nullable().optional(),
   })
   .strict();
+export interface ExperimentRunDatasetEntrySchema extends Named<
+  typeof experimentRunDatasetEntrySchemaDefinition
+> {}
+export const experimentRunDatasetEntrySchema: ExperimentRunDatasetEntrySchema =
+  experimentRunDatasetEntrySchemaDefinition;
 
-export const experimentRunEvaluationSchema = z
+const experimentRunEvaluationSchemaDefinition = z
   .object({
     evaluator: z.string(),
     name: z.string().nullable().optional(),
@@ -207,6 +275,11 @@ export const experimentRunEvaluationSchema = z
     inputs: jsonRecordSchema.nullable().optional(),
   })
   .strict();
+export interface ExperimentRunEvaluationSchema extends Named<
+  typeof experimentRunEvaluationSchemaDefinition
+> {}
+export const experimentRunEvaluationSchema: ExperimentRunEvaluationSchema =
+  experimentRunEvaluationSchemaDefinition;
 
 const experimentRunStoredCountSchema = z
   .object({
@@ -219,16 +292,21 @@ const experimentRunStoredCountSchema = z
  * What is stored of a run against what the run reported. Results are stored after they are
  * reported, so a read can hold part of a run; `expected` is null when the run reported no counts.
  */
-export const experimentRunCompletenessSchema = z
+const experimentRunCompletenessSchemaDefinition = z
   .object({
     complete: z.boolean(),
     dataset: experimentRunStoredCountSchema,
     evaluations: experimentRunStoredCountSchema,
   })
   .strict();
+export interface ExperimentRunCompletenessSchema extends Named<
+  typeof experimentRunCompletenessSchemaDefinition
+> {}
+export const experimentRunCompletenessSchema: ExperimentRunCompletenessSchema =
+  experimentRunCompletenessSchemaDefinition;
 export type ExperimentRunCompleteness = z.infer<typeof experimentRunCompletenessSchema>;
 
-export const experimentRunWithItemsSchema = z
+const experimentRunWithItemsSchemaDefinition = z
   .object({
     experimentId: z.string(),
     runId: z.string(),
@@ -243,17 +321,27 @@ export const experimentRunWithItemsSchema = z
     completeness: experimentRunCompletenessSchema,
   })
   .strict();
+export interface ExperimentRunWithItemsSchema extends Named<
+  typeof experimentRunWithItemsSchemaDefinition
+> {}
+export const experimentRunWithItemsSchema: ExperimentRunWithItemsSchema =
+  experimentRunWithItemsSchemaDefinition;
 export type ExperimentRunWithItems = z.infer<typeof experimentRunWithItemsSchema>;
 
-export const experimentRunListInputSchema = z
+const experimentRunListInputSchemaDefinition = z
   .object({
     projectId: z.string(),
     experimentIds: z.array(z.string()),
   })
   .strict();
+export interface ExperimentRunListInputSchema extends Named<
+  typeof experimentRunListInputSchemaDefinition
+> {}
+export const experimentRunListInputSchema: ExperimentRunListInputSchema =
+  experimentRunListInputSchemaDefinition;
 export type ExperimentRunListInput = z.infer<typeof experimentRunListInputSchema>;
 
-export const experimentRunPageInputSchema = z
+const experimentRunPageInputSchemaDefinition = z
   .object({
     projectId: z.string(),
     experimentId: z.string(),
@@ -261,18 +349,28 @@ export const experimentRunPageInputSchema = z
     pageSize: z.number().int().positive().max(200),
   })
   .strict();
+export interface ExperimentRunPageInputSchema extends Named<
+  typeof experimentRunPageInputSchemaDefinition
+> {}
+export const experimentRunPageInputSchema: ExperimentRunPageInputSchema =
+  experimentRunPageInputSchemaDefinition;
 export type ExperimentRunPageInput = z.infer<typeof experimentRunPageInputSchema>;
 
-export const experimentRunLookupSchema = z
+const experimentRunLookupSchemaDefinition = z
   .object({
     projectId: z.string(),
     experimentId: z.string(),
     runId: z.string(),
   })
   .strict();
+export interface ExperimentRunLookupSchema extends Named<
+  typeof experimentRunLookupSchemaDefinition
+> {}
+export const experimentRunLookupSchema: ExperimentRunLookupSchema =
+  experimentRunLookupSchemaDefinition;
 export type ExperimentRunLookup = z.infer<typeof experimentRunLookupSchema>;
 
-export const experimentRunSlugPageInputSchema = z
+const experimentRunSlugPageInputSchemaDefinition = z
   .object({
     projectId: z.string(),
     experimentSlug: z.string(),
@@ -280,4 +378,9 @@ export const experimentRunSlugPageInputSchema = z
     pageSize: z.number().int().positive().max(200),
   })
   .strict();
+export interface ExperimentRunSlugPageInputSchema extends Named<
+  typeof experimentRunSlugPageInputSchemaDefinition
+> {}
+export const experimentRunSlugPageInputSchema: ExperimentRunSlugPageInputSchema =
+  experimentRunSlugPageInputSchemaDefinition;
 export type ExperimentRunSlugPageInput = z.infer<typeof experimentRunSlugPageInputSchema>;

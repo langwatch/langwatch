@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import type { SsoAssertionRefusedError } from "../../identity.errors.ts";
@@ -71,7 +72,7 @@ export type SsoUserResolution =
  * gone live, named so a screen can say which organization was being proved.
  * A union rather than a nullable, so "not a tester" is an answer.
  */
-export const ssoTestArrivalStandingSchema = z.discriminatedUnion("testing", [
+const ssoTestArrivalStandingSchemaDefinition = z.discriminatedUnion("testing", [
   z
     .object({
       testing: z.literal(true),
@@ -82,6 +83,11 @@ export const ssoTestArrivalStandingSchema = z.discriminatedUnion("testing", [
     .strict(),
   z.object({ testing: z.literal(false) }).strict(),
 ]);
+export interface SsoTestArrivalStandingSchema extends Named<
+  typeof ssoTestArrivalStandingSchemaDefinition
+> {}
+export const ssoTestArrivalStandingSchema: SsoTestArrivalStandingSchema =
+  ssoTestArrivalStandingSchemaDefinition;
 export type SsoTestArrivalStanding = z.infer<typeof ssoTestArrivalStandingSchema>;
 
 /** The answer for everybody who is not proving a connection. */

@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import type { Instant } from "@langwatch/time";
 import { z } from "zod";
 
@@ -33,7 +34,7 @@ const traceIOEditSchema = z.object({ value: z.string() });
 /**
  * One span's correction.
  */
-export const traceEditSpanPatchSchema = z.object({
+const traceEditSpanPatchSchemaDefinition = z.object({
   spanId: z.string().min(1),
   name: z.string().nullable().optional(),
   type: spanTypesSchema.optional(),
@@ -42,6 +43,11 @@ export const traceEditSpanPatchSchema = z.object({
   params: z.record(z.string(), z.unknown()).nullable().optional(),
   error: errorCaptureSchema.nullable().optional(),
 });
+export interface TraceEditSpanPatchSchema extends Named<
+  typeof traceEditSpanPatchSchemaDefinition
+> {}
+export const traceEditSpanPatchSchema: TraceEditSpanPatchSchema =
+  traceEditSpanPatchSchemaDefinition;
 
 export type TraceEditSpanPatch = z.infer<typeof traceEditSpanPatchSchema>;
 
@@ -68,11 +74,16 @@ export type TraceEditTraceField = (typeof TRACE_EDIT_TRACE_FIELDS)[number];
  */
 const traceMetadataEditSchema = z.record(z.string(), z.unknown());
 
-export const traceEditTracePatchSchema = z.object({
+const traceEditTracePatchSchemaDefinition = z.object({
   input: traceIOEditSchema.optional(),
   output: traceIOEditSchema.optional(),
   metadata: traceMetadataEditSchema.nullable().optional(),
 });
+export interface TraceEditTracePatchSchema extends Named<
+  typeof traceEditTracePatchSchemaDefinition
+> {}
+export const traceEditTracePatchSchema: TraceEditTracePatchSchema =
+  traceEditTracePatchSchemaDefinition;
 
 const traceEditOverlayPatchObjectSchema = z.object({
   version: z.literal(TRACE_EDIT_OVERLAY_PATCH_VERSION),
@@ -100,7 +111,7 @@ function patchExceedsSizeLimit(value: unknown): boolean {
   return new TextEncoder().encode(json).length > TRACE_EDIT_OVERLAY_MAX_PATCH_BYTES;
 }
 
-export const traceEditOverlayPatchSchema = traceEditOverlayPatchObjectSchema.superRefine(
+const traceEditOverlayPatchSchemaDefinition = traceEditOverlayPatchObjectSchema.superRefine(
   (patch, ctx) => {
     if (patchExceedsSizeLimit(patch)) {
       ctx.addIssue({
@@ -112,6 +123,11 @@ export const traceEditOverlayPatchSchema = traceEditOverlayPatchObjectSchema.sup
     }
   },
 );
+export interface TraceEditOverlayPatchSchema extends Named<
+  typeof traceEditOverlayPatchSchemaDefinition
+> {}
+export const traceEditOverlayPatchSchema: TraceEditOverlayPatchSchema =
+  traceEditOverlayPatchSchemaDefinition;
 
 export type TraceEditOverlayPatch = z.infer<typeof traceEditOverlayPatchSchema>;
 

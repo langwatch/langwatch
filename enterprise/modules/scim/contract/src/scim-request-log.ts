@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import { z } from "zod";
 
@@ -29,7 +30,7 @@ export const scimRefusalReasonSchema = z.enum([
 ]);
 export type ScimRefusalReason = z.infer<typeof scimRefusalReasonSchema>;
 
-export const scimRequestRecordSchema = z
+const scimRequestRecordSchemaDefinition = z
   .object({
     organizationId: z.string().min(1),
     connectionId: z.string().nullable(),
@@ -44,20 +45,32 @@ export const scimRequestRecordSchema = z
     detail: z.string().nullable(),
   })
   .strict();
+export interface ScimRequestRecordSchema extends Named<typeof scimRequestRecordSchemaDefinition> {}
+export const scimRequestRecordSchema: ScimRequestRecordSchema = scimRequestRecordSchemaDefinition;
 export type ScimRequestRecord = z.infer<typeof scimRequestRecordSchema>;
 
-export const scimRequestLogEntrySchema = scimRequestRecordSchema
+const scimRequestLogEntrySchemaDefinition = scimRequestRecordSchema
   .safeExtend({ id: z.string(), occurredAt: z.date() })
   .strict();
+export interface ScimRequestLogEntrySchema extends Named<
+  typeof scimRequestLogEntrySchemaDefinition
+> {}
+export const scimRequestLogEntrySchema: ScimRequestLogEntrySchema =
+  scimRequestLogEntrySchemaDefinition;
 export type ScimRequestLogEntry = z.infer<typeof scimRequestLogEntrySchema>;
 
-export const scimRequestLogQuerySchema = z
+const scimRequestLogQuerySchemaDefinition = z
   .object({
     organizationId: z.string().min(1),
     connectionId: z.string().min(1),
     limit: z.number().int().positive().max(200).default(50),
   })
   .strict();
+export interface ScimRequestLogQuerySchema extends Named<
+  typeof scimRequestLogQuerySchemaDefinition
+> {}
+export const scimRequestLogQuerySchema: ScimRequestLogQuerySchema =
+  scimRequestLogQuerySchemaDefinition;
 export type ScimRequestLogQuery = z.infer<typeof scimRequestLogQuerySchema>;
 
 /**
@@ -65,14 +78,21 @@ export type ScimRequestLogQuery = z.infer<typeof scimRequestLogQuerySchema>;
  * answered. The tenant and the connection are the question rather than the
  * answer, so neither is repeated on every row.
  */
-export const scimRequestEntrySchema = scimRequestLogEntrySchema
+const scimRequestEntrySchemaDefinition = scimRequestLogEntrySchema
   .omit({ organizationId: true, connectionId: true })
   .strict();
+export interface ScimRequestEntrySchema extends Named<typeof scimRequestEntrySchemaDefinition> {}
+export const scimRequestEntrySchema: ScimRequestEntrySchema = scimRequestEntrySchemaDefinition;
 export type ScimRequestEntry = z.infer<typeof scimRequestEntrySchema>;
 
-export const scimConnectionRequestsInputSchema = z
+const scimConnectionRequestsInputSchemaDefinition = z
   .object({ organizationId: z.string().min(1), connectionId: z.string().min(1) })
   .strict();
+export interface ScimConnectionRequestsInputSchema extends Named<
+  typeof scimConnectionRequestsInputSchemaDefinition
+> {}
+export const scimConnectionRequestsInputSchema: ScimConnectionRequestsInputSchema =
+  scimConnectionRequestsInputSchemaDefinition;
 export type ScimConnectionRequestsInput = z.infer<typeof scimConnectionRequestsInputSchema>;
 
 /** How many lines the feed carries. The question it answers is about the last

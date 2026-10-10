@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { onboardingVariantSchema } from "@langwatch/onboarding-contract";
 import { z } from "zod";
 
@@ -14,7 +15,7 @@ export const RECORD_SCENARIO_CREATED_COMMAND_TYPE = "lw.scenario.record_created"
 export const SCENARIO_LIFECYCLE_EVENT_TYPES = [SCENARIO_CREATED_EVENT_TYPE] as const;
 
 /** A scenario was written, how many the project holds counting it, and when. */
-export const scenarioCreatedEventDataSchema = z.object({
+const scenarioCreatedEventDataSchemaDefinition = z.object({
   scenarioId: z.string(),
   projectId: z.string(),
   userId: z.string(),
@@ -23,13 +24,23 @@ export const scenarioCreatedEventDataSchema = z.object({
   onboardingVariant: onboardingVariantSchema.nullish(),
   occurredAt: z.number().int().nonnegative(),
 });
+export interface ScenarioCreatedEventDataSchema extends Named<
+  typeof scenarioCreatedEventDataSchemaDefinition
+> {}
+export const scenarioCreatedEventDataSchema: ScenarioCreatedEventDataSchema =
+  scenarioCreatedEventDataSchemaDefinition;
 export type ScenarioCreatedEventData = z.infer<typeof scenarioCreatedEventDataSchema>;
 
-export const scenarioCreatedEventSchema = z.object({
+const scenarioCreatedEventSchemaDefinition = z.object({
   ...simulationEventSchema.shape,
   type: z.literal(SCENARIO_CREATED_EVENT_TYPE),
   version: z.literal(SCENARIO_CREATED_EVENT_VERSION),
   data: scenarioCreatedEventDataSchema,
 });
+export interface ScenarioCreatedEventSchema extends Named<
+  typeof scenarioCreatedEventSchemaDefinition
+> {}
+export const scenarioCreatedEventSchema: ScenarioCreatedEventSchema =
+  scenarioCreatedEventSchemaDefinition;
 export type ScenarioCreatedEvent = z.infer<typeof scenarioCreatedEventSchema>;
 export type ScenarioLifecycleEvent = ScenarioCreatedEvent;

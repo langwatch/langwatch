@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 /**
  * Gateway tRPC response shapes, stated once in the contract for client
  * reading and development/test validation.
@@ -15,7 +16,7 @@ const virtualKeyScopeEntrySchema = z
   .strict();
 
 /** A virtual key, camelCased and secret-free: `displayPrefix`, never the plaintext key. */
-export const virtualKeyCamelDtoSchema = z
+const virtualKeyCamelDtoSchemaDefinition = z
   .object({
     id: z.string(),
     organizationId: z.string(),
@@ -45,10 +46,15 @@ export const virtualKeyCamelDtoSchema = z
     expiresAt: z.string().nullable(),
   })
   .strict();
+export interface VirtualKeyCamelDtoSchema extends Named<
+  typeof virtualKeyCamelDtoSchemaDefinition
+> {}
+export const virtualKeyCamelDtoSchema: VirtualKeyCamelDtoSchema =
+  virtualKeyCamelDtoSchemaDefinition;
 export type VirtualKeyCamelDtoResponse = z.infer<typeof virtualKeyCamelDtoSchema>;
 
 /** A key was minted or rotated: the DTO, and the plaintext secret this one moment carries. */
-export const virtualKeyMintedSchema = z
+const virtualKeyMintedSchemaDefinition = z
   .object({
     virtualKey: virtualKeyCamelDtoSchema,
     secret: z.string(),
@@ -56,10 +62,12 @@ export const virtualKeyMintedSchema = z
     preview: z.string().optional(),
   })
   .strict();
+export interface VirtualKeyMintedSchema extends Named<typeof virtualKeyMintedSchemaDefinition> {}
+export const virtualKeyMintedSchema: VirtualKeyMintedSchema = virtualKeyMintedSchemaDefinition;
 export type VirtualKeyMinted = z.infer<typeof virtualKeyMintedSchema>;
 
 /** Spend per key this calendar month, and its own direct budget if it carries one. */
-export const virtualKeySpendThisMonthSchema = z
+const virtualKeySpendThisMonthSchemaDefinition = z
   .object({
     virtualKeyId: z.string(),
     spentUsd: z.string(),
@@ -77,10 +85,15 @@ export const virtualKeySpendThisMonthSchema = z
   })
   .strict()
   .array();
+export interface VirtualKeySpendThisMonthSchema extends Named<
+  typeof virtualKeySpendThisMonthSchemaDefinition
+> {}
+export const virtualKeySpendThisMonthSchema: VirtualKeySpendThisMonthSchema =
+  virtualKeySpendThisMonthSchemaDefinition;
 export type VirtualKeySpendThisMonth = z.infer<typeof virtualKeySpendThisMonthSchema>;
 
 /** Every budget that would constrain a key, existing or a create-drawer draft. */
-export const virtualKeyApplicableBudgetsSchema = z
+const virtualKeyApplicableBudgetsSchemaDefinition = z
   .object({
     id: z.string(),
     name: z.string(),
@@ -99,6 +112,11 @@ export const virtualKeyApplicableBudgetsSchema = z
   })
   .strict()
   .array();
+export interface VirtualKeyApplicableBudgetsSchema extends Named<
+  typeof virtualKeyApplicableBudgetsSchemaDefinition
+> {}
+export const virtualKeyApplicableBudgetsSchema: VirtualKeyApplicableBudgetsSchema =
+  virtualKeyApplicableBudgetsSchemaDefinition;
 export type VirtualKeyApplicableBudgets = z.infer<typeof virtualKeyApplicableBudgetsSchema>;
 
 /**
@@ -106,7 +124,7 @@ export type VirtualKeyApplicableBudgets = z.infer<typeof virtualKeyApplicableBud
  * and CLI read it — though the canonical resource calls it `mode`;
  * timestamps travel as ISO strings, matching this transport's old DTO.
  */
-export const gatewayCacheRuleDtoSchema = z
+const gatewayCacheRuleDtoSchemaDefinition = z
   .object({
     id: z.string(),
     organizationId: z.string(),
@@ -122,6 +140,11 @@ export const gatewayCacheRuleDtoSchema = z
     updatedAt: z.string(),
   })
   .strict();
+export interface GatewayCacheRuleDtoSchema extends Named<
+  typeof gatewayCacheRuleDtoSchemaDefinition
+> {}
+export const gatewayCacheRuleDtoSchema: GatewayCacheRuleDtoSchema =
+  gatewayCacheRuleDtoSchemaDefinition;
 export type GatewayCacheRuleDto = z.infer<typeof gatewayCacheRuleDtoSchema>;
 
 /** The budget wire row: the stored fields plus the computed current period. */
@@ -170,16 +193,18 @@ const gatewayBudgetEnrichedSchema = gatewayBudgetDtoSchema.safeExtend({
 });
 
 /** A page of budgets, with whether spend tracking itself is available at all. */
-export const gatewayBudgetListSchema = z
+const gatewayBudgetListSchemaDefinition = z
   .object({
     spendAvailable: z.boolean(),
     budgets: z.array(gatewayBudgetEnrichedSchema),
   })
   .strict();
+export interface GatewayBudgetListSchema extends Named<typeof gatewayBudgetListSchemaDefinition> {}
+export const gatewayBudgetListSchema: GatewayBudgetListSchema = gatewayBudgetListSchemaDefinition;
 export type GatewayBudgetList = z.infer<typeof gatewayBudgetListSchema>;
 
 /** One budget in full, with its recent ledger entries. */
-export const gatewayBudgetDetailSchema = gatewayBudgetEnrichedSchema
+const gatewayBudgetDetailSchemaDefinition = gatewayBudgetEnrichedSchema
   .safeExtend({
     recentLedger: z.array(
       z
@@ -197,19 +222,29 @@ export const gatewayBudgetDetailSchema = gatewayBudgetEnrichedSchema
     ),
   })
   .strict();
+export interface GatewayBudgetDetailSchema extends Named<
+  typeof gatewayBudgetDetailSchemaDefinition
+> {}
+export const gatewayBudgetDetailSchema: GatewayBudgetDetailSchema =
+  gatewayBudgetDetailSchemaDefinition;
 export type GatewayBudgetDetailResponse = z.infer<typeof gatewayBudgetDetailSchema>;
 
 /** The groups a per-member budget can target, with their sizes. */
-export const gatewayBudgetGroupTargetsSchema = z
+const gatewayBudgetGroupTargetsSchemaDefinition = z
   .object({ id: z.string(), name: z.string(), memberCount: z.number() })
   .strict()
   .array();
+export interface GatewayBudgetGroupTargetsSchema extends Named<
+  typeof gatewayBudgetGroupTargetsSchemaDefinition
+> {}
+export const gatewayBudgetGroupTargetsSchema: GatewayBudgetGroupTargetsSchema =
+  gatewayBudgetGroupTargetsSchemaDefinition;
 
 /** A single budget, as `create`/`update`/`archive`/`reset` answer it. */
 export const gatewayBudgetDtoResponseSchema = gatewayBudgetDtoSchema;
 
 /** One spend event row, as the ledger stores it. */
-export const gatewaySpendEventRowSchema = z
+const gatewaySpendEventRowSchemaDefinition = z
   .object({
     tenantId: z.string(),
     gatewayRequestId: z.string(),
@@ -244,9 +279,14 @@ export const gatewaySpendEventRowSchema = z
     occurredAt: z.date(),
   })
   .strict();
+export interface GatewaySpendEventRowSchema extends Named<
+  typeof gatewaySpendEventRowSchemaDefinition
+> {}
+export const gatewaySpendEventRowSchema: GatewaySpendEventRowSchema =
+  gatewaySpendEventRowSchemaDefinition;
 
 /** One page of the spend-event ledger, newest first. */
-export const gatewaySpendEventPageSchema = z
+const gatewaySpendEventPageSchemaDefinition = z
   .object({
     rows: z.array(gatewaySpendEventRowSchema),
     nextCursor: z
@@ -257,6 +297,11 @@ export const gatewaySpendEventPageSchema = z
     clickHouseDisabled: z.boolean(),
   })
   .strict();
+export interface GatewaySpendEventPageSchema extends Named<
+  typeof gatewaySpendEventPageSchemaDefinition
+> {}
+export const gatewaySpendEventPageSchema: GatewaySpendEventPageSchema =
+  gatewaySpendEventPageSchemaDefinition;
 export type GatewaySpendEventPage = z.infer<typeof gatewaySpendEventPageSchema>;
 
 const gatewayUsageByModelSchema = z
@@ -267,7 +312,7 @@ const gatewayUsageByDaySchema = z
   .strict();
 
 /** The Usage page's org-wide rollup, over the caller's visible keys. */
-export const gatewayUsageSummarySchema = z
+const gatewayUsageSummarySchemaDefinition = z
   .object({
     totalUsd: z.string(),
     totalRequests: z.number(),
@@ -288,10 +333,15 @@ export const gatewayUsageSummarySchema = z
     byDay: z.array(gatewayUsageByDaySchema),
   })
   .strict();
+export interface GatewayUsageSummarySchema extends Named<
+  typeof gatewayUsageSummarySchemaDefinition
+> {}
+export const gatewayUsageSummarySchema: GatewayUsageSummarySchema =
+  gatewayUsageSummarySchemaDefinition;
 export type GatewayUsageSummary = z.infer<typeof gatewayUsageSummarySchema>;
 
 /** One key's usage, with its 20 most recent debits. */
-export const gatewayVirtualKeyUsageSummarySchema = z
+const gatewayVirtualKeyUsageSummarySchemaDefinition = z
   .object({
     totalUsd: z.string(),
     totalRequests: z.number(),
@@ -316,6 +366,11 @@ export const gatewayVirtualKeyUsageSummarySchema = z
     ),
   })
   .strict();
+export interface GatewayVirtualKeyUsageSummarySchema extends Named<
+  typeof gatewayVirtualKeyUsageSummarySchemaDefinition
+> {}
+export const gatewayVirtualKeyUsageSummarySchema: GatewayVirtualKeyUsageSummarySchema =
+  gatewayVirtualKeyUsageSummarySchemaDefinition;
 export type GatewayVirtualKeyUsageSummary = z.infer<typeof gatewayVirtualKeyUsageSummarySchema>;
 
 /**
@@ -323,7 +378,7 @@ export type GatewayVirtualKeyUsageSummary = z.infer<typeof gatewayVirtualKeyUsag
  * the other. It is what a caller with no personal workspace, no virtual key, or no
  * analytics store gets: no budget to describe.
  */
-export const gatewayPersonalBudgetSchema = z.union([
+const gatewayPersonalBudgetSchemaDefinition = z.union([
   z.object({ status: z.literal("ok") }).strict(),
   z
     .object({
@@ -338,6 +393,11 @@ export const gatewayPersonalBudgetSchema = z.union([
     })
     .strict(),
 ]);
+export interface GatewayPersonalBudgetSchema extends Named<
+  typeof gatewayPersonalBudgetSchemaDefinition
+> {}
+export const gatewayPersonalBudgetSchema: GatewayPersonalBudgetSchema =
+  gatewayPersonalBudgetSchemaDefinition;
 export type GatewayPersonalBudget = z.infer<typeof gatewayPersonalBudgetSchema>;
 
 /* Casing at the REST wire seam: lower_snake_case (wire) and SCREAMING_SNAKE (stored). */

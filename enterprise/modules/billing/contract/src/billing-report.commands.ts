@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 /**
@@ -23,7 +24,7 @@ export const BILLING_REPORTING_PIPELINE_NAME = "billing_reporting" as const;
  * records `lw.entitlement.month_counted`; `billableEvents` is that counted total. Uses
  * organizationId as tenantId — the framework needs it for groupKey only.
  */
-export const reportUsageForMonthCommandDataSchema = z.object({
+const reportUsageForMonthCommandDataSchemaDefinition = z.object({
   organizationId: z.string(),
   billingMonth: z.string(),
   tenantId: z.string(),
@@ -32,5 +33,10 @@ export const reportUsageForMonthCommandDataSchema = z.object({
   /** The month_counted event id the total came from; a k-sortable cursor, compared as a string. */
   countedEventId: z.string().optional(),
 });
+export interface ReportUsageForMonthCommandDataSchema extends Named<
+  typeof reportUsageForMonthCommandDataSchemaDefinition
+> {}
+export const reportUsageForMonthCommandDataSchema: ReportUsageForMonthCommandDataSchema =
+  reportUsageForMonthCommandDataSchemaDefinition;
 
 export type ReportUsageForMonthCommandData = z.infer<typeof reportUsageForMonthCommandDataSchema>;

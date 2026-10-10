@@ -1,5 +1,6 @@
 /** Portable field mapping shared by scenario authoring and execution. */
 
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 export function hasScenarioInputMapping(mappings: Record<string, FieldMapping>): boolean {
@@ -210,7 +211,7 @@ function findMatchingField(
 }
 
 /** How an agent input is filled from scenario data or a literal value. */
-export const FieldMappingSchema = z.discriminatedUnion("type", [
+const FieldMappingSchemaDefinition = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("source"),
     sourceId: z.string(),
@@ -218,5 +219,7 @@ export const FieldMappingSchema = z.discriminatedUnion("type", [
   }),
   z.object({ type: z.literal("value"), value: z.string() }),
 ]);
+export interface FieldMappingSchema extends Named<typeof FieldMappingSchemaDefinition> {}
+export const FieldMappingSchema: FieldMappingSchema = FieldMappingSchemaDefinition;
 
 export type FieldMapping = z.infer<typeof FieldMappingSchema>;

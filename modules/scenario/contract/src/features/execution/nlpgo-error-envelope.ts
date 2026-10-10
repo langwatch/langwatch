@@ -4,13 +4,14 @@
  */
 
 import { handledErrorFaultSchema } from "@langwatch/handled-error";
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 /**
  * nlpgo error envelope: `fault` is declared optional but never on wire; don't classify on it.
  * See scenario code-agent adapter's `parseErrorEnvelope`.
  */
-export const goErrorEnvelopeSchema = z.object({
+const goErrorEnvelopeSchemaDefinition = z.object({
   error: z.object({
     type: z.string(),
     message: z.string().optional(),
@@ -22,3 +23,5 @@ export const goErrorEnvelopeSchema = z.object({
     docs_url: z.string().optional(),
   }),
 });
+export interface GoErrorEnvelopeSchema extends Named<typeof goErrorEnvelopeSchemaDefinition> {}
+export const goErrorEnvelopeSchema: GoErrorEnvelopeSchema = goErrorEnvelopeSchemaDefinition;

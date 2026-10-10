@@ -1,4 +1,5 @@
 import { NotFoundError, ValidationError } from "@langwatch/handled-error";
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import { unsupportedGovernanceValue } from "./governance.errors.ts";
@@ -21,7 +22,7 @@ export type AnomalyRuleSeverity = z.infer<typeof anomalyRuleSeveritySchema>;
 export type AnomalyRuleScope = z.infer<typeof anomalyRuleScopeSchema>;
 export type AnomalyRuleStatus = z.infer<typeof anomalyRuleStatusSchema>;
 
-export const anomalyRuleSchema = z.object({
+const anomalyRuleSchemaDefinition = z.object({
   id: z.string(),
   organizationId: z.string(),
   scope: anomalyRuleScopeSchema,
@@ -38,9 +39,11 @@ export const anomalyRuleSchema = z.object({
   updatedAt: z.date(),
   createdById: z.string().nullable(),
 });
+export interface AnomalyRuleSchema extends Named<typeof anomalyRuleSchemaDefinition> {}
+export const anomalyRuleSchema: AnomalyRuleSchema = anomalyRuleSchemaDefinition;
 export type AnomalyRule = z.infer<typeof anomalyRuleSchema>;
 
-export const createAnomalyRuleInputSchema = z.object({
+const createAnomalyRuleInputSchemaDefinition = z.object({
   organizationId: z.string(),
   name: z.string().min(1).max(128),
   description: z.string().nullable().optional(),
@@ -53,9 +56,14 @@ export const createAnomalyRuleInputSchema = z.object({
   status: anomalyRuleStatusSchema.optional(),
   actorUserId: z.string(),
 });
+export interface CreateAnomalyRuleInputSchema extends Named<
+  typeof createAnomalyRuleInputSchemaDefinition
+> {}
+export const createAnomalyRuleInputSchema: CreateAnomalyRuleInputSchema =
+  createAnomalyRuleInputSchemaDefinition;
 export type CreateAnomalyRuleInput = z.infer<typeof createAnomalyRuleInputSchema>;
 
-export const updateAnomalyRuleInputSchema = z.object({
+const updateAnomalyRuleInputSchemaDefinition = z.object({
   id: z.string(),
   organizationId: z.string(),
   name: z.string().min(1).max(128).optional(),
@@ -68,6 +76,11 @@ export const updateAnomalyRuleInputSchema = z.object({
   destinationConfig: z.record(z.string(), z.unknown()).optional(),
   status: anomalyRuleStatusSchema.optional(),
 });
+export interface UpdateAnomalyRuleInputSchema extends Named<
+  typeof updateAnomalyRuleInputSchemaDefinition
+> {}
+export const updateAnomalyRuleInputSchema: UpdateAnomalyRuleInputSchema =
+  updateAnomalyRuleInputSchemaDefinition;
 export type UpdateAnomalyRuleInput = z.infer<typeof updateAnomalyRuleInputSchema>;
 
 export class AnomalyRuleNotFoundError extends NotFoundError {
@@ -78,7 +91,7 @@ export class AnomalyRuleNotFoundError extends NotFoundError {
 }
 
 export const SUPPORTED_DESTINATION_TYPES = ["webhook", "webhook_endpoint"] as const;
-export const webhookDestinationSchema = z
+const webhookDestinationSchemaDefinition = z
   .object({
     type: z.literal("webhook"),
     url: z
@@ -92,17 +105,34 @@ export const webhookDestinationSchema = z
     endpointId: z.string().min(1).optional(),
   })
   .strict();
+export interface WebhookDestinationSchema extends Named<
+  typeof webhookDestinationSchemaDefinition
+> {}
+export const webhookDestinationSchema: WebhookDestinationSchema =
+  webhookDestinationSchemaDefinition;
 /** One of the organisation's registered webhook endpoints, delivered via WebhookApi (ADR-167). */
-export const webhookEndpointDestinationSchema = z
+const webhookEndpointDestinationSchemaDefinition = z
   .object({ type: z.literal("webhook_endpoint"), endpointId: z.string().min(1) })
   .strict();
-export const anomalyDestinationSchema = z.discriminatedUnion("type", [
+export interface WebhookEndpointDestinationSchema extends Named<
+  typeof webhookEndpointDestinationSchemaDefinition
+> {}
+export const webhookEndpointDestinationSchema: WebhookEndpointDestinationSchema =
+  webhookEndpointDestinationSchemaDefinition;
+const anomalyDestinationSchemaDefinition = z.discriminatedUnion("type", [
   webhookDestinationSchema,
   webhookEndpointDestinationSchema,
 ]);
-export const destinationConfigSchema = z
+export interface AnomalyDestinationSchema extends Named<
+  typeof anomalyDestinationSchemaDefinition
+> {}
+export const anomalyDestinationSchema: AnomalyDestinationSchema =
+  anomalyDestinationSchemaDefinition;
+const destinationConfigSchemaDefinition = z
   .object({ destinations: z.array(anomalyDestinationSchema).max(10) })
   .strict();
+export interface DestinationConfigSchema extends Named<typeof destinationConfigSchemaDefinition> {}
+export const destinationConfigSchema: DestinationConfigSchema = destinationConfigSchemaDefinition;
 
 export type SupportedDestinationType = (typeof SUPPORTED_DESTINATION_TYPES)[number];
 export type WebhookDestination = z.infer<typeof webhookDestinationSchema>;
@@ -206,13 +236,18 @@ export const ALLOWED_RULE_TYPES = [
 export type SupportedRuleType = (typeof SUPPORTED_RULE_TYPES)[number];
 export type AllowedRuleType = (typeof ALLOWED_RULE_TYPES)[number];
 
-export const spendSpikeThresholdConfigSchema = z
+const spendSpikeThresholdConfigSchemaDefinition = z
   .object({
     windowSec: z.number().int().positive(),
     ratioVsBaseline: z.number().positive(),
     minBaselineUsd: z.number().nonnegative(),
   })
   .strict();
+export interface SpendSpikeThresholdConfigSchema extends Named<
+  typeof spendSpikeThresholdConfigSchemaDefinition
+> {}
+export const spendSpikeThresholdConfigSchema: SpendSpikeThresholdConfigSchema =
+  spendSpikeThresholdConfigSchemaDefinition;
 export type SpendSpikeThresholdConfig = z.infer<typeof spendSpikeThresholdConfigSchema>;
 export type SpendSpikeThresholdConfigParsed = SpendSpikeThresholdConfig;
 
@@ -252,7 +287,7 @@ export const spendSpikeDecisionSchema = z.enum([
 ]);
 export type SpendSpikeDecision = z.infer<typeof spendSpikeDecisionSchema>;
 
-export const spendSpikeEvaluationInputSchema = z.object({
+const spendSpikeEvaluationInputSchemaDefinition = z.object({
   ruleId: z.string(),
   organizationId: z.string(),
   config: spendSpikeThresholdConfigSchema,
@@ -262,9 +297,14 @@ export const spendSpikeEvaluationInputSchema = z.object({
   windowStart: z.date(),
   windowEnd: z.date(),
 });
+export interface SpendSpikeEvaluationInputSchema extends Named<
+  typeof spendSpikeEvaluationInputSchemaDefinition
+> {}
+export const spendSpikeEvaluationInputSchema: SpendSpikeEvaluationInputSchema =
+  spendSpikeEvaluationInputSchemaDefinition;
 export type SpendSpikeEvaluationInput = z.infer<typeof spendSpikeEvaluationInputSchema>;
 
-export const spendSpikeEvaluationResultSchema = z.object({
+const spendSpikeEvaluationResultSchemaDefinition = z.object({
   ruleId: z.string(),
   organizationId: z.string(),
   decision: spendSpikeDecisionSchema,
@@ -274,9 +314,14 @@ export const spendSpikeEvaluationResultSchema = z.object({
   windowStart: z.date(),
   windowEnd: z.date(),
 });
+export interface SpendSpikeEvaluationResultSchema extends Named<
+  typeof spendSpikeEvaluationResultSchemaDefinition
+> {}
+export const spendSpikeEvaluationResultSchema: SpendSpikeEvaluationResultSchema =
+  spendSpikeEvaluationResultSchemaDefinition;
 export type SpendSpikeEvaluationResult = z.infer<typeof spendSpikeEvaluationResultSchema>;
 
-export const anomalyAlertDispatchRuleSchema = z.object({
+const anomalyAlertDispatchRuleSchemaDefinition = z.object({
   id: z.string(),
   name: z.string(),
   ruleType: z.string(),
@@ -284,9 +329,14 @@ export const anomalyAlertDispatchRuleSchema = z.object({
   organizationId: z.string(),
   destinationConfig: z.record(z.string(), z.unknown()),
 });
+export interface AnomalyAlertDispatchRuleSchema extends Named<
+  typeof anomalyAlertDispatchRuleSchemaDefinition
+> {}
+export const anomalyAlertDispatchRuleSchema: AnomalyAlertDispatchRuleSchema =
+  anomalyAlertDispatchRuleSchemaDefinition;
 export type AnomalyAlertDispatchRule = z.infer<typeof anomalyAlertDispatchRuleSchema>;
 
-export const anomalyAlertDispatchRecordSchema = z.object({
+const anomalyAlertDispatchRecordSchemaDefinition = z.object({
   id: z.string(),
   triggerWindowStart: z.date(),
   triggerWindowEnd: z.date(),
@@ -295,15 +345,25 @@ export const anomalyAlertDispatchRecordSchema = z.object({
   detail: z.unknown(),
   detectedAt: z.date(),
 });
+export interface AnomalyAlertDispatchRecordSchema extends Named<
+  typeof anomalyAlertDispatchRecordSchemaDefinition
+> {}
+export const anomalyAlertDispatchRecordSchema: AnomalyAlertDispatchRecordSchema =
+  anomalyAlertDispatchRecordSchemaDefinition;
 export type AnomalyAlertDispatchRecord = z.infer<typeof anomalyAlertDispatchRecordSchema>;
 
-export const anomalyAlertDispatchInputSchema = z.object({
+const anomalyAlertDispatchInputSchemaDefinition = z.object({
   rule: anomalyAlertDispatchRuleSchema,
   alert: anomalyAlertDispatchRecordSchema,
 });
+export interface AnomalyAlertDispatchInputSchema extends Named<
+  typeof anomalyAlertDispatchInputSchemaDefinition
+> {}
+export const anomalyAlertDispatchInputSchema: AnomalyAlertDispatchInputSchema =
+  anomalyAlertDispatchInputSchemaDefinition;
 export type AnomalyAlertDispatchInput = z.infer<typeof anomalyAlertDispatchInputSchema>;
 
-export const anomalyAlertDispatchOutcomeSchema = z.discriminatedUnion("status", [
+const anomalyAlertDispatchOutcomeSchemaDefinition = z.discriminatedUnion("status", [
   z.object({
     destinationIndex: z.number().int().nonnegative(),
     type: z.literal("webhook"),
@@ -321,12 +381,22 @@ export const anomalyAlertDispatchOutcomeSchema = z.discriminatedUnion("status", 
     status: z.literal("queued"),
   }),
 ]);
+export interface AnomalyAlertDispatchOutcomeSchema extends Named<
+  typeof anomalyAlertDispatchOutcomeSchemaDefinition
+> {}
+export const anomalyAlertDispatchOutcomeSchema: AnomalyAlertDispatchOutcomeSchema =
+  anomalyAlertDispatchOutcomeSchemaDefinition;
 export type AnomalyAlertDispatchOutcome = z.infer<typeof anomalyAlertDispatchOutcomeSchema>;
 
-export const anomalyAlertDispatchResultSchema = z.object({
+const anomalyAlertDispatchResultSchemaDefinition = z.object({
   dispatchTag: z.string(),
   outcomes: z.array(anomalyAlertDispatchOutcomeSchema),
 });
+export interface AnomalyAlertDispatchResultSchema extends Named<
+  typeof anomalyAlertDispatchResultSchemaDefinition
+> {}
+export const anomalyAlertDispatchResultSchema: AnomalyAlertDispatchResultSchema =
+  anomalyAlertDispatchResultSchemaDefinition;
 export type AnomalyAlertDispatchResult = z.infer<typeof anomalyAlertDispatchResultSchema>;
 
 export function evaluateSpendSpike(input: SpendSpikeEvaluationInput): SpendSpikeEvaluationResult {

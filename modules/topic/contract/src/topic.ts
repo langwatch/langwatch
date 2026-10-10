@@ -1,9 +1,9 @@
-import { moduleApi } from "@langwatch/module";
+import { moduleApi, type Named } from "@langwatch/module";
 import { z } from "zod";
 
 import { TOPIC_CLUSTERING_TRIGGER } from "./topic-clustering.constants.ts";
 
-export const topicSchema = z
+const topicSchemaDefinition = z
   .object({
     id: z.string(),
     name: z.string(),
@@ -11,34 +11,45 @@ export const topicSchema = z
     automaticallyGenerated: z.boolean(),
   })
   .strict();
+export interface TopicSchema extends Named<typeof topicSchemaDefinition> {}
+export const topicSchema: TopicSchema = topicSchemaDefinition;
 
 export type Topic = z.infer<typeof topicSchema>;
 
-export const topicProjectInputSchema = z
+const topicProjectInputSchemaDefinition = z
   .object({
     projectId: z.string().min(1),
   })
   .strict();
+export interface TopicProjectInputSchema extends Named<typeof topicProjectInputSchemaDefinition> {}
+export const topicProjectInputSchema: TopicProjectInputSchema = topicProjectInputSchemaDefinition;
 
 /** An aggregate's facets name its members' topics, so the lookup spans every project read. */
-export const topicNamesInputSchema = z
+const topicNamesInputSchemaDefinition = z
   .object({
     projectIds: z.array(z.string().min(1)),
     ids: z.array(z.string()),
   })
   .strict();
+export interface TopicNamesInputSchema extends Named<typeof topicNamesInputSchemaDefinition> {}
+export const topicNamesInputSchema: TopicNamesInputSchema = topicNamesInputSchemaDefinition;
 
-export const topicClusteringRequestInputSchema = topicProjectInputSchema.safeExtend({
+const topicClusteringRequestInputSchemaDefinition = topicProjectInputSchema.safeExtend({
   occurredAt: z.number(),
   trigger: z.enum([TOPIC_CLUSTERING_TRIGGER.MANUAL, TOPIC_CLUSTERING_TRIGGER.BOOTSTRAP]),
   requestedByUserId: z.string().optional(),
 });
+export interface TopicClusteringRequestInputSchema extends Named<
+  typeof topicClusteringRequestInputSchemaDefinition
+> {}
+export const topicClusteringRequestInputSchema: TopicClusteringRequestInputSchema =
+  topicClusteringRequestInputSchemaDefinition;
 
 export type TopicProjectInput = z.infer<typeof topicProjectInputSchema>;
 export type TopicNamesInput = z.infer<typeof topicNamesInputSchema>;
 export type TopicClusteringRequestInput = z.infer<typeof topicClusteringRequestInputSchema>;
 
-export const topicClusteringStatusSchema = z
+const topicClusteringStatusSchemaDefinition = z
   .object({
     lastRequestedAt: z.number().nullable(),
     lastRequestTrigger: z.string().nullable(),
@@ -56,10 +67,15 @@ export const topicClusteringStatusSchema = z
     nextRunAt: z.number().nullable(),
   })
   .strict();
+export interface TopicClusteringStatusSchema extends Named<
+  typeof topicClusteringStatusSchemaDefinition
+> {}
+export const topicClusteringStatusSchema: TopicClusteringStatusSchema =
+  topicClusteringStatusSchemaDefinition;
 
 export type TopicClusteringStatus = z.infer<typeof topicClusteringStatusSchema>;
 
-export const topicClusteringRunHistoryEntrySchema = z
+const topicClusteringRunHistoryEntrySchemaDefinition = z
   .object({
     runId: z.string(),
     trigger: z.string(),
@@ -78,18 +94,28 @@ export const topicClusteringRunHistoryEntrySchema = z
     pages: z.number(),
   })
   .strict();
+export interface TopicClusteringRunHistoryEntrySchema extends Named<
+  typeof topicClusteringRunHistoryEntrySchemaDefinition
+> {}
+export const topicClusteringRunHistoryEntrySchema: TopicClusteringRunHistoryEntrySchema =
+  topicClusteringRunHistoryEntrySchemaDefinition;
 
 export type TopicClusteringRunHistoryEntry = z.infer<typeof topicClusteringRunHistoryEntrySchema>;
 
 /** What a manual clustering trigger did, which is not always "started a run". */
-export const topicClusteringTriggerResultSchema = z.union([
+const topicClusteringTriggerResultSchemaDefinition = z.union([
   z.object({ started: z.literal(true) }).strict(),
   z.object({ started: z.literal(false), reason: z.literal("already_running") }).strict(),
 ]);
+export interface TopicClusteringTriggerResultSchema extends Named<
+  typeof topicClusteringTriggerResultSchemaDefinition
+> {}
+export const topicClusteringTriggerResultSchema: TopicClusteringTriggerResultSchema =
+  topicClusteringTriggerResultSchemaDefinition;
 export type TopicClusteringTriggerResult = z.infer<typeof topicClusteringTriggerResultSchema>;
 
 /** The named topic and subtopic counts the trace filters render. */
-export const namedTopicCountsSchema = z.object({
+const namedTopicCountsSchemaDefinition = z.object({
   topicCounts: z.array(z.object({ id: z.string(), name: z.string(), count: z.number() })),
   subtopicCounts: z.array(
     z.object({
@@ -100,6 +126,8 @@ export const namedTopicCountsSchema = z.object({
     }),
   ),
 });
+export interface NamedTopicCountsSchema extends Named<typeof namedTopicCountsSchemaDefinition> {}
+export const namedTopicCountsSchema: NamedTopicCountsSchema = namedTopicCountsSchemaDefinition;
 export type NamedTopicCounts = z.infer<typeof namedTopicCountsSchema>;
 
 /** The project's conversation topics, and what the last clustering run did. */

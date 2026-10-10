@@ -14,6 +14,7 @@ import {
   type ConfigOf,
 } from "@langwatch/config";
 import { defineBrowserConfig } from "@langwatch/config/public-app-config";
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 export const authServerConfig = Config.define((c) => ({
@@ -89,7 +90,7 @@ export function assertAuthServerConfig(
  * the passkey button, and whether the identifier-first screens are the front
  * door here. Both derived, never the raw setting.
  */
-export const authWebConfigSchema = z.strictObject({
+const authWebConfigSchemaDefinition = z.strictObject({
   passkeys: z.boolean(),
   identityFrontDoor: z.boolean(),
   /** `AUTH_PROVIDER` (or its NextAuth-era name): a provider id, never a credential. */
@@ -106,6 +107,8 @@ export const authWebConfigSchema = z.strictObject({
    */
   signUpMode: z.enum(["open", "invite_only"]),
 });
+export interface AuthWebConfigSchema extends Named<typeof authWebConfigSchemaDefinition> {}
+export const authWebConfigSchema: AuthWebConfigSchema = authWebConfigSchemaDefinition;
 
 export type AuthWebConfig = z.infer<typeof authWebConfigSchema>;
 

@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import type { PreviewEnvelope, SharedDef } from "../provider-types.ts";
@@ -29,7 +30,7 @@ export function isSlackWebhookUrl(value: string): boolean {
   return secure && slackHost && defaultPort && noCredentials && hasWebhookPath;
 }
 
-export const slackActionParamsSchema = z
+const slackActionParamsSchemaDefinition = z
   .object({
     /** The named Slack connection this automation delivers through (ADR-093 §5a); when set,
      *  the connection's kind decides the method and the legacy secret fields are ignored. */
@@ -75,6 +76,8 @@ export const slackActionParamsSchema = z
       });
     }
   });
+export interface SlackActionParamsSchema extends Named<typeof slackActionParamsSchemaDefinition> {}
+export const slackActionParamsSchema: SlackActionParamsSchema = slackActionParamsSchemaDefinition;
 export type SlackActionParams = z.infer<typeof slackActionParamsSchema>;
 
 export function slackDeliveryMethodOf(params: {
