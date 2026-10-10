@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { formatMoney } from "../../format-money.ts";
 import type { Money } from "../../type-utils.ts";
 import { Tooltip } from "../overlays/tooltip.tsx";
+import { NumberFormats } from "./formatted-number.tsx";
 
 export const FormatMoney = ({
   amount,
@@ -19,7 +20,7 @@ export const FormatMoney = ({
   const formatted = formatMoney({ amount, currency }, format);
 
   return (
-    <Tooltip content={tooltip ?? (formatted.startsWith("<") ? amount : "")}>
+    <Tooltip content={tooltip ?? <NumberFormats value={amount} currency={currency ?? "USD"} />}>
       <Text as="span" whiteSpace="nowrap">
         {formatted}
       </Text>
