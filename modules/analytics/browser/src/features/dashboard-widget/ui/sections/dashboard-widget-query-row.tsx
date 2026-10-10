@@ -113,7 +113,7 @@ export function DashboardWidgetQueryRow({
 
             <Spacer />
             {!nameEdit.isEditingName && summary && (
-              <Text fontSize="11px" color={lastRun?.error ? "red.fg" : "fg.muted"} truncate>
+              <Text textStyle="micro" color={lastRun?.error ? "red.fg" : "fg.muted"} truncate>
                 {summary}
               </Text>
             )}
@@ -131,7 +131,7 @@ export function DashboardWidgetQueryRow({
             </IconButton>
           </HStack>
           {nameError && (
-            <Text fontSize="11px" color="red.fg">
+            <Text textStyle="micro" color="red.fg">
               {nameError}
             </Text>
           )}
@@ -207,7 +207,7 @@ function QueryNameField({
       textAlign="start"
       aria-label={`Rename query ${queryName || "(unnamed query)"}`}
       fontFamily="mono"
-      fontSize="13px"
+      textStyle="bodySm"
       truncate
       cursor="pointer"
       onClick={edit.startEditing}

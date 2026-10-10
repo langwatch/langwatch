@@ -17,7 +17,7 @@ export const LLMSummary = () => {
     graphType: "summary",
     series: [
       {
-        name: "Mean Tokens per Message",
+        name: "Mean tokens per message",
         metric: "performance.total_tokens",
         aggregation: "avg",
         colorSet: analyticsMetrics.performance.total_tokens.colorSet,
@@ -25,7 +25,7 @@ export const LLMSummary = () => {
       ...(hasPermission("cost:view")
         ? ([
             {
-              name: "Mean Cost per Message",
+              name: "Mean cost per message",
               metric: "performance.total_cost",
               aggregation: "avg",
               colorSet: analyticsMetrics.performance.total_cost.colorSet,
@@ -33,13 +33,13 @@ export const LLMSummary = () => {
           ] as CustomGraphInput["series"])
         : []),
       {
-        name: "90th Percentile Time to First Token",
+        name: "P90 time to first token",
         metric: "performance.first_token",
         aggregation: "p90",
         colorSet: analyticsMetrics.performance.first_token.colorSet,
       },
       {
-        name: "90th Percentile Completion Time",
+        name: "P90 completion time",
         metric: "performance.completion_time",
         aggregation: "p90",
         colorSet: analyticsMetrics.performance.completion_time.colorSet,
@@ -56,10 +56,10 @@ export const LLMSummary = () => {
         <HStack gap={1}>
           <Heading size="sm">Summary</Heading>
           {project?.slug && (
-            <Tooltip content="View LLM Metrics">
+            <Tooltip content="View LLM metrics">
               <Link href={`/${project.slug}/analytics/metrics`}>
                 <IconButton
-                  aria-label="View LLM Metrics"
+                  aria-label="View LLM metrics"
                   variant="ghost"
                   size="2xs"
                   color="fg.subtle"

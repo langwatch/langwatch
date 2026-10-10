@@ -60,7 +60,7 @@ export function DashboardNameDialog({
     <Dialog.Root open={open} size="sm" onOpenChange={({ open: isOpen }) => onOpenChange(isOpen)}>
       <Dialog.Content>
         <Dialog.Header>
-          <Dialog.Title>Create Dashboard</Dialog.Title>
+          <Dialog.Title>Create dashboard</Dialog.Title>
           <Dialog.CloseTrigger />
         </Dialog.Header>
         <Dialog.Body>

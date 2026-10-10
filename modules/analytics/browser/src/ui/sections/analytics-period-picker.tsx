@@ -108,13 +108,13 @@ export function AnalyticsPeriodPicker({
         <Popover.Arrow />
         <Popover.CloseTrigger />
         <Popover.Header>
-          <Popover.Title>Select Date Range</Popover.Title>
+          <Popover.Title>Select date range</Popover.Title>
         </Popover.Header>
         <Popover.Body>
           <HStack align="start" gap={6}>
             <VStack gap={4}>
               <Field.Root>
-                <Field.Label>Start Date</Field.Label>
+                <Field.Label>Start date</Field.Label>
                 <Input
                   type="datetime-local"
                   value={format(startDate.epochMilliseconds, "yyyy-MM-dd'T'HH:mm")}
@@ -124,7 +124,7 @@ export function AnalyticsPeriodPicker({
                 />
               </Field.Root>
               <Field.Root>
-                <Field.Label>End Date</Field.Label>
+                <Field.Label>End date</Field.Label>
                 <Input
                   type="datetime-local"
                   value={format(endDate.epochMilliseconds, "yyyy-MM-dd'T'HH:mm")}

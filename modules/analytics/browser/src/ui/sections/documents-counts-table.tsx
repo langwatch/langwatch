@@ -36,7 +36,7 @@ export const DocumentsCountsTable = ({ params }: { params?: TopUsedDocumentsPara
           <Table.Row>
             <Table.ColumnHeader paddingLeft={0}>Document ID</Table.ColumnHeader>
             <Table.ColumnHeader>Snippet</Table.ColumnHeader>
-            <Table.ColumnHeader>Usage Count</Table.ColumnHeader>
+            <Table.ColumnHeader>Usage count</Table.ColumnHeader>
           </Table.Row>
         </Table.Header>
         <Table.Body>

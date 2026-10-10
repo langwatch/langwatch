@@ -104,7 +104,7 @@ function LangWatchQLChartCanvas({
       >
         <Box ref={containerRef} width="full" minHeight={CHART_MIN_HEIGHT} />
       </Box>
-      <Text id={descriptionId} fontSize="12px" color="fg.muted">
+      <Text id={descriptionId} textStyle="caption" color="fg.muted">
         Drawn from the result of the query you ran. Switch to the table to read every returned row.
       </Text>
     </Box>
@@ -127,7 +127,7 @@ function LangWatchQLChartWarnings({ warnings }: { warnings: readonly VegaValidat
       {warnings.map((warning, index) => (
         <Text
           key={`${warning.code}-${warning.path}-${index}`}
-          fontSize="12.5px"
+          textStyle="bodySm"
           color="fg.muted"
           data-warning-code={warning.code}
         >

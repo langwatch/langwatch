@@ -24,7 +24,7 @@ interface DashboardWidgetQueryResultViewProps {
 export function DashboardWidgetQueryResultView({ run }: DashboardWidgetQueryResultViewProps) {
   if (!run) {
     return (
-      <Text fontSize="12px" color="fg.muted">
+      <Text textStyle="caption" color="fg.muted">
         Not run yet.
       </Text>
     );
@@ -33,7 +33,7 @@ export function DashboardWidgetQueryResultView({ run }: DashboardWidgetQueryResu
   if (run.error) {
     return (
       <Box
-        fontSize="12px"
+        textStyle="caption"
         color="red.fg"
         borderWidth="1px"
         borderColor="red.subtle"
@@ -53,7 +53,7 @@ export function DashboardWidgetQueryResultView({ run }: DashboardWidgetQueryResu
 
   return (
     <Box>
-      <Text fontSize="11px" color="fg.muted" marginBottom={1}>
+      <Text textStyle="micro" color="fg.muted" marginBottom={1}>
         {formatNumber(result.rows.length)} row
         {result.rows.length === 1 ? "" : "s"}
         {elapsedMs !== undefined ? ` · ${elapsedMs}ms` : ""}
@@ -70,7 +70,7 @@ export function DashboardWidgetQueryResultView({ run }: DashboardWidgetQueryResu
           <Table.Header>
             <Table.Row>
               {result.columns.map((column) => (
-                <Table.ColumnHeader key={column.name} fontSize="11px">
+                <Table.ColumnHeader key={column.name} textStyle="micro">
                   {column.name}
                 </Table.ColumnHeader>
               ))}
@@ -81,7 +81,7 @@ export function DashboardWidgetQueryResultView({ run }: DashboardWidgetQueryResu
               // result rows carry no id of their own; the list is never reordered
               <Table.Row key={rowIndex}>
                 {result.columns.map((column) => (
-                  <Table.Cell key={column.name} fontSize="11px">
+                  <Table.Cell key={column.name} textStyle="micro">
                     {String(row[column.name])}
                   </Table.Cell>
                 ))}

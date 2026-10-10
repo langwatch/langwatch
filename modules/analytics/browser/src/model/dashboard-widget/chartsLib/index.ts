@@ -8,6 +8,9 @@ import type * as RechartsLibrary from "recharts";
 
 type Row = Record<string, unknown>;
 
+// Mirrors TYPE_SCALE_PX; the frame bundle cannot import the design system.
+const TYPE_PX = { micro: 11, caption: 12, bodySm: 13, metric: 18 } as const;
+
 interface LWGlobal {
   dashboardContext?: { colors?: Readonly<Record<string, string>> };
   navigate?: (target: string, params?: Record<string, unknown>) => void;
@@ -226,7 +229,7 @@ function legendBar(keys: string[], palette: string[], c: ReturnType<typeof chrom
         flexWrap: "wrap",
         gap: "2px 12px",
         marginBottom: 4,
-        fontSize: 10.5,
+        fontSize: TYPE_PX.micro,
         color: c.text,
       },
     },
@@ -331,12 +334,12 @@ export function MetricStat({
   return h(
     "div",
     { style: { height, display: "flex", flexDirection: "column", gap: 4 } },
-    h("div", { style: { fontSize: 12, color: c.axis } }, label),
+    h("div", { style: { fontSize: TYPE_PX.caption, color: c.axis } }, label),
     h(
       "div",
       {
         style: {
-          fontSize: 24,
+          fontSize: TYPE_PX.metric,
           fontWeight: 600,
           color: hasValue ? c.text : c.axis,
           lineHeight: 1.2,
@@ -345,7 +348,11 @@ export function MetricStat({
       hasValue ? formatValue(value, format) : "No data",
     ),
     delta !== undefined &&
-      h("div", { style: { fontSize: 12, color: deltaColor } }, `${deltaArrow} ${Math.abs(delta)}%`),
+      h(
+        "div",
+        { style: { fontSize: TYPE_PX.caption, color: deltaColor } },
+        `${deltaArrow} ${Math.abs(delta)}%`,
+      ),
     sparkline &&
       h(Sparkline, {
         data: sparkline,
@@ -467,14 +474,14 @@ export function AreaTimeseries({
             axisLine: false,
             tickLine: false,
             minTickGap: 24,
-            tick: { fill: c.axis, fontSize: 11 },
+            tick: { fill: c.axis, fontSize: TYPE_PX.micro },
             tickFormatter: axisTickFormatter(x, data),
           }),
           h(R.YAxis, {
             axisLine: false,
             tickLine: false,
             width: 48,
-            tick: { fill: c.axis, fontSize: 11 },
+            tick: { fill: c.axis, fontSize: TYPE_PX.micro },
             tickFormatter: compactNumber,
           }),
           h(R.Tooltip, {
@@ -568,14 +575,14 @@ export function StackedBars({
             axisLine: false,
             tickLine: false,
             minTickGap: 24,
-            tick: { fill: c.axis, fontSize: 11 },
+            tick: { fill: c.axis, fontSize: TYPE_PX.micro },
             tickFormatter: axisTickFormatter(x, data),
           }),
           h(R.YAxis, {
             axisLine: false,
             tickLine: false,
             width: 48,
-            tick: { fill: c.axis, fontSize: 11 },
+            tick: { fill: c.axis, fontSize: TYPE_PX.micro },
             tickFormatter: compactNumber,
           }),
           h(R.Tooltip, {
@@ -639,14 +646,14 @@ export function GroupedBars({
             axisLine: false,
             tickLine: false,
             minTickGap: 24,
-            tick: { fill: c.axis, fontSize: 11 },
+            tick: { fill: c.axis, fontSize: TYPE_PX.micro },
             tickFormatter: axisTickFormatter(x, data),
           }),
           h(R.YAxis, {
             axisLine: false,
             tickLine: false,
             width: 48,
-            tick: { fill: c.axis, fontSize: 11 },
+            tick: { fill: c.axis, fontSize: TYPE_PX.micro },
             tickFormatter: compactNumber,
           }),
           h(R.Tooltip, {
@@ -706,14 +713,14 @@ export function ProjectionBars({
         axisLine: false,
         tickLine: false,
         minTickGap: 24,
-        tick: { fill: c.axis, fontSize: 11 },
+        tick: { fill: c.axis, fontSize: TYPE_PX.micro },
         tickFormatter: axisTickFormatter(x, data),
       }),
       h(R.YAxis, {
         axisLine: false,
         tickLine: false,
         width: 48,
-        tick: { fill: c.axis, fontSize: 11 },
+        tick: { fill: c.axis, fontSize: TYPE_PX.micro },
         tickFormatter: compactNumber,
         // Auto-scaled domain can clip the budget's ReferenceLine when budget
         // exceeds the data's own max; pad the domain to always include it.
@@ -738,7 +745,7 @@ export function ProjectionBars({
             value: "Budget",
             position: "right",
             fill: token("fg.error"),
-            fontSize: 11,
+            fontSize: TYPE_PX.micro,
           },
         }),
       projectedBar(R, {
@@ -826,7 +833,7 @@ export function Donut({
               left: "50%",
               transform: "translate(-50%, -50%)",
               textAlign: "center",
-              fontSize: 13,
+              fontSize: TYPE_PX.bodySm,
               fontWeight: 600,
               color: c.text,
               pointerEvents: "none",
@@ -902,7 +909,7 @@ export function Leaderboard({
         h(
           "div",
           {
-            style: { fontSize: 12, color: c.text, minWidth: 96, flexShrink: 0 },
+            style: { fontSize: TYPE_PX.caption, color: c.text, minWidth: 96, flexShrink: 0 },
           },
           cellText(row[labelKey]),
         ),
@@ -924,7 +931,7 @@ export function Leaderboard({
           "div",
           {
             style: {
-              fontSize: 12,
+              fontSize: TYPE_PX.caption,
               color: c.axis,
               minWidth: 48,
               textAlign: "right",
@@ -1049,7 +1056,7 @@ function Table({ data, height }: { data: Row[]; height?: number }) {
     { style: { height, overflow: "auto" } },
     h(
       "table",
-      { style: { width: "100%", borderCollapse: "collapse", fontSize: 12 } },
+      { style: { width: "100%", borderCollapse: "collapse", fontSize: TYPE_PX.caption } },
       h(
         "thead",
         {},

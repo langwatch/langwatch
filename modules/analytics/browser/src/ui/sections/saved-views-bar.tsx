@@ -31,6 +31,7 @@ import {
   Input,
   Text,
 } from "@langwatch/design-system/primitives";
+import { MetaText } from "@langwatch/design-system/typography";
 import { Check, MoreVertical, User, X } from "lucide-react";
 import type React from "react";
 import { useCallback, useRef, useState } from "react";
@@ -356,7 +357,8 @@ export function SavedViewsBar() {
       paddingY={2}
       data-testid="saved-views-bar"
     >
-      <HStack gap={2} overflowX="auto" width="full">
+      <HStack gap={2} overflowX="auto" width="full" paddingRight={16}>
+        <MetaText flexShrink={0}>Views</MetaText>
         {allTracesView && (
           <ViewBadge
             id={allTracesView.id}

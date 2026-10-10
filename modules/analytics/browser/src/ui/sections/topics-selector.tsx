@@ -162,7 +162,7 @@ function TopicRow({ name, count, checked, onToggle }: TopicRowProps) {
           {name}
         </OverflownTextWithTooltip>
       </Checkbox>
-      <Text color="fg.muted" fontSize="12px" whiteSpace="nowrap">
+      <Text color="fg.muted" textStyle="caption" whiteSpace="nowrap">
         {count}
       </Text>
     </HStack>
@@ -183,7 +183,7 @@ function SubtopicRow({ name, count, checked, onToggle }: TopicRowProps) {
           {name}
         </OverflownTextWithTooltip>
       </Checkbox>
-      <Text color="fg.muted" fontSize="12px" whiteSpace="nowrap">
+      <Text color="fg.muted" textStyle="caption" whiteSpace="nowrap">
         {count}
       </Text>
     </HStack>

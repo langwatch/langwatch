@@ -1,5 +1,5 @@
+import { Banner, BannerAction } from "@langwatch/design-system/banner";
 import {
-  Alert,
   Box,
   Button,
   Card,
@@ -38,21 +38,19 @@ function AnalyticsContent() {
   return (
     <AnalyticsLayout tab="overview">
       {project && !project.hasFirstMessage && (
-        <Alert.Root status="warning" marginBottom={6}>
-          <Alert.Indicator />
-          <Alert.Content>
-            <Alert.Title>No traces received yet</Alert.Title>
-            <Alert.Description>
-              <Text as="span">
-                {"Tracing is not integrated yet, so there's no data to display. Go to the "}
-              </Text>
-              <Link textDecoration="underline" href={`/${project.slug}/traces`}>
-                setup
-              </Link>
-              <Text as="span"> page to get started.</Text>
-            </Alert.Description>
-          </Alert.Content>
-        </Alert.Root>
+        <Box marginBottom={6}>
+          <Banner
+            status="warning"
+            title="No traces received yet"
+            action={
+              <BannerAction asChild>
+                <a href={`/${project.slug}/traces`}>Set up tracing</a>
+              </BannerAction>
+            }
+          >
+            Tracing is not integrated yet, so there is no data to display.
+          </Banner>
+        </Box>
       )}
 
       <HStack align="start" width="full" gap={8}>
@@ -90,7 +88,7 @@ function DocumentsMetrics() {
       </HStack>
       <Card.Root width="full">
         <Card.Body>
-          <Tabs.Root variant="plain" defaultValue="total-documents">
+          <Tabs.Root variant="line" defaultValue="total-documents">
             <Tabs.List gap={12}>
               <Tabs.Trigger value="total-documents" paddingX={0} paddingBottom={4}>
                 <VStack align="start">
@@ -100,13 +98,6 @@ function DocumentsMetrics() {
                   </Box>
                 </VStack>
               </Tabs.Trigger>
-              <Tabs.Indicator
-                mt="-1.5px"
-                height="4px"
-                bg="orange.solid"
-                borderRadius="1px"
-                bottom={0}
-              />
             </Tabs.List>
             <Tabs.Content value="total-documents">
               <DocumentsCountsTable params={params} />

@@ -73,7 +73,13 @@ export function DashboardTitleRow({
           onClick={startEdit}
           _hover={isEditable ? { "& .edit-icon": { opacity: 1 } } : void 0}
         >
-          <Heading as="h2" fontSize="16px" lineHeight="24px" fontWeight="semibold" truncate>
+          <Heading
+            as="h2"
+            textStyle="sectionTitle"
+            lineHeight="24px"
+            fontWeight="semibold"
+            truncate
+          >
             {title}
           </Heading>
           {isEditable ? (

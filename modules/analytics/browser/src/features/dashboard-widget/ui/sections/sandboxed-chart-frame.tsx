@@ -170,7 +170,7 @@ export function SandboxedChartFrame({
         gap={2}
         padding={4}
       >
-        <Text fontSize="13px" color="fg.muted">
+        <Text textStyle="bodySm" color="fg.muted">
           {restart.status === "exhausted"
             ? `Restarted ${FRAME_RESTART_MAX_ATTEMPTS} times, still not responding.`
             : "The chart stopped responding. Restarting…"}

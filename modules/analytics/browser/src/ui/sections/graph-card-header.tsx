@@ -129,7 +129,7 @@ export function GraphCardHeader({
       return seriesNames.replace(/,([^,]*)$/, " and$1");
     }
 
-    return "Untitled Graph";
+    return "Untitled graph";
   }, [name, graph]);
 
   const hasFilters = useMemo(

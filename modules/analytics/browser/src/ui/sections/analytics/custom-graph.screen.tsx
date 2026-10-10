@@ -99,6 +99,7 @@ import { FilterToggle, FilterToggleButton } from "../../../ui/sections/filter-to
 import { SavedViewsScope } from "../../../ui/sections/saved-views-scope.tsx";
 import { SeriesFiltersDialog } from "../../../ui/sections/series-filters-dialog.tsx";
 import { withAggregateAnalyticsGate } from "../aggregate-analytics-gate.tsx";
+import { AnalyticsOverflowMenu } from "../analytics-overflow-menu.tsx";
 
 /** Which of the builder's two addresses this render is. */
 export type CustomGraphScreenMode = "new" | "edit";
@@ -202,32 +203,32 @@ const chartOptions: Required<CustomGraphFormData>["graphType"][] = [
     icon: <AlignLeft />,
   },
   {
-    label: "Line Chart",
+    label: "Line chart",
     value: "line",
     icon: <TrendingUp />,
   },
   {
-    label: "Area Chart",
+    label: "Area chart",
     value: "area",
     icon: <Triangle />,
   },
   {
-    label: "Stacked Area Chart",
+    label: "Stacked area chart",
     value: "stacked_area",
     icon: <Triangle />,
   },
   {
-    label: "Bar Chart",
+    label: "Bar chart",
     value: "bar",
     icon: <BarChart2 />,
   },
   {
-    label: "Stacked Bar Chart",
+    label: "Stacked bar chart",
     value: "stacked_bar",
     icon: <BarChart2 />,
   },
   {
-    label: "Horizontal Bar Chart",
+    label: "Horizontal bar chart",
     value: "horizontal_bar",
     icon: (
       <BarChart2
@@ -238,22 +239,22 @@ const chartOptions: Required<CustomGraphFormData>["graphType"][] = [
     ),
   },
   {
-    label: "Scatter Chart",
+    label: "Scatter chart",
     value: "scatter",
     icon: <GitBranch />,
   },
   {
-    label: "Pie Chart",
+    label: "Pie chart",
     value: "pie",
     icon: <PieChart />,
   },
   {
-    label: "Donut Chart",
+    label: "Donut chart",
     value: "donnut",
     icon: <PieChart />,
   },
   {
-    label: "Monitor Graph",
+    label: "Monitor graph",
     value: "monitor_graph",
     icon: <LuChartArea />,
   },
@@ -369,7 +370,7 @@ function AnalyticsCustomGraphContent({
   return (
     <SavedViewsScope>
       <PageLayout.Header>
-        <PageLayout.Heading>Custom Graph</PageLayout.Heading>
+        <PageLayout.Heading>Custom graph</PageLayout.Heading>
         <Spacer />
         <FilterToggle />
         <AnalyticsPeriodPicker
@@ -378,6 +379,7 @@ function AnalyticsCustomGraphContent({
           setPeriod={setPeriod}
           setRelativePeriod={setRelativePeriod}
         />
+        <AnalyticsOverflowMenu />
       </PageLayout.Header>
       <PageLayout.Container>
         <VStack width="full" align="start" gap={6}>
@@ -396,7 +398,7 @@ function AnalyticsCustomGraphContent({
                     border="none"
                     paddingX={2}
                     fontWeight="bold"
-                    fontSize="16px"
+                    textStyle="sectionTitle"
                     data-testid="analytics-graph-title"
                   />
                   <HStack gap={2}>
@@ -750,7 +752,7 @@ function CustomGraphForm({
   return (
     <VStack width="full" align="start" gap={4} maxWidth="500px">
       <Field.Root>
-        <Field.Label>Graph Type</Field.Label>
+        <Field.Label>Graph type</Field.Label>
         <GraphTypeField form={form} />
       </Field.Root>
       {showsTimeScale && (
@@ -771,7 +773,7 @@ function CustomGraphForm({
             render={({ field }) => (
               <NativeSelect.Root>
                 <NativeSelect.Field {...field}>
-                  <option value="full">Full Period</option>
+                  <option value="full">Full period</option>
                   <option value="10">10 minutes</option>
                   <option value="30">30 minutes</option>
                   <option value="60">1 hour</option>
@@ -802,7 +804,7 @@ function CustomGraphForm({
         </Field.Root>
       )}
       <Field.Root>
-        <Field.Label fontSize="16px" width="full">
+        <Field.Label textStyle="sectionTitle" width="full">
           <HStack width="full" justify="space-between">
             Series
             <Button
@@ -1093,7 +1095,7 @@ function SeriesFieldItem({
             onClick={(e) => {
               e.stopPropagation();
             }}
-            fontSize="14px"
+            textStyle="body"
             fontWeight="normal"
             onDoubleClick={() => {
               setExpandedSeries((prev) => {
@@ -1371,8 +1373,8 @@ function SeriesField({
                     onClick={() => setEditingSeriesFilters(true)}
                   >
                     {Object.keys(nonEmptyFilters).length > 0
-                      ? "Edit Filters"
-                      : "Add Filter for Series"}
+                      ? "Edit filters"
+                      : "Add filter for series"}
                   </FilterToggleButton>
                   <SeriesFiltersDialog
                     open={editingSeriesFilters}
@@ -1611,4 +1613,4 @@ function CustomGraphScreen({ mode }: { mode: CustomGraphScreenMode }) {
   );
 }
 
-export default withAggregateAnalyticsGate("Custom Graph", CustomGraphScreen);
+export default withAggregateAnalyticsGate("Custom graph", CustomGraphScreen);

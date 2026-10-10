@@ -1,12 +1,6 @@
-import {
-  Card,
-  EmptyState,
-  GridItem,
-  Heading,
-  HStack,
-  SimpleGrid,
-  VStack,
-} from "@langwatch/design-system/primitives";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
+import { Card, GridItem, Heading, HStack, SimpleGrid } from "@langwatch/design-system/primitives";
+import { Users } from "lucide-react";
 
 import { ChartCard } from "../../../ui/elements/chart-card.tsx";
 import AnalyticsLayout from "../../../ui/sections/analytics-layout.tsx";
@@ -196,24 +190,14 @@ const tracesByCustomer: CustomGraphInput = {
 };
 
 const userEmptyState = (
-  <EmptyState.Root size="sm" paddingY={10}>
-    <EmptyState.Content>
-      <VStack textAlign="center">
-        <EmptyState.Title textStyle="sm">No user data yet</EmptyState.Title>
-        <EmptyState.Description textStyle="xs">
-          Start tracking users to see metrics here.{" "}
-          <a
-            href="https://langwatch.ai/docs/integration/metadata-and-labels"
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{ textDecoration: "underline" }}
-          >
-            Learn how to set up
-          </a>
-        </EmptyState.Description>
-      </VStack>
-    </EmptyState.Content>
-  </EmptyState.Root>
+  <NoDataInfoBlock
+    size="inline"
+    bordered={false}
+    icon={<Users size={20} />}
+    title="No user data yet"
+    description="Start tracking users to see metrics here."
+    docsHref="https://langwatch.ai/docs/integration/metadata-and-labels"
+  />
 );
 
 function UsersContent() {
@@ -224,7 +208,7 @@ function UsersContent() {
           <GridItem colSpan={2} display="inline-grid">
             <Card.Root overflow="auto">
               <Card.Header>
-                <Heading size="sm">User Traces</Heading>
+                <Heading size="sm">User traces</Heading>
               </Card.Header>
               <Card.Body>
                 <CustomGraph input={messagesCount} emptyState={userEmptyState} />
@@ -234,14 +218,14 @@ function UsersContent() {
           <GridItem colSpan={2} display="inline-grid">
             <Card.Root overflow="auto">
               <Card.Header>
-                <Heading size="sm">User Threads</Heading>
+                <Heading size="sm">User threads</Heading>
               </Card.Header>
               <Card.Body>
                 <CustomGraph input={userThreads} emptyState={userEmptyState} />
               </Card.Body>
             </Card.Root>
           </GridItem>
-          <ChartCard title="Daily Users" colSpan={2}>
+          <ChartCard title="Daily users" colSpan={2}>
             <CustomGraph input={userCountGraph} emptyState={userEmptyState} />
           </ChartCard>
           <ChartCard title="Daily Threads" colSpan={2}>

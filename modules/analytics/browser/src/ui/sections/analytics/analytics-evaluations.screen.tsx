@@ -1,5 +1,5 @@
+import { Banner, BannerAction } from "@langwatch/design-system/banner";
 import {
-  Alert,
   Box,
   Card,
   GridItem,
@@ -15,7 +15,6 @@ import { Fragment, useCallback } from "react";
 import type { AnalyticsMonitorSummary } from "../../../behavior/analytics-api.ts";
 import { useProjectMonitors } from "../../../behavior/use-dashboards.ts";
 import { useAnalyticsHost } from "../../../model/analytics-host.ts";
-import { Link } from "../../../ui/elements/analytics-link.tsx";
 import AnalyticsLayout from "../../../ui/sections/analytics-layout.tsx";
 import { CustomGraph, type CustomGraphInput } from "../../../ui/sections/custom-graph.tsx";
 import { FilterSidebar } from "../../../ui/sections/filter-sidebar.tsx";
@@ -421,31 +420,34 @@ function EvaluationsContent() {
   return (
     <AnalyticsLayout tab="evaluations">
       {checks.data && checks.data?.length === 0 && (
-        <Alert.Root status="warning" variant="surface" marginBottom={6}>
-          <Alert.Indicator />
-          <Alert.Content>
-            <Alert.Title>No online evaluations yet</Alert.Title>
-            <Alert.Description>
-              <Text as="span">Online evaluation results will be displayed here. </Text>
-              <Link href={`/${project?.slug}/online-evaluations`}>Set up an online evaluation</Link>
-              <Text as="span"> to see results for your project.</Text>
-            </Alert.Description>
-          </Alert.Content>
-        </Alert.Root>
+        <Box marginBottom={6}>
+          <Banner
+            status="warning"
+            title="No online evaluations yet"
+            action={
+              <BannerAction asChild>
+                <a href={`/${project?.slug}/online-evaluations`}>Set up an online evaluation</a>
+              </BannerAction>
+            }
+          >
+            Online evaluation results will be displayed here.
+          </Banner>
+        </Box>
       )}
       {selectedEvaluation && (
-        <Alert.Root status="info" marginBottom={6}>
-          <Alert.Indicator />
-          <Alert.Content>
-            <Alert.Title>{selectedEvaluation.name}</Alert.Title>
-            <Alert.Description>
-              Showing analytics for this online evaluation.{" "}
-              <Link href={`/${project?.slug}/analytics/evaluations`}>
-                View all online evaluations
-              </Link>
-            </Alert.Description>
-          </Alert.Content>
-        </Alert.Root>
+        <Box marginBottom={6}>
+          <Banner
+            status="info"
+            title={selectedEvaluation.name}
+            action={
+              <BannerAction asChild>
+                <a href={`/${project?.slug}/analytics/evaluations`}>View all online evaluations</a>
+              </BannerAction>
+            }
+          >
+            Showing analytics for this online evaluation.
+          </Banner>
+        </Box>
       )}
       <HStack alignItems="start" gap={4}>
         <SimpleGrid templateColumns="repeat(4, 1fr)" gap={5} width="100%">

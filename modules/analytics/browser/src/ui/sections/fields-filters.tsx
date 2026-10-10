@@ -613,7 +613,7 @@ function FilterOptionRow({
         </Checkbox>
         <Spacer />
         {typeof count !== "undefined" && (
-          <Text fontSize="12px" color="fg.subtle">
+          <Text textStyle="caption" color="fg.subtle">
             {count}
           </Text>
         )}

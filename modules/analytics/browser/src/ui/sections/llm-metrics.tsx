@@ -154,11 +154,11 @@ export function LLMMetrics() {
     <>
       <HStack paddingTop={6} paddingBottom={2}>
         <Heading as="h2" size="md">
-          LLM Metrics
+          LLM metrics
         </Heading>
-        <Tooltip content="View LLM Metrics dashboard">
+        <Tooltip content="View LLM metrics dashboard">
           <Link href={`/${project?.slug}/analytics/metrics`}>
-            <IconButton aria-label="View LLM Metrics" variant="ghost" size="xs" color="fg.subtle">
+            <IconButton aria-label="View LLM metrics" variant="ghost" size="xs" color="fg.subtle">
               <ArrowUpRight size={14} />
             </IconButton>
           </Link>
@@ -169,7 +169,7 @@ export function LLMMetrics() {
           <Card.Root>
             <Card.Body>
               <Tabs.Root
-                variant="plain"
+                variant="line"
                 defaultValue="llmCallsGraph"
                 // Every panel here is a read-only CustomGraph analytics
                 // query with no user-entered state, so fully unmounting
@@ -212,13 +212,6 @@ export function LLMMetrics() {
                       }}
                     />
                   </Tabs.Trigger>
-                  <Tabs.Indicator
-                    mt="-1.5px"
-                    height="4px"
-                    bg="orange.solid"
-                    borderRadius="1px"
-                    bottom={0}
-                  />
                 </Tabs.List>
                 <Tabs.Content value="llmCallsGraph">
                   <CustomGraph input={llmCallsGraph} />
@@ -242,11 +235,11 @@ export function LLMMetrics() {
           <Card.Root height="full">
             <Card.Header>
               <HStack gap={1}>
-                <Heading size="sm">Evaluations Summary</Heading>
-                <Tooltip content="View Online Evaluations">
+                <Heading size="sm">Evaluations summary</Heading>
+                <Tooltip content="View online evaluations">
                   <Link href={`/${project?.slug}/analytics/evaluations`}>
                     <IconButton
-                      aria-label="View Evaluations"
+                      aria-label="View evaluations"
                       variant="ghost"
                       size="2xs"
                       color="fg.subtle"
@@ -270,7 +263,7 @@ export function LLMMetrics() {
         <GridItem>
           <Card.Root height="full">
             <Card.Header>
-              <Heading size="sm">Error Trend</Heading>
+              <Heading size="sm">Error trend</Heading>
             </Card.Header>
             <Card.Body>
               <CustomGraph input={errorTrend} />
@@ -280,7 +273,7 @@ export function LLMMetrics() {
         <GridItem>
           <Card.Root height="full">
             <Card.Header>
-              <Heading size="sm">Latency Trend</Heading>
+              <Heading size="sm">Latency trend</Heading>
             </Card.Header>
             <Card.Body>
               <CustomGraph input={latencyTrend} />
