@@ -2,6 +2,7 @@
 
 import type { WireOf } from "@langwatch/api/web";
 import { UserAvatar } from "@langwatch/design-system/avatar";
+import { InlineCode } from "@langwatch/design-system/inline-code";
 import {
   Badge,
   Box,
@@ -62,56 +63,57 @@ export function AuditLogEntry({
       paddingY={1}
       borderRadius="md"
       _hover={{ bg: "bg.subtle" }}
+      className="group"
       data-testid="audit-log-entry"
     >
       <EntryTime at={log.createdAt} />
       <Box alignSelf="center">
         <ActorAvatar actor={actor} />
       </Box>
-      <Text fontSize="sm" lineHeight="short" minWidth={0}>
-        <ActorName actor={actor} /> {lowerFirst(auditActionPhrase(log.action))}
-        {log.targetId && (
-          <>
-            {" "}
-            <Tooltip content={`${log.targetKind ?? "target"} ${log.targetId}`}>
-              <Text as="span" fontWeight="semibold">
+      <HStack gap={2} minWidth={0} gridColumn="3 / span 2" align="baseline">
+        <Text fontSize="sm" lineHeight="short" minWidth={0} color="fg.muted">
+          <ActorName actor={actor} /> {lowerFirst(auditActionPhrase(log.action))}
+          {log.targetId && (
+            <>
+              {" "}
+              <InlineCode maxWidth="280px" verticalAlign="bottom">
                 {log.targetId}
+              </InlineCode>
+            </>
+          )}
+          {log.projectId && (
+            <>
+              {" in "}
+              <Text as="span" color="fg" fontWeight="medium">
+                {projectLabel(log.projectId)}
               </Text>
-            </Tooltip>
-          </>
-        )}
-        {log.projectId && (
-          <>
-            {" in "}
-            <Text as="span" fontWeight="semibold">
-              {projectLabel(log.projectId)}
-            </Text>
-          </>
-        )}
-      </Text>
-      <HStack gap={1.5} justify="end">
-        {log.error && (
-          <Badge size="xs" variant="subtle" colorPalette="red" gap={1}>
-            <CircleAlert size={10} />
-            Failed
-          </Badge>
-        )}
-        {count > 1 && (
-          <Button
-            size="2xs"
-            variant="subtle"
-            height="5"
-            minWidth="0"
-            paddingX={1.5}
-            fontSize="xs"
-            fontVariantNumeric="tabular-nums"
-            aria-expanded={repeatsOpen}
-            aria-label={`Show all ${count} repeats`}
-            onClick={() => setRepeatsOpen((open) => !open)}
-          >
-            ×{count}
-          </Button>
-        )}
+            </>
+          )}
+        </Text>
+        <HStack gap={1.5} flexShrink={0}>
+          {log.error && (
+            <Badge size="xs" variant="subtle" colorPalette="red" gap={1}>
+              <CircleAlert size={10} />
+              Failed
+            </Badge>
+          )}
+          {count > 1 && (
+            <Button
+              size="2xs"
+              variant="subtle"
+              height="5"
+              minWidth="0"
+              paddingX={1.5}
+              fontSize="xs"
+              fontVariantNumeric="tabular-nums"
+              aria-expanded={repeatsOpen}
+              aria-label={`Show all ${count} repeats`}
+              onClick={() => setRepeatsOpen((open) => !open)}
+            >
+              ×{count}
+            </Button>
+          )}
+        </HStack>
       </HStack>
 
       <Indented>
@@ -213,7 +215,7 @@ function EntryTime({ at }: { at: string }) {
 }
 
 function MetaLine({ log, children }: { log: EnrichedAuditLog; children: ReactNode }) {
-  const client = auditClient(log.userAgent) ?? (log.userId ? "Unknown client" : "Worker");
+  const client = auditClient(log.userAgent) ?? (log.userId ? "" : "Worker");
   return (
     <Grid
       templateColumns={META_COLUMNS}
@@ -223,7 +225,7 @@ function MetaLine({ log, children }: { log: EnrichedAuditLog; children: ReactNod
       alignItems="center"
     >
       <Text fontFamily="mono" truncate>
-        {log.ipAddress ?? "no address"}
+        {log.ipAddress}
       </Text>
       <Tooltip content={log.userAgent}>
         <Text truncate>{client}</Text>
@@ -261,7 +263,11 @@ function EntryButton({
       padding={0}
       fontSize="xs"
       fontWeight="normal"
-      color="blue.fg"
+      color="fg.subtle"
+      opacity={expanded ? 1 : 0}
+      _groupHover={{ opacity: 1 }}
+      _focusVisible={{ opacity: 1 }}
+      _hover={{ color: "fg" }}
       aria-expanded={expanded}
       onClick={onClick}
       flexShrink={0}
@@ -322,7 +328,7 @@ function ActorAvatar({ actor }: { actor: AuditActor }) {
 function Bold({ children, hint }: { children: ReactNode; hint?: string | null }) {
   return (
     <Tooltip content={hint}>
-      <Text as="span" fontWeight="semibold">
+      <Text as="span" color="fg" fontWeight="medium">
         {children}
       </Text>
     </Tooltip>

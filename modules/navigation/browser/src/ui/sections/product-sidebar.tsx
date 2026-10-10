@@ -363,12 +363,14 @@ export function SidebarContent({
           // opt out of the ::-webkit-scrollbar styling below, and the
           // native bar it falls back to is a wide one with a track.
           // Firefox takes its default scrollbar instead.
-          "&::-webkit-scrollbar": { width: "4px" },
+          "&::-webkit-scrollbar": { width: "10px" },
           "&::-webkit-scrollbar-thumb": {
             background: "var(--chakra-colors-border-emphasized)",
-            borderRadius: "2px",
+            backgroundClip: "padding-box",
+            border: "3px solid transparent",
+            borderRadius: "999px",
           },
-          "&::-webkit-scrollbar-track": { background: "transparent" },
+          "&::-webkit-scrollbar-track": { background: "transparent", marginBlock: "6px" },
         }}
       >
         <QuickSearchMenuItem showLabel={showExpanded} />

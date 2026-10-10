@@ -78,7 +78,7 @@ function JoinerSeatOptions({
         colorPalette="orange"
         onValueChange={(event) => onSelect((event.value ?? "MEMBER") as JoinerRole)}
       >
-        <VStack align="stretch" gap={2}>
+        <VStack align="stretch" gap={3}>
           {JOINER_SEAT_OPTIONS.map((option) => (
             <RadioGroup.Item
               key={option.value}
@@ -90,6 +90,8 @@ function JoinerSeatOptions({
               borderColor="border.muted"
               borderRadius="md"
               background="bg.panel"
+              transition="background 0.15s ease, border-color 0.15s ease"
+              _hover={{ borderColor: "border.emphasized" }}
               _checked={{
                 borderColor: "colorPalette.solid",
                 background: "bg.muted",
@@ -212,8 +214,9 @@ export function JoinPolicyCard({
           {OPTIONS.map((option) => (
             // The tooltip hangs off a wrapper: a disabled radio takes no pointer events.
             <Tooltip key={option.value} content={explanation} disabled={!isLocked(option.value)}>
-              <Box>
+              <Box width="full">
                 <RadioGroup.Item
+                  width="full"
                   value={option.value}
                   disabled={saving || isLocked(option.value)}
                   paddingX={2.5}
