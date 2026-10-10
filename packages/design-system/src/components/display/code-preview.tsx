@@ -21,6 +21,7 @@ import {
   normalizeShikiLang,
   useShikiAdapter,
 } from "../../shiki-adapter.ts";
+import { type DiffLineKind, parseUnifiedDiff } from "../../unified-diff.ts";
 import { useCopyToClipboard } from "../../use-copy-to-clipboard.ts";
 import { toaster } from "../overlays/toaster.tsx";
 import { Tooltip } from "../overlays/tooltip.tsx";
@@ -32,7 +33,68 @@ interface CodePreviewProps {
   filename?: string;
   /** Caps a tall snippet and scrolls it, keeping the title bar in view. */
   maxHeight?: string;
+  /**
+   * Reads `code` as a unified diff: a `+`/`-` column, added and removed lines tinted,
+   * each line highlighted as `language`. Copy still writes the diff.
+   */
+  diff?: boolean;
+  /** A gutter of line numbers; a diff numbers its old and new lines side by side. */
+  lineNumbers?: boolean;
 }
+
+/** One gutter string per line, drawn by CSS so selecting the code never takes it. */
+function gutters({
+  code,
+  diff,
+  lineNumbers,
+}: {
+  code: string;
+  diff: boolean;
+  lineNumbers: boolean;
+}): { body: string; lines: { kind: DiffLineKind; gutter: string }[] } {
+  if (!diff) {
+    const count = code.split("\n").length;
+    const width = String(count).length;
+    return {
+      body: code,
+      lines: Array.from({ length: count }, (_, index) => ({
+        kind: "context",
+        gutter: lineNumbers ? `${String(index + 1).padStart(width)}  ` : "",
+      })),
+    };
+  }
+  const parsed = parseUnifiedDiff(code);
+  const width = String(
+    Math.max(1, ...parsed.flatMap((line) => [line.oldLine ?? 0, line.newLine ?? 0])),
+  ).length;
+  const cell = (n: number | null) => (n === null ? "" : String(n)).padStart(width);
+  const mark = { add: "+", remove: "-", context: " ", hunk: " ", meta: " " } as const;
+  return {
+    body: parsed.map((line) => line.text).join("\n"),
+    lines: parsed.map((line) => ({
+      kind: line.kind,
+      gutter: `${lineNumbers ? `${cell(line.oldLine)} ${cell(line.newLine)} ` : ""}${mark[line.kind]} `,
+    })),
+  };
+}
+
+const GUTTERED = {
+  "& pre": { paddingInline: 0 },
+  "& pre code": { display: "inline-block", minWidth: "100%" },
+  "& .line": { display: "inline-block", width: "100%", paddingInline: "16px" },
+  "& .line::before": {
+    content: "attr(data-gutter)",
+    whiteSpace: "pre",
+    color: "fg.subtle",
+    userSelect: "none",
+  },
+  "& .line[data-diff=add]": { background: "green.subtle" },
+  "& .line[data-diff=add]::before": { color: "green.fg" },
+  "& .line[data-diff=remove]": { background: "red.subtle" },
+  "& .line[data-diff=remove]::before": { color: "red.fg" },
+  "& .line[data-diff=hunk]": { background: "blue.subtle" },
+  "& .line[data-diff=hunk] span, & .line[data-diff=meta] span": { color: "fg.muted !important" },
+} as const;
 
 /** One house window for every code sample: title bar, copy button, Shiki body. */
 export function CodePreview({
@@ -40,22 +102,32 @@ export function CodePreview({
   language,
   filename,
   maxHeight,
+  diff = false,
+  lineNumbers = false,
 }: CodePreviewProps): React.ReactElement | null {
   const { colorMode } = useColorMode();
   const { copied, copy } = useCopyToClipboard();
   const [highlighted, setHighlighted] = useState<{ key: string; html: string } | null>(null);
-  const key = `${colorMode}\u0000${language}\u0000${code}`;
+  const guttered = diff || lineNumbers;
+  const key = `${colorMode}\u0000${language}\u0000${diff}\u0000${lineNumbers}\u0000${code}`;
 
   useEffect(() => {
     let cancelled = false;
     const highlight = colorMode === "dark" ? codeToHtmlDark : codeToHtml;
-    void highlight({ code, lang: language }).then((html) => {
+    const { body, lines } = gutters({ code, diff, lineNumbers });
+    const lineData = guttered
+      ? (line: number) => {
+          const at = lines[line - 1];
+          return at ? { diff: at.kind, gutter: at.gutter } : undefined;
+        }
+      : undefined;
+    void highlight({ code: body, lang: language, lineData }).then((html) => {
       if (!cancelled) setHighlighted({ key, html });
     });
     return () => {
       cancelled = true;
     };
-  }, [code, language, colorMode, key]);
+  }, [code, language, colorMode, key, diff, lineNumbers, guttered]);
 
   if (!code) return null;
   const html = highlighted?.key === key ? highlighted.html : null;
@@ -69,7 +141,7 @@ export function CodePreview({
       width="full"
     >
       <HStack justify="space-between" paddingX={3} paddingY={1} borderBottomWidth="1px">
-        <Text fontSize="xs">{filename ?? language}</Text>
+        <Text fontSize="xs">{filename ?? (diff ? `${language} diff` : language)}</Text>
         <IconButton
           size="2xs"
           variant="ghost"
@@ -82,7 +154,10 @@ export function CodePreview({
       <Box
         overflow="auto"
         maxHeight={maxHeight}
-        css={{ "& pre": { margin: 0, padding: "12px 16px", whiteSpace: "pre", overflowX: "auto" } }}
+        css={{
+          "& pre": { margin: 0, padding: "12px 16px", whiteSpace: "pre", overflowX: "auto" },
+          ...(guttered ? GUTTERED : {}),
+        }}
       >
         {html ? (
           <Box display="contents" dangerouslySetInnerHTML={{ __html: html }} />

@@ -2,6 +2,7 @@ import numeral from "numeral";
 
 import type { Money } from "./type-utils.ts";
 
+/** @deprecated Use `formatCurrency` from `@langwatch/design-system/format-currency`. */
 export const formatMoney = (money: Money, format = "$0.00[00]"): string => {
   const currencySymbols = {
     USD: "$",

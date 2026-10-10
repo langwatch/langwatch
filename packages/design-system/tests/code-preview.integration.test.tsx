@@ -27,4 +27,34 @@ describe("CodePreview", () => {
       expect(container.querySelector("pre")).toBeNull();
     });
   });
+
+  describe("given a diff with line numbers", () => {
+    /** @scenario "A diff draws a marker column beside highlighted code" */
+    it("tags each line with its kind and a gutter, and the code loses its markers", async () => {
+      const { container } = renderWithDesignSystem(
+        <CodePreview
+          code={"@@ -1,2 +1,2 @@\n keep\n-old\n+new"}
+          language="python"
+          diff
+          lineNumbers
+        />,
+      );
+
+      await waitFor(() => expect(container.querySelector("pre.shiki")).not.toBeNull());
+      const lines = [...container.querySelectorAll(".line")];
+      expect(lines.map((line) => line.getAttribute("data-diff"))).toEqual([
+        "hunk",
+        "context",
+        "remove",
+        "add",
+      ]);
+      expect(lines.map((line) => line.getAttribute("data-gutter"))).toEqual([
+        "      ",
+        "1 1   ",
+        "2   - ",
+        "  2 + ",
+      ]);
+      expect(lines[2]?.textContent).toBe("old");
+    });
+  });
 });

@@ -18,6 +18,18 @@
       "types": "./dist/components/values/formatted-date.d.ts",
       "default": "./src/components/values/formatted-date.tsx"
     },
+    "./money": {
+      "types": "./dist/components/values/money.d.ts",
+      "default": "./src/components/values/money.tsx"
+    },
+    "./describe-instant": {
+      "types": "./dist/describe-instant.d.ts",
+      "default": "./src/describe-instant.ts"
+    },
+    "./unified-diff": {
+      "types": "./dist/unified-diff.d.ts",
+      "default": "./src/unified-diff.ts"
+    },
     "./format-money-display": {
       "types": "./dist/components/values/format-money-display.d.ts",
       "default": "./src/components/values/format-money-display.tsx"
@@ -109,6 +121,10 @@
     "./format-money": {
       "types": "./dist/format-money.d.ts",
       "default": "./src/format-money.ts"
+    },
+    "./format-currency": {
+      "types": "./dist/format-currency.d.ts",
+      "default": "./src/format-currency.ts"
     },
     "./back-link": {
       "types": "./dist/components/layout/back-link.d.ts",

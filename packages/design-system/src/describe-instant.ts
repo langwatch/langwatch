@@ -68,3 +68,56 @@ export function describeInstant({
     iso: Temporal.Instant.fromEpochMilliseconds(epochMs).toString(),
   };
 }
+
+/**
+ * `datetime`: `Oct 8, 2026, 2:32 PM`; `date` and `time`: one half of it;
+ * `relative`: `3 minutes ago`; `auto`, for lists: the time today, the day and
+ * time this year, the date before that.
+ */
+export type InstantDisplay = "datetime" | "date" | "time" | "relative" | "auto";
+
+/** One instant as the label a reader scans, in `timeZone` (the viewer's by default). */
+export function formatInstant({
+  epochMs,
+  display = "datetime",
+  nowMs = nowInstant().epochMilliseconds,
+  locale,
+  timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone,
+  showZone = false,
+}: {
+  epochMs: number;
+  display?: InstantDisplay;
+  nowMs?: number;
+  locale?: string;
+  timeZone?: string;
+  /** Appends the zone's short name, `CEST`, for a time read across zones. */
+  showZone?: boolean;
+}): string {
+  if (display === "relative") return describeInstant({ epochMs, nowMs, locale }).relative;
+  const zone = showZone ? ({ timeZoneName: "short" } as const) : {};
+  const format = (options: Intl.DateTimeFormatOptions) =>
+    new Intl.DateTimeFormat(locale, { timeZone, ...options, ...zone }).format(epochMs);
+  const time = { hour: "numeric", minute: "2-digit" } as const;
+  const date = { year: "numeric", month: "short", day: "numeric" } as const;
+
+  if (display === "date") {
+    return new Intl.DateTimeFormat(locale, { timeZone, ...date }).format(epochMs);
+  }
+  if (display === "time") return format(time);
+  if (display === "datetime") return format({ ...date, ...time });
+
+  const at = Temporal.Instant.fromEpochMilliseconds(epochMs).toZonedDateTimeISO(timeZone);
+  const now = Temporal.Instant.fromEpochMilliseconds(nowMs).toZonedDateTimeISO(timeZone);
+  const today = now.toPlainDate();
+  if (at.toPlainDate().equals(today)) return format(time);
+  if (at.year === now.year) return format({ month: "short", day: "numeric", ...time });
+  return new Intl.DateTimeFormat(locale, { timeZone, ...date }).format(epochMs);
+}
+
+/** How long a relative label stays right: a second while fresh, then minutes, then hours. */
+export function relativeRefreshMs({ epochMs, nowMs }: { epochMs: number; nowMs: number }): number {
+  const age = Math.abs(nowMs - epochMs);
+  if (age < 60_000) return 1_000;
+  if (age < 3_600_000) return 30_000;
+  return 1_800_000;
+}

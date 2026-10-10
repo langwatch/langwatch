@@ -6,6 +6,7 @@ import type { Money } from "../../type-utils.ts";
 import { Tooltip } from "../overlays/tooltip.tsx";
 import { NumberFormats } from "./formatted-number.tsx";
 
+/** @deprecated Use `Money` from `@langwatch/design-system/money`: any currency, locale-aware. */
 export const FormatMoney = ({
   amount,
   currency,

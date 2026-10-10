@@ -7,8 +7,8 @@ const meta = {
   title: "Data display/Format money",
   parameters: {
     usage: {
-      use: "A money amount with its currency, formatted the one way.",
-      avoid: "A plain number: use Formatted number.",
+      use: "Existing call sites only. New code uses Money: any currency, the reader's locale, sizes and tones.",
+      avoid: "Any new screen: use Money. A plain number: use Formatted number.",
     },
   },
   component: FormatMoney,
