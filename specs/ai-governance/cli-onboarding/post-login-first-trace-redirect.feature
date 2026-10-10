@@ -47,6 +47,12 @@ Feature: Post-login first-trace watch on the CLI authorize page
     And the first trace there takes the user to that project's traces page
 
   @bdd @cli-onboarding @first-trace @integration
+  Scenario: The page's organization list names who owns each personal workspace
+    Given the signed-in user owns a personal workspace in an organization
+    When the page reads the organizations the user belongs to
+    Then that workspace's team names the user as its owner, so the watch can find it
+
+  @bdd @cli-onboarding @first-trace @integration
   Scenario: Sending a project API key keeps the success card still, with no waiting line and no redirect
     Given the CLI requested a project API key instead of a device session
     When the user sends the key to the CLI

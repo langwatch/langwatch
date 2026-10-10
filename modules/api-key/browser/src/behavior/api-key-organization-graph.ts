@@ -43,6 +43,7 @@ function toHostTeams(entry: GraphOrganization): ApiKeyOrganizationTeam[] {
     id: team.id,
     name: team.name,
     isPersonal: team.isPersonal,
+    ownerUserId: team.ownerUserId,
     projects: team.projects.map((project) => ({
       id: project.id,
       name: project.name,
