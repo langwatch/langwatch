@@ -3,7 +3,7 @@
  * a large figure, an optional meter against a limit, an optional hint. Tiles
  * sit in a `StatTileGrid`. Presentational only: no fetching, no module words.
  */
-import { Card, HStack, SimpleGrid, Skeleton, Stat, Text, VStack } from "@chakra-ui/react";
+import { Card, HStack, SimpleGrid, Skeleton, Text, VStack } from "@chakra-ui/react";
 import { ArrowUpRight } from "lucide-react";
 import type { ReactNode } from "react";
 
@@ -151,8 +151,8 @@ export interface CompactStatProps {
 }
 
 /**
- * A dense dashboard figure on a strip of many: a label, one value or several, an optional
- * drill-down. A page's headline facts take `StatTile` instead.
+ * A dashboard figure on a strip of many, drawn as a `StatTile` card: a label, one value or
+ * several, an optional drill-down.
  */
 export function CompactStat({
   label,
@@ -168,34 +168,38 @@ export function CompactStat({
 }: CompactStatProps) {
   const linked = href !== undefined && renderLink !== undefined;
   const content = (
-    <Stat.Root
+    <Card.Root
+      variant="elevated"
+      minWidth={0}
+      flexShrink={0}
       cursor={linked ? "pointer" : undefined}
       _hover={linked ? { bg: "bg.subtle" } : undefined}
-      borderRadius="md"
-      flexShrink={0}
-      padding={2}
       transition="background 0.1s"
       data-testid={testId}
       title={hint}
       data-warning={warning === undefined ? undefined : String(warning)}
     >
-      <Stat.Label whiteSpace="nowrap">
-        <HStack gap={1}>
-          <Text>{label}</Text>
-          {linked ? <ArrowUpRight size={10} /> : null}
-        </HStack>
-      </Stat.Label>
-      {children ?? (
-        <Stat.ValueText color={color} whiteSpace="nowrap">
-          {value}
-        </Stat.ValueText>
-      )}
-      {sublabel ? (
-        <Text textStyle="xs" color="fg.muted" fontWeight="normal" whiteSpace="nowrap">
-          {sublabel}
-        </Text>
-      ) : null}
-    </Stat.Root>
+      <Card.Body paddingX={4} paddingY={3}>
+        <VStack align="start" gap={1.5} minWidth={0}>
+          <HStack gap={1.5} color="fg.muted">
+            <Text textStyle="caption" fontWeight="medium" whiteSpace="nowrap">
+              {label}
+            </Text>
+            {linked ? <ArrowUpRight size={10} /> : null}
+          </HStack>
+          {children ?? (
+            <HStack color={color} minWidth={0} maxWidth="full">
+              <StatTileFigure>{value}</StatTileFigure>
+            </HStack>
+          )}
+          {sublabel ? (
+            <Text textStyle="caption" color="fg.muted" whiteSpace="nowrap">
+              {sublabel}
+            </Text>
+          ) : null}
+        </VStack>
+      </Card.Body>
+    </Card.Root>
   );
   return linked ? renderLink(content, href) : content;
 }
