@@ -39,6 +39,7 @@ const columnsFor = ({ onRestart, onStart, busy }: RowRestart): TableColumn<Surfa
     hideOnNarrow: true,
     title: (surface) => surface.url || surface.hostname || surface.role,
     cell: (surface) => {
+      if (surface.status === "not-selected") return `off: haven up +${surface.name}`;
       if (surface.url === "") return surface.hostname || "no hostname";
       return (
         <Link href={surface.url} mono>
