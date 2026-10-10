@@ -2,6 +2,7 @@ import { neutralizeRows } from "@langwatch/csv";
 import { FilterChips } from "@langwatch/design-system/filter-chips";
 import { InlineCode } from "@langwatch/design-system/inline-code";
 import { ListTable } from "@langwatch/design-system/list-table";
+import { Money } from "@langwatch/design-system/money";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import {
@@ -26,7 +27,6 @@ import {
 import { Tooltip as UITooltip } from "@langwatch/design-system/tooltip";
 import { TYPE_SCALE_PX } from "@langwatch/design-system/typography";
 import {
-  formatBudgetUsd,
   type GatewayUsageSummary,
   type GatewayVirtualKeyUsageSummary,
 } from "@langwatch/gateway-contract";
@@ -373,15 +373,19 @@ function UsageBreakdown({
     <VStack align="stretch" gap={6}>
       <StatTileGrid columns={4}>
         <StatTile variant="showcase" label="Total spend">
-          <StatTileFigure>{formatBudgetUsd(data.totalUsd)}</StatTileFigure>
+          <StatTileFigure>
+            <Money amount={Number(data.totalUsd)} currency="USD" />
+          </StatTileFigure>
         </StatTile>
         <StatTile variant="showcase" label="Requests">
           <UITooltip content="Every dispatch attempt is counted, including upstream 4xx/5xx responses. Failed-auth requests don't bill tokens but do ledger as 0-cost entries so blip-driven spikes stay visible in ops review.">
             <StatTileFigure>{data.totalRequests.toLocaleString()}</StatTileFigure>
           </UITooltip>
         </StatTile>
-        <StatTile variant="showcase" label="Avg $/request">
-          <StatTileFigure>{formatAvgCost(data.avgUsdPerRequest)}</StatTileFigure>
+        <StatTile variant="showcase" label="Average cost per request">
+          <StatTileFigure>
+            <Money amount={Number(data.avgUsdPerRequest)} currency="USD" />
+          </StatTileFigure>
         </StatTile>
         <StatTile variant="showcase" label="Blocked by guardrail">
           <Box color={data.blockedRequests > 0 ? "fg.error" : undefined}>
@@ -421,7 +425,9 @@ function UsageBreakdown({
                         {row.displayPrefix}…
                       </Text>
                     </Table.Cell>
-                    <Table.Cell>{formatBudgetUsd(row.totalUsd)}</Table.Cell>
+                    <Table.Cell>
+                      <Money amount={Number(row.totalUsd)} currency="USD" plain />
+                    </Table.Cell>
                     <Table.Cell>{row.requests}</Table.Cell>
                   </Table.Row>
                 ))}
@@ -463,7 +469,9 @@ function UsageBreakdown({
                   <Table.Cell>
                     <InlineCode>{row.model}</InlineCode>
                   </Table.Cell>
-                  <Table.Cell>{formatBudgetUsd(row.totalUsd)}</Table.Cell>
+                  <Table.Cell>
+                    <Money amount={Number(row.totalUsd)} currency="USD" plain />
+                  </Table.Cell>
                   <Table.Cell>{row.requests}</Table.Cell>
                 </Table.Row>
               ))}
@@ -555,17 +563,6 @@ function formatDayTick(day: string): string {
   const [, mm, dd] = day.split("-");
   if (!mm || !dd) return day;
   return `${mm}/${dd}`;
-}
-
-// Avg-cost often sits in $0.001–$0.1; 2 decimals rounds to $0.00 and
-// 6 decimals is noisy. Match the same logic as the ledger-line
-// formatter on budget detail.
-function formatAvgCost(raw: string | number): string {
-  const n = typeof raw === "number" ? raw : Number(raw);
-  if (!Number.isFinite(n)) return "—";
-  if (n >= 1) return `$${n.toFixed(4)}`;
-  if (n >= 0.01) return `$${n.toFixed(5)}`;
-  return `$${n.toFixed(6)}`;
 }
 
 export default GatewayUsagePage;

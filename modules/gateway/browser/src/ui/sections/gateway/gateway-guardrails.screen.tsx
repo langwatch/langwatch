@@ -18,6 +18,7 @@ import {
   Textarea,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import type {
   GatewayGuardrailDirection,
   GatewayGuardrailFailureMode,
@@ -30,6 +31,7 @@ import { api } from "../../../behavior/gateway-api.ts";
 import { useShowErrorToast } from "../../../behavior/gateway-feedback.ts";
 import { useOrganizationTeamProject } from "../../../behavior/gateway-session.ts";
 import { useGatewayHost } from "../../../model/gateway-host.ts";
+import { Link } from "../../../ui/elements/gateway-link.tsx";
 import AiGatewayLayout from "../../../ui/sections/gateway-layout.tsx";
 import { ListSkeleton } from "../../elements/list-skeleton.tsx";
 
@@ -153,14 +155,21 @@ function GuardrailsPage() {
         <PageLayout.Heading>Guardrails</PageLayout.Heading>
         <Spacer />
         {canManage && (
-          <PageLayout.HeaderButton
-            primary
-            data-testid="gateway-guardrail-new"
-            onClick={() => openGuardrail()}
-            disabled={guardrailEvaluators.length === 0}
+          <Tooltip
+            content="Add an evaluator that runs as a guardrail first, then you can create guardrails from it."
+            disabled={guardrailEvaluators.length > 0}
           >
-            <Plus size={14} /> New guardrail
-          </PageLayout.HeaderButton>
+            <span>
+              <PageLayout.HeaderButton
+                primary
+                data-testid="gateway-guardrail-new"
+                onClick={() => openGuardrail()}
+                disabled={guardrailEvaluators.length === 0}
+              >
+                <Plus size={14} /> New guardrail
+              </PageLayout.HeaderButton>
+            </span>
+          </Tooltip>
         )}
       </PageLayout.Header>
 
@@ -173,7 +182,10 @@ function GuardrailsPage() {
 
           {isLoadingGuardrails && <ListSkeleton />}
           {showGuardrailsEmpty && (
-            <GuardrailsEmptyState hasGuardrailEvaluators={guardrailEvaluators.length > 0} />
+            <GuardrailsEmptyState
+              hasGuardrailEvaluators={guardrailEvaluators.length > 0}
+              evaluatorsHref={project?.slug ? `/${project.slug}/evaluators` : undefined}
+            />
           )}
           {showGuardrails && (
             <GuardrailsTable
@@ -193,7 +205,7 @@ function GuardrailsPage() {
           if (!open) setArchiving(null);
         }}
         title={`Archive guardrail "${archiving?.name ?? ""}"?`}
-        message="The guardrail stops being evaluated on the gateway within ~60s. VKs that referenced it via guardrailAttachments will simply skip it on next bundle refresh."
+        message="The guardrail stops running on gateway requests within about a minute. Virtual keys that use it will simply skip it from then on."
         confirmLabel="Archive"
         tone="danger"
         loading={archiveMutation.isPending}
@@ -203,16 +215,25 @@ function GuardrailsPage() {
   );
 }
 
-function GuardrailsEmptyState({ hasGuardrailEvaluators }: { hasGuardrailEvaluators: boolean }) {
+function GuardrailsEmptyState({
+  hasGuardrailEvaluators,
+  evaluatorsHref,
+}: {
+  hasGuardrailEvaluators: boolean;
+  evaluatorsHref: string | undefined;
+}) {
   return (
     <NoDataInfoBlock
       title="No guardrails yet"
       description={
         hasGuardrailEvaluators
-          ? "Click New guardrail to bind one of your project evaluators as a pre / post / stream_chunk hook."
-          : "No project evaluators are marked as guardrails. Open Evaluations, edit an evaluator, and switch its execution mode to AS_GUARDRAIL before binding it here."
+          ? "Choose New guardrail to run one of your evaluators on requests, responses or both."
+          : "None of your evaluators can run as a guardrail yet. Open an evaluator and set it to run as a guardrail, then come back to use it here."
       }
       icon={<Shield size={36} />}
+      secondaryAction={
+        evaluatorsHref ? <Link href={evaluatorsHref}>Go to evaluators</Link> : undefined
+      }
     />
   );
 }

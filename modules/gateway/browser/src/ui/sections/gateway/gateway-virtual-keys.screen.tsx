@@ -270,9 +270,7 @@ function VirtualKeysPage() {
               onRetry={() => listQuery.refetch()}
             />
           )}
-          {listView === "empty" && (
-            <VirtualKeysEmptyState canCreate={canCreate} onCreate={() => setCreateOpen(true)} />
-          )}
+          {listView === "empty" && <VirtualKeysEmptyState />}
           {listView === "list" && (
             <VStack align="stretch" gap={3} width="full">
               <Tabs.Root
@@ -691,26 +689,14 @@ function traceHrefsByKeyId(input: {
   return map;
 }
 
-function VirtualKeysEmptyState({
-  canCreate,
-  onCreate,
-}: {
-  canCreate: boolean;
-  onCreate: () => void;
-}) {
+function VirtualKeysEmptyState() {
   return (
-    <VStack gap={6} align="center" paddingY={8}>
+    <VStack gap={6} align="stretch" paddingY={4}>
       <NoDataInfoBlock
         title="No virtual keys yet"
-        description="Mint your first virtual key to route requests through the LangWatch AI Gateway with budgets, guardrails, and per-tenant tracing attached."
+        description="Create your first virtual key to send requests through the LangWatch AI Gateway with budgets, guardrails and tracing attached."
         icon={<KeyRound size={32} />}
-      >
-        {canCreate && (
-          <PageLayout.HeaderButton primary onClick={onCreate} marginTop={4}>
-            <Plus size={14} /> New virtual key
-          </PageLayout.HeaderButton>
-        )}
-      </NoDataInfoBlock>
+      />
       <GatewayCapabilityPreview />
     </VStack>
   );
@@ -748,30 +734,31 @@ function GatewayCapabilityPreview() {
   }[] = [
     {
       icon: <Zap size={14} />,
-      label: "Cache control",
-      defaultValue: "respect",
+      label: "Prompt caching",
+      defaultValue: "automatic",
       detail:
-        "Provider-agnostic passthrough. Anthropic cache_control, OpenAI/Azure automatic, Gemini cachedContent. Switch to disable/force per key.",
+        "Reuse repeated prompts across providers to cut cost and latency. Turn it off or force it on for any key.",
     },
     {
       icon: <Shield size={14} />,
       label: "Guardrails",
       defaultValue: "none",
       detail:
-        "Attach pre/post/stream_chunk monitors. Block-by-default, opt-in fail-open per direction.",
+        "Check requests and responses with your evaluators. Choose whether a failed check blocks the call or lets it through.",
     },
     {
       icon: <Ban size={14} />,
       label: "Blocked patterns",
       defaultValue: "none",
       detail:
-        "RE2 deny/allow for tools, MCP servers, URLs, and models. Enforced pre-provider-dispatch at zero cost.",
+        "Allow or deny specific tools, MCP servers, URLs and models before a request reaches the provider.",
     },
     {
       icon: <Gauge size={14} />,
       label: "Rate limits",
       defaultValue: "unlimited",
-      detail: "Per-VK RPM and RPD. 429 + Retry-After emitted by the gateway when exceeded.",
+      detail:
+        "Cap requests per minute and per day for each key. Callers get a clear retry-after answer when they hit it.",
     },
   ];
   return (
@@ -784,7 +771,7 @@ function GatewayCapabilityPreview() {
           preview
         </Badge>
       </HStack>
-      <Box borderWidth="1px" borderColor="border.subtle" borderRadius="md" padding={3}>
+      <Box>
         <VStack align="stretch" gap={3}>
           {rows.map((row) => (
             <HStack key={row.label} align="start" gap={3}>
