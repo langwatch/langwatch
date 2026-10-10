@@ -433,6 +433,19 @@ Feature: Terminating an organization's identity provider - OpenID Connect and SA
     Then the replacement is registered beside the legacy connection for migration
     But an ordinary second connection and any further replacement are refused with "sso_connection_already_registered"
 
+  @unit
+  Scenario: A direct replacement counts the domain proof it inherited from the grandfathered connection
+    Given the organization's grandfathered connection proved its domain from the earlier configuration
+    When the direct replacement that names that connection inherits the proof
+    Then the replacement counts the domain as proved, as main does
+    But the same earlier-configuration proof on a connection replacing any other connection, or replacing nothing, proves nothing
+
+  @unit
+  Scenario: Only the grandfather step writes an earlier-configuration proof or a grandfathered connection
+    Given every product path that records a domain proof or registers a connection
+    When the sources are read for a legacy-configuration proof or a legacy-grandfathered source being written
+    Then only the grandfather tenant step writes either, so no customer-facing route or Api operation on cloud can mint one
+
   @integration @regression
   Scenario: Migration routing waits for the replacement to be active
     Given the replacement has completed a test sign-in but is not active

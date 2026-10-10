@@ -238,6 +238,7 @@ export {
   type SsoMigrationView,
 } from "./features/sso-arrival/sso-migration.ts";
 export {
+  grandfatheredSsoConnectionId,
   isConfiguredLegacySsoRoute,
   isSsoConnectionInSetup,
   lapsedDomainsOf,

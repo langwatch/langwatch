@@ -2,6 +2,7 @@ import { HandledError } from "@langwatch/handled-error";
 import {
   compareConnectionRouting,
   type ConnectionRoutingComparison,
+  grandfatheredSsoConnectionId,
   normalizeDomain,
   type SsoConnectionType,
   type SsoIdpMetadata,
@@ -9,10 +10,7 @@ import {
 
 import type { SignInDomainRouting } from "../../signin/services/signin-router.service.ts";
 import type { LegacySsoOrganizationRepository } from "../../sso-arrival/repositories/legacy-sso-organization.repository.ts";
-import {
-  grandfatherCommandId,
-  grandfatheredSsoConnectionId,
-} from "../rules/sso-connection-id.rules.ts";
+import { grandfatherCommandId } from "../rules/sso-connection-id.rules.ts";
 import type { SsoConnectionService } from "./sso-connection.service.ts";
 
 /**

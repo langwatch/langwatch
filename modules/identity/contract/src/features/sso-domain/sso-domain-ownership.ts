@@ -57,8 +57,20 @@ export type SsoDomainOwnershipQualification =
 /** The connection facts the qualification is read off. */
 export type QualifiableConnection = Pick<
   SsoConnectionState,
-  "verifiedDomains" | "domainVerifications" | "source"
+  "verifiedDomains" | "domainVerifications" | "source" | "organizationId" | "replacesConnectionId"
 >;
+
+/**
+ * The connection the grandfather migration creates for an organization, derived
+ * from it so every pass names the same aggregate and only it can hold the import.
+ */
+export function grandfatheredSsoConnectionId({
+  organizationId,
+}: {
+  organizationId: string;
+}): string {
+  return `ssoc_gf_${organizationId}`;
+}
 
 /** The one qualification used wherever domain control grants authority.
  *  `verifiedDomains` is routing history, not evidence: each method keeps what
@@ -77,7 +89,7 @@ export function qualifySsoDomainOwnership({
   if (proof.proofState === "LAPSED") return { status: "LAPSED", proof };
   if (proof.verifiedAtMs <= 0) return { status: "UNKNOWN", reason: "incomplete" };
 
-  const completeness = proofCompleteness({ proof, source: state.source });
+  const completeness = proofCompleteness({ proof, state });
   if (completeness === "complete") return { status: "QUALIFIED", proof };
   return { status: "UNKNOWN", reason: completeness };
 }
@@ -85,10 +97,10 @@ export function qualifySsoDomainOwnership({
 /** Whether a proof carries what its method needs; "inferred" for a method nothing records. */
 function proofCompleteness({
   proof,
-  source,
+  state,
 }: {
   proof: SsoDomainVerification;
-  source: QualifiableConnection["source"];
+  state: QualifiableConnection;
 }): "complete" | "incomplete" | "inferred" {
   if (isSsoPublishedProofChannel(proof.method)) return completeWhen(Boolean(proof.tokenHash));
   if (proof.method === "operator-attested") return completeWhen(proof.actorId !== null);
@@ -97,12 +109,22 @@ function proofCompleteness({
   if (proof.method === "license-token") {
     return completeWhen(Boolean(proof.evidenceRef) && proof.actorId !== null);
   }
-  // The one-time import stands in for an operator nobody asked, so a named
-  // person on it is a row that did not come from the migration.
+  // The one-time import stands in for an operator nobody asked, so a named person
+  // on it did not come from the migration. A replacement holds it only as inherited
+  // from the grandfathered connection it names, as main checks the predecessor.
   if (proof.method === "legacy-configuration") {
-    return completeWhen(source === "legacy-grandfathered" && proof.actorId === null);
+    return completeWhen(proof.actorId === null && holdsTheLegacyImport(state));
   }
   return "inferred";
+}
+
+function holdsTheLegacyImport(state: QualifiableConnection): boolean {
+  if (state.source === "legacy-grandfathered") return true;
+  return (
+    state.replacesConnectionId !== null &&
+    state.replacesConnectionId ===
+      grandfatheredSsoConnectionId({ organizationId: state.organizationId })
+  );
 }
 
 function completeWhen(holds: boolean): "complete" | "incomplete" {
