@@ -136,7 +136,7 @@ func handDownPasswordHash(runDir string) ([]string, error) {
 		return nil, err
 	}
 	path := filepath.Join(runDir, "password.hash")
-	if err := os.WriteFile(path, hash, 0o600); err != nil {
+	if err := os.WriteFile(path, hash, 0o600); err != nil { //nolint:gosec // seedgen's own --run-dir, like the failure file
 		return nil, err
 	}
 	return []string{"--password-hash-file", path}, nil

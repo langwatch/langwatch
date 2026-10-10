@@ -166,9 +166,9 @@ func gatedVendor(contentType string, chunks []string, produced *atomic.Int32, ne
 		w.Header().Set("Content-Type", contentType)
 		flusher, _ := w.(http.Flusher)
 		for i, chunk := range chunks {
+			produced.Add(1)
 			_, _ = w.Write([]byte(chunk))
 			flusher.Flush()
-			produced.Add(1)
 			if i == len(chunks)-1 {
 				return
 			}

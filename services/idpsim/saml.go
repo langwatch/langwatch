@@ -150,7 +150,6 @@ func (s *Server) readAuthnRequest(w http.ResponseWriter, t *Tenant, r *http.Requ
 		return nil, permissiveSPProvider{}, false
 	}
 	var pre saml.AuthnRequest
-	//nolint:gosec // G709: bounded above; encoding/xml is XXE-safe and this is a local dev simulator
 	if err := xml.Unmarshal(req.RequestBuffer, &pre); err != nil {
 		http.Error(w, fmt.Sprintf("unparseable SAML request: %v", err), http.StatusBadRequest)
 		return nil, permissiveSPProvider{}, false
