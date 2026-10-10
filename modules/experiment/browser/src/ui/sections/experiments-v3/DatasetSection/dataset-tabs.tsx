@@ -207,7 +207,7 @@ function DatasetTab({
         data-testid={`dataset-tab-${dataset.id}`}
       >
         <HStack gap={1}>
-          <Database size={12} color={isSaved ? "var(--chakra-colors-blue-500)" : "currentColor"} />
+          <Database size={12} color={isSaved ? "var(--chakra-colors-blue-fg)" : "currentColor"} />
           <Text fontSize="12px" fontWeight="medium">
             {dataset.name}
           </Text>
@@ -232,10 +232,7 @@ function DatasetTab({
           data-testid={`dataset-tab-${dataset.id}`}
         >
           <HStack gap={1}>
-            <Database
-              size={12}
-              color={isSaved ? "var(--chakra-colors-blue-500)" : "currentColor"}
-            />
+            <Database size={12} color={isSaved ? "var(--chakra-colors-blue-fg)" : "currentColor"} />
             <Text fontSize="12px" fontWeight="semibold">
               {dataset.name}
             </Text>

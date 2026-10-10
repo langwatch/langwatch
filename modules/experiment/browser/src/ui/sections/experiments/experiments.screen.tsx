@@ -97,7 +97,7 @@ function ExperimentRunStatus({ runsSummary }: { runsSummary: ExperimentListRow["
   if (timestamps?.finishedAt) {
     return (
       <>
-        <LuCircleCheckBig size={14} color="var(--chakra-colors-green-500)" />
+        <LuCircleCheckBig size={14} color="var(--chakra-colors-green-fg)" />
         <Text fontSize="sm">Completed</Text>
       </>
     );
@@ -105,7 +105,7 @@ function ExperimentRunStatus({ runsSummary }: { runsSummary: ExperimentListRow["
   if (timestamps?.stoppedAt) {
     return (
       <>
-        <LuCircleX size={14} color="var(--chakra-colors-red-500)" />
+        <LuCircleX size={14} color="var(--chakra-colors-red-fg)" />
         <Text fontSize="sm">Stopped</Text>
       </>
     );
@@ -122,7 +122,7 @@ function ExperimentRunStatus({ runsSummary }: { runsSummary: ExperimentListRow["
   if (runsSummary.count > 0) {
     return (
       <>
-        <LuCircleCheckBig size={14} color="var(--chakra-colors-green-500)" />
+        <LuCircleCheckBig size={14} color="var(--chakra-colors-green-fg)" />
         <Text fontSize="sm">Completed</Text>
       </>
     );
