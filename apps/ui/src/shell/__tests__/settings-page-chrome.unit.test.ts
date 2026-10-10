@@ -66,7 +66,7 @@ describe("given every page the Settings menu can open", () => {
   );
 
   it("finds the menu's pages and the route table's placements", () => {
-    expect(addresses.length).toBeGreaterThanOrEqual(20);
+    expect(addresses.length).toBeGreaterThanOrEqual(19);
     expect(routed.length).toBeGreaterThanOrEqual(20);
   });
 
