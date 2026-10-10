@@ -361,7 +361,7 @@ describe("ops migration enrollment procedures", () => {
 
   describe("when the page lists enrollments", () => {
     it("answers with the service's listing untouched", async () => {
-      const listing = { isSaaS: true, enrollments: [] };
+      const listing = { enrollments: [] };
       service.getEnrollments.mockResolvedValue(listing);
       const caller = buildCaller();
 

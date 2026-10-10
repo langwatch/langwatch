@@ -208,8 +208,21 @@ export const upgradeImageStepSchema = z.object({
 });
 export type UpgradeImageStep = z.infer<typeof upgradeImageStepSchema>;
 
+/** What the running image is: a release, or a development build of the newest it contains. */
+export const upgradeImageVersionSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("release"), release: z.string() }),
+  z.object({
+    kind: z.literal("development"),
+    containsRelease: z.string().nullable(),
+    commit: z.string().nullable(),
+  }),
+]);
+export type UpgradeImageVersion = z.infer<typeof upgradeImageVersionSchema>;
+
 export const upgradeImageSchema = z.object({
   release: z.string(),
+  /** How the status names this image; unset reads its release, or "Development build". */
+  name: z.string().optional(),
   steps: z.array(upgradeImageStepSchema),
 });
 export type UpgradeImage = z.infer<typeof upgradeImageSchema>;

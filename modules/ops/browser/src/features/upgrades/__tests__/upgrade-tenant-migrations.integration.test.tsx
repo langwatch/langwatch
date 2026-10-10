@@ -1,6 +1,6 @@
 /**
  * @vitest-environment jsdom
- * The Tenant migrations tab: one table of steps, a short intro, badges only for held or parked.
+ * The Organizations tab: one table of steps, a short intro, badges only for held or parked.
  * Spec: modules/ops/specs/upgrades.feature
  */
 import { DesignSystemProvider } from "@langwatch/design-system/provider";
@@ -71,6 +71,7 @@ function renderTab() {
 
 describe("UpgradeTenantMigrations", () => {
   describe("given a step with a 300-character title and two parked organizations", () => {
+    /** @scenario "Each organization step shows its organizations' progress on the Organizations tab" */
     it("names the title in full on hover and badges only the non-zero parked count", () => {
       MIGRATIONS = LONG_STEP;
       isSaaS = false;
@@ -79,11 +80,15 @@ describe("UpgradeTenantMigrations", () => {
       const row = screen.getByTestId("upgrade-tenant-migration-ops:long-step");
       expect(within(row).getByTitle(LONG_TITLE)).toBeTruthy();
       expect(row.querySelectorAll("[class*='badge']").length).toBe(1);
+      const cells = within(row)
+        .getAllByRole("cell")
+        .map((cell) => cell.textContent);
+      expect(cells.slice(1, 4)).toEqual(["4", "0", "2"]);
       expect(screen.getByTestId("upgrade-tenant-migrations-table")).toBeTruthy();
     });
   });
 
-  describe("given an automatic step on SaaS with one held organization and no enrolment rows", () => {
+  describe("given an automatic step with one held organization and no enrolment rows", () => {
     /** @scenario "An automatic step reads every organization as enrolled" */
     it("reads Enrolled as All and lists the held organization without an empty enrolment table", () => {
       MIGRATIONS = [
@@ -112,6 +117,21 @@ describe("UpgradeTenantMigrations", () => {
       expect(within(row).getByText("All")).toBeTruthy();
       expect(screen.queryByText("No organizations are enrolled for this step yet.")).toBeNull();
       expect(screen.getByText("Organization needing attention")).toBeTruthy();
+    });
+  });
+
+  describe("given a self-hosted installation with a step not enrolled automatically", () => {
+    /** @scenario "Every organization action shows on cloud and self-hosted alike" */
+    it("offers enrol, enrol a cohort, run for an organization and roll back, with Enrolled", () => {
+      MIGRATIONS = [{ ...LONG_STEP[0], name: "ops:manual", enrolledAutomatically: false }];
+      isSaaS = false;
+      renderTab();
+
+      const row = screen.getByTestId("upgrade-tenant-migration-ops:manual");
+      for (const name of [/^Enroll…/, /Enroll cohort/, /Run for organization/, /Roll back/]) {
+        expect(within(row).getByRole("button", { name })).toBeTruthy();
+      }
+      expect(screen.getByRole("columnheader", { name: "Enrolled" })).toBeTruthy();
     });
   });
 });

@@ -83,6 +83,31 @@ export const opsUpgradeDeprecationSchema: OpsUpgradeDeprecationSchema =
   opsUpgradeDeprecationSchemaDefinition;
 export type OpsUpgradeDeprecation = z.infer<typeof opsUpgradeDeprecationSchema>;
 
+/** The running image: a release, or a development build of the newest release it contains. */
+const opsUpgradeVersionSchemaDefinition = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("release"), release: z.string() }),
+  z.object({
+    kind: z.literal("development"),
+    containsRelease: z.string().nullable(),
+    commit: z.string().nullable(),
+  }),
+]);
+export interface OpsUpgradeVersionSchema extends Named<typeof opsUpgradeVersionSchemaDefinition> {}
+export const opsUpgradeVersionSchema: OpsUpgradeVersionSchema = opsUpgradeVersionSchemaDefinition;
+export type OpsUpgradeVersion = z.infer<typeof opsUpgradeVersionSchema>;
+
+/** A newer release cloud named in its usage-report reply, with its release notes (U8-Q-U3). */
+const opsUpgradeLatestReleaseSchemaDefinition = z.object({
+  release: z.string(),
+  notesUrl: z.string(),
+});
+export interface OpsUpgradeLatestReleaseSchema extends Named<
+  typeof opsUpgradeLatestReleaseSchemaDefinition
+> {}
+export const opsUpgradeLatestReleaseSchema: OpsUpgradeLatestReleaseSchema =
+  opsUpgradeLatestReleaseSchemaDefinition;
+export type OpsUpgradeLatestRelease = z.infer<typeof opsUpgradeLatestReleaseSchema>;
+
 /** Where the installation stands; `state`, `tone` and `reason` are the reader's words, raw. */
 const opsUpgradeStatusSchemaDefinition = z.object({
   state: z.string(),
@@ -102,6 +127,9 @@ const opsUpgradeStatusSchemaDefinition = z.object({
   failedTargets: z.number().int(),
   /** The image's deprecation register (ruling D8), shown under "Deprecated". */
   deprecations: z.array(opsUpgradeDeprecationSchema),
+  version: opsUpgradeVersionSchema,
+  /** Null unless usage reporting is on and cloud named a release newer than this one. */
+  latestRelease: opsUpgradeLatestReleaseSchema.nullable(),
 });
 export interface OpsUpgradeStatusSchema extends Named<typeof opsUpgradeStatusSchemaDefinition> {}
 export const opsUpgradeStatusSchema: OpsUpgradeStatusSchema = opsUpgradeStatusSchemaDefinition;
@@ -288,73 +316,6 @@ export interface OpsUpgradeIdInputSchema extends Named<typeof opsUpgradeIdInputS
 export const opsUpgradeIdInputSchema: OpsUpgradeIdInputSchema = opsUpgradeIdInputSchemaDefinition;
 export type OpsUpgradeIdInput = z.infer<typeof opsUpgradeIdInputSchema>;
 
-/** One release of a previewed plan: the step ids it runs, by phase. */
-const opsUpgradePlannedReleaseSchemaDefinition = z.object({
-  release: z.string().nullable(),
-  virtual: z.boolean(),
-  schema: z.array(z.string()),
-  blocking: z.array(z.string()),
-  background: z.array(z.string()),
-  operator: z.array(z.string()),
-});
-export interface OpsUpgradePlannedReleaseSchema extends Named<
-  typeof opsUpgradePlannedReleaseSchemaDefinition
-> {}
-export const opsUpgradePlannedReleaseSchema: OpsUpgradePlannedReleaseSchema =
-  opsUpgradePlannedReleaseSchemaDefinition;
-
-/** The plan narrowed to the target, or the reader's refusal; `code` is the reader's word, raw. */
-const opsUpgradePlanSchemaDefinition = z.discriminatedUnion("outcome", [
-  z.object({
-    outcome: z.literal("planned"),
-    fresh: z.boolean(),
-    releases: z.array(opsUpgradePlannedReleaseSchema),
-    notNeeded: z.array(z.string()),
-  }),
-  z.object({
-    outcome: z.literal("refused"),
-    code: z.string(),
-    stopAt: z.string().nullable(),
-    message: z.string(),
-  }),
-]);
-export interface OpsUpgradePlanSchema extends Named<typeof opsUpgradePlanSchemaDefinition> {}
-export const opsUpgradePlanSchema: OpsUpgradePlanSchema = opsUpgradePlanSchemaDefinition;
-export type OpsUpgradePlan = z.infer<typeof opsUpgradePlanSchema>;
-
-/** One preflight row as the CLI prints it; `outcome` is verified, refused or unchecked. */
-const opsUpgradePreflightRowSchemaDefinition = z.object({
-  id: z.string(),
-  name: z.string(),
-  outcome: z.string(),
-  detail: z.string().nullable(),
-  fix: z.string().nullable(),
-  docsPath: z.string().nullable(),
-});
-export interface OpsUpgradePreflightRowSchema extends Named<
-  typeof opsUpgradePreflightRowSchemaDefinition
-> {}
-export const opsUpgradePreflightRowSchema: OpsUpgradePreflightRowSchema =
-  opsUpgradePreflightRowSchemaDefinition;
-export type OpsUpgradePreflightRow = z.infer<typeof opsUpgradePreflightRowSchema>;
-
-const opsUpgradePreviewSchemaDefinition = z.object({
-  installed: z.string().nullable(),
-  plan: opsUpgradePlanSchema,
-  preflight: z.array(opsUpgradePreflightRowSchema),
-});
-export interface OpsUpgradePreviewSchema extends Named<typeof opsUpgradePreviewSchemaDefinition> {}
-export const opsUpgradePreviewSchema: OpsUpgradePreviewSchema = opsUpgradePreviewSchemaDefinition;
-export type OpsUpgradePreview = z.infer<typeof opsUpgradePreviewSchema>;
-
-const opsUpgradePreviewInputSchemaDefinition = z.object({ to: z.string().min(1) });
-export interface OpsUpgradePreviewInputSchema extends Named<
-  typeof opsUpgradePreviewInputSchemaDefinition
-> {}
-export const opsUpgradePreviewInputSchema: OpsUpgradePreviewInputSchema =
-  opsUpgradePreviewInputSchemaDefinition;
-export type OpsUpgradePreviewInput = z.infer<typeof opsUpgradePreviewInputSchema>;
-
 /** One ClickHouse target: its latest done version, steps not done and latest failure. */
 const opsUpgradeTargetSummarySchemaDefinition = z.object({
   target: z.string(),
@@ -399,11 +360,6 @@ export const opsUpgradeTrpc = defineTrpcContract("ops.upgrade")
   .withInput(opsUpgradeIdInputSchema)
   .withOutput(opsUpgradeRunSchema)
 
-  /** `upgrade plan --to` with its preflight; a target newer than the image is refused. */
-  .query("preview")
-  .withInput(opsUpgradePreviewInputSchema)
-  .withOutput(opsUpgradePreviewSchema)
-
   /** Each ClickHouse target the ledger records per-target rows for; empty when none. */
   .query("listTargets")
   .withInput(z.void())
@@ -430,8 +386,7 @@ export const opsUpgradeTrpc = defineTrpcContract("ops.upgrade")
 
   /**
    * Which organizations are enrolled for which migrations, with the names an
-   * operator recognizes. Carries `isSaaS`, so the page can say honestly that a
-   * self-hosted installation has nothing to enroll.
+   * operator recognizes, on cloud and self-hosted alike (ADR-173 section 7).
    */
   .query("listMigrationEnrollments")
   .withInput(z.void())
@@ -447,8 +402,8 @@ export const opsUpgradeTrpc = defineTrpcContract("ops.upgrade")
 
   /**
    * Enroll one organization for one registered migration, effective next
-   * pass. Duplicates, unknown migrations/organizations, auto-admitting
-   * migrations and self-hosted installs are each refused by name.
+   * pass. Duplicates and unknown migrations/organizations are refused by name;
+   * a migration that admits every organization already answers a no-op.
    */
   .mutation("enrollMigrationTenant")
   .withInput(opsEnrollMigrationTenantInputSchema)

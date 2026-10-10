@@ -237,8 +237,6 @@ import {
   type OpsUpgradeListRunsInput,
   type OpsUpgradeListStepsInput,
   type OpsUpgradeListTenantsInput,
-  type OpsUpgradePreview,
-  type OpsUpgradePreviewInput,
   type OpsUpgradeReleasePage,
   type OpsUpgradeRun,
   type OpsUpgradeRunPage,
@@ -848,6 +846,7 @@ export class OpsModule implements OpsApi {
         clickhouse: repositories.clickhouseHealth,
         redis: repositories.redisHealth,
         upgradeLedger: repositories.upgradeLedger,
+        cloudLatestRelease: repositories.cloudLatestRelease,
       },
       channels: setup.channels,
       // Read only when a report is taken, by which time `app` below exists.
@@ -955,7 +954,10 @@ export class OpsModule implements OpsApi {
         }),
       }),
       checkup: setup.checkup,
-      upgrades: OpsUpgradeService.create({ ledger: repositories.upgradeLedger }),
+      upgrades: OpsUpgradeService.create({
+        ledger: repositories.upgradeLedger,
+        ...(setup.checkup ? { cloudReleases: setup.checkup.usageReports } : {}),
+      }),
       anomalies: setup.anomalies,
       storageStats: setup.storageStats,
       groupQueueReaper: GroupQueueReaperService.create({
@@ -1968,10 +1970,6 @@ export class OpsModule implements OpsApi {
 
   getUpgradeRun(input: OpsUpgradeIdInput): Promise<OpsUpgradeRun> {
     return this.#dependencies.upgrades.getRun(input);
-  }
-
-  previewUpgrade(input: OpsUpgradePreviewInput): Promise<OpsUpgradePreview> {
-    return this.#dependencies.upgrades.preview(input);
   }
 
   listUpgradeTargets(): Promise<OpsUpgradeTargetSummary[]> {

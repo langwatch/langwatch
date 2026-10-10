@@ -129,7 +129,6 @@ export class SystemMigrationsService {
 
   /** The enrollment listing for the ops page, audited because it carries enrollers' names. */
   async getEnrollments({ requestedBy }: { requestedBy: string }): Promise<{
-    isSaaS: boolean;
     enrollments: MigrationEnrollmentRecord[];
   }> {
     return this.enrollment.getEnrollments({ requestedBy });

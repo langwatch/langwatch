@@ -635,12 +635,6 @@ Feature: Running system migrations across organizations
     When a pass runs
     Then organizations are processed without consulting enrollment
 
-  @unit
-  Scenario: Cohort enrollment does not apply to self-hosted installations
-    Given a self-hosted installation
-    When a cohort enrollment is attempted
-    Then it is refused
-
   @integration
   Scenario: A self-hosted installation migrates every organization
     Given a self-hosted installation

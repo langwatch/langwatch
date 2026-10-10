@@ -85,7 +85,7 @@ type EnrollmentListing = RouterOutputs["ops"]["upgrade"]["listMigrationEnrollmen
 type EnrollmentRecord = EnrollmentListing["enrollments"][number];
 type PickedOrganization = { id: string; name: string };
 
-/** Tenant migrations: per-organization progress, enrolment and actions (was Ops > Migrations). */
+/** Organizations: per-organization step progress, enrolment and actions, on every deployment. */
 export function UpgradeTenantMigrations() {
   const showErrorToast = useShowErrorToast();
   const toaster = useOpsToaster();
@@ -110,7 +110,7 @@ export function UpgradeTenantMigrations() {
 
   if (query.isLoading) {
     return (
-      <Stack gap={4} aria-label="Loading tenant migrations">
+      <Stack gap={4} aria-label="Loading organization steps">
         <Skeleton height="64px" />
         <Skeleton height="200px" />
       </Stack>
@@ -128,7 +128,6 @@ export function UpgradeTenantMigrations() {
     );
   }
 
-  const isSaaS = enrollmentsQuery.data?.isSaaS ?? false;
   const enrollments = enrollmentsQuery.data?.enrollments ?? [];
   const migrations = query.data ?? [];
 
@@ -140,11 +139,6 @@ export function UpgradeTenantMigrations() {
             Per-organization data migrations, run in order at worker boot. Held organizations failed
             the parity proof and stay on the legacy path; parked ones hit an error and retry.
           </Text>
-          {enrollmentsQuery.data && !isSaaS && (
-            <Text textStyle="sm" color="fg.muted">
-              Released migrations run for every organization here, so nothing needs enrolling.
-            </Text>
-          )}
           {enrollmentsQuery.error && !enrollmentsQuery.data && (
             <Text textStyle="sm" color="fg.muted">
               Enrollment could not be read, so its actions are hidden. Retrying every 30 seconds.
@@ -173,7 +167,7 @@ export function UpgradeTenantMigrations() {
             <Table.ColumnHeader textAlign="end">Finalized</Table.ColumnHeader>
             <Table.ColumnHeader textAlign="end">Held</Table.ColumnHeader>
             <Table.ColumnHeader textAlign="end">Parked</Table.ColumnHeader>
-            {isSaaS && <Table.ColumnHeader textAlign="end">Enrolled</Table.ColumnHeader>}
+            <Table.ColumnHeader textAlign="end">Enrolled</Table.ColumnHeader>
             {canManage && <Table.ColumnHeader>Actions</Table.ColumnHeader>}
           </Table.Row>
         </Table.Header>
@@ -183,7 +177,6 @@ export function UpgradeTenantMigrations() {
               key={migration.name}
               migration={migration}
               previousMigrationTitle={migrations[index - 1]?.title}
-              isSaaS={isSaaS}
               canManage={canManage}
             />
           ))}
@@ -197,7 +190,6 @@ export function UpgradeTenantMigrations() {
           enrollments={enrollments.filter(
             (enrollment) => enrollment.migrationName === migration.name,
           )}
-          isSaaS={isSaaS}
           canManage={canManage}
         />
       ))}
@@ -226,12 +218,10 @@ function CountCell({ count, palette }: { count: number; palette?: string }) {
 function MigrationRow({
   migration,
   previousMigrationTitle,
-  isSaaS,
   canManage,
 }: {
   migration: MigrationListing;
   previousMigrationTitle?: string;
-  isSaaS: boolean;
   canManage: boolean;
 }) {
   const requiresConfirmation = migration.requiresOperatorConfirmation;
@@ -248,7 +238,7 @@ function MigrationRow({
           </Text>
           {!migration.availableOnThisInstallation && (
             <Text textStyle="xs" color="fg.muted">
-              Not yet available for self-hosted installations.
+              Not available on this installation yet.
             </Text>
           )}
         </Stack>
@@ -262,22 +252,20 @@ function MigrationRow({
       <Table.Cell textAlign="end">
         <CountCell count={migration.counts.parked} palette="red" />
       </Table.Cell>
-      {isSaaS && (
-        <Table.Cell textAlign="end">
-          {migration.enrollment ? (
-            <CountCell count={migration.enrollment.enrolledCount} />
-          ) : (
-            <Text as="span" textStyle="sm" color="fg.muted">
-              All
-            </Text>
-          )}
-        </Table.Cell>
-      )}
+      <Table.Cell textAlign="end">
+        {migration.enrollment ? (
+          <CountCell count={migration.enrollment.enrolledCount} />
+        ) : (
+          <Text as="span" textStyle="sm" color="fg.muted">
+            All
+          </Text>
+        )}
+      </Table.Cell>
       {canManage && (
         <Table.Cell>
           {actionable && (
             <Wrap gap={1}>
-              {isSaaS && !migration.enrolledAutomatically && (
+              {!migration.enrolledAutomatically && (
                 <>
                   <EnrollAction
                     migrationName={migration.name}
@@ -310,17 +298,14 @@ function MigrationRow({
 function MigrationDetail({
   migration,
   enrollments,
-  isSaaS,
   canManage,
 }: {
   migration: MigrationListing;
   enrollments: EnrollmentRecord[];
-  isSaaS: boolean;
   canManage: boolean;
 }) {
   // An automatic step admits every organization, so its enrolment rows decide nothing.
-  const showEnrollments =
-    isSaaS && migration.availableOnThisInstallation && !migration.enrolledAutomatically;
+  const showEnrollments = migration.availableOnThisInstallation && !migration.enrolledAutomatically;
   if (!migration.availableOnThisInstallation) return null;
   if (!showEnrollments && migration.attention.length === 0) return null;
   return (

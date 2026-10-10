@@ -15,7 +15,12 @@ import {
   readGooseVersions,
   readPrismaMigrations,
 } from "../seed-sources.ts";
-import { computeInstallationState, describeInstallationState } from "./installation-state.ts";
+import {
+  computeInstallationState,
+  describeInstallationState,
+  imageNameOf,
+  type InstallationFacts,
+} from "./installation-state.ts";
 import { preflightFrom, type UpgradePreflightRow } from "./preflight.ts";
 import { previewUpgradeTo, type UpgradePreview } from "./preview.ts";
 import {
@@ -79,7 +84,7 @@ function viewLease(lease: LedgerLeaseRow): UpgradeLeaseView {
   return {
     name: lease.name,
     owner: lease.owner,
-    image: lease.image,
+    image: lease.image === UNRELEASED_IMAGE ? null : lease.image,
     host: lease.host,
     heartbeatAt: lease.heartbeat_at,
     expiresAt: lease.expires_at,
@@ -256,6 +261,40 @@ async function readPlanFacts({
   return { steps: [...prisma, ...goose], runs: [] };
 }
 
+/** The installation-state facts of one status read, the image named as the summary names it. */
+function installationFactsOf({
+  image,
+  floor,
+  facts,
+  installed,
+}: {
+  image: UpgradeImage;
+  floor: UpgradeFloor | null;
+  facts: {
+    ledgerFloor: string | null;
+    ledgerHoldsRecords: boolean;
+    stepFacts: readonly LedgerStepFact[];
+    failedTargets: number;
+    holdsLease: boolean;
+    latestRun: LedgerRunRow | null;
+  };
+  installed: string | null;
+}): InstallationFacts {
+  return {
+    imageRelease: image.release,
+    ...(image.name === undefined ? {} : { imageName: image.name }),
+    imageSteps: image.steps,
+    floor: floor?.release ?? null,
+    installed,
+    ledgerFloor: facts.ledgerFloor,
+    ledgerHoldsRecords: facts.ledgerHoldsRecords,
+    steps: facts.stepFacts,
+    failedTargets: facts.failedTargets,
+    holdsLease: facts.holdsLease,
+    lastRunFailed: facts.latestRun?.outcome === "failed",
+  };
+}
+
 /**
  * The read model of the Upgrades page and `upgrade status` (dev/docs/plans/upgrade-ui-2026-10-06.md
  * section 8). It touches only the ledger tables, tolerates unknown kinds and statuses, and is
@@ -309,24 +348,14 @@ export function createUpgradeReader({
     const tables = await repository.findTables();
     const facts = await readStatusFacts({ tables });
     const { installed, origin } = pickInstalled(facts);
-    const verdict = computeInstallationState({
-      imageRelease: image.release,
-      imageSteps: image.steps,
-      floor: floor?.release ?? null,
-      installed,
-      ledgerFloor: facts.ledgerFloor,
-      ledgerHoldsRecords: facts.ledgerHoldsRecords,
-      steps: facts.stepFacts,
-      failedTargets: facts.failedTargets,
-      holdsLease: facts.holdsLease,
-      lastRunFailed: facts.latestRun?.outcome === "failed",
-    });
+    const installationFacts = installationFactsOf({ image, floor, facts, installed });
+    const verdict = computeInstallationState(installationFacts);
     return {
       ...verdict,
       ...describeInstallationState({ state: verdict.state }),
-      installed,
+      installed: installed === UNRELEASED_IMAGE ? null : installed,
       origin,
-      image: image.release,
+      image: imageNameOf(installationFacts),
       floor: floor?.release ?? null,
       ledgerFloor: facts.ledgerFloor,
       lease: facts.lease ? viewLease(facts.lease) : null,

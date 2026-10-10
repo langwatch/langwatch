@@ -128,12 +128,38 @@ Feature: The upgrade reader answers the installation state and the ledger's rows
     Then the origin is "inferred"
 
   @unit @integration
-  Scenario: An upgrade by an unreleased image reads as installed unreleased
+  Scenario: An upgrade by a development build reads as installed past every release
     Given a seed run recorded release 3.19.0, below the floor 3.20.1
     And a later upgrade by an image no release names succeeded
     When the status is read
-    Then the installed release is "unreleased", recorded
+    Then no installed release is named, and the origin is recorded
     And the state is not unsupported
+
+  @unit
+  Scenario: An up-to-date development build names itself in the summary
+    Given an image no release names, called "Development build 3.20.1+abc1234"
+    And its upgrade succeeded with nothing left to run
+    When the status is read
+    Then the summary reads "Development build 3.20.1+abc1234 is current."
+    And the image reads "Development build 3.20.1+abc1234"
+
+  @unit
+  Scenario: An up-to-date release names its release in the summary
+    Given an installation on 3.21.0 running the 3.21.0 image with nothing left to run
+    When the status is read
+    Then the summary reads "3.21.0 is current."
+
+  @unit
+  Scenario: A state summary names no command to run
+    Given an image newer than the installed release
+    When the status is read
+    Then the summary names both releases and no command
+
+  @unit
+  Scenario: A step imported from before upgrade tracking carries the baseline release
+    Given a seed run imported a step the 3.18.1 baseline lists, with no release of its own
+    When the step is read
+    Then its release is 3.18.1
 
   @integration
   Scenario: An unknown step status is shown raw

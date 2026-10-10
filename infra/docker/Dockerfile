@@ -134,6 +134,13 @@ RUN if [ "$LANGWATCH_RELEASE_BUILD" = "true" ]; then \
       sed -i 's/^export const isReleaseBuild: boolean = false;$/export const isReleaseBuild: boolean = true;/' packages/config/src/release-build.ts \
       && grep -q '^export const isReleaseBuild: boolean = true;$' packages/config/src/release-build.ts; \
     fi
+# Build commit stamp: the Upgrades page names a development build `<release>+<commit>` (ADR-173 §7).
+ARG LANGWATCH_BUILD_COMMIT=""
+RUN if echo "$LANGWATCH_BUILD_COMMIT" | grep -Eq '^[0-9a-f]{7,40}$'; then \
+      SHORT_COMMIT=$(printf '%.7s' "$LANGWATCH_BUILD_COMMIT") \
+      && sed -i "s/^export const buildCommit: string | null = null;\$/export const buildCommit: string | null = \"$SHORT_COMMIT\";/" packages/upgrade/src/reader/build-commit.ts \
+      && grep -q "^export const buildCommit: string | null = \"$SHORT_COMMIT\";\$" packages/upgrade/src/reader/build-commit.ts; \
+    fi
 
 # `build:types` first: the module contracts' declarations now come from one
 # `tsc -b` over every contract's build config rather than a compiler process per

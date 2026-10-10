@@ -54,6 +54,7 @@ const claimedOpsRepositories = prismaRepositories({
 /** The ones the live registry builds over Redis and ClickHouse. */
 type NotPostgres =
   | "migrationLease"
+  | "cloudLatestRelease"
   | "snapshots"
   | "metrics"
   | "queues"

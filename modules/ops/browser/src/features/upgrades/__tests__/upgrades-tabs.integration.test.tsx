@@ -1,6 +1,6 @@
 /**
  * @vitest-environment jsdom
- * The Upgrades page tabs: Tenant migrations always, Dataplanes only with a private target.
+ * The Upgrades page tabs: Overview, Runs, Steps, Organizations, Dataplanes with a private target.
  * Spec: modules/ops/specs/upgrades.feature
  */
 import { DesignSystemProvider } from "@langwatch/design-system/provider";
@@ -18,7 +18,9 @@ function renderTabs(targets: UpgradeTargetSummaryView[]) {
       <UpgradesTabs
         targets={targets}
         overview={<p>The overview</p>}
-        tenants={<p>The tenant migrations</p>}
+        runs={<p>The runs</p>}
+        steps={<p>The steps</p>}
+        organizations={<p>The organizations</p>}
       />
     </DesignSystemProvider>,
   );
@@ -52,15 +54,21 @@ describe("UpgradesTabs", () => {
     });
   });
 
-  describe("given an operator opens the Tenant migrations tab", () => {
-    /** @scenario "Tenant migrations are a tab of the Upgrades page" */
-    it("opens the tenant migrations", async () => {
+  describe("given an operator opens the Organizations tab", () => {
+    /** @scenario "Organizations are a tab of the Upgrades page" */
+    it("offers Overview, Runs, Steps and Organizations and opens the organizations", async () => {
       renderTabs([]);
 
-      fireEvent.click(screen.getByRole("tab", { name: "Tenant migrations" }));
+      expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual([
+        "Overview",
+        "Runs",
+        "Steps",
+        "Organizations",
+      ]);
+      fireEvent.click(screen.getByRole("tab", { name: "Organizations" }));
 
-      expect(await screen.findByText("The tenant migrations")).toBeTruthy();
-      expect(screen.getByRole("tab", { name: "Tenant migrations" })).toHaveAttribute(
+      expect(await screen.findByText("The organizations")).toBeTruthy();
+      expect(screen.getByRole("tab", { name: "Organizations" })).toHaveAttribute(
         "aria-selected",
         "true",
       );

@@ -3,12 +3,16 @@ Feature: Ops shows an installation's release upgrades, read-only
   show where the installation stands: the installed and image releases, the LTS
   floor, each release's steps and each run's phases. Nothing here runs a step.
   Plan: dev/docs/plans/upgrade-ui-2026-10-06.md sections 4, 7 (W1 to W4) and 9.
+  Layout and names: dev/docs/adr/173-upgrades-run-on-deploy.md section 7 (UPGRADE-UI-2). The
+  page has the tabs Overview, Runs, Steps and Organizations, plus Dataplanes when targets exist.
+  No screen says "unreleased", offers a back button or hints at a command: the worker upgrades.
 
   @unit
-  Scenario: An image newer than the ledger is described as behind with the command to run
-    Given the reader's reason is that the image is newer than the installed release
-    When the overview asks which command fixes it
-    Then it names the command "pnpm task upgrade"
+  Scenario: A development build reads as the release it contains and its short commit
+    Given a build that is not a release, containing 3.20.1 at commit abc1234def
+    When the page names the running version
+    Then it reads "Development build 3.20.1+abc1234"
+    And a release build reads "Running" with its release
 
   @unit
   Scenario: A step status the page does not know is shown as the reader gave it
@@ -17,25 +21,31 @@ Feature: Ops shows an installation's release upgrades, read-only
     Then it is shown as the reader labelled it, unchanged, in a neutral tone
 
   @integration
-  Scenario: The overview names the installed release, the image release and the floor
-    Given an installation on 3.23.0 whose image is 3.23.0 with the LTS floor 3.20.1
+  Scenario: The overview names the running release and one state line
+    Given an installation running release 3.23.0 that is up to date
     When an operator opens Ops, Upgrades
-    Then the page shows "Up to date"
-    And it shows the installed release, the image release and the floor
+    Then the overview reads "Running 3.23.0"
+    And its one state line reads "Up to date"
 
   @integration
-  Scenario: A release below the floor reads as unsupported and names the LTS to upgrade to first
+  Scenario: A release below the floor reads as refused with the reader's message
     Given the reader says the installed release 3.18.0 is below the floor 3.20.1
     When an operator opens Ops, Upgrades
-    Then the page reads "Unsupported"
-    And it tells the operator to upgrade to 3.20.1 first
+    Then the state line reads "Refused" with the message to upgrade to 3.20.1 first
 
   @integration
-  Scenario: An image newer than the ledger reads as behind and names the command
-    Given an installation whose ledger is on 3.22.0 and whose image is 3.23.0
+  Scenario: An upgrade in progress reads as step n of m and names no command
+    Given an installation upgrading with 12 of 40 steps settled
     When an operator opens Ops, Upgrades
-    Then the page reads "Behind"
-    And it names the command "pnpm task upgrade"
+    Then the state line reads "Upgrading: step 13 of 40"
+    And no command to run is shown
+
+  @integration
+  Scenario: A newer release is named with its release notes only when cloud names one
+    Given cloud's usage-report reply names release 3.22.0 with its notes
+    When an operator opens Ops, Upgrades
+    Then the overview reads "Newer version 3.22.0 available" with a release notes link
+    And with no latest release named, nothing about a newer version is shown
 
   @integration
   Scenario: The overview lists what the image deprecates, its replacement and when it is removed
@@ -52,27 +62,28 @@ Feature: Ops shows an installation's release upgrades, read-only
     Then the page says this installation has not recorded an upgrade yet
 
   @integration
-  Scenario: A failed step names its error and its fix and is listed under needs attention
-    Given a release with one step that failed with an error and a fix
-    When an operator opens that release
-    Then the overview lists it under "Needs attention" with its error
-    And the line opens the step
+  Scenario: Failed steps read as needs attention with their count and one Retry for a manager
+    Given two steps that failed
+    When an operator holding ops:manage opens Ops, Upgrades
+    Then the state line reads "Needs attention: 2 failed steps"
+    And its Retry reopens both failed steps
 
   @integration
   Scenario: A release's steps read as a summary, the unfinished ones first, the applied ones collapsed
     Given a release with hundreds of applied steps and a few still to do
-    When an operator opens that release
+    When an operator opens that release on the Steps tab
     Then it shows how many steps sit in each status and of each kind
     And the unfinished steps are listed first with their mode and what they wait on
     And the applied steps are one collapsed group that says whether each ran or was recorded done
     And an empty owner, zero attempts and a duration that never started are not shown
 
   @unit
-  Scenario: The releases list puts unreleased first, then the newest release, and calls out what is left
-    Given releases 3.19.0, 3.19.4 and 3.20.1 and unreleased steps
-    When an operator opens Ops, Upgrades
-    Then the unreleased steps are listed first and the releases newest first after them
-    And each release calls out how many of its steps are still pending
+  Scenario: The Steps tab groups by version, the development build first, then the newest release
+    Given releases 3.18.1, 3.19.4 and 3.20.1 and steps no release names
+    When an operator opens the Steps tab
+    Then the steps no release names read "Development build" and are listed first
+    And the releases follow newest first, each calling out how many steps are still pending
+    And the oldest release, the history imported from before tracking, reads "3.18.1 and earlier"
 
   @unit
   Scenario: A long step error reads as a one-line summary with the full text a click away
@@ -82,29 +93,36 @@ Feature: Ops shows an installation's release upgrades, read-only
     And the full text shows on hover and in the step drawer
 
   @integration
-  Scenario: Tenant migrations are a tab of the Upgrades page
-    When an operator opens the Tenant migrations tab on Ops, Upgrades
-    Then the tenant migrations, their enrolment and per-organization actions are shown
+  Scenario: Organizations are a tab of the Upgrades page
+    When an operator opens the Organizations tab on Ops, Upgrades
+    Then the organization steps, their enrolment and per-organization actions are shown
     And the retired Ops, Migrations address opens this tab
 
   @integration
   Scenario: An automatic step reads every organization as enrolled
     Given a step that enrols every organization automatically, with one held organization
-    When an operator opens the Tenant migrations tab on SaaS
+    When an operator opens the Organizations tab
     Then its Enrolled count reads All and no empty enrolment list is shown
     And the held organization is listed as needing attention
 
   @integration
-  Scenario: The Tenant migrations tab lists every tenant's state, filtered by step and state
+  Scenario: Every organization action shows on cloud and self-hosted alike
+    Given a self-hosted installation with a step that is not enrolled automatically
+    When an operator holding ops:manage opens the Organizations tab
+    Then the step offers enrol, enrol a cohort, run for an organization and roll back
+    And the Enrolled column is shown
+
+  @integration
+  Scenario: The Organizations tab lists every organization's state, filtered by step and state
     Given a held organization in one step and a finalized one in another
-    When an operator filters the tenant list to held tenants
+    When an operator filters the organization list to held organizations
     Then only the held organization is listed, with its step and state
 
   @integration
-  Scenario: The tenant list names a failed read instead of showing an empty list
-    Given the tenant read fails
-    When an operator opens the Tenant migrations tab
-    Then the tenant list shows the failure and not the empty state
+  Scenario: The organization list names a failed read instead of showing an empty list
+    Given the organization read fails
+    When an operator opens the Organizations tab
+    Then the organization list shows the failure and not the empty state
 
   @unit
   Scenario: Tenant rows are listed by step and state, one page at a time
@@ -133,9 +151,23 @@ Feature: Ops shows an installation's release upgrades, read-only
     And it offers no action
 
   @integration
+  Scenario: A run opens as a drawer from the Runs tab with Phases, Steps and Log
+    Given a run listed on the Runs tab
+    When an operator opens it
+    Then a drawer opens with the tabs Phases, Steps and Log
+    And the raw plan and report show only behind a "Details" toggle
+
+  @integration
+  Scenario: The seed run reads as imported history with a one-line explanation
+    Given the run that imported history from before upgrade tracking
+    When an operator opens it
+    Then it reads "Imported history" in the list and the drawer
+    And its log explains it in one line instead of showing its raw report
+
+  @integration
   Scenario: A run's steps are listed per release in the order the reader gives them
     Given a run that passed through 3.22.0 and 3.23.0
-    When an operator opens the run
+    When an operator opens the run's Steps tab
     Then each release's steps are listed under it, 3.22.0 first, in the reader's order
 
   @integration
@@ -210,7 +242,7 @@ Feature: Ops shows an installation's release upgrades, read-only
   @integration
   Scenario: The background step list shows each step's state, progress and deadline
     Given a background step at 63 percent, one waiting on old writers and one failed
-    When an operator opens "Finishing in background"
+    When an operator opens "Finishing in background" on the Steps tab
     Then each step shows its id, status and progress from its checkpoint report
     And each shows the release it must finish before
     And the waiting step names the processes it waits on by role, image and last seen
@@ -254,40 +286,6 @@ Feature: Ops shows an installation's release upgrades, read-only
     When an operator holding ops:manage asks to retry it
     Then it is refused as not found
 
-  # W5 Preview (U6, ruling U6-U9-READS 2026-10-09): ops.upgrade.preview({ to })
-  @unit
-  Scenario: The preview lists the steps up to the release asked for, release by release
-    Given an installation on 3.21.0 whose image is 3.23.0
-    When an operator holding ops:view previews an upgrade to 3.22.0
-    Then the preview lists release 3.22.0 with its schema, blocking, background and operator steps
-    And it lists nothing from 3.23.0
-
-  @unit
-  Scenario: The preview shows the preflight rows the CLI prints
-    Given a step that failed and no upgrade holding the lease
-    When an operator previews an upgrade to the image's release
-    Then the preflight refuses "No failed step" naming that step
-    And it verifies "No upgrade in progress"
-    And it leaves "Recent backup" unchecked with the fix to take a backup
-
-  @unit
-  Scenario: A target newer than the image is refused with the command that previews from that image
-    Given an image on 3.23.0
-    When an operator previews an upgrade to 3.24.0
-    Then the preview is refused as "target_not_in_image"
-    And it shows the command that runs "upgrade plan --to 3.24.0" from the 3.24.0 image
-
-  @unit
-  Scenario: An installation below the floor previews as refused with the LTS to upgrade to first
-    Given an installation on 3.18.0 below the floor 3.20.1
-    When an operator previews an upgrade to the image's release
-    Then the preview is refused as "below_lts_floor" naming 3.20.1
-
-  @integration
-  Scenario: The preview page shows a skeleton while the preview loads
-    When an operator opens Ops, Upgrades, Preview
-    Then a loading skeleton shows until the preview answers
-
   # W7 Dataplanes (U9, ruling U6-U9-READS 2026-10-09): ops.upgrade.listTargets
   @unit
   Scenario: The dataplanes tab lists each ClickHouse target with its version, outstanding steps and last error
@@ -319,15 +317,54 @@ Feature: Ops shows an installation's release upgrades, read-only
   # --- Tenant and operator steps on the Upgrades page (U4, U5) ---
 
   @integration
-  Scenario: Each tenant step shows its tenants' progress on the Upgrades page
-    Given a tenant step with tenants finalized, held and parked
-    When an operator opens the Upgrades page
-    Then the step lists how many tenants are finalized, held and parked
-    And opening the row opens the step
+  Scenario: Each organization step shows its organizations' progress on the Organizations tab
+    Given an organization step with organizations finalized, held and parked
+    When an operator opens the Organizations tab
+    Then the step lists how many organizations are finalized, held and parked
 
   @integration
-  Scenario: An unfinished operator step shows its state and a failed one offers Retry to a manager
+  Scenario: An unfinished operator step shows under Action needed and a failed one offers Retry
     Given an operator step that failed and one still pending
     When an operator holding ops:manage opens the Upgrades page
-    Then both operator steps show their status
+    Then both operator steps show under "Action needed" with their status
     And only the failed one offers Retry
+
+  # The status read behind the overview (ADR-173 section 7, UPGRADE-UI-2)
+  @unit
+  Scenario: The status names a release build by its release
+    Given an image that is release 3.21.0
+    When an operator holding ops:view reads the upgrade status
+    Then its version is the release 3.21.0
+
+  @unit
+  Scenario: The status names a development build by the newest release it contains and its commit
+    Given an image that no release names, containing 3.20.1 and built from commit abc1234
+    When an operator holding ops:view reads the upgrade status
+    Then its version is a development build containing 3.20.1 at commit abc1234
+    And nothing in the status reads "unreleased"
+
+  @unit
+  Scenario: The status names cloud's latest release with its notes only when it is newer
+    Given cloud's last usage-report reply named release 3.22.0
+    When the status of an image on 3.21.0 is read
+    Then the latest release is 3.22.0 with the notes at its langwatch@v3.22.0 release page
+    And an image on 3.22.0 or newer names no latest release
+
+  @unit
+  Scenario: No latest release is named when usage reporting is off
+    Given cloud once named release 3.22.0 and usage reporting is now switched off
+    When the status of an image on 3.21.0 is read
+    Then no latest release is named
+
+  @unit
+  Scenario: The usage report keeps the latest release cloud's reply names
+    Given cloud answers a usage report naming release 3.22.0
+    When the install sends its daily report
+    Then the latest release 3.22.0 is kept for the status to read
+    And a later reply naming none forgets it
+
+  @unit
+  Scenario: Enrolment acts on a self-hosted installation as it does on cloud
+    Given a self-hosted installation and a step that is not enrolled automatically
+    When an operator holding ops:manage enrols an organization, enrols a cohort or withdraws one
+    Then each action is recorded and none is refused for being self-hosted

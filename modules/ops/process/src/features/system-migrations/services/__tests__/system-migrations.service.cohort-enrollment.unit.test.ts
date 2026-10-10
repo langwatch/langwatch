@@ -274,18 +274,18 @@ describe("SystemMigrationsService.enrollCohort", () => {
 
   describe("given a self-hosted installation", () => {
     describe("when an operator enrolls a cohort", () => {
-      /** @scenario "Cohort enrollment does not apply to self-hosted installations" */
-      it("refuses with the enrollment's cloud-only error", async () => {
+      /** @scenario "Enrolment acts on a self-hosted installation as it does on cloud" */
+      it("records the cohort as it does on cloud", async () => {
         const { service, createMany } = serviceWith({ isSaaS: false });
 
-        await expect(
-          service.enrollCohort({
-            migrationName: MIGRATION,
-            sampleSize: 5,
-            actorUserId: "user_ops",
-          }),
-        ).rejects.toMatchObject({ code: "migration_enrollment_cloud_only" });
-        expect(createMany).not.toHaveBeenCalled();
+        const result = await service.enrollCohort({
+          migrationName: MIGRATION,
+          sampleSize: 5,
+          actorUserId: "user_ops",
+        });
+
+        expect(result.enrolled).toHaveLength(5);
+        expect(createMany).toHaveBeenCalledTimes(1);
       });
     });
   });

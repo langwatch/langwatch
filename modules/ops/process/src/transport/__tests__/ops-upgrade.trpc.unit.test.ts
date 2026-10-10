@@ -164,7 +164,7 @@ function boundAccess(): Record<string, string> {
 
 describe("the ops.upgrade reads", () => {
   /** @scenario "Every upgrade read asks the operator view grant at the door" */
-  it("declares each of the nine reads behind ops:view at the platform scope", () => {
+  it("declares each of the eight reads behind ops:view at the platform scope", () => {
     const reads = Object.fromEntries(
       Object.entries(boundAccess()).filter(
         ([name]) => !MIGRATION_PROCEDURE_NAMES.includes(name) && name !== "ops.upgrade.retryStep",
@@ -178,7 +178,6 @@ describe("the ops.upgrade reads", () => {
       "ops.upgrade.getStep": "permission-platform:ops:view",
       "ops.upgrade.listRuns": "permission-platform:ops:view",
       "ops.upgrade.getRun": "permission-platform:ops:view",
-      "ops.upgrade.preview": "permission-platform:ops:view",
       "ops.upgrade.listTargets": "permission-platform:ops:view",
       "ops.upgrade.listTenants": "permission-platform:ops:view",
     });
@@ -201,7 +200,12 @@ describe("the ops.upgrade reads", () => {
       const reader = readerOfOneRelease();
       const { operator } = mount({ reader });
 
-      expect(await operator.status()).toEqual({ ...(await reader.status()), deprecations: [] });
+      expect(await operator.status()).toEqual({
+        ...(await reader.status()),
+        deprecations: [],
+        version: { kind: "development", containsRelease: null, commit: null },
+        latestRelease: null,
+      });
       expect(await operator.listReleases()).toEqual(await reader.listReleases());
       expect(await operator.listSteps({ release: "3.23.0" })).toEqual(
         await reader.listSteps({ release: "3.23.0" }),

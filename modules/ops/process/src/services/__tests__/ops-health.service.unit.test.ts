@@ -176,6 +176,8 @@ const UPGRADE: OpsUpgradeStatus = {
   failedStepIds: ["ops:tenant-split"],
   failedTargets: 2,
   deprecations: [],
+  version: { kind: "release", release: "3.21.0" },
+  latestRelease: null,
 };
 
 function health(overrides: Partial<OpsHealthReaders> = {}) {

@@ -5,10 +5,7 @@
  */
 
 import { createLogger } from "@langwatch/observability";
-import {
-  MigrationEnrolledAutomaticallyError,
-  MigrationEnrollmentCloudOnlyError,
-} from "@langwatch/ops-contract";
+import { MigrationEnrolledAutomaticallyError } from "@langwatch/ops-contract";
 
 import {
   sample,
@@ -30,11 +27,10 @@ export class SystemMigrationEnrollmentService {
 
   /**
    * Enrollment listing for the ops page: every migration, newest first, with
-   * names still resolving. `isSaaS` rides along so page says self-hosted has
-   * nothing to enroll. Read is audited because enrollers' names are personal data.
+   * names still resolving, on cloud and self-hosted alike (ADR-173 section 7).
+   * Read is audited because enrollers' names are personal data.
    */
   async getEnrollments({ requestedBy }: { requestedBy: string }): Promise<{
-    isSaaS: boolean;
     enrollments: MigrationEnrollmentRecord[];
   }> {
     const enrollments = await this.deps.enrollments.findAll();
@@ -43,7 +39,7 @@ export class SystemMigrationEnrollmentService {
       action: "systemMigrations.listEnrollments",
     });
 
-    return { isSaaS: this.deps.isSaaS(), enrollments };
+    return { enrollments };
   }
 
   /**
@@ -61,9 +57,9 @@ export class SystemMigrationEnrollmentService {
   }
 
   /**
-   * Enrolls one organization for one registered migration, taking effect on the next pass since
-   * the runner reads enrollment fresh. It refuses rather than lies: off cloud, for a migration
-   * that already admits everyone or that nothing answers to, and for an unknown or enrolled org.
+   * Enrolls one organization for one migration from the next pass. It refuses a migration that
+   * admits everyone or that nothing answers to, and an unknown or enrolled org. A self-hosted
+   * pass admits every organization, so there the row changes nothing (ADR-173 section 7).
    */
   async enroll({
     organizationId,
@@ -74,10 +70,6 @@ export class SystemMigrationEnrollmentService {
     migrationName: string;
     actorUserId: string;
   }): Promise<void> {
-    if (!this.deps.isSaaS()) {
-      throw new MigrationEnrollmentCloudOnlyError();
-    }
-
     this.lookup.registeredMigration(this.deps, migrationName);
     this.requireEnrollmentDecidesSomething(migrationName);
     await this.deps.enrollments.getOrganizationById({ organizationId });
@@ -122,10 +114,6 @@ export class SystemMigrationEnrollmentService {
     enrolled: { id: string; name: string }[];
     eligibleCount: number;
   }> {
-    if (!this.deps.isSaaS()) {
-      throw new MigrationEnrollmentCloudOnlyError();
-    }
-
     this.lookup.registeredMigration(this.deps, migrationName);
     this.requireEnrollmentDecidesSomething(migrationName);
     // The steps run as an ordered pipeline per organization, so a later
@@ -211,10 +199,6 @@ export class SystemMigrationEnrollmentService {
     migrationName: string;
     actorUserId: string;
   }): Promise<void> {
-    if (!this.deps.isSaaS()) {
-      throw new MigrationEnrollmentCloudOnlyError();
-    }
-
     this.requireEnrollmentDecidesSomething(migrationName);
     await this.deps.enrollments.delete({ organizationId, migrationName });
     logger.info(

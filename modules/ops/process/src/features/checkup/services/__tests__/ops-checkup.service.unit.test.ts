@@ -14,11 +14,13 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import { MemoryCheckupProbeChannel } from "../../../../channels/memory/memory.checkup-probe.channel.ts";
 import { MemoryUsageReportChannel } from "../../../../channels/memory/memory.usage-report.channel.ts";
+import { MemoryCloudLatestReleaseRepository } from "../../../../repositories/memory/memory.cloud-latest-release.repository.ts";
 import {
   MemoryClickHouseHealthRepository,
   MemoryPostgresHealthRepository,
   MemoryRedisHealthRepository,
 } from "../../../../repositories/memory/memory.datastore-health.repository.ts";
+import { MemoryOpsStore } from "../../../../repositories/memory/memory.ops.store.ts";
 import { ledgerOf, stepOf } from "../../../../services/__tests__/support/upgrade-ledger.ts";
 import { UsageReportWorld } from "../../../../services/__tests__/support/usage-report-peers.ts";
 import { OpsCheckupService } from "../ops-checkup.service.ts";
@@ -152,6 +154,9 @@ function service() {
     repositories: {
       ...datastores,
       upgradeLedger: { findStatus: upgrade.status, findSteps: upgrade.listSteps },
+      cloudLatestRelease: MemoryCloudLatestReleaseRepository.create({
+        store: MemoryOpsStore.create(),
+      }),
     },
     channels: {
       usageReport: MemoryUsageReportChannel.create(),

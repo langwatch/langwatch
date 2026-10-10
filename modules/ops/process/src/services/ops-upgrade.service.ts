@@ -3,8 +3,7 @@ import type {
   OpsUpgradeIdInput,
   OpsUpgradeListRunsInput,
   OpsUpgradeListStepsInput,
-  OpsUpgradePreview,
-  OpsUpgradePreviewInput,
+  OpsUpgradeLatestRelease,
   OpsUpgradeRelease,
   OpsUpgradeReleasePage,
   OpsUpgradeRun,
@@ -21,7 +20,7 @@ import type {
 import { UpgradeStepNotFailedError } from "@langwatch/ops-contract";
 import type { Deprecation } from "@langwatch/upgrade/manifest";
 import type {
-  UpgradePreview,
+  UpgradeImageVersion,
   UpgradeReleaseSummary,
   UpgradeRunDetail,
   UpgradeRunPhaseView,
@@ -32,8 +31,11 @@ import type {
   UpgradeTargetSummary,
   UpgradeTargetView,
 } from "@langwatch/upgrade/reader";
+import { orderReleases } from "@langwatch/upgrade/reader";
 
+import type { CloudLatestRelease } from "../repositories/cloud-latest-release.repository.ts";
 import type { UpgradeLedgerRepository } from "../repositories/upgrade-ledger.repository.ts";
+import type { UsageReportService } from "./usage-report.service.ts";
 
 function runSummaryOf(run: UpgradeRunSummary): OpsUpgradeRunSummary {
   const { id, kind, release, floor, startedAt, finishedAt, outcome } = run;
@@ -45,7 +47,9 @@ function deprecationOf(entry: Deprecation): OpsUpgradeDeprecation {
   return { id, what, kind, deprecatedIn, removedIn, successor: entry.successor ?? null, notice };
 }
 
-function statusOf(status: UpgradeStatus): Omit<OpsUpgradeStatus, "deprecations"> {
+function statusOf(
+  status: UpgradeStatus,
+): Omit<OpsUpgradeStatus, "deprecations" | "version" | "latestRelease"> {
   const { lease, lastRun } = status;
   return {
     state: status.state,
@@ -127,28 +131,26 @@ function runOf(run: UpgradeRunDetail): OpsUpgradeRun {
   };
 }
 
-function previewOf(preview: UpgradePreview): OpsUpgradePreview {
-  const { plan } = preview;
-  return {
-    installed: preview.installed,
-    plan:
-      plan.outcome === "planned"
-        ? {
-            outcome: "planned",
-            fresh: plan.fresh,
-            releases: plan.releases.map((release) => ({ ...release })),
-            notNeeded: [...plan.notNeeded],
-          }
-        : { outcome: "refused", code: plan.code, stopAt: plan.stopAt, message: plan.message },
-    preflight: preview.preflight.map((row) => ({
-      id: row.id,
-      name: row.name,
-      outcome: row.outcome,
-      detail: row.detail ?? null,
-      fix: row.fix ?? null,
-      docsPath: row.docsPath ?? null,
-    })),
-  };
+/** The release page every LangWatch release is tagged with: `langwatch@v<release>`. */
+function releaseNotesUrl({ release }: { release: string }): string {
+  return `https://github.com/langwatch/langwatch/releases/tag/langwatch@v${release}`;
+}
+
+/** Cloud's latest release, kept only when newer than the release this image is or holds. */
+function newerReleasesOf({
+  version,
+  held,
+}: {
+  version: UpgradeImageVersion;
+  held: readonly CloudLatestRelease[];
+}): OpsUpgradeLatestRelease[] {
+  const running = version.kind === "release" ? version.release : version.containsRelease;
+  return held
+    .filter(
+      (latest) =>
+        running === null || orderReleases({ left: latest.release, right: running }) === "newer",
+    )
+    .map(({ release }) => ({ release, notesUrl: releaseNotesUrl({ release }) }));
 }
 
 function targetSummaryOf(summary: UpgradeTargetSummary): OpsUpgradeTargetSummary {
@@ -162,15 +164,31 @@ function targetSummaryOf(summary: UpgradeTargetSummary): OpsUpgradeTargetSummary
  * Spec: modules/ops/specs/upgrades.feature
  */
 export class OpsUpgradeService {
-  static create({ ledger }: { ledger: UpgradeLedgerRepository }): OpsUpgradeService {
-    return new OpsUpgradeService(ledger);
+  static create({
+    ledger,
+    cloudReleases,
+  }: {
+    ledger: UpgradeLedgerRepository;
+    /** The usage report's held reply; a process without one names no latest release. */
+    cloudReleases?: Pick<UsageReportService, "findLatestRelease">;
+  }): OpsUpgradeService {
+    return new OpsUpgradeService(ledger, cloudReleases);
   }
 
-  private constructor(private readonly ledger: UpgradeLedgerRepository) {}
+  private constructor(
+    private readonly ledger: UpgradeLedgerRepository,
+    private readonly cloudReleases: Pick<UsageReportService, "findLatestRelease"> | undefined,
+  ) {}
 
   async getStatus(): Promise<OpsUpgradeStatus> {
     const deprecations = this.ledger.findDeprecations().map(deprecationOf);
-    return { ...statusOf(await this.ledger.findStatus()), deprecations };
+    const version = this.ledger.findImageVersion();
+    const [status, held] = await Promise.all([
+      this.ledger.findStatus(),
+      this.cloudReleases?.findLatestRelease() ?? [],
+    ]);
+    const [latestRelease = null] = newerReleasesOf({ version, held });
+    return { ...statusOf(status), deprecations, version: { ...version }, latestRelease };
   }
 
   async listReleases(): Promise<OpsUpgradeReleasePage> {
@@ -194,10 +212,6 @@ export class OpsUpgradeService {
 
   async getRun({ id }: OpsUpgradeIdInput): Promise<OpsUpgradeRun> {
     return runOf(await this.ledger.getRun({ id }));
-  }
-
-  async preview({ to }: OpsUpgradePreviewInput): Promise<OpsUpgradePreview> {
-    return previewOf(await this.ledger.findPreview({ to }));
   }
 
   async listTargets(): Promise<OpsUpgradeTargetSummary[]> {

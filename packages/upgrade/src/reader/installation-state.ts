@@ -1,9 +1,12 @@
 import { INSTALLATION_STATES } from "./labels.ts";
 import type { InstallationReason, InstallationState } from "./reader.schema.ts";
 import { orderReleases } from "./release.ts";
+import { UNRELEASED_IMAGE } from "./step-view.ts";
 
 export interface InstallationFacts {
   imageRelease: string;
+  /** How a summary names the image: its release, or "Development build <release>+<commit>". */
+  imageName?: string;
   imageSteps: readonly { id: string; mode: string }[];
   floor: string | null;
   installed: string | null;
@@ -24,12 +27,18 @@ export interface InstallationVerdict {
 
 const SETTLED = new Set(["done", "not-needed"]);
 
+/** The image's name in a summary; never the internal "unreleased" (UPGRADE-UI-2). */
+export function imageNameOf({ imageRelease, imageName }: InstallationFacts): string {
+  return imageName ?? (imageRelease === UNRELEASED_IMAGE ? "Development build" : imageRelease);
+}
+
 function plural({ count, one, many }: { count: number; one: string; many: string }): string {
   return `${count} ${count === 1 ? one : many}`;
 }
 
 function checkUnsupported(facts: InstallationFacts): InstallationVerdict | null {
   const { imageRelease, installed, floor, ledgerFloor } = facts;
+  const image = imageNameOf(facts);
   if (floor && installed && orderReleases({ left: installed, right: floor }) === "older") {
     return {
       state: "unsupported",
@@ -41,7 +50,7 @@ function checkUnsupported(facts: InstallationFacts): InstallationVerdict | null 
     return {
       state: "unsupported",
       reason: "image-below-ledger-floor",
-      summary: `This image (${imageRelease}) is older than the floor ${ledgerFloor} this installation was upgraded with.`,
+      summary: `This image (${image}) is older than the floor ${ledgerFloor} this installation was upgraded with.`,
     };
   }
   return null;
@@ -78,7 +87,7 @@ function checkNeverUpgraded(facts: InstallationFacts): InstallationVerdict | nul
   return {
     state: "never-upgraded",
     reason: "no-upgrade-recorded",
-    summary: "No upgrade recorded yet. Run the upgrade before this image serves.",
+    summary: "No upgrade recorded yet.",
   };
 }
 
@@ -88,7 +97,7 @@ function checkBehind(facts: InstallationFacts): InstallationVerdict | null {
     return {
       state: "behind",
       reason: "image-newer",
-      summary: `Image ${imageRelease} is newer than the installed ${installed}. Run the upgrade.`,
+      summary: `Image ${imageNameOf(facts)} is newer than the installed ${installed}.`,
     };
   }
   const statusById = new Map(facts.steps.map((step) => [step.id, step.status]));
@@ -100,7 +109,7 @@ function checkBehind(facts: InstallationFacts): InstallationVerdict | null {
   return {
     state: "behind",
     reason: "blocking-steps-pending",
-    summary: `${count} this image declares not completed. Run the upgrade.`,
+    summary: `${count} this image declares not completed.`,
   };
 }
 
@@ -112,7 +121,7 @@ function checkRolledBack(facts: InstallationFacts): InstallationVerdict | null {
   return {
     state: "rolled-back",
     reason: "image-older",
-    summary: `Image ${imageRelease} is older than the installed ${installed}.`,
+    summary: `Image ${imageNameOf(facts)} is older than the installed ${installed}.`,
   };
 }
 
@@ -145,9 +154,15 @@ export function computeInstallationState(facts: InstallationFacts): Installation
     checkFinishing(facts) ?? {
       state: "up-to-date",
       reason: "current",
-      summary: `Release ${facts.installed ?? facts.imageRelease} is current.`,
+      summary: `${installedName(facts)} is current.`,
     }
   );
+}
+
+/** The installed release, or the image's name when it installed past every release. */
+function installedName(facts: InstallationFacts): string {
+  const { installed } = facts;
+  return installed && installed !== UNRELEASED_IMAGE ? installed : imageNameOf(facts);
 }
 
 export function describeInstallationState({ state }: { state: InstallationState }) {

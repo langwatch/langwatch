@@ -34,10 +34,6 @@ export const opsUpgradeTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsUp
     .withPermission("ops:view", { at: "platform" })
     .handle(({ app, input }) => app.getUpgradeRun({ id: input.id }))
 
-    .procedure("preview")
-    .withPermission("ops:view", { at: "platform" })
-    .handle(({ app, input }) => app.previewUpgrade({ to: input.to }))
-
     .procedure("listTargets")
     .withPermission("ops:view", { at: "platform" })
     .handle(({ app }) => app.listUpgradeTargets())

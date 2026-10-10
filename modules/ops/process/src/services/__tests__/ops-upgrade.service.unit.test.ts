@@ -10,14 +10,18 @@ import {
   opsUpgradeStatusSchema,
   opsUpgradeStepDetailSchema,
   opsUpgradeStepPageSchema,
+  opsUpgradeTargetSummarySchema,
 } from "@langwatch/ops-contract";
 import type {
   UpgradePreview,
   UpgradeRunDetail,
   UpgradeStepDetail,
+  UpgradeImageVersion,
+  UpgradeTargetSummary,
 } from "@langwatch/upgrade/reader";
 import { describe, expect, it } from "vitest";
 
+import type { CloudLatestRelease } from "../../repositories/cloud-latest-release.repository.ts";
 import { MemoryUpgradeLedgerRepository } from "../../repositories/memory/memory.upgrade-ledger.repository.ts";
 import { OpsUpgradeService } from "../ops-upgrade.service.ts";
 import { statusOf, stepOf } from "./support/upgrade-ledger.ts";
@@ -81,9 +85,19 @@ const STATUS = statusOf({
   failedTargets: 1,
 });
 
-function service() {
+function service({
+  version,
+  held,
+  targets = [],
+}: {
+  version?: UpgradeImageVersion;
+  held?: CloudLatestRelease[];
+  targets?: UpgradeTargetSummary[];
+} = {}) {
   return OpsUpgradeService.create({
+    ...(held ? { cloudReleases: { findLatestRelease: async () => held } } : {}),
     ledger: MemoryUpgradeLedgerRepository.create({
+      ...(version ? { version } : {}),
       reader: {
         status: async () => STATUS,
         listReleases: async () => ({
@@ -98,7 +112,7 @@ function service() {
         getRun: async () => RUN,
         preflight: async () => [],
         preview: async () => ({ installed: null, plan: PLAN, preflight: [] }),
-        listTargets: async () => [],
+        listTargets: async () => targets,
       },
     }),
   });
@@ -146,6 +160,8 @@ describe("OpsUpgradeService", () => {
       expect(opsUpgradeStatusSchema.parse(await upgrades.getStatus())).toEqual({
         ...STATUS,
         deprecations: [],
+        version: { kind: "development", containsRelease: null, commit: null },
+        latestRelease: null,
       });
       expect(opsUpgradeReleasePageSchema.parse(await upgrades.listReleases())).toEqual({
         items: [
@@ -175,6 +191,75 @@ describe("OpsUpgradeService", () => {
         ["preflight", null, "succeeded"],
         ["postgres-schema", "3.22.0", "running"],
       ]);
+    });
+  });
+});
+
+describe("OpsUpgradeService.listTargets", () => {
+  /** @scenario "The dataplanes tab lists each ClickHouse target with its version, outstanding steps and last error" */
+  it("keeps each target's version, outstanding count and last error", async () => {
+    const targets = [
+      { target: "eu-1", version: "00041", outstanding: 0, lastError: null },
+      { target: "us-1", version: "00040", outstanding: 2, lastError: "Code: 241" },
+    ];
+
+    const listed = await service({ targets }).listTargets();
+
+    expect(opsUpgradeTargetSummarySchema.array().parse(listed)).toEqual(targets);
+  });
+});
+
+describe("OpsUpgradeService.getStatus version and latest release", () => {
+  describe("given a release image", () => {
+    /** @scenario "The status names a release build by its release" */
+    it("names its release", async () => {
+      const status = await service({ version: { kind: "release", release: "3.21.0" } }).getStatus();
+      expect(status.version).toEqual({ kind: "release", release: "3.21.0" });
+    });
+  });
+
+  describe("given a development build", () => {
+    /** @scenario "The status names a development build by the newest release it contains and its commit" */
+    it("names the release it contains and its commit, never unreleased", async () => {
+      const version = {
+        kind: "development" as const,
+        containsRelease: "3.20.1",
+        commit: "abc1234",
+      };
+      const status = await service({ version }).getStatus();
+      expect(status.version).toEqual(version);
+      expect(JSON.stringify(status)).not.toContain("unreleased");
+    });
+  });
+
+  describe("given cloud named 3.22.0", () => {
+    const held = [{ release: "3.22.0", commit: "def5678" }];
+
+    /** @scenario "The status names cloud's latest release with its notes only when it is newer" */
+    it("names it with its notes for an older image, and not for one on it or newer", async () => {
+      const older = await service({
+        version: { kind: "release", release: "3.21.0" },
+        held,
+      }).getStatus();
+      expect(older.latestRelease).toEqual({
+        release: "3.22.0",
+        notesUrl: "https://github.com/langwatch/langwatch/releases/tag/langwatch@v3.22.0",
+      });
+      for (const release of ["3.22.0", "3.23.0"]) {
+        const current = await service({ version: { kind: "release", release }, held }).getStatus();
+        expect(current.latestRelease).toBeNull();
+      }
+    });
+  });
+
+  describe("given usage reporting is off", () => {
+    /** @scenario "No latest release is named when usage reporting is off" */
+    it("names none", async () => {
+      const status = await service({
+        version: { kind: "release", release: "3.21.0" },
+        held: [],
+      }).getStatus();
+      expect(status.latestRelease).toBeNull();
     });
   });
 });

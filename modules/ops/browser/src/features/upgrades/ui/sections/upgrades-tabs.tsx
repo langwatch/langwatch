@@ -8,7 +8,7 @@ import { UpgradeErrorSummary } from "../elements/upgrade-error-summary.tsx";
 /** The query key naming the open tab; the overview is the bare address. */
 export const UPGRADES_TAB_PARAM = "tab";
 
-export type UpgradesTab = "overview" | "tenants" | "dataplanes";
+export type UpgradesTab = "overview" | "runs" | "steps" | "organizations" | "dataplanes";
 
 /** The tab an address names; anything unknown, or Dataplanes with no target, opens the overview. */
 export function parseUpgradesTab({
@@ -18,7 +18,7 @@ export function parseUpgradesTab({
   value: string | undefined;
   hasTargets: boolean;
 }): UpgradesTab {
-  if (value === "tenants") return value;
+  if (value === "runs" || value === "steps" || value === "organizations") return value;
   if (value === "dataplanes" && hasTargets) return value;
   return "overview";
 }
@@ -61,17 +61,21 @@ function TargetsTable({ targets }: { targets: readonly UpgradeTargetSummaryView[
   );
 }
 
-/** Overview and Tenant migrations, plus Dataplanes when the ledger records a private target. */
+/** Overview, Runs, Steps and Organizations, plus Dataplanes when the ledger records a target. */
 export function UpgradesTabs({
   targets,
   overview,
-  tenants,
+  runs,
+  steps,
+  organizations,
   tab,
   onSelectTab,
 }: {
   targets: readonly UpgradeTargetSummaryView[];
   overview: ReactNode;
-  tenants: ReactNode;
+  runs: ReactNode;
+  steps: ReactNode;
+  organizations: ReactNode;
   /** The open tab, when the address names it; otherwise the tabs keep their own. */
   tab?: UpgradesTab;
   onSelectTab?: (next: UpgradesTab) => void;
@@ -91,14 +95,22 @@ export function UpgradesTabs({
     >
       <Tabs.List marginBottom={5} overflowX="auto">
         <Tabs.Trigger value="overview">Overview</Tabs.Trigger>
-        <Tabs.Trigger value="tenants">Tenant migrations</Tabs.Trigger>
+        <Tabs.Trigger value="runs">Runs</Tabs.Trigger>
+        <Tabs.Trigger value="steps">Steps</Tabs.Trigger>
+        <Tabs.Trigger value="organizations">Organizations</Tabs.Trigger>
         {targets.length > 0 && <Tabs.Trigger value="dataplanes">Dataplanes</Tabs.Trigger>}
       </Tabs.List>
       <Tabs.Content value="overview" padding={0}>
         {overview}
       </Tabs.Content>
-      <Tabs.Content value="tenants" padding={0}>
-        {tenants}
+      <Tabs.Content value="runs" padding={0}>
+        {runs}
+      </Tabs.Content>
+      <Tabs.Content value="steps" padding={0}>
+        {steps}
+      </Tabs.Content>
+      <Tabs.Content value="organizations" padding={0}>
+        {organizations}
       </Tabs.Content>
       {targets.length > 0 && (
         <Tabs.Content value="dataplanes" padding={0}>

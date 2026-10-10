@@ -41,11 +41,15 @@ vi.mock("../../../behavior/ops-api.ts", () => ({
     },
   },
 }));
-vi.mock("../../../behavior/ops-router.ts", () => ({
-  useOpsRouter: () => ({ query: { runId: "run_1" }, asPath: "", push: vi.fn() }),
-}));
 
-import UpgradeRunScreen from "../ui/sections/upgrade-run.screen.tsx";
+import { useUpgradeReadHints } from "../behavior/use-upgrade-read-hints.ts";
+import { UpgradeRunDrawer } from "../ui/sections/upgrade-run-drawer.tsx";
+
+/** The run drawer as the Upgrades screen mounts it, under the screen's read hints. */
+function OpenRun() {
+  useUpgradeReadHints();
+  return <UpgradeRunDrawer runId="run_1" onClose={() => undefined} />;
+}
 
 afterEach(cleanup);
 
@@ -121,14 +125,14 @@ function renderRunScreen(rpc: HintRpc) {
     <QueryClientProvider client={new QueryClient()}>
       <UiHostServicesContextProvider value={capabilities}>
         <DesignSystemProvider forcedTheme="light">
-          <UpgradeRunScreen />
+          <OpenRun />
         </DesignSystemProvider>
       </UiHostServicesContextProvider>
     </QueryClientProvider>,
   );
 }
 
-describe("UpgradeRunScreen", () => {
+describe("UpgradeRunDrawer", () => {
   describe("given an operator has a run open while it is running", () => {
     /** @scenario "The upgrade pages re-read when the runner raises a read hint, without a timer" */
     it("reads the run again on the runner's hint and shows its new outcome", async () => {
@@ -145,7 +149,7 @@ describe("UpgradeRunScreen", () => {
       expect(await screen.findByText("Succeeded")).toBeTruthy();
       expect(readRun).toHaveBeenCalledTimes(2);
       for (const options of queryOptions) {
-        expect(options).not.toHaveProperty("refetchInterval");
+        expect(options ?? {}).not.toHaveProperty("refetchInterval");
       }
     });
   });

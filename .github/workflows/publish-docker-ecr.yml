@@ -360,6 +360,7 @@ jobs:
           # the OTel resource report; the other images ignore it.
           build-args: |
             VERSION=${{ needs.meta.outputs.version || needs.meta.outputs.image_tag }}
+            LANGWATCH_BUILD_COMMIT=${{ github.sha }}
           tags: |
             ${{ steps.ecr.outputs.registry }}/${{ matrix.image }}:${{ needs.meta.outputs.image_tag }}-${{ matrix.arch }}
 
