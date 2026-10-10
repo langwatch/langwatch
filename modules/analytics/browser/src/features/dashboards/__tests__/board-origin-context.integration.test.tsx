@@ -9,7 +9,7 @@
 import type { UiProcedureCall } from "@langwatch/browser/testing-transport";
 import { act, cleanup, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { useEffect, useReducer } from "react";
+import { useEffect, useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const { frames } = vi.hoisted(() => ({
@@ -27,7 +27,10 @@ vi.mock("../../dashboard-widget/ui/sections/sandboxed-chart-frame.tsx", () => ({
   ),
 }));
 
-import type { AnalyticsRouteReading } from "../../../model/analytics-host.ts";
+import {
+  AnalyticsHostProvider,
+  type AnalyticsRouteReading,
+} from "../../../model/analytics-host.ts";
 import {
   ANALYTICS_MEMBER_PERMISSIONS,
   StubAnalyticsHost,
@@ -120,14 +123,22 @@ class AddressedHost extends StubAnalyticsHost {
   }
 }
 
-/** Renders the board again whenever its address changes, as the editor's opening does. */
+/**
+ * Renders the board again whenever its address changes, under a host that is a new object
+ * each time, as the router's is: a compiled screen reads the address again only for a new host.
+ */
 function AddressedBoard({ host }: { host: AddressedHost }) {
-  const [, rerender] = useReducer((count: number) => count + 1, 0);
+  const [atAddress, setAtAddress] = useState(host);
   useEffect(() => {
-    host.listeners.add(rerender);
-    return () => void host.listeners.delete(rerender);
+    const readdress = () => setAtAddress(new Proxy(host, {}));
+    host.listeners.add(readdress);
+    return () => void host.listeners.delete(readdress);
   }, [host]);
-  return <DashboardBoardScreen />;
+  return (
+    <AnalyticsHostProvider value={atAddress}>
+      <DashboardBoardScreen />
+    </AnalyticsHostProvider>
+  );
 }
 
 /** Runs one of a frame's queries, as the widget's code would on load. */
