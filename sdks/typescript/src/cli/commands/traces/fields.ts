@@ -1,15 +1,6 @@
 /**
- * `langwatch trace fields` — what a trace filter can name.
- *
- * Reads the query reference, so the list is the platform's own rather than a
- * copy of it: the field registry lives in the app, and a second list in the CLI
- * would be a second thing to keep in step. That is the exact drift that left
- * the MCP server naming fields the product had renamed.
- *
- * `--syntax` prints the language's own document and `--examples` the filter
- * examples, because both come down the same call and a caller learning the
- * language wants them next to the field list, not from three commands.
- *
+ * `langwatch trace fields`: what a trace filter can name, read from the platform's query reference
+ * rather than a CLI copy that drifts. `--syntax` and `--examples` come down the same call.
  * @see specs/traces/trace-filter-api.feature
  */
 
@@ -19,12 +10,13 @@ import {
   type QueryReferenceResult,
   QueryApiService,
 } from "@/client-sdk/services/query/query-api.service";
+
 import { resolveCredentials } from "../../utils/apiKey";
-import { runnableLabel } from "../query/requirements";
 import { formatTable } from "../../utils/formatting";
 import type { CommandResult } from "../../utils/output";
 import { createSpinner } from "../../utils/spinner";
 import { failSpinner } from "../../utils/spinnerError";
+import { runnableLabel } from "../query/requirements";
 
 export interface TraceFieldsOptions {
   syntax?: boolean;
@@ -35,6 +27,27 @@ export interface TraceFieldsOptions {
 /** Values shown inline before the rest are left to the facets command. */
 const KNOWN_VALUES_SHOWN = 6;
 
+function knownValuesCell(field: QueryReferenceResult["traceFilter"]["fields"][number]): string {
+  if (field.knownValues.length > 0) {
+    return field.knownValues.slice(0, KNOWN_VALUES_SHOWN).join(", ");
+  }
+  return field.facetable ? chalk.gray("ask facets") : "";
+}
+
+function commandData(reference: QueryReferenceResult, options: TraceFieldsOptions) {
+  const { traceFilter } = reference;
+  if (options.syntax) return { syntax: traceFilter.syntax };
+  if (options.examples) {
+    return {
+      examples: reference.examples.filter((example) => example.language === "trace-filter"),
+    };
+  }
+  return {
+    fields: traceFilter.fields,
+    dynamicPrefixes: traceFilter.dynamicPrefixes,
+  };
+}
+
 function printFields(reference: QueryReferenceResult): void {
   console.log();
   formatTable({
@@ -42,12 +55,7 @@ function printFields(reference: QueryReferenceResult): void {
       Field: field.name,
       Type: field.valueType,
       Group: field.group ?? "",
-      Values:
-        field.knownValues.length > 0
-          ? field.knownValues.slice(0, KNOWN_VALUES_SHOWN).join(", ")
-          : field.facetable
-            ? chalk.gray("ask facets")
-            : "",
+      Values: knownValuesCell(field),
     })),
     headers: ["Field", "Type", "Group", "Values"],
   });
@@ -63,9 +71,7 @@ function printFields(reference: QueryReferenceResult): void {
 }
 
 function printExamples(reference: QueryReferenceResult): void {
-  const examples = reference.examples.filter(
-    (example) => example.language === "trace-filter",
-  );
+  const examples = reference.examples.filter((example) => example.language === "trace-filter");
   console.log();
   for (const example of examples) {
     console.log(`  ${chalk.cyan(example.text)}`);
@@ -94,18 +100,7 @@ export const traceFieldsCommand = async (
       `${traceFilter.fields.length} field${traceFilter.fields.length !== 1 ? "s" : ""} and ${traceFilter.dynamicPrefixes.length} attribute namespaces`,
     );
 
-    const data = options.syntax
-      ? { syntax: traceFilter.syntax }
-      : options.examples
-        ? {
-            examples: reference.examples.filter(
-              (example) => example.language === "trace-filter",
-            ),
-          }
-        : {
-            fields: traceFilter.fields,
-            dynamicPrefixes: traceFilter.dynamicPrefixes,
-          };
+    const data = commandData(reference, options);
 
     return {
       data,

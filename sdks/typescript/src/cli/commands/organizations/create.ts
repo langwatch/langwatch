@@ -1,4 +1,5 @@
 import chalk from "chalk";
+
 import type { CommandResult } from "../../utils/output";
 import { runManagement } from "../management/_shared";
 import { instanceAdminService, requireInstanceKey } from "./_shared";
@@ -11,12 +12,9 @@ export interface CreateOrganizationOptions {
 }
 
 /**
- * Provision an organization on a self-hosted instance, and the org-scoped
- * admin key that everything else is then done with.
- *
- * `data` deliberately includes the admin key's token: it is returned once,
- * here, and the whole point of this command is to hand the next step of an
- * infrastructure-as-code run a working credential.
+ * Provisions an organization plus its org-scoped admin key. `data`
+ * deliberately includes the token -- it's returned once, here, to hand the
+ * next infrastructure-as-code step a working credential.
  */
 export const createOrganizationCommand = async (
   options: CreateOrganizationOptions,
@@ -35,8 +33,7 @@ export const createOrganizationCommand = async (
           ? { adminApiKeyName: options.adminApiKeyName }
           : {}),
       }),
-    succeed: (created) =>
-      `Created organization "${chalk.cyan(created.organization.name)}"`,
+    succeed: (created) => `Created organization "${chalk.cyan(created.organization.name)}"`,
     table: (created) => {
       console.log();
       console.log(chalk.gray("Organization id:   ") + created.organization.id);
@@ -44,9 +41,7 @@ export const createOrganizationCommand = async (
       console.log(chalk.gray("Default team:      ") + created.team.name);
       console.log();
       console.log(
-        chalk.bold.yellow(
-          "⚠  Save the admin API key below NOW. It will not be shown again.",
-        ),
+        chalk.bold.yellow("⚠  Save the admin API key below NOW. It will not be shown again."),
       );
       console.log();
       console.log(`  ${chalk.green(created.adminApiKey.token)}`);

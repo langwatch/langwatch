@@ -1,0 +1,71 @@
+{
+  "extends": ["./tsconfig.json", "../../tsconfig.emit.json"],
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": "src",
+    "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo",
+    "paths": {
+      "@langwatch/browser-host": ["./src/index.ts"]
+    }
+  },
+  "files": [
+    "./src/index.ts",
+    "./src/capabilities.ts",
+    "./src/use-router.ts",
+    "./src/toaster.ts",
+    "./src/storage.ts",
+    "./src/errors.ts",
+    "./src/query/query-retry.ts",
+    "./src/testing.ts",
+    "./src/link.tsx",
+    "./src/global-store.ts",
+    "./src/use-organization-team-project.ts",
+    "./src/format-time-ago.ts",
+    "./src/feature-flag.ts",
+    "./src/period-selector.tsx",
+    "./src/markdown/index.tsx",
+    "./src/isolated-error-boundary.tsx",
+    "./src/copy-button.tsx",
+    "./src/drawer/index.ts",
+    "./src/address.ts"
+  ],
+  "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],
+  "exclude": [
+    "**/__tests__/**",
+    "**/__mocks__/**",
+    "**/tests/**",
+    "**/*.test.*",
+    "**/*.spec.*",
+    "**/*.stories.*",
+    "**/*.bench.*",
+    "**/__bench__/**",
+    "**/testing.ts",
+    "**/testing.tsx"
+  ],
+  "references": [
+    {
+      "path": "../api/tsconfig.build.json"
+    },
+    {
+      "path": "../config/tsconfig.build.json"
+    },
+    {
+      "path": "../design-system/tsconfig.build.json"
+    },
+    {
+      "path": "../handled-error/tsconfig.build.json"
+    },
+    {
+      "path": "../module/tsconfig.build.json"
+    },
+    {
+      "path": "../observability/tsconfig.build.json"
+    },
+    {
+      "path": "../react-rum/tsconfig.build.json"
+    },
+    {
+      "path": "../time/tsconfig.build.json"
+    }
+  ]
+}

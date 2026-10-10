@@ -4,6 +4,7 @@ import httpx
 
 from ... import errors
 from ...client import AuthenticatedClient, Client
+from ...models.scim_create_user_body import ScimCreateUserBody
 from ...models.scim_create_user_response_201 import ScimCreateUserResponse201
 from ...models.scim_create_user_response_400 import ScimCreateUserResponse400
 from ...models.scim_create_user_response_401 import ScimCreateUserResponse401
@@ -12,13 +13,22 @@ from ...models.scim_create_user_response_409 import ScimCreateUserResponse409
 from ...types import Response, safe_http_status
 
 
-def _get_kwargs() -> dict[str, Any]:
+def _get_kwargs(
+    *,
+    body: ScimCreateUserBody,
+) -> dict[str, Any]:
+    headers: dict[str, Any] = {}
 
     _kwargs: dict[str, Any] = {
         "method": "post",
         "url": "/api/scim/v2/Users",
     }
 
+    _kwargs["json"] = body.to_dict()
+
+    headers["Content-Type"] = "application/scim+json"
+
+    _kwargs["headers"] = headers
     return _kwargs
 
 
@@ -86,6 +96,7 @@ def _build_response(
 def sync_detailed(
     *,
     client: AuthenticatedClient,
+    body: ScimCreateUserBody,
 ) -> Response[
     ScimCreateUserResponse201
     | ScimCreateUserResponse400
@@ -101,6 +112,9 @@ def sync_detailed(
     role at organization scope. `costCenter` on the enterprise user extension assigns their department,
     creating that department on first use.
 
+    Args:
+        body (ScimCreateUserBody):
+
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
@@ -109,7 +123,9 @@ def sync_detailed(
         Response[ScimCreateUserResponse201 | ScimCreateUserResponse400 | ScimCreateUserResponse401 | ScimCreateUserResponse403 | ScimCreateUserResponse409]
     """
 
-    kwargs = _get_kwargs()
+    kwargs = _get_kwargs(
+        body=body,
+    )
 
     response = client.get_httpx_client().request(
         **kwargs,
@@ -121,6 +137,7 @@ def sync_detailed(
 def sync(
     *,
     client: AuthenticatedClient,
+    body: ScimCreateUserBody,
 ) -> (
     ScimCreateUserResponse201
     | ScimCreateUserResponse400
@@ -137,6 +154,9 @@ def sync(
     role at organization scope. `costCenter` on the enterprise user extension assigns their department,
     creating that department on first use.
 
+    Args:
+        body (ScimCreateUserBody):
+
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
@@ -147,12 +167,14 @@ def sync(
 
     return sync_detailed(
         client=client,
+        body=body,
     ).parsed
 
 
 async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
+    body: ScimCreateUserBody,
 ) -> Response[
     ScimCreateUserResponse201
     | ScimCreateUserResponse400
@@ -168,6 +190,9 @@ async def asyncio_detailed(
     role at organization scope. `costCenter` on the enterprise user extension assigns their department,
     creating that department on first use.
 
+    Args:
+        body (ScimCreateUserBody):
+
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
@@ -176,7 +201,9 @@ async def asyncio_detailed(
         Response[ScimCreateUserResponse201 | ScimCreateUserResponse400 | ScimCreateUserResponse401 | ScimCreateUserResponse403 | ScimCreateUserResponse409]
     """
 
-    kwargs = _get_kwargs()
+    kwargs = _get_kwargs(
+        body=body,
+    )
 
     response = await client.get_async_httpx_client().request(**kwargs)
 
@@ -186,6 +213,7 @@ async def asyncio_detailed(
 async def asyncio(
     *,
     client: AuthenticatedClient,
+    body: ScimCreateUserBody,
 ) -> (
     ScimCreateUserResponse201
     | ScimCreateUserResponse400
@@ -201,6 +229,9 @@ async def asyncio(
     sync be re-run without special-casing the people it already knows. New members join with the MEMBER
     role at organization scope. `costCenter` on the enterprise user extension assigns their department,
     creating that department on first use.
+
+    Args:
+        body (ScimCreateUserBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -213,5 +244,6 @@ async def asyncio(
     return (
         await asyncio_detailed(
             client=client,
+            body=body,
         )
     ).parsed

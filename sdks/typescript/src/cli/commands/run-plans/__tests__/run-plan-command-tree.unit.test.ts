@@ -1,9 +1,7 @@
 /**
- * Where the run plan and test suite commands sit in the command tree, and the
- * surface header every one of their requests carries.
- *
- * Spec: specs/features/run-plan-cli.feature
- * Spec: specs/features/test-suite-cli.feature
+ * Where the run plan and test suite commands sit in the command tree, and
+ * the surface header every one of their requests carries.
+ * Specs: specs/features/{run-plan-cli,test-suite-cli}.feature
  */
 import { describe, expect, it, vi } from "vitest";
 
@@ -13,13 +11,11 @@ vi.mock("@/internal/api/client", () => ({
   createLangWatchApiClient: vi.fn(() => ({ use: useSpy })),
 }));
 
-import { buildProgram } from "../../../program";
-import { createCliRunPlansService } from "../cli-run-plans-service";
-import { createCliTestSuitesService } from "../../test-suites/cli-test-suites-service";
-import {
-  CLI_SURFACE_HEADER,
-  CLI_SURFACE_VALUE,
-} from "../../../utils/governance/surface";
+import { CLI_SURFACE_HEADER, CLI_SURFACE_VALUE } from "@/internal/surface";
+
+import { buildProgram } from "../../../program.ts";
+import { createCliTestSuitesService } from "../../test-suites/cli-test-suites-service.ts";
+import { createCliRunPlansService } from "../cli-run-plans-service.ts";
 
 // buildProgram() reads the tsup-injected __CLI_VERSION__ build constant, which
 // no test runner defines (see help-topic.unit.test.ts).
@@ -38,8 +34,7 @@ const surfaceHeaderOf = (call: unknown): string | null => {
 
 describe("the run plan and test suite commands, given the CLI command tree", () => {
   const program = buildProgram();
-  const groupNamed = (name: string) =>
-    program.commands.find((command) => command.name() === name);
+  const groupNamed = (name: string) => program.commands.find((command) => command.name() === name);
 
   /** @scenario "List run plans" */
   it("registers the run-plan group with run, list, get and archive", () => {
@@ -56,9 +51,7 @@ describe("the run plan and test suite commands, given the CLI command tree", () 
 
   /** @scenario "The old --suite flag is still accepted" */
   it("keeps --suite on run-plan run, read but not listed", () => {
-    const run = groupNamed("run-plan")!.commands.find(
-      (command) => command.name() === "run",
-    )!;
+    const run = groupNamed("run-plan")!.commands.find((command) => command.name() === "run")!;
     const longFlags = run.options.map((option) => option.long);
 
     expect(longFlags).toContain("--test-suite");
@@ -73,21 +66,15 @@ describe("the run plan and test suite commands, given the CLI command tree", () 
 
     expect(testSuite).toBeDefined();
     const subcommands = testSuite!.commands.map((command) => command.name());
-    expect(subcommands).toEqual([
-      "list",
-      "create",
-      "update",
-      "get",
-      "rename",
-      "archive",
-      "run",
-    ]);
+    expect(subcommands).toEqual(["list", "create", "update", "get", "rename", "archive", "run"]);
     expect(
-      subcommands.filter((name) => name !== "run").flatMap((name) =>
-        testSuite!.commands
-          .find((command) => command.name() === name)!
-          .commands.map((child) => child.name()),
-      ),
+      subcommands
+        .filter((name) => name !== "run")
+        .flatMap((name) =>
+          testSuite!.commands
+            .find((command) => command.name() === name)!
+            .commands.map((child) => child.name()),
+        ),
     ).toEqual([]);
   });
 
@@ -96,9 +83,7 @@ describe("the run plan and test suite commands, given the CLI command tree", () 
     const testSuite = groupNamed("test-suite");
 
     expect(testSuite!.aliases()).toContain("suite");
-    expect(program.commands.map((command) => command.name())).not.toContain(
-      "suite",
-    );
+    expect(program.commands.map((command) => command.name())).not.toContain("suite");
   });
 
   /** @scenario "Every run plan request declares the command line as its surface" */

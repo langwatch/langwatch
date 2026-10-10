@@ -1,0 +1,382 @@
+import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
+import { ListTable } from "@langwatch/design-system/list-table";
+import { Menu } from "@langwatch/design-system/menu";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
+import { PageLayout } from "@langwatch/design-system/page-layout";
+import {
+  Badge,
+  Button,
+  Card,
+  HStack,
+  Spacer,
+  Table,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
+import { Switch } from "@langwatch/design-system/switch";
+import { Archive, MoreVertical, Pencil, Plus, Zap } from "lucide-react";
+import { useState } from "react";
+
+import { api, type RouterOutputs } from "../../../behavior/gateway-api.ts";
+import { useShowErrorToast } from "../../../behavior/gateway-feedback.ts";
+import { useOrganizationTeamProject } from "../../../behavior/gateway-session.ts";
+import { CacheRuleCreateDrawer } from "../../../features/cache-rules/ui/sections/cache-rule-create-drawer.tsx";
+import { CacheRuleEditDrawer } from "../../../features/cache-rules/ui/sections/cache-rule-edit-drawer.tsx";
+import { useGatewayHost } from "../../../model/gateway-host.ts";
+import { GatewayErrorPanel } from "../../../ui/elements/gateway-error-panel.tsx";
+import AiGatewayLayout from "../../../ui/sections/gateway-layout.tsx";
+import { ListSkeleton } from "../../elements/list-skeleton.tsx";
+
+type CacheRuleListRow = RouterOutputs["gatewayCacheRules"]["list"][number];
+
+function CacheRulesPage() {
+  const showErrorToast = useShowErrorToast();
+  const { organization } = useOrganizationTeamProject();
+  const host = useGatewayHost();
+  const canCreate = host.hasPermission("gatewayCacheRules:create");
+  const canUpdate = host.hasPermission("gatewayCacheRules:update");
+  const canDelete = host.hasPermission("gatewayCacheRules:delete");
+
+  const listQuery = api.gatewayCacheRules.list.useQuery(
+    { organizationId: organization?.id ?? "" },
+    { enabled: !!organization?.id },
+  );
+  const utils = api.useUtils();
+
+  const archiveMutation = api.gatewayCacheRules.archive.useMutation({
+    onSuccess: async () => {
+      if (organization?.id) {
+        await utils.gatewayCacheRules.list.invalidate({
+          organizationId: organization.id,
+        });
+      }
+    },
+  });
+
+  const toggleEnabledMutation = api.gatewayCacheRules.update.useMutation({
+    onSuccess: async () => {
+      if (organization?.id) {
+        await utils.gatewayCacheRules.list.invalidate({
+          organizationId: organization.id,
+        });
+      }
+    },
+  });
+
+  const [createOpen, setCreateOpen] = useState(false);
+  const [editing, setEditing] = useState<CacheRuleListRow | null>(null);
+  const [archiving, setArchiving] = useState<CacheRuleListRow | null>(null);
+
+  const confirmArchive = async () => {
+    if (!archiving || !organization) return;
+    try {
+      await archiveMutation.mutateAsync({
+        organizationId: organization.id,
+        id: archiving.id,
+      });
+      setArchiving(null);
+    } catch (error) {
+      showErrorToast({
+        error,
+        fallbackTitle: "Couldn't archive the cache rule",
+      });
+    }
+  };
+
+  const toggleEnabled = async (rule: CacheRuleListRow) => {
+    if (!organization) return;
+    try {
+      await toggleEnabledMutation.mutateAsync({
+        organizationId: organization.id,
+        id: rule.id,
+        enabled: !rule.enabled,
+      });
+    } catch (error) {
+      showErrorToast({
+        error,
+        fallbackTitle: "Couldn't toggle the cache rule",
+      });
+    }
+  };
+
+  const rows = listQuery.data ?? [];
+
+  const isLoadingRules = listQuery.isLoading;
+  const showRulesError = !isLoadingRules && listQuery.isError;
+  const showRulesEmpty = !isLoadingRules && !listQuery.isError && rows.length === 0;
+  const showRules = !isLoadingRules && !listQuery.isError && rows.length !== 0;
+
+  return (
+    <AiGatewayLayout>
+      <>
+        <PageLayout.Header>
+          <PageLayout.Heading>Cache Rules</PageLayout.Heading>
+          <Spacer />
+          {canCreate && !showRulesEmpty && (
+            <PageLayout.HeaderButton primary onClick={() => setCreateOpen(true)}>
+              <Plus size={14} /> New rule
+            </PageLayout.HeaderButton>
+          )}
+        </PageLayout.Header>
+
+        <PageLayout.Container>
+          <Text color="fg.muted" marginBottom={6}>
+            Decide when the gateway answers from its cache instead of calling the model. Rules are
+            checked from the lowest priority number up, and the first one that matches wins.
+          </Text>
+          {isLoadingRules && <ListSkeleton />}
+          {showRulesError && (
+            <GatewayErrorPanel
+              title="Failed to load cache rules"
+              error={listQuery.error}
+              onRetry={() => listQuery.refetch()}
+            />
+          )}
+          {showRulesEmpty && (
+            <CacheRulesEmptyState canCreate={canCreate} onCreate={() => setCreateOpen(true)} />
+          )}
+          {showRules && (
+            <CacheRulesTable
+              rows={rows}
+              canUpdate={canUpdate}
+              canDelete={canDelete}
+              onToggle={(rule) => void toggleEnabled(rule)}
+              onEdit={setEditing}
+              onArchive={setArchiving}
+            />
+          )}
+        </PageLayout.Container>
+      </>
+
+      <CacheRuleCreateDrawer
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        onCreated={() => {
+          void listQuery.refetch();
+        }}
+      />
+      <CacheRuleEditDrawer
+        rule={editing}
+        onOpenChange={(open) => {
+          if (!open) setEditing(null);
+        }}
+        onSaved={() => {
+          setEditing(null);
+          void listQuery.refetch();
+        }}
+      />
+      <ConfirmDialog
+        open={!!archiving}
+        onOpenChange={(open) => {
+          if (!open) setArchiving(null);
+        }}
+        title={`Archive ${archiving?.name ?? "rule"}?`}
+        message="The rule stops applying to new requests. Historical traces stay attributed to their rule id; the rule itself remains visible in the audit log."
+        confirmLabel="Archive"
+        tone="warning"
+        loading={archiveMutation.isPending}
+        onConfirm={confirmArchive}
+      />
+    </AiGatewayLayout>
+  );
+}
+
+function CacheRulesEmptyState({
+  canCreate,
+  onCreate,
+}: {
+  canCreate: boolean;
+  onCreate: () => void;
+}) {
+  return (
+    <NoDataInfoBlock
+      title="No cache rules yet"
+      description="Cache rules let operators force, disable, or override cache behaviour across virtual keys, models, principals, or custom request metadata: no client code changes required."
+      icon={<Zap size={32} />}
+    >
+      {canCreate && (
+        <PageLayout.HeaderButton primary onClick={onCreate} marginTop={4}>
+          <Plus size={14} /> New rule
+        </PageLayout.HeaderButton>
+      )}
+    </NoDataInfoBlock>
+  );
+}
+
+function CacheRulesTable({
+  rows,
+  canUpdate,
+  canDelete,
+  onToggle,
+  onEdit,
+  onArchive,
+}: {
+  rows: CacheRuleListRow[];
+  canUpdate: boolean;
+  canDelete: boolean;
+  onToggle: (rule: CacheRuleListRow) => void;
+  onEdit: (rule: CacheRuleListRow) => void;
+  onArchive: (rule: CacheRuleListRow) => void;
+}) {
+  return (
+    <Card.Root variant="showcase" width="full" overflow="hidden">
+      <Card.Body paddingY={0} paddingX={0}>
+        <ListTable
+          containerProps={{ overflowX: "auto", maxWidth: "full" }}
+          variant="line"
+          size="md"
+          width="full"
+        >
+          <Table.Header>
+            <Table.Row>
+              <Table.ColumnHeader width="60px">Priority</Table.ColumnHeader>
+              <Table.ColumnHeader>Name</Table.ColumnHeader>
+              <Table.ColumnHeader>Match</Table.ColumnHeader>
+              <Table.ColumnHeader>Action</Table.ColumnHeader>
+              <Table.ColumnHeader>Enabled</Table.ColumnHeader>
+              <Table.ColumnHeader></Table.ColumnHeader>
+            </Table.Row>
+          </Table.Header>
+          <Table.Body>
+            {rows.map((r) => (
+              <Table.Row key={r.id}>
+                <Table.Cell>
+                  <Badge colorPalette="gray">{r.priority}</Badge>
+                </Table.Cell>
+                <Table.Cell>
+                  <VStack align="start" gap={0}>
+                    <Text fontWeight="medium">{r.name}</Text>
+                    {r.description && (
+                      <Text fontSize="xs" color="fg.muted">
+                        {r.description}
+                      </Text>
+                    )}
+                  </VStack>
+                </Table.Cell>
+                <Table.Cell>
+                  <MatcherSummary matchers={r.matchers} />
+                </Table.Cell>
+                <Table.Cell>
+                  <ActionBadge action={r.action} modeEnum={r.modeEnum} />
+                </Table.Cell>
+                <Table.Cell>
+                  <Switch
+                    colorPalette="accent"
+                    checked={r.enabled}
+                    onCheckedChange={() => onToggle(r)}
+                    disabled={!canUpdate}
+                    size="sm"
+                  />
+                </Table.Cell>
+                <Table.Cell>
+                  {(canUpdate || canDelete) && (
+                    <Menu.Root>
+                      <Menu.Trigger asChild>
+                        <Button variant="ghost" size="xs" aria-label="Actions">
+                          <MoreVertical size={14} />
+                        </Button>
+                      </Menu.Trigger>
+                      <Menu.Content>
+                        {canUpdate && (
+                          <Menu.Item value="edit" onClick={() => onEdit(r)}>
+                            <Pencil size={14} /> Edit
+                          </Menu.Item>
+                        )}
+                        {canDelete && (
+                          <Menu.Item value="archive" onClick={() => onArchive(r)}>
+                            <Archive size={14} /> Archive
+                          </Menu.Item>
+                        )}
+                      </Menu.Content>
+                    </Menu.Root>
+                  )}
+                </Table.Cell>
+              </Table.Row>
+            ))}
+          </Table.Body>
+        </ListTable>
+      </Card.Body>
+    </Card.Root>
+  );
+}
+
+function MatcherSummary({ matchers }: { matchers: unknown }) {
+  if (!matchers || typeof matchers !== "object") {
+    return (
+      <Text fontSize="xs" color="fg.muted">
+        any request
+      </Text>
+    );
+  }
+  const m = matchers as Record<string, unknown>;
+  const parts: string[] = [];
+  if (typeof m.vk_id === "string") parts.push(`vk=${m.vk_id}`);
+  if (typeof m.vk_prefix === "string") parts.push(`vk~${m.vk_prefix}*`);
+  if (Array.isArray(m.vk_tags) && m.vk_tags.length > 0) {
+    parts.push(`tags:[${m.vk_tags.join(",")}]`);
+  }
+  if (typeof m.principal_id === "string") parts.push(`user=${m.principal_id}`);
+  if (typeof m.model === "string") parts.push(`model=${m.model}`);
+  if (
+    m.request_metadata &&
+    typeof m.request_metadata === "object" &&
+    !Array.isArray(m.request_metadata)
+  ) {
+    const keys = Object.keys(m.request_metadata as Record<string, unknown>);
+    if (keys.length > 0) {
+      parts.push(`meta:${keys.join(",")}`);
+    }
+  }
+  if (parts.length === 0) {
+    return (
+      <Text fontSize="xs" color="fg.muted">
+        any request
+      </Text>
+    );
+  }
+  return (
+    <HStack gap={1} flexWrap="wrap">
+      {parts.map((p) => (
+        <Badge key={p} colorPalette="gray" fontSize="2xs" variant="subtle">
+          {p}
+        </Badge>
+      ))}
+    </HStack>
+  );
+}
+
+function modeTone(modeEnum: "RESPECT" | "FORCE" | "DISABLE"): "orange" | "red" | "green" {
+  if (modeEnum === "FORCE") return "orange";
+  if (modeEnum === "DISABLE") return "red";
+  return "green";
+}
+
+function ActionBadge({
+  action,
+  modeEnum,
+}: {
+  action: unknown;
+  modeEnum: "RESPECT" | "FORCE" | "DISABLE";
+}) {
+  const a = (action ?? {}) as Record<string, unknown>;
+  const tone = modeTone(modeEnum);
+  return (
+    <HStack gap={1}>
+      <Badge colorPalette={tone} textTransform="capitalize">
+        {modeEnum.toLowerCase()}
+      </Badge>
+      {typeof a.ttl === "number" && (
+        <Text fontSize="xs" color="fg.muted">
+          ttl {a.ttl}s
+        </Text>
+      )}
+      {typeof a.salt === "string" && a.salt.length > 0 && (
+        <Text fontSize="xs" color="fg.muted">
+          salted
+        </Text>
+      )}
+    </HStack>
+  );
+}
+
+export default CacheRulesPage;

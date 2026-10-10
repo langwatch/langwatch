@@ -1,11 +1,6 @@
 /**
- * The export renderers, on their own.
- *
- * These are where an export goes quietly wrong: a JSON column written as a
- * string of JSON, a CSV cell holding an unescaped quote, a carriage return
- * splitting a row for one reader and not another. All three produce a file that
- * looks fine and parses wrong, so they are asserted rather than eyeballed.
- *
+ * The export renderers, where an export goes quietly wrong: a JSON column
+ * written as a string, an unescaped quote, a carriage return splitting a row.
  * @see specs/analytics/lwql-cli-query.feature
  */
 import { describe, expect, it } from "vitest";

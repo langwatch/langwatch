@@ -76,6 +76,18 @@ Feature: Runaway automations are contained without punishing the customer
       When their Redis Cluster slots are compared
       Then both keys carry the same hash tag
 
+    @unit
+    Scenario: An unreachable Redis degrades the ceiling to per-worker counting
+      Given the shared counter store cannot be reached
+      When confirmed dispatches consume slots
+      Then each is counted once per dispatch on this worker and the answer says degraded
+
+    @unit
+    Scenario: The automations list does not hide an unreachable counter store
+      Given the shared counter store cannot be reached
+      When the list reads today's counts
+      Then the read fails instead of showing no skipped matches
+
   Rule: The ceiling is a per-trigger daily allowance that follows the plan
 
     @unit

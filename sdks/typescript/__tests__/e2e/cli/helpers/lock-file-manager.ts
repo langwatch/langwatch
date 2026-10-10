@@ -6,14 +6,7 @@ export interface LockFile {
   [key: string]: any;
 }
 
-/**
- * Manages the prompts-lock.json lock file.
- *
- * Responsibilities:
- * - Read lock file
- * - Check lock file existence
- * - Provide access to prompt version information
- */
+/** Manages the prompts-lock.json lock file: reads it and exposes prompt versions. */
 export class LockFileManager {
   private readonly lockPath: string;
 

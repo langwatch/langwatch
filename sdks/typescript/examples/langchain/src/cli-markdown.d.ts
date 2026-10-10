@@ -1,5 +1,5 @@
-declare module 'cli-markdown' {
-  export interface CliMarkdownOptions {
+declare module "cli-markdown" {
+  interface CliMarkdownOptions {
     /**
      * Custom styles for different markdown elements
      */
@@ -92,7 +92,7 @@ declare module 'cli-markdown' {
       /**
        * Custom renderer for emphasis (bold/italic)
        */
-      emphasis?: (text: string, type: 'bold' | 'italic') => string;
+      emphasis?: (text: string, type: "bold" | "italic") => string;
     };
     /**
      * Maximum width for text wrapping

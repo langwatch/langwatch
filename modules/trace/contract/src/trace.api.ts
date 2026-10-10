@@ -1,0 +1,970 @@
+import type { Authorization, PrincipalRef } from "@langwatch/authorization";
+import type { InstantEvalRunReference } from "@langwatch/instant-eval-contract";
+import { moduleApi } from "@langwatch/module";
+
+import type { ConversationView } from "./conversation/conversation-steps.ts";
+import type {
+  TraceAttributedRecency,
+  TraceAttributedSpendComparison,
+  TraceAttributedSpendSort,
+  TraceAttributedTrace,
+  TraceAttributedTraceDetail,
+  TraceAttributedValueComparison,
+  TraceAttributedValueSpend,
+  TraceAttributeMatch,
+  TraceAttributeUsageBucket,
+  TraceAttributeValueSpend,
+  TraceDailyGroupSpend,
+  TraceDailySpend,
+  TraceDailySpendGroup,
+  TraceModelRequests,
+  TraceModelSpend,
+  TraceModelSpendWindow,
+  TraceProjectValueSpend,
+  TraceSpendSummary,
+} from "./features/analytics/trace-model-spend.ts";
+import type {
+  TraceTopicClusteringCounts,
+  TraceTopicClusteringPage,
+  TraceTopicClusteringPageInput,
+} from "./features/analytics/trace-topic-clustering-read.ts";
+import type {
+  ClassifyClaudeCallInput,
+  ClassifyClaudeCallResult,
+  CanonicalizeLogRecordInput,
+  CanonicalizeLogRecordResult,
+  CanonicalizeSpanAttributesInput,
+  CanonicalizeSpanAttributesResult,
+  DeriveClaudeResponseContentInput,
+  DeriveClaudeResponseContentResult,
+} from "./features/attribute/trace-canonicalisation.ts";
+import type {
+  TraceEditOverlayDto,
+  TraceEditOverlayPatch,
+} from "./features/edit-overlay/trace-edit-overlay.contract.ts";
+import type {
+  EvaluationTraceReadInput,
+  EvaluationTraceSpan,
+  EvaluationTraceEvent,
+} from "./features/evaluation/trace-evaluation.contract.ts";
+import type { ResolvedInstantEvalRun } from "./features/evaluation/trace-instant-eval-chips.ts";
+import type { ExportProgressEvent } from "./features/export/export-progress.trpc.ts";
+import type {
+  TraceExportDownload,
+  TraceExportDownloadInput,
+} from "./features/export/trace-export.vocabulary.ts";
+import type { TraceOtlpIngestApi } from "./features/ingest/otlp-ingest.rest.ts";
+import type {
+  AssignTopicCommandData,
+  RecordCapturedSpanInput,
+  RecordMetricCorrelationCommandData,
+  RecordSpanCommandData,
+} from "./features/ingest/trace-processing.commands.ts";
+import type { LogRecordReceivedEventData } from "./features/ingest/trace-processing.events.ts";
+import type { TraceSummaryData } from "./features/ingest/trace-projection.ts";
+import type {
+  DiscoverResult,
+  FacetValuesResult,
+  TraceListPage,
+} from "./features/list/trace-list-view.ts";
+import type { LangWatchQLTraceFilter } from "./features/query/trace-langwatch-ql-filter.ts";
+import type { TraceQueryEvaluationRun } from "./features/query/trace-query-evaluation.types.ts";
+import type {
+  TraceQueryClassification,
+  TraceQueryClassificationInput,
+  TraceQueryFieldCatalogueInput,
+} from "./features/query/trace-query.contract.ts";
+import type { LogTraceContribution } from "./features/span/trace-log-contribution.ts";
+import type {
+  SpanSummaryRow,
+  SpanResourceInfo,
+  TraceEventRollup,
+  TraceLogRecordDto,
+  ModelUsageStatsRow,
+  ModelSpanSampleRow,
+} from "./features/span/trace-span-read-model.ts";
+import type { Trace, Span, ElasticSearchEvent } from "./trace-format.schemas.ts";
+import type {
+  TraceFullReadInput,
+  TraceFullRecord,
+  TraceFullThreadReadInput,
+} from "./trace-full-read.contract.ts";
+import type { TraceDateField } from "./trace-legacy-read.types.ts";
+import type { CheckPreconditions } from "./trace-precondition.schemas.ts";
+import type {
+  TraceCost,
+  TraceLegacyListInput,
+  TraceSummaryListOptions,
+  TraceSummaryListQuery,
+  TraceSummaryPage,
+  TracesForProjectResult,
+} from "./trace-read.contract.ts";
+import type { TraceRecord } from "./trace-record.ts";
+import type {
+  TraceFacetsAnswer,
+  TraceFacetsQuery,
+  TraceMetadataUpdate,
+} from "./trace-rest.schemas.ts";
+import type { SharedTraceDto } from "./trace-share.schemas.ts";
+import type { SpanDetail, SpanLangwatchSignals } from "./trace-view.contract.ts";
+import type { Protections } from "./trace-viewer-protections.contract.ts";
+import type {
+  SpanTreeDeltaInput,
+  SpanTreeInput,
+  TraceIngestWaitInput,
+  TraceByIdInput,
+  TraceDerivedEventsInput,
+  TraceSummaryLookupInput,
+} from "./trace.queries.ts";
+import type {
+  DerivedTraceEvent,
+  TracesConversationContext,
+  TracesSessionsPage,
+} from "./trace.responses.ts";
+import type { NormalizedSpan } from "./trace.spans.ts";
+import type { SpanTreeNode, SpanTreePage } from "./trace.ts";
+import type { TraceSessionGroupsInput } from "./traces.trpc.ts";
+
+/** A reviewer correction target owned by Trace, shared structurally with Annotation. */
+export type TraceSuggestionTarget =
+  | Readonly<{ kind: "trace"; field: "input" | "output" }>
+  | Readonly<{ kind: "span"; spanId: string; field: "input" | "output" }>;
+
+/** The durable marker projected onto a trace when an annotation is added or removed. */
+export type TraceAnnotationMarker = Readonly<{
+  tenantId: string;
+  traceId: string;
+  annotationId: string;
+  occurredAt: number;
+}>;
+
+export type TraceAnnotationCommands = Readonly<{
+  add(input: TraceAnnotationMarker): Promise<void>;
+  remove(input: TraceAnnotationMarker): Promise<void>;
+}>;
+
+/** Which side of a captured call a messages rendering answers with. */
+export type TraceMessagesSide = "both" | "input" | "output";
+
+/** One named span's messages, and whether the trace holds that span at all. */
+export interface TraceRenderedSpanMessages {
+  readonly isSpanPresent: boolean;
+  readonly json: string | null;
+}
+
+/**
+ * What the install-wide usage report counts here (ADR-156, section 10): the
+ * traces and spans ingested, since `since` (epoch ms) where one is given.
+ * A span re-ingested before its parts merged counts twice, as written.
+ */
+export interface TraceUsageCount {
+  readonly traces: number;
+  readonly spans: number;
+}
+
+/** Public Trace operations shared by process peers after boot composition. */
+export interface TraceApi extends TraceOtlpIngestApi {
+  extractInlineMediaFromEvent(input: {
+    event: unknown;
+    projectId: string;
+    ownerKind: "scenario_run";
+    ownerId: string;
+    purpose: "scenario_event";
+  }): Promise<{ rewrittenEvent: unknown; refs: readonly { id: string }[] }>;
+  downloadTraceExport(input: TraceExportDownloadInput): Promise<TraceExportDownload>;
+  formatSpansDigest(input: { spans: Span[] }): Promise<string>;
+  /**
+   * The trace as the LLM-readable span digest, under a token budget. What a
+   * reader that is a model gets, where `formatSpansDigest` is unbounded.
+   */
+  renderReadableTrace(input: { trace: Trace; maxTokens: number }): Promise<string>;
+  /**
+   * A thread as one markdown transcript, traces already ordered and cut:
+   * `conversation` reads like the chat view, `steps` lists each turn's tool
+   * calls and results. Under `maxTokens` turns shorten before any drops.
+   */
+  renderThreadTranscript(input: {
+    threadKey: string;
+    traces: readonly Trace[];
+    view: ConversationView;
+    maxTokens?: number;
+  }): Promise<string>;
+  /**
+   * The trace's chat messages as JSON: `"both"` answers `{input, output}`, a
+   * one-sided ask answers a bare array. Null when the trace carries no
+   * readable conversation at all, which is a different answer from an empty one.
+   */
+  renderTraceMessages(input: { trace: Trace; side: TraceMessagesSide }): Promise<string | null>;
+  /** One named span's chat messages as JSON, and whether the trace holds it. */
+  renderSpanMessages(input: { trace: Trace; spanId: string }): Promise<TraceRenderedSpanMessages>;
+  /** The whole trace as one JSON object, spans included. */
+  renderTraceJson(input: { trace: Trace }): Promise<string>;
+  recordCapturedSpan(input: RecordCapturedSpanInput): Promise<void>;
+  /** Main's `traces.recordSpan`: one raw OTLP span through the ingress command. */
+  recordSpan(input: RecordSpanCommandData): Promise<void>;
+  /** Main's `getNormalizedSpansByTraceId`: a trace's stored spans, attributes unresolved. */
+  findNormalizedSpansByTraceId(input: {
+    authorization: Authorization;
+    traceId: string;
+    limit?: number;
+  }): Promise<NormalizedSpan[]>;
+  resolveIngestWaitTimeout(input: TraceIngestWaitInput): Promise<number>;
+  getEvaluationSpans(input: EvaluationTraceReadInput): Promise<EvaluationTraceSpan[]>;
+  getEvaluationEvents(input: EvaluationTraceReadInput): Promise<EvaluationTraceEvent[]>;
+  /** The canonical trace record, closed under payload-parity review. */
+  getById(input: TraceByIdInput): Promise<TraceRecord>;
+  getFullRecord(input: TraceFullReadInput): Promise<TraceFullRecord>;
+  getFullThread(input: TraceFullThreadReadInput): Promise<TraceFullRecord[]>;
+  deriveEvents(input: TraceDerivedEventsInput): Promise<DerivedTraceEvent[]>;
+  /** The query-language field catalogue an AI composer's prompt is grounded on. */
+  buildQueryFieldCatalogue(request: {
+    input: TraceQueryFieldCatalogueInput;
+    authorization: Authorization;
+  }): Promise<string>;
+  classifyQuery(input: TraceQueryClassificationInput): TraceQueryClassification;
+  /** A polling read: absent summaries and disabled projections both read as null. */
+  findSummary(input: TraceSummaryLookupInput): Promise<TraceSummaryData | null>;
+  listTraces(input: {
+    query: TraceLegacyListInput;
+    protections: unknown;
+    options?: {
+      dateField?: TraceDateField;
+      downloadMode?: boolean;
+      includeSpans?: boolean;
+      resolveBlobs?: boolean;
+      scrollId?: string | null;
+      /** The v1 REST search's compiled query-language filter, ANDed into the read. */
+      filterWhere?: { sql: string; params: Record<string, unknown> };
+      /** The proof `filterWhere`'s tenant markers expand into (ADR-177 block C). */
+      authorization?: Authorization;
+      /** Refuse above this plan bound instead of clamping to the list bound. */
+      refuseAbove?: "tracesPageSizeMax" | "tracesDownloadPageSizeMax";
+    };
+  }): Promise<TracesForProjectResult>;
+  /**
+   * The project's latest trace summaries on the `dateField` axis, paged by `scrollId`:
+   * no content, spans, evaluations or protections, for a system reader.
+   */
+  listTraceSummaries(input: {
+    query: TraceSummaryListQuery;
+    options?: TraceSummaryListOptions;
+  }): Promise<TraceSummaryPage>;
+  findTrace(input: {
+    projectId: string;
+    traceId: string;
+    protections: unknown;
+    withEditOverlay?: boolean;
+  }): Promise<Trace | undefined>;
+  /** `GET /api/traces/:traceId` for an API key: the trace, its evaluations and its address. */
+  getTraceByIdForApiKey(input: {
+    projectId: string;
+    traceId: string;
+    format: "digest" | "json";
+    projectSlug: string;
+    principal: PrincipalRef | null;
+  }): Promise<Record<string, unknown>>;
+  /** One trace through the viewer's protections; refuses with `TraceNotFoundError`. */
+  getTraceForViewer(input: {
+    projectId: string;
+    traceId: string;
+    withEditOverlay?: boolean;
+    viewerUserId: string;
+  }): Promise<Trace>;
+  /** A tenant's `trace_updated` or `discover_updated` pushes, until `signal` aborts. */
+  streamTenantUpdates(input: {
+    projectId: string;
+    eventName: "trace_updated" | "discover_updated";
+    signal?: AbortSignal;
+  }): AsyncIterable<unknown>;
+  /** One conversation's turns, oldest first, through the viewer's protections. */
+  readConversationContextForViewer(input: {
+    projectId: string;
+    conversationId: string;
+    viewerUserId: string;
+    authorization: Authorization;
+    tenantId?: string | undefined;
+  }): Promise<TracesConversationContext>;
+  /** One span's detail through the viewer's protections; refuses with `SpanNotFoundError`. */
+  readSpanDetailForViewer(input: {
+    projectId: string;
+    authorization: Authorization;
+    traceId: string;
+    spanId: string;
+    occurredAtMs?: number;
+    viewerUserId: string;
+  }): Promise<SpanDetail>;
+  /** `GET /api/traces/facets` for an API key: the discovery payload or one field's paged values. */
+  readTraceFacetsForApiKey(input: {
+    projectId: string;
+    query: TraceFacetsQuery;
+    principal: PrincipalRef | null;
+    authorization: Authorization;
+  }): Promise<TraceFacetsAnswer>;
+  /** The discover vocabulary, or the facet counts under `query` when one is given. */
+  readDiscoverForQuery(input: {
+    projectId: string;
+    timeRange: { from: number; to: number; live?: boolean };
+    query?: string | null;
+    evalRuns?: Readonly<Record<string, InstantEvalRunReference>>;
+    authorization: Authorization;
+  }): Promise<DiscoverResult>;
+  /** Renames a trace after trimming; a name out of bounds refuses with `ValidationError`. */
+  renameTrace(
+    input: { projectId: string; traceId: string; newName: string },
+    by: { id: string },
+  ): Promise<{ traceId: string; newName: string }>;
+  /** The Prompt Studio span through the viewer's protections; refuses with `SpanNotFoundError`. */
+  getPromptStudioSpan(input: {
+    projectId: string;
+    spanId: string;
+    viewerUserId: string;
+    trace?: {
+      authorization: Authorization;
+      traceId: string;
+      tenantId?: string;
+      occurredAtMs?: number;
+    };
+  }): Promise<unknown>;
+  /** The trace's edit overlay as the viewer may see it; `overlay` is null when none exists. */
+  readTraceEditOverlayForViewer(input: {
+    projectId: string;
+    authorization: Authorization;
+    traceId: string;
+    viewerUserId: string;
+  }): Promise<{ overlay: TraceEditOverlayDto | null }>;
+  /** Saves the viewer's patch, carrying over edits their protections withheld from them. */
+  saveTraceEditOverlayAsViewer(input: {
+    projectId: string;
+    traceId: string;
+    patch: TraceEditOverlayPatch;
+    viewerUserId: string;
+  }): Promise<TraceEditOverlayDto>;
+  readTracesWithSpans(input: {
+    projectId: string;
+    traceIds: string[];
+    protections: unknown;
+    occurredAt?: { from: number; to: number };
+    withEditOverlay?: boolean;
+  }): Promise<Trace[]>;
+  readTracesWithSpansPreview(input: {
+    projectId: string;
+    traceIds: string[];
+    protections: unknown;
+    withEditOverlay?: boolean;
+  }): Promise<Trace[]>;
+  readOrderedSpansForTrace(input: {
+    projectId: string;
+    traceId: string;
+    protections: unknown;
+  }): Promise<Span[]>;
+  readThreadTraces(input: {
+    projectId: string;
+    threadId: string;
+    protections: unknown;
+  }): Promise<Trace[]>;
+  /**
+   * Every trace of the named threads. `maxTraces` is the ceiling across all of
+   * them together: a caller asking for many threads at once sizes it by the
+   * threads, because a ceiling below what they hold drops the rest silently.
+   */
+  readThreadsTraces(input: {
+    projectId: string;
+    threadIds: string[];
+    protections: unknown;
+    withEditOverlay?: boolean;
+    maxTraces?: number;
+  }): Promise<Trace[]>;
+  readSampleTraces(input: {
+    query: TraceLegacyListInput;
+    protections: unknown;
+    pageSize: number;
+  }): Promise<Trace[]>;
+  /**
+   * Main's `traces.getSampleTraces`: up to `expectedResults` sampled traces a check would run on,
+   * topped up with ones it would not while fewer than ten pass.
+   */
+  readPreconditionSampleTraces(
+    input: TracePreconditionSampleInput,
+  ): Promise<(Trace & { passesPreconditions: boolean })[]>;
+  readForViewer(input: {
+    projectId: string;
+    userId: string;
+    traceIds: readonly string[];
+  }): Promise<Trace[]>;
+  /** The caller's read-time redactions for one project, resolved from who they are. */
+  resolveViewerProtections(input: {
+    projectId: string;
+    userId: string | null;
+    /** The read's proof; its projects' policies fold in, strictest wins (ADR-177 decision 9). */
+    authorization?: Authorization;
+  }): Promise<Protections>;
+  /**
+   * The same redactions for an API-KEY caller: the public branch of every
+   * content category, plus the credential's own `cost:view` grant. A legacy
+   * project key (`principal: null`) predates RBAC and sees costs.
+   */
+  resolveApiKeyProtections(input: {
+    projectId: string;
+    principal: PrincipalRef | null;
+  }): Promise<Protections>;
+  findExistingTraceIds(input: {
+    projectId: string;
+    traceIds: readonly string[];
+  }): Promise<string[]>;
+  /** Each named trace's latest summary cost inside `occurredAt` (epoch ms); unknown ids absent. */
+  findTraceCosts(input: {
+    projectId: string;
+    traceIds: readonly string[];
+    occurredAt: { from: number; to: number };
+  }): Promise<TraceCost[]>;
+  loadTraces(input: {
+    userId: string;
+    projectId: string;
+    traceIds: readonly string[];
+  }): Promise<readonly Trace[]>;
+  writeSuggestion(input: {
+    projectId: string;
+    traceId: string;
+    target: TraceSuggestionTarget;
+    text: string;
+    userId: string;
+  }): Promise<void>;
+  recordAnnotation(input: TraceAnnotationMarker): Promise<void>;
+  removeAnnotation(input: TraceAnnotationMarker): Promise<void>;
+  isCodingAgentShapedSpan(span: Span): boolean;
+  enrichSpansFromCodingAgentLogs(input: {
+    projectId: string;
+    traceId: string;
+    spans: Span[];
+    occurredAtMs?: number;
+  }): Promise<Span[]>;
+  enrichSpanFromCodingAgentLogs(input: {
+    span: Span;
+    modelCallRefs: unknown;
+    logRows: TraceLogRecordDto[];
+  }): Span;
+  mapCodingAgentSummaryRows(rows: SpanSummaryRow[]): unknown;
+  getLogsByTraceId(input: {
+    tenantId: string;
+    traceId: string;
+    occurredAtMs?: number;
+    limit?: number;
+  }): Promise<
+    readonly {
+      spanId: string;
+      timeUnixMs: number;
+      body: string;
+      attributes: Record<string, string>;
+      resourceAttributes: Record<string, string>;
+      scopeName: string;
+      scopeVersion: string | null;
+    }[]
+  >;
+  readSpanSummaries(input: {
+    authorization: Authorization;
+    traceId: string;
+    occurredAtMs?: number;
+  }): Promise<SpanSummaryRow[]>;
+  readSpans(input: {
+    authorization: Authorization;
+    traceId: string;
+    occurredAtMs?: number;
+    visibilityCutoffMs?: number | null;
+    limit?: number;
+  }): Promise<Span[]>;
+  readSpansPage(input: {
+    authorization: Authorization;
+    traceId: string;
+    limit: number;
+    offset: number;
+    occurredAtMs?: number;
+    visibilityCutoffMs?: number | null;
+  }): Promise<{ spans: Span[]; total: number }>;
+  readSpansSince(input: {
+    authorization: Authorization;
+    traceId: string;
+    sinceStartTimeMs: number;
+    occurredAtMs?: number;
+    visibilityCutoffMs?: number | null;
+  }): Promise<Span[]>;
+  findSpan(input: {
+    authorization: Authorization;
+    traceId: string;
+    spanId: string;
+    occurredAtMs?: number;
+    visibilityCutoffMs?: number | null;
+  }): Promise<Span | null>;
+  readSpanEvents(input: {
+    authorization: Authorization;
+    traceId: string;
+    spanId: string;
+    occurredAtMs?: number;
+  }): Promise<ElasticSearchEvent[]>;
+  readLangwatchSignals(input: {
+    authorization: Authorization;
+    traceId: string;
+    occurredAtMs?: number;
+  }): Promise<{ spanId: string; signals: SpanLangwatchSignals["signals"] }[]>;
+  readSpanResources(input: {
+    authorization: Authorization;
+    traceId: string;
+    occurredAtMs?: number;
+  }): Promise<SpanResourceInfo[]>;
+  readTraceEvents(input: {
+    authorization: Authorization;
+    traceId: string;
+    occurredAtMs?: number;
+  }): Promise<DerivedTraceEvent[]>;
+  readTraceEventRollups(input: {
+    authorization: Authorization;
+    traceIds: string[];
+    timeRange: { from: number; to: number };
+  }): Promise<Record<string, TraceEventRollup>>;
+  readSpanTreePage(input: SpanTreeInput & { authorization: Authorization }): Promise<SpanTreePage>;
+  readSpanTreeDelta(
+    input: SpanTreeDeltaInput & { authorization: Authorization },
+  ): Promise<SpanTreeNode[]>;
+  readModelUsageStats(input: {
+    authorization: Authorization;
+    fromMs: number;
+    limit: number;
+  }): Promise<ModelUsageStatsRow[]>;
+  /** The project's most-spent models in the window, most spent first, at most `limit`. */
+  findModelSpend(input: {
+    projectId: string;
+    window: TraceModelSpendWindow;
+    limit: number;
+  }): Promise<TraceModelSpend[]>;
+  /** The project's deduped spend and token totals in the window. */
+  getSpendSummary(input: {
+    projectId: string;
+    window: TraceModelSpendWindow;
+  }): Promise<TraceSpendSummary>;
+  /** The project's most-used models by trace count in the window, most first, at most `limit`. */
+  findTopModelsByRequests(input: {
+    projectId: string;
+    window: TraceModelSpendWindow;
+    limit: number;
+  }): Promise<TraceModelRequests[]>;
+  /** The project's spend per UTC day in the window, oldest first. */
+  findDailySpend(input: {
+    projectId: string;
+    window: TraceModelSpendWindow;
+  }): Promise<TraceDailySpend[]>;
+  /** Per attribute value in `values`, the project's deduped spend and trace count in the window. */
+  findSpendByAttributeValue(input: {
+    projectId: string;
+    attributeKey: string;
+    values: string[];
+    window: TraceModelSpendWindow;
+  }): Promise<TraceAttributeValueSpend[]>;
+  /** The project's traces carrying the attribute (or one of `values`), per value, model and day. */
+  findAttributeUsageBuckets(input: {
+    projectId: string;
+    attributeKey: string;
+    window: TraceModelSpendWindow;
+    values?: string[];
+  }): Promise<TraceAttributeUsageBucket[]>;
+  /** The project's newest traces carrying the attribute, at most `limit`; `model` is the first. */
+  findAttributedTraces(input: {
+    projectId: string;
+    attributeKey: string;
+    window: TraceModelSpendWindow;
+    values?: string[];
+    model?: string;
+    limit: number;
+  }): Promise<TraceAttributedTrace[]>;
+  /** Current and previous window spend of the traces matching every attribute; distinct actors. */
+  getAttributedSpendComparison(input: {
+    projectId: string;
+    matches: readonly TraceAttributeMatch[];
+    actorKey: string;
+    previousStartMs: number;
+    currentStartMs: number;
+    endMs: number;
+  }): Promise<TraceAttributedSpendComparison>;
+  /** Spend per non-empty `valueKey` value of the matching traces, sorted and paged in the store. */
+  findAttributedSpendByValue(input: {
+    projectId: string;
+    matches: readonly TraceAttributeMatch[];
+    valueKey: string;
+    window: TraceModelSpendWindow;
+    sortBy: TraceAttributedSpendSort;
+    sortDirection: "asc" | "desc";
+    limit: number;
+    offset: number;
+  }): Promise<TraceAttributedValueSpend[]>;
+  /** Per non-empty `valueKey` value, spend split at `currentStartMs`; unsorted. */
+  findAttributedSpendComparisonByValue(input: {
+    projectId: string;
+    matches: readonly TraceAttributeMatch[];
+    valueKey: string;
+    previousStartMs: number;
+    currentStartMs: number;
+    endMs: number;
+  }): Promise<TraceAttributedValueComparison[]>;
+  /** Spend per (project, `valueKey` value) across one organisation's projects; unsorted. */
+  findSpendByProjectAndValue(input: {
+    projectIds: readonly string[];
+    valueKey: string;
+    window: TraceModelSpendWindow;
+  }): Promise<TraceProjectValueSpend[]>;
+  /** Spend of the matching traces per UTC day and group value, oldest day first. */
+  findDailyAttributedSpend(input: {
+    projectId: string;
+    matches: readonly TraceAttributeMatch[];
+    groupBy: TraceDailySpendGroup;
+    window: TraceModelSpendWindow;
+  }): Promise<TraceDailyGroupSpend[]>;
+  /** Matching traces since `sinceMs`, counted per `valueKey` value among `values`. */
+  countAttributedTracesByValue(input: {
+    projectId: string;
+    matches: readonly TraceAttributeMatch[];
+    valueKey: string;
+    values: readonly string[];
+    sinceMs: number;
+  }): Promise<{ value: string; count: number }[]>;
+  /** The newest matching traces before `beforeMs`, at most `limit`, with the asked attributes. */
+  findAttributedTracesBefore(input: {
+    projectId: string;
+    matches: readonly TraceAttributeMatch[];
+    attributeKeys: readonly string[];
+    beforeMs: number;
+    limit: number;
+  }): Promise<TraceAttributedTraceDetail[]>;
+  /** Matching trace counts since each of `countSinceMs`, and their newest occurrence ever. */
+  getAttributedTraceRecency(input: {
+    projectId: string;
+    matches: readonly TraceAttributeMatch[];
+    countSinceMs: readonly number[];
+  }): Promise<TraceAttributedRecency>;
+  readRecentSpansByModels(input: {
+    authorization: Authorization;
+    models: string[];
+    fromMs: number;
+    perModelLimit: number;
+    limit: number;
+  }): Promise<ModelSpanSampleRow[]>;
+  /** With a proof, one trace's evaluations from its member, for the viewer (ADR-177 block F). */
+  readEvaluations(
+    input:
+      | { projectId: string; traceIds: string[]; protections: unknown }
+      | {
+          projectId: string;
+          traceId: string;
+          tenantId?: string | undefined;
+          authorization: Authorization;
+          viewerUserId: string;
+        },
+  ): Promise<Record<string, unknown[]>>;
+  readTopicCounts(input: TraceLegacyListInput): Promise<unknown>;
+  readCustomersAndLabels(input: TraceLegacyListInput): Promise<unknown>;
+  /**
+   * The trace query language's free-text filter, compiled to a parameterized
+   * ClickHouse WHERE fragment. Null for an empty query; throws `FilterParseError`
+   * on invalid syntax.
+   */
+  translateTraceFilter(input: {
+    query: string;
+    tenantId: string;
+    timeRange: { from: number; to: number };
+    /** The Instant Eval runs registered for the query's `eval` chips. */
+    evalRuns?: readonly ResolvedInstantEvalRun[];
+  }): { sql: string; params: Record<string, unknown> } | null;
+  /**
+   * A legacy `filters` document compiled to parameterized ClickHouse conditions
+   * over `trace_summaries ts`. Trace owns the grammar because it owns the tables.
+   */
+  translateLegacyFilters(input: {
+    filters: Readonly<Record<string, unknown>>;
+    window?: { startDate?: number; endDate?: number };
+  }): { conditions: string[]; params: Record<string, unknown>; hasUnsupportedFilters: boolean };
+  /**
+   * The Explorer's own filter: the query compiled, hidden origins left out
+   * unless the query (or `originNamed`) names one; `dateField` refuses a
+   * span/event clause on the `updated` axis.
+   */
+  compileExplorerTraceFilter(input: {
+    query: string;
+    tenantId: string;
+    timeRange: { from: number; to: number };
+    evalRuns?: readonly ResolvedInstantEvalRun[];
+    originNamed?: boolean;
+    dateField?: TraceDateField;
+  }): { sql: string; params: Record<string, unknown> };
+  /**
+   * The filter compiled against the LangWatchQL trace view, for a statement a
+   * caller runs; throws `FilterParseError` on syntax the language cannot read.
+   */
+  compileLangWatchQLTraceFilter(input: { filter: string }): LangWatchQLTraceFilter;
+  /**
+   * The trace ids a filter selects, newest first and capped: the predicate the
+   * Explorer's table shows. What an Instant Eval run started from the Explorer
+   * judges when its own dialect cannot compile the filter.
+   */
+  findTraceIdsForFilter(input: {
+    projectId: string;
+    authorization: Authorization;
+    filter: string;
+    window: { from: number; to: number };
+    limit: number;
+  }): Promise<readonly string[]>;
+  /** The query's positive bare-word terms, for a content (log-body) search. */
+  extractTraceFreeTextTerms(query: string): string[];
+  readFieldNames(input: {
+    projectId: string;
+    startDate: number;
+    endDate: number;
+  }): Promise<unknown>;
+  findPromptStudioSpan(input: {
+    projectId: string;
+    spanId: string;
+    protections: unknown;
+  }): Promise<unknown>;
+  readTraceList(params: {
+    authorization: Authorization;
+    timeRange: { from: number; to: number };
+    sort: { columnId: string; direction: "asc" | "desc" };
+    page?: number;
+    pageSize: number;
+    cursor?: { sortValue: number; traceId: string };
+    filterWhere?: { sql: string; params: Record<string, unknown> };
+    visibilityCutoffMs?: number | null;
+  }): Promise<TraceListPage>;
+  /**
+   * One page of the Sessions lens through the viewer's protections: content redacted and spend
+   * gated, with `codingAgent` left null for coding-agent, which serves the lens, to fill and gate.
+   */
+  readSessionGroups(
+    input: TraceSessionGroupsInput & { protections: Protections; authorization: Authorization },
+  ): Promise<TracesSessionsPage>;
+  /**
+   * The sidebar's facets under the active query: descriptors counted in the
+   * window the list reads, each facet exempt from its own terms (ADR-139).
+   */
+  readFilteredFacets(input: {
+    projectId: string;
+    timeRange: { from: number; to: number; live?: boolean };
+    query: string;
+    evalRuns?: readonly ResolvedInstantEvalRun[];
+    authorization: Authorization;
+  }): Promise<unknown>;
+  readNewCount(params: unknown): Promise<number>;
+  readSuggestions(params: unknown): Promise<string[]>;
+  readDiscover(params: {
+    authorization: Authorization;
+    timeRange: { from: number; to: number; live?: boolean };
+  }): Promise<DiscoverResult>;
+  readFacetValues(params: {
+    authorization: Authorization;
+    timeRange: { from: number; to: number };
+    facetKey: string;
+    prefix?: string;
+    limit: number;
+    offset: number;
+  }): Promise<FacetValuesResult>;
+  /** The proof narrowed to the member holding the trace; an unreadable member is not found. */
+  authorizationForTrace(input: {
+    authorization: Authorization;
+    traceId: string;
+    tenantId?: string | undefined;
+  }): Promise<Authorization>;
+  readTraceSummary(input: {
+    authorization: Authorization;
+    traceId: string;
+    /** The member the header named; narrows an aggregate's proof (ADR-177 block F). */
+    tenantId?: string | undefined;
+    occurredAtMs?: number;
+    visibilityCutoffMs?: number | null;
+    full?: boolean;
+  }): Promise<unknown>;
+  isTraceWindowRedacted(input: {
+    authorization: Authorization;
+    traceId: string;
+    visibilityCutoffMs: number | null | undefined;
+  }): Promise<boolean>;
+  readTraceLogRecords(input: {
+    projectId: string;
+    traceId: string;
+    occurredAtMs?: number;
+    limit?: number;
+  }): Promise<TraceLogRecordDto[]>;
+  changeTraceName(
+    input: { projectId: string; traceId: string; newName: string; occurredAt?: number },
+    by: { id: string },
+  ): Promise<unknown>;
+  findTraceEditOverlay(input: {
+    projectId: string;
+    traceId: string;
+  }): Promise<TraceEditOverlayDto | null>;
+  saveTraceEditOverlay(
+    input: { projectId: string; traceId: string; patch: TraceEditOverlayPatch },
+    by: { id: string },
+  ): Promise<TraceEditOverlayDto>;
+  deleteTraceEditOverlay(input: { projectId: string; traceId: string }): Promise<void>;
+  /** With a proof, the trace member's runs, content gated for the viewer (ADR-177 block F). */
+  readEvaluationRuns(
+    input:
+      | { tenantId: string; traceId: string }
+      | {
+          projectId: string;
+          traceId: string;
+          tenantId?: string | undefined;
+          authorization: Authorization;
+          viewerUserId: string;
+        },
+  ): Promise<unknown>;
+  /** The transcript through the viewer's own protections; `codingAgents.transcript` reads it. */
+  readCodingAgentTranscript(input: {
+    projectId: string;
+    traceId: string;
+    occurredAtMs?: number | undefined;
+    viewerUserId: string;
+    authorization?: Authorization;
+  }): Promise<unknown>;
+  /**
+   * Main's `GET /api/traces/:traceId/transcript`: the key's protections, the trace by id or
+   * prefix, then its transcript.
+   */
+  readTraceTranscript(input: {
+    projectId: string;
+    traceId: string;
+    principal: PrincipalRef | null;
+  }): Promise<unknown>;
+  /**
+   * Main's `PATCH /api/traces/:traceId/metadata`: one synthetic span carrying the metadata,
+   * recorded through the collector's ingress command. Refuses by name where no recorder is.
+   */
+  updateTraceMetadata(input: {
+    projectId: string;
+    traceId: string;
+    metadata: TraceMetadataUpdate;
+  }): Promise<void>;
+  /** One export's progress frames from the tenant broadcast, ending at `done` or `error`. */
+  streamExportProgress(input: {
+    projectId: string;
+    exportId: string;
+    signal?: AbortSignal | undefined;
+  }): AsyncGenerator<ExportProgressEvent>;
+  resolveShareForViewer(input: {
+    token: string;
+    viewer: unknown;
+    viewerKey?: string;
+  }): Promise<unknown>;
+  readCachedSharePayload(input: { token: string; protections: unknown }): Promise<unknown>;
+  writeCachedSharePayload(input: {
+    token: string;
+    protections: unknown;
+    payload: unknown;
+  }): Promise<void>;
+  findProject(projectId: string): Promise<unknown>;
+  /**
+   * The anonymous share page's whole payload for one token (port of main's
+   * `sharedTrace.get`, ADR-057). `viewerUserId` is the signed-in caller, if any.
+   */
+  getSharedTrace(input: {
+    token: string;
+    viewerUserId: string | null;
+    clientIp: string | null;
+    userAgent: string | null;
+  }): Promise<SharedTraceDto>;
+
+  /**
+   * The runs a query's `eval` chips claim, checked against the project and
+   * dated for the compiler. A claim the project does not own is dropped, so
+   * the chip behind it stays pending and selects no rows.
+   */
+  findExplorerEvalRuns(input: {
+    projectId: string;
+    evalRuns?: Readonly<Record<string, InstantEvalRunReference>>;
+  }): Promise<readonly ResolvedInstantEvalRun[]>;
+
+  /** The platform's own address for one trace resource, built from the
+   * project's slug and the path the caller already resolved. */
+  platformUrl(input: { projectSlug: string; path: string }): string;
+  /** The usage report's figures (ADR-156, section 10). */
+  countUsage(input: { projectIds: readonly string[]; since?: number }): Promise<TraceUsageCount>;
+  classifyClaudeCall(input: ClassifyClaudeCallInput): ClassifyClaudeCallResult;
+  deriveClaudeResponseContent(
+    input: DeriveClaudeResponseContentInput,
+  ): DeriveClaudeResponseContentResult;
+  /** Lifts a log record's attributes into Trace's canonical names. */
+  canonicalizeLogRecord(input: CanonicalizeLogRecordInput): CanonicalizeLogRecordResult;
+  /** Lifts a decoded span's attributes and events into Trace's canonical names, as ingest does. */
+  canonicalizeSpanAttributes(
+    input: CanonicalizeSpanAttributesInput,
+  ): CanonicalizeSpanAttributesResult;
+  /** A log record's input and output, each cut to Trace's 64 KiB projection preview. */
+  extractLogRecordIO(input: LogRecordReceivedEventData): {
+    input: string | null;
+    output: string | null;
+    truncated: boolean;
+  };
+  /** Sends trace_processing's recordLogContribution batch; refuses where none is registered. */
+  recordLogContributions(input: readonly LogTraceContribution[]): Promise<void>;
+  /** Sends trace_processing's recordMetricCorrelation batch; refuses where none is registered. */
+  recordMetricCorrelations(input: readonly RecordMetricCorrelationCommandData[]): Promise<void>;
+  /** Sends trace_processing's assignTopic command; refuses where this process registered none. */
+  assignTopic(input: AssignTopicCommandData): Promise<void>;
+  deriveScenarioRoleMetrics(input: ScenarioRoleMetricsInput): Promise<ScenarioRoleMetrics>;
+  /** A saved query against one folded trace, in memory; fails closed on anything it cannot read. */
+  matchesFilterQuery(input: {
+    query: string;
+    foldState: TraceSummaryData;
+    evaluations: TraceQueryEvaluationRun[] | null;
+    events: DerivedTraceEvent[] | null;
+  }): boolean;
+  /** A trigger's legacy trace filters against one folded trace; evaluation fields fail closed. */
+  matchesTraceFilters(input: {
+    filters: Readonly<Record<string, unknown>>;
+    foldState: TraceSummaryData;
+    events: DerivedTraceEvent[] | null;
+  }): boolean;
+  readTopicClusteringCounts(input: { projectId: string }): Promise<TraceTopicClusteringCounts>;
+  readTopicClusteringPage(input: TraceTopicClusteringPageInput): Promise<TraceTopicClusteringPage>;
+  /** This UTC billing month's distinct traces per project; refuses a foreign project. */
+  countTracesByProjects(input: {
+    organizationId: string;
+    projectIds: string[];
+  }): Promise<{ projectId: string; count: number }[]>;
+  /** The project's distinct traces over the last 24 hours. */
+  countTracesInLastDay(input: { projectId: string }): Promise<number>;
+  /** Whether any trace carrying `attribute` landed for the project at or after `sinceMs`. */
+  hasTraceWithAttribute(input: {
+    projectId: string;
+    sinceMs: number;
+    attribute: TraceAttributeMatch;
+  }): Promise<boolean>;
+  /** Rows carrying `attribute` since `sinceMs`, counted per `groupByKey` value, most first. */
+  findTraceCountsByAttribute(input: {
+    projectId: string;
+    sinceMs: number;
+    attribute: TraceAttributeMatch;
+    groupByKey: string;
+  }): Promise<{ value: string; count: number }[]>;
+}
+
+export type TracePreconditionSampleInput = {
+  query: TraceLegacyListInput;
+  viewerUserId: string;
+  evaluatorType: string;
+  preconditions: CheckPreconditions;
+  expectedResults: number;
+};
+
+export const TraceApi = moduleApi<TraceApi>()("trace");
+
+/** One trace's per-role cost and latency, derived from its stored spans. */
+export interface ScenarioRoleMetrics {
+  scenarioRoleCosts: Record<string, number>;
+  scenarioRoleLatencies: Record<string, number>;
+}
+
+export interface ScenarioRoleMetricsInput {
+  tenantId: string;
+  traceId: string;
+  /** The trace's earliest span time: a partition hint, never a freshness cutoff. */
+  occurredAtMs?: number;
+  /** The fold's span count. A derivation is reused only within one fold version. */
+  foldVersion?: number;
+}

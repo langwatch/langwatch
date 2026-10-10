@@ -5,9 +5,7 @@ keywords: langwatch, agent testing, red teaming, adversarial testing, agent secu
 description: RedTeamAgent replaces the user simulator with a multi-turn attacker, in the same scenario.run() loop and the same judge as your functional tests.
 ---
 
-<Warning>
-  Use red teaming only on agents you own or have explicit permission to test.
-</Warning>
+<Warning>Use red teaming only on agents you own or have explicit permission to test.</Warning>
 
 ## How an attack runs
 
@@ -21,7 +19,8 @@ Single-turn red-teaming tools fire thousands of prompts and score each in isolat
 
 <CardGroup cols={2}>
   <Card title="Crescendo escalation" icon="arrow-trend-up">
-    A planner tailors an attack to your target, then escalates across phases instead of firing blind.
+    A planner tailors an attack to your target, then escalates across phases instead of firing
+    blind.
   </Card>
   <Card title="Per-turn scoring" icon="gauge">
     Each response is scored 0 to 10 and the next turn adapts, pushing harder or switching technique.
@@ -36,12 +35,12 @@ Single-turn red-teaming tools fire thousands of prompts and score each in isolat
 
 ## How Crescendo escalates
 
-| Phase | Turns | Approach |
-| --- | --- | --- |
-| **Warmup** | 0 to 20% | Rapport-building. Maps capabilities without revealing intent. |
-| **Probing** | 20 to 45% | Hypothetical framing, "what if" scenarios, academic curiosity. |
-| **Escalation** | 45 to 75% | Authority claims, roleplay, urgency, social engineering. |
-| **Direct** | 75 to 100% | Encoding tricks (Base64, ROT13), prompt injection, multi-vector. |
+| Phase          | Turns      | Approach                                                         |
+| -------------- | ---------- | ---------------------------------------------------------------- |
+| **Warmup**     | 0 to 20%   | Rapport-building. Maps capabilities without revealing intent.    |
+| **Probing**    | 20 to 45%  | Hypothetical framing, "what if" scenarios, academic curiosity.   |
+| **Escalation** | 45 to 75%  | Authority claims, roleplay, urgency, social engineering.         |
+| **Direct**     | 75 to 100% | Encoding tricks (Base64, ROT13), prompt injection, multi-vector. |
 
 For a hardened agent, [GOAT](https://langwatch.ai/scenario/advanced/red-teaming/goat) is a drop-in alternative that picks a technique per turn instead of following fixed phases (based on Meta's [GOAT paper](https://arxiv.org/abs/2410.01606), ICML 2025).
 
@@ -124,6 +123,7 @@ If you have not used Scenario, start with [Getting Started](/agent-testing/scena
         ```
       </Tab>
     </Tabs>
+
   </Step>
   <Step title="Run it">
     Run it alongside your test suite. Use 50 turns for thorough coverage. Agents that hold early often break under sustained pressure. With `LANGWATCH_API_KEY` set, every adversarial turn appears under **Agent Testing > Results**, and `scenario redteam-report` opens the findings dashboard with severity and prioritized fixes.
@@ -133,16 +133,32 @@ If you have not used Scenario, start with [Getting Started](/agent-testing/scena
 ## Full documentation
 
 <CardGroup cols={2}>
-  <Card title="Red teaming quick start" icon="rocket" href="https://langwatch.ai/scenario/advanced/red-teaming/quick-start">
+  <Card
+    title="Red teaming quick start"
+    icon="rocket"
+    href="https://langwatch.ai/scenario/advanced/red-teaming/quick-start"
+  >
     Try it against your agent without writing code.
   </Card>
-  <Card title="Full reference" icon="book" href="https://langwatch.ai/scenario/advanced/red-teaming">
+  <Card
+    title="Full reference"
+    icon="book"
+    href="https://langwatch.ai/scenario/advanced/red-teaming"
+  >
     Every parameter, check function, and CI pattern.
   </Card>
-  <Card title="GOAT strategy" icon="chess-knight" href="https://langwatch.ai/scenario/advanced/red-teaming/goat">
+  <Card
+    title="GOAT strategy"
+    icon="chess-knight"
+    href="https://langwatch.ai/scenario/advanced/red-teaming/goat"
+  >
     Per-turn dynamic technique selection for hardened agents.
   </Card>
-  <Card title="Reports dashboard" icon="chart-column" href="https://langwatch.ai/scenario/advanced/red-teaming/report">
+  <Card
+    title="Reports dashboard"
+    icon="chart-column"
+    href="https://langwatch.ai/scenario/advanced/red-teaming/report"
+  >
     Analyze findings, severity, and prioritized fixes.
   </Card>
 </CardGroup>

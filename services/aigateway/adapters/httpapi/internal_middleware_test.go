@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"bytes"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
@@ -14,6 +15,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/langwatch/langwatch/pkg/config"
 )
 
 const testSecret = "test-secret-do-not-use-in-prod"
@@ -99,6 +102,18 @@ func TestInternalAuthMiddleware_EmptySecretFailsClosed(t *testing.T) {
 	// Empty server-side secret returns ErrInternal (mapped to 500),
 	// distinct from the 401 paths above.
 	assert.NotEqual(t, http.StatusOK, rec.Code, "must reject when server secret is empty")
+}
+
+func TestInternalAuthMiddleware_RefusesAnOversizedBody(t *testing.T) {
+	t.Parallel()
+	wrapped := InternalAuthMiddleware(testSecret)(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		t.Fatal("handler must not run for a body over the ceiling")
+	}))
+	body := bytes.Repeat([]byte("a"), int(config.DefaultMaxRequestBodyBytes)+1)
+
+	rec := executeSigned(t, wrapped, http.MethodPost, "/internal/transform", body, signWith{secret: testSecret})
+
+	assert.Equal(t, http.StatusRequestEntityTooLarge, rec.Code)
 }
 
 // ── helpers ─────────────────────────────────────────────────────────

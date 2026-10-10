@@ -1,0 +1,1038 @@
+# Gateway flows (builder C): virtual keys, budgets, routing policies, guardrails,
+# webhooks, usage and the spend reads. Steps click and fill by data-testid; text only
+# asserts. A `setup:` prerequisite is posted through the public API and captured, and
+# its names come from the setup's own {uid}, so a flow reaches it through a capture.
+# A call made WITH a virtual key is a setup step carrying `bearer:` (setup.go): it posts
+# to the stack's gateway origin and llmsim answers. Not scriptable here: a budget
+# crossing its limit (needs spend on the ledger).
+flows:
+  - id: gateway-virtual-key-create-reveal-revoke
+    title: Create a virtual key, reveal its secret once, revoke it and see the API read it back revoked
+    steps:
+      - action: go
+        with:
+          path: /gateway/virtual-keys
+      - action: click
+        with:
+          text: New virtual key
+      - action: fill
+        with:
+          field: e.g. codex-prod
+          value: vk-{uid}
+      - action: click
+        with:
+          text: /^\s*Create\s*$/
+      - action: click
+        with:
+          label: Reveal secret
+      - action: capture
+        with:
+          selector: '[role="alertdialog"] code'
+          as: vkSecret
+      - action: click
+        with:
+          selector: "#vk-secret-confirm"
+      - action: click
+        with:
+          text: /^\s*Close\s*$/
+      - action: expect
+        with:
+          text: "{vkSecret}"
+          equals: "0"
+      - action: expect
+        with:
+          api: /api/gateway/v1/virtual-keys
+          contains: vk-{uid}
+      - action: go
+        with:
+          path: /gateway/virtual-keys
+      - action: click
+        with:
+          selector: 'tr:has-text("vk-{uid}") button[aria-label^="Actions"]'
+      - action: click
+        with:
+          selector: '[role="menuitem"]'
+          hasText: /^\s*Revoke\s*$/
+      - action: click
+        with:
+          text: Revoke key
+      - action: expect
+        with:
+          api: /api/gateway/v1/virtual-keys
+          contains: '"status":"revoked"'
+
+  - id: gateway-virtual-key-revoke-reads-back
+    title: Revoke a virtual key from its row and read the revoked status back from the API
+    isolated: true
+    setup:
+      - post: /api/gateway/v1/virtual-keys
+        body:
+          name: vd-vk-revoke-{uid}
+        as:
+          vkId: virtual_key.id
+          vkName: virtual_key.name
+    steps:
+      - action: expect
+        with:
+          api: /api/gateway/v1/virtual-keys/{vkId}
+          field: virtual_key.status
+          equals: active
+      - action: go
+        with:
+          path: /gateway/virtual-keys
+      - action: click
+        with:
+          selector: 'tr:has-text("{vkName}") button[aria-label^="Actions"]'
+      - action: click
+        with:
+          selector: '[role="menuitem"]'
+          hasText: /^\s*Revoke\s*$/
+      - action: click
+        with:
+          text: Revoke key
+      - action: expect
+        with:
+          api: /api/gateway/v1/virtual-keys/{vkId}
+          field: virtual_key.status
+          equals: revoked
+      - action: expect
+        with:
+          api: /api/gateway/v1/virtual-keys/{vkId}
+          field: virtual_key.revoked_at
+          min: "1"
+
+  - id: gateway-virtual-key-rotate-reveals-new-secret
+    title: Rotate a virtual key, reveal the new secret once and see the API hold its prefix
+    isolated: true
+    setup:
+      - post: /api/gateway/v1/virtual-keys
+        body:
+          name: vd-vk-rotate-{uid}
+        as:
+          vkId: virtual_key.id
+          vkName: virtual_key.name
+          oldSecret: secret
+    steps:
+      - action: go
+        with:
+          path: /gateway/virtual-keys
+      - action: click
+        with:
+          selector: 'tr:has-text("{vkName}") button[aria-label^="Actions"]'
+      - action: click
+        with:
+          selector: '[role="menuitem"]'
+          hasText: Rotate secret
+      - action: click
+        with:
+          text: Rotate secret
+      - action: click
+        with:
+          label: Reveal secret
+      - action: capture
+        with:
+          selector: '[role="alertdialog"] code'
+          match: "^(.{13})"
+          as: newPrefix
+      - action: expect
+        with:
+          api: /api/gateway/v1/virtual-keys/{vkId}
+          field: virtual_key.display_prefix
+          equals: "{newPrefix}"
+      - action: expect
+        with:
+          api: /api/gateway/v1/virtual-keys/{vkId}
+          field: virtual_key.status
+          equals: active
+      - action: click
+        with:
+          selector: "#vk-secret-confirm"
+      - action: click
+        with:
+          text: /^\s*Close\s*$/
+      - action: expect
+        with:
+          text: "{oldSecret}"
+          equals: "0"
+
+  - id: gateway-virtual-key-budget-and-limits
+    title: Set a virtual key's budget and request limit from its edit drawer and read both back from the API
+    isolated: true
+    setup:
+      - post: /api/gateway/v1/virtual-keys
+        body:
+          name: vd-vk-limits-{uid}
+        as:
+          vkId: virtual_key.id
+          vkName: virtual_key.name
+    steps:
+      - action: go
+        with:
+          path: /gateway/virtual-keys
+      - action: click
+        with:
+          selector: 'tr:has-text("{vkName}") button[aria-label^="Actions"]'
+      - action: click
+        with:
+          selector: '[role="menuitem"]'
+          hasText: /^\s*Edit\s*$/
+      - action: fill
+        with:
+          testId: vk-budget-limit
+          value: "25"
+      - action: select
+        with:
+          testId: vk-budget-window
+          option: /per week/
+      - action: fill
+        with:
+          selector: 'xpath=//label[normalize-space(.)="rpm"]/following::input[1]'
+          value: "60"
+      - action: click
+        with:
+          text: /^\s*Save changes\s*$/
+      - action: expect
+        with:
+          api: /api/gateway/v1/virtual-keys/{vkId}
+          field: virtual_key.config.rateLimits.rpm
+          equals: "60"
+      - action: expect
+        with:
+          api: /api/gateway/v1/budgets?scope_type=virtual_key&limit=200
+          contains: "{vkId}"
+
+  - id: gateway-virtual-key-disable-enable
+    title: Disable a virtual key from its page, see it disabled in the API, then enable it again
+    isolated: true
+    setup:
+      - post: /api/gateway/v1/virtual-keys
+        body:
+          name: vd-vk-disable-{uid}
+        as:
+          vkId: virtual_key.id
+    steps:
+      - action: go
+        with:
+          path: /gateway/virtual-keys/{vkId}
+      - action: click
+        with:
+          text: /^\s*Disable\s*$/
+      - action: click
+        with:
+          text: Disable key
+      - action: expect
+        with:
+          api: /api/gateway/v1/virtual-keys/{vkId}
+          field: virtual_key.status
+          equals: disabled
+      - action: expect
+        with:
+          testId: vk-detail-status
+          hasText: /disabled/i
+      - action: click
+        with:
+          text: /^\s*Enable\s*$/
+      - action: expect
+        with:
+          api: /api/gateway/v1/virtual-keys/{vkId}
+          field: virtual_key.status
+          equals: active
+
+  - id: gateway-virtual-key-real-call-usage-and-spend
+    title: Call the gateway with a virtual key, then read its requests and spend from the API, the key list and the usage page
+    isolated: true
+    setup:
+      - post: /api/gateway/v1/virtual-keys
+        body:
+          name: vd-vk-call-{uid}
+        as:
+          vkId: virtual_key.id
+          vkName: virtual_key.name
+          vkSecret: secret
+      - post: /v1/chat/completions
+        bearer: "{vkSecret}"
+        body:
+          model: openai/gpt-5-mini
+          messages:
+            - role: user
+              content: Say hi in one word
+    steps:
+      - action: expect
+        with:
+          api: /api/gateway/v1/virtual-keys/{vkId}/spend
+          field: requests
+          min: "1"
+          timeout: "60000"
+      - action: go
+        with:
+          path: /gateway/virtual-keys
+      - action: expect
+        with:
+          testId: vk-spend-{vkId}
+      - action: go
+        with:
+          path: /gateway/virtual-keys/{vkId}
+      - action: expect
+        with:
+          testIdPrefix: vk-usage-model-
+          timeout: "30000"
+      - action: go
+        with:
+          path: /gateway/usage?vk={vkId}
+      - action: expect
+        with:
+          testId: usage-key-filter
+          hasText: "{vkName}"
+      - action: expect
+        with:
+          text: Total spend
+          timeout: "30000"
+      - action: expect
+        with:
+          text: No usage in this window
+          equals: "0"
+
+  - id: gateway-budget-create
+    title: Create a budget and see it in the budgets API and list
+    isolated: true
+    steps:
+      - action: go
+        with:
+          path: /gateway/budgets
+      - action: click
+        with:
+          text: New budget
+      - action: fill
+        with:
+          field: e.g. Engineering monthly $1k cap
+          value: "budget-{uid}"
+      - action: select
+        with:
+          testId: budget-target
+          option: /^(?!Pick a|Loading).+/
+      - action: fill
+        with:
+          field: "1000.00"
+          value: "25"
+      - action: click
+        with:
+          text: /^\s*Create budget\s*$/
+      - action: expect
+        with:
+          api: /api/gateway/v1/budgets
+          contains: budget-{uid}
+      - action: go
+        with:
+          path: /gateway/budgets
+      - action: expect
+        with:
+          text: budget-{uid}
+      - action: expect
+        with:
+          count: 'tr:has-text("budget-{uid}")'
+          min: "1"
+
+  - id: gateway-budget-org-warn-create
+    title: Create an organisation budget that only warns on breach and see both in its row
+    isolated: true
+    steps:
+      - action: go
+        with:
+          path: /gateway/budgets
+      - action: click
+        with:
+          text: New budget
+      - action: fill
+        with:
+          field: e.g. Engineering monthly $1k cap
+          value: "budget-org-{uid}"
+      - action: click
+        with:
+          testId: budget-kind-organization
+      - action: select
+        with:
+          selector: 'xpath=//label[contains(normalize-space(.),"Window")]/following::select[1]'
+          option: Per day
+      - action: fill
+        with:
+          field: "1000.00"
+          value: "40"
+      - action: select
+        with:
+          selector: 'xpath=//label[contains(normalize-space(.),"On breach")]/following::select[1]'
+          option: /^Warn/
+      - action: click
+        with:
+          text: /^\s*Create budget\s*$/
+      - action: go
+        with:
+          path: /gateway/budgets
+      - action: expect
+        with:
+          count: 'tr:has-text("budget-org-{uid}"):has-text("organization"):has-text("day"):has-text("warn")'
+          min: "1"
+
+  - id: gateway-budget-team-create
+    title: Create a budget on a team and see the team as its scope after a reload
+    isolated: true
+    steps:
+      - action: go
+        with:
+          path: /gateway/budgets
+      - action: click
+        with:
+          text: New budget
+      - action: fill
+        with:
+          field: e.g. Engineering monthly $1k cap
+          value: "budget-team-{uid}"
+      - action: click
+        with:
+          testId: budget-kind-team
+      - action: select
+        with:
+          testId: budget-target
+          option: /^(?!Pick a|Loading).+/
+      - action: fill
+        with:
+          field: "1000.00"
+          value: "60"
+      - action: click
+        with:
+          text: /^\s*Create budget\s*$/
+      - action: go
+        with:
+          path: /gateway/budgets
+      - action: expect
+        with:
+          count: 'tr:has-text("budget-team-{uid}"):has-text("team")'
+          min: "1"
+
+  - id: gateway-budget-project-create
+    title: Create a budget on a project and see the project as its scope after a reload
+    isolated: true
+    steps:
+      - action: go
+        with:
+          path: /gateway/budgets
+      - action: click
+        with:
+          text: New budget
+      - action: fill
+        with:
+          field: e.g. Engineering monthly $1k cap
+          value: "budget-project-{uid}"
+      - action: click
+        with:
+          testId: budget-kind-project
+      - action: select
+        with:
+          testId: budget-target
+          option: /^(?!Pick a|Loading).+/
+      - action: fill
+        with:
+          field: "1000.00"
+          value: "70"
+      - action: click
+        with:
+          text: /^\s*Create budget\s*$/
+      - action: go
+        with:
+          path: /gateway/budgets
+      - action: expect
+        with:
+          count: 'tr:has-text("budget-project-{uid}"):has-text("project")'
+          min: "1"
+
+  - id: gateway-budget-virtual-key-create
+    title: Create a budget on a virtual key and see the key as its scope after a reload
+    isolated: true
+    setup:
+      - post: /api/gateway/v1/virtual-keys
+        body:
+          name: vd-vk-budget-{uid}
+        as:
+          vkName: virtual_key.name
+    steps:
+      - action: go
+        with:
+          path: /gateway/budgets
+      - action: click
+        with:
+          text: New budget
+      - action: fill
+        with:
+          field: e.g. Engineering monthly $1k cap
+          value: "budget-key-{uid}"
+      - action: click
+        with:
+          testId: budget-kind-virtual_key
+      - action: select
+        with:
+          testId: budget-target
+          option: "{vkName}"
+      - action: fill
+        with:
+          field: "1000.00"
+          value: "15"
+      - action: click
+        with:
+          text: /^\s*Create budget\s*$/
+      - action: go
+        with:
+          path: /gateway/budgets
+      - action: expect
+        with:
+          count: 'tr:has-text("budget-key-{uid}"):has-text("{vkName}")'
+          min: "1"
+
+  - id: gateway-budget-edit-limit-and-breach
+    title: Raise a budget's limit and switch it to warn, and read both back from the API
+    setup:
+      - post: /api/gateway/v1/budgets
+        body:
+          scope:
+            kind: virtual_key
+            virtual_key_id: "{virtualKey}"
+          name: vd-budget-edit-{uid}
+          window: month
+          limit_usd: 20
+        as:
+          budgetId: budget.id
+          budgetName: budget.name
+    steps:
+      - action: go
+        with:
+          path: /gateway/budgets
+      - action: click
+        with:
+          selector: 'tr:has-text("{budgetName}") button[aria-label="Actions"]'
+      - action: click
+        with:
+          selector: '[role="menuitem"]'
+          hasText: /^\s*Edit\s*$/
+      - action: fill
+        with:
+          selector: 'xpath=//label[contains(normalize-space(.),"Limit (USD)")]/following::input[1]'
+          value: "55"
+      - action: select
+        with:
+          selector: 'xpath=//label[contains(normalize-space(.),"On breach")]/following::select[1]'
+          option: /^Warn/
+      - action: click
+        with:
+          text: /^\s*Save changes\s*$/
+      - action: expect
+        with:
+          api: /api/gateway/v1/budgets/{budgetId}
+          field: budget.on_breach
+          equals: warn
+      - action: expect
+        with:
+          api: /api/gateway/v1/budgets/{budgetId}
+          field: budget.limit_usd
+          contains: "55"
+
+  - id: gateway-budget-archive
+    title: Archive a budget from its row and see it gone from the list after a reload
+    setup:
+      - post: /api/gateway/v1/budgets
+        body:
+          scope:
+            kind: virtual_key
+            virtual_key_id: "{virtualKey}"
+          name: vd-budget-archive-{uid}
+          window: month
+          limit_usd: 10
+        as:
+          budgetId: budget.id
+          budgetName: budget.name
+    steps:
+      - action: go
+        with:
+          path: /gateway/budgets
+      - action: expect
+        with:
+          count: 'tr:has-text("{budgetName}")'
+          min: "1"
+      - action: click
+        with:
+          selector: 'tr:has-text("{budgetName}") button[aria-label="Actions"]'
+      - action: click
+        with:
+          selector: '[role="menuitem"]'
+          hasText: Archive
+      - action: click
+        with:
+          text: Archive
+          hasText: ^Archive$
+      - action: go
+        with:
+          path: /gateway/budgets
+      - action: expect
+        with:
+          count: 'tr:has-text("{budgetName}")'
+          equals: "0"
+
+  - id: gateway-budget-detail-page
+    title: A budget opens on its own page, showing its name and the scope it applies to
+    setup:
+      - post: /api/gateway/v1/budgets
+        body:
+          scope:
+            kind: virtual_key
+            virtual_key_id: "{virtualKey}"
+          name: vd-budget-detail-{uid}
+          window: week
+          limit_usd: 12
+        as:
+          budgetId: budget.id
+          budgetName: budget.name
+    steps:
+      - action: go
+        with:
+          path: /gateway/budgets/{budgetId}
+      - action: expect
+        with:
+          text: "{budgetName}"
+      - action: expect
+        with:
+          api: /api/gateway/v1/budgets/{budgetId}
+          field: budget.window
+          equals: week
+
+  - id: gateway-webhook-create
+    title: Create a webhook endpoint and see it listed after a reload
+    isolated: true
+    steps:
+      - action: go
+        with:
+          path: /gateway/webhooks
+      - action: click
+        with:
+          testId: webhook-new
+      - action: fill
+        with:
+          testId: webhook-url-input
+          value: https://example.com/vd-{uid}
+      - action: click
+        with:
+          testId: webhook-family-toggle-gateway
+      - action: click
+        with:
+          testId: webhook-save
+      - action: go
+        with:
+          path: /gateway/webhooks
+      - action: expect
+        with:
+          text: example.com/vd-{uid}
+
+  - id: gateway-routing-policy-create
+    title: Create a routing policy and see it listed after a reload
+    isolated: true
+    steps:
+      - action: go
+        with:
+          path: /gateway/routing-policies
+      - action: click
+        with:
+          text: New policy
+      - action: fill
+        with:
+          field: Developer default
+          value: "policy-{uid}"
+      - action: select
+        with:
+          selector: 'select[aria-label="Add model provider"]'
+          option: /^(?!Add a).+/
+      - action: click
+        with:
+          text: Create policy
+      - action: go
+        with:
+          path: /gateway/routing-policies
+      - action: expect
+        with:
+          text: policy-{uid}
+
+  - id: gateway-routing-policy-edit-and-delete
+    title: Rename a routing policy from its row, then delete it and see it gone after a reload
+    isolated: true
+    steps:
+      - action: go
+        with:
+          path: /gateway/routing-policies
+      - action: click
+        with:
+          text: New policy
+      - action: fill
+        with:
+          field: Developer default
+          value: "policy-edit-{uid}"
+      - action: select
+        with:
+          selector: 'select[aria-label="Add model provider"]'
+          option: /^(?!Add a).+/
+      - action: click
+        with:
+          text: Create policy
+      - action: go
+        with:
+          path: /gateway/routing-policies
+      - action: click
+        with:
+          label: Actions for policy-edit-{uid}
+      - action: click
+        with:
+          selector: '[role="menuitem"]'
+          hasText: /^\s*Edit\s*$/
+      - action: fill
+        with:
+          field: Developer default
+          value: "policy-renamed-{uid}"
+      - action: click
+        with:
+          text: Save changes
+      - action: go
+        with:
+          path: /gateway/routing-policies
+      - action: expect
+        with:
+          text: policy-renamed-{uid}
+      - action: expect
+        with:
+          text: policy-edit-{uid}
+          equals: "0"
+      - action: click
+        with:
+          label: Actions for policy-renamed-{uid}
+      - action: click
+        with:
+          selector: '[role="menuitem"]'
+          hasText: /^\s*Delete\s*$/
+      - action: click
+        with:
+          text: Delete
+          hasText: ^Delete$
+      - action: go
+        with:
+          path: /gateway/routing-policies
+      - action: expect
+        with:
+          text: policy-renamed-{uid}
+          equals: "0"
+
+  - id: gateway-routing-policy-set-default
+    title: Make a routing policy the organisation default from its row menu
+    isolated: true
+    steps:
+      - action: go
+        with:
+          path: /gateway/routing-policies
+      - action: click
+        with:
+          text: New policy
+      - action: fill
+        with:
+          field: Developer default
+          value: "policy-default-{uid}"
+      - action: select
+        with:
+          selector: 'select[aria-label="Add model provider"]'
+          option: /^(?!Add a).+/
+      - action: click
+        with:
+          text: Create policy
+      - action: go
+        with:
+          path: /gateway/routing-policies
+      - action: click
+        with:
+          label: Actions for policy-default-{uid}
+      - action: click
+        with:
+          selector: '[role="menuitem"]'
+          hasText: Make default
+      - action: go
+        with:
+          path: /gateway/routing-policies
+      - action: click
+        with:
+          label: Actions for policy-default-{uid}
+      - action: expect
+        with:
+          text: Make default
+          equals: "0"
+
+  # The evaluation itself runs in the gateway data plane; this proves the guardrail is
+  # stored and attaches to a key. The evaluator is a monitor set to run as a guardrail.
+  - id: gateway-guardrail-create-and-attach
+    title: Create a guardrail over a guardrail evaluator, see it after a reload and attach it to a key
+    setup:
+      - post: /api/evaluators
+        body:
+          name: vd-guard-evaluator-{uid}
+          config:
+            evaluatorType: langevals/exact_match
+        as:
+          evaluatorId: id
+      - post: /api/monitors
+        body:
+          name: vd-guard-monitor-{uid}
+          checkType: langevals/exact_match
+          evaluatorId: "{evaluatorId}"
+          executionMode: AS_GUARDRAIL
+          sample: 1
+        as:
+          monitorName: name
+      - post: /api/gateway/v1/virtual-keys
+        body:
+          name: vd-vk-guard-{uid}
+        as:
+          vkId: virtual_key.id
+    steps:
+      - action: go
+        with:
+          path: /gateway/guardrails
+      - action: click
+        with:
+          text: New guardrail
+      - action: fill
+        with:
+          field: e.g. block PII on requests
+          value: "guardrail-{uid}"
+      - action: select
+        with:
+          field: Evaluator
+          option: "{monitorName}"
+      - action: click
+        with:
+          text: /^\s*Create\s*$/
+      - action: go
+        with:
+          path: /gateway/guardrails
+      - action: expect
+        with:
+          count: 'tr:has-text("guardrail-{uid}")'
+          min: "1"
+      - action: go
+        with:
+          path: /gateway/virtual-keys/{vkId}
+      - action: click
+        with:
+          text: "guardrail-{uid}"
+      - action: click
+        with:
+          text: /^\s*Save guardrails\s*$/
+      - action: expect
+        with:
+          text: Guardrails updated
+
+  - id: gateway-guardrail-archive
+    title: Archive a guardrail from its row and see it gone after a reload
+    setup:
+      - post: /api/evaluators
+        body:
+          name: vd-guard-archive-evaluator-{uid}
+          config:
+            evaluatorType: langevals/exact_match
+        as:
+          evaluatorId: id
+      - post: /api/monitors
+        body:
+          name: vd-guard-archive-monitor-{uid}
+          checkType: langevals/exact_match
+          evaluatorId: "{evaluatorId}"
+          executionMode: AS_GUARDRAIL
+          sample: 1
+        as:
+          monitorName: name
+    steps:
+      - action: go
+        with:
+          path: /gateway/guardrails
+      - action: click
+        with:
+          text: New guardrail
+      - action: fill
+        with:
+          field: e.g. block PII on requests
+          value: "guardrail-archive-{uid}"
+      - action: select
+        with:
+          field: Evaluator
+          option: "{monitorName}"
+      - action: click
+        with:
+          text: /^\s*Create\s*$/
+      - action: click
+        with:
+          selector: 'tr:has-text("guardrail-archive-{uid}") button:has([class*="lucide-archive"])'
+      - action: click
+        with:
+          text: Archive
+          hasText: ^Archive$
+      - action: go
+        with:
+          path: /gateway/guardrails
+      - action: expect
+        with:
+          count: 'tr:has-text("guardrail-archive-{uid}")'
+          equals: "0"
+
+  - id: gateway-usage-screen-renders
+    title: The usage screen opens with its key filter and either its charts or its empty state
+    steps:
+      - action: go
+        with:
+          path: /gateway/usage?vk={virtualKey}
+      - action: expect
+        with:
+          testId: usage-key-filter
+      - action: expect
+        with:
+          text: Usage
+
+  - id: gateway-billing-events-screen-renders
+    title: The billing events screen opens with its status filter
+    steps:
+      - action: go
+        with:
+          path: /gateway/billing-events
+      - action: expect
+        with:
+          text: Billing Events
+      - action: expect
+        with:
+          testId: filter-status
+
+  - id: gateway-spend-events-api-answers
+    title: The spend-events pull answers 200 with a data page for an organisation key, and 401 without one
+    steps:
+      - action: expect
+        with:
+          api: /api/gateway/v1/spend-events?from=1&to=9007199254740991
+          auth: "{orgKey}"
+          status: "200"
+          contains: '"data":['
+      - action: expect
+        with:
+          api: /api/gateway/v1/spend-events?from=1&to=9007199254740991
+          auth: none
+          status: "401"
+
+  - id: gateway-spend-summaries-api-answers
+    title: The spend-summaries rollup answers 200 with a data page for each grouping
+    steps:
+      - action: expect
+        with:
+          api: /api/gateway/v1/spend-summaries?group_by=virtual_key&from=1&to=9007199254740991
+          auth: "{orgKey}"
+          status: "200"
+          contains: '"data":['
+      - action: expect
+        with:
+          api: /api/gateway/v1/spend-summaries?group_by=model&from=1&to=9007199254740991&allow_unstable=true
+          auth: "{orgKey}"
+          status: "200"
+          contains: '"data":['
+
+  - id: gateway-cache-rule-create
+    title: Create a cache rule that forces caching for a model and see it listed and in the API
+    isolated: true
+    steps:
+      - action: go
+        with:
+          path: /gateway/cache-rules
+      - action: click
+        with:
+          text: New rule
+      - action: fill
+        with:
+          field: e.g. force-cache-on-enterprise
+          value: cr-{uid}
+      - action: fill
+        with:
+          field: claude-3-5-sonnet-latest
+          value: gpt-5-mini
+      - action: select
+        with:
+          selector: 'xpath=//label[contains(normalize-space(.),"Cache control mode")]/following::select[1]'
+          option: /^force/
+      - action: click
+        with:
+          text: Create rule
+      - action: go
+        with:
+          path: /gateway/cache-rules
+      - action: expect
+        with:
+          text: cr-{uid}
+      - action: expect
+        with:
+          api: /api/gateway/v1/cache-rules?limit=200
+          contains: cr-{uid}
+
+  - id: gateway-cache-rule-edit-toggle-archive
+    title: Switch a cache rule's mode from its row, turn it off, then archive it and see it gone after a reload
+    setup:
+      - post: /api/gateway/v1/cache-rules
+        body:
+          name: vd-cache-{uid}
+          matchers:
+            model: gpt-5-mini
+          action:
+            mode: force
+        as:
+          ruleId: cache_rule.id
+          ruleName: cache_rule.name
+    steps:
+      - action: go
+        with:
+          path: /gateway/cache-rules
+      - action: click
+        with:
+          selector: 'tr:has-text("{ruleName}") button[aria-label="Actions"]'
+      - action: click
+        with:
+          selector: '[role="menuitem"]'
+          hasText: /^\s*Edit\s*$/
+      - action: select
+        with:
+          selector: 'xpath=//label[contains(normalize-space(.),"Cache control mode")]/following::select[1]'
+          option: /^disable/
+      - action: click
+        with:
+          text: /^\s*Save changes\s*$/
+      - action: expect
+        with:
+          api: /api/gateway/v1/cache-rules/{ruleId}
+          field: cache_rule.action.mode
+          equals: disable
+      - action: click
+        with:
+          selector: 'tr:has-text("{ruleName}") [data-scope="switch"][data-part="control"]'
+      - action: expect
+        with:
+          api: /api/gateway/v1/cache-rules/{ruleId}
+          field: cache_rule.enabled
+          equals: "false"
+      - action: click
+        with:
+          selector: 'tr:has-text("{ruleName}") button[aria-label="Actions"]'
+      - action: click
+        with:
+          selector: '[role="menuitem"]'
+          hasText: Archive
+      - action: click
+        with:
+          text: Archive
+          hasText: ^Archive$
+      - action: go
+        with:
+          path: /gateway/cache-rules
+      - action: expect
+        with:
+          count: 'tr:has-text("{ruleName}")'
+          equals: "0"

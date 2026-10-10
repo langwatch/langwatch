@@ -1,0 +1,1084 @@
+import { passkey } from "@better-auth/passkey";
+import type {
+  SSOOptions,
+  SSOUserResolution,
+  SSOUserResolutionContext,
+  SSOUserResolutionInput,
+} from "@better-auth/sso";
+import { sso } from "@better-auth/sso";
+import {
+  isCredentialMutationPath,
+  isEmailAuthPath,
+  isGateDependentPath,
+  isGatedSsoPath,
+  isPasswordResetPath,
+  normalizedRequestPathname,
+  requestPathname,
+  type AuthApi,
+} from "@langwatch/auth-contract";
+import { HandledError } from "@langwatch/handled-error";
+import {
+  type AssertedEmailVerification,
+  assertedEmailVerification,
+  type IdentityApi,
+  idpInitiatedLanding,
+  type SignInMethodPolicy,
+  type SsoAssertionApi,
+  ssoSamlIdpConfigSchema,
+} from "@langwatch/identity-contract";
+import { createLogger } from "@langwatch/observability";
+import { fromDate } from "@langwatch/time";
+import type { UserApi } from "@langwatch/user-contract";
+import { compare, hash } from "bcrypt";
+import { type Auth, type BetterAuthOptions, betterAuth } from "better-auth";
+import type { AdapterFactory } from "better-auth/adapters";
+import { APIError, createAuthMiddleware } from "better-auth/api";
+import type { genericOAuth } from "better-auth/plugins/generic-oauth";
+import { twoFactor } from "better-auth/plugins/two-factor";
+
+import type { BetterAuthHooksRepository } from "../../repositories/better-auth-hooks.repository.ts";
+import { findRegisteredRefusals } from "../../rules/better-auth-error-code.rules.ts";
+import {
+  ID_TOKEN_MAX_AGE_SECONDS,
+  SIGN_IN_CLOCK_TOLERANCE_SECONDS,
+} from "../../rules/sign-in-clock.rules.ts";
+import {
+  findSubmittedAddresses,
+  isLockoutCountedPath,
+} from "../../rules/sign-in-identifier-hash.rules.ts";
+import { resolveTrustedOrigins } from "../../rules/trusted-origins.rules.ts";
+import type {
+  BetterAuthAnnouncements,
+  BetterAuthFederation,
+  BetterAuthIdentityCeremonies,
+} from "../better-auth.channel.ts";
+import {
+  afterAccountCreate,
+  afterAccountUpdate,
+  afterSessionCreate,
+  afterUserCreate,
+  createBeforeAccountCreateHook,
+  createBeforeSessionCreateHook,
+  createBeforeUserCreateHook,
+  type BetterAuthHookCollaborators,
+  type FindGoverningConnections,
+  type SessionMintClaims,
+  type SignUpPolicy,
+} from "./http.better-auth-hooks.channel.ts";
+import type { CredentialSessionGuard } from "./http.credential-session-guard.channel.ts";
+import type { IdTokenIssuerRefusalChannel } from "./http.id-token-issuer-refusal.channel.ts";
+import {
+  type PasskeySignUpEligibility,
+  passkeySignUpRegistration,
+  type SignUpVerification,
+} from "./http.passkey-sign-up.channel.ts";
+import {
+  PasswordResetSessionChannel,
+  replaceLiveResetLink,
+} from "./http.password-reset-session.channel.ts";
+import { resilientGenericOAuth } from "./http.resilient-generic-oauth.channel.ts";
+import { samlOwnOriginRepost } from "./http.saml-own-origin-repost.channel.ts";
+import { SessionCallbackEvidenceChannel } from "./http.session-callback-evidence.channel.ts";
+import {
+  runSignInRouterShadow,
+  type SignInRouterShadow,
+} from "./http.sign-in-router-shadow.channel.ts";
+import {
+  signUpConfirmationPlugin,
+  type SignUpAddressConfirmation,
+} from "./http.sign-up-confirmation.channel.ts";
+
+const logger = createLogger("langwatch:better-auth");
+
+/**
+ * Everything about this deployment the option set is built from.
+ */
+export type BetterAuthDeploymentConfiguration = Readonly<{
+  /** `betterAuth({ baseURL })` — where this instance believes it is served. */
+  baseUrl: string;
+  /**
+   * The externally reachable origin, where a proxy makes it differ from {@link baseUrl}.
+   */
+  publicBaseUrl?: string | undefined;
+  /** The signing secret. Never logged, never reported, never defaulted. */
+  secret: string;
+  /**
+   * Whether the email/password routes MOUNT. The auth contract's
+   * `isEmailPasswordEnabled` is the rule; mounting is not the gate, the request hook is.
+   */
+  emailPasswordEnabled: boolean;
+  /** Whether the two-factor plugin is mounted. */
+  mfaEnrollmentOpen: boolean;
+  /** Whether the passkey plugin is mounted. */
+  passkeysEnabled: boolean;
+  /** Salts the provisional handle a passkey sign-up ceremony is minted with. */
+  passkeyHandleSecret: string;
+  /** `SSO_TRUSTED_IDP_ORIGINS`: an operator's own allowlist of identity
+   *  providers, honoured everywhere. See {@link resolveTrustedOrigins}. */
+  trustedIdpOrigins?: string | undefined;
+  /** `LANGWATCH_IDPSIM_URL`: the simulator a worktree runs, trusted outside
+   *  production only. */
+  idpSimulatorUrl?: string | undefined;
+  /** Whether this is a production deployment — the process's own fact. */
+  isProduction: boolean;
+  /** Social providers this deployment mounted, already built. */
+  socialProviders: NonNullable<BetterAuthOptions["socialProviders"]>;
+  /** Generic-OIDC connections this deployment mounted, already built. */
+  genericOAuthConfigs: readonly Parameters<typeof genericOAuth>[0]["config"][number][];
+}>;
+
+/**
+ * Seals better-auth's own sign-up route unconditionally, before any licence
+ * is read: creation belongs to `auth.register`'s pending-confirmation latch,
+ * else email-mode (the common case) would stay wide open to the raw route.
+ */
+function refuseDirectEmailSignUp(pathname: string): void {
+  if (!pathname.endsWith("/sign-up/email")) return;
+
+  throw APIError.from("NOT_FOUND", { code: "NOT_FOUND", message: "Not found" });
+}
+
+/**
+ * Whether a licensed deployment should refuse this credential route, the
+ * ADR-027 gate site #3 decision.
+ * ADR-117 §4 is what changed here, and only in mechanism: the question used to
+ */
+function refusesCredentialRoute({
+  pathname,
+  isResetPath,
+  policy,
+}: {
+  pathname: string;
+  isResetPath: boolean;
+  policy: SignInMethodPolicy;
+}): boolean {
+  if (!isResetPath && !isEmailAuthPath(pathname)) return false;
+  // D09: a deployment that offers a password answers the form it just drew.
+  if (policy.defaultMethods.some((method) => method.kind === "password")) return false;
+
+  return policy.defaultMethods.some((method) => method.kind === "federated");
+}
+
+/** Whether an organization's own connection governs this address (D04). */
+type AddressRoutesToConnection = (input: { email: string }) => Promise<boolean>;
+
+/**
+ * A password reset for an address an organization signs in through its own
+ * provider would mint the local password that connection exists to prevent,
+ * one email later - refused in every mode. An address-less request passes.
+ */
+async function refuseConnectionGovernedReset({
+  pathname,
+  body,
+  addressRoutesToConnection,
+}: {
+  pathname: string;
+  body: unknown;
+  addressRoutesToConnection: AddressRoutesToConnection;
+}): Promise<void> {
+  if (!isPasswordResetPath(pathname)) return;
+
+  const [email] = findSubmittedAddresses(body);
+  if (email === undefined) return;
+  if (!(await addressRoutesToConnection({ email }))) return;
+
+  throw APIError.from("BAD_REQUEST", {
+    code: "EMAIL_PASSWORD_DISABLED",
+    message:
+      "Credential management is disabled — your account is managed by your identity provider.",
+  });
+}
+
+/**
+ * The part of the lock-out service these hooks may reach (GAC-09). Narrower
+ * on purpose: a hook may refuse an attempt and record how it went, and may
+ * never release a hold - that is an administrator's act.
+ */
+export interface SignInAttemptCounter {
+  refuseIfLockedOut(input: { identifier: string }): Promise<void>;
+  recordFailure(input: { identifier: string }): Promise<void>;
+  recordSuccess(input: { identifier: string }): Promise<void>;
+}
+
+/**
+ * Records how a counted sign-in attempt went (GAC-09). Its failure is
+ * swallowed: the endpoint has answered, so nothing here changes the outcome.
+ */
+async function countSignInAttempt({
+  ctx,
+  signInLockout,
+}: {
+  ctx: { request?: { url?: string }; body?: unknown; context?: { returned?: unknown } };
+  signInLockout: SignInAttemptCounter;
+}): Promise<void> {
+  const pathname = normalizedRequestPathname(ctx.request?.url ?? "");
+  if (!isLockoutCountedPath(pathname)) return;
+
+  const [identifier] = findSubmittedAddresses(ctx.body);
+  if (identifier === undefined) return;
+
+  const refused = ctx.context?.returned instanceof APIError;
+  try {
+    await (refused
+      ? signInLockout.recordFailure({ identifier })
+      : signInLockout.recordSuccess({ identifier }));
+  } catch (error) {
+    logger.warn(
+      { error, refused },
+      "could not record how a sign-in attempt went; the attempt itself already answered",
+    );
+  }
+}
+
+/**
+ * A refusal on a translated route family re-thrown as its handled error, so the host renders
+ * it in the canonical envelope at its own status (main's handled-errors table).
+ * Server-side calls carry no request and stay untouched.
+ */
+export function answerAuthRefusalByRegisteredCode(ctx: {
+  request?: { url?: string };
+  context?: { returned?: unknown };
+}): void {
+  const url = ctx.request?.url;
+  if (url === undefined) return;
+
+  const returned = ctx.context?.returned;
+  if (!(returned instanceof APIError)) return;
+
+  const betterAuthCode = returned.body?.code;
+  if (betterAuthCode === undefined) return;
+
+  const pathname = normalizedRequestPathname(url);
+  const [refusal] = findRegisteredRefusals({ pathname, betterAuthCode });
+  if (refusal === undefined) return;
+
+  const handled = new refusal.error(`${pathname} refused with ${betterAuthCode}`);
+  logger.warn(
+    { path: pathname, betterAuthCode, code: handled.code, status: handled.httpStatus },
+    "an auth endpoint refused, and it is answered as a handled error",
+  );
+  throw handled;
+}
+
+/**
+ * better-auth's router error hook: a handled refusal leaves its handler for the host's
+ * renderer; every other failure keeps better-auth's own answer and is logged here.
+ */
+export function releaseHandledRefusal(error: unknown): void {
+  if (HandledError.isHandled(error)) throw error;
+  if (error instanceof APIError && error.status !== "INTERNAL_SERVER_ERROR") return;
+  logger.error({ error }, "an auth endpoint failed");
+}
+
+/**
+ * GAC-09, and asked FIRST: checking the password before the lock lets
+ * somebody keep testing passwords and simply not be told the answer, with the
+ * timing of the response telling them anyway.
+ */
+async function refuseLockedOutAddress({
+  pathname,
+  body,
+  signInLockout,
+}: {
+  pathname: string;
+  body: unknown;
+  signInLockout: SignInAttemptCounter;
+}): Promise<void> {
+  if (!isLockoutCountedPath(pathname)) return;
+
+  const [attempted] = findSubmittedAddresses(body);
+  if (attempted === undefined) return;
+
+  await signInLockout.refuseIfLockedOut({ identifier: attempted });
+}
+
+function createBeforeRequestHook({
+  federation,
+  shadow,
+  signInLockout,
+  addressRoutesToConnection,
+}: {
+  federation: BetterAuthFederation;
+  shadow: SignInRouterShadow;
+  signInLockout: SignInAttemptCounter;
+  addressRoutesToConnection: AddressRoutesToConnection;
+}): NonNullable<BetterAuthOptions["hooks"]>["before"] {
+  return async (ctx) => {
+    const url = ctx.request?.url ?? "";
+    const pathname = normalizedRequestPathname(url);
+
+    await refuseLockedOutAddress({ pathname, body: ctx.body, signInLockout });
+    refuseDirectEmailSignUp(pathname);
+    await runSignInRouterShadow({ pathname, url, body: ctx.body, shadow });
+
+    await refuseConnectionGovernedReset({ pathname, body: ctx.body, addressRoutesToConnection });
+
+    if (!federation.federationCapable()) return;
+
+    if (isCredentialMutationPath(pathname)) {
+      throw APIError.from("BAD_REQUEST", {
+        code: "EMAIL_PASSWORD_DISABLED",
+        message:
+          "Credential management is disabled in cloud/SSO mode — your account is managed by your identity provider.",
+      });
+    }
+
+    const isResetPath = isPasswordResetPath(pathname);
+    if (!isGateDependentPath(url)) return;
+
+    const policy = await federation.resolveSignInMethodPolicy();
+    if (policy.federationLicensed) {
+      if (refusesCredentialRoute({ pathname, isResetPath, policy })) {
+        throw APIError.from("BAD_REQUEST", {
+          code: "EMAIL_PASSWORD_DISABLED",
+          message:
+            "Credential management is disabled — your account is managed by your identity provider.",
+        });
+      }
+      return;
+    }
+
+    if (!isResetPath && isGatedSsoPath(url)) {
+      logger.warn(
+        { path: requestPathname(url), reason: "no_license" },
+        "Blocked SSO request: deployment has no genuine license",
+      );
+      throw APIError.from("FORBIDDEN", {
+        code: "SSO_LICENSE_REQUIRED",
+        message:
+          "SSO is not available on this deployment — sign in with your email and password instead.",
+      });
+    }
+  };
+}
+
+/**
+ * Builds the Better Auth transport around the process-owned mailer.
+ */
+export const createAuthOptions = ({
+  repo,
+  deployment,
+  storage,
+  federation,
+  identity,
+  shadow,
+  hooks,
+  ssoIssuers,
+  credentialGuard,
+  signInLockout,
+  findGoverningConnections,
+  signUpPolicy,
+  passwordResetSession,
+  idTokenIssuerRefusals,
+  sessionClaims,
+}: {
+  repo: BetterAuthHooksRepository;
+  deployment: BetterAuthDeploymentConfiguration;
+  storage: AdapterFactory<BetterAuthOptions>;
+  federation: BetterAuthFederation;
+  identity: BetterAuthIdentityCeremonies;
+  shadow: SignInRouterShadow;
+  hooks: BetterAuthHookCollaborators;
+  ssoIssuers: BetterAuthSsoIssuers;
+  credentialGuard: CredentialSessionGuard;
+  signInLockout: SignInAttemptCounter;
+  findGoverningConnections: FindGoverningConnections;
+  /** Who the installation lets create an account; asked before every user row is written. */
+  signUpPolicy: SignUpPolicy;
+  /** Opens the session a completed password reset earned. */
+  passwordResetSession?: PasswordResetSessionChannel;
+  /** Keeps the issuer of an ID token the engine refused, so the redirect can name it. */
+  idTokenIssuerRefusals?: IdTokenIssuerRefusalChannel;
+  /** What a session records at mint (D06): identity's answer over this callback's evidence. */
+  sessionClaims: SessionMintClaims;
+}): BetterAuthOptions & {
+  // `emailAndPassword` is optional on `BetterAuthOptions` but this factory
+  // always states it, and `enabled` inside it is REQUIRED. Saying so keeps the
+  // spread below from degrading the credentials gate to "unset", which
+  // better-auth would then have to guess at.
+  emailAndPassword: NonNullable<BetterAuthOptions["emailAndPassword"]>;
+} => ({
+  baseURL: deployment.baseUrl,
+  /**
+   * Our own address, plus the providers our customers registered. A FUNCTION
+   * because the answer is not fixed at boot, and only single sign-on requests
+   * pay for the read. See `rules/trusted-origins.rules.ts`.
+   */
+  trustedOrigins: async (request) => {
+    const registeredIssuers = await ssoIssuers.issuersForRequest(request);
+    return resolveTrustedOrigins({
+      baseUrl: deployment.baseUrl,
+      publicBaseUrl: deployment.publicBaseUrl,
+      trustedIdpOrigins: deployment.trustedIdpOrigins,
+      idpSimulatorUrl: deployment.idpSimulatorUrl,
+      registeredIssuers,
+      issuerEndpointOrigins: (await ssoIssuers.endpointOriginsFor?.(registeredIssuers)) ?? [],
+      isProduction: deployment.isProduction,
+    });
+  },
+  secret: deployment.secret,
+  /**
+   * The identity storage adapter (ADR-116 §1) — one `database:` entry,
+   * forever.
+   */
+  database: storage,
+
+  /**
+   * The only header BetterAuth's rate limiter (and session IP tracking) reads, with no
+   * trusted proxies so it takes the value as stated: the auth route restates the
+   * platform's resolved caller there (transport/auth.rest.ts).
+   */
+  advanced: {
+    ipAddress: {
+      ipAddressHeaders: ["x-forwarded-for"],
+      trustedProxies: [],
+    },
+  },
+
+  /**
+   * Route OAuth callback errors to our Next.js `/auth/error` page (which handles the
+   * friendly messages for `DIFFERENT_EMAIL_NOT_ALLOWED`, `SSO_PROVIDER_NOT_ALLOWED`,
+   * `OAuthAccountNotLinked`, etc.).
+   */
+  onAPIError: {
+    errorURL: `${deployment.baseUrl}/auth/error`,
+    onError: releaseHandledRefusal,
+  },
+
+  // Map BetterAuth's expected models to the existing capitalized Prisma tables.
+  // Field mappings translate BetterAuth's canonical names to the legacy
+  // snake_case / NextAuth column names we keep in place — no column renames.
+  user: {
+    modelName: "User",
+    additionalFields: {
+      pendingSsoSetup: { type: "boolean", defaultValue: false, input: false },
+      deactivatedAt: { type: "date", required: false, input: false },
+      lastLoginAt: { type: "date", required: false, input: false },
+      // Read by the session-create refusal; hidden so get-session stays unchanged.
+      signupConfirmationPending: {
+        type: "boolean",
+        defaultValue: false,
+        input: false,
+        returned: false,
+      },
+    },
+  },
+  session: {
+    modelName: "Session",
+    fields: {
+      token: "sessionToken",
+      expiresAt: "expires",
+    },
+    additionalFields: {
+      // What the minting sign-in proved (D06), written by the session create hook only.
+      amr: { type: "string[]", required: false, input: false },
+      // Which of the person's identifiers minted it (D06), written by the same hook only.
+      identifierId: { type: "string", required: false, input: false },
+    },
+    // Preserve NextAuth's 30-day session TTL. BetterAuth defaults to 7 days,
+    // which would force users to re-auth more often than before. Match the
+    // old NextAuth `maxAge: 30 * 24 * 60 * 60` value for parity.
+    expiresIn: 30 * 24 * 60 * 60,
+    // Refresh the session expiry on use but not on every request — the old
+    // NextAuth behavior was "rolling, but not thrashing the DB".
+    updateAge: 24 * 60 * 60,
+    /**
+     * REQUIRED when `secondaryStorage` is set. Without this, BetterAuth's `createSession`
+     * skips the main adapter (Prisma) and only writes to Redis.
+     */
+    storeSessionInDatabase: true,
+  },
+  account: {
+    modelName: "Account",
+    fields: {
+      accountId: "providerAccountId",
+      providerId: "provider",
+      accessToken: "access_token",
+      refreshToken: "refresh_token",
+      accessTokenExpiresAt: "expires_at",
+      idToken: "id_token",
+      scope: "scope",
+    },
+    /**
+     * Allow an OAuth sign-in to link to an existing User row when the email matches AND that
+     * User's `emailVerified` is true.
+     */
+    accountLinking: {
+      enabled: true,
+    },
+  },
+  verification: {
+    modelName: "VerificationToken",
+    // SAML replay reservations are primary-key inserts: with Redis as secondary
+    // storage they must still reach Postgres, so a replayed assertion is refused.
+    storeInDatabase: true,
+    fields: {
+      identifier: "identifier",
+      value: "token",
+      expiresAt: "expires",
+    },
+  },
+
+  /**
+   * Credentials signin/signup is ONLY enabled in on-prem `email` mode.
+   * ADR-027: on self-hosted (`!IS_SAAS`) the routes are always MOUNTED —
+   */
+  emailAndPassword: {
+    enabled: deployment.emailPasswordEnabled,
+    password: {
+      hash: async (password: string) => hash(password, 10),
+      verify: async ({ password, hash: storedHash }) => compare(password, storedHash),
+    },
+    /**
+     * Reset-link lifetime. Kept at BetterAuth's one-hour default but stated
+     * explicitly so the email copy ("this link expires in 1 hour") and the
+     * token expiry can't silently drift apart.
+     */
+    resetPasswordTokenExpiresIn: 60 * 60,
+    /**
+     * Password reset wired to transactional mailer. Deliberately reachable on
+     * denied SSO deployments for recovery (ADR-027); after reset, force-logout all sessions.
+     */
+  },
+
+  /**
+   * Rate limiting to mitigate credential stuffing / brute force on signin. Defaults apply to
+   * every /api/auth/* path; customRules tighten the credentials signin path specifically.
+   */
+  rateLimit: {
+    enabled: true,
+    window: 60,
+    max: 100,
+    storage: "memory",
+    customRules: {
+      "/sign-in/email": { window: 60 * 15, max: 30 },
+      "/sign-up/email": { window: 60 * 60, max: 50 },
+      "/sign-in/social": { window: 60 * 15, max: 50 },
+      // BetterAuth's password reset endpoints are `request-password-reset` and `reset-password`.
+      // The NextAuth-era rule named `/forget-password` didn't match anything under BetterAuth —
+      // we ported it literally during the migration without checking the new endpoint names.
+      "/request-password-reset": { window: 60 * 60, max: 5 },
+      "/reset-password": { window: 60 * 60, max: 5 },
+      // Passkey sign-up drops the session requirement from these two, so they are an
+      // unauthenticated way to create an account and are limited as one — alongside
+      // `/sign-up/email`, which is the same thing by another door. Options are generated once
+      // per attempt and verification runs only after a system prompt, so a person doing this by
+      // hand never approaches either number.
+      "/passkey/generate-register-options": { window: 60 * 60, max: 50 },
+      "/passkey/verify-registration": { window: 60 * 60, max: 50 },
+    },
+  },
+
+  secondaryStorage: undefined,
+  socialProviders: deployment.socialProviders,
+  plugins: genericOAuthPlugins(deployment),
+
+  databaseHooks: {
+    user: {
+      create: {
+        before: createBeforeUserCreateHook({ policy: signUpPolicy, findGoverningConnections }),
+        after: async (user) => {
+          await afterUserCreate({
+            user: {
+              id: user.id,
+              email: user.email,
+              name: user.name,
+              emailVerified: user.emailVerified,
+            },
+            collaborators: hooks,
+          });
+        },
+      },
+      delete: {
+        /**
+         * ADR-101 §2: a user delete is an ERASURE, and erasure is what wipes
+         * `Identifier.value` and `identifierHash`. Before the row goes, so a refused ceremony
+         * refuses the delete with it; a no-op for users whose backfill has not latched.
+         */
+        before: async (user) => {
+          await identity.beforeUserDelete(user as { id: string });
+        },
+      },
+    },
+    account: {
+      create: {
+        before: async (account, context) => {
+          await createBeforeAccountCreateHook({
+            repo,
+            organizations: hooks.organizations,
+            federation,
+            findGoverningConnections,
+            linkProposals: hooks.linkProposals,
+          })(account, context);
+          // ADR-101 §2: the account row is an identifier attach. Returning
+          // the row data pins its id, which is what makes the live identifier id and the backfill's
+          // derived id the same id.
+          // The BRIDGE ceremonies, not the bare ones (ADR-116 §5): the
+          const pin = await identity.createAccountIdentifier(account);
+          return pin.pinned ? { data: pin.data } : undefined;
+        },
+        after: async (account) => {
+          if (!account.userId || !account.providerId || !account.accountId) return;
+          await afterAccountCreate({
+            repo,
+            account: {
+              userId: account.userId as string,
+              providerId: account.providerId as string,
+              accountId: account.accountId as string,
+            },
+            collaborators: hooks,
+          });
+        },
+      },
+      update: {
+        after: async (account) => {
+          // BetterAuth refreshes tokens on the linked Account row on every
+          // OAuth sign-in. Use that as the trigger to reconcile pendingSsoSetup
+          // for users whose correct-provider account is already linked.
+          if (!account.userId || !account.providerId || !account.accountId) return;
+          await afterAccountUpdate({
+            repo,
+            account: {
+              userId: account.userId as string,
+              providerId: account.providerId as string,
+              accountId: account.accountId as string,
+            },
+            collaborators: hooks,
+            findGoverningConnections,
+          });
+        },
+      },
+      delete: {
+        /** ADR-101 §2: an account row removed is an identifier detach — and
+         *  the adapter's own, for anyone it routes to the identity branch. */
+        before: async (account) => {
+          await identity.beforeAccountDelete(account);
+        },
+      },
+    },
+    verification: {
+      create: {
+        // The ceremony companion a second factor is checked against, written
+        // beside better-auth's own 2FA challenge (sso-credential-enforcement).
+        before: async (verification, context) => {
+          await credentialGuard.beforeVerificationCreate({
+            verification: { ...verification, expiresAt: fromDate(verification.expiresAt) },
+            context,
+          });
+          await replaceLiveResetLink({ verification, storage: context?.context.adapter });
+          return undefined;
+        },
+      },
+    },
+    session: {
+      create: {
+        before: async (session, context) => {
+          await credentialGuard.beforeSessionCreate({ userId: session.userId, context });
+          return createBeforeSessionCreateHook({ repo, collaborators: hooks, sessionClaims })(
+            session,
+            context,
+          );
+        },
+        after: async (session) => {
+          await afterSessionCreate({
+            repo,
+            organizations: hooks.organizations,
+            userId: session.userId,
+            announcements: hooks.announcements,
+          });
+        },
+      },
+    },
+  },
+
+  // BetterAuth logger wiring
+  logger: {
+    disabled: false,
+    log: (level, message, ...args) => {
+      idTokenIssuerRefusals?.note([message, ...args]);
+      if (level === "error") {
+        logger.error({ args }, message);
+      } else if (level === "warn") {
+        logger.warn({ args }, message);
+      } else {
+        logger.info({ args }, message);
+      }
+    },
+  },
+
+  /**
+   * BetterAuth mounts credential endpoints even when email/password is off.
+   * In SSO mode, ADR-027 uses this same memoized gate: allow blocks email
+   */
+  hooks: {
+    before: createBeforeRequestHook({
+      federation,
+      shadow,
+      signInLockout,
+      addressRoutesToConnection: async ({ email }) =>
+        (await findGoverningConnections({ email })).length > 0,
+    }),
+    /** `createAuthMiddleware` is load-bearing, not ceremony: the after-hook
+     *  runner reads `.headers` off whatever the hook returns, unguarded, so a
+     *  bare async resolving undefined fails EVERY auth request after its
+     *  endpoint has already answered. */
+    after: createAuthMiddleware(async (ctx) => {
+      await passwordResetSession?.signInAfterPasswordReset(ctx);
+      await countSignInAttempt({ ctx, signInLockout });
+      answerAuthRefusalByRegisteredCode(ctx);
+    }),
+  },
+});
+
+/**
+ * Two-step verification as main mounts it: an account holding no password (a
+ * passkey sign-up) sets it up without one, and backup codes are stored encrypted.
+ */
+export function twoFactorPlugin(): ReturnType<typeof twoFactor> {
+  return twoFactor({
+    issuer: "LangWatch",
+    allowPasswordless: true,
+    backupCodeOptions: { storeBackupCodes: "encrypted" },
+  });
+}
+
+/**
+ * The generic-OIDC plugin, mounted only when this deployment configured a connection for it. A
+ * provider unreachable at startup is left out and retried, rather than failing the process.
+ */
+function genericOAuthPlugins(
+  deployment: BetterAuthDeploymentConfiguration,
+): NonNullable<BetterAuthOptions["plugins"]> {
+  if (deployment.genericOAuthConfigs.length === 0) return [];
+  return [resilientGenericOAuth({ config: [...deployment.genericOAuthConfigs] })];
+}
+
+/**
+ * Sign-ins a SAML identity provider starts: the connection's own document opts it in
+ * and lists where one may land, and identity's rule picks the landing from that list.
+ * specs/identity/sso-saml-idp-initiated.feature
+ */
+export const ssoSamlOptions: NonNullable<SSOOptions["saml"]> = {
+  // samlify and the plugin read this allowance in milliseconds.
+  clockSkew: SIGN_IN_CLOCK_TOLERANCE_SECONDS * 1_000,
+  // Pinned: the per-connection opt-in lives inside this check; off would admit every connection.
+  enableInResponseToValidation: true,
+  resolveIdpInitiatedLanding: ({ relayState, samlConfig, appOrigin }) => {
+    const document = ssoSamlIdpConfigSchema.pick({ idpInitiated: true }).safeParse(samlConfig);
+    return idpInitiatedLanding({
+      relayState,
+      allowedTargets: document.success ? document.data.idpInitiated.landingTargets : [],
+      appOrigin,
+      defaultTarget: "/",
+    });
+  },
+};
+
+/**
+ * The single sign-on plugin: `/sign-in/sso` and the callbacks a customer's
+ * own identity provider answers. Mounted always, because a connection is
+ * refused per organization by the gate below and never by an absent route.
+ */
+function ssoPlugin({
+  assertions,
+  evidence,
+}: {
+  assertions: SsoAssertionApi;
+  evidence: Pick<SessionCallbackEvidenceChannel, "recordAuthenticatedSsoAccount">;
+}): ReturnType<typeof sso> {
+  return sso({
+    /**
+     * Provider rows are a projection of the managed connection log, so the
+     * plugin's own session-authenticated registration route must never become
+     * a second writer for the same configuration.
+     */
+    providersLimit: 0,
+    /**
+     * The provider's word on whether it verified the address, which is what
+     * lets an organization move without minting a second account for
+     * everybody. Warranted only because `resolveUser` asks the proved domain.
+     */
+    trustEmailVerified: true,
+    /** Somebody with no account who signs in through their employer's
+     *  provider gets one; where they land is the arrival policy's business. */
+    disableImplicitSignUp: false,
+    saml: ssoSamlOptions,
+    // Seconds, as jose reads them; `maxTokenAge` is what makes jose refuse an `iat` in the future.
+    oidc: {
+      clockTolerance: SIGN_IN_CLOCK_TOLERANCE_SECONDS,
+      maxTokenAge: ID_TOKEN_MAX_AGE_SECONDS,
+    },
+    resolveUser: async (input, context) => {
+      const resolution = await resolveSsoUser({ assertions, input, context });
+      // The exact account admitted here is the one the session it mints is attributed to.
+      if (resolution.action !== "reject") {
+        evidence.recordAuthenticatedSsoAccount({
+          providerId: input.providerId,
+          providerAccountId: input.accountKey.accountId,
+        });
+      }
+      return resolution;
+    },
+  });
+}
+
+/** What the provider said about the address: SAML never says anything; OIDC is
+ *  read from the signature-checked ID token and the userinfo response. */
+function emailVerificationOf(input: SSOUserResolutionInput): AssertedEmailVerification {
+  if (input.protocol !== "oidc") return "unasserted";
+  const tokenIssuer = input.verifiedIdTokenClaims.iss;
+  return assertedEmailVerification({
+    claimSources: [input.verifiedIdTokenClaims, input.providerClaims],
+    issuer: typeof tokenIssuer === "string" ? tokenIssuer : input.accountKey.issuer,
+  });
+}
+
+/**
+ * Whether this verified assertion may become a session at all — asked before
+ * anything links it to a person, because deciding membership first was an
+ * account takeover (ADR-117 §5).
+ */
+export async function resolveSsoUser({
+  assertions,
+  input,
+  context,
+}: {
+  assertions: SsoAssertionApi;
+  input: SSOUserResolutionInput;
+  context: SSOUserResolutionContext;
+}): Promise<SSOUserResolution> {
+  try {
+    const decision = await assertions.decide({
+      providerId: input.providerId,
+      accountId: input.accountKey.accountId,
+      email: input.providerUser.email,
+    });
+    /** RETURNED, NEVER THROWN: the plugin catches and answers
+     *  `SSO_USER_RESOLUTION_FAILED`, destroying a thrown handled error.
+     *  Returned, the code reaches the screen that renders its copy. */
+    if (decision.action === "reject") return { action: "reject", code: decision.error.code };
+
+    // Only an admitted assertion is linked to anybody (specs/identity/scim-sso-signin.feature).
+    const resolution = await assertions.resolveUser({
+      protocol: input.protocol,
+      providerId: input.providerId,
+      accountKey: input.accountKey,
+      email: input.providerUser.email,
+      emailVerified: input.providerUser.emailVerified,
+      emailVerification: emailVerificationOf(input),
+    });
+    if (resolution.action !== "link" || !resolution.confirmAddress) return resolution;
+    // Inside the library's callback transaction, so a failed link leaves the address unconfirmed.
+    await context.database.update({
+      model: "user",
+      where: [{ field: "id", value: resolution.userId }],
+      update: { emailVerified: true },
+    });
+    return { action: "link", userId: resolution.userId, profile: resolution.profile };
+  } catch (error) {
+    /** We log our own failure because nobody else will: the plugin discards
+     *  this error and answers `SSO_USER_RESOLUTION_FAILED` to the customer. */
+    logger.error(
+      { error, providerId: input.providerId },
+      "deciding whether a single sign-on account may be linked threw; the plugin will answer SSO_USER_RESOLUTION_FAILED and discard this error",
+    );
+    throw error;
+  }
+}
+
+/**
+ * The issuers ONE request may reach. Asked per request rather than resolved
+ * at boot: a connection registered a minute ago has to be dialable now.
+ */
+interface BetterAuthSsoIssuers {
+  issuersForRequest(request: Request | undefined): Promise<string[]>;
+  /** The public origins those issuers' discovery documents serve endpoints
+   *  from. Absent, only the issuers' own origins are trusted. */
+  endpointOriginsFor?(issuers: readonly string[]): Promise<string[]>;
+}
+
+/**
+ * Everything the deployment's one Better Auth instance is built from.
+ */
+type BetterAuthTransportOptions = Readonly<{
+  /** The Auth service whose sessions this instance mints and revokes. */
+  auth: AuthApi;
+  /** Where an ID token refused for its issuer is noted for the callback's redirect. */
+  idTokenIssuerRefusals?: IdTokenIssuerRefusalChannel;
+  /** The persistence boundary every database hook reads and writes through. */
+  database: BetterAuthHooksRepository;
+  /** better-auth's whole `database:` entry: identity's storage adapter (ADR-116 §1). */
+  storage: AdapterFactory<BetterAuthOptions>;
+  deployment: BetterAuthDeploymentConfiguration;
+  federation: BetterAuthFederation;
+  identity: BetterAuthIdentityCeremonies;
+  invites: BetterAuthHookCollaborators["invites"];
+  organizations: BetterAuthHookCollaborators["organizations"];
+  announcements: BetterAuthAnnouncements;
+  shadow: SignInRouterShadow;
+  /** The grant ledger an SSO auto-join writes its membership through. */
+  authzGrants: BetterAuthHookCollaborators["authzGrants"];
+  /** The connection's arrival door every federated sign-in is asked of. */
+  arrivals: BetterAuthHookCollaborators["arrivals"];
+  /** Whether a customer's identity provider may assert this address at all. */
+  ssoAssertions: SsoAssertionApi;
+  /** Whose registered issuers this request is allowed to reach. */
+  ssoIssuers: BetterAuthSsoIssuers;
+  /** Where a sign-in through a connection is recorded as having happened. */
+  ssoActivity: BetterAuthHookCollaborators["ssoActivity"];
+  /** Which of a cutover's two connections a callback belongs to. */
+  ssoMigration: BetterAuthHookCollaborators["ssoMigration"];
+  /** Where a refused sign-in link leaves a proposal for an administrator. */
+  linkProposals: BetterAuthHookCollaborators["linkProposals"];
+  /**
+   * Sends the password-reset link.
+   */
+  sendResetPassword: (input: { email: string; token: string }) => Promise<void>;
+  secondaryStorage: NonNullable<BetterAuthOptions["secondaryStorage"]>;
+  /** Whether Better Auth's rate limiter counts in the shared secondary storage. */
+  sharedStorage: boolean;
+  signUpVerification: SignUpVerification & SignUpAddressConfirmation;
+  users: UserApi;
+  /** Whether an already proved password may open this deployment's local door
+   *  for the organization its address routes to. */
+  credentialGuard: CredentialSessionGuard;
+  /** The consecutive-failure counter behind account lock-out (GAC-09). */
+  signInLockout: SignInAttemptCounter;
+  /** The organization connections that govern an address (D04). */
+  findGoverningConnections: FindGoverningConnections;
+  /** Who the installation lets create an account. */
+  signUpPolicy: SignUpPolicy;
+  /** Whether a proven address still enrols a passkey here, asked at both ends of the ceremony. */
+  passkeySignUpEligibility: PasskeySignUpEligibility;
+  /** Identity's answer to what a session records at mint (D06). */
+  mintClaims: Pick<IdentityApi, "claimsForMint">;
+}>;
+
+/** Each plugin the instance may mount; named so the options type stays short in emit. */
+type TransportPlugin =
+  | typeof samlOwnOriginRepost
+  | ReturnType<typeof twoFactor>
+  | ReturnType<typeof passkey>
+  | ReturnType<typeof sso>
+  | ReturnType<typeof signUpConfirmationPlugin>;
+
+type TransportOptions = ReturnType<typeof createAuthOptions> & { plugins: TransportPlugin[] };
+
+/** The options the deployment's ONE Better Auth instance is built from. */
+const transportOptions = ({
+  announcements,
+  arrivals,
+  auth,
+  authzGrants,
+  credentialGuard,
+  database,
+  deployment,
+  federation,
+  identity,
+  invites,
+  organizations,
+  sharedStorage,
+  secondaryStorage,
+  sendResetPassword,
+  shadow,
+  signUpVerification,
+  ssoActivity,
+  ssoAssertions,
+  ssoIssuers,
+  signInLockout,
+  findGoverningConnections,
+  signUpPolicy,
+  passkeySignUpEligibility,
+  ssoMigration,
+  linkProposals,
+  storage,
+  users,
+  idTokenIssuerRefusals,
+  mintClaims,
+  callbackEvidence,
+}: BetterAuthTransportOptions & {
+  callbackEvidence: SessionCallbackEvidenceChannel;
+}): TransportOptions => {
+  const passwordResetSession = PasswordResetSessionChannel.create();
+  const authOptions = createAuthOptions({
+    repo: database,
+    deployment,
+    storage,
+    federation,
+    identity,
+    shadow,
+    ssoIssuers,
+    credentialGuard,
+    signInLockout,
+    findGoverningConnections,
+    signUpPolicy,
+    passwordResetSession,
+    idTokenIssuerRefusals,
+    sessionClaims: { identity: mintClaims, evidence: callbackEvidence },
+    hooks: {
+      federation,
+      invites,
+      organizations,
+      announcements,
+      authzGrants,
+      arrivals,
+      ssoActivity,
+      ssoMigration,
+      linkProposals,
+    },
+  });
+  return {
+    ...authOptions,
+    plugins: [
+      samlOwnOriginRepost,
+      ...genericOAuthPlugins(deployment),
+      ...(deployment.mfaEnrollmentOpen ? [twoFactorPlugin()] : []),
+      ...(deployment.passkeysEnabled
+        ? [
+            passkey({
+              registration: passkeySignUpRegistration({
+                announcements,
+                handleSecret: deployment.passkeyHandleSecret,
+                users,
+                verification: signUpVerification,
+                policy: signUpPolicy,
+                eligibility: passkeySignUpEligibility,
+              }),
+            }),
+          ]
+        : []),
+      ssoPlugin({ assertions: ssoAssertions, evidence: callbackEvidence }),
+      signUpConfirmationPlugin({ verification: signUpVerification, users }),
+    ],
+    secondaryStorage,
+    rateLimit: {
+      ...authOptions.rateLimit,
+      storage: sharedStorage ? "secondary-storage" : "memory",
+    },
+    emailAndPassword: {
+      ...authOptions.emailAndPassword,
+      sendResetPassword: async ({ user, token }) => {
+        await sendResetPassword({ email: user.email, token });
+      },
+      onPasswordReset: async ({ user }, request) => {
+        await auth.revokeAllBrowserSessions({ userId: user.id });
+        passwordResetSession.recordPasswordReset({ userId: user.id, request });
+      },
+    },
+  } satisfies BetterAuthOptions;
+};
+
+export type BetterAuthTransport = Auth<TransportOptions>;
+
+/** Builds the deployment's ONE Better Auth instance; each request it handles opens its
+ *  own callback-evidence slot, so a session is attributed only to its own callback. */
+export const createBetterAuthTransport = (
+  options: BetterAuthTransportOptions,
+): BetterAuthTransport => {
+  const callbackEvidence = SessionCallbackEvidenceChannel.create();
+  const instance = betterAuth(transportOptions({ ...options, callbackEvidence }));
+  return {
+    ...instance,
+    handler: (request: Request) => callbackEvidence.runWithScope(() => instance.handler(request)),
+  };
+};

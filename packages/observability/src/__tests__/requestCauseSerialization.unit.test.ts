@@ -1,29 +1,17 @@
 /**
- * What a re-keyed cause actually looks like once pino has written it.
- *
- * The other request-logging tests assert on the object handed to the logger,
- * which is one level above the bug this file exists for. pino applies
- * serializers by exact property name and warns about nothing when a key has
- * none: the value goes to `JSON.stringify`, and an `Error` has no enumerable
- * own properties, so it lands as `{}`. Moving a cause from `error` to
- * `requestError` without registering the second key therefore drops the
- * message and the stack - the only reasons the cause is logged at all - while
- * every assertion on the handed-over object still passes.
- *
- * So these tests read the emitted line, through the same serializer map
- * `createLogger` installs.
+ * Test emitted line through serializer map (catches errors pino silently drops).
+ * Catches missing serializers that JSON.stringify converts to {}.
  */
 
 import { Writable } from "node:stream";
+
 import pino from "pino";
 import { describe, expect, it } from "vitest";
-import { REQUEST_CAUSE_FIELD } from "../constants";
-import { NODE_LOG_SERIALIZERS } from "../logger";
-import {
-  MAX_SUMMARY_MESSAGE_LENGTH,
-  MAX_SUMMARY_STACK_LENGTH,
-} from "../request/errorSummary";
-import { logHttpRequest } from "../request/requestLogging";
+
+import { REQUEST_CAUSE_FIELD } from "../constants.ts";
+import { NODE_LOG_SERIALIZERS } from "../logger.ts";
+import { MAX_SUMMARY_MESSAGE_LENGTH, MAX_SUMMARY_STACK_LENGTH } from "../request/errorSummary.ts";
+import { logHttpRequest } from "../request/requestLogging.ts";
 
 /**
  * A pino logger wired to the real serializer map, writing where we can read it.
@@ -101,9 +89,7 @@ describe("emitted request-log records", () => {
     });
 
     it("does not emit the cause as an empty object", () => {
-      expect(
-        Object.keys(warnRecord()?.[REQUEST_CAUSE_FIELD] ?? {}),
-      ).not.toHaveLength(0);
+      expect(Object.keys(warnRecord()?.[REQUEST_CAUSE_FIELD] ?? {})).not.toHaveLength(0);
     });
 
     it("carries no field named error, so nothing downstream reads it as one", () => {
@@ -223,12 +209,12 @@ describe("emitted request-log records", () => {
           /** @scenario A wide failure is logged as a bounded summary */
           it("carries only type, message, code and stack on the cause", () => {
             const cause = emitted()[field];
-            expect(Object.keys(cause).every((k) =>
-              ["type", "message", "code", "stack"].includes(k),
-            )).toBe(true);
+            expect(
+              Object.keys(cause).every((k) => ["type", "message", "code", "stack"].includes(k)),
+            ).toBe(true);
             expect(cause.type).toBe(fixture.name);
             expect(cause.message).toContain(fixture.make().message);
-            if (fixture.code) expect(cause.code).toBe(fixture.code);
+            expect(cause.code).toBe(fixture.code);
           });
 
           /** @scenario Error records carry no superjson metadata */
@@ -263,10 +249,11 @@ describe("emitted request-log records", () => {
     });
 
     describe("when it is an error-like object", () => {
-      const cause = () => emittedFor({
-        message: "database unavailable",
-        code: "P1001",
-      });
+      const cause = () =>
+        emittedFor({
+          message: "database unavailable",
+          code: "P1001",
+        });
 
       /** @scenario An error-like object keeps its message and code */
       it("keeps its message and code", () => {
@@ -278,9 +265,7 @@ describe("emitted request-log records", () => {
 
       it("emits only type, message, code and stack", () => {
         expect(
-          Object.keys(cause()).every((k) =>
-            ["type", "message", "code", "stack"].includes(k),
-          ),
+          Object.keys(cause()).every((k) => ["type", "message", "code", "stack"].includes(k)),
         ).toBe(true);
       });
     });
@@ -302,9 +287,7 @@ describe("emitted request-log records", () => {
       const thrown = { headers: { authorization: "Bearer secret" } };
 
       it("does not emit the secret", () => {
-        expect(JSON.stringify(emittedFor(thrown))).not.toContain(
-          "Bearer secret",
-        );
+        expect(JSON.stringify(emittedFor(thrown))).not.toContain("Bearer secret");
       });
 
       /** @scenario A thrown plain object is described without its contents */
@@ -379,9 +362,7 @@ describe("emitted request-log records", () => {
 
     describe("when it is an Error wrapping another Error as its cause", () => {
       it("keeps the inner message in the message or stack", () => {
-        const cause = emittedFor(
-          new Error("outer", { cause: new Error("inner") }),
-        );
+        const cause = emittedFor(new Error("outer", { cause: new Error("inner") }));
         expect(`${cause.message}\n${cause.stack}`).toContain("inner");
       });
     });
@@ -400,8 +381,7 @@ describe("emitted request-log records", () => {
             userAgent: null,
             error: {
               name: "ReplyError",
-              message:
-                "WRONGPASS invalid username-password pair AUTH s3cret-pass",
+              message: "WRONGPASS invalid username-password pair AUTH s3cret-pass",
               command: { name: "auth", args: ["default", "s3cret-pass"] },
             },
           });
@@ -414,13 +394,10 @@ describe("emitted request-log records", () => {
 
   describe("given an ioredis ReplyError carrying the AUTH password", () => {
     const replyError = () =>
-      Object.assign(
-        new Error("WRONGPASS invalid username-password pair or user is disabled."),
-        {
-          name: "ReplyError",
-          command: { name: "auth", args: ["default", "s3cret-pass"] },
-        },
-      );
+      Object.assign(new Error("WRONGPASS invalid username-password pair or user is disabled."), {
+        name: "ReplyError",
+        command: { name: "auth", args: ["default", "s3cret-pass"] },
+      });
 
     for (const { label, statusCode } of [
       { label: "warn", statusCode: 409 },

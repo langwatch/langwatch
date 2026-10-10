@@ -15,8 +15,9 @@ Feature: haven service selection
   Scenario: A fresh worktree starts lean
     Given a worktree that has never been up
     When the developer runs "haven up"
-    Then the stack runs the app (workers in-process), nlp, gateway, and the idp simulator
+    Then the stack runs the three Node lanes (ui, api, workers), nlp, gateway, and the idp simulator
     And langy is not started
+    And neither developer tool is started
     And the first up prints the selection and how to change it
 
   Scenario: Adding a service is one word and it sticks
@@ -53,10 +54,14 @@ Feature: haven service selection
     Then the report names the selected services and their health
     And names the services not selected, each with the exact "+svc" to add it
 
-  Scenario: The standalone workers lane is a selection, not an env var
-    When the developer runs "haven up +workers"
-    Then the workers run as their own lane instead of in-process
-    And the choice sticks like any other selection
+  # The workers lane stopped being selectable when the background worker became
+  # its own application: every stack runs it, so ±workers has nothing to pick.
+  # It is refused BY NAME rather than falling into the generic "unknown service"
+  # error, which reads as a typo. See specs/setup/dev-process-topology.feature.
+  Scenario: A retired service delta is refused by name
+    When the developer runs "haven up +workers" or "haven up -workers"
+    Then the command is refused
+    And the refusal says the background worker is its own process now
 
   Scenario: Removed selection env vars name their replacement
     Given the developer still has "LANGWATCH_SKIP_NLP=1" set from before
@@ -65,10 +70,14 @@ Feature: haven service selection
     And the error says the variable no longer selects services
     And it names the one command that replaces it, "haven up -nlp"
 
-  Scenario: A variable haven never read as a selection does not block a stack
-    Given the developer sets "WORKERS_IN_PROCESS=1", which is what plain "pnpm dev" already sets
+  # Neither worker variable describes a topology this repository still has, so
+  # both are refused on ANY value rather than only the one that used to change
+  # what ran, and neither refusal offers a replacement — there is none.
+  Scenario: A knob nothing reads is refused whichever way it is set
+    Given the developer still has "WORKERS_IN_PROCESS" or "START_WORKERS" set from before
     When they run "haven up"
-    Then the stack starts normally
+    Then the command fails instead of starting a stack
+    And the error says the variable no longer does anything, naming no replacement
 
   # Every consumer outside haven spells truthiness differently, so matching one
   # literal lets the others through — and letting one through means running a
@@ -91,3 +100,120 @@ Feature: haven service selection
     Then langy is on
     And gateway and nlp keep the defaults they would have had
     And a file that names no services at all is treated as never written
+
+  Rule: Langy's isolation tier is decided before the stack is built
+
+    # The tier is the isolation posture the Langy worker runs under, and it is
+    # persisted on the stack, carried into the overlay, the plan, a restart and
+    # the reconcile guard — so it is resolved once, up front, from the
+    # developer's own choice and from the machine. On a laptop with no container
+    # runtime the only alternative to the host tier was no manager at all, which
+    # is a stack that looks healthy and answers no chat. Bound by
+    # domain/langytier_test.go and app/langy_tier_test.go. See ADR-129.
+
+    Scenario: No container runtime on a development machine runs langy on the host
+      Given a development stack on a machine with no container runtime
+      And the developer has not chosen an isolation tier
+      When they run "haven up +langy"
+      Then the worker runs on the host instead of langy being skipped
+      And one line names the missing runtime, why the worker runs on the host, and how to refuse
+
+    Scenario: A development machine with a container runtime keeps the sandbox
+      Given a development stack on a machine that has a container runtime
+      When they run "haven up +langy"
+      Then the worker runs in the container with the per-worker sandbox on
+      And nothing is said about the tier
+
+    Scenario: A non-development stack with no container runtime keeps the sandbox
+      Given a stack whose environment is not a development one
+      And the machine has no container runtime
+      When they run "haven up +langy"
+      Then the tier stays the production-like one
+      And langy is skipped with the host-access opt-in named, as before
+
+    Scenario: An explicit isolation choice is never overridden by the machine
+      Given the developer asked for a tier by hand
+      When they run "haven up +langy" on a machine with no container runtime
+      Then the tier they asked for is the tier they get
+      And refusing host access explicitly keeps the sandboxed tier
+
+    Scenario: A Langy that cannot start leaves the app no dead agent address
+      Given the developer ran "haven up +langy"
+      And the langy-worker build failed, so langy is skipped for this run
+      When the services start
+      Then the app is not given LANGY_AGENT_URL or the agent's shared secret
+      And a Langy send refuses with "Agent not configured" instead of reconnecting forever
+
+  Rule: The developer tools are optional lanes, never product lanes
+
+    # The design system's Storybook and the mail studio are tools a developer
+    # opens, not services the application talks to: nothing in the product
+    # degrades when they are absent. So they stay in their own packages
+    # (@langwatch/design-system, @langwatch/mail) and haven runs them the way it
+    # runs langy — off by default, added by name, sticky from then on. Bound by
+    # domain/devtools_test.go and app/plan_devtools_test.go.
+
+    Scenario: The developer tools are off until a worktree asks for them
+      Given a worktree that has never been up
+      When the developer runs "haven up"
+      Then the design-system Storybook is not started
+      And the mail studio is not started
+      And the status line names each one with the exact "+svc" that adds it
+
+    Scenario: Adding both developer tools is one command and it sticks
+      When the developer runs "haven up +design-system +mail-room"
+      Then both developer-tool hostnames are routed for this stack
+      And the Storybook and the mail studio are each built and served by haven
+      And a later plain "haven up" in this worktree still routes both
+
+    # The lanes used to be called "storybook" and "mail"; the old names are
+    # refused by name, naming the flag that replaced each one, the same way
+    # "haven up ±workers" is refused.
+    Scenario: A renamed developer-tool lane is refused by its old name
+      When the developer runs "haven up +storybook"
+      Then the command is refused, naming "+design-system" as the replacement
+      When the developer runs "haven up +mail"
+      Then the command is refused, naming "+mail-room" as the replacement
+
+    # The Storybook is haven's design-system lane: built with `storybook build`
+    # and served as static files by haven's own binary. The mail studio is the
+    # mail-room lane the same way: `build:studio` renders every fixture to static
+    # files at build time, and its props panel is read-only (2026-10-10).
+    Scenario: A selected developer tool is reached by hostname
+      Given a worktree that selected both developer tools
+      Then the Storybook is served at "design-system.<slug>.langwatch.localhost"
+      And the mail studio is served at "mail-room.<slug>.langwatch.localhost"
+      And each is healthy once its root answers
+      And the Storybook's output appears in "haven logs design-system"
+      And the mail studio's output appears in "haven logs mail-room"
+
+    # Haven hands the ui lane the routed URL of the built Storybook, so the
+    # hostname and the application's /design-system reach the same Storybook.
+    Scenario: The application frames the Storybook the stack routes to
+      Given a worktree that selected the Storybook
+      When someone opens "/design-system" in the application
+      Then the page frames the Storybook behind "design-system.<slug>.langwatch.localhost"
+      And no Storybook dev server is started
+      And a worktree that did not select it starts no Storybook at all
+
+    # A stack missing one of the three Node lanes serves pages and quietly
+    # processes no jobs. Neither developer tool can be mistaken for one of them.
+    Scenario: A developer tool is not one of the three Node lanes
+      Given a worktree that selected both developer tools
+      When a reader asks which Node lanes the stack supervises
+      Then the answer is still ui, api and workers
+      And neither developer tool appears among them
+
+    # A worktree's .haven.json may predate the rename and still carry the old
+    # "storybook" / "mail" keys. Losing that on read would silently turn a lane
+    # back off for every worktree that had turned it on. Bound by
+    # adapters/fileregistry/store_test.go.
+    Scenario: A stored old-name developer-tool selection migrates on load
+      Given a worktree's selection file states "storybook" and "mail" from before the rename
+      When haven reads the worktree's selection
+      Then the design system reads back on from its old key
+      But the mail room does not: "mail" now states the mail sink lane, so a
+        worktree that had the mail room on under the old spelling turns it on
+        again by hand
+      And the next write replaces "storybook" with "design-system" and states
+        the mail room under its own key

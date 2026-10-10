@@ -76,8 +76,15 @@ Feature: Langy conversation titles are derived, then generated once by a cheap m
     And the turn's outcome is unaffected
 
   @unit
+  Scenario: A project with no model for titles falls back to the cheap default
+    Given the project has no model configured for titles
+    When the title is generated
+    Then the title is generated on the cheap default model, retried once at most
+
+  @unit
   Scenario: A project with no model for titles is not retried
     Given the project has no model configured for titles
+    And the cheap default model cannot be asked either
     When the title is generated
     Then no title is produced and nothing is retried
 

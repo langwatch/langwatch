@@ -1,0 +1,874 @@
+import type { PersonalFeatures } from "@langwatch/organization-contract";
+import {
+  NEVER_LANDED_ON_PROJECT_KINDS,
+  NON_DESTINATION_PROJECT_KINDS,
+  aggregateRuleSchema,
+  type AggregateMemberCandidate,
+  type AggregateRule,
+  type LiveAggregate,
+  type StoredAggregateProject,
+  PROJECT_KIND,
+  ProjectNotFoundError,
+  internalProjectSchema,
+  projectSchema,
+  traceDestinationProjectSchema,
+  type ActiveProjectsByScopesInput,
+  type CreateProjectInput,
+  type InternalProject,
+  type InternalProjectKind,
+  type PaginatedProjects,
+  type ArchivedProject,
+  type Project,
+  type ProjectIdentity,
+  type ProjectPath,
+  type ProjectWithTeam,
+  type SearchProjectsResult,
+  type TraceDestinationProject,
+  type TraceSharingConfig,
+  type UpdateProjectInput,
+  type UpdateProjectMetadataInput,
+  type ProjectIdPage,
+  type ProjectIdPageInput,
+  type ProjectLwqlKeyPage,
+  type ProjectOrganizationPage,
+  type ProjectPrivateS3Page,
+  type ProjectUsageCount,
+  type ProjectKind,
+} from "@langwatch/project-contract";
+import { nowInstant, toDate, type Instant } from "@langwatch/time";
+
+import type {
+  ProjectRepository,
+  ProjectWithOrgAdmin,
+  TouchCodingAgentActivityInput,
+} from "../project.repository.ts";
+import type { MemoryProjectDatabase } from "./memory.project.database.ts";
+
+/** Newest first, then id, which is the order both listings are read in. */
+function newestFirst(left: Project, right: Project): number {
+  return right.createdAt.getTime() - left.createdAt.getTime() || right.id.localeCompare(left.id);
+}
+
+function contains(haystack: string, needle: string): boolean {
+  return haystack.toLowerCase().includes(needle.toLowerCase());
+}
+
+export class MemoryProjectRepository implements ProjectRepository {
+  readonly #database: MemoryProjectDatabase;
+
+  private constructor(database: MemoryProjectDatabase) {
+    this.#database = database;
+  }
+
+  static create(input: Readonly<{ memory: MemoryProjectDatabase }>): MemoryProjectRepository {
+    return new MemoryProjectRepository(input.memory);
+  }
+
+  async findPaths(input: { projectIds: string[] }): Promise<ProjectPath[]> {
+    return input.projectIds.flatMap((projectId) => {
+      const project = this.#database.findProject(projectId);
+      if (!project) return [];
+      const team = this.#database.findTeam(project.teamId);
+      const organization = this.#database.findOrganizationOf(project);
+      if (!team || !organization) return [];
+
+      return [
+        {
+          projectId: project.id,
+          fullPath: `${organization.name} / ${team.name} / ${project.name}`,
+        },
+      ];
+    });
+  }
+
+  async findProjectsWithDepartments({
+    organizationId,
+    hiddenKinds,
+  }: {
+    organizationId: string;
+    hiddenKinds: readonly string[];
+  }): Promise<{ id: string; name: string; departmentId: string | null }[]> {
+    return this.#database
+      .projects()
+      .filter(
+        (row) =>
+          row.kind !== PROJECT_KIND.INTERNAL_GOVERNANCE &&
+          !hiddenKinds.includes(row.kind) &&
+          this.#database.isInOrganization(row, organizationId),
+      )
+      .map((row) => ({ id: row.id, name: row.name, departmentId: row.departmentId }))
+      .toSorted((left, right) => left.name.localeCompare(right.name));
+  }
+
+  async assignProjectDepartment(input: {
+    organizationId: string;
+    projectId: string;
+    departmentId: string | null;
+  }): Promise<boolean> {
+    const project = this.#database.findProject(input.projectId);
+    if (!project || !this.#database.isInOrganization(project, input.organizationId)) return false;
+    this.#database.putProject({ ...project, departmentId: input.departmentId });
+    return true;
+  }
+
+  async findInternalByOrganization(organizationId: string): Promise<InternalProject | null> {
+    const project = this.#database
+      .projects()
+      .find(
+        (row) =>
+          row.kind === PROJECT_KIND.INTERNAL_GOVERNANCE &&
+          row.archivedAt === null &&
+          this.#database.isInOrganization(row, organizationId),
+      );
+
+    return project ? this.#internal(project) : null;
+  }
+
+  async findLiveInternalIds({ kind }: { kind: InternalProjectKind }): Promise<string[]> {
+    return this.#database
+      .projects()
+      .filter((row) => row.kind === kind && row.archivedAt === null)
+      .map((row) => row.id);
+  }
+
+  async findInternalBySlug(slug: string): Promise<InternalProject | null> {
+    const project = this.#database.projects().find((row) => row.slug === slug);
+    if (!project || project.kind !== PROJECT_KIND.INTERNAL_GOVERNANCE) return null;
+
+    return this.#internal(project);
+  }
+
+  async createInternalOrFindWinner(input: {
+    id: string;
+    name: string;
+    slug: string;
+    apiKey: string;
+    teamId: string;
+  }): Promise<InternalProject> {
+    const winner = this.#database.projects().find((row) => row.slug === input.slug);
+    if (winner) return this.#internal(winner);
+
+    return this.#internal(
+      this.#database.putProject(
+        this.#row({
+          id: input.id,
+          name: input.name,
+          slug: input.slug,
+          apiKey: input.apiKey,
+          teamId: input.teamId,
+          language: "internal",
+          framework: "governance",
+          kind: PROJECT_KIND.INTERNAL_GOVERNANCE,
+          traceSharingEnabled: false,
+        }),
+      ),
+    );
+  }
+
+  async isPresenceEnabled(projectId: string): Promise<boolean> {
+    const project = this.#database.findProject(projectId);
+    const organization = project ? this.#database.findOrganizationOf(project) : undefined;
+
+    return Boolean(project?.presenceEnabled && organization?.presenceEnabled);
+  }
+
+  async findById(id: string): Promise<Project | null> {
+    return this.#database.findProject(id) ?? null;
+  }
+
+  async findOrganizationId(projectId: string): Promise<string | undefined> {
+    const project = this.#database.findProject(projectId);
+
+    return project ? this.#database.findTeam(project.teamId)?.organizationId : undefined;
+  }
+
+  async findWithTeam(id: string): Promise<ProjectWithTeam | null> {
+    const project = this.#database.findProject(id);
+    if (!project || project.archivedAt !== null) return null;
+    const team = this.#database.findTeam(project.teamId);
+    if (!team) return null;
+
+    return { ...project, team };
+  }
+
+  async updateMetadata({ id, data }: UpdateProjectMetadataInput): Promise<void> {
+    const project = this.#database.findProject(id);
+    if (!project) return;
+    this.#database.putProject({ ...project, ...data, updatedAt: toDate(nowInstant()) });
+  }
+
+  async touchCodingAgentSessionSeen(input: TouchCodingAgentActivityInput): Promise<void> {
+    this.#touch(input, "lastCodingAgentSessionAt");
+  }
+
+  async touchCodingAgentPullRequestSeen(input: TouchCodingAgentActivityInput): Promise<void> {
+    this.#touch(input, "lastCodingAgentPullRequestAt");
+  }
+
+  async findWithOrgAdmin(id: string): Promise<ProjectWithOrgAdmin | null> {
+    const project = this.#database.findProject(id);
+    if (!project) return null;
+    const organization = this.#database.findOrganizationOf(project);
+
+    return {
+      firstMessage: project.firstMessage,
+      organizationId: organization?.id ?? null,
+      adminUserId: organization?.adminUserIds[0] ?? null,
+      onboardingVariant: organization?.onboardingVariant ?? null,
+      organizationCreatedAt: organization?.createdAt ?? null,
+    };
+  }
+
+  async findTraceSharingConfig(id: string): Promise<TraceSharingConfig | null> {
+    const project = this.#database.findProject(id);
+    if (!project) return null;
+    const organization = this.#database.findOrganizationOf(project);
+
+    return {
+      orgEnabled: organization?.traceSharingEnabled ?? false,
+      projectEnabled: project.traceSharingEnabled,
+    };
+  }
+
+  async searchByQuery(input: {
+    query: string;
+    organizationId?: string;
+    limit?: number;
+  }): Promise<SearchProjectsResult[]> {
+    return this.#database
+      .projects()
+      .filter(
+        (project) =>
+          (project.id.includes(input.query) ||
+            contains(project.name, input.query) ||
+            contains(project.slug, input.query)) &&
+          (!input.organizationId || this.#database.isInOrganization(project, input.organizationId)),
+      )
+      .slice(0, input.limit ?? 20)
+      .map(({ id, name, slug }) => ({ id, name, slug }));
+  }
+
+  async create(input: CreateProjectInput): Promise<Project> {
+    return this.#database.putProject(this.#row(input));
+  }
+
+  async update(input: {
+    id: string;
+    organizationId: string;
+    data: UpdateProjectInput;
+  }): Promise<Project> {
+    const project = this.#live(input.id, input.organizationId);
+
+    return this.#database.putProject(
+      projectSchema.parse({ ...project, ...input.data, updatedAt: toDate(nowInstant()) }),
+    );
+  }
+
+  async archive(input: { id: string; organizationId: string }): Promise<ArchivedProject> {
+    const project = this.#live(input.id, input.organizationId);
+    const archivedAt = toDate(nowInstant());
+
+    return { ...this.#database.putProject({ ...project, archivedAt }), archivedAt };
+  }
+
+  async listAllByOrganization(input: {
+    organizationId: string;
+    page: number;
+    limit: number;
+    projectIds?: string[];
+    includeGovernance?: boolean;
+    hiddenKinds?: ProjectKind[];
+  }): Promise<PaginatedProjects> {
+    const matching = this.#database
+      .projects()
+      .filter(
+        (project) =>
+          project.archivedAt === null &&
+          (input.includeGovernance === true || project.kind !== PROJECT_KIND.INTERNAL_GOVERNANCE) &&
+          !input.hiddenKinds?.some((kind) => kind === project.kind) &&
+          this.#database.isInOrganization(project, input.organizationId) &&
+          (!input.projectIds || input.projectIds.includes(project.id)),
+      )
+      .toSorted(newestFirst);
+    const from = (input.page - 1) * input.limit;
+
+    return {
+      data: matching.slice(from, from + input.limit),
+      pagination: { page: input.page, limit: input.limit, total: matching.length },
+    };
+  }
+
+  async findAllByTeam(input: {
+    organizationId: string;
+    teamId: string;
+    includeGovernance?: boolean;
+  }): Promise<Project[]> {
+    return this.#database
+      .projects()
+      .filter(
+        (project) =>
+          project.teamId === input.teamId &&
+          project.archivedAt === null &&
+          (input.includeGovernance === true || project.kind !== PROJECT_KIND.INTERNAL_GOVERNANCE) &&
+          this.#database.isInOrganization(project, input.organizationId),
+      )
+      .toSorted(newestFirst);
+  }
+
+  async findIdentity(id: string): Promise<ProjectIdentity | null> {
+    const project = this.#database.findProject(id);
+
+    return project ? this.#identity(project) : null;
+  }
+
+  async findNamesByIds(projectIds: string[]): Promise<ProjectIdentity[]> {
+    return projectIds.flatMap((projectId) => {
+      const project = this.#database.findProject(projectId);
+      const identity = project ? this.#identity(project) : null;
+
+      return identity ? [identity] : [];
+    });
+  }
+
+  async countUsage({
+    organizationIds,
+    since,
+  }: {
+    organizationIds: readonly string[];
+    since?: number;
+  }): Promise<ProjectUsageCount> {
+    const after = (at: number) => since === undefined || at >= since;
+    const projects = this.#database
+      .projects()
+      .filter((project) =>
+        organizationIds.some((organizationId) =>
+          this.#database.isInOrganization(project, organizationId),
+        ),
+      );
+    const made = projects.map((project) => project.createdAt.getTime());
+    return {
+      projects: projects.filter((project) => after(project.createdAt.getTime())).length,
+      updatedProjects: projects.filter((project) => after(project.updatedAt.getTime())).length,
+      ...(made.length === 0 ? {} : { firstProjectAt: Math.min(...made) }),
+    };
+  }
+
+  async listAllIds({ after, limit }: ProjectIdPageInput = {}): Promise<ProjectIdPage> {
+    const ids = this.#database
+      .projects()
+      .map((project) => project.id)
+      .filter((id) => after === undefined || id > after)
+      .toSorted();
+    if (limit === undefined || ids.length <= limit) return { ids, next: null };
+    const page = ids.slice(0, limit);
+    return { ids: page, next: page[page.length - 1] ?? null };
+  }
+
+  async listAllWithOrganization({
+    after,
+    limit,
+  }: ProjectIdPageInput = {}): Promise<ProjectOrganizationPage> {
+    const projects = this.#database
+      .projects()
+      .filter((project) => after === undefined || project.id > after)
+      .toSorted((left, right) => (left.id < right.id ? -1 : 1))
+      .flatMap((project) => {
+        const organizationId = this.#database.findTeam(project.teamId)?.organizationId;
+        return organizationId === undefined ? [] : [{ id: project.id, organizationId }];
+      });
+    if (limit === undefined || projects.length <= limit) return { projects, next: null };
+    const page = projects.slice(0, limit);
+    return { projects: page, next: page[page.length - 1]?.id ?? null };
+  }
+
+  async listAllWithPrivateS3({
+    after,
+    limit,
+  }: ProjectIdPageInput = {}): Promise<ProjectPrivateS3Page> {
+    const projects = this.#database
+      .projects()
+      .filter((project) => after === undefined || project.id > after)
+      .toSorted((left, right) => (left.id < right.id ? -1 : 1))
+      .map((project) => ({ id: project.id, privateS3: !!project.s3Bucket }));
+    if (limit === undefined || projects.length <= limit) return { projects, next: null };
+    const page = projects.slice(0, limit);
+    return { projects: page, next: page[page.length - 1]?.id ?? null };
+  }
+
+  async listLwqlKeys({ after, limit }: ProjectIdPageInput = {}): Promise<ProjectLwqlKeyPage> {
+    const projects = this.#database
+      .projects()
+      .filter((project) => after === undefined || project.id > after)
+      .toSorted((left, right) => (left.id < right.id ? -1 : 1))
+      .map((project) => ({ id: project.id, lwqlKey: project.lwqlKey }));
+    if (limit === undefined || projects.length <= limit) return { projects, next: null };
+    const page = projects.slice(0, limit);
+    return { projects: page, next: page[page.length - 1]?.id ?? null };
+  }
+
+  async countWithTraces({ organizationId }: { organizationId: string }): Promise<number> {
+    return this.#database
+      .projects()
+      .filter(
+        (project) =>
+          this.#database.isInOrganization(project, organizationId) &&
+          project.archivedAt === null &&
+          project.kind !== PROJECT_KIND.INTERNAL_GOVERNANCE &&
+          project.firstMessage,
+      ).length;
+  }
+
+  async findSharedProjectSlugs({
+    organizationId,
+    memberUserId,
+    limit,
+  }: {
+    organizationId: string;
+    memberUserId?: string;
+    limit: number;
+  }): Promise<string[]> {
+    return this.#database
+      .projects()
+      .filter((project) => {
+        const team = this.#database.findTeam(project.teamId);
+        return (
+          team?.organizationId === organizationId &&
+          !team.isPersonal &&
+          project.archivedAt === null &&
+          !NEVER_LANDED_ON_PROJECT_KINDS.includes(project.kind) &&
+          (memberUserId === undefined || this.#database.isTeamMember(team.id, memberUserId))
+        );
+      })
+      .toSorted((left, right) => left.createdAt.getTime() - right.createdAt.getTime())
+      .slice(0, limit)
+      .map((project) => project.slug);
+  }
+
+  async findIdsByOrganization(organizationId: string): Promise<string[]> {
+    return this.#database
+      .projects()
+      .filter((project) => this.#database.isInOrganization(project, organizationId))
+      .map((project) => project.id);
+  }
+
+  async findLiveNonGovernanceIds({
+    organizationId,
+    includeArchived,
+  }: {
+    organizationId: string;
+    includeArchived: boolean;
+  }): Promise<string[]> {
+    return this.#database
+      .projects()
+      .filter(
+        (project) =>
+          (includeArchived || project.archivedAt === null) &&
+          project.kind !== PROJECT_KIND.INTERNAL_GOVERNANCE &&
+          this.#database.isInOrganization(project, organizationId),
+      )
+      .map((project) => project.id);
+  }
+
+  async findLiveByIdInOrganization(input: {
+    id: string;
+    organizationId: string;
+  }): Promise<Project[]> {
+    return this.#findLiveInOrganization({
+      organizationId: input.organizationId,
+      matches: (project) => project.id === input.id,
+    });
+  }
+
+  async findLiveBySlugInOrganization(input: {
+    slug: string;
+    organizationId: string;
+  }): Promise<Project[]> {
+    return this.#findLiveInOrganization({
+      organizationId: input.organizationId,
+      matches: (project) => project.slug === input.slug,
+    });
+  }
+
+  #findLiveInOrganization({
+    organizationId,
+    matches,
+  }: {
+    organizationId: string;
+    matches: (project: Project) => boolean;
+  }): Project[] {
+    return this.#database
+      .projects()
+      .filter(
+        (project) =>
+          project.archivedAt === null &&
+          matches(project) &&
+          this.#database.isInOrganization(project, organizationId),
+      )
+      .slice(0, 1);
+  }
+
+  async findActiveByScopes(input: ActiveProjectsByScopesInput): Promise<Project[]> {
+    return this.#database
+      .projects()
+      .filter(
+        (project) =>
+          project.archivedAt === null &&
+          this.#database.isInOrganization(project, input.organizationId) &&
+          (input.organizationWide ||
+            input.projectIds.includes(project.id) ||
+            input.teamIds.includes(project.teamId)),
+      )
+      .toSorted(newestFirst)
+      .slice(0, input.limit + 1);
+  }
+
+  async findBySlugInTeam(input: { slug: string; teamId: string }): Promise<Project | null> {
+    return (
+      this.#database
+        .projects()
+        .find((project) => project.slug === input.slug && project.teamId === input.teamId) ?? null
+    );
+  }
+
+  async findLiveTraceDestination(input: {
+    organizationId: string;
+    projectId: string;
+  }): Promise<TraceDestinationProject | null> {
+    const project = this.#database.findProject(input.projectId);
+    if (
+      !project ||
+      project.archivedAt !== null ||
+      project.kind === PROJECT_KIND.AGGREGATE ||
+      !this.#database.isInOrganization(project, input.organizationId)
+    ) {
+      return null;
+    }
+
+    return this.#destination(project);
+  }
+
+  async findOldestGovernanceTraceDestination(
+    organizationId: string,
+  ): Promise<TraceDestinationProject | null> {
+    const project = this.#database
+      .projects()
+      .filter(
+        (row) =>
+          row.kind === PROJECT_KIND.INTERNAL_GOVERNANCE &&
+          row.archivedAt === null &&
+          this.#database.isInOrganization(row, organizationId),
+      )
+      .toSorted((left, right) => -newestFirst(left, right))[0];
+
+    return project ? this.#destination(project) : null;
+  }
+
+  async countLiveNonGovernanceProjects(organizationId: string): Promise<number> {
+    return this.#database
+      .projects()
+      .filter(
+        (project) =>
+          project.archivedAt === null &&
+          project.kind !== PROJECT_KIND.INTERNAL_GOVERNANCE &&
+          this.#database.isInOrganization(project, organizationId),
+      ).length;
+  }
+
+  async findTraceDestination(projectId: string): Promise<TraceDestinationProject | null> {
+    const project = this.#database.findProject(projectId);
+
+    return project ? this.#destination(project) : null;
+  }
+
+  async findTraceDestinations(projectIds: string[]): Promise<TraceDestinationProject[]> {
+    return projectIds.flatMap((projectId) => {
+      const project = this.#database.findProject(projectId);
+
+      return project ? [this.#destination(project)] : [];
+    });
+  }
+
+  async findIdByLegacyApiKey(input: { token: string }): Promise<string | null> {
+    const project = this.#database
+      .projects()
+      .find((row) => row.apiKey === input.token && row.archivedAt === null);
+
+    return project?.id ?? null;
+  }
+
+  /** Answers false for a project this memory holds no live row for, as the fenced UPDATE does. */
+  async rotateLegacyApiKey(input: { projectId: string; token: string }): Promise<boolean> {
+    const project = this.#database.findProject(input.projectId);
+    if (!project || project.archivedAt !== null) return false;
+    this.#database.putProject({ ...project, apiKey: input.token });
+
+    return true;
+  }
+
+  async createPersonal(input: {
+    id: string;
+    slug: string;
+    apiKey: string;
+    teamId: string;
+    ownerUserId: string;
+  }): Promise<string> {
+    const existing = this.#database
+      .projects()
+      .find((row) => row.teamId === input.teamId && row.isPersonal);
+    if (existing) return existing.id;
+    this.#database.putProject(
+      this.#row({
+        id: input.id,
+        name: "Personal Workspace",
+        slug: input.slug,
+        apiKey: input.apiKey,
+        teamId: input.teamId,
+        language: "other",
+        framework: "other",
+        isPersonal: true,
+        ownerUserId: input.ownerUserId,
+      }),
+    );
+    return input.id;
+  }
+
+  async archivePersonalInTeams(input: { teamIds: string[]; archivedAt: Instant }): Promise<void> {
+    for (const project of this.#database.projects()) {
+      if (!input.teamIds.includes(project.teamId)) continue;
+      if (!project.isPersonal || project.archivedAt !== null) continue;
+      this.#database.putProject({ ...project, archivedAt: toDate(input.archivedAt) });
+    }
+  }
+
+  async revivePersonalInTeam(input: { teamId: string }): Promise<string[]> {
+    const revived: string[] = [];
+    for (const project of this.#database.projects()) {
+      if (project.teamId !== input.teamId) continue;
+      if (!project.isPersonal || project.archivedAt === null) continue;
+      this.#database.putProject({ ...project, archivedAt: null });
+      revived.push(project.id);
+    }
+    return revived;
+  }
+
+  async updateAggregateRule(input: {
+    id: string;
+    organizationId: string;
+    aggregateRule: AggregateRule;
+  }): Promise<Project> {
+    const project = this.#live(input.id, input.organizationId);
+    if (project.kind !== PROJECT_KIND.AGGREGATE)
+      throw new ProjectNotFoundError("Project not found");
+    const updated = { ...project, aggregateRule: input.aggregateRule };
+    this.#database.putProject(updated);
+    return updated;
+  }
+
+  async findPersonalProjectIds(input: {
+    organizationId: string;
+    ownerUserIds?: readonly string[];
+  }): Promise<string[]> {
+    return this.#readable(input.organizationId)
+      .filter(
+        (project) =>
+          project.isPersonal &&
+          (input.ownerUserIds === undefined ||
+            (project.ownerUserId !== null && input.ownerUserIds.includes(project.ownerUserId))),
+      )
+      .map((project) => project.id)
+      .toSorted();
+  }
+
+  async findReadableProjectIds(input: {
+    organizationId: string;
+    projectIds: readonly string[];
+  }): Promise<string[]> {
+    return this.#readable(input.organizationId)
+      .filter((project) => input.projectIds.includes(project.id))
+      .map((project) => project.id)
+      .toSorted();
+  }
+
+  /** The memory twin holds no users, so a personal owner reads as nameless. */
+  async findCandidateMembers(input: {
+    organizationId: string;
+  }): Promise<AggregateMemberCandidate[]> {
+    return this.#readable(input.organizationId)
+      .toSorted(
+        (left, right) => left.name.localeCompare(right.name) || left.id.localeCompare(right.id),
+      )
+      .map((project) => ({
+        id: project.id,
+        name: project.name,
+        isPersonal: project.isPersonal,
+        owner: project.isPersonal && project.ownerUserId ? { name: null, email: null } : null,
+      }));
+  }
+
+  async findAggregate(input: { aggregateProjectId: string }): Promise<StoredAggregateProject[]> {
+    const project = this.#database.findProject(input.aggregateProjectId);
+    if (!project || project.kind !== PROJECT_KIND.AGGREGATE) return [];
+    const team = this.#database.findTeam(project.teamId);
+    if (!team) return [];
+    return [
+      {
+        id: project.id,
+        organizationId: team.organizationId,
+        archived: project.archivedAt !== null || team.archivedAt !== null,
+        // A malformed stored rule reads as none: guessing would attach reads nobody asked for.
+        rule: aggregateRuleSchema.safeParse(project.aggregateRule).data ?? null,
+      },
+    ];
+  }
+
+  async findLiveAggregateIds(input: { organizationId: string }): Promise<string[]> {
+    return this.#liveAggregates()
+      .filter((aggregate) => aggregate.organizationId === input.organizationId)
+      .map((aggregate) => aggregate.id);
+  }
+
+  async findAllLiveAggregates(): Promise<LiveAggregate[]> {
+    return this.#liveAggregates();
+  }
+
+  /** Live projects of live teams of the organisation whose kind an aggregate may read. */
+  #readable(organizationId: string): Project[] {
+    return this.#database.projects().filter((project) => {
+      const team = this.#database.findTeam(project.teamId);
+      return (
+        team?.organizationId === organizationId &&
+        team.archivedAt === null &&
+        project.archivedAt === null &&
+        !NON_DESTINATION_PROJECT_KINDS.includes(project.kind)
+      );
+    });
+  }
+
+  #liveAggregates(): LiveAggregate[] {
+    return this.#database
+      .projects()
+      .flatMap((project) => {
+        const team = this.#database.findTeam(project.teamId);
+        if (project.kind !== PROJECT_KIND.AGGREGATE || project.archivedAt !== null) return [];
+        if (!team || team.archivedAt !== null) return [];
+        return [{ id: project.id, organizationId: team.organizationId }];
+      })
+      .toSorted((left, right) => left.id.localeCompare(right.id));
+  }
+
+  async updatePersonalFeatures(input: {
+    projectId: string;
+    features: PersonalFeatures;
+  }): Promise<void> {
+    const project = this.#database.findProject(input.projectId);
+    if (!project?.isPersonal) return;
+    this.#database.putProject({ ...project, personalFeatures: input.features });
+  }
+
+  async findPersonalProjectOwner(input: {
+    organizationId: string;
+    scopeId: string;
+  }): Promise<{ ownerUserId: string | null } | null> {
+    const project = this.#database.findProject(input.scopeId);
+    if (!project) return null;
+    const owningTeam = this.#database.findTeam(project.teamId);
+    if (!owningTeam || owningTeam.organizationId !== input.organizationId) return null;
+    if (!project.isPersonal && !owningTeam.isPersonal) return null;
+
+    return { ownerUserId: owningTeam.ownerUserId };
+  }
+
+  /** The live row an update or an archive names, or the miss both answer with. */
+  #live(id: string, organizationId: string): Project {
+    const project = this.#database.findProject(id);
+    if (
+      !project ||
+      project.archivedAt !== null ||
+      !this.#database.isInOrganization(project, organizationId)
+    ) {
+      throw new ProjectNotFoundError("Project not found");
+    }
+
+    return project;
+  }
+
+  #touch(
+    input: TouchCodingAgentActivityInput,
+    column: "lastCodingAgentSessionAt" | "lastCodingAgentPullRequestAt",
+  ): void {
+    const project = this.#database.findProject(input.projectId);
+    if (!project || project.archivedAt !== null) return;
+    const seen = project[column];
+    const stampedRecently = seen !== null && seen.getTime() > toDate(input.staleBefore).getTime();
+    if (stampedRecently) return;
+    this.#database.putProject({ ...project, [column]: toDate(input.at) });
+  }
+
+  #identity(project: Project): ProjectIdentity | null {
+    const team = this.#database.findTeam(project.teamId);
+    if (!team) return null;
+
+    return {
+      id: project.id,
+      name: project.name,
+      slug: project.slug,
+      teamId: project.teamId,
+      organizationId: team.organizationId,
+      isPersonal: project.isPersonal,
+      ownerUserId: project.ownerUserId,
+      kind: project.kind,
+    };
+  }
+
+  #internal(project: Project): InternalProject {
+    return internalProjectSchema.parse({
+      id: project.id,
+      name: project.name,
+      slug: project.slug,
+      teamId: project.teamId,
+      kind: project.kind,
+      archivedAtMs: project.archivedAt?.getTime() ?? null,
+      traceSharingEnabled: project.traceSharingEnabled,
+    });
+  }
+
+  #destination(project: Project): TraceDestinationProject {
+    return traceDestinationProjectSchema.parse({
+      id: project.id,
+      teamId: project.teamId,
+      archivedAt: project.archivedAt,
+      kind: project.kind,
+    });
+  }
+
+  /** A freshly inserted row, with the columns the database defaults. */
+  #row(input: CreateProjectInput & Partial<Project>): Project {
+    const now = toDate(nowInstant());
+
+    return projectSchema.parse({
+      lwqlKey: `lwql-${input.id}`,
+      kind: PROJECT_KIND.APPLICATION,
+      firstMessage: false,
+      integrated: false,
+      createdAt: now,
+      updatedAt: now,
+      userLinkTemplate: null,
+      traceSharingEnabled: true,
+      presenceEnabled: true,
+      s3Endpoint: null,
+      s3AccessKeyId: null,
+      s3SecretAccessKey: null,
+      s3Bucket: null,
+      archivedAt: null,
+      isPersonal: false,
+      ownerUserId: null,
+      personalFeatures: {},
+      departmentId: null,
+      aggregateRule: null,
+      langyEgressAllowlist: null,
+      lastCodingAgentSessionAt: null,
+      lastCodingAgentPullRequestAt: null,
+      ...input,
+    });
+  }
+}

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-vi.mock("../langwatch-api.js", async (importOriginal) => {
+vi.mock("../langwatch-api.ts", async (importOriginal) => {
   const actual = (await importOriginal()) as Record<string, unknown>;
   return {
     ...actual,
@@ -8,8 +8,8 @@ vi.mock("../langwatch-api.js", async (importOriginal) => {
   };
 });
 
-import { LangWatchApiError, makeRequest } from "../langwatch-api.js";
-import { handleExperimentResults } from "../tools/get-experiment-results.js";
+import { LangWatchApiError, makeRequest } from "../langwatch-api.ts";
+import { handleExperimentResults } from "../tools/get-experiment-results.ts";
 
 const mockMakeRequest = vi.mocked(makeRequest);
 
@@ -26,7 +26,14 @@ const sample = {
   ],
   evaluations: [
     { evaluator: "quality", index: 0, status: "processed", score: 0.9, passed: true },
-    { evaluator: "quality", index: 2, status: "processed", score: 0.2, passed: false, details: "off-topic" },
+    {
+      evaluator: "quality",
+      index: 2,
+      status: "processed",
+      score: 0.2,
+      passed: false,
+      details: "off-topic",
+    },
     { evaluator: "safety", index: 0, status: "processed", score: 1.0, passed: true },
   ],
   timestamps: { createdAt: 0, updatedAt: 0, finishedAt: 1 },
@@ -44,7 +51,7 @@ describe("handleExperimentResults()", () => {
         await handleExperimentResults({ runId: "run_1" });
         expect(mockMakeRequest).toHaveBeenCalledWith(
           "GET",
-          "/api/experiments/runs/run_1/results",
+          "/api/v1/experiments/runs/run_1/results",
         );
       });
 
@@ -223,6 +230,28 @@ describe("handleExperimentResults()", () => {
         expect(out).toContain("still in progress");
         expect(out).toContain("Row #0");
         expect(out).toContain("Progress**: 2/3");
+      });
+    });
+  });
+
+  describe("given the run has ended and is still being stored", () => {
+    describe("when results are requested", () => {
+      /** @scenario "The MCP results tool says when a finished run is still being stored" */
+      it("notes how much of the run is stored so far", async () => {
+        mockMakeRequest.mockResolvedValueOnce({
+          ...sample,
+          completeness: {
+            complete: false,
+            dataset: { received: 3, expected: 40 },
+            evaluations: { received: 3, expected: 480 },
+          },
+        });
+
+        const result = await handleExperimentResults({ runId: "run_1" });
+
+        expect(result).toContain("**Status**: completed");
+        expect(result).toContain("the platform is still storing it");
+        expect(result).toContain("3 of 40 rows and 3 of 480 evaluations");
       });
     });
   });

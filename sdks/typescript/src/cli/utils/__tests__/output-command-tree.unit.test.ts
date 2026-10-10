@@ -1,19 +1,12 @@
+import type { Command } from "commander";
 /**
- * The port wired into the REAL command tree. The unit suites alongside this one
- * prove the mechanism; this proves it is actually connected — a migration that
- * converts an implementation but forgets its `emitsResult` registration would
- * leave the command silently unmigrated, which is precisely the state this work
- * exists to end.
- *
- * Split out of `output-port.unit.test.ts`, which pins the port itself.
+ * The port wired into the REAL command tree: proves it is connected, since a
+ * migration that forgets `emitsResult` registration would leave a command
+ * silently unmigrated. Split from `output-port.unit.test.ts`.
  */
 import { describe, it, expect } from "vitest";
-import { Command } from "commander";
-import {
-  assertFormatIsSupported,
-  isOutputAware,
-  resolveActionOutputOptions,
-} from "../output";
+
+import { assertFormatIsSupported, isOutputAware, resolveActionOutputOptions } from "../output";
 import { installOutputHarness } from "./output-harness";
 
 const { warned } = installOutputHarness();
@@ -38,11 +31,9 @@ describe("the real command tree", () => {
   });
 
   /**
-   * The registration is the ONLY thing that marks a command output-aware —
-   * migrating an implementation to return a CommandResult does nothing on its
-   * own, and a registration left on `.action(` fails silently for `table`
-   * callers while refusing `-o json`. So the wiring is asserted here, per
-   * group, rather than trusted.
+   * Registration is the ONLY thing that marks a command output-aware; a
+   * registration left on `.action(` fails silently for `table` callers while
+   * refusing `-o json`. So the wiring is asserted here, per group.
    */
   describe("when a command group has been wired to the port", () => {
     const wired = [
@@ -99,12 +90,9 @@ describe("the real command tree", () => {
 
   describe("when a command deliberately emits nothing at all", () => {
     /**
-     * The session context hook runs as a coding agent's own hook, where stdout
-     * is injected into the user's session context, so it prints nothing in any
-     * format. That honours every format, and the registration is what keeps the
-     * auto-detected agent mode (Claude Code sets CLAUDECODE in its children)
-     * from annotating every session start and stop with a note about a table
-     * that does not exist.
+     * The session context hook runs as a coding agent's own hook, printing
+     * nothing in any format. Registration keeps agent mode from annotating
+     * every session start/stop with a note about a table that doesn't exist.
      */
     it("marks `ingest hook` as speaking the output contract", async () => {
       const { buildProgram } = await import("../../program.js");
@@ -118,19 +106,14 @@ describe("the real command tree", () => {
   describe("when a tool wrapper runs inside a coding agent", () => {
     /** @scenario "A wrapper run inside a coding agent prints no table note" */
     it("prints no note about a table for any wrapper", async () => {
-      const { buildProgram, TOOL_WRAPPER_COMMANDS } = await import(
-        "../../program.js"
-      );
+      const { buildProgram, TOOL_WRAPPER_COMMANDS } = await import("../../program.js");
       const root = buildProgram();
       process.env.CLAUDECODE = "1";
 
       for (const tool of TOOL_WRAPPER_COMMANDS) {
         const wrapper = findCommand(root, [tool]);
         expect(wrapper, tool).toBeDefined();
-        await assertFormatIsSupported(
-          wrapper!,
-          resolveActionOutputOptions(wrapper!),
-        );
+        await assertFormatIsSupported(wrapper!, resolveActionOutputOptions(wrapper!));
       }
 
       expect(warned.join("")).not.toContain("not machine-readable");
@@ -138,30 +121,15 @@ describe("the real command tree", () => {
   });
 
   /**
-   * The exhaustive counterpart to the per-command lists above: EVERY leaf in
-   * the real tree is either wired to the port or named here as a deliberate
-   * holdout.
-   *
-   * This is the check that was missing, and the per-command lists could not
-   * have replaced it — the broken commands were simply absent from them.
-   * `commands`, `help-tree`, `status`, `trace search|get` and the entire
-   * `skills` group each rendered every format correctly through `printResult`,
-   * but the gate only recognised `emitsResult`, so it refused `-o json` on all
-   * of them with "does not emit structured output yet". `lw commands` — whose
-   * own description is "Machine-readable catalog of every CLI command" — had no
-   * working machine-readable path at all, and the refusal message pointed the
-   * caller at it.
-   *
-   * Adding a command now forces a decision: wire it to the port, or say here
-   * why it cannot be.
+   * The exhaustive counterpart to the lists above: every leaf in the real
+   * tree must be wired to the port or named here as a deliberate holdout, so
+   * a new command forces that decision rather than silently missing both.
    */
+
   /**
-   * `-o json` is the current spelling, but `-f/--format json` is the one the
-   * skills put in front of the agent, and 186 commands accept it. The three
-   * commands that drive the open page did not, so an agent that followed its
-   * own instructions got `error: unknown option '--format'` and had to guess
-   * again. Commander rejects an undeclared option before the output
-   * preprocessor ever runs, so the flag has to be declared per command.
+   * `-o json` is current, but `-f/--format json` is what skills put in front
+   * of agents; Commander rejects an undeclared option before the output
+   * preprocessor runs, so the flag must be declared per command.
    */
   describe("when inspecting the commands an agent drives the open page with", () => {
     const agentDriven = [
@@ -170,16 +138,19 @@ describe("the real command tree", () => {
       ["workbench", "get-state"],
     ];
 
-    it.each(agentDriven)("lets `%s %s` be asked for json the way the skills ask", async (group, name) => {
-      const { buildProgram } = await import("../../program.js");
-      const command = findCommand(buildProgram(), [group, name]);
+    it.each(agentDriven)(
+      "lets `%s %s` be asked for json the way the skills ask",
+      async (group, name) => {
+        const { buildProgram } = await import("../../program.js");
+        const command = findCommand(buildProgram(), [group, name]);
 
-      expect(command).toBeDefined();
-      expect(command!.options.map((option) => option.long)).toContain("--format");
-    });
+        expect(command).toBeDefined();
+        expect(command!.options.map((option) => option.long)).toContain("--format");
+      },
+    );
   });
 
-  describe("every leaf command", () => {
+  describe("when checking every leaf command", () => {
     /** Leaf path -> why the port cannot serve it. */
     const holdouts = new Map<string, string>([
       // Raw byte stream / file destination: the payload is not a document.
@@ -266,8 +237,7 @@ describe("the real command tree", () => {
       const root = buildProgram();
 
       const unaccounted = leafPaths(root).filter(
-        (path) =>
-          !holdouts.has(path) && !isOutputAware(findCommand(root, path.split(" "))!),
+        (path) => !holdouts.has(path) && !isOutputAware(findCommand(root, path.split(" "))!),
       );
 
       expect(

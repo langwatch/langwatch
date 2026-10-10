@@ -1,0 +1,464 @@
+import type { Command, CommandHandler } from "@langwatch/eventing";
+import { createTenantId, defineCommandSchema, EventUtils } from "@langwatch/eventing";
+import {
+  PROJECT_AGGREGATE_TYPE,
+  PROJECT_CREATED_EVENT_TYPE,
+  PROJECT_CREATED_EVENT_VERSION,
+  PROJECT_LEGACY_KEY_REVOKED_EVENT_TYPE,
+  PROJECT_LEGACY_KEY_REVOKED_EVENT_VERSION,
+  PROJECT_PRESENCE_SETTING_CHANGED_EVENT_TYPE,
+  PROJECT_PRESENCE_SETTING_CHANGED_EVENT_VERSION,
+  PROJECT_MOVED_EVENT_TYPE,
+  PROJECT_MOVED_EVENT_VERSION,
+  PROJECT_ARCHIVED_EVENT_TYPE,
+  PROJECT_ARCHIVED_EVENT_VERSION,
+  PROJECT_DEPARTMENT_ASSIGNED_EVENT_TYPE,
+  PROJECT_DEPARTMENT_ASSIGNED_EVENT_VERSION,
+  PROJECT_TRACE_SHARING_DISABLED_EVENT_TYPE,
+  PROJECT_TRACE_SHARING_DISABLED_EVENT_VERSION,
+  PROJECT_AGGREGATE_RULE_CHANGED_EVENT_TYPE,
+  PROJECT_AGGREGATE_RULE_CHANGED_EVENT_VERSION,
+  PROJECT_REVIVED_EVENT_TYPE,
+  PROJECT_REVIVED_EVENT_VERSION,
+} from "@langwatch/project-contract";
+
+import {
+  RECORD_PROJECT_AGGREGATE_RULE_CHANGED_COMMAND_TYPE,
+  RECORD_PROJECT_REVIVED_COMMAND_TYPE,
+  type ProjectAggregateRuleChangedEvent,
+  type ProjectRevivedEvent,
+  type RecordProjectAggregateRuleChangedCommandData,
+  type RecordProjectRevivedCommandData,
+  recordProjectAggregateRuleChangedCommandDataSchema,
+  recordProjectRevivedCommandDataSchema,
+  RECORD_PROJECT_CREATED_COMMAND_TYPE,
+  RECORD_PROJECT_LEGACY_KEY_REVOKED_COMMAND_TYPE,
+  RECORD_PROJECT_PRESENCE_SETTING_CHANGED_COMMAND_TYPE,
+  RECORD_PROJECT_MOVED_COMMAND_TYPE,
+  RECORD_PROJECT_ARCHIVED_COMMAND_TYPE,
+  RECORD_PROJECT_DEPARTMENT_ASSIGNED_COMMAND_TYPE,
+  RECORD_PROJECT_TRACE_SHARING_DISABLED_COMMAND_TYPE,
+  type ProjectTraceSharingDisabledEvent,
+  type RecordProjectTraceSharingDisabledCommandData,
+  recordProjectTraceSharingDisabledCommandDataSchema,
+  type ProjectDepartmentAssignedEvent,
+  type RecordProjectDepartmentAssignedCommandData,
+  recordProjectDepartmentAssignedCommandDataSchema,
+  type ProjectMovedEvent,
+  type ProjectArchivedEvent,
+  type RecordProjectMovedCommandData,
+  recordProjectMovedCommandDataSchema,
+  type RecordProjectArchivedCommandData,
+  recordProjectArchivedCommandDataSchema,
+  type ProjectCreatedEvent,
+  type ProjectLegacyKeyRevokedEvent,
+  type ProjectPresenceSettingChangedEvent,
+  type RecordProjectPresenceSettingChangedCommandData,
+  recordProjectPresenceSettingChangedCommandDataSchema,
+  type RecordProjectLegacyKeyRevokedCommandData,
+  recordProjectLegacyKeyRevokedCommandDataSchema,
+  type RecordProjectCreatedCommandData,
+  recordProjectCreatedCommandDataSchema,
+} from "./project-lifecycle.events.ts";
+
+/**
+ * Records that a project exists. A project is created once, so a redelivery records nothing new.
+ */
+export class RecordProjectCreatedCommand implements CommandHandler<
+  Command<RecordProjectCreatedCommandData>,
+  ProjectCreatedEvent
+> {
+  static readonly schema = defineCommandSchema(
+    RECORD_PROJECT_CREATED_COMMAND_TYPE,
+    recordProjectCreatedCommandDataSchema,
+    "Record that a project was created",
+  );
+
+  async handle(command: Command<RecordProjectCreatedCommandData>): Promise<ProjectCreatedEvent[]> {
+    const data = command.data;
+    return [
+      EventUtils.createEvent<ProjectCreatedEvent>({
+        aggregateType: PROJECT_AGGREGATE_TYPE,
+        aggregateId: data.projectId,
+        tenantId: createTenantId(command.tenantId),
+        type: PROJECT_CREATED_EVENT_TYPE,
+        version: PROJECT_CREATED_EVENT_VERSION,
+        data,
+        metadata: {},
+        occurredAt: data.occurredAt,
+        idempotencyKey: `${data.projectId}:created`,
+      }),
+    ];
+  }
+
+  static getAggregateId(payload: RecordProjectCreatedCommandData): string {
+    return payload.projectId;
+  }
+
+  static getSpanAttributes(
+    payload: RecordProjectCreatedCommandData,
+  ): Record<string, string | number | boolean> {
+    return {
+      "payload.project.id": payload.projectId,
+      "payload.organization.id": payload.organizationId,
+    };
+  }
+}
+
+/** Records that a project's legacy key was revoked, which is what makes its status read stale. */
+export class RecordProjectLegacyKeyRevokedCommand implements CommandHandler<
+  Command<RecordProjectLegacyKeyRevokedCommandData>,
+  ProjectLegacyKeyRevokedEvent
+> {
+  static readonly schema = defineCommandSchema(
+    RECORD_PROJECT_LEGACY_KEY_REVOKED_COMMAND_TYPE,
+    recordProjectLegacyKeyRevokedCommandDataSchema,
+    "Record that a project's legacy key was revoked",
+  );
+
+  async handle(
+    command: Command<RecordProjectLegacyKeyRevokedCommandData>,
+  ): Promise<ProjectLegacyKeyRevokedEvent[]> {
+    const data = command.data;
+    return [
+      EventUtils.createEvent<ProjectLegacyKeyRevokedEvent>({
+        aggregateType: PROJECT_AGGREGATE_TYPE,
+        aggregateId: data.projectId,
+        tenantId: createTenantId(command.tenantId),
+        type: PROJECT_LEGACY_KEY_REVOKED_EVENT_TYPE,
+        version: PROJECT_LEGACY_KEY_REVOKED_EVENT_VERSION,
+        data,
+        metadata: {},
+        occurredAt: data.occurredAt,
+        idempotencyKey: `${data.projectId}:legacy-key-revoked:${data.occurredAt}`,
+      }),
+    ];
+  }
+
+  static getAggregateId(payload: RecordProjectLegacyKeyRevokedCommandData): string {
+    return payload.projectId;
+  }
+
+  static getSpanAttributes(
+    payload: RecordProjectLegacyKeyRevokedCommandData,
+  ): Record<string, string | number | boolean> {
+    return {
+      "payload.project.id": payload.projectId,
+      "payload.organization.id": payload.organizationId,
+    };
+  }
+}
+
+/**
+ * Records a project's presence switch. A change is keyed on its moment; a backfill once per
+ * project, so a re-run collapses onto the first.
+ */
+export class RecordProjectPresenceSettingChangedCommand implements CommandHandler<
+  Command<RecordProjectPresenceSettingChangedCommandData>,
+  ProjectPresenceSettingChangedEvent
+> {
+  static readonly schema = defineCommandSchema(
+    RECORD_PROJECT_PRESENCE_SETTING_CHANGED_COMMAND_TYPE,
+    recordProjectPresenceSettingChangedCommandDataSchema,
+    "Record that a project's presence setting changed",
+  );
+
+  async handle(
+    command: Command<RecordProjectPresenceSettingChangedCommandData>,
+  ): Promise<ProjectPresenceSettingChangedEvent[]> {
+    const data = command.data;
+    return [
+      EventUtils.createEvent<ProjectPresenceSettingChangedEvent>({
+        aggregateType: PROJECT_AGGREGATE_TYPE,
+        aggregateId: data.projectId,
+        tenantId: createTenantId(command.tenantId),
+        type: PROJECT_PRESENCE_SETTING_CHANGED_EVENT_TYPE,
+        version: PROJECT_PRESENCE_SETTING_CHANGED_EVENT_VERSION,
+        data,
+        metadata: {},
+        occurredAt: data.occurredAt,
+        idempotencyKey: data.backfilled
+          ? `${data.projectId}:presence-setting:backfilled`
+          : `${data.projectId}:presence-setting:${data.occurredAt}`,
+      }),
+    ];
+  }
+
+  static getAggregateId(payload: RecordProjectPresenceSettingChangedCommandData): string {
+    return payload.projectId;
+  }
+
+  static getSpanAttributes(
+    payload: RecordProjectPresenceSettingChangedCommandData,
+  ): Record<string, string | number | boolean> {
+    return {
+      "payload.project.id": payload.projectId,
+      "payload.organization.id": payload.organizationId,
+    };
+  }
+}
+
+/** Records a project's move to another team, keyed on its moment so a redelivery collapses. */
+export class RecordProjectMovedCommand implements CommandHandler<
+  Command<RecordProjectMovedCommandData>,
+  ProjectMovedEvent
+> {
+  static readonly schema = defineCommandSchema(
+    RECORD_PROJECT_MOVED_COMMAND_TYPE,
+    recordProjectMovedCommandDataSchema,
+    "Record that a project moved to another team",
+  );
+
+  async handle(command: Command<RecordProjectMovedCommandData>): Promise<ProjectMovedEvent[]> {
+    const data = command.data;
+    return [
+      EventUtils.createEvent<ProjectMovedEvent>({
+        aggregateType: PROJECT_AGGREGATE_TYPE,
+        aggregateId: data.projectId,
+        tenantId: createTenantId(command.tenantId),
+        type: PROJECT_MOVED_EVENT_TYPE,
+        version: PROJECT_MOVED_EVENT_VERSION,
+        data,
+        metadata: {},
+        occurredAt: data.occurredAt,
+        idempotencyKey: `${data.projectId}:moved:${data.occurredAt}`,
+      }),
+    ];
+  }
+
+  static getAggregateId(payload: RecordProjectMovedCommandData): string {
+    return payload.projectId;
+  }
+
+  static getSpanAttributes(
+    payload: RecordProjectMovedCommandData,
+  ): Record<string, string | number | boolean> {
+    return {
+      "payload.project.id": payload.projectId,
+      "payload.organization.id": payload.organizationId,
+    };
+  }
+}
+
+/** Records a project's archive, keyed on its moment so a redelivery collapses. */
+export class RecordProjectArchivedCommand implements CommandHandler<
+  Command<RecordProjectArchivedCommandData>,
+  ProjectArchivedEvent
+> {
+  static readonly schema = defineCommandSchema(
+    RECORD_PROJECT_ARCHIVED_COMMAND_TYPE,
+    recordProjectArchivedCommandDataSchema,
+    "Record that a project was archived",
+  );
+
+  async handle(
+    command: Command<RecordProjectArchivedCommandData>,
+  ): Promise<ProjectArchivedEvent[]> {
+    const data = command.data;
+    return [
+      EventUtils.createEvent<ProjectArchivedEvent>({
+        aggregateType: PROJECT_AGGREGATE_TYPE,
+        aggregateId: data.projectId,
+        tenantId: createTenantId(command.tenantId),
+        type: PROJECT_ARCHIVED_EVENT_TYPE,
+        version: PROJECT_ARCHIVED_EVENT_VERSION,
+        data,
+        metadata: {},
+        occurredAt: data.occurredAt,
+        idempotencyKey: `${data.projectId}:archived:${data.occurredAt}`,
+      }),
+    ];
+  }
+
+  static getAggregateId(payload: RecordProjectArchivedCommandData): string {
+    return payload.projectId;
+  }
+
+  static getSpanAttributes(
+    payload: RecordProjectArchivedCommandData,
+  ): Record<string, string | number | boolean> {
+    return {
+      "payload.project.id": payload.projectId,
+      "payload.organization.id": payload.organizationId,
+    };
+  }
+}
+
+/**
+ * Records a project's department with its team. A change is keyed on its moment; a backfill once
+ * per project, so a re-run collapses onto the first.
+ */
+export class RecordProjectDepartmentAssignedCommand implements CommandHandler<
+  Command<RecordProjectDepartmentAssignedCommandData>,
+  ProjectDepartmentAssignedEvent
+> {
+  static readonly schema = defineCommandSchema(
+    RECORD_PROJECT_DEPARTMENT_ASSIGNED_COMMAND_TYPE,
+    recordProjectDepartmentAssignedCommandDataSchema,
+    "Record a project's department assignment",
+  );
+
+  async handle(
+    command: Command<RecordProjectDepartmentAssignedCommandData>,
+  ): Promise<ProjectDepartmentAssignedEvent[]> {
+    const data = command.data;
+    return [
+      EventUtils.createEvent<ProjectDepartmentAssignedEvent>({
+        aggregateType: PROJECT_AGGREGATE_TYPE,
+        aggregateId: data.projectId,
+        tenantId: createTenantId(command.tenantId),
+        type: PROJECT_DEPARTMENT_ASSIGNED_EVENT_TYPE,
+        version: PROJECT_DEPARTMENT_ASSIGNED_EVENT_VERSION,
+        data,
+        metadata: {},
+        occurredAt: data.occurredAt,
+        idempotencyKey: data.backfilled
+          ? `${data.projectId}:department-assigned:backfilled`
+          : `${data.projectId}:department-assigned:${data.occurredAt}`,
+      }),
+    ];
+  }
+
+  static getAggregateId(payload: RecordProjectDepartmentAssignedCommandData): string {
+    return payload.projectId;
+  }
+
+  static getSpanAttributes(
+    payload: RecordProjectDepartmentAssignedCommandData,
+  ): Record<string, string | number | boolean> {
+    return {
+      "payload.project.id": payload.projectId,
+      "payload.organization.id": payload.organizationId,
+    };
+  }
+}
+
+/** Records that a project's trace sharing was switched off; a change is keyed on its moment. */
+export class RecordProjectTraceSharingDisabledCommand implements CommandHandler<
+  Command<RecordProjectTraceSharingDisabledCommandData>,
+  ProjectTraceSharingDisabledEvent
+> {
+  static readonly schema = defineCommandSchema(
+    RECORD_PROJECT_TRACE_SHARING_DISABLED_COMMAND_TYPE,
+    recordProjectTraceSharingDisabledCommandDataSchema,
+    "Record that a project's trace sharing was disabled",
+  );
+
+  async handle(
+    command: Command<RecordProjectTraceSharingDisabledCommandData>,
+  ): Promise<ProjectTraceSharingDisabledEvent[]> {
+    const data = command.data;
+    return [
+      EventUtils.createEvent<ProjectTraceSharingDisabledEvent>({
+        aggregateType: PROJECT_AGGREGATE_TYPE,
+        aggregateId: data.projectId,
+        tenantId: createTenantId(command.tenantId),
+        type: PROJECT_TRACE_SHARING_DISABLED_EVENT_TYPE,
+        version: PROJECT_TRACE_SHARING_DISABLED_EVENT_VERSION,
+        data,
+        metadata: {},
+        occurredAt: data.occurredAt,
+        idempotencyKey: `${data.projectId}:trace-sharing-disabled:${data.occurredAt}`,
+      }),
+    ];
+  }
+
+  static getAggregateId(payload: RecordProjectTraceSharingDisabledCommandData): string {
+    return payload.projectId;
+  }
+
+  static getSpanAttributes(
+    payload: RecordProjectTraceSharingDisabledCommandData,
+  ): Record<string, string | number | boolean> {
+    return {
+      "payload.project.id": payload.projectId,
+      "payload.organization.id": payload.organizationId,
+    };
+  }
+}
+
+/** Records an aggregate's replaced rule, keyed on its moment so a redelivery collapses. */
+export class RecordProjectAggregateRuleChangedCommand implements CommandHandler<
+  Command<RecordProjectAggregateRuleChangedCommandData>,
+  ProjectAggregateRuleChangedEvent
+> {
+  static readonly schema = defineCommandSchema(
+    RECORD_PROJECT_AGGREGATE_RULE_CHANGED_COMMAND_TYPE,
+    recordProjectAggregateRuleChangedCommandDataSchema,
+    "Record that an aggregate project's rule was replaced",
+  );
+
+  async handle(
+    command: Command<RecordProjectAggregateRuleChangedCommandData>,
+  ): Promise<ProjectAggregateRuleChangedEvent[]> {
+    const data = command.data;
+    return [
+      EventUtils.createEvent<ProjectAggregateRuleChangedEvent>({
+        aggregateType: PROJECT_AGGREGATE_TYPE,
+        aggregateId: data.projectId,
+        tenantId: createTenantId(command.tenantId),
+        type: PROJECT_AGGREGATE_RULE_CHANGED_EVENT_TYPE,
+        version: PROJECT_AGGREGATE_RULE_CHANGED_EVENT_VERSION,
+        data,
+        metadata: {},
+        occurredAt: data.occurredAt,
+        idempotencyKey: `${data.projectId}:aggregate_rule_changed:${data.occurredAt}`,
+      }),
+    ];
+  }
+
+  static getAggregateId(payload: RecordProjectAggregateRuleChangedCommandData): string {
+    return payload.projectId;
+  }
+
+  static getSpanAttributes(
+    payload: RecordProjectAggregateRuleChangedCommandData,
+  ): Record<string, string | number | boolean> {
+    return {
+      "payload.project.id": payload.projectId,
+      "payload.organization.id": payload.organizationId,
+    };
+  }
+}
+
+/** Records a personal project's revival, keyed on its moment so a redelivery collapses. */
+export class RecordProjectRevivedCommand implements CommandHandler<
+  Command<RecordProjectRevivedCommandData>,
+  ProjectRevivedEvent
+> {
+  static readonly schema = defineCommandSchema(
+    RECORD_PROJECT_REVIVED_COMMAND_TYPE,
+    recordProjectRevivedCommandDataSchema,
+    "Record that an archived personal project is live again",
+  );
+
+  async handle(command: Command<RecordProjectRevivedCommandData>): Promise<ProjectRevivedEvent[]> {
+    const data = command.data;
+    return [
+      EventUtils.createEvent<ProjectRevivedEvent>({
+        aggregateType: PROJECT_AGGREGATE_TYPE,
+        aggregateId: data.projectId,
+        tenantId: createTenantId(command.tenantId),
+        type: PROJECT_REVIVED_EVENT_TYPE,
+        version: PROJECT_REVIVED_EVENT_VERSION,
+        data,
+        metadata: {},
+        occurredAt: data.occurredAt,
+        idempotencyKey: `${data.projectId}:revived:${data.occurredAt}`,
+      }),
+    ];
+  }
+
+  static getAggregateId(payload: RecordProjectRevivedCommandData): string {
+    return payload.projectId;
+  }
+
+  static getSpanAttributes(
+    payload: RecordProjectRevivedCommandData,
+  ): Record<string, string | number | boolean> {
+    return {
+      "payload.project.id": payload.projectId,
+      "payload.organization.id": payload.organizationId,
+    };
+  }
+}

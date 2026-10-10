@@ -1,12 +1,6 @@
 /**
- * What `langwatch instant-eval run` shows while a run is judging, and what it
- * leaves on the screen when the run is done.
- *
- * A run blocks and answers, the way any other command does. So the terminal
- * carries the three things worth watching while it works, the statement, the
- * price and the progress, and then replaces them with the answer: how many
- * rows matched, what it cost, and the first rows themselves.
- *
+ * What `instant-eval run` shows while judging (statement, price, progress) and what it leaves when
+ * done: rows matched, cost and the first rows.
  * @see specs/features/instant-eval-cli.feature
  */
 
@@ -31,11 +25,9 @@ export const INSTANT_EVAL_SHOW_CEILING = 25;
 const POLL_INTERVAL_MS = 1_000;
 
 /**
- * How long a blocking run follows before it gives up and hands back the id.
- *
- * A run is followed to its end, but not forever: a wedged run would otherwise
- * hold the terminal with no way out but Ctrl-C. The same ceiling `--wait`
- * carried before waiting became the default.
+ * How long a blocking run follows before it gives up and hands back the id. A run is followed to
+ * its end, but not forever: a wedged run would otherwise hold the terminal with no way out but
+ * Ctrl-C. The same ceiling `--wait` carried before waiting became the default.
  */
 export const DEFAULT_INSTANT_EVAL_FOLLOW_MS = 45 * 60 * 1_000;
 
@@ -61,10 +53,7 @@ export function elapsedLabel(ms: number): string {
 
 /** Whether every question the run asks answers yes or no. */
 function isBooleanRun(run: InstantEvalRun): boolean {
-  return (
-    run.questions.length > 0 &&
-    run.questions.every((question) => question.kind === "boolean")
-  );
+  return run.questions.length > 0 && run.questions.every((question) => question.kind === "boolean");
 }
 
 /** The noun for one row of this run, so the headline reads as the thing counted. */
@@ -84,10 +73,7 @@ function rowNoun(run: InstantEvalRun): string {
  *
  * Updated in place, so it carries everything that moves while the run works.
  */
-export function instantEvalProgressLine(
-  run: InstantEvalRun,
-  elapsedMs: number,
-): string {
+export function instantEvalProgressLine(run: InstantEvalRun, elapsedMs: number): string {
   const total = run.total ?? run.limit;
   const parts = [`Judging ${grouped(run.progress)}/${grouped(total)}`];
   if (run.matched !== null) parts.push(`${grouped(run.matched)} matched`);
@@ -97,20 +83,14 @@ export function instantEvalProgressLine(
 }
 
 /**
- * `Found 412 matches in 10,000 conversations · 20.4s · 6.1M tokens · $0.33`.
- *
- * A run whose questions are not all yes or no counts nothing, because a score
- * or a label has no threshold to be on the far side of, so it reports what it
- * read instead.
+ * `Found 412 matches in 10,000 conversations · 20.4s · 6.1M tokens · $0.33`. A run whose questions
+ * are not all yes or no counts nothing, because a score or a label has no threshold to be on the
+ * far side of, so it reports what it read instead.
  */
-export function instantEvalHeadline(
-  run: InstantEvalRun,
-  elapsedMs: number,
-): string {
+export function instantEvalHeadline(run: InstantEvalRun, elapsedMs: number): string {
   // A run that did not finish judged what it judged, not what it selected: a
   // failed run reporting its whole selection as judged reads as a success.
-  const total =
-    run.status === "finished" ? (run.total ?? run.progress) : run.progress;
+  const total = run.status === "finished" ? (run.total ?? run.progress) : run.progress;
   const noun = rowNoun(run);
   const head =
     isBooleanRun(run) && run.matched !== null
@@ -129,9 +109,7 @@ function verdictOf(judgment: InstantEvalJudgment): string {
   if (judgment.status !== "judged") return judgment.status;
   if (judgment.label !== null) {
     const probability =
-      judgment.probability === null
-        ? ""
-        : ` (${judgment.probability.toFixed(2)})`;
+      judgment.probability === null ? "" : ` (${judgment.probability.toFixed(2)})`;
     return `${judgment.label}${probability}`;
   }
   if (judgment.score !== null) return judgment.score.toFixed(2);
@@ -150,11 +128,9 @@ function preview(text: unknown, width: number): string {
 }
 
 /**
- * The text a row was judged on, taken from whichever column holds it.
- *
- * The statement names its own text column, so the row is searched for the
- * longest string that is not one of the keys, which is what the extraction
- * function returned.
+ * The text a row was judged on, taken from whichever column holds it. The statement names its own
+ * text column, so the row is searched for the longest string that is not one of the keys, which is
+ * what the extraction function returned.
  */
 function textOf(row: Record<string, unknown>): string {
   const keys = new Set(["TraceId", "SpanId", "ThreadId", "OccurredAt"]);
@@ -237,11 +213,9 @@ function keyHeaderOf(column: string): string {
 }
 
 /**
- * Enough of a key to tell two rows apart.
- *
- * Cut from the end rather than the start: a production id is random either
- * way, and a prefixed one carries its distinguishing part last, so cutting
- * the front leaves every row looking the same.
+ * Enough of a key to tell two rows apart. Cut from the end rather than the start: a production id
+ * is random either way, and a prefixed one carries its distinguishing part last, so cutting the
+ * front leaves every row looking the same.
  */
 function shortKey(key: string): string {
   return key.length <= 20 ? key : `…${key.slice(-19)}`;
@@ -262,10 +236,9 @@ export interface InstantEvalLiveResult {
 }
 
 /**
- * Follow the run to its end, reporting progress in place while it goes.
- *
- * Reports nothing in a machine format: stdout there carries one document, and
- * a progress line written into it would not parse.
+ * Follow the run to its end, reporting progress in place while it goes. Reports nothing in a
+ * machine format: stdout there carries one document, and a progress line written into it would not
+ * parse.
  */
 export async function followInstantEvalRun({
   service,
@@ -283,9 +256,7 @@ export async function followInstantEvalRun({
   now?: () => number;
 }): Promise<InstantEvalLiveResult> {
   const startedAt = now();
-  const spinner = machine
-    ? undefined
-    : createSpinner(instantEvalProgressLine(created, 0)).start();
+  const spinner = machine ? undefined : createSpinner(instantEvalProgressLine(created, 0)).start();
 
   let last = created;
   let failures = 0;

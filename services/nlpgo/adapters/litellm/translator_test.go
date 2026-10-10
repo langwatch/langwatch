@@ -105,6 +105,8 @@ func TestIsReasoningModel(t *testing.T) {
 		"openai/co3-thing",     // `co3` would substring-match o3 in the full id
 		"vertex_ai/pro1-model", // `pro1` would substring-match o1 in the full id
 		"custom/super-gpt-5x",  // gpt-5 anywhere but the start would substring-match
+		"openai/gpt-6x",        // a generation must end at the id's end, a `.` or a `-`
+		"openai/o1x-model",
 	}
 	for _, m := range yes {
 		if !IsReasoningModel(m) {

@@ -26,7 +26,7 @@ app:
     skipEnvValidation: true
   resources:
     requests: { cpu: 250m, memory: 768Mi }
-    limits:   { cpu: 1, memory: 2Gi }
+    limits: { cpu: 1, memory: 2Gi }
 
 workers:
   # Pinned true rather than inherited: an overlay has to be self-contained, or
@@ -36,13 +36,13 @@ workers:
   replicaCount: 1
   resources:
     requests: { cpu: 250m, memory: 768Mi }
-    limits:   { cpu: 1, memory: 2Gi }
+    limits: { cpu: 1, memory: 2Gi }
 
 langwatch_nlp:
   replicaCount: 1
   resources:
     requests: { cpu: 50m, memory: 256Mi }
-    limits:   { cpu: 250m, memory: 512Mi }
+    limits: { cpu: 250m, memory: 512Mi }
 
 langevals:
   replicaCount: 1
@@ -50,7 +50,7 @@ langevals:
   # not a reservation, so it costs nothing until an evaluator loads a model.
   resources:
     requests: { cpu: 100m, memory: 768Mi }
-    limits:   { cpu: 500m, memory: 4Gi }
+    limits: { cpu: 500m, memory: 4Gi }
   extraEnvs:
     - { name: DISABLE_EVALUATORS_PRELOAD, value: "true" }
 
@@ -74,7 +74,7 @@ postgresql:
       size: 1Gi
     resources:
       requests: { cpu: 50m, memory: 128Mi }
-      limits:   { cpu: 250m, memory: 256Mi }
+      limits: { cpu: 250m, memory: 256Mi }
 
 redis:
   chartManaged: true
@@ -83,7 +83,7 @@ redis:
       size: 1Gi
     resources:
       requests: { cpu: 25m, memory: 32Mi }
-      limits:   { cpu: 100m, memory: 128Mi }
+      limits: { cpu: 100m, memory: 128Mi }
 
 prometheus:
   chartManaged: false

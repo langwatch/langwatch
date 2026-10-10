@@ -102,7 +102,7 @@ func (g *Group) Run(ctx context.Context) error {
 	// Start services in registration order.
 	started := 0
 	for _, svc := range g.services {
-		g.logger.Info("lifecycle_start", zap.Stringer("service", svc))
+		g.logger.Info("lifecycle_start", zap.Stringer("lifecycle_service", svc))
 		if err := svc.Start(ctx); err != nil {
 			cancel()
 			_ = g.stopN(context.Background(), started)
@@ -165,8 +165,11 @@ func (g *Group) stopN(ctx context.Context, n int) error {
 	var first error
 	for i := n - 1; i >= 0; i-- {
 		svc := g.services[i]
-		g.logger.Info("lifecycle_stop", zap.Stringer("service", svc))
-		if err := svc.Stop(ctx); err != nil {
+		g.logger.Info("lifecycle_stop", zap.Stringer("lifecycle_service", svc))
+		stopCtx, cancel := stopContext(ctx, svc)
+		err := svc.Stop(stopCtx)
+		cancel()
+		if err != nil {
 			g.logger.Warn("lifecycle_stop_error",
 				zap.Stringer("lifecycle_service", svc), zap.Error(err))
 			if first == nil {
@@ -175,6 +178,17 @@ func (g *Group) stopN(ctx context.Context, n int) error {
 		}
 	}
 	return first
+}
+
+// stopContext is the context one service stops under: the group's, or one
+// with the service's own budget when it states one. The own budget runs from
+// the moment that service is stopped and is not cut short by the group's.
+func stopContext(ctx context.Context, svc Service) (context.Context, context.CancelFunc) {
+	budgeted, ok := svc.(stopBudgeter)
+	if !ok || budgeted.StopBudget() <= 0 {
+		return ctx, func() {}
+	}
+	return context.WithTimeout(context.WithoutCancel(ctx), budgeted.StopBudget())
 }
 
 // mergeFatal fans-in Fatal() channels from all registered services.

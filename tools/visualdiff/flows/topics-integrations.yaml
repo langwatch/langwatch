@@ -1,0 +1,110 @@
+# Topic clustering settings and the setup-checklist surfaces (lane green-topics-integrations).
+# Labels come from origin/main: pages/settings/topic-clustering.tsx, components/IntegrationChecks.tsx
+# and components/home/OnboardingProgress.tsx. The analytics topics page has its flows in analytics.yaml.
+# Not scripted: a completed run's "Organized N traces into N topics" line (the stack has no clustering
+# model, so a run ends skipped or failed) and the step ticking to done after a workflow is made
+# (the checklist reads cached for a session on main: staleTime Infinity).
+flows:
+  - id: topic-clustering-settings-cards
+    title: The topic clustering settings page shows its schedule, manual run and history cards
+    steps:
+      - action: go
+        with:
+          path: /settings/topic-clustering
+      - action: expect
+        with:
+          text: Topic Clustering
+          timeout: "20000"
+      - action: expect
+        with:
+          text: Schedule
+      - action: expect
+        with:
+          text: Next scheduled run
+          timeout: "20000"
+      - action: expect
+        with:
+          text: Manual topic clustering
+      - action: expect
+        with:
+          text: Topic clustering needs at least 10 traces to group anything
+      - action: expect
+        with:
+          text: Run history
+      - action: expect
+        with:
+          text: Run topic clustering
+
+  - id: topic-clustering-manual-run-reaches-history
+    title: Ask for a topic clustering run and see it listed in the run history after a reload
+    isolated: true
+    steps:
+      - action: go
+        with:
+          path: /settings/topic-clustering
+      - action: click
+        with:
+          selector: button
+          text: /^\s*Run topic clustering\s*$/
+      - action: expect
+        with:
+          text: /Topic clustering started|A run is already in progress/
+          timeout: "20000"
+      - action: wait
+        with:
+          millis: "5000"
+      - action: go
+        with:
+          path: /settings/topic-clustering
+      - action: expect
+        with:
+          text: Started by
+          timeout: "30000"
+      - action: expect
+        with:
+          text: No runs yet
+          equals: "0"
+
+  - id: integration-checks-fresh-project-steps
+    title: A project with no traces lists its setup steps on the home and opens one
+    isolated: true
+    steps:
+      - action: go
+        with:
+          path: /{isolatedSlug}
+      - action: expect
+        with:
+          text: Sync your first message
+          timeout: "20000"
+      - action: expect
+        with:
+          text: Create your new project
+      - action: expect
+        with:
+          text: Setup your model providers
+      - action: expect
+        with:
+          text: Create your first workflow
+      - action: click
+        with:
+          text: Create your first workflow
+      - action: expect
+        with:
+          url: /{isolatedSlug}/workflows
+          timeout: "20000"
+
+  - id: integration-checks-home-step-links
+    title: A setup step on the home opens the settings page it names
+    isolated: true
+    steps:
+      - action: go
+        with:
+          path: /{isolatedSlug}
+      - action: click
+        with:
+          text: Setup your model providers
+          timeout: "20000"
+      - action: expect
+        with:
+          url: /settings/model-providers
+          timeout: "20000"

@@ -1,0 +1,75 @@
+import {
+  StoredObjectNotFoundError,
+  StoredObjectOwnerLookupUnavailableError,
+  StoredObjectOwnerResolver,
+} from "@langwatch/stored-object-contract";
+
+import {
+  type StoredObjectOwnerRepository,
+  type StoredObjectOwnerLookupResult,
+} from "../repositories/stored-object-owner.repository.ts";
+
+export type StoredObjectOwnerLookupSpan = Readonly<{
+  setAttribute(name: string, value: string | number | boolean): void;
+}>;
+
+/** Records the owner lookup's fixed database-operation attributes on one span. */
+export interface StoredObjectOwnerLookupTelemetry {
+  withLookupSpan<Result>(
+    input: { id: string },
+    operation: (span: StoredObjectOwnerLookupSpan) => Promise<Result>,
+  ): Promise<Result>;
+}
+
+/**
+ * The legacy id-only file URL crosses tenant boundaries solely to identify an
+ * owner. It is separate from ordinary project-scoped Stored Object access.
+ */
+export class StoredObjectOwnerLookupService extends StoredObjectOwnerResolver {
+  static create(input: {
+    repository: StoredObjectOwnerRepository;
+    telemetry: StoredObjectOwnerLookupTelemetry;
+  }): StoredObjectOwnerLookupService {
+    return new StoredObjectOwnerLookupService(input.repository, input.telemetry);
+  }
+
+  private constructor(
+    private readonly repository: StoredObjectOwnerRepository,
+    private readonly telemetry: StoredObjectOwnerLookupTelemetry,
+  ) {
+    super();
+  }
+
+  getOwner(input: { id: string }): Promise<{ projectId: string }> {
+    return this.telemetry.withLookupSpan(input, async (span) => {
+      const result = await this.repository.findOwner(input.id);
+      this.recordResult(span, result);
+
+      if (result.hit) {
+        return { projectId: result.hit.projectId };
+      }
+
+      if (result.failedTargets.length > 0) {
+        throw new StoredObjectOwnerLookupUnavailableError(result.failedTargets);
+      }
+
+      throw new StoredObjectNotFoundError();
+    });
+  }
+
+  private recordResult(
+    span: StoredObjectOwnerLookupSpan,
+    result: StoredObjectOwnerLookupResult,
+  ): void {
+    span.setAttribute("clickhouse.instances_searched", result.instancesSearched);
+    span.setAttribute("clickhouse.instances_failed", result.failedTargets.length);
+    span.setAttribute("result.found", result.hit !== null);
+    if (result.hit) {
+      span.setAttribute("result.matched_instance", result.hit.target);
+    }
+
+    if (!result.hit && result.failedTargets.length > 0) {
+      span.setAttribute("result.degraded", true);
+    }
+  }
+}

@@ -1,7 +1,7 @@
 package domain
 
 // Static local dev identity haven injects into every worktree, matching
-// platform/app/prisma/seed.ts exactly (keep the two in sync by hand — they
+// apps/tasks/src/storage-seed/storage-seed.ts exactly (keep the two in sync by hand — they
 // intentionally can't share a constant across the Go/TS boundary). See that
 // file's header comment for the full rationale and how each value maps onto
 // this codebase's real Organization/Project/User/ApiKey model.
@@ -11,7 +11,7 @@ package domain
 const (
 	// DefaultAdminEmail/DefaultAdminPassword are the seeded BetterAuth
 	// credential login every worktree and every agent can sign in with.
-	DefaultAdminEmail    = "admin@haven.localhost"
+	DefaultAdminEmail    = "admin@mail.langwatch.localhost"
 	DefaultAdminPassword = "LocalHavenAdmin!2026"
 
 	// DefaultPrivateAccessToken is a full-access personal access token
@@ -22,4 +22,10 @@ const (
 	// traces:create only) — the least-privileged key type this codebase has;
 	// there is no true client-safe/publishable-key concept here.
 	DefaultPublicAccessToken = "ik-lw-LocalDevPublicIk_LocalDevPublicIngestionTokenSecretFixedValue0000"
+
+	// The seeded organization, team and project slugs (ORG_SLUG, TEAM_SLUG,
+	// PROJECT_SLUG in storage-seed.ts).
+	DefaultOrganizationSlug = "local-dev-org"
+	DefaultTeamSlug         = "local-dev-team"
+	DefaultProjectSlug      = "local-dev-project"
 )

@@ -1,23 +1,8 @@
-// Generates the skill accordion markup inside docs pages, between
-// {/* lw-generated:<section>:start */} and {/* lw-generated:<section>:end */}
-// markers, from docs/skills/skills-pages-manifest.json plus the compiled
-// prompts in skills/_compiled/. Manifest keys are docs-root-relative paths,
-// so any docs page can carry a generated section.
-//
-// The markup is plain lowercase HTML elements on purpose: Mintlify only
-// server-renders page content, never components imported from snippets, and
-// it strips <details>/<summary> entirely, so a div-based accordion driven by
-// docs/posthog.js (event delegation on data attributes) is the only shape
-// that both renders server-side for search engines and stays interactive.
-//
-// Mintlify's server pipeline also drops attributes whose values contain
-// non-ASCII characters (or grow into multi-kilobyte multi-line strings) and
-// strips <polyline>/<line> from svg icons, so: prompts ship as hidden fenced
-// code blocks (real content, copied via data-copy-source in posthog.js),
-// every icon uses <path>-only drawing, and only short ASCII values may go
-// into data attributes.
-//
-// Run via: bash docs/scripts/sync-prompts.sh (compiles skills first)
+// Generates the skill accordion markup inside docs pages (between
+// lw-generated markers) from skills-pages-manifest.json and skills/_compiled/.
+// Plain lowercase HTML only: Mintlify server-renders elements but not
+// components, and strips <details> and non-ASCII/multi-line attributes —
+// hence hidden fenced code blocks and <path>-only icons. Run: docs/scripts/sync-prompts.sh
 
 import fs from "fs";
 import path from "path";
@@ -28,7 +13,7 @@ const docsRoot = path.resolve(__dirname, "..");
 const repoRoot = path.resolve(docsRoot, "..");
 const compiledDir = path.join(repoRoot, "skills", "_compiled");
 const manifest = JSON.parse(
-  fs.readFileSync(path.join(docsRoot, "skills", "skills-pages-manifest.json"), "utf8")
+  fs.readFileSync(path.join(docsRoot, "skills", "skills-pages-manifest.json"), "utf8"),
 );
 
 // `--list-pages` prints the repo-relative pages this script writes. The
@@ -107,13 +92,17 @@ function renderAccordion(entry, open = false) {
     // the page's whole point, and a collapsed header hides it behind a
     // click for no reason. posthog.js toggles data-open either way.
     lines.push(`<div className="lw-accordion" data-open="true">`);
-    lines.push(`  <div className="lw-accordion-header" role="button" tabIndex={0} aria-expanded="true">`);
+    lines.push(
+      `  <div className="lw-accordion-header" role="button" tabIndex={0} aria-expanded="true">`,
+    );
     lines.push(`    <span className="lw-accordion-title">${titleHtml}</span>`);
     lines.push(`    ${ICONS.chevron}`);
     lines.push(`  </div>`);
   } else {
     lines.push(`<div className="lw-accordion">`);
-    lines.push(`  <div className="lw-accordion-header" role="button" tabIndex={0} aria-expanded="false">`);
+    lines.push(
+      `  <div className="lw-accordion-header" role="button" tabIndex={0} aria-expanded="false">`,
+    );
     lines.push(`    <span className="lw-accordion-title">${titleHtml}</span>`);
     lines.push(`    ${ICONS.chevron}`);
     lines.push(`  </div>`);
@@ -133,7 +122,7 @@ function renderAccordion(entry, open = false) {
       })
         .split("\n")
         .map((l) => "    " + l)
-        .join("\n")
+        .join("\n"),
     );
     lines.push(`      </div>`);
     if (slashCommand) {
@@ -148,7 +137,7 @@ function renderAccordion(entry, open = false) {
         })
           .split("\n")
           .map((l) => "    " + l)
-          .join("\n")
+          .join("\n"),
       );
       lines.push(`      </div>`);
     }
@@ -159,18 +148,22 @@ function renderAccordion(entry, open = false) {
   // prompt text survives verbatim as server-rendered (hidden) content.
   const longestBacktickRun = Math.max(3, ...[...prompt.matchAll(/`+/g)].map((m) => m[0].length));
   const fence = "`".repeat(longestBacktickRun + 1);
-  lines.push(`    <div className="lw-accordion-actions${!skill ? " lw-accordion-actions-single" : ""}">`);
   lines.push(
-    `      <div className="lw-accordion-action" role="button" tabIndex={0} data-copy-source="prompt" data-track="docs_copy_prompt" data-track-title=${attr(title)} data-track-skill=${attr(skill || "platform")}>`
+    `    <div className="lw-accordion-actions${!skill ? " lw-accordion-actions-single" : ""}">`,
   );
-  lines.push(`        <span className="lw-accordion-action-icon lw-copy-line-icon">${ICONS.copyLarge}</span>`);
   lines.push(
-    `        <span className="lw-accordion-action-icon lw-copy-line-check" style={{ display: "none" }}>${ICONS.checkLarge}</span>`
+    `      <div className="lw-accordion-action" role="button" tabIndex={0} data-copy-source="prompt" data-track="docs_copy_prompt" data-track-title=${attr(title)} data-track-skill=${attr(skill || "platform")}>`,
+  );
+  lines.push(
+    `        <span className="lw-accordion-action-icon lw-copy-line-icon">${ICONS.copyLarge}</span>`,
+  );
+  lines.push(
+    `        <span className="lw-accordion-action-icon lw-copy-line-check" style={{ display: "none" }}>${ICONS.checkLarge}</span>`,
   );
   lines.push(`        <span className="lw-accordion-action-text">`);
   lines.push(`          <span className="lw-accordion-action-title">Copy Full Prompt</span>`);
   lines.push(
-    `          <span className="lw-accordion-action-subtitle">${skill ? "Run skill without installing" : "Paste into any AI assistant"}</span>`
+    `          <span className="lw-accordion-action-subtitle">${skill ? "Run skill without installing" : "Paste into any AI assistant"}</span>`,
   );
   lines.push(`        </span>`);
   lines.push(`        <div className="lw-prompt-source">`);
@@ -184,12 +177,14 @@ function renderAccordion(entry, open = false) {
   if (skill) {
     const downloadUrl = `https://raw.githubusercontent.com/langwatch/skills/main/${skillPath}/SKILL.md`;
     lines.push(
-      `      <div className="lw-accordion-action" role="button" tabIndex={0} data-download-url="${downloadUrl}" data-download-name="SKILL.md" data-track="docs_download_skill" data-track-title=${attr(title)} data-track-skill=${attr(skill)}>`
+      `      <div className="lw-accordion-action" role="button" tabIndex={0} data-download-url="${downloadUrl}" data-download-name="SKILL.md" data-track="docs_download_skill" data-track-title=${attr(title)} data-track-skill=${attr(skill)}>`,
     );
     lines.push(`        <span className="lw-accordion-action-icon">${ICONS.download}</span>`);
     lines.push(`        <span className="lw-accordion-action-text">`);
     lines.push(`          <span className="lw-accordion-action-title">Download SKILL.md</span>`);
-    lines.push(`          <span className="lw-accordion-action-subtitle">Manual installation</span>`);
+    lines.push(
+      `          <span className="lw-accordion-action-subtitle">Manual installation</span>`,
+    );
     lines.push(`        </span>`);
     lines.push(`      </div>`);
   }
@@ -227,7 +222,12 @@ for (const [pageFile, sections] of listPages ? [] : Object.entries(manifest)) {
     const generated = entries
       .map((entry) => renderAccordion(entry, entries.length === 1))
       .join("\n\n");
-    content = content.slice(0, startIdx + start.length) + "\n\n" + generated + "\n\n" + content.slice(endIdx);
+    content =
+      content.slice(0, startIdx + start.length) +
+      "\n\n" +
+      generated +
+      "\n\n" +
+      content.slice(endIdx);
   }
   fs.writeFileSync(pagePath, content);
   console.log(`Generated skill accordions in docs/${pageFile}`);

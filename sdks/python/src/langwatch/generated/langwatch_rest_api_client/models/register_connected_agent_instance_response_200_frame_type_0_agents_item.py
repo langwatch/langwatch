@@ -4,7 +4,6 @@ from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from attrs import define as _attrs_define
-from attrs import field as _attrs_field
 
 if TYPE_CHECKING:
     from ..models.register_connected_agent_instance_response_200_frame_type_0_agents_item_scope_type_0 import (
@@ -45,7 +44,6 @@ class RegisterConnectedAgentInstanceResponse200FrameType0AgentsItem:
         | RegisterConnectedAgentInstanceResponse200FrameType0AgentsItemScopeType1
         | RegisterConnectedAgentInstanceResponse200FrameType0AgentsItemScopeType2
     )
-    additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         from ..models.register_connected_agent_instance_response_200_frame_type_0_agents_item_scope_type_0 import (
@@ -74,7 +72,7 @@ class RegisterConnectedAgentInstanceResponse200FrameType0AgentsItem:
             scope = self.scope.to_dict()
 
         field_dict: dict[str, Any] = {}
-        field_dict.update(self.additional_properties)
+
         field_dict.update(
             {
                 "name": name,
@@ -151,21 +149,4 @@ class RegisterConnectedAgentInstanceResponse200FrameType0AgentsItem:
             scope=scope,
         )
 
-        register_connected_agent_instance_response_200_frame_type_0_agents_item.additional_properties = d
         return register_connected_agent_instance_response_200_frame_type_0_agents_item
-
-    @property
-    def additional_keys(self) -> list[str]:
-        return list(self.additional_properties.keys())
-
-    def __getitem__(self, key: str) -> Any:
-        return self.additional_properties[key]
-
-    def __setitem__(self, key: str, value: Any) -> None:
-        self.additional_properties[key] = value
-
-    def __delitem__(self, key: str) -> None:
-        del self.additional_properties[key]
-
-    def __contains__(self, key: str) -> bool:
-        return key in self.additional_properties

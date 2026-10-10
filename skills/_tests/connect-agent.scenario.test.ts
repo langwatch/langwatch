@@ -1,10 +1,16 @@
-import scenario, { type ScenarioExecutionStateLike, assertSkillWasRead, bashCommands } from "@langwatch/scenario";
 import fs from "fs";
-import { describe, it, expect } from "vitest";
-import dotenv from "dotenv";
 import path from "path";
 import { fileURLToPath } from "url";
+
 import { openai } from "@ai-sdk/openai";
+import scenario, {
+  type ScenarioExecutionStateLike,
+  assertSkillWasRead,
+  bashCommands,
+} from "@langwatch/scenario";
+import dotenv from "dotenv";
+import { describe, it, expect } from "vitest";
+
 import {
   copyFixtureToWorkDir,
   createClaudeCodeAgent,
@@ -12,7 +18,7 @@ import {
   installSkillToWorkDir,
   removeSkillTestWorkDir,
   SKILL_TESTS_SET_ID,
-} from "./helpers/claude-code-adapter";
+} from "./helpers/claude-code-adapter.ts";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -29,13 +35,9 @@ function findFiles(dir: string, pattern: RegExp): string[] {
 
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     const fullPath = path.join(dir, entry.name);
-    if (
-      entry.isDirectory() &&
-      entry.name !== "node_modules" &&
-      entry.name !== ".venv" &&
-      entry.name !== "venv" &&
-      entry.name !== ".git"
-    ) {
+    const isSearchableDirectory =
+      entry.isDirectory() && !["node_modules", ".venv", "venv", ".git"].includes(entry.name);
+    if (isSearchableDirectory) {
       results.push(...findFiles(fullPath, pattern));
     } else if (entry.isFile() && pattern.test(entry.name)) {
       results.push(fullPath);
@@ -50,9 +52,7 @@ function readAll(files: string[]): string {
 
 function transcriptText(state: ScenarioExecutionStateLike): string {
   return state.messages
-    .map((m) =>
-      typeof m.content === "string" ? m.content : JSON.stringify(m.content ?? ""),
-    )
+    .map((m) => (typeof m.content === "string" ? m.content : JSON.stringify(m.content ?? "")))
     .join("\n")
     .replace(/\\/g, "");
 }
@@ -84,8 +84,7 @@ describe("Connect Agent Skill", () => {
           const endpoint = process.env.LANGWATCH_ENDPOINT?.trim();
           fs.writeFileSync(
             path.join(tempFolder, ".env"),
-            `LANGWATCH_API_KEY=${apiKey}\n` +
-              (endpoint ? `LANGWATCH_ENDPOINT=${endpoint}\n` : ""),
+            `LANGWATCH_API_KEY=${apiKey}\n` + (endpoint ? `LANGWATCH_ENDPOINT=${endpoint}\n` : ""),
           );
         }
 
@@ -198,8 +197,7 @@ describe("Connect Agent Skill", () => {
           const endpoint = process.env.LANGWATCH_ENDPOINT?.trim();
           fs.writeFileSync(
             path.join(tempFolder, ".env"),
-            `LANGWATCH_API_KEY=${apiKey}\n` +
-              (endpoint ? `LANGWATCH_ENDPOINT=${endpoint}\n` : ""),
+            `LANGWATCH_API_KEY=${apiKey}\n` + (endpoint ? `LANGWATCH_ENDPOINT=${endpoint}\n` : ""),
           );
         }
 

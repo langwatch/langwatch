@@ -20,8 +20,8 @@ type metricsPayload struct {
 	EvalDuration       int64 `json:"eval_duration"`
 }
 
-// merge folds one decoded NDJSON chunk's metrics into m, the typed counterpart
-// of mergeFromMap. Ollama sends the counts and durations only on the final line
+// merge folds one decoded NDJSON chunk's metrics into m, overwriting only
+// non-zero fields. Ollama sends the counts and durations only on the final line
 // of a stream, but which line that is cannot be assumed, so every non-zero field
 // is taken as it arrives and a zero leaves the accumulated value standing.
 func (m *metricsPayload) merge(chunk metricsPayload) {

@@ -5,10 +5,9 @@ export interface ParsedFrontmatter {
 
 // Minimal `---`-delimited YAML frontmatter reader. Captures only top-level
 // single-line `key: value` pairs — enough for skill metadata (name,
-// description, license, compatibility). Nested keys (e.g. `metadata:`) are
-// intentionally ignored; callers that need them should parse the body
-// themselves. Shared by the docs/platform compiler and the native skill
-// generator so both read frontmatter the same way.
+// description, license, compatibility). Nested keys are intentionally
+// ignored; callers needing them parse the body themselves. Shared by the
+// docs/platform compiler and the native skill generator.
 export function splitFrontmatter(raw: string): ParsedFrontmatter {
   const m = raw.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
   if (!m) return { frontmatter: {}, body: raw };

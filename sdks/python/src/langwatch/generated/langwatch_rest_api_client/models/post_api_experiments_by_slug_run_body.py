@@ -20,13 +20,10 @@ T = TypeVar("T", bound="PostApiExperimentsBySlugRunBody")
 class PostApiExperimentsBySlugRunBody:
     """
     Attributes:
-        data (list[PostApiExperimentsBySlugRunBodyDataItem] | Unset): Rows to evaluate inline, instead of the
-            experiment's saved dataset. Mutually exclusive with dataset_id.
-        dataset_id (str | Unset): A saved dataset to evaluate, instead of the one the experiment is configured with.
-            Mutually exclusive with data.
-        parameters (PostApiExperimentsBySlugRunBodyParameters | Unset): Constant inputs applied to every row, overriding
-            fields of the same name
-        row_indices (list[int] | Unset): Run only these rows of the dataset, by zero-based index
+        data (list[PostApiExperimentsBySlugRunBodyDataItem] | Unset):
+        dataset_id (str | Unset):
+        parameters (PostApiExperimentsBySlugRunBodyParameters | Unset):
+        row_indices (list[int] | Unset):
     """
 
     data: list[PostApiExperimentsBySlugRunBodyDataItem] | Unset = UNSET

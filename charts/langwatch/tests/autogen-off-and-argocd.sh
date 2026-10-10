@@ -244,7 +244,7 @@ extract_render_script() {
   ' "$tmp/$name.yaml" \
     | sed -e "s#/render#$tmp/run/render#g" \
           -e "s#/tmp/write-secret.mjs#$tmp/run/write-secret.mjs#g" \
-          -e "s#cd /app/platform/app#:#"
+          -e "s#cd /app/apps/tasks#:#"
 }
 
 # Runs the extracted script with stand-ins for pnpm (the renderer, which fails

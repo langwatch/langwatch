@@ -1,9 +1,11 @@
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+
 import { describe, expect, it } from "vitest";
-import { listNativeSkills, renderSkill } from "../_compiler/native.js";
-import { listPublishedSkills } from "../_lib/feature-skills.js";
+
+import { listNativeSkills, renderSkill } from "../_compiler/native.ts";
+import { listPublishedSkills } from "../_lib/feature-skills.ts";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -53,22 +55,74 @@ const STATIC_ACCORDION_HEADER =
 // from the same selection the publish sync writes (recipes nest under
 // recipes/<slug>). The accordion download URLs must only ever reference these.
 const publishedPaths = new Set(
-  listPublishedSkills(skillsRoot).map((s) => (s.isRecipe ? `recipes/${s.slug}` : s.slug))
+  listPublishedSkills(skillsRoot).map((s) => (s.isRecipe ? `recipes/${s.slug}` : s.slug)),
 );
+
+type PageFile = { name: string; content: string };
+
+/** One accordion, one prompt action and one non-trivial prompt fence per manifest entry. */
+function expectAccordionPerEntry({ name, content }: PageFile) {
+  const entries = Object.values(manifest[name]!).flat();
+  const accordions = content.match(ACCORDION_OPEN) ?? [];
+  expect(accordions.length, `${name} accordion count`).toBe(entries.length);
+  const copyActions = content.match(/data-copy-source="prompt"/g) ?? [];
+  expect(copyActions.length, `${name} prompt actions`).toBe(entries.length);
+  const promptBlocks = [...content.matchAll(/^(`{4,})text\n([\s\S]*?)^\1$/gm)];
+  expect(promptBlocks.length, `${name} prompt fences`).toBe(entries.length);
+  for (const block of promptBlocks) {
+    expect(block[2]!.length, `${name} prompt fence content`).toBeGreaterThan(200);
+  }
+}
+
+/** The section's generated block exists and lists its entries in manifest order. */
+function expectGeneratedSectionInOrder({
+  name,
+  content,
+  sectionId,
+  entries,
+}: PageFile & { sectionId: string; entries: { title: string }[] }) {
+  const start = content.indexOf(`{/* lw-generated:${sectionId}:start */}`);
+  const end = content.indexOf(`{/* lw-generated:${sectionId}:end */}`);
+  expect(start, `${name} ${sectionId} start marker`).toBeGreaterThanOrEqual(0);
+  expect(end, `${name} ${sectionId} end marker`).toBeGreaterThan(start);
+  const block = content.slice(start, end);
+  let cursor = -1;
+  for (const entry of entries) {
+    const idx = block.indexOf(`data-track-title={${JSON.stringify(entry.title)}}`);
+    expect(idx, `${name} ${sectionId}: "${entry.title}" present in order`).toBeGreaterThan(cursor);
+    cursor = idx;
+  }
+}
+
+/**
+ * Every interactive control carries button semantics. A static card never toggles, so its header
+ * is not one; the inert-header test pins that, which keeps this subtraction honest.
+ */
+function expectInteractiveControlsAreButtons({ name, content }: PageFile) {
+  const inertHeaders = content.match(STATIC_ACCORDION_HEADER)?.length ?? 0;
+  for (const cls of ["lw-accordion-header", "lw-accordion-action", "lw-accordion-cmd-box"]) {
+    const total = content.match(new RegExp(`className="${cls}[" ]`, "g"))?.length ?? 0;
+    const buttons =
+      content.match(new RegExp(`className="${cls}[" ][^>]*role="button" tabIndex=\\{0\\}`, "g"))
+        ?.length ?? 0;
+    const interactive = cls === "lw-accordion-header" ? total - inertHeaders : total;
+    expect(buttons, `${name}: ${cls} keyboard semantics`).toBe(interactive);
+  }
+}
 
 describe("docs skills directory pages", () => {
   describe("given the publish sync defines which skills exist in langwatch/skills", () => {
     const manifestSkills = Object.values(manifest).flatMap((sections) =>
       Object.values(sections).flatMap((entries) =>
-        entries.filter((e) => e.skill).map((e) => e.skill!.replace("langwatch/skills/", ""))
-      )
+        entries.filter((e) => e.skill).map((e) => e.skill!.replace("langwatch/skills/", "")),
+      ),
     );
 
     it("only lists skills that resolve inside the published repo layout", () => {
       const unknown = manifestSkills.filter((p) => !publishedPaths.has(p));
       expect(
         unknown,
-        `these manifest skills would 404 on raw.githubusercontent.com/langwatch/skills: ${unknown.join(", ")}`
+        `these manifest skills would 404 on raw.githubusercontent.com/langwatch/skills: ${unknown.join(", ")}`,
       ).toEqual([]);
     });
 
@@ -77,7 +131,7 @@ describe("docs skills directory pages", () => {
       const missing = [...publishedPaths].filter((p) => !listed.has(p));
       expect(
         missing,
-        `published skills missing from the docs directory pages: ${missing.join(", ")}`
+        `published skills missing from the docs directory pages: ${missing.join(", ")}`,
       ).toEqual([]);
     });
   });
@@ -90,9 +144,9 @@ describe("docs skills directory pages", () => {
           .flatMap((entries) => entries.filter((e) => e.skill))
           .map(
             (e) =>
-              `https://raw.githubusercontent.com/langwatch/skills/main/${e.skill!.replace("langwatch/skills/", "")}/SKILL.md`
+              `https://raw.githubusercontent.com/langwatch/skills/main/${e.skill!.replace("langwatch/skills/", "")}/SKILL.md`,
           );
-        expect(urls.sort(), `${name} download URLs`).toEqual(expected.sort());
+        expect(urls.toSorted(), `${name} download URLs`).toEqual(expected.toSorted());
       }
     });
 
@@ -103,28 +157,22 @@ describe("docs skills directory pages", () => {
     });
 
     it("renders every manifest accordion with its title and a server-rendered prompt block", () => {
-      for (const { name, content } of pageFiles) {
-        const entries = Object.values(manifest[name]!).flat();
-        const accordions = content.match(ACCORDION_OPEN) ?? [];
-        expect(accordions.length, `${name} accordion count`).toBe(entries.length);
-        const copyActions = content.match(/data-copy-source="prompt"/g) ?? [];
-        expect(copyActions.length, `${name} prompt actions`).toBe(entries.length);
-        const promptBlocks = [...content.matchAll(/^(`{4,})text\n([\s\S]*?)^\1$/gm)];
-        expect(promptBlocks.length, `${name} prompt fences`).toBe(entries.length);
-        for (const block of promptBlocks) {
-          expect(block[2]!.length, `${name} prompt fence content`).toBeGreaterThan(200);
-        }
-      }
+      for (const page of pageFiles) expectAccordionPerEntry(page);
     });
 
     it("keeps data attribute values ASCII-only because the renderer drops non-ASCII attributes", () => {
       for (const { name, content } of pageFiles) {
         const attrValues = [
           ...extractAll(content, /data-[\w-]+="([^"]*)"/g),
-          ...extractAll(content, /data-[\w-]+=\{("(?:[^"\\]|\\.)*")\}/g).map((v) => JSON.parse(v) as string),
+          ...extractAll(content, /data-[\w-]+=\{("(?:[^"\\]|\\.)*")\}/g).map(
+            (v) => JSON.parse(v) as string,
+          ),
         ];
         const offenders = attrValues.filter((v) => /[^\x20-\x7E]/.test(v));
-        expect(offenders, `${name} non-ASCII data attribute values: ${offenders.join(" | ")}`).toEqual([]);
+        expect(
+          offenders,
+          `${name} non-ASCII data attribute values: ${offenders.join(" | ")}`,
+        ).toEqual([]);
       }
     });
 
@@ -138,17 +186,7 @@ describe("docs skills directory pages", () => {
     it("keeps the generated blocks fresh with the manifest ordering", () => {
       for (const { name, content } of pageFiles) {
         for (const [sectionId, entries] of Object.entries(manifest[name]!)) {
-          const start = content.indexOf(`{/* lw-generated:${sectionId}:start */}`);
-          const end = content.indexOf(`{/* lw-generated:${sectionId}:end */}`);
-          expect(start, `${name} ${sectionId} start marker`).toBeGreaterThanOrEqual(0);
-          expect(end, `${name} ${sectionId} end marker`).toBeGreaterThan(start);
-          const block = content.slice(start, end);
-          let cursor = -1;
-          for (const entry of entries) {
-            const idx = block.indexOf(`data-track-title={${JSON.stringify(entry.title)}}`);
-            expect(idx, `${name} ${sectionId}: "${entry.title}" present in order`).toBeGreaterThan(cursor);
-            cursor = idx;
-          }
+          expectGeneratedSectionInOrder({ name, content, sectionId, entries });
         }
       }
     });
@@ -157,7 +195,7 @@ describe("docs skills directory pages", () => {
       // sync-prompts.sh runs the compiler before generating, so every
       // promptFile in the manifest must be a compiler output name.
       const knownStems = listPublishedSkills(skillsRoot).map((s) =>
-        s.isRecipe ? `recipes-${s.slug}` : s.slug
+        s.isRecipe ? `recipes-${s.slug}` : s.slug,
       );
       const validNames = new Set([
         ...knownStems.map((s) => `${s}.docs.txt`),
@@ -167,7 +205,9 @@ describe("docs skills directory pages", () => {
         .flatMap((sections) => Object.values(sections).flat())
         .map((e) => e.promptFile)
         .filter((f) => !validNames.has(f));
-      expect(bad, `manifest promptFile entries with no compiler output: ${bad.join(", ")}`).toEqual([]);
+      expect(bad, `manifest promptFile entries with no compiler output: ${bad.join(", ")}`).toEqual(
+        [],
+      );
     });
   });
 
@@ -185,7 +225,7 @@ describe("docs skills directory pages", () => {
       });
       expect(
         offenders,
-        `snippet imports disable server-side rendering of the accordions:\n  ${offenders.join("\n  ")}`
+        `snippet imports disable server-side rendering of the accordions:\n  ${offenders.join("\n  ")}`,
       ).toEqual([]);
     });
 
@@ -205,35 +245,24 @@ describe("docs skills directory pages", () => {
       expect(js).toContain("data-copy-source");
       expect(js).toContain(".lw-prompt-source code");
       expect(js, "keyboard activation must cover all interactive controls").toContain(
-        ".lw-accordion-header, .lw-accordion-action, .lw-accordion-cmd-box"
+        ".lw-accordion-header, .lw-accordion-action, .lw-accordion-cmd-box",
       );
     });
 
     it("marks every interactive control as a focusable button", () => {
-      for (const { name, content } of pageFiles) {
-        // A static card never toggles, so its header is not an interactive
-        // control. The next test pins that it stays inert, which is what keeps
-        // this subtraction from hiding a header that lost its semantics.
-        const inertHeaders = content.match(STATIC_ACCORDION_HEADER)?.length ?? 0;
-        for (const cls of ["lw-accordion-header", "lw-accordion-action", "lw-accordion-cmd-box"]) {
-          const total = content.match(new RegExp(`className="${cls}[" ]`, "g"))?.length ?? 0;
-          const buttons = content.match(new RegExp(`className="${cls}[" ][^>]*role="button" tabIndex=\\{0\\}`, "g"))?.length ?? 0;
-          const interactive = cls === "lw-accordion-header" ? total - inertHeaders : total;
-          expect(buttons, `${name}: ${cls} keyboard semantics`).toBe(interactive);
-        }
-      }
+      for (const page of pageFiles) expectInteractiveControlsAreButtons(page);
     });
 
     it("leaves the static card header inert because nothing handles its click", () => {
       const js = fs.readFileSync(path.join(docsRoot, "posthog.js"), "utf8");
       expect(js, "the header click handler must skip static cards").toContain(
-        "lw-accordion-static"
+        "lw-accordion-static",
       );
       for (const { name, content } of pageFiles) {
         for (const [, attrs] of content.matchAll(STATIC_ACCORDION_HEADER)) {
           expect(
             attrs!.trim(),
-            `${name}: a static card header must claim no button semantics`
+            `${name}: a static card header must claim no button semantics`,
           ).toBe("");
         }
       }
@@ -260,13 +289,12 @@ describe("the documentation paths the skills tell the agent to fetch", () => {
 
   /**
    * The paths, with the placeholders and the index (no path) left out.
-   *
-   * `scenario-docs` fetches the Scenario site, which is not in this tree, so
-   * only `langwatch docs` is checkable here.
+   * `scenario-docs` fetches the Scenario site, not in this tree, so only
+   * `langwatch docs` is checkable here.
    */
   function docsPaths(rendered: string): string[] {
     return extractAll(rendered, /langwatch docs ([a-z0-9/_<>|-]+)/g).filter(
-      (docsPath) => !docsPath.includes("<")
+      (docsPath) => !docsPath.includes("<"),
     );
   }
 
@@ -286,7 +314,7 @@ describe("the documentation paths the skills tell the agent to fetch", () => {
       expect(checked, "expected the skills to name documentation pages").toBeGreaterThan(5);
       expect(
         missing,
-        `these pages would 404 for the agent that fetched them: ${missing.join(", ")}`
+        `these pages would 404 for the agent that fetched them: ${missing.join(", ")}`,
       ).toEqual([]);
     });
   });

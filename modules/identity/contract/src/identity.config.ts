@@ -1,0 +1,39 @@
+import {
+  Config,
+  type ConfigOf,
+  isSaas,
+  localPasswords,
+  mfaEnrollmentOpen,
+  passkeysEnabled,
+  publicBaseUrl,
+} from "@langwatch/config";
+import { z } from "zod";
+
+/**
+ * Where a domain proof's TXT lookup asks, in node's `setServers` spelling
+ * (`127.0.0.1:15353`, comma-separated). A deployment names none and the
+ * machine's own resolver answers; development names the simulator.
+ */
+const nameserversSchema = z
+  .string()
+  .optional()
+  .transform((value) =>
+    (value ?? "")
+      .split(",")
+      .map((entry) => entry.trim())
+      .filter((entry) => entry !== ""),
+  );
+
+export const identityConfig = Config.define((c) => ({
+  ssoDomainProofDnsServers: c.env("SSO_DOMAIN_PROOF_DNS_SERVERS", nameserversSchema),
+  /** LangWatch's own cloud: what licenses federation, and so automatic joining. */
+  isSaas,
+  /** The shared deployment origin: what a SAML identity provider is told LangWatch is called. */
+  publicBaseUrl,
+  /** The sign-in capability switches auth also reads (round 48, A1-a). */
+  passkeysEnabled,
+  mfaEnrollmentOpen,
+  localPasswords,
+}));
+
+export type IdentityServerConfig = ConfigOf<typeof identityConfig>;

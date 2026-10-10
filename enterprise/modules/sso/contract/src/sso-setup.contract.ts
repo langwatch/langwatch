@@ -1,0 +1,708 @@
+import { ledgerActorSchema } from "@langwatch/authorization";
+import { ssoSamlIdpInitiatedSchema } from "@langwatch/identity-contract";
+import type { Named } from "@langwatch/module";
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+/**
+ * What an organization's own administrator reads about its connection, as
+ * distinct from the back office's cross-tenant surface. Spec:
+ * specs/identity/sso-connection-history.feature.
+ */
+import { z } from "zod";
+
+import { ssoSelfServeAvailabilitySchema } from "./sso-self-serve.contract.ts";
+
+/** Which connection of the caller's own organization is being read. */
+const ssoSetupConnectionSchemaDefinition = z.object({
+  organizationId: z.string().min(1),
+  connectionId: z.string().min(1),
+});
+export interface SsoSetupConnectionSchema extends Named<
+  typeof ssoSetupConnectionSchemaDefinition
+> {}
+export const ssoSetupConnectionSchema: SsoSetupConnectionSchema =
+  ssoSetupConnectionSchemaDefinition;
+
+export type SsoSetupConnectionInput = z.infer<typeof ssoSetupConnectionSchema>;
+
+/** Whose setup journey is being read. */
+const ssoSetupOrganizationSchemaDefinition = z.object({ organizationId: z.string().min(1) });
+export interface SsoSetupOrganizationSchema extends Named<
+  typeof ssoSetupOrganizationSchemaDefinition
+> {}
+export const ssoSetupOrganizationSchema: SsoSetupOrganizationSchema =
+  ssoSetupOrganizationSchemaDefinition;
+
+export type SsoSetupOrganizationInput = z.infer<typeof ssoSetupOrganizationSchema>;
+
+/**
+ * Where an organization's setup stands, as the page reads it in one go.
+ *
+ * The spellings are identity's own (`SsoSetupView`), repeated here because a
+ * wire schema is this module's own statement of what it sends; the transport
+ * maps identity's read onto it, and a value identity stops sending fails to
+ * compile rather than reaching a screen as undefined.
+ */
+/** How a domain was proved, in identity's own spellings. */
+const ssoSetupVerificationMethodSchema = z.enum([
+  "dns-txt",
+  "https-file",
+  "license-token",
+  "operator-attested",
+  "legacy-configuration",
+]);
+
+/** Which connection of a migration pair a reference names. */
+const ssoSetupConnectionSourceSchema = z.enum(["self-serve", "legacy-grandfathered"]);
+
+const ssoSetupProofSchema = z
+  .object({
+    domain: z.string(),
+    method: ssoSetupVerificationMethodSchema,
+    qualification: z.enum(["QUALIFIED", "UNKNOWN", "LAPSED"]),
+    proofState: z.enum(["VERIFIED", "WAVERING", "LAPSED"]),
+    /** When a lapse becomes final; null while the evidence is there. */
+    graceEndsAtMs: z.number().nullable(),
+    verifiedAtMs: z.number(),
+    verifier: ledgerActorSchema,
+  })
+  .strict();
+
+const ssoSetupClaimSchema = z
+  .object({
+    domain: z.string(),
+    state: z.enum(["CLAIMED", "APPROVED", "REJECTED"]),
+    /** Why an operator refused it, so a re-claim starts from what they said. */
+    note: z.string().nullable(),
+    waitsForReview: z.boolean(),
+  })
+  .strict();
+
+const ssoSetupRecordSchema = z
+  .object({
+    domain: z.string(),
+    method: ssoSetupVerificationMethodSchema,
+    expiresAtMs: z.number().nullable(),
+    expired: z.boolean(),
+  })
+  .strict();
+
+const ssoSetupGoLiveSchema = z
+  .object({
+    domainProved: z.boolean(),
+    testSignIn: z.object({ done: z.boolean() }).strict(),
+    breakGlass: z.object({ inPlace: z.boolean(), liveCount: z.number() }).strict(),
+    arrivalsDecided: z.boolean(),
+    ready: z.boolean(),
+    activated: z.boolean(),
+  })
+  .strict();
+
+const ssoSetupConnectionViewSchema = z
+  .object({
+    connectionId: z.string(),
+    state: z.enum([
+      "DRAFT",
+      "CLAIMED",
+      "APPROVED",
+      "REJECTED",
+      "DISCARDED",
+      "VERIFICATION_PENDING",
+      "VERIFIED",
+      "ACTIVE",
+      "SUSPENDED",
+      "TEARDOWN_PENDING",
+      "TORN_DOWN",
+    ]),
+    type: z.enum(["oidc", "saml"]),
+    providerId: z.string(),
+    issuer: z.string().nullable(),
+    source: ssoSetupConnectionSourceSchema,
+    arrivalPolicy: z.enum(["admit", "request", "refuse"]),
+    /** Null while the registration default stands: going live waits for a
+     *  decision, and "turn everybody away" is a decision too. */
+    arrivalPolicyDecidedAtMs: z.number().nullable(),
+    tearDownAfterMs: z.number().nullable(),
+    createdAtMs: z.number(),
+    verifiedDomains: z.array(z.string()),
+    domainProofs: z.array(ssoSetupProofSchema),
+  })
+  .strict();
+
+/**
+ * Where one organization's legacy-to-direct cutover stands, as the card reads
+ * it. Everything here is re-read on every request: finalizing never trusts a
+ * snapshot a screen was holding. Identity's `SsoMigrationView`, repeated for
+ * the reason the page view above is repeated.
+ */
+const ssoMigrationConnectionRefSchema = z
+  .object({
+    connectionId: z.string(),
+    source: ssoSetupConnectionSourceSchema,
+    providerId: z.string(),
+  })
+  .strict();
+
+const ssoMigrationStragglerSchema = z
+  .object({
+    userId: z.string(),
+    name: z.string().nullable(),
+    email: z.string().nullable(),
+    lastLegacyAuthenticationAtMs: z.number().nullable(),
+    /** Whether the replacement recognises them by address, and if not, why. */
+    move: z.enum(["matched", "no-address", "shared-address", "unproved-domain"]),
+  })
+  .strict();
+
+const ssoSetupMigrationSchemaDefinition = z
+  .object({
+    legacy: ssoMigrationConnectionRefSchema,
+    replacement: ssoMigrationConnectionRefSchema,
+    phase: z.enum(["SETUP", "GRACE_LEGACY", "GRACE_DIRECT", "FINALIZING", "FINALIZED"]),
+    /** Which half decides an ordinary sign-in while the pair stands. */
+    selectedRoute: z.enum(["legacy", "direct"]),
+    /** The proofs the replacement was registered with, still qualifying. */
+    inheritedDomains: z.array(
+      z
+        .object({
+          domain: z.string(),
+          method: ssoSetupVerificationMethodSchema,
+          proofState: z.enum(["VERIFIED", "WAVERING", "LAPSED"]),
+          /** What the proof was read back against; null for one that
+           *  published nothing. */
+          evidenceRef: z.string().nullable(),
+          verifiedAtMs: z.number(),
+        })
+        .strict(),
+    ),
+    testSignIn: z.object({ done: z.boolean(), atMs: z.number().nullable() }).strict(),
+    members: z
+      .object({
+        activeCount: z.number(),
+        linkedCount: z.number(),
+        /** Members the replacement will match at their next sign-in. */
+        nextSignInCount: z.number(),
+        stragglers: z.array(ssoMigrationStragglerSchema),
+        nextCursor: z.string().nullable(),
+      })
+      .strict(),
+    quietPeriod: z
+      .object({
+        lastLegacyAuthenticationAtMs: z.number().nullable(),
+        /** When finishing opens, or null before sign-in is switched over. */
+        clearsAtMs: z.number().nullable(),
+        complete: z.boolean(),
+      })
+      .strict(),
+    /** Whether directory provisioning is on the replacement, or still has
+     *  to be repointed before finishing. */
+    scim: z.object({ status: z.enum(["not-applicable", "needs-repointing", "ready"]) }).strict(),
+    /** One reason finalizing would be premature, in the words the reader acts on. */
+    blockers: z.array(z.object({ code: z.string(), message: z.string() }).strict()),
+    canFinalize: z.boolean(),
+  })
+  .strict();
+export interface SsoSetupMigrationSchema extends Named<typeof ssoSetupMigrationSchemaDefinition> {}
+export const ssoSetupMigrationSchema: SsoSetupMigrationSchema = ssoSetupMigrationSchemaDefinition;
+
+export type SsoSetupMigration = z.infer<typeof ssoSetupMigrationSchema>;
+
+const ssoSetupPageViewSchemaDefinition = z
+  .object({
+    /** Whether this organization may set single sign-on up itself, and if not, why. */
+    availability: ssoSelfServeAvailabilitySchema,
+    /** Null before the organization has registered its first connection. */
+    connection: ssoSetupConnectionViewSchema.nullable(),
+    claims: z.array(ssoSetupClaimSchema),
+    record: ssoSetupRecordSchema.nullable(),
+    goLive: ssoSetupGoLiveSchema.nullable(),
+    /** The compatibility route a grandfathered connection stands in for. It
+     *  names its connection: a replacement registered against that id
+     *  inherits what it proved, where one registered against nothing is a
+     *  rival to the route people are signing in through right now. */
+    legacyRoute: z
+      .object({ connectionId: z.string(), domain: z.string(), provider: z.string() })
+      .strict()
+      .nullable(),
+    /** Where the cutover stands, when this connection replaces a
+     *  grandfathered one. Null for every connection outside a pair. */
+    migration: ssoSetupMigrationSchema.nullable(),
+    /** The plan, not the person, is what refuses: the screen offers no control that would only be refused. */
+    enterpriseRequired: z.boolean(),
+    /** The addresses an identity provider is pointed at. This module serves
+     *  them, so identity's own read does not answer them. */
+    serviceProvider: z
+      .object({
+        redirectUrl: z.string(),
+        assertionConsumerServiceUrl: z.string(),
+        singleLogoutUrl: z.string(),
+        entityId: z.string(),
+        metadataUrl: z.string(),
+        /** The sign-in the deployment configures for itself (`AUTH_PROVIDER`) and the
+         *  address it returns to, which is not the connection's. Null for email only. */
+        deploymentSignIn: z
+          .object({ name: z.string(), redirectUrl: z.string() })
+          .strict()
+          .nullable()
+          .optional(),
+      })
+      .strict(),
+  })
+  .strict();
+export interface SsoSetupPageViewSchema extends Named<typeof ssoSetupPageViewSchemaDefinition> {}
+export const ssoSetupPageViewSchema: SsoSetupPageViewSchema = ssoSetupPageViewSchemaDefinition;
+
+export type SsoSetupPageView = z.infer<typeof ssoSetupPageViewSchema>;
+
+/**
+ * One line of a connection's history, already in a reader's words: identity
+ * composes the sentence; the optional event type lets a surface choose its icon.
+ */
+const ssoConnectionHistoryEntrySchemaDefinition = z
+  .object({
+    eventId: z.string(),
+    eventType: z.string().optional(),
+    occurredAtMs: z.number(),
+    summary: z.string(),
+    /** True where the grandfather migration produced the fact, not a person. */
+    carriedOver: z.boolean(),
+  })
+  .strict();
+export interface SsoConnectionHistoryEntrySchema extends Named<
+  typeof ssoConnectionHistoryEntrySchemaDefinition
+> {}
+export const ssoConnectionHistoryEntrySchema: SsoConnectionHistoryEntrySchema =
+  ssoConnectionHistoryEntrySchemaDefinition;
+
+export type SsoConnectionHistoryEntry = z.infer<typeof ssoConnectionHistoryEntrySchema>;
+
+/**
+ * A bare "something changed here", which is the whole signal: the page
+ * refreshes the history read it already has permission for, so the tick
+ * itself discloses nothing.
+ */
+const ssoHistoryActivitySchemaDefinition = z.object({ connectionId: z.string() }).strict();
+export interface SsoHistoryActivitySchema extends Named<
+  typeof ssoHistoryActivitySchemaDefinition
+> {}
+export const ssoHistoryActivitySchema: SsoHistoryActivitySchema =
+  ssoHistoryActivitySchemaDefinition;
+
+export type SsoHistoryActivity = z.infer<typeof ssoHistoryActivitySchema>;
+
+/** One domain of the caller's own connection. Separate from the back
+ *  office's target of the same shape: the two surfaces are gated apart. */
+const ssoSetupDomainSchemaDefinition = z.object({
+  ...ssoSetupConnectionSchema.shape,
+  domain: z.string().min(1).max(253),
+});
+export interface SsoSetupDomainSchema extends Named<typeof ssoSetupDomainSchemaDefinition> {}
+export const ssoSetupDomainSchema: SsoSetupDomainSchema = ssoSetupDomainSchemaDefinition;
+
+export type SsoSetupDomainInput = z.infer<typeof ssoSetupDomainSchema>;
+
+/**
+ * What a claim answers: whether a person has to look at it before the domain
+ * routes, whether somebody else has already proved the same domain, and
+ * whether the installation's licence verified it at once.
+ */
+const ssoDomainClaimOutcomeSchemaDefinition = z
+  .object({ waitsForReview: z.boolean(), disputed: z.boolean(), verified: z.boolean() })
+  .strict();
+export interface SsoDomainClaimOutcomeSchema extends Named<
+  typeof ssoDomainClaimOutcomeSchemaDefinition
+> {}
+export const ssoDomainClaimOutcomeSchema: SsoDomainClaimOutcomeSchema =
+  ssoDomainClaimOutcomeSchemaDefinition;
+
+export type SsoDomainClaimOutcome = z.infer<typeof ssoDomainClaimOutcomeSchema>;
+
+/** Where one domain's proof goes, and the token to publish there. Answered
+ *  once: identity keeps only the hash, so a lost value is replaced. */
+const ssoIssuedDnsRecordSchemaDefinition = z
+  .object({
+    domain: z.string(),
+    label: z.string(),
+    name: z.string(),
+    type: z.string(),
+    file: z.object({ path: z.string(), url: z.string() }).strict(),
+    value: z.string(),
+    expiresAtMs: z.number(),
+  })
+  .strict();
+export interface SsoIssuedDnsRecordSchema extends Named<
+  typeof ssoIssuedDnsRecordSchemaDefinition
+> {}
+export const ssoIssuedDnsRecordSchema: SsoIssuedDnsRecordSchema =
+  ssoIssuedDnsRecordSchemaDefinition;
+
+export type SsoIssuedDnsRecord = z.infer<typeof ssoIssuedDnsRecordSchema>;
+
+/** Either the domain already proves itself, or here is what to publish. */
+const ssoDomainProofSchemaDefinition = z.discriminatedUnion("proved", [
+  z.object({ proved: z.literal(true) }).strict(),
+  z.object({ proved: z.literal(false), record: ssoIssuedDnsRecordSchema }).strict(),
+]);
+export interface SsoDomainProofSchema extends Named<typeof ssoDomainProofSchemaDefinition> {}
+export const ssoDomainProofSchema: SsoDomainProofSchema = ssoDomainProofSchemaDefinition;
+
+export type SsoDomainProof = z.infer<typeof ssoDomainProofSchema>;
+
+/** A check answers only that it proved: anything else is a refusal. */
+const ssoDomainProvedSchemaDefinition = z.object({ proved: z.literal(true) }).strict();
+export interface SsoDomainProvedSchema extends Named<typeof ssoDomainProvedSchemaDefinition> {}
+export const ssoDomainProvedSchema: SsoDomainProvedSchema = ssoDomainProvedSchemaDefinition;
+
+export type SsoDomainProved = z.infer<typeof ssoDomainProvedSchema>;
+
+/**
+ * What an administrator hands over to register their identity provider (D09).
+ * Two protocols and one shape each, discriminated rather than a bag of
+ * optional fields, because half the combinations are nonsense. Identity's
+ * spellings, repeated for the same reason the page view above repeats them.
+ */
+const ssoSetupOidcRegistrationSchemaDefinition = z.object({
+  protocol: z.literal("oidc"),
+  /** The address the discovery document lives under. */
+  issuer: z.string().trim().min(1).max(2048),
+  clientId: z.string().trim().min(1).max(512),
+  clientSecret: z.string().min(1).max(4096),
+});
+export interface SsoSetupOidcRegistrationSchema extends Named<
+  typeof ssoSetupOidcRegistrationSchemaDefinition
+> {}
+export const ssoSetupOidcRegistrationSchema: SsoSetupOidcRegistrationSchema =
+  ssoSetupOidcRegistrationSchemaDefinition;
+
+const ssoSetupSamlRegistrationSchemaDefinition = z.object({
+  protocol: z.literal("saml"),
+  /** Where a sign-in request is sent. */
+  entryPoint: z.string().trim().min(1).max(2048),
+  /** Derivable from metadata, so either this or `metadataXml` has to be there
+   *  and neither alone is required. */
+  entityId: z.string().trim().max(2048).nullable().default(null),
+  metadataXml: z.string().max(512_000).nullable().default(null),
+  certificate: z.string().max(64_000).nullable().default(null),
+  /** Opt-in to sign-ins the IdP starts, landing only on a listed app path. */
+  idpInitiated: ssoSamlIdpInitiatedSchema,
+});
+export interface SsoSetupSamlRegistrationSchema extends Named<
+  typeof ssoSetupSamlRegistrationSchemaDefinition
+> {}
+export const ssoSetupSamlRegistrationSchema: SsoSetupSamlRegistrationSchema =
+  ssoSetupSamlRegistrationSchemaDefinition;
+
+const ssoSetupRegistrationSchemaDefinition = z.discriminatedUnion("protocol", [
+  ssoSetupOidcRegistrationSchema,
+  ssoSetupSamlRegistrationSchema,
+]);
+export interface SsoSetupRegistrationSchema extends Named<
+  typeof ssoSetupRegistrationSchemaDefinition
+> {}
+export const ssoSetupRegistrationSchema: SsoSetupRegistrationSchema =
+  ssoSetupRegistrationSchemaDefinition;
+
+export type SsoSetupRegistration = z.infer<typeof ssoSetupRegistrationSchema>;
+
+const ssoSetupRegisterSchemaDefinition = z.object({
+  ...ssoSetupOrganizationSchema.shape,
+  /** What the administrator calls this provider. */
+  providerId: z.string().min(1).max(100),
+  idp: ssoSetupRegistrationSchema,
+});
+export interface SsoSetupRegisterSchema extends Named<typeof ssoSetupRegisterSchemaDefinition> {}
+export const ssoSetupRegisterSchema: SsoSetupRegisterSchema = ssoSetupRegisterSchemaDefinition;
+
+export type SsoSetupRegisterInput = z.infer<typeof ssoSetupRegisterSchema>;
+
+/** The connection registering minted, which the page reads back straight away. */
+const ssoSetupRegisteredSchemaDefinition = z.object({ connectionId: z.string() }).strict();
+export interface SsoSetupRegisteredSchema extends Named<
+  typeof ssoSetupRegisteredSchemaDefinition
+> {}
+export const ssoSetupRegisteredSchema: SsoSetupRegisteredSchema =
+  ssoSetupRegisteredSchemaDefinition;
+
+export type SsoSetupRegistered = z.infer<typeof ssoSetupRegisteredSchema>;
+
+/**
+ * An existing connection's identity provider settings, replaced in place so
+ * its id, and the redirect address registered at the provider, stay. A blank
+ * OpenID Connect client secret is null and keeps the stored one: a secret is
+ * never shown back.
+ */
+const ssoSetupOidcUpdateSchemaDefinition = z.object({
+  ...ssoSetupOidcRegistrationSchema.shape,
+  clientSecret: z.string().max(4096).nullable().default(null),
+});
+export interface SsoSetupOidcUpdateSchema extends Named<
+  typeof ssoSetupOidcUpdateSchemaDefinition
+> {}
+export const ssoSetupOidcUpdateSchema: SsoSetupOidcUpdateSchema =
+  ssoSetupOidcUpdateSchemaDefinition;
+
+const ssoSetupIdentityProviderUpdateSchemaDefinition = z.discriminatedUnion("protocol", [
+  ssoSetupOidcUpdateSchema,
+  ssoSetupSamlRegistrationSchema,
+]);
+export interface SsoSetupIdentityProviderUpdateSchema extends Named<
+  typeof ssoSetupIdentityProviderUpdateSchemaDefinition
+> {}
+export const ssoSetupIdentityProviderUpdateSchema: SsoSetupIdentityProviderUpdateSchema =
+  ssoSetupIdentityProviderUpdateSchemaDefinition;
+
+export type SsoSetupIdentityProviderUpdate = z.infer<typeof ssoSetupIdentityProviderUpdateSchema>;
+
+const ssoSetupUpdateIdentityProviderSchemaDefinition = z.object({
+  ...ssoSetupConnectionSchema.shape,
+  idp: ssoSetupIdentityProviderUpdateSchema,
+});
+export interface SsoSetupUpdateIdentityProviderSchema extends Named<
+  typeof ssoSetupUpdateIdentityProviderSchemaDefinition
+> {}
+export const ssoSetupUpdateIdentityProviderSchema: SsoSetupUpdateIdentityProviderSchema =
+  ssoSetupUpdateIdentityProviderSchemaDefinition;
+
+export type SsoSetupUpdateIdentityProviderInput = z.infer<
+  typeof ssoSetupUpdateIdentityProviderSchema
+>;
+
+/**
+ * A connection's current identity provider settings, as the edit form is
+ * prefilled with them. Never the OpenID Connect client secret: the form says
+ * whether one is stored.
+ */
+const ssoSetupIdentityProviderViewSchemaDefinition = z.discriminatedUnion("protocol", [
+  z
+    .object({
+      protocol: z.literal("oidc"),
+      issuer: z.string().nullable(),
+      clientId: z.string().nullable(),
+      hasClientSecret: z.boolean(),
+    })
+    .strict(),
+  z
+    .object({
+      protocol: z.literal("saml"),
+      entryPoint: z.string().nullable(),
+      entityId: z.string().nullable(),
+      metadataXml: z.string().nullable(),
+      certificate: z.string().nullable(),
+      idpInitiated: ssoSamlIdpInitiatedSchema,
+    })
+    .strict(),
+]);
+export interface SsoSetupIdentityProviderViewSchema extends Named<
+  typeof ssoSetupIdentityProviderViewSchemaDefinition
+> {}
+export const ssoSetupIdentityProviderViewSchema: SsoSetupIdentityProviderViewSchema =
+  ssoSetupIdentityProviderViewSchemaDefinition;
+
+export type SsoSetupIdentityProviderView = z.infer<typeof ssoSetupIdentityProviderViewSchema>;
+
+/** Who the connection admits (ADR-117 §3). `policy` is the wire's word. */
+const ssoSetupArrivalsSchemaDefinition = z.object({
+  ...ssoSetupConnectionSchema.shape,
+  policy: z.enum(["admit", "request", "refuse"]),
+});
+export interface SsoSetupArrivalsSchema extends Named<typeof ssoSetupArrivalsSchemaDefinition> {}
+export const ssoSetupArrivalsSchema: SsoSetupArrivalsSchema = ssoSetupArrivalsSchemaDefinition;
+
+export type SsoSetupArrivalsInput = z.infer<typeof ssoSetupArrivalsSchema>;
+
+/** Taking a connection away. WHICH removal that is comes from where the
+ *  connection stands, so the caller states a reason and nothing else. */
+const ssoSetupRemovalSchemaDefinition = z.object({
+  ...ssoSetupConnectionSchema.shape,
+  reason: z.string().min(1).max(1000).nullable().default(null),
+});
+export interface SsoSetupRemovalSchema extends Named<typeof ssoSetupRemovalSchemaDefinition> {}
+export const ssoSetupRemovalSchema: SsoSetupRemovalSchema = ssoSetupRemovalSchemaDefinition;
+
+export type SsoSetupRemovalInput = z.infer<typeof ssoSetupRemovalSchema>;
+
+/** One page of a cutover's members. The first page arrives with the setup
+ *  read; this is how the card asks for the rest. */
+const ssoSetupMigrationProgressSchemaDefinition = z.object({
+  ...ssoSetupConnectionSchema.shape,
+  cursor: z.string().min(1).nullable().default(null),
+  limit: z.number().int().min(1).max(100).default(25),
+});
+export interface SsoSetupMigrationProgressSchema extends Named<
+  typeof ssoSetupMigrationProgressSchemaDefinition
+> {}
+export const ssoSetupMigrationProgressSchema: SsoSetupMigrationProgressSchema =
+  ssoSetupMigrationProgressSchemaDefinition;
+
+export type SsoSetupMigrationProgressInput = z.infer<typeof ssoSetupMigrationProgressSchema>;
+
+/**
+ * The direct replacement for a grandfathered connection, registered with the
+ * same evidence an ordinary registration takes — and carrying over the
+ * domains the connection it replaces has already proved.
+ */
+const ssoSetupStartMigrationSchemaDefinition = z.object({
+  ...ssoSetupOrganizationSchema.shape,
+  legacyConnectionId: z.string().min(1),
+  providerId: z.string().min(1).max(100),
+  idp: ssoSetupRegistrationSchema,
+});
+export interface SsoSetupStartMigrationSchema extends Named<
+  typeof ssoSetupStartMigrationSchemaDefinition
+> {}
+export const ssoSetupStartMigrationSchema: SsoSetupStartMigrationSchema =
+  ssoSetupStartMigrationSchemaDefinition;
+
+export type SsoSetupStartMigrationInput = z.infer<typeof ssoSetupStartMigrationSchema>;
+
+/** Which half of a migration pair decides ordinary sign-ins. */
+const ssoSetupMigrationRouteSchemaDefinition = z.object({
+  ...ssoSetupConnectionSchema.shape,
+  route: z.enum(["legacy", "direct"]),
+});
+export interface SsoSetupMigrationRouteSchema extends Named<
+  typeof ssoSetupMigrationRouteSchemaDefinition
+> {}
+export const ssoSetupMigrationRouteSchema: SsoSetupMigrationRouteSchema =
+  ssoSetupMigrationRouteSchemaDefinition;
+
+export type SsoSetupMigrationRouteInput = z.infer<typeof ssoSetupMigrationRouteSchema>;
+
+/** The word on the card; nothing routes on it. */
+const ssoSetupRenameSchemaDefinition = z.object({
+  ...ssoSetupConnectionSchema.shape,
+  name: z.string().trim().min(1).max(120),
+});
+export interface SsoSetupRenameSchema extends Named<typeof ssoSetupRenameSchemaDefinition> {}
+export const ssoSetupRenameSchema: SsoSetupRenameSchema = ssoSetupRenameSchemaDefinition;
+
+export type SsoSetupRenameInput = z.infer<typeof ssoSetupRenameSchema>;
+
+/**
+ * One way back in, as the page reads it (D05, ADR-117 §5): the two people on
+ * it named, and how long it has left. A row in user ids answers "who can
+ * still get in without the identity provider" for nobody.
+ */
+const ssoBreakGlassGrantSchemaDefinition = z
+  .object({
+    bindingId: z.string(),
+    userId: z.string(),
+    name: z.string().nullable(),
+    email: z.string().nullable(),
+    grantedByUserId: z.string(),
+    grantedByName: z.string().nullable(),
+    grantedAtMs: z.number(),
+    expiresAtMs: z.number(),
+    /** Set where a renewal replaced this row, which is history rather than a
+     *  live way in. */
+    supersededAtMs: z.number().nullable(),
+    live: z.boolean(),
+    daysRemaining: z.number(),
+  })
+  .strict();
+export interface SsoBreakGlassGrantSchema extends Named<
+  typeof ssoBreakGlassGrantSchemaDefinition
+> {}
+export const ssoBreakGlassGrantSchema: SsoBreakGlassGrantSchema =
+  ssoBreakGlassGrantSchemaDefinition;
+
+export type SsoBreakGlassGrant = z.infer<typeof ssoBreakGlassGrantSchema>;
+
+/** Somebody a way back in can be granted to: an administrator, today. */
+const ssoBreakGlassCandidateSchemaDefinition = z
+  .object({
+    userId: z.string(),
+    name: z.string().nullable(),
+    email: z.string().nullable(),
+  })
+  .strict();
+export interface SsoBreakGlassCandidateSchema extends Named<
+  typeof ssoBreakGlassCandidateSchemaDefinition
+> {}
+export const ssoBreakGlassCandidateSchema: SsoBreakGlassCandidateSchema =
+  ssoBreakGlassCandidateSchemaDefinition;
+
+export type SsoBreakGlassCandidate = z.infer<typeof ssoBreakGlassCandidateSchema>;
+
+/**
+ * The binding itself, as the command that wrote it answers. Immutable: a
+ * renewal writes a NEW row naming the one it replaced, so the date a way in
+ * previously ended stays readable afterwards.
+ */
+const ssoBreakGlassBindingSchemaDefinition = z
+  .object({
+    bindingId: z.string(),
+    organizationId: z.string(),
+    userId: z.string(),
+    grantedByUserId: z.string(),
+    grantedAtMs: z.number(),
+    expiresAtMs: z.number(),
+    supersededAtMs: z.number().nullable(),
+    renewedFromBindingId: z.string().nullable(),
+    /** Which end-of-grant warnings have already gone out. */
+    warnedDays: z.array(z.number()),
+  })
+  .strict();
+export interface SsoBreakGlassBindingSchema extends Named<
+  typeof ssoBreakGlassBindingSchemaDefinition
+> {}
+export const ssoBreakGlassBindingSchema: SsoBreakGlassBindingSchema =
+  ssoBreakGlassBindingSchemaDefinition;
+
+export type SsoBreakGlassBinding = z.infer<typeof ssoBreakGlassBindingSchema>;
+
+/** Grant one. Never open-ended: the expiry is the whole of what stops a way
+ *  back in from quietly becoming a permanent second door. */
+const ssoBreakGlassGrantInputSchemaDefinition = z.object({
+  ...ssoSetupOrganizationSchema.shape,
+  userId: z.string().min(1),
+  expiresAtMs: z.number().int().positive(),
+});
+export interface SsoBreakGlassGrantInputSchema extends Named<
+  typeof ssoBreakGlassGrantInputSchemaDefinition
+> {}
+export const ssoBreakGlassGrantInputSchema: SsoBreakGlassGrantInputSchema =
+  ssoBreakGlassGrantInputSchemaDefinition;
+
+export type SsoBreakGlassGrantInput = z.infer<typeof ssoBreakGlassGrantInputSchema>;
+
+/** Extend one to a new date, by writing a new grant that names the old. */
+const ssoBreakGlassRenewalInputSchemaDefinition = z.object({
+  ...ssoSetupOrganizationSchema.shape,
+  bindingId: z.string().min(1),
+  expiresAtMs: z.number().int().positive(),
+});
+export interface SsoBreakGlassRenewalInputSchema extends Named<
+  typeof ssoBreakGlassRenewalInputSchemaDefinition
+> {}
+export const ssoBreakGlassRenewalInputSchema: SsoBreakGlassRenewalInputSchema =
+  ssoBreakGlassRenewalInputSchemaDefinition;
+
+export type SsoBreakGlassRenewalInput = z.infer<typeof ssoBreakGlassRenewalInputSchema>;
+
+/** Which grant is being ended now. */
+const ssoBreakGlassBindingInputSchemaDefinition = z.object({
+  ...ssoSetupOrganizationSchema.shape,
+  bindingId: z.string().min(1),
+});
+export interface SsoBreakGlassBindingInputSchema extends Named<
+  typeof ssoBreakGlassBindingInputSchemaDefinition
+> {}
+export const ssoBreakGlassBindingInputSchema: SsoBreakGlassBindingInputSchema =
+  ssoBreakGlassBindingInputSchemaDefinition;
+
+export type SsoBreakGlassBindingInput = z.infer<typeof ssoBreakGlassBindingInputSchema>;
+
+/** A renewal answers both rows: the new grant, and the one it replaced. */
+const ssoBreakGlassRenewalSchemaDefinition = z
+  .object({
+    renewed: ssoBreakGlassBindingSchema,
+    replaced: ssoBreakGlassBindingSchema,
+  })
+  .strict();
+export interface SsoBreakGlassRenewalSchema extends Named<
+  typeof ssoBreakGlassRenewalSchemaDefinition
+> {}
+export const ssoBreakGlassRenewalSchema: SsoBreakGlassRenewalSchema =
+  ssoBreakGlassRenewalSchemaDefinition;
+
+export type SsoBreakGlassRenewal = z.infer<typeof ssoBreakGlassRenewalSchema>;

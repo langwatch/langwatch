@@ -22,7 +22,7 @@ The page is nine columns wide and answers almost nothing an operator actually as
 
 The last one is what forces the decision. A read-only surface is only a discipline if the alternative it forbids is genuinely more dangerous; here the alternative is a hand-written `UPDATE` against a production table with no audit trail, no permission gate, and no idempotency, performed by whoever is awake.
 
-What makes this delicate is not the mutation but the *fan-out*. One scheduler serves every project. A "run now" on a schedule-triggered report sends a real report to a real customer, and a careless one sends it twice.
+What makes this delicate is not the mutation but the _fan-out_. One scheduler serves every project. A "run now" on a schedule-triggered report sends a real report to a real customer, and a careless one sends it twice.
 
 ## Decision
 
@@ -30,7 +30,7 @@ What makes this delicate is not the mutation but the *fan-out*. One scheduler se
 
 **A manual run is a first-class slot, not a bypass.** This is the load-bearing choice. "Run now" does not call the target's handler and does not claim the slot itself; it pulls the schedule's `nextRunAt` forward so the row becomes due, and the ordinary calendar loop claims and runs it. Three properties fall out, and they are exactly the ones a bypass would lose:
 
-- A manual run **races safely** with the scheduled one. The scheduler's exactly-once guarantee is a *Postgres conditional-update lease* — `claim` updates `WHERE id = :id AND nextRunAt = :expectedNextRunAt`, so N workers racing one due row produce exactly one winner and no Redis lock is involved (ADR-044 §4; note this is NOT the process-manager revision fencing of ADR-052, which governs durable wakes). Making a row due hands it to that same mechanism, so a manual run and a cron tick landing together still fire once. The ops write is itself guarded on the same `nextRunAt` it read, so an operator acting on a row the loop already moved changes nothing and is told so.
+- A manual run **races safely** with the scheduled one. The scheduler's exactly-once guarantee is a _Postgres conditional-update lease_ — `claim` updates `WHERE id = :id AND nextRunAt = :expectedNextRunAt`, so N workers racing one due row produce exactly one winner and no Redis lock is involved (ADR-044 §4; note this is NOT the process-manager revision fencing of ADR-052, which governs durable wakes). Making a row due hands it to that same mechanism, so a manual run and a cron tick landing together still fire once. The ops write is itself guarded on the same `nextRunAt` it read, so an operator acting on a row the loop already moved changes nothing and is told so.
 - A manual run is **visible as a run**. It appears in `currentSlot`, it increments `attempts` on failure, it writes `lastError`, and it shows on the page as Running exactly like a scheduled one. An operator watching the page sees the effect of their own action in the same place they saw the problem.
 - A manual run **cannot resurrect a retired schedule**. It reads the same `active` flag the loop reads; an inactive schedule refuses the run rather than firing once out of band.
 
@@ -70,7 +70,7 @@ The confirm step names the target and the project **by name**, because the whole
 
 **Why "make it due" rather than "invoke the handler", or even "claim it here".** Invoking directly is a smaller change and a much worse primitive: it has no interaction with the calendar loop, so it double-sends under a race; it is invisible in `currentSlot`, so nothing on the page reflects it; and it would need its own retry, error and audit story rather than inheriting three that already exist.
 
-Claiming the slot *inside the ops request* was the next candidate and was also rejected. The claim is only half the job — something then has to run the handler, settle the calendar and drive the retry ladder — and the code that does all of that lives in the worker loop. An ops request that claimed a slot would either have to execute customer-facing work inside a web request or leave the slot claimed and unworked until its lease expired. Moving `nextRunAt` instead is the smallest write that reaches the whole existing machine.
+Claiming the slot _inside the ops request_ was the next candidate and was also rejected. The claim is only half the job — something then has to run the handler, settle the calendar and drive the retry ladder — and the code that does all of that lives in the worker loop. An ops request that claimed a slot would either have to execute customer-facing work inside a web request or leave the slot claimed and unworked until its lease expired. Moving `nextRunAt` instead is the smallest write that reaches the whole existing machine.
 
 **Why run-now is gated behind naming the tenant.** Every other guard here is structural. This one is human: the failure mode is not a race, it is an operator acting on the row above the one they meant. Rendering the project name in the confirm — not the ksuid they cannot check — is the only guard that addresses it.
 

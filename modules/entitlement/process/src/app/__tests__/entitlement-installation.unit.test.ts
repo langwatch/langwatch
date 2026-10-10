@@ -1,0 +1,447 @@
+import type { BillingApi } from "@langwatch/enterprise-billing-contract";
+import { LicensingApi } from "@langwatch/enterprise-licensing-contract";
+import {
+  EntitlementApi,
+  type EntitlementSource,
+  type ListOrganizationSpendInput,
+  type Plan,
+  type ProjectSpendRollup,
+} from "@langwatch/entitlement-contract";
+import { defineAggregate, definePipeline, EventSourcing } from "@langwatch/eventing";
+import { EventStoreMemory, testEventSchema } from "@langwatch/eventing/testing";
+import type { OrganizationApi } from "@langwatch/organization-contract";
+import { createApp } from "@langwatch/process";
+import { memoryStores } from "@langwatch/process-stores";
+import { createTestLogger } from "@langwatch/test-harness";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { SPAN_RECEIVED_EVENT_TYPE, TraceApi } from "@langwatch/trace-contract";
+import { describe, expect, it } from "vitest";
+import { z } from "zod";
+
+import { entitlementProcessModule } from "../../entitlement.module.ts";
+import { MemoryEntitlementDatabase } from "../../repositories/memory/memory.entitlement.database.ts";
+import { MemoryOrganizationSpendRepository } from "../../repositories/memory/memory.organization-spend.repository.ts";
+import { MemoryTenancyRepository } from "../../repositories/memory/memory.tenancy.repository.ts";
+import { MemoryUsageMembershipRepository } from "../../repositories/memory/memory.usage-membership.repository.ts";
+import type { OrganizationSpendRepository } from "../../repositories/organization-spend.repository.ts";
+import { EntitlementModule } from "../entitlement.app.ts";
+import {
+  createEntitlementTestApp,
+  fixedEntitlementSource,
+  TestUsageWarnings,
+} from "./entitlement.fixture.ts";
+
+const free: Plan = {
+  planSource: "free",
+  type: "FREE",
+  name: "Free",
+  free: true,
+  maxMembers: 5,
+  maxMembersLite: 5,
+  maxMessagesPerMonth: 1_000,
+  canPublish: false,
+  prices: { USD: 0, EUR: 0 },
+};
+
+/** A rollup reader that answers nothing and remembers what it was asked. */
+class RecordingSpendRepository implements OrganizationSpendRepository {
+  readonly asked: ListOrganizationSpendInput[] = [];
+
+  async findSpendRollups(input: ListOrganizationSpendInput): Promise<ProjectSpendRollup[]> {
+    this.asked.push(input);
+
+    return [];
+  }
+}
+
+/** The role's eventing, with trace's pipeline standing in as the owner of span_received. */
+function eventingFor(role: "api" | "worker"): EventSourcing {
+  const eventing = new EventSourcing({
+    eventStore: EventStoreMemory.createForTesting(),
+    executionTarget: role,
+    consumersEnabled: false,
+    processManagerMode: "producer-only",
+  });
+  eventing.register(
+    definePipeline({ name: "trace_stand_in", aggregate: defineAggregate({ type: "trace" }) })
+      .withEvents([testEventSchema(SPAN_RECEIVED_EVENT_TYPE, z.object({}))])
+      .build(),
+  );
+  return eventing;
+}
+
+describe("entitlement's dependencies", () => {
+  /** @scenario "Trace is no longer asked to count usage" */
+  it("names no TraceApi: traces are counted off entitlement's own meter", () => {
+    expect(Object.values(EntitlementModule.dependencies)).not.toContain(TraceApi);
+  });
+});
+
+describe("entitlement app installation", () => {
+  /**
+   * @scenario "The core baseline works without enterprise sources"
+   * @scenario "An organization's month volume is counted from its projects in its metering unit"
+   * @scenario "The entitlement installer constructs its private service"
+   * `EntitlementModule` reads no members and declares no subscription
+   * dependency at all, and its declared `license` dependency is answered
+   * here with a source that never grants — so a plain boot, with no
+   * Enterprise billing composed and no active license, still resolves a
+   * plan instead of crashing on an undefined baseline (the measured defect:
+   * `entitlement.service.ts:70`, "Cannot use 'in' operator to search for
+   * 'resolve' in undefined").
+   */
+  it.each(["api", "worker"] as const)(
+    "installs a working capability in the %s role, with no enterprise sources composed",
+    async (role) => {
+      const { logger } = createTestLogger();
+      const runtime = await createApp({ role })
+        .withModules([entitlementProcessModule])
+        .withConfig({ entitlement: { requestBounds: undefined, isSaas: true } })
+        .withStores(memoryStores())
+        .withEventing(eventingFor(role))
+        .withObservability((observability) => observability.withLogging(logger))
+        .provide({
+          billing: createApiFixture<BillingApi>({
+            getActiveSubscriptionPlan: async () => free,
+            getPricingModel: async () => ({ pricingModel: null }),
+          }),
+          organization: createApiFixture<OrganizationApi>({
+            countMemberSeats: async () => ({ fullMembers: 0, liteMembers: 0, developers: 0 }),
+          }),
+          licensing: createApiFixture<LicensingApi>({
+            resolve: async () => ({ granted: true, plan: free }),
+          }),
+        })
+        .boot();
+
+      try {
+        const app = runtime.service(EntitlementApi);
+
+        expect(runtime.module(entitlementProcessModule).provided).toBe(app);
+
+        await expect(
+          app.getActivePlan({ organizationId: "organization-1" }),
+        ).resolves.toMatchObject({
+          type: "FREE",
+          planSource: "free",
+        });
+
+        await expect(app.getUsage({ organizationId: "organization-1" })).resolves.toMatchObject({
+          currentMonthMessagesCount: 0,
+          membersCount: 0,
+          usageUnit: "events",
+        });
+
+        // Entitlement records the crossed threshold through its own pipeline; billing mails it.
+        await expect(
+          app.sendUsageLimitWarning({
+            organizationId: "organization-1",
+            currentMonthMessagesCount: 900,
+            maxMonthlyUsageLimit: 1_000,
+          }),
+        ).resolves.toEqual({ sent: true });
+      } finally {
+        await runtime.stop();
+      }
+    },
+  );
+
+  describe("given the activated license source a process composition root provided", () => {
+    /**
+     * Tests what EntitlementModule does once told "licensed" or "not licensed".
+     * The licensing service handles the other three "not licensed" causes.
+     */
+    async function bootWithLicense(source: EntitlementSource) {
+      const { logger } = createTestLogger();
+      const runtime = await createApp({ role: "api" })
+        .withModules([entitlementProcessModule])
+        .withConfig({ entitlement: { requestBounds: undefined, isSaas: true } })
+        .withStores(memoryStores())
+        .withObservability((observability) => observability.withLogging(logger))
+        .provide({
+          billing: createApiFixture<BillingApi>({ getActiveSubscriptionPlan: async () => free }),
+          organization: createApiFixture<OrganizationApi>({
+            countMemberSeats: async () => ({ fullMembers: 0, liteMembers: 0, developers: 0 }),
+          }),
+          licensing: createApiFixture<LicensingApi>({
+            resolve: (input) => source.resolve(input),
+          }),
+        })
+        .boot();
+
+      return runtime;
+    }
+
+    /** @scenario "A valid signed unexpired Enterprise license resolves the Enterprise plan" */
+    it("resolves ENTERPRISE for a valid, unexpired, correctly signed license", async () => {
+      const runtime = await bootWithLicense(
+        fixedEntitlementSource({
+          planSource: "free",
+          type: "ENTERPRISE",
+          name: "Enterprise",
+          free: false,
+          maxMembers: 100,
+          maxMembersLite: 100,
+          maxMessagesPerMonth: 1_000_000,
+          canPublish: true,
+          prices: { USD: 0, EUR: 0 },
+        }),
+      );
+
+      try {
+        const app = runtime.service(EntitlementApi);
+
+        await expect(
+          app.getActivePlan({ organizationId: "organization-1" }),
+        ).resolves.toMatchObject({ type: "ENTERPRISE", planSource: "license" });
+      } finally {
+        await runtime.stop();
+      }
+    });
+
+    /** @scenario "An absent license resolves the baseline plan" */
+    it("resolves the baseline when no license key is stored for the organization", async () => {
+      // Licensing's own absent reading (`LicensePlanSourceService.getActivePlan`)
+      // answers a free `PlanInfo`, never `null`, for "no key stored" — the
+      // source contract also allows `null`, and either degrades identically
+      // here.
+      const runtime = await bootWithLicense(fixedEntitlementSource(null));
+
+      try {
+        const app = runtime.service(EntitlementApi);
+
+        await expect(
+          app.getActivePlan({ organizationId: "organization-1" }),
+        ).resolves.toMatchObject({ type: "FREE", planSource: "free" });
+      } finally {
+        await runtime.stop();
+      }
+    });
+
+    /** @scenario "A license with an invalid signature resolves the baseline plan" */
+    it("resolves the baseline when the stored license fails signature verification", async () => {
+      // Stands in for `LicenseCryptography.validateLicense` answering
+      // `{ valid: false }`: Licensing maps that to the same free `PlanInfo`
+      // an absent key answers with, so `tryResolvePaidPlan` treats it as
+      // unlicensed identically.
+      const runtime = await bootWithLicense(
+        fixedEntitlementSource({
+          planSource: "free",
+          type: "OPEN_SOURCE",
+          name: "Open Source",
+          free: true,
+          maxMembers: 5,
+          maxMembersLite: 5,
+          maxMessagesPerMonth: 1_000,
+          canPublish: true,
+          prices: { USD: 0, EUR: 0 },
+        }),
+      );
+
+      try {
+        const app = runtime.service(EntitlementApi);
+
+        await expect(
+          app.getActivePlan({ organizationId: "organization-1" }),
+        ).resolves.toMatchObject({ planSource: "free" });
+      } finally {
+        await runtime.stop();
+      }
+    });
+
+    /** @scenario "An expired license resolves the baseline plan" */
+    it("resolves the baseline when the stored license's term has lapsed", async () => {
+      // Stands in for the Cloud reading's signature-AND-term check lapsing:
+      // `LicensePlanSourceService.getActivePlan` answers the same free
+      // `PlanInfo` an invalid signature does, so this seam sees one shape
+      // for every "not licensed" cause.
+      const runtime = await bootWithLicense(
+        fixedEntitlementSource({
+          planSource: "free",
+          type: "OPEN_SOURCE",
+          name: "Open Source",
+          free: true,
+          maxMembers: 5,
+          maxMembersLite: 5,
+          maxMessagesPerMonth: 1_000,
+          canPublish: true,
+          prices: { USD: 0, EUR: 0 },
+        }),
+      );
+
+      try {
+        const app = runtime.service(EntitlementApi);
+
+        await expect(
+          app.getActivePlan({ organizationId: "organization-1" }),
+        ).resolves.toMatchObject({ planSource: "free" });
+      } finally {
+        await runtime.stop();
+      }
+    });
+  });
+
+  describe("given the installed licensing module", () => {
+    /** @scenario "Entitlement resolves licenses through its installed peer" */
+    it("declares the exact LicensingApi token supplied by the licensing module", () => {
+      expect(entitlementProcessModule.dependencies.license).toBe(LicensingApi);
+    });
+  });
+
+  describe("given a plan resolved for the operator behind a request", () => {
+    /** @scenario "An impersonating operator reaches the sources by identifier" */
+    it("names the impersonator by id, with no directory lookup", async () => {
+      const seen: (string | undefined)[] = [];
+      const app = createEntitlementTestApp({
+        infrastructure: {
+          baseline: free,
+          authorization: {
+            resolve: (user) => {
+              seen.push(user?.impersonator?.id);
+
+              return { overrideAddingLimitations: user?.impersonator?.id === "staff-1" };
+            },
+          },
+        },
+      });
+
+      await expect(
+        app.getActivePlan({
+          organizationId: "organization-1",
+          operator: { id: "user-1", impersonatorId: "staff-1" },
+        }),
+      ).resolves.toMatchObject({ overrideAddingLimitations: true });
+
+      await expect(
+        app.getActivePlan({ organizationId: "organization-1", operator: { id: "user-1" } }),
+      ).resolves.toMatchObject({ overrideAddingLimitations: false });
+
+      expect(seen).toEqual(["staff-1", undefined]);
+    });
+  });
+
+  describe("given an approaching-limit warning", () => {
+    /** @scenario "An approaching-limit warning reports whether it was sent" */
+    it("answers the row it wrote, and reports nothing sent when it wrote none", async () => {
+      const sentAt = new Date(0);
+      const warnings = TestUsageWarnings.create({
+        sent: true,
+        notificationId: "notification-1",
+        sentAt,
+      });
+      const app = createEntitlementTestApp({
+        infrastructure: { baseline: free, warnings },
+      });
+
+      await expect(
+        app.sendUsageLimitWarning({
+          organizationId: "organization-1",
+          currentMonthMessagesCount: 900,
+          maxMonthlyUsageLimit: 1_000,
+        }),
+      ).resolves.toEqual({ sent: true, notificationId: "notification-1", sentAt });
+
+      expect(warnings.sent).toHaveLength(1);
+
+      const quiet = createEntitlementTestApp({
+        infrastructure: { baseline: free, warnings: TestUsageWarnings.create() },
+      });
+
+      await expect(
+        quiet.sendUsageLimitWarning({
+          organizationId: "organization-1",
+          currentMonthMessagesCount: 1,
+          maxMonthlyUsageLimit: 1_000,
+        }),
+      ).resolves.toEqual({ sent: false });
+    });
+  });
+
+  describe("given an organization's spend", () => {
+    /** @scenario "Spend is rolled up only for the projects a caller can reach" */
+    it("answers the rollups recorded for that caller and none for anybody else", async () => {
+      const database = MemoryEntitlementDatabase.create();
+      const rollup: ProjectSpendRollup = {
+        project: { id: "project-1", name: "Chat", slug: "chat", teamId: "team-1" },
+        costs: [
+          {
+            projectId: "project-1",
+            costType: "TRACE_CHECK",
+            currency: "USD",
+            _sum: { amount: 4 },
+            _count: { id: 2 },
+          },
+        ],
+      };
+      database.put({
+        organizationId: "organization-1",
+        memberCount: 0,
+        membersLiteCount: 0,
+        currentMonthCost: 0,
+        projectCosts: {},
+        spendByUserId: { "member-1": [rollup] },
+      });
+
+      const app = createEntitlementTestApp({
+        repositories: {
+          membership: MemoryUsageMembershipRepository.create({ memory: database }),
+          spend: MemoryOrganizationSpendRepository.create({ memory: database }),
+          tenancy: MemoryTenancyRepository.create({ memory: database }),
+        },
+        infrastructure: { baseline: free },
+      });
+
+      await expect(
+        app.listOrganizationSpend({
+          organizationId: "organization-1",
+          userId: "member-1",
+          startDate: 0,
+          endDate: 1,
+        }),
+      ).resolves.toEqual([rollup]);
+
+      await expect(
+        app.listOrganizationSpend({
+          organizationId: "organization-1",
+          userId: "outsider",
+          startDate: 0,
+          endDate: 1,
+        }),
+      ).resolves.toEqual([]);
+    });
+
+    /** @scenario "A spend window ending within the last hour is read as up to now" */
+    it("pulls a recent end date forward and leaves an older one alone", async () => {
+      const spend = new RecordingSpendRepository();
+      const app = createEntitlementTestApp({
+        repositories: {
+          membership: MemoryUsageMembershipRepository.create({
+            memory: MemoryEntitlementDatabase.create(),
+          }),
+          spend,
+          tenancy: MemoryTenancyRepository.create({ memory: MemoryEntitlementDatabase.create() }),
+        },
+        infrastructure: { baseline: free },
+      });
+
+      const now = Date.now();
+      await app.listOrganizationSpend({
+        organizationId: "organization-1",
+        userId: "member-1",
+        startDate: now - 86_400_000,
+        endDate: now - 60_000,
+      });
+
+      const old = now - 86_400_000;
+      await app.listOrganizationSpend({
+        organizationId: "organization-1",
+        userId: "member-1",
+        startDate: old - 86_400_000,
+        endDate: old,
+      });
+
+      expect(spend.asked[0]!.endDate).toBeGreaterThanOrEqual(now);
+      expect(spend.asked[1]!.endDate).toBe(old);
+    });
+  });
+});

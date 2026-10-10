@@ -1,0 +1,273 @@
+import type {
+  EvaluationRunData,
+  EvaluationCompletedEvent,
+  EvaluationProcessingEvent,
+  EvaluationStartedEvent,
+} from "@langwatch/evaluation-contract";
+import {
+  EVALUATION_PROCESSING_EVENT_TYPES,
+  evaluationCompletedEventSchema,
+  evaluationReportedEventSchema,
+  evaluationScheduledEventSchema,
+  evaluationStartedEventSchema,
+} from "@langwatch/evaluation-contract";
+import {
+  createTenantId,
+  type EventSourcedQueueProcessor,
+  EventSourcingService,
+  type FoldProjectionStore,
+  type JobRegistryEntry,
+  sealFoldProjection,
+  sealCommandClass,
+} from "@langwatch/eventing";
+import { EventStoreMemory, QueueManager } from "@langwatch/eventing/testing";
+import { describe, expect, it, vi } from "vitest";
+import { z } from "zod";
+
+import { EvaluationAnalyticsFoldProjection } from "../eventing/evaluation-analytics-fold.projection.ts";
+import type { EvaluationAnalyticsData } from "../eventing/evaluation-analytics-row.projection.ts";
+import { ExecuteEvaluationCommand } from "../eventing/evaluation-execution.intent.ts";
+import { createEvaluationProcessingPipeline } from "../eventing/evaluation-processing-definition.pipeline.ts";
+import { EvaluationRunFoldProjection } from "../eventing/evaluation-run.projection.ts";
+import { EvaluationCommandService } from "../services/evaluation-command.service.ts";
+
+const tenantId = createTenantId("project-1");
+
+const evaluationEventSchema = z.discriminatedUnion("type", [
+  evaluationScheduledEventSchema,
+  evaluationStartedEventSchema,
+  evaluationCompletedEventSchema,
+  evaluationReportedEventSchema,
+]);
+const parseEvaluationEvent = (value: unknown): EvaluationProcessingEvent =>
+  evaluationEventSchema.parse(value);
+
+function foldStore<State>(): FoldProjectionStore<State> {
+  return {
+    get: vi.fn().mockResolvedValue({ kind: "empty" }),
+    store: vi.fn().mockResolvedValue(undefined),
+  };
+}
+
+function sharedQueue(): EventSourcedQueueProcessor<Record<string, unknown>> {
+  return {
+    send: vi.fn().mockResolvedValue(undefined),
+    sendBatch: vi.fn().mockResolvedValue(undefined),
+    close: vi.fn().mockResolvedValue(undefined),
+    waitUntilReady: vi.fn().mockResolvedValue(undefined),
+  };
+}
+
+function startedEvent(params: {
+  evaluationId: string;
+  id: string;
+  createdAt: number;
+  occurredAt: number;
+}): EvaluationStartedEvent {
+  return {
+    id: params.id,
+    aggregateId: params.evaluationId,
+    aggregateType: "evaluation",
+    tenantId,
+    createdAt: params.createdAt,
+    occurredAt: params.occurredAt,
+    type: "lw.evaluation.started",
+    version: "2025-01-14",
+    data: {
+      evaluationId: params.evaluationId,
+      evaluatorId: "evaluator-1",
+      evaluatorType: "custom",
+    },
+  };
+}
+
+function completedEvent(params: {
+  evaluationId: string;
+  id: string;
+  createdAt: number;
+  occurredAt: number;
+}): EvaluationCompletedEvent {
+  return {
+    id: params.id,
+    aggregateId: params.evaluationId,
+    aggregateType: "evaluation",
+    tenantId,
+    createdAt: params.createdAt,
+    occurredAt: params.occurredAt,
+    type: "lw.evaluation.completed",
+    version: "2025-01-14",
+    data: {
+      evaluationId: params.evaluationId,
+      status: "processed",
+    },
+  };
+}
+
+describe("evaluation processing live FIFO", () => {
+  const commands = EvaluationCommandService.create();
+
+  it("uses evaluationId as the aggregate identity for every lifecycle command", () => {
+    expect(
+      commands.start.getAggregateId({
+        tenantId,
+        evaluationId: "random-evaluation-id",
+        evaluatorId: "evaluator-1",
+        evaluatorType: "custom",
+        occurredAt: 1_000,
+      }),
+    ).toBe("random-evaluation-id");
+    expect(
+      commands.complete.getAggregateId({
+        tenantId,
+        evaluationId: "random-evaluation-id",
+        status: "processed",
+        occurredAt: 2_000,
+      }),
+    ).toBe("random-evaluation-id");
+  });
+
+  it("groups one evaluation together, separates other evaluations, and scores by accepted order", () => {
+    const registry = new Map<string, JobRegistryEntry>();
+    new EventSourcingService<EvaluationProcessingEvent>({
+      parseEvent: parseEvaluationEvent,
+      pipelineName: "evaluation_processing",
+      aggregateType: "evaluation",
+      allowedEventTypes: EVALUATION_PROCESSING_EVENT_TYPES,
+      eventStore: EventStoreMemory.createForTesting(),
+      foldProjections: [
+        sealFoldProjection(
+          new EvaluationRunFoldProjection({
+            store: foldStore<EvaluationRunData>(),
+          }),
+        ),
+        sealFoldProjection(
+          new EvaluationAnalyticsFoldProjection({
+            store: foldStore<EvaluationAnalyticsData>(),
+          }),
+        ),
+      ],
+      globalQueue: sharedQueue(),
+      globalJobRegistry: registry,
+    });
+
+    const runEntry = registry.get("evaluation_processing:projection:evaluationRun");
+    const analyticsEntry = registry.get("evaluation_processing:projection:evaluationAnalytics");
+    expect(runEntry).toBeDefined();
+    expect(analyticsEntry).toBeDefined();
+
+    const firstAccepted = startedEvent({
+      evaluationId: "eval-random-a",
+      id: "evt-a",
+      createdAt: 1_000,
+      occurredAt: 9_000,
+    });
+    const laterAcceptedButBackdated = completedEvent({
+      evaluationId: "eval-random-a",
+      id: "evt-b",
+      createdAt: 2_000,
+      occurredAt: 500,
+    });
+    const otherEvaluation = startedEvent({
+      evaluationId: "eval-random-b",
+      id: "evt-c",
+      createdAt: 1_500,
+      occurredAt: 9_500,
+    });
+
+    expect(runEntry?.route(firstAccepted).groupKey).toBe(
+      runEntry?.route(laterAcceptedButBackdated).groupKey,
+    );
+    expect(runEntry?.route(firstAccepted).groupKey).not.toBe(
+      runEntry?.route(otherEvaluation).groupKey,
+    );
+    expect(runEntry?.route(firstAccepted).score).toBe(1_000);
+    expect(runEntry?.route(laterAcceptedButBackdated).score).toBe(2_000);
+    expect(analyticsEntry?.route(laterAcceptedButBackdated).score).toBe(2_000);
+  });
+
+  it("serializes different lifecycle commands for one evaluation while leaving other evaluations independent", () => {
+    const registry = new Map<string, JobRegistryEntry>();
+    const manager = new QueueManager({
+      parseEvent: parseEvaluationEvent,
+      aggregateType: "evaluation",
+      pipelineName: "evaluation_processing",
+      globalQueue: sharedQueue(),
+      globalJobRegistry: registry,
+    });
+
+    manager.initializeCommandQueues(
+      [
+        sealCommandClass({
+          name: "startEvaluation",
+          handlerClass: commands.start,
+          options: { serializeByAggregate: true },
+        }),
+        sealCommandClass({
+          name: "completeEvaluation",
+          handlerClass: commands.complete,
+          options: { serializeByAggregate: true },
+        }),
+      ],
+      vi.fn(),
+      "evaluation_processing",
+    );
+
+    const startEntry = registry.get("evaluation_processing:command:startEvaluation");
+    const completeEntry = registry.get("evaluation_processing:command:completeEvaluation");
+    const commandPayload = (evaluationId: string) => ({
+      tenantId,
+      evaluationId,
+      evaluatorId: "evaluator-1",
+      evaluatorType: "langevals/exact_match",
+      status: "processed" as const,
+      occurredAt: 1_000,
+    });
+
+    expect(startEntry?.route(commandPayload("eval-random-a")).groupKey).toBe(
+      completeEntry?.route(commandPayload("eval-random-a")).groupKey,
+    );
+    expect(startEntry?.route(commandPayload("eval-random-a")).groupKey).not.toBe(
+      completeEntry?.route(commandPayload("eval-random-b")).groupKey,
+    );
+
+    const now = vi.spyOn(Date, "now").mockReturnValueOnce(10_000).mockReturnValueOnce(20_000);
+    expect(
+      startEntry?.route({
+        ...commandPayload("eval-random-a"),
+        occurredAt: 99_000,
+      }).score,
+    ).toBe(10_000);
+    expect(
+      completeEntry?.route({
+        ...commandPayload("eval-random-a"),
+        occurredAt: 500,
+      }).score,
+    ).toBe(20_000);
+    now.mockRestore();
+  });
+
+  it("opts every evaluation-processing command into aggregate serialization", () => {
+    const pipeline = createEvaluationProcessingPipeline({
+      evalRunStore: foldStore<EvaluationRunData>(),
+      evaluationAnalyticsStore: foldStore<EvaluationAnalyticsData>(),
+      evaluationAnalyticsRollupAppendStore: {
+        append: vi.fn().mockResolvedValue(undefined),
+      },
+      executeEvaluationCommand: ExecuteEvaluationCommand.create({
+        execute: async () => [],
+      }),
+    });
+
+    expect(
+      pipeline.commands.map(({ definition: { name, options } }) => [
+        name,
+        options?.serializeByAggregate,
+      ]),
+    ).toEqual([
+      ["executeEvaluation", true],
+      ["startEvaluation", true],
+      ["completeEvaluation", true],
+      ["reportEvaluation", true],
+    ]);
+  });
+});

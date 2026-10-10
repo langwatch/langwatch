@@ -7,8 +7,15 @@ keywords: rebilling, metering, multi-tenant billing, spend events, webhooks, bud
 
 This cookbook is for a platform whose customers consume LLMs through it. Your backend provisions one virtual key per customer through the management API, the LangWatch AI Gateway enforces the caps and meters every request, and signed spend events feed your billing ledger. Your product keeps no metering code of its own, and your customers never see a provider credential.
 
-<Card title="The runnable reference: agent-billing-demo" icon="github" href="https://github.com/langwatch/agent-billing-demo">
-  An open-source agent-platform SaaS that implements every step below in both TypeScript and Python: sign-up provisions a real tenant key and real caps, chat goes through the gateway, and the meters on screen come from the signed events its own receiver ingests. The webhook receiver, ledger, reconciliation loop and provisioning are written to be copied from.
+<Card
+  title="The runnable reference: agent-billing-demo"
+  icon="github"
+  href="https://github.com/langwatch/agent-billing-demo"
+>
+  An open-source agent-platform SaaS that implements every step below in both TypeScript and Python:
+  sign-up provisions a real tenant key and real caps, chat goes through the gateway, and the meters
+  on screen come from the signed events its own receiver ingests. The webhook receiver, ledger,
+  reconciliation loop and provisioning are written to be copied from.
 </Card>
 
 ## What you need
@@ -34,11 +41,11 @@ Tenant runtime  --/v1/chat/completions-->  LangWatch AI Gateway  -->  the provid
 
 Pick the unit of tenancy once:
 
-| Unit | One virtual key per | Budget scope | When to use |
-|---|---|---|---|
-| Customer | tenant | `virtual_key` | Most SaaS products: one account is one key. |
-| Seat | LangWatch user | `principal` | Internal platforms where every seat is a LangWatch member. |
-| Team | team in your organization | `team` | Customers modelled as LangWatch teams with their own projects. |
+| Unit     | One virtual key per       | Budget scope  | When to use                                                    |
+| -------- | ------------------------- | ------------- | -------------------------------------------------------------- |
+| Customer | tenant                    | `virtual_key` | Most SaaS products: one account is one key.                    |
+| Seat     | LangWatch user            | `principal`   | Internal platforms where every seat is a LangWatch member.     |
+| Team     | team in your organization | `team`        | Customers modelled as LangWatch teams with their own projects. |
 
 The rest of this page uses one key per customer. `principal` budgets target LangWatch member accounts, which your external customers are not, so for a reseller the per-customer unit is the virtual key itself.
 
@@ -140,7 +147,8 @@ response = client.chat.completions.create(
 That is the whole integration on the request side. The `user` field, or the `X-LangWatch-End-User-Id` header which wins over the body, is what the per-user template enforces on and what `end_user_id` carries on every spend event. The metadata echo is how your billing joins events back to your own records without lookups.
 
 <Warning>
-With an attributed-user template active, a request that carries no end-user id is rejected with `400` and `error.code = "end_user_required"`. Send the id from day one.
+  With an attributed-user template active, a request that carries no end-user id is rejected with
+  `400` and `error.code = "end_user_required"`. Send the id from day one.
 </Warning>
 
 The gateway, on every request: authenticates the key, checks the tenant's and the end user's budgets, applies `modelsAllowed`, sends the request to the provider on your credential, records the spend against both budgets, and writes a trace into the key's trace project.
@@ -220,6 +228,7 @@ curl -sS "$LW/api/gateway/v1/spend-summaries?group_by=model,end_user\
 Grouping by `model` or `provider`, or into time buckets, is refused with `400 gateway_spend_group_by_unstable` on a window recent enough that outcomes can still arrive. Until a request settles, the model and provider recorded against it are the ones that were asked for, and they are replaced by the ones that served it. A page walk over a group that can move counts some requests twice and misses others.
 
 Reconcile closed periods and this never fires. For a live dashboard where an approximate shape is enough, send `allow_unstable=true`. The refusal carries `meta.settles_at`, so a scheduler can wait for that time instead of guessing.
+
 </Warning>
 
 ## 6. Breach handling and period close
@@ -232,9 +241,11 @@ When a cap is reached, the gateway rejects the request with `402` and names the 
     "type": "budget_exceeded",
     "code": "budget_exceeded",
     "message": "The end user spending limit (per month) for this request has been reached. Contact your LangWatch admin to raise it.",
-    "meta": {"budget_id": "bgt_...", "budget_scope": "attributed_user", "budget_window": "month"},
-    "tips": ["Contact your LangWatch admin to raise the end user spending limit",
-             "Switch to a cheaper model or reduce request volume to stay within the limit"],
+    "meta": { "budget_id": "bgt_...", "budget_scope": "attributed_user", "budget_window": "month" },
+    "tips": [
+      "Contact your LangWatch admin to raise the end user spending limit",
+      "Switch to a cheaper model or reduce request volume to stay within the limit"
+    ],
     "docs_url": "https://docs.langwatch.ai/ai-gateway/budgets",
     "trace_id": "..."
   }

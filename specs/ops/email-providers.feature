@@ -71,7 +71,8 @@ Feature: Email gateway providers
     Given no email provider is named
     And no email credentials are configured
     When the application sends an email
-    Then sending fails with an error saying no email method is available
+    Then the send is skipped with one warning naming the subject it did not send
+    And sending does not fail, because mail off is a state and not an error
 
   @unit
   Scenario Outline: The full message surface survives every gateway

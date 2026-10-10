@@ -1,0 +1,116 @@
+import { PLATFORM_DEFAULT_DATA_PRIVACY } from "@langwatch/data-privacy-contract";
+import { describe, expect, it, vi } from "vitest";
+
+import {
+  createDataPrivacyTestScopes,
+  dataPrivacyTestGraph,
+  dataPrivacyTestPlacement,
+} from "../../app/__tests__/data-privacy.fixture.ts";
+import { MemoryDataPrivacyProjectScopeRepository } from "../../repositories/memory/memory.data-privacy-project-scope.repository.ts";
+import { MemoryDataPrivacyPolicyRepository } from "../../repositories/memory/memory.data-privacy.repository.ts";
+import { DataPrivacyProjectScopeService } from "../data-privacy-project-scope.service.ts";
+import { DataPrivacyResolutionService } from "../data-privacy-resolution.service.ts";
+
+/**
+ * Spec: modules/data-privacy/specs/data-privacy-resolution-seam.feature.
+ * Resolving a project's policy asks no other module: data privacy's placement reader over
+ * project's and organization's rows carries the organization, team and department.
+ */
+
+const ORGANIZATION_ID = dataPrivacyTestGraph.organizationId;
+
+async function resolution(options: { drops?: boolean } = {}) {
+  const repository = MemoryDataPrivacyPolicyRepository.create();
+  if (options.drops) {
+    await repository.upsertForScope({
+      organizationId: ORGANIZATION_ID,
+      scope: { scopeType: "PROJECT", scopeId: "project-1" },
+      personalOnly: false,
+      config: { categories: { input: { disposition: "drop" } } },
+    });
+  }
+
+  const findForProjectChain = vi.spyOn(repository, "findForProjectChain");
+  const placements = createDataPrivacyTestScopes();
+  const findPlacement = vi.spyOn(placements, "find");
+
+  return {
+    findForProjectChain,
+    findPlacement,
+    built: DataPrivacyResolutionService.create({
+      repository,
+      scopes: DataPrivacyProjectScopeService.create({ repository: placements }),
+    }),
+  };
+}
+
+describe("DataPrivacyResolutionService", () => {
+  describe("given a policy store and a project placed by its rows", () => {
+    describe("when a project's policy is resolved", () => {
+      /** @scenario "The policy resolution composes from a database and its placement reader" */
+      it("reads the chain from the project's own organization", async () => {
+        const { built, findForProjectChain } = await resolution();
+
+        await expect(
+          built.getResolvedForProject({ projectId: "project-1" }),
+        ).resolves.toMatchObject({ categories: expect.any(Object) });
+        expect(findForProjectChain).toHaveBeenCalledWith({
+          organizationId: ORGANIZATION_ID,
+          scopes: expect.arrayContaining([
+            expect.objectContaining({ scopeType: "PROJECT", scopeId: "project-1" }),
+          ]),
+        });
+      });
+
+      /** @scenario "A stored drop rule reaches the resolved policy" */
+      it("carries a project-scoped rule into the resolution", async () => {
+        const { built } = await resolution({ drops: true });
+
+        const resolved = await built.getResolvedForProject({ projectId: "project-1" });
+
+        expect(resolved.categories.input.disposition).toBe("drop");
+      });
+
+      /** @scenario "A project created on main with no rule row resolves main's platform default" */
+      it("resolves every main-created project without a rule row to the platform default", async () => {
+        const projects = [
+          dataPrivacyTestPlacement({ projectId: "team-project" }),
+          dataPrivacyTestPlacement({
+            projectId: "personal-project",
+            isPersonal: true,
+            departmentId: "risk",
+          }),
+          dataPrivacyTestPlacement({ projectId: "archived-project" }),
+          dataPrivacyTestPlacement({
+            projectId: "other-organization-project",
+            organizationId: "organization-2",
+            teamId: "team-2",
+          }),
+        ];
+        const built = DataPrivacyResolutionService.create({
+          repository: MemoryDataPrivacyPolicyRepository.create(),
+          scopes: DataPrivacyProjectScopeService.create({
+            repository: MemoryDataPrivacyProjectScopeRepository.create({ projects }),
+          }),
+        });
+
+        for (const { projectId } of projects) {
+          await expect(built.getResolvedForProject({ projectId })).resolves.toEqual(
+            PLATFORM_DEFAULT_DATA_PRIVACY,
+          );
+        }
+      });
+
+      /** @scenario "A second resolution inside the window reuses the first" */
+      it("reads the policy rows and the placement once per project inside the window", async () => {
+        const { built, findForProjectChain, findPlacement } = await resolution();
+
+        await built.getResolvedForProject({ projectId: "project-1" });
+        await built.getResolvedForProject({ projectId: "project-1" });
+
+        expect(findForProjectChain).toHaveBeenCalledTimes(1);
+        expect(findPlacement).toHaveBeenCalledTimes(1);
+      });
+    });
+  });
+});

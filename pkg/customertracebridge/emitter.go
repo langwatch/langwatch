@@ -19,9 +19,9 @@ import (
 	semconv "go.opentelemetry.io/otel/semconv/v1.40.0"
 	"go.opentelemetry.io/otel/trace"
 
+	"github.com/langwatch/langwatch/pkg/aitrace"
 	"github.com/langwatch/langwatch/pkg/contexts"
 	"github.com/langwatch/langwatch/pkg/otelsetup"
-	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
 
 const (
@@ -44,7 +44,7 @@ const (
 	attrOrgID = attribute.Key("langwatch.organization_id")
 )
 
-// Mirror tier values (ADR-061), mirroring services/langyagent/domain.MirrorTier.
+// Mirror tier values (ADR-061), mirroring services/langyagent/aitrace.MirrorTier.
 const (
 	mirrorTierContent    = "content"
 	mirrorTierStructural = "structural"
@@ -239,7 +239,7 @@ func NewEmitter(ctx context.Context, opts EmitterOptions) (*Emitter, error) {
 // BeginSpan starts a customer-facing span that nests under the customer's
 // inbound traceparent. It returns an enriched context (carrying the open span)
 // and a W3C traceparent string representing the new span.
-func (e *Emitter) BeginSpan(ctx context.Context, projectID string, reqType domain.RequestType) (context.Context, string) {
+func (e *Emitter) BeginSpan(ctx context.Context, projectID string, reqType aitrace.RequestType) (context.Context, string) {
 	tp := TraceParent(ctx)
 	spanCtx := e.customerSpanContext(tp)
 
@@ -266,12 +266,47 @@ func (e *Emitter) BeginSpan(ctx context.Context, projectID string, reqType domai
 
 // EndSpan retrieves the span started by BeginSpan, sets final attributes, and
 // ends it. If no span is found in context this is a no-op.
-func (e *Emitter) EndSpan(ctx context.Context, params domain.AITraceParams) {
+func (e *Emitter) EndSpan(ctx context.Context, params aitrace.Params) {
 	span := activeSpanFrom(ctx)
 	if span == nil {
 		return
 	}
 
+	// When the request failed upstream, the provider's HTTP status + error
+	// class are stamped so the trace renders as an error instead of silently
+	// dropping (previously the span was never ended on error).
+	isError := params.UpstreamStatusCode >= 400 || params.UpstreamErrorType != ""
+	span.SetAttributes(endSpanAttributes(ctx, params)...)
+
+	if input := extractInputMessages(params.RequestBody, params.RequestType); input != "" {
+		span.SetAttributes(attrInputMessages.String(input))
+	}
+	output := extractOutputMessages(params.ResponseBody, params.RequestType)
+	if output != "" {
+		span.SetAttributes(attrOutputMessages.String(output))
+	}
+
+	stampMirrorMarkers(span, params)
+
+	if isError {
+		span.SetStatus(codes.Error, params.UpstreamErrorType)
+	}
+
+	if isEmptyProbe(params, isError, output) || isOrphanLangyCall(ctx, params) {
+		span.SetAttributes(attrDrop.Bool(true))
+	}
+
+	span.End()
+}
+
+// isMirroredTier reports whether a mirror tier is a non-skip (Langy) tier.
+func isMirroredTier(tier string) bool {
+	return tier == mirrorTierContent || tier == mirrorTierStructural
+}
+
+// endSpanAttributes builds the final model, usage, routing and error
+// attributes of a gateway span.
+func endSpanAttributes(ctx context.Context, params aitrace.Params) []attribute.KeyValue {
 	// PromptTokens includes any cached tokens; the span reports the fresh,
 	// non-cached input separately from the cache-read/cache-write counts so the
 	// cost calc prices each bucket once. The spend record reports the same
@@ -287,63 +322,87 @@ func (e *Emitter) EndSpan(ctx context.Context, params domain.AITraceParams) {
 		attrTotalUsage.Int(params.Usage.TotalTokens),
 		attrCost.Int64(params.Usage.CostMicroUSD),
 	}
-	if params.RequestedModel != "" {
-		attrs = append(attrs, attribute.String(AttrRequestedModel, params.RequestedModel))
+	attrs = append(attrs, usageAttributes(params)...)
+	attrs = append(attrs, attributionAttributes(ctx, params)...)
+	if params.UpstreamStatusCode >= 400 {
+		attrs = append(attrs, semconv.HTTPResponseStatusCodeKey.Int(params.UpstreamStatusCode))
 	}
-	// Audio tokens ride beside the text totals, not inside them, so the cost
-	// pipeline can price them at the audio rate. Reporting them inside
-	// gen_ai.usage.input_tokens instead priced an eight-times-dearer token at
-	// the text rate, which is why a trace and its budget disagreed on every
-	// audio call.
-	if params.Usage.InputAudioTokens > 0 {
-		attrs = append(attrs, attribute.Int(AttrGenAIUsageInputAudioTokens, params.Usage.InputAudioTokens))
+	if params.UpstreamErrorType != "" {
+		attrs = append(attrs, semconv.ErrorTypeKey.String(params.UpstreamErrorType))
 	}
-	if params.Usage.OutputAudioTokens > 0 {
-		attrs = append(attrs, attribute.Int(AttrGenAIUsageOutputAudioTokens, params.Usage.OutputAudioTokens))
+	return attrs
+}
+
+// usageAttributes stamps every positive side-channel usage count.
+//
+// Audio and image tokens ride beside the text totals, not inside them, so the
+// cost pipeline can price them at their own rate: reporting them inside
+// gen_ai.usage.input_tokens priced an eight-times-dearer token at the text
+// rate, which is why a trace and its budget disagreed on every audio call.
+// The image count is what a per-image price is applied to. TTS reports the
+// characters synthesized and STT the seconds transcribed: character- and
+// duration-priced audio models have no token usage, so these attrs are what
+// the cost pipeline prices them from.
+func usageAttributes(params aitrace.Params) []attribute.KeyValue {
+	u := params.Usage
+	counts := []struct {
+		key   string
+		value int
+	}{
+		{AttrGenAIUsageInputAudioTokens, u.InputAudioTokens},
+		{AttrGenAIUsageOutputAudioTokens, u.OutputAudioTokens},
+		{AttrGenAIUsageInputImageTokens, u.InputImageTokens},
+		{AttrGenAIUsageOutputImageTokens, u.OutputImageTokens},
+		{AttrGenAIUsageImageCount, u.ImageCount},
+		{AttrGenAIUsageCacheRead, u.CacheReadTokens},
+		{AttrGenAIUsageCacheCreate, u.CacheCreationTokens},
+		{AttrGenAIUsageCacheCreate1h, u.CacheCreation1hTokens},
+		{AttrGenAIUsageInputChars, u.InputChars},
 	}
-	// Image tokens ride beside the text totals for the same reason the audio
-	// ones do, and the image count is what a per-image price is applied to.
-	if params.Usage.InputImageTokens > 0 {
-		attrs = append(attrs, attribute.Int(AttrGenAIUsageInputImageTokens, params.Usage.InputImageTokens))
+	var attrs []attribute.KeyValue
+	for _, c := range counts {
+		if c.value > 0 {
+			attrs = append(attrs, attribute.Int(c.key, c.value))
+		}
 	}
-	if params.Usage.OutputImageTokens > 0 {
-		attrs = append(attrs, attribute.Int(AttrGenAIUsageOutputImageTokens, params.Usage.OutputImageTokens))
+	if u.AudioSeconds > 0 {
+		attrs = append(attrs, attribute.Float64(AttrGenAIUsageAudioSeconds, u.AudioSeconds))
 	}
-	if params.Usage.ImageCount > 0 {
-		attrs = append(attrs, attribute.Int(AttrGenAIUsageImageCount, params.Usage.ImageCount))
+	return attrs
+}
+
+// attributionAttributes stamps the non-empty routing and attribution ids.
+//
+//   - VK id + request id let the control plane's trace-processing pipeline
+//     identify gateway traces and fold idempotent budget debits into
+//     ClickHouse (specs/ai-gateway/_shared/contract.md §4.5).
+//   - The model provider id is the provider actually dispatched to; the trace
+//     fold matches it against each budget's provider filter.
+//   - The requested model is the caller's own spelling, before resolution.
+//   - The session id is the wrapped tool's own conversation id, so multi-turn
+//     gateway traces group under a stable thread.
+//   - The end-user id: the header-resolved id (middleware) wins, else the
+//     OpenAI `user` body param; attributed-user budget buckets key on it.
+//   - The request metadata is the caller's echo, validated at the edge and
+//     round-tripped verbatim into billing spend events as their join key.
+func attributionAttributes(ctx context.Context, params aitrace.Params) []attribute.KeyValue {
+	values := []struct {
+		key   string
+		value string
+	}{
+		{AttrRequestedModel, params.RequestedModel},
+		{AttrVirtualKeyID, params.VirtualKeyID},
+		{AttrGatewayReqID, params.GatewayRequestID},
+		{AttrModelProviderID, params.ModelProviderID},
+		{AttrGenAIConversationID, clientSessionID(ctx, params)},
+		{AttrEndUserID, endUserID(ctx, params)},
+		{AttrRequestMetadata, RequestMetadataJSON(ctx)},
 	}
-	if params.Usage.CacheReadTokens > 0 {
-		attrs = append(attrs, attribute.Int(AttrGenAIUsageCacheRead, params.Usage.CacheReadTokens))
-	}
-	if params.Usage.CacheCreationTokens > 0 {
-		attrs = append(attrs, attribute.Int(AttrGenAIUsageCacheCreate, params.Usage.CacheCreationTokens))
-	}
-	if params.Usage.CacheCreation1hTokens > 0 {
-		attrs = append(attrs, attribute.Int(AttrGenAIUsageCacheCreate1h, params.Usage.CacheCreation1hTokens))
-	}
-	// Audio usage: TTS reports the characters synthesized, STT the seconds
-	// transcribed. Character- and duration-priced audio models have no token
-	// usage, so these attrs are what the cost pipeline prices them from.
-	if params.Usage.InputChars > 0 {
-		attrs = append(attrs, attribute.Int(AttrGenAIUsageInputChars, params.Usage.InputChars))
-	}
-	if params.Usage.AudioSeconds > 0 {
-		attrs = append(attrs, attribute.Float64(AttrGenAIUsageAudioSeconds, params.Usage.AudioSeconds))
-	}
-	// VK id + request id let the control plane's trace-processing pipeline
-	// identify gateway traces and fold idempotent budget debits into ClickHouse.
-	// See specs/ai-gateway/_shared/contract.md §4.5.
-	if params.VirtualKeyID != "" {
-		attrs = append(attrs, attribute.String(AttrVirtualKeyID, params.VirtualKeyID))
-	}
-	if params.GatewayRequestID != "" {
-		attrs = append(attrs, attribute.String(AttrGatewayReqID, params.GatewayRequestID))
-	}
-	// The provider actually dispatched to (a ModelProvider row id). The
-	// trace fold matches it against each budget's provider filter, so
-	// provider-filtered budgets accrue exactly their own vendor's spend.
-	if params.ModelProviderID != "" {
-		attrs = append(attrs, attribute.String(AttrModelProviderID, params.ModelProviderID))
+	var attrs []attribute.KeyValue
+	for _, v := range values {
+		if v.value != "" {
+			attrs = append(attrs, attribute.String(v.key, v.value))
+		}
 	}
 	// VK tags become the trace's labels: the ingestion pipeline maps the
 	// langwatch.labels attribute into metadata.labels, the field the Trace
@@ -351,108 +410,69 @@ func (e *Emitter) EndSpan(ctx context.Context, params domain.AITraceParams) {
 	if len(params.VKTags) > 0 {
 		attrs = append(attrs, attribute.StringSlice(AttrLabels, params.VKTags))
 	}
-	// The wrapped tool's own session / conversation id, so multi-turn gateway
-	// traces group under a stable thread instead of having no thread id at all.
-	if sessionID := clientSessionID(ctx, params); sessionID != "" {
-		attrs = append(attrs, attribute.String(AttrGenAIConversationID, sessionID))
-	}
-	// External end-user attribution: the header-resolved id (middleware) wins,
-	// else the OpenAI `user` body param. The trace fold copies this into
-	// per-request spend events and attributed-user budget buckets key on it.
-	if endUser := endUserID(ctx, params); endUser != "" {
-		attrs = append(attrs, attribute.String(AttrEndUserID, endUser))
-	}
-	// The caller's metadata echo, validated at the edge; round-tripped
-	// verbatim into billing spend events as their join key.
-	if md := RequestMetadataJSON(ctx); md != "" {
-		attrs = append(attrs, attribute.String(AttrRequestMetadata, md))
-	}
+	return attrs
+}
 
-	// When the request failed upstream, stamp the provider's HTTP status +
-	// error class so the trace renders as an error instead of silently dropping
-	// (previously the span was never ended on error, losing the failure).
-	isError := params.UpstreamStatusCode >= 400 || params.UpstreamErrorType != ""
-	if params.UpstreamStatusCode >= 400 {
-		attrs = append(attrs, semconv.HTTPResponseStatusCodeKey.Int(params.UpstreamStatusCode))
+// stampMirrorMarkers sets the ADR-061 mirror markers: internal signaling for
+// mirrorExporter, stripped from every exported copy. Only stamped for a
+// non-skip tier (Langy VKs), so ordinary customer traffic never grows a
+// mirror copy.
+//
+// A Langy turn's model call is Langy's, not the customer's, and this span is
+// the first piece of the turn to reach the customer's project: the worker
+// spans and the langy.turn root only land when the turn ends, many seconds
+// later. Stamped with the gateway's own origin, the span folded a "gateway"
+// trace first, which marked a fresh project as integrated before the langy
+// root could rank the trace as Langy's. Naming the origin here, on the span,
+// settles the trace's origin from its first span. The resource keeps the
+// gateway's identity.
+func stampMirrorMarkers(span trace.Span, params aitrace.Params) {
+	if !isMirroredTier(params.MirrorTier) {
+		return
 	}
-	if params.UpstreamErrorType != "" {
-		attrs = append(attrs, semconv.ErrorTypeKey.String(params.UpstreamErrorType))
+	span.SetAttributes(attribute.String(otelsetup.AttrLangWatchOrigin, OriginLangy))
+	span.SetAttributes(attrMirrorTier.String(params.MirrorTier))
+	if params.MirrorSourceOrgID != "" {
+		span.SetAttributes(attrMirrorSourceOrg.String(params.MirrorSourceOrgID))
 	}
-	span.SetAttributes(attrs...)
+}
 
-	if input := extractInputMessages(params.RequestBody, params.RequestType); input != "" {
-		span.SetAttributes(attrInputMessages.String(input))
-	}
-	output := extractOutputMessages(params.ResponseBody, params.RequestType)
-	if output != "" {
-		span.SetAttributes(attrOutputMessages.String(output))
-	}
-
-	// ADR-061 mirror markers: internal signaling for mirrorExporter, stripped
-	// from every exported copy. Only stamped for a non-skip tier (Langy VKs),
-	// so ordinary customer traffic never grows a mirror copy.
-	if tier := params.MirrorTier; tier == mirrorTierContent || tier == mirrorTierStructural {
-		// A Langy turn's model call is Langy's, not the customer's, and this
-		// span is the first piece of the turn to reach the customer's project:
-		// the worker spans and the langy.turn root only land when the turn
-		// ends, many seconds later. Stamped with the gateway's own origin, the
-		// span folded a "gateway" trace first, which marked a fresh project as
-		// integrated before the langy root could rank the trace as Langy's.
-		// Naming the origin here, on the span, settles the trace's origin from
-		// its first span. The resource keeps the gateway's identity.
-		span.SetAttributes(attribute.String(otelsetup.AttrLangWatchOrigin, OriginLangy))
-		span.SetAttributes(attrMirrorTier.String(tier))
-		if params.MirrorSourceOrgID != "" {
-			span.SetAttributes(attrMirrorSourceOrg.String(params.MirrorSourceOrgID))
-		}
-	}
-
-	if isError {
-		span.SetStatus(codes.Error, params.UpstreamErrorType)
-	}
-
-	// Suppress zero-cost, no-output, successful CHAT-SHAPED spans: these are
-	// claude-code's internal probe calls (system-reminder / skills-list pings)
-	// that return no usage and no assistant content, so they'd otherwise
-	// clutter the trace list with empty $0 rows. Keep anything with output OR
-	// cost OR an error. The drop marker is honored by dropFilterExporter at
-	// export time. PATH-A ONLY: Path B (claude-code direct OTLP) does not
-	// route through the gateway, so its probes are not affected here.
-	//
-	// Gated to chat/messages because that is the only shape probes have.
-	// Applying it to every type silently swallowed legitimate successful
-	// calls that structurally never carry completion tokens or extracted
-	// output: TTS spans (binary audio response), duration-priced STT spans
-	// (scribe reports seconds, not tokens), and embeddings.
-	// Audio tokens count as output here even though they are carried out of
-	// the completion total: an audio-native model answers entirely in audio
-	// tokens, so reading the completion field alone would drop a real answer
-	// as an empty probe.
+// isEmptyProbe reports a zero-cost, no-output, successful CHAT-SHAPED span:
+// claude-code's internal probe calls (system-reminder / skills-list pings)
+// that return no usage and no assistant content, so they'd otherwise clutter
+// the trace list with empty $0 rows. Anything with output OR cost OR an error
+// is kept. The drop marker is honored by dropFilterExporter at export time.
+// PATH-A ONLY: Path B (claude-code direct OTLP) does not route through the
+// gateway, so its probes are not affected here.
+//
+// Gated to chat/messages because that is the only shape probes have.
+// Applying it to every type silently swallowed legitimate successful calls
+// that structurally never carry completion tokens or extracted output: TTS
+// spans (binary audio response), duration-priced STT spans (scribe reports
+// seconds, not tokens), and embeddings. Audio tokens count as output here
+// even though they are carried out of the completion total: an audio-native
+// model answers entirely in audio tokens, so reading the completion field
+// alone would drop a real answer as an empty probe.
+func isEmptyProbe(params aitrace.Params, isError bool, output string) bool {
 	answeredTokens := params.Usage.CompletionTokens + params.Usage.OutputAudioTokens
-	isProbeShape := params.RequestType == domain.RequestTypeChat ||
-		params.RequestType == domain.RequestTypeMessages
-	if !isError && isProbeShape && answeredTokens == 0 && params.Usage.CostMicroUSD == 0 && output == "" {
-		span.SetAttributes(attrDrop.Bool(true))
-	}
+	isProbeShape := params.RequestType == aitrace.RequestTypeChat ||
+		params.RequestType == aitrace.RequestTypeMessages
+	return !isError && isProbeShape && answeredTokens == 0 && params.Usage.CostMicroUSD == 0 && output == ""
+}
 
-	// A Langy turn's model call belongs INSIDE the turn's trace. When the call
-	// arrived WITHOUT the turn's traceparent (a relay gap, or a call outside
-	// any turn), this span rooted a standalone trace that duplicates the turn
-	// in the customer's trace explorer; the worker's own spans already show
-	// the call, so the copy adds nothing but a second row with the same cost.
-	// Drop it, errors included: the turn span carries the failure. A Langy
-	// call is recognized by its mirror tier, which the control plane resolves
-	// to non-skip ONLY for Langy virtual keys, so ordinary gateway traffic
-	// (playground, customer API keys) never carries one, so its standalone
-	// root, the only trace such traffic has, is untouched. attrDrop sits
-	// outermost in the export chain, so the unjoinable span's mirror copy is
-	// suppressed with it.
-	if tier := params.MirrorTier; (tier == mirrorTierContent || tier == mirrorTierStructural) &&
-		TraceParent(ctx) == "" {
-		span.SetAttributes(attrDrop.Bool(true))
-	}
-
-	span.End()
+// isOrphanLangyCall reports a Langy model call that arrived WITHOUT the
+// turn's traceparent (a relay gap, or a call outside any turn). Its span
+// would root a standalone trace that duplicates the turn in the customer's
+// trace explorer; the worker's own spans already show the call, so the copy
+// adds nothing but a second row with the same cost. It is dropped, errors
+// included: the turn span carries the failure. A Langy call is recognized by
+// its mirror tier, which the control plane resolves to non-skip ONLY for
+// Langy virtual keys, so ordinary gateway traffic (playground, customer API
+// keys) never carries one and its standalone root is untouched. attrDrop sits
+// outermost in the export chain, so the unjoinable span's mirror copy is
+// suppressed with it.
+func isOrphanLangyCall(ctx context.Context, params aitrace.Params) bool {
+	return isMirroredTier(params.MirrorTier) && TraceParent(ctx) == ""
 }
 
 // canonicalModelID reports the model under the platform's provider-prefixed
@@ -466,7 +486,7 @@ func (e *Emitter) EndSpan(ctx context.Context, params domain.AITraceParams) {
 // provider, as nlpgo does. A model whose provider is unknown (implicit
 // resolution never fills it) or that already starts with its provider is
 // reported as requested.
-func canonicalModelID(provider domain.ProviderID, model string) string {
+func canonicalModelID(provider aitrace.ProviderID, model string) string {
 	if provider == "" || model == "" || strings.HasPrefix(model, string(provider)+"/") {
 		return model
 	}
@@ -531,17 +551,17 @@ func parseTraceparent(tp string) (traceID []byte, spanID []byte) {
 // middleware-lifted header value wins (already sanitized), else the OpenAI
 // `user` body param on the request shapes that carry one. Both paths land in
 // SanitizeEndUserID so the stamped value is source-independent.
-func endUserID(ctx context.Context, params domain.AITraceParams) string {
+func endUserID(ctx context.Context, params aitrace.Params) string {
 	if id := EndUserID(ctx); id != "" {
 		return id
 	}
 	switch params.RequestType {
-	case domain.RequestTypeChat, domain.RequestTypeEmbeddings,
-		domain.RequestTypeResponses, domain.RequestTypeSpeech,
-		domain.RequestTypeImageGeneration, domain.RequestTypeImageEdit:
+	case aitrace.RequestTypeChat, aitrace.RequestTypeEmbeddings,
+		aitrace.RequestTypeResponses, aitrace.RequestTypeSpeech,
+		aitrace.RequestTypeImageGeneration, aitrace.RequestTypeImageEdit:
 		return EndUserIDFromBody(params.RequestBody)
-	case domain.RequestTypeMessages, domain.RequestTypePassthrough,
-		domain.RequestTypeTranscription, domain.RequestTypeRealtimeSession:
+	case aitrace.RequestTypeMessages, aitrace.RequestTypePassthrough,
+		aitrace.RequestTypeTranscription, aitrace.RequestTypeRealtimeSession:
 		// No OpenAI-wire `user` field to read on these shapes: the Anthropic
 		// messages body carries attribution under metadata.user_id, passthrough
 		// bodies are provider-shaped and forwarded verbatim, transcription
@@ -571,27 +591,27 @@ func EndUserIDFromBody(body []byte) string {
 // the id survives even if a future middleware change stops forwarding the
 // header. Empty when the tool sends no per-conversation id on the gateway wire
 // (gemini-cli, which only emits its conversation id via direct OTLP / Path B).
-func clientSessionID(ctx context.Context, params domain.AITraceParams) string {
+func clientSessionID(ctx context.Context, params aitrace.Params) string {
 	if id := ClientSessionID(ctx); id != "" {
 		return id
 	}
 	switch params.RequestType {
-	case domain.RequestTypeMessages:
+	case aitrace.RequestTypeMessages:
 		// claude-code: body.metadata.user_id is a JSON string carrying session_id.
 		if userID := gjson.GetBytes(params.RequestBody, "metadata.user_id").String(); userID != "" {
 			if sid := gjson.Get(userID, "session_id").String(); sid != "" {
 				return sid
 			}
 		}
-	case domain.RequestTypeResponses:
+	case aitrace.RequestTypeResponses:
 		// codex: body.prompt_cache_key is the per-session cache key == session id.
 		if sid := gjson.GetBytes(params.RequestBody, "prompt_cache_key").String(); sid != "" {
 			return sid
 		}
-	case domain.RequestTypeChat, domain.RequestTypeEmbeddings, domain.RequestTypePassthrough,
-		domain.RequestTypeSpeech, domain.RequestTypeTranscription,
-		domain.RequestTypeImageGeneration, domain.RequestTypeImageEdit,
-		domain.RequestTypeRealtimeSession:
+	case aitrace.RequestTypeChat, aitrace.RequestTypeEmbeddings, aitrace.RequestTypePassthrough,
+		aitrace.RequestTypeSpeech, aitrace.RequestTypeTranscription,
+		aitrace.RequestTypeImageGeneration, aitrace.RequestTypeImageEdit,
+		aitrace.RequestTypeRealtimeSession:
 		// No inline session id on these request shapes (audio and image bodies
 		// carry no session field at all, and a realtime mint's session id is
 		// the one the gateway itself hands back); the header lifted above
@@ -609,55 +629,43 @@ func jsonString(s string) string {
 	return string(b)
 }
 
-func extractInputMessages(body []byte, reqType domain.RequestType) string {
+func extractInputMessages(body []byte, reqType aitrace.RequestType) string {
 	if len(body) == 0 {
 		return ""
 	}
 	switch reqType {
-	case domain.RequestTypePassthrough:
+	case aitrace.RequestTypePassthrough:
 		// Gemini-native /v1beta bodies carry `contents` not `messages`.
 		// Convert to a synthetic chat-completion `messages` shape so the
 		// LangWatch trace viewer renders the conversation the same way
 		// it does for the OpenAI / Anthropic surfaces.
 		return geminiContentsAsMessages(body)
-	case domain.RequestTypeResponses:
+	case aitrace.RequestTypeResponses:
 		// OpenAI Responses API (used by codex): `input` is either a
 		// string (single user turn) OR an array of messages. Both shapes
 		// are normalised to a chat-style messages array so downstream
 		// rendering matches the other surfaces.
 		return responsesInputAsMessages(body)
-	case domain.RequestTypeMessages:
+	case aitrace.RequestTypeMessages:
 		// Anthropic /v1/messages: the system prompt lives in a
 		// top-level `system` field, not inside `messages`, so reading
 		// only `messages` drops it from the trace. Prepend it as a
 		// system message and keep the caller's messages verbatim.
 		return anthropicBodyAsMessages(body)
-	case domain.RequestTypeImageGeneration, domain.RequestTypeImageEdit:
+	case aitrace.RequestTypeImageGeneration, aitrace.RequestTypeImageEdit:
 		// Images: the prompt is the meaningful input, rendered as a single
 		// user message so the trace viewer shows it like any chat. The source
 		// images of an edit stay out: they are megabytes of binary that no
 		// span should carry.
-		if in := gjson.GetBytes(body, "prompt"); in.Exists() && in.String() != "" {
-			return fmt.Sprintf(`[{"role":"user","content":%s}]`, jsonString(in.String()))
-		}
-		return ""
-	case domain.RequestTypeSpeech:
+		return firstFieldAsMessage(body, "user", "prompt")
+	case aitrace.RequestTypeSpeech:
 		// TTS: the synthesized text is the meaningful input. Rendered as a
 		// single user message so the trace viewer shows it like any chat.
 		// Two field names because two wires reach this shape: the OpenAI one
 		// calls it input, and ElevenLabs' own route calls it text.
-		for _, field := range []string{"input", "text"} {
-			if in := gjson.GetBytes(body, field); in.Exists() && in.String() != "" {
-				return fmt.Sprintf(`[{"role":"user","content":%s}]`, jsonString(in.String()))
-			}
-		}
-		return ""
+		return firstFieldAsMessage(body, "user", "input", "text")
 	default:
-		r := gjson.GetBytes(body, "messages")
-		if !r.Exists() {
-			return ""
-		}
-		return r.Raw
+		return gjson.GetBytes(body, "messages").Raw
 	}
 }
 
@@ -849,7 +857,7 @@ func joinGeminiPartsText(parts gjson.Result) string {
 // then hands it here). For streamed bodies the JSON-first parse falls
 // through and the SSE walker reassembles the assistant text out of the
 // provider-native delta event shape.
-func extractOutputMessages(body []byte, reqType domain.RequestType) string {
+func extractOutputMessages(body []byte, reqType aitrace.RequestType) string {
 	if len(body) == 0 {
 		return ""
 	}
@@ -863,47 +871,52 @@ func extractOutputMessages(body []byte, reqType domain.RequestType) string {
 	// stream extractor first for every type, then fall back to the
 	// single-object JSON shape for non-streamed (sync) responses.
 	switch reqType {
-	case domain.RequestTypeChat:
-		if out := openAIChatOutputFromSSE(body); out != "" {
-			return out
-		}
-		return openAIChatOutputFromJSON(body)
-	case domain.RequestTypeMessages:
-		if out := anthropicOutputFromSSE(body); out != "" {
-			return out
-		}
-		return anthropicOutputFromJSON(body)
-	case domain.RequestTypeResponses:
-		if out := responsesOutputFromSSE(body); out != "" {
-			return out
-		}
-		return responsesOutputFromJSON(body)
-	case domain.RequestTypePassthrough:
-		if out := geminiOutputFromSSE(body); out != "" {
-			return out
-		}
-		return geminiOutputFromJSON(body)
-	case domain.RequestTypeTranscription:
-		// STT: the transcript is the meaningful output. The response is the
-		// OpenAI transcription JSON; anything without a text field (or a
-		// non-JSON body) renders as empty rather than as raw bytes.
-		if t := gjson.GetBytes(body, "text"); t.Exists() && t.String() != "" {
-			return fmt.Sprintf(`[{"role":"assistant","content":%s}]`, jsonString(t.String()))
+	case aitrace.RequestTypeChat:
+		return streamedOrSync(body, openAIChatOutputFromSSE, openAIChatOutputFromJSON)
+	case aitrace.RequestTypeMessages:
+		return streamedOrSync(body, anthropicOutputFromSSE, anthropicOutputFromJSON)
+	case aitrace.RequestTypeResponses:
+		return streamedOrSync(body, responsesOutputFromSSE, responsesOutputFromJSON)
+	case aitrace.RequestTypePassthrough:
+		return streamedOrSync(body, geminiOutputFromSSE, geminiOutputFromJSON)
+	case aitrace.RequestTypeTranscription:
+		// STT: the transcript is the meaningful output. It arrives as JSON
+		// with a text field, as SSE, or as the body itself for the text, srt
+		// and vtt formats.
+		if text := transcriptText(body); text != "" {
+			return fmt.Sprintf(`[{"role":"assistant","content":%s}]`, jsonString(text))
 		}
 		return ""
-	case domain.RequestTypeImageGeneration, domain.RequestTypeImageEdit:
+	case aitrace.RequestTypeImageGeneration, aitrace.RequestTypeImageEdit:
 		// Images: the response body is base64 image data, megabytes of it,
 		// which must never land on a span. The model's rewritten prompt is
 		// the one renderable part, when the provider states one.
-		if p := gjson.GetBytes(body, "data.0.revised_prompt"); p.Exists() && p.String() != "" {
-			return fmt.Sprintf(`[{"role":"assistant","content":%s}]`, jsonString(p.String()))
-		}
-		return ""
+		return firstFieldAsMessage(body, "assistant", "data.0.revised_prompt")
 	default:
 		// RequestTypeSpeech lands here on purpose: the response body is
 		// binary audio, which has no renderable message form.
 		return ""
 	}
+}
+
+// streamedOrSync tries the stream extractor first and falls back to the
+// single-object JSON shape of a non-streamed response.
+func streamedOrSync(body []byte, fromSSE, fromJSON func([]byte) string) string {
+	if out := fromSSE(body); out != "" {
+		return out
+	}
+	return fromJSON(body)
+}
+
+// firstFieldAsMessage renders the first non-empty string field among paths
+// as a one-message array spoken by role, or "" when none is set.
+func firstFieldAsMessage(body []byte, role string, paths ...string) string {
+	for _, path := range paths {
+		if v := gjson.GetBytes(body, path); v.Exists() && v.String() != "" {
+			return fmt.Sprintf(`[{"role":%q,"content":%s}]`, role, jsonString(v.String()))
+		}
+	}
+	return ""
 }
 
 // looksLikeSSE returns true if the body's leading non-whitespace bytes
@@ -928,6 +941,39 @@ func looksLikeSSE(body []byte) bool {
 		}
 	}
 	return false
+}
+
+// transcriptText reads the transcript out of a transcription response in any
+// of the shapes the route returns.
+func transcriptText(body []byte) string {
+	switch {
+	case looksLikeSSE(body):
+		return transcriptFromSSE(body)
+	case gjson.ValidBytes(body):
+		return gjson.GetBytes(body, "text").String()
+	default:
+		return strings.TrimSpace(string(body))
+	}
+}
+
+// transcriptFromSSE reads the transcript out of a streamed transcription:
+// the text on transcript.text.done, or the deltas joined when the stream was
+// cut before that event.
+func transcriptFromSSE(body []byte) string {
+	var deltas strings.Builder
+	final := ""
+	walkStreamEvents(body, func(data []byte) {
+		switch gjson.GetBytes(data, "type").String() {
+		case "transcript.text.done":
+			final = gjson.GetBytes(data, "text").String()
+		case "transcript.text.delta":
+			deltas.WriteString(gjson.GetBytes(data, "delta").String())
+		}
+	})
+	if final != "" {
+		return final
+	}
+	return deltas.String()
 }
 
 func openAIChatOutputFromJSON(body []byte) string {

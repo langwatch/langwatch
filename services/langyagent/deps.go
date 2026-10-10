@@ -3,9 +3,7 @@ package langyagent
 import (
 	"context"
 	"fmt"
-	"os"
 
-	"github.com/oklog/ulid/v2"
 	"go.uber.org/zap"
 
 	"github.com/langwatch/langwatch/pkg/clog"
@@ -39,7 +37,7 @@ type Deps struct {
 func NewDeps(ctx context.Context, cfg Config) (context.Context, *Deps, error) {
 	logger := clog.New(ctx, cfg.Log)
 	ctx = clog.Set(ctx, logger)
-	nodeID := resolveNodeID(ctx, logger)
+	nodeID := otelsetup.ResolveNodeID(logger)
 
 	otelProvider, err := cfg.OTel.Configure(ctx, nodeID)
 	if err != nil {
@@ -77,15 +75,4 @@ func NewDeps(ctx context.Context, cfg Config) (context.Context, *Deps, error) {
 		Telemetry: telemetry.New(),
 		OTelRelay: relay,
 	}, nil
-}
-
-func resolveNodeID(ctx context.Context, logger *zap.Logger) string {
-	_ = ctx
-	hostname, err := os.Hostname()
-	if err != nil {
-		id := ulid.Make().String()
-		logger.Warn("hostname_unavailable", zap.Error(err), zap.String("fallback_node_id", id))
-		return id
-	}
-	return hostname
 }

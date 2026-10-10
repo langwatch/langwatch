@@ -1,4 +1,3 @@
-import * as semconv from "@opentelemetry/semantic-conventions/incubating";
 import {
   type Span,
   type SpanContext,
@@ -8,6 +7,15 @@ import {
   type Link,
   type Exception,
 } from "@opentelemetry/api";
+import * as semconv from "@opentelemetry/semantic-conventions/incubating";
+
+import { type Prompt } from "@/client-sdk/services/prompts";
+
+import { type ChatMessage, type SpanInputOutput } from "../../internal/generated/types/tracer";
+import { emitEvaluationEvent, type AddEvaluationParams } from "../evaluation";
+import type { SemConvAttributeKey, SemConvAttributes } from "../semconv";
+import * as intSemconv from "../semconv/attributes";
+import { processSpanInputOutput } from "./input-output";
 import {
   type SimpleChatMessage,
   type LangWatchSpan,
@@ -15,18 +23,9 @@ import {
   type LangWatchSpanRAGContext,
   type SpanType,
 } from "./types";
-import { type Prompt } from "@/client-sdk/services/prompts";
-import { type ChatMessage, type SpanInputOutput } from "../../internal/generated/types/tracer";
-import * as intSemconv from "../semconv/attributes";
-import { processSpanInputOutput } from "./input-output";
-import type { SemConvAttributeKey, SemConvAttributes } from "../semconv";
-import {
-  emitEvaluationEvent,
-  type AddEvaluationParams,
-} from "../evaluation";
 
 class LangWatchSpanInternal implements LangWatchSpan {
-  constructor(private span: Span) { }
+  constructor(private span: Span) {}
   setAttributes(attributes: SemConvAttributes): this {
     this.span.setAttributes(attributes);
     return this;
@@ -118,10 +117,7 @@ class LangWatchSpanInternal implements LangWatchSpan {
   }
 
   setRAGContexts(ragContexts: LangWatchSpanRAGContext[]): this {
-    return this.setAttribute(
-      intSemconv.ATTR_LANGWATCH_RAG_CONTEXTS,
-      JSON.stringify(ragContexts)
-    );
+    return this.setAttribute(intSemconv.ATTR_LANGWATCH_RAG_CONTEXTS, JSON.stringify(ragContexts));
   }
 
   setRAGContext(ragContext: LangWatchSpanRAGContext): this {
@@ -134,36 +130,30 @@ class LangWatchSpanInternal implements LangWatchSpan {
       JSON.stringify({
         type: "json",
         value: metrics,
-      })
+      }),
     );
   }
 
   setInput(type: "text", input: string): this;
-  setInput(type: "raw", input: any): this;
+  setInput(type: "raw", input: unknown): this;
   setInput(type: "chat_messages", input: ChatMessage[] | SimpleChatMessage[]): this;
   setInput(type: "list", input: SpanInputOutput[]): this;
-  setInput(type: "json", input: any): this;
-  setInput(input: any): this;
-  setInput(typeOrInput: any, input?: any): this {
+  setInput(type: "json", input: unknown): this;
+  setInput(input: unknown): this;
+  setInput(typeOrInput: unknown, input?: unknown): this {
     const spanInput = processSpanInputOutput(typeOrInput, input);
-    return this.setAttribute(
-      intSemconv.ATTR_LANGWATCH_INPUT,
-      JSON.stringify(spanInput)
-    );
+    return this.setAttribute(intSemconv.ATTR_LANGWATCH_INPUT, JSON.stringify(spanInput));
   }
 
   setOutput(type: "text", output: string): this;
-  setOutput(type: "raw", output: any): this;
+  setOutput(type: "raw", output: unknown): this;
   setOutput(type: "chat_messages", output: ChatMessage[] | SimpleChatMessage[]): this;
   setOutput(type: "list", output: SpanInputOutput[]): this;
-  setOutput(type: "json", output: any): this;
-  setOutput(output: any): this;
-  setOutput(typeOrOutput: any, output?: any): this {
+  setOutput(type: "json", output: unknown): this;
+  setOutput(output: unknown): this;
+  setOutput(typeOrOutput: unknown, output?: unknown): this {
     const spanOutput = processSpanInputOutput(typeOrOutput, output);
-    return this.setAttribute(
-      intSemconv.ATTR_LANGWATCH_OUTPUT,
-      JSON.stringify(spanOutput)
-    );
+    return this.setAttribute(intSemconv.ATTR_LANGWATCH_OUTPUT, JSON.stringify(spanOutput));
   }
 }
 
@@ -172,14 +162,6 @@ class LangWatchSpanInternal implements LangWatchSpan {
  *
  * @param span - The OpenTelemetry Span to add LangWatch methods to
  * @returns A LangWatchSpan with additional methods for LLM/GenAI observability
- *
- * @example
- * ```typescript
- * import { createLangWatchSpan } from './span';
- * const otelSpan = tracer.startSpan('llm-call');
- * const span = createLangWatchSpan(otelSpan);
- * span.setType('llm').setInput('Prompt').setOutput('Completion');
- * ```
  */
 export function createLangWatchSpan(span: Span): LangWatchSpan {
   return new LangWatchSpanInternal(span);

@@ -1,0 +1,40 @@
+import type { ProjectReach } from "../../model/langy-project-reach.ts";
+import { api } from "../langy-api.ts";
+import { useOrganizationTeamProject } from "../use-organization-team-project.ts";
+
+export interface ProjectReachResult extends ProjectReach {
+  /** True until we know, so nothing offers asks it may have to withdraw. */
+  isLoading: boolean;
+  /** No traces yet: the home page leads with setup rather than figures. */
+  isNewProject: boolean;
+}
+
+/**
+ * How far into the product this project has got.
+ */
+export function useProjectReach(): ProjectReachResult {
+  const { project } = useOrganizationTeamProject({
+    redirectToOnboarding: false,
+    redirectToProjectOnboarding: false,
+  });
+
+  const { data, isLoading } = api.integrationsChecks.getCheckStatus.useQuery(
+    { projectId: project?.id ?? "" },
+    { enabled: !!project?.id },
+  );
+
+  // The project row in hand already answers "has a trace ever arrived" —
+  // the collector flips `firstMessage` on the first one. The checks query
+  // re-reads the same column but its answer can lag (cache) or never come
+  // (it is permission-gated); the row is authoritative for never leading a
+  // traced project with "send your first trace".
+  const hasTraces = (project?.firstMessage ?? false) || (data?.firstMessage ?? false);
+
+  return {
+    isLoading: isLoading || !data,
+    isNewProject: !isLoading && !!data && !hasTraces,
+    hasTraces,
+    hasEvaluations: (data?.onlineEvaluations ?? 0) > 0,
+    hasExperiments: (data?.simulations ?? 0) > 0 || (data?.datasets ?? 0) > 0,
+  };
+}

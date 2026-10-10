@@ -1,9 +1,11 @@
+import { redisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { describe, expect, it, vi } from "vitest";
-import { RedisReadinessService } from "./readiness";
-import type { RedisConnection } from "./types";
+
+import { RedisReadinessService } from "./readiness.ts";
+import type { RedisConnection } from "./types.ts";
 
 function connectionThat(ping: () => Promise<unknown>): RedisConnection {
-  return { ping } as unknown as RedisConnection;
+  return redisDouble({ ping });
 }
 
 function createLoggerSpy() {
@@ -23,10 +25,7 @@ describe("RedisReadinessService", () => {
         }),
       ).resolves.toBeUndefined();
 
-      expect(logger.info).toHaveBeenCalledWith(
-        { target: "redis://localhost:6379" },
-        "redis ready",
-      );
+      expect(logger.info).toHaveBeenCalledWith({ target: "redis://localhost:6379" }, "redis ready");
       expect(logger.error).not.toHaveBeenCalled();
     });
   });
@@ -98,10 +97,7 @@ describe("RedisReadinessService", () => {
         target: "one:6379,two:6380",
       });
 
-      expect(logger.info).toHaveBeenCalledWith(
-        { target: "one:6379,two:6380" },
-        "redis ready",
-      );
+      expect(logger.info).toHaveBeenCalledWith({ target: "one:6379,two:6380" }, "redis ready");
     });
   });
 

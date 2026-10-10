@@ -1,0 +1,408 @@
+# The original twelve flows. Every name a flow creates ends in {uid}, so any
+# number of flows share one stack; only project-settings and trace-filters run alone.
+flows:
+  - id: automation-alert
+    title: Create an alert on a custom graph's series
+    steps:
+      - action: go
+        with:
+          path: /{slug}/traces
+      - action: dismissTour
+      - action: click
+        with:
+          text: /^\s*Automate\s*$/
+      - action: expect
+        with:
+          testId: automation-name-input
+      - action: fill
+        with:
+          testId: automation-name-input
+          value: VD Alert {uid}
+      - action: click
+        with:
+          text: A graph
+      - action: select
+        with:
+          field: Custom graph
+          option: Visual Diff Graph
+      - action: select
+        with:
+          field: Series
+          option: /Traces/
+      - action: click
+        with:
+          text: /^\s*Continue\s*$/
+      - action: click
+        with:
+          testId: automation-delivery-send-email
+      - action: fill
+        with:
+          field: "alerts@partner.com"
+          value: "vd-{uid}@example.com"
+      - action: click
+        with:
+          text: Add email
+      - action: click
+        with:
+          text: /^\s*Done\s*$/
+      - action: click
+        with:
+          text: /^\s*Continue\s*$/
+      - action: click
+        with:
+          text: /^\s*Create automation\s*$/
+      - action: go
+        with:
+          path: /{slug}/automations/alerts
+      - action: expect
+        with:
+          text: VD Alert {uid}
+      - action: expect
+        with:
+          api: /api/triggers
+          contains: VD Alert {uid}
+
+  - id: annotate-trace
+    title: Add an annotation to a trace
+    steps:
+      - action: annotate
+        with:
+          traceId: trace_visualdiff_1
+          comment: Visual diff note {uid}
+      - action: go
+        with:
+          path: /{slug}/annotations/all
+      - action: expect
+        with:
+          text: Visual diff note {uid}
+
+  - id: trace-view
+    title: Open a seeded trace and read its spans
+    steps:
+      - action: sendTrace
+      - action: go
+        with:
+          path: /{slug}/traces/{trace}
+      - action: expect
+        with:
+          text: Answer 0
+          timeout: "30000"
+      - action: expect
+        with:
+          text: Trace not found
+          equals: "0"
+      - action: click
+        with:
+          text: /^\s*Trace\s*$/
+      - action: expect
+        with:
+          testId: waterfall-row
+          hasText: handle_request
+      - action: expect
+        with:
+          testId: waterfall-row
+          hasText: retrieve_documents
+
+  - id: automation-create
+    title: Create an automation using every part of its form
+    steps:
+      - action: go
+        with:
+          path: /{slug}/traces
+      - action: dismissTour
+      - action: click
+        with:
+          text: /^\s*Automate\s*$/
+      - action: expect
+        with:
+          testId: automation-name-input
+      - action: fill
+        with:
+          testId: automation-name-input
+          value: VD Automation {uid}
+      - action: click
+        with:
+          text: /^\s*Code\s*$/
+      - action: click
+        with:
+          text: status:error
+      - action: click
+        with:
+          text: /^\s*Continue\s*$/
+      - action: click
+        with:
+          testId: automation-delivery-send-email
+      - action: fill
+        with:
+          field: "alerts@partner.com"
+          value: "vd-{uid}@example.com"
+      - action: click
+        with:
+          text: Add email
+      - action: click
+        with:
+          text: /^\s*Done\s*$/
+          optional: "true"
+      - action: fill
+        with:
+          field: Settle window
+          value: "45"
+      - action: select
+        with:
+          label: Batch window
+          option: every 15 minutes
+      - action: click
+        with:
+          text: /^\s*Continue\s*$/
+      - action: click
+        with:
+          text: /^\s*Create automation\s*$/
+      - action: go
+        with:
+          path: /{slug}/automations/automations
+      - action: expect
+        with:
+          text: VD Automation {uid}
+      - action: expect
+        with:
+          api: /api/triggers
+          contains: VD Automation {uid}
+
+  - id: prompt-create
+    title: Add a prompt and read it back from the API
+    steps:
+      - action: createPrompt
+        with:
+          message: You are the visual-diff assistant.
+          handle: vd-prompt-{uid}
+      - action: go
+        with:
+          path: /{slug}/prompts
+      - action: expect
+        with:
+          api: /api/prompts
+          contains: vd-prompt-{uid}
+
+  - id: agent-testing
+    title: Connect an HTTP agent and see it listed
+    steps:
+      - action: go
+        with:
+          path: /{slug}/agents
+      - action: click
+        with:
+          text: New Agent
+      - action: click
+        with:
+          testId: agent-type-http
+      - action: fill
+        with:
+          testId: agent-name-input
+          value: VD Agent {uid}
+      - action: fill
+        with:
+          testId: url-input
+          value: https://example.com/chat
+      - action: click
+        with:
+          testId: save-agent-button
+      - action: expect
+        with:
+          api: /api/agents
+          contains: VD Agent {uid}
+
+  - id: pairwise
+    title: Open a pairwise comparison
+    steps:
+      - action: createPairwise
+        with:
+          start: /{slug}/experiments/workbench
+      - action: expect
+        with:
+          text: /comparison/i
+
+  - id: experiment-create
+    title: Add an experiment and read it back
+    steps:
+      - action: createExperiment
+      - action: click
+        with:
+          text: Create Experiment
+      - action: expect
+        with:
+          text: Datasets
+      - action: expect
+        with:
+          api: /api/experiments
+          min: "1"
+
+  - id: analytics-dashboard
+    title: Build a custom analytics chart
+    steps:
+      - action: createDashboard
+        with:
+          start: /{slug}/analytics/reports
+      - action: expect
+        with:
+          api: /api/dashboards
+          field: data
+          min: "1"
+
+  - id: online-evaluation
+    title: Create an online evaluation with no model call
+    steps:
+      - action: createEvaluation
+        with:
+          start: /{slug}/online-evaluations
+      - action: click
+        with:
+          text: Trace Level
+      - action: click
+        with:
+          text: Select Evaluator
+      - action: click
+        with:
+          testId: new-evaluator-button
+      - action: click
+        with:
+          testId: evaluator-category-quality
+      - action: click
+        with:
+          testId: evaluator-type-lingua-language_detection
+      - action: fill
+        with:
+          testId: evaluator-name-input
+          value: VD Evaluator {uid}
+      - action: click
+        with:
+          testId: save-evaluator-button
+      - action: fill
+        with:
+          field: Enter evaluation name
+          value: VD Monitor {uid}
+      - action: click
+        with:
+          text: /^\s*(Create Online Evaluation|Save Changes)\s*$/
+      - action: expect
+        with:
+          text: VD Monitor {uid}
+      - action: expect
+        with:
+          api: /api/monitors
+          contains: VD Monitor {uid}
+
+  - id: trace-filters
+    title: Use the trace explorer filters
+    serial: true
+    steps:
+      - action: go
+        with:
+          path: /{slug}/traces
+      - action: click
+        with:
+          text: Errors
+      - action: expect
+        with:
+          count: '[role=tab][aria-selected=true]:has-text("Errors")'
+      - action: click
+        with:
+          text: Filters
+      - action: click
+        with:
+          text: Last 30 days
+      - action: click
+        with:
+          text: Last 24 hours
+          optional: "true"
+      - action: expect
+        with:
+          url: /traces
+
+  - id: project-settings
+    title: Edit project and organization settings
+    serial: true
+    steps:
+      - action: editProjectSettings
+        with:
+          name: Visual Diff
+      - action: go
+        with:
+          path: /settings/projects
+      - action: go
+        with:
+          path: /settings/members
+      - action: expect
+        with:
+          text: Visual Diff
+
+  # The home greets, draws the traces overview and offers the docs; the account's passkey nudge
+  # is answered first, so it never covers the page the screenshot is meant to judge.
+  - id: home-loaded-nudge-dismissed
+    title: The home loads with its greeting, traces overview and docs, the passkey nudge answered
+    steps:
+      - action: sendTrace
+      - action: go
+        with:
+          path: /{slug}
+      - action: expect
+        with:
+          text: /Good (morning|afternoon|evening)/
+          timeout: "20000"
+      - action: wait
+        with:
+          millis: "2000"
+      - action: click
+        with:
+          selector: '[role="dialog"] button'
+          hasText: /^\s*Not now\s*$/
+          optional: "true"
+      - action: expect
+        with:
+          text: Traces overview
+          timeout: "30000"
+      - action: expect
+        with:
+          count: 'input[placeholder$="jump to anything"]'
+          timeout: "30000"
+      - action: expect
+        with:
+          text: Onboard your agent
+          timeout: "30000"
+      - action: expect
+        with:
+          text: Docs and guides
+      - action: expect
+        with:
+          text: Sign in faster next time
+          equals: "0"
+
+  - id: home-command-palette
+    title: Focusing the home search opens the palette with Ask Langy, recent items and navigation
+    steps:
+      - action: go
+        with:
+          path: /{slug}
+      - action: expect
+        with:
+          text: /Good (morning|afternoon|evening)/
+          timeout: "20000"
+      - action: wait
+        with:
+          millis: "2000"
+      - action: click
+        with:
+          selector: '[role="dialog"] button'
+          hasText: /^\s*Not now\s*$/
+          optional: "true"
+      - action: click
+        with:
+          selector: 'input[placeholder$="jump to anything"]'
+      - action: expect
+        with:
+          text: Ask about the project in plain language
+      - action: expect
+        with:
+          text: /^Navigation$/
+      - action: expect
+        with:
+          text: Explore traces and spans

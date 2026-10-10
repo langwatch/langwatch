@@ -69,6 +69,24 @@ Feature: The evaluation_runs JOIN is bounded below, and only below
   # ---------------------------------------------------------------------------
 
   @unit
+  Scenario: Every range bound in generated analytics SQL names the bounded table's partition column
+    Given a timeseries query that joins evaluation_runs
+    When the generated SQL is checked for bounds on non-prunable columns
+    Then every joined table is bounded only on its own partition column
+
+  @unit
+  Scenario: Filter-value queries bound evaluation_runs on its own partition column
+    Given a filter-values query over evaluation_runs
+    When the generated SQL is checked for bounds on non-prunable columns
+    Then evaluation_runs is bounded only on its own partition column
+
+  @unit
+  Scenario: The guard is non-vacuous: stored_spans really is bounded, on StartTime
+    Given a query that joins stored_spans
+    When the generated SQL is checked for bounds on non-prunable columns
+    Then stored_spans is bounded on StartTime
+
+  @unit
   Scenario: Bounds qualified with the bounded table's own name are inspected, not skipped
     Given a bound qualified with the name of the table it bounds
     When the generated SQL is checked for bounds on non-prunable columns

@@ -1,9 +1,17 @@
 import { Liquid } from "liquidjs";
-import { PromptTracingDecorator, tracer } from "./tracing";
+
 import { createTracingProxy } from "@/client-sdk/tracing/create-tracing-proxy";
-import { promptDataSchema } from "./schema";
-import { type TemplateVariables, type PromptData, type CorePromptData, type PromptScope } from "./types";
+
 import { PromptCompilationError, PromptValidationError } from "./errors";
+import { promptDataOf } from "./prompt-data";
+import { promptDataSchema } from "./schema";
+import { PromptTracingDecorator, tracer } from "./tracing";
+import {
+  type TemplateVariables,
+  type PromptData,
+  type CorePromptData,
+  type PromptScope,
+} from "./types";
 
 // Re-export types and errors for convenience
 export type { TemplateVariables, PromptData, CorePromptData, PromptMetadata } from "./types";
@@ -22,10 +30,10 @@ const liquid = new Liquid({
 export class Prompt {
   // === Core functionality (required) ===
   public readonly model!: string;
-  public readonly messages!: Array<{
+  public readonly messages!: {
     role: "user" | "assistant" | "system";
     content: string;
-  }>;
+  }[];
 
   // === Optional core fields ===
   public readonly prompt?: string;
@@ -48,10 +56,7 @@ export class Prompt {
     const validationResult = promptDataSchema.strip().safeParse(data);
 
     if (!validationResult.success) {
-      throw new PromptValidationError(
-        "Invalid prompt data provided",
-        validationResult.error
-      );
+      throw new PromptValidationError("Invalid prompt data provided", validationResult.error);
     }
 
     // Assign validated data
@@ -65,7 +70,7 @@ export class Prompt {
   }
 
   private extractSystemPrompt(): string {
-    return this.messages.find(m => m.role === "system")?.content ?? "";
+    return this.messages.find((m) => m.role === "system")?.content ?? "";
   }
 
   /**
@@ -73,10 +78,7 @@ export class Prompt {
    * @param variables - Object containing variable values for template compilation
    * @returns CompiledPrompt instance with compiled content
    */
-  private _compile(
-    variables: TemplateVariables,
-    strict: boolean,
-  ): CompiledPrompt {
+  private _compile(variables: TemplateVariables, strict: boolean): CompiledPrompt {
     try {
       // Compile main prompt
       const compiledPrompt = this.prompt
@@ -97,7 +99,7 @@ export class Prompt {
 
       // Create new prompt data with compiled content
       const compiledData: PromptData = {
-        ...this,
+        ...promptDataOf(this),
         prompt: compiledPrompt,
         messages: compiledMessages,
       };
@@ -128,7 +130,6 @@ export class Prompt {
     return this._compile(variables, true);
   }
 }
-
 
 /**
  * Represents a compiled prompt that extends Prompt with reference to the original template

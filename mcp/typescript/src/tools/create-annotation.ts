@@ -1,4 +1,4 @@
-import { createAnnotation as apiCreateAnnotation } from "../langwatch-api-annotations.js";
+import { createAnnotation as apiCreateAnnotation } from "../langwatch-api-annotations.ts";
 
 export async function handleCreateAnnotation(params: {
   traceId: string;
@@ -12,7 +12,12 @@ export async function handleCreateAnnotation(params: {
     email: params.email,
   });
 
-  const rating = params.isThumbsUp === true ? " 👍" : params.isThumbsUp === false ? " 👎" : "";
+  let rating = "";
+  if (params.isThumbsUp === true) {
+    rating = " 👍";
+  } else if (params.isThumbsUp === false) {
+    rating = " 👎";
+  }
 
   return `Annotation created successfully!${rating}\n\n**ID**: ${annotation.id ?? "—"}\n**Trace ID**: ${params.traceId}${params.comment ? `\n**Comment**: ${params.comment}` : ""}`;
 }

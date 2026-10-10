@@ -13,7 +13,7 @@ Feature: Heavy runs are admitted, queued, or refused
   # mid-session on an 11-core / 18 GiB machine: 17 node processes, 550-712 MB
   # each, PIDs inside a 250-PID range — one simultaneous burst of about 10.5 GB,
   # alongside an 8 GB colima VM. Those are vitest workers under `pool:
-  # "vmForks"`, which platform/app/vitest.config.ts picks deliberately and
+  # "vmForks"`, which the repository's vitest configs pick deliberately and
   # measures at 573 MB per fork — which is what the observed range is.
   # `maxWorkers: "50%"` is 5 workers PER RUN on 11 cores, so three or four
   # agents testing at once is 15-20 workers.
@@ -54,7 +54,7 @@ Feature: Heavy runs are admitted, queued, or refused
   #
   # NEIGHBOURS, so this file's boundary is explicit rather than discovered
   # later. specs/setup/memory-footprint.feature is about what a single process
-  # LOADS; specs/setup/in-process-workers-dev.feature is about HOW MANY
+  # LOADS; specs/setup/dev-process-topology.feature is about HOW MANY
   # processes a stack runs; specs/setup/haven-resource-caps.feature caps the
   # shared services. This file is about how many heavy runs may start at once,
   # and touches none of those levers.
@@ -82,11 +82,11 @@ Feature: Heavy runs are admitted, queued, or refused
 
   # --- Admitted exactly once ---
 
-  # ADR-091's gate rewraps an agent's command under `haven run --class heavy`,
+  # ADR-091's gate rewraps an agent's command under `haven machine run --class heavy`,
   # which holds a slot of its own. The wrapped command is still a package script
   # that routes through this counter, so without a handoff the outer run waits
   # for the inner one and at a limit of 1 it waits for itself. #6598 already
-  # established the rule for `haven typecheck`, which passes CHECK_SLOTS=0.
+  # established the rule for `haven machine typecheck`, which passes CHECK_SLOTS=0.
   @unit @unimplemented
   Scenario: A run already admitted by haven is not admitted a second time
     Given a run that haven has already taken a slot for

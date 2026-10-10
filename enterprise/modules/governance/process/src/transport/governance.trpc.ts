@@ -1,0 +1,70 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+/**
+ * The server half of `governance.*`. The actor lookup collapses every refusal to
+ * null, so a `governance:view` holder learns nothing about who exists elsewhere, as on main.
+ * The caller's own /me reads were `user.*` until the peer cut (peer-cycle-cuts §4 B4 U).
+ */
+import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
+import { GovernanceRestApi, governanceTrpc } from "@langwatch/enterprise-governance-contract";
+
+export const governanceTrpcTransport: TrpcRouterDeclaration<
+  GovernanceRestApi,
+  typeof governanceTrpc
+> = defineTrpcRouter(GovernanceRestApi, governanceTrpc)
+  .procedure("resolveActorPersonalProject")
+  .withPermission("governance:view")
+  .handle(({ app, input }) => app.findActorWorkspace(input))
+
+  .procedure("resolveHome")
+  .withPermission("organization:view")
+  .handle(({ app, input, actor }) => app.governanceResolveHome(input, { id: actor.id }))
+
+  .procedure("setupState")
+  .withPermission("governance:view")
+  .handle(({ app, input }) => app.governanceSetupState(input))
+
+  .procedure("ocsfExport")
+  .withPermission("complianceExport:view")
+  .handle(({ app, input, actor }) =>
+    app.governanceOcsfExport(
+      {
+        organizationId: input.organizationId,
+        sinceMs: input.sinceMs ?? 0,
+        sinceEventId: input.sinceEventId,
+        limit: input.limit,
+      },
+      actor,
+    ),
+  )
+
+  .procedure("quarantineFillStats")
+  .withPermission("governance:view")
+  .handle(({ app, input }) => app.governanceQuarantineFillStats(input))
+
+  .procedure("recordWorkspaceView")
+  .withPermission("governance:view")
+  .handle(({ app, input, actor }) =>
+    app.governanceRecordWorkspaceView({ ...input, actorUserId: actor.id }),
+  )
+
+  .procedure("personalUsage")
+  .withPermission("organization:view")
+  .handle(({ app, actor, input: { organizationId, windowStartMs, windowEndMs } }) =>
+    app.personalUsageDashboard(
+      windowStartMs && windowEndMs
+        ? { organizationId, window: { startMs: windowStartMs, endMs: windowEndMs } }
+        : { organizationId },
+      { id: actor.id },
+    ),
+  )
+
+  .procedure("budgetOverview")
+  .withPermission("organization:view")
+  .handle(({ app, actor, input }) => app.personalBudgetOverview(input, { id: actor.id }))
+
+  .procedure("cliBootstrap")
+  .withPermission("organization:view")
+  .handle(({ app, actor, input }) =>
+    app.cliBootstrap({ organizationId: input.organizationId }, { id: actor.id }),
+  )
+  .build();

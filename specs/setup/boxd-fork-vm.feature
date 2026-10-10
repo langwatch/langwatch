@@ -165,3 +165,10 @@ Feature: boxd Makefile orchestrates per-PR / per-branch / per-issue VM forks
     Given the provisioning recipe runs as the VM's default non-root user
     When the recipe enables corepack to install pnpm
     Then "corepack enable" runs under sudo so the /usr/bin/pnpm symlink succeeds
+
+  @unit
+  Scenario: No boxd exec recipe hands set -o pipefail to dash
+    Given boxd-fork.sh sends recipes to the VM through "boxd exec"
+    When any line of the script sets pipefail
+    Then the "boxd exec" invocation that encloses it wraps its recipe in "bash -c"
+    And a recipe that would hand pipefail to dash fails the check, naming the line

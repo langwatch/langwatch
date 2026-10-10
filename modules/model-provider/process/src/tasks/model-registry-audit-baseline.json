@@ -1,0 +1,14 @@
+{
+  "_comment": "Price-audit findings already known and accepted. The weekly sync fails on any finding NOT listed here, so this file is the line between known debt and a new defect. Remove an entry when the underlying gap is closed; never add one to silence a finding you have not understood. Cross-source disagreements are reported but never blocking, so they do not belong here.",
+  "unpriced": {
+    "gemini/lyria-3-clip-preview": "Music generation, priced per 30-second clip at $0.04. Both price sources report 0 per token and the catalog has no per-clip field. Tracked as a coverage gap.",
+    "gemini/lyria-3-pro-preview": "Music generation, priced per song at $0.08. Same missing per-clip unit as the clip preview."
+  },
+  "unitMismatch": {
+    "openai/gpt-4o-mini-tts": "Overlay prices per character, derived from OpenAI's published per-minute estimate. OpenAI bills the output side per second of speech, and the catalog has a per-second field for input only. Remove this line once an output-per-second field exists and the model imports on its own."
+  },
+  "disagreements": {
+    "elevenlabs/eleven_multilingual_v2::inputCostPerCharacter": "The overlay carries $0.10 per 1k characters and litellm carries $0.18. The overlay entry was written because litellm lagged a provider price cut, so litellm may now be the stale side. Needs one check against the provider's own price page.",
+    "openai/gpt-realtime-2::outputCostPerToken": "The overlay carries $24.00 per million and litellm carries $16.00, which is the previous generation's rate. The provider page is the overlay's source (https://developers.openai.com/api/docs/models/gpt-realtime-2, verified 2026-08-16), so litellm is the stale side here. Remove this line once litellm agrees."
+  }
+}

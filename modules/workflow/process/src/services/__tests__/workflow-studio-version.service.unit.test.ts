@@ -1,0 +1,217 @@
+import {
+  parseStudioWorkflow,
+  type SaveWorkflowVersionCommand,
+  type StudioWorkflow,
+  type WorkflowVersion,
+} from "@langwatch/workflow-contract";
+import { describe, expect, it } from "vitest";
+
+import type {
+  WorkflowAgentMapping,
+  WorkflowHttpSecrets,
+  WorkflowStudioDsl,
+} from "../../app/workflow.app.ts";
+import { WorkflowStudioVersionService } from "../workflow-studio-version.service.ts";
+
+const graph = (name: string): StudioWorkflow =>
+  parseStudioWorkflow({
+    workflow_id: "wf-1",
+    spec_version: "1.4",
+    name,
+    icon: "x",
+    description: "x",
+    version: "1.0",
+    nodes: [],
+    edges: [],
+    state: {},
+  });
+
+/** Answers a graph that is visibly not the one it was given. */
+class RenamingDsl implements WorkflowStudioDsl {
+  readonly seen: { projectId: string; dsl: StudioWorkflow }[] = [];
+
+  prepare(input: { projectId: string; dsl: StudioWorkflow }): Promise<StudioWorkflow> {
+    this.seen.push(input);
+    return Promise.resolve({ ...input.dsl, name: "prepared" });
+  }
+}
+
+/** Leaves the graph's credentials where they are. */
+class UnchangedHttpSecrets implements WorkflowHttpSecrets {
+  store<Dsl extends { nodes?: unknown }>(input: { dsl: Dsl }): Promise<Dsl> {
+    return Promise.resolve(input.dsl);
+  }
+}
+
+class RecordingAgentMapping implements WorkflowAgentMapping {
+  readonly recomputed: { projectId: string; workflowId: string; dsl: StudioWorkflow }[] = [];
+
+  constructor(private readonly outcome: Promise<void> = Promise.resolve()) {}
+
+  recompute(input: { projectId: string; workflowId: string; dsl: StudioWorkflow }): Promise<void> {
+    this.recomputed.push(input);
+    return this.outcome;
+  }
+}
+
+class RecordingWorkflowService {
+  readonly saved: SaveWorkflowVersionCommand[] = [];
+
+  saveVersion(input: SaveWorkflowVersionCommand): Promise<WorkflowVersion> {
+    this.saved.push(input);
+    return Promise.resolve({
+      id: "version-1",
+      workflowId: input.workflowId,
+      projectId: input.projectId,
+      version: "1",
+      autoSaved: false,
+      commitMessage: "",
+      authorId: null,
+      parentId: null,
+      dsl: { version: "1", name: "x", nodes: [], edges: [] },
+      createdAt: new Date(0),
+      updatedAt: new Date(0),
+    });
+  }
+}
+
+function build(
+  options: { agentMappings?: RecordingAgentMapping; httpSecrets?: WorkflowHttpSecrets } = {},
+) {
+  const workflows = new RecordingWorkflowService();
+  const studioDsl = new RenamingDsl();
+  const agentMappings = options.agentMappings ?? new RecordingAgentMapping();
+  const versionsSaved: {
+    projectId: string;
+    workflowId: string;
+    versionId: string;
+    authorId: string;
+  }[] = [];
+  const service = WorkflowStudioVersionService.create({
+    workflows: workflows as never,
+    studioDsl,
+    httpSecrets: options.httpSecrets ?? new UnchangedHttpSecrets(),
+    agentMappings,
+    recordVersionSaved: (input) => versionsSaved.push(input),
+  });
+
+  return { service, workflows, studioDsl, agentMappings, versionsSaved };
+}
+
+describe("WorkflowStudioVersionService", () => {
+  describe("given a Studio graph to commit", () => {
+    describe("when it is saved", () => {
+      /** @scenario Saving a Studio graph records the version as a fact agents react to */
+      it("records the saved version as a fact, attributed to the caller", async () => {
+        const { service, versionsSaved } = build();
+
+        await service.saveOrCommit({
+          projectId: "project-1",
+          workflowId: "wf-1",
+          dsl: graph("draft"),
+          autoSaved: false,
+          commitMessage: "first",
+          authorId: "user-1",
+        });
+
+        expect(versionsSaved).toEqual([
+          {
+            projectId: "project-1",
+            workflowId: "wf-1",
+            versionId: "version-1",
+            authorId: "user-1",
+          },
+        ]);
+      });
+
+      it("writes the prepared graph rather than the one it was handed", async () => {
+        const { service, workflows } = build();
+
+        await service.saveOrCommit({
+          projectId: "project-1",
+          workflowId: "wf-1",
+          dsl: graph("draft"),
+          autoSaved: false,
+          commitMessage: "first",
+          authorId: "user-1",
+        });
+
+        expect(workflows.saved[0]?.dsl.name).toBe("prepared");
+      });
+
+      it("attributes the version to the caller and keeps it the latest by default", async () => {
+        const { service, workflows } = build();
+
+        await service.saveOrCommit({
+          projectId: "project-1",
+          workflowId: "wf-1",
+          dsl: graph("draft"),
+          autoSaved: true,
+          commitMessage: "autosave",
+          authorId: "user-1",
+        });
+
+        expect({
+          authorId: workflows.saved[0]?.authorId,
+          setAsLatestVersion: workflows.saved[0]?.setAsLatestVersion,
+          autoSaved: workflows.saved[0]?.autoSaved,
+        }).toEqual({ authorId: "user-1", setAsLatestVersion: true, autoSaved: true });
+      });
+
+      /** @scenario A token typed into an HTTP node is stored as a project secret and never read back */
+      it("writes the graph the secret store answered, not the one holding the token", async () => {
+        const { service, workflows } = build({
+          httpSecrets: {
+            store: async (input) => ({ ...input.dsl, name: "token replaced by a reference" }),
+          },
+        });
+
+        await service.saveOrCommit({
+          projectId: "project-1",
+          workflowId: "wf-1",
+          dsl: graph("draft"),
+          autoSaved: true,
+          commitMessage: "autosave",
+          authorId: "user-1",
+        });
+
+        expect(workflows.saved[0]?.dsl.name).toBe("token replaced by a reference");
+      });
+
+      it("recomputes the agent mappings from the graph the caller sent, not the prepared one", async () => {
+        const { service, agentMappings } = build();
+
+        await service.saveOrCommit({
+          projectId: "project-1",
+          workflowId: "wf-1",
+          dsl: graph("draft"),
+          autoSaved: false,
+          commitMessage: "first",
+          authorId: "user-1",
+        });
+
+        expect(agentMappings.recomputed[0]?.dsl.name).toBe("draft");
+      });
+    });
+
+    describe("when the mapping recompute fails", () => {
+      it("still answers the version that was written", async () => {
+        const agentMappings = new RecordingAgentMapping(
+          Promise.reject(new Error("agent rows unavailable")),
+        );
+        const { service } = build({ agentMappings });
+
+        const version = await service.saveOrCommit({
+          projectId: "project-1",
+          workflowId: "wf-1",
+          dsl: graph("draft"),
+          autoSaved: false,
+          commitMessage: "first",
+          authorId: "user-1",
+        });
+
+        expect(version.id).toBe("version-1");
+      });
+    });
+  });
+});

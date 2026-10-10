@@ -1,22 +1,14 @@
-import { createSpinner } from "../../utils/spinner";
-import { SQS_SECRET_ENV, sqsSecretFromEnv } from "./create";
 import { WebhooksApiService } from "@/client-sdk/services/webhooks/webhooks-api.service";
+
 import { checkOrgApiKey } from "../../utils/apiKey";
-import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
+import { SQS_SECRET_ENV, sqsSecretFromEnv } from "./create";
 
 export const updateWebhookCommand = async (
   id: string,
-  options: {
-    url?: string;
-    queueUrl?: string;
-    roleArn?: string;
-    accessKeyId?: string;
-    events?: string;
-    maxBatchSize?: string;
-    maxBatchDelay?: string;
-    maxInFlight?: string;
-  },
+  options: UpdateWebhookOptions,
 ): Promise<CommandResult | void> => {
   const apiKey = checkOrgApiKey();
   // Which mode was asked for comes first. Asking for the missing secret of a
@@ -41,56 +33,15 @@ export const updateWebhookCommand = async (
   // on the same request. Sending only the new fields would leave the old
   // mode's stored beside them: an encrypted key nothing reads, or a role that
   // goes on winning over the key that was just set.
-  const sqsFields = {
-    ...(options.queueUrl !== undefined ? { queue_url: options.queueUrl } : {}),
-    ...(options.roleArn !== undefined
-      ? {
-          role_arn: options.roleArn,
-          access_key_id: null,
-          secret_access_key: null,
-        }
-      : {}),
-    ...(options.accessKeyId !== undefined
-      ? {
-          access_key_id: options.accessKeyId,
-          secret_access_key: secretAccessKey,
-          role_arn: null,
-          external_id: null,
-        }
-      : {}),
-  };
-  if (
-    options.url === undefined &&
-    Object.keys(sqsFields).length === 0 &&
-    options.events === undefined &&
-    options.maxBatchSize === undefined &&
-    options.maxBatchDelay === undefined &&
-    options.maxInFlight === undefined
-  ) {
+  const sqsFields = sqsFieldsOf({ options, secretAccessKey });
+  if (options.url === undefined && Object.keys(sqsFields).length === 0 && !hasTuningFlag(options)) {
     console.error(
       "Nothing to update: pass at least one of --url, --queue-url, --role-arn, --access-key-id, --events, --max-batch-size, --max-batch-delay, --max-in-flight.",
     );
     process.exit(1);
   }
-  // Number("abc") is NaN and JSON.stringify turns NaN into null, so loose
-  // parsing here would ship a null patch the server cannot bound-check.
-  const parseIntOption = (
-    value: string | undefined,
-    flag: string,
-  ): number | undefined => {
-    if (value === undefined) return undefined;
-    const parsed = Number(value);
-    if (!Number.isInteger(parsed) || value.trim() === "") {
-      console.error(`Invalid ${flag} value: ${value} (expected an integer)`);
-      process.exit(1);
-    }
-    return parsed;
-  };
   const maxBatchSize = parseIntOption(options.maxBatchSize, "--max-batch-size");
-  const maxBatchDelayMs = parseIntOption(
-    options.maxBatchDelay,
-    "--max-batch-delay",
-  );
+  const maxBatchDelayMs = parseIntOption(options.maxBatchDelay, "--max-batch-delay");
   const maxInFlight = parseIntOption(options.maxInFlight, "--max-in-flight");
   const service = new WebhooksApiService({ apiKey });
   const spinner = createSpinner("Updating webhook endpoint...").start();
@@ -103,9 +54,13 @@ export const updateWebhookCommand = async (
       max_batch_size: maxBatchSize,
       max_batch_delay_ms: maxBatchDelayMs,
       max_in_flight: maxInFlight,
-      enabled_events: options.events !== undefined
-        ? options.events.split(",").map((e) => e.trim()).filter(Boolean)
-        : undefined,
+      enabled_events:
+        options.events !== undefined
+          ? options.events
+              .split(",")
+              .map((e) => e.trim())
+              .filter(Boolean)
+          : undefined,
     });
     spinner.succeed(`Updated endpoint ${endpoint.id}`);
     return {
@@ -121,7 +76,9 @@ export const updateWebhookCommand = async (
             : `URL:         ${endpoint.url}`,
         );
         console.log(`Events:      ${endpoint.enabled_events.join(", ")}`);
-        console.log(`Delivery:    batch<=${endpoint.max_batch_size}, delay ${endpoint.max_batch_delay_ms}ms, in-flight<=${endpoint.max_in_flight}`);
+        console.log(
+          `Delivery:    batch<=${endpoint.max_batch_size}, delay ${endpoint.max_batch_delay_ms}ms, in-flight<=${endpoint.max_in_flight}`,
+        );
         console.log();
       },
     };
@@ -142,7 +99,9 @@ export const enableWebhookCommand = async (id: string): Promise<CommandResult | 
       data: endpoint,
       table: () => {
         console.log();
-        console.log(`Endpoint ${endpoint.id} is active again. Replay the gap window if the pause left undelivered events.`);
+        console.log(
+          `Endpoint ${endpoint.id} is active again. Replay the gap window if the pause left undelivered events.`,
+        );
         console.log();
       },
     };
@@ -163,7 +122,9 @@ export const disableWebhookCommand = async (id: string): Promise<CommandResult |
       data: endpoint,
       table: () => {
         console.log();
-        console.log(`Endpoint ${endpoint.id} is disabled. Events keep accruing; re-enable and replay to catch up.`);
+        console.log(
+          `Endpoint ${endpoint.id} is disabled. Events keep accruing; re-enable and replay to catch up.`,
+        );
         console.log();
       },
     };
@@ -172,3 +133,67 @@ export const disableWebhookCommand = async (id: string): Promise<CommandResult |
     process.exit(1);
   }
 };
+
+type UpdateWebhookOptions = {
+  url?: string;
+  queueUrl?: string;
+  roleArn?: string;
+  accessKeyId?: string;
+  events?: string;
+  maxBatchSize?: string;
+  maxBatchDelay?: string;
+  maxInFlight?: string;
+};
+
+// Number("abc") is NaN and JSON.stringify turns NaN into null, so loose
+// parsing here would ship a null patch the server cannot bound-check.
+function parseIntOption(value: string | undefined, flag: string): number | undefined {
+  if (value === undefined) return undefined;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed)) {
+    console.error(`Invalid ${flag} value: ${value} (expected an integer)`);
+    process.exit(1);
+  }
+  if (value.trim() === "") {
+    console.error(`Invalid ${flag} value: ${value} (expected an integer)`);
+    process.exit(1);
+  }
+  return parsed;
+}
+
+function hasTuningFlag(options: UpdateWebhookOptions): boolean {
+  return (
+    options.events !== undefined ||
+    options.maxBatchSize !== undefined ||
+    options.maxBatchDelay !== undefined ||
+    options.maxInFlight !== undefined
+  );
+}
+
+/** A credential flag names a mode, and the mode it leaves is cleared on the same request. */
+function sqsFieldsOf({
+  options,
+  secretAccessKey,
+}: {
+  options: UpdateWebhookOptions;
+  secretAccessKey: ReturnType<typeof sqsSecretFromEnv>;
+}) {
+  return {
+    ...(options.queueUrl !== undefined ? { queue_url: options.queueUrl } : {}),
+    ...(options.roleArn !== undefined
+      ? {
+          role_arn: options.roleArn,
+          access_key_id: null,
+          secret_access_key: null,
+        }
+      : {}),
+    ...(options.accessKeyId !== undefined
+      ? {
+          access_key_id: options.accessKeyId,
+          secret_access_key: secretAccessKey,
+          role_arn: null,
+          external_id: null,
+        }
+      : {}),
+  };
+}

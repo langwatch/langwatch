@@ -1,0 +1,86 @@
+/**
+ * Round 5: the rendered-Markdown view in the I/O viewer must sit in the same bordered
+ * "bg.subtle + border" container that Pretty uses for plain text and JSON.
+ * @vitest-environment jsdom
+ */
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
+import { cleanup, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import "@testing-library/jest-dom/vitest";
+
+// The header's translate hook dispatches through tRPC; these tests pin
+// container chrome, so stub it to the identity passthrough.
+vi.mock("../../../../../behavior/trace-host.ts", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  useTraceHost: () => ({ hasPermission: () => false }),
+}));
+vi.mock("../../../../../features/trace-drawer/behavior/use-text-translation.ts", () => ({
+  useTextTranslation: ({ texts }: { texts: Record<string, string> }) => ({
+    displayTexts: texts,
+    isActive: false,
+    isLoading: false,
+    toggle: () => undefined,
+  }),
+}));
+
+// The toolbar checks the annotation permission and reads the field's
+// comments; neither matters to container chrome.
+vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
+  useOrganizationTeamProject: () => ({
+    project: { id: "project-1" },
+  }),
+}));
+
+vi.mock("../../../../../behavior/trace-api.ts", () => ({
+  api: {
+    useQueries: () => [],
+  },
+}));
+
+import { MemoryRouterWrapper } from "../../hooks/__tests__/memory-router-wrapper.tsx";
+import { IOViewer } from "../io-viewer.tsx";
+
+afterEach(cleanup);
+
+const wrapper = ({ children }: { children: React.ReactNode }) => (
+  <MemoryRouterWrapper>
+    <DesignSystemProvider forcedTheme="light">{children}</DesignSystemProvider>
+  </MemoryRouterWrapper>
+);
+
+// Markdown content with structural signals but NO fenced code block, so the
+// render path stays synchronous (no Shiki / ClientOnly to await).
+const MARKDOWN = "# Report\n\nThe summary line.\n\n- first point\n- second point";
+
+/** Walk up from a node to the nearest ancestor painting a 1px border. */
+function nearestBorderedAncestor(node: HTMLElement | null): HTMLElement | null {
+  let el: HTMLElement | null = node;
+  while (el) {
+    if (getComputedStyle(el).borderTopWidth === "1px") return el;
+    el = el.parentElement;
+  }
+  return null;
+}
+
+describe("IOViewer Markdown container", () => {
+  describe("given Markdown-looking content rendered in the Markdown view", () => {
+    it("wraps the rendered Markdown body in a bordered container", async () => {
+      const user = userEvent.setup();
+      render(<IOViewer label="Output" content={MARKDOWN} />, { wrapper });
+
+      // Switch from the default Pretty view to Markdown (defaults to the
+      // rendered submode) through the format selector's menu.
+      await user.click(screen.getByRole("button", { name: "Output view format" }));
+      await user.click(await screen.findByRole("menuitem", { name: "Markdown" }));
+
+      // The heading renders as real Markdown (an <h1>), proving we're on the
+      // rendered path and not the flush raw-text fallback.
+      const heading = screen.getByRole("heading", { name: "Report" });
+      expect(heading).toBeInTheDocument();
+
+      // ...and that rendered content sits inside a bordered box.
+      expect(nearestBorderedAncestor(heading)).not.toBeNull();
+    });
+  });
+});

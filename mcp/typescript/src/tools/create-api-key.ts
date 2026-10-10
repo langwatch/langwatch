@@ -1,15 +1,15 @@
-import { createApiKey as apiCreateApiKey } from "../langwatch-api-api-keys.js";
+import { createApiKey as apiCreateApiKey } from "../langwatch-api-api-keys.ts";
 
 export async function handleCreateApiKey(params: {
   keyType: "personal" | "service";
   name: string;
   description?: string;
   expiresAt?: string;
-  bindings?: Array<{
+  bindings?: {
     role: "ADMIN" | "MEMBER" | "VIEWER";
     scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
     scopeId: string;
-  }>;
+  }[];
   projectIds?: string[];
 }): Promise<string> {
   const result = await apiCreateApiKey(params);
@@ -21,9 +21,7 @@ export async function handleCreateApiKey(params: {
   lines.push(`**Token**: \`${result.token}\``);
   lines.push(`**Created**: ${result.apiKey.createdAt}`);
   lines.push("");
-  lines.push(
-    "> ⚠️ Save this token now — it will not be shown again.",
-  );
+  lines.push("> ⚠️ Save this token now — it will not be shown again.");
 
   return lines.join("\n");
 }

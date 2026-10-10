@@ -102,6 +102,16 @@ Feature: An aggregate project reads its member projects
     Then the query is restricted to tenants aggregate, A and B
     And rows from A and B are restricted to the window of their grant
 
+  @unit
+  Scenario: The tenant guard admits the proof's fence and nothing wider
+    Given a statement fenced by an aggregate's proof with shared members
+    When the tenant guard checks it
+    Then it accepts one Array(String) tenant set holding exactly the proof's tenants
+    And it accepts the OR between own and shared grants inside the fence's bracket
+    And it refuses a set holding a tenant outside the proof, or missing one
+    And it refuses an OR beside the set, or inside a subquery beneath it
+    And it refuses NOT in front of any tenant predicate
+
   @integration
   Scenario: A project outside the proof contributes nothing
     Given an aggregate project with one member
@@ -261,6 +271,13 @@ Feature: An aggregate project reads its member projects
     Then the rule is refused
     And no grant is written
 
+  @unit
+  Scenario: Editing an aggregate's rule asks organisation manage of the aggregate's organisation
+    Given an edit that names only the aggregate project
+    When the door decides the edit
+    Then it asks organization:manage of the organisation that owns the aggregate
+    And the edit never fails as an internal error for want of an organisation id
+
   @integration
   Scenario: A non-admin on the aggregate's team is refused
     Given an aggregate project whose team includes sam
@@ -323,6 +340,20 @@ Feature: An aggregate project reads its member projects
     And a member in Engineering whose personal project is a member
     When that member is moved to department Sales
     Then their personal project is no longer a member
+
+  @unit
+  Scenario: A disabled member's personal project leaves every personal-project aggregate
+    Given an aggregate project with the rule "all personal projects"
+    And a member whose personal project is a member
+    When that member is disabled
+    Then their personal project is no longer a member
+
+  @unit
+  Scenario: Re-enabling a member reconciles the organisation's aggregates
+    Given an aggregate project with the rule "all personal projects"
+    And a disabled member whose personal project left it
+    When that member is re-enabled
+    Then each of the organisation's aggregates is queued for one reconcile, however often the fact arrives
 
   @integration
   Scenario: Removing a project from an explicit rule revokes its read
@@ -573,8 +604,8 @@ Feature: An aggregate project reads its member projects
     When ana asks for an access token bound to the aggregate project
     Then she is refused because the aggregate accepts no credential
     And no key bound to the aggregate exists
-    And the aggregate's setup page and onboarding say "Data can't be added to this project"
-    And they show no key, no wait for a first trace and no button to mint one
+    And the aggregate's onboarding says "Data can't be added to this project"
+    And it shows no key, no wait for a first trace and no button to mint one
 
   @integration
   Scenario: Landing never resolves to an aggregate from a remembered selection

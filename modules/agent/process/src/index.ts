@@ -1,0 +1,7 @@
+export { agentProcessModule } from "./agent.module.ts";
+export { agentTrpcTransport } from "./transport/agent.trpc.ts";
+
+export { createAgentRest, agentTraceparent } from "./transport/agent.rest.ts";
+export { agentLegacyRest, AGENTS_ALIAS_SUCCESSOR } from "./transport/agent-legacy.rest.ts";
+export { agentConnectCredentials, createAgentConnectRest } from "./transport/agent-connect.rest.ts";
+export { CONNECT_PATH, createAgentWebSocketProtocol } from "./transport/agent-connect.ws.ts";

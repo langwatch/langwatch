@@ -22,12 +22,13 @@ pip install langwatch langchain langchain-openai
 ```bash uv
 uv add langwatch langchain langchain-openai
 ```
+
 </CodeGroup>
 
 ## Usage
 
 <Info>
-The LangWatch API key is configured by default via the `LANGWATCH_API_KEY` environment variable.
+  The LangWatch API key is configured by default via the `LANGWATCH_API_KEY` environment variable.
 </Info>
 
 Use LangWatch's callback handler to instrument your Langchain agents and chains. The callback automatically captures LLM calls, tool usage, and chain execution as spans within your trace.

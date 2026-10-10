@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, TypeVar, cast
+from typing import TYPE_CHECKING, Any, Literal, TypeVar, cast
 
 from attrs import define as _attrs_define
-from attrs import field as _attrs_field
 
 from ..types import UNSET, Unset
 
@@ -21,68 +20,60 @@ T = TypeVar("T", bound="ScimPatchUserResponse200")
 class ScimPatchUserResponse200:
     """
     Attributes:
-        schemas (list[str] | Unset): The SCIM schema URNs this resource conforms to.
-        id (str | Unset): The LangWatch user id. Use it as the resource id in later calls, and as a member value on a
-            group.
-        user_name (str | Unset): The member's email address, which is their login.
-        name (ScimPatchUserResponse200Name | Unset):
-        emails (list[ScimPatchUserResponse200EmailsItem] | Unset):
-        active (bool | Unset): False once the account is deactivated.
-        meta (ScimPatchUserResponse200Meta | Unset):
+        schemas (list[Literal['urn:ietf:params:scim:schemas:core:2.0:User']]):
+        id (str):
+        user_name (str):
+        name (ScimPatchUserResponse200Name):
+        emails (list[ScimPatchUserResponse200EmailsItem]):
+        active (bool):
+        meta (ScimPatchUserResponse200Meta):
+        external_id (str | Unset):
     """
 
-    schemas: list[str] | Unset = UNSET
-    id: str | Unset = UNSET
-    user_name: str | Unset = UNSET
-    name: ScimPatchUserResponse200Name | Unset = UNSET
-    emails: list[ScimPatchUserResponse200EmailsItem] | Unset = UNSET
-    active: bool | Unset = UNSET
-    meta: ScimPatchUserResponse200Meta | Unset = UNSET
-    additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
+    schemas: list[Literal["urn:ietf:params:scim:schemas:core:2.0:User"]]
+    id: str
+    user_name: str
+    name: ScimPatchUserResponse200Name
+    emails: list[ScimPatchUserResponse200EmailsItem]
+    active: bool
+    meta: ScimPatchUserResponse200Meta
+    external_id: str | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
-        schemas: list[str] | Unset = UNSET
-        if not isinstance(self.schemas, Unset):
-            schemas = self.schemas
+        schemas = self.schemas
 
         id = self.id
 
         user_name = self.user_name
 
-        name: dict[str, Any] | Unset = UNSET
-        if not isinstance(self.name, Unset):
-            name = self.name.to_dict()
+        name = self.name.to_dict()
 
-        emails: list[dict[str, Any]] | Unset = UNSET
-        if not isinstance(self.emails, Unset):
-            emails = []
-            for emails_item_data in self.emails:
-                emails_item = emails_item_data.to_dict()
-                emails.append(emails_item)
+        emails = []
+        for emails_item_data in self.emails:
+            emails_item = emails_item_data.to_dict()
+            emails.append(emails_item)
 
         active = self.active
 
-        meta: dict[str, Any] | Unset = UNSET
-        if not isinstance(self.meta, Unset):
-            meta = self.meta.to_dict()
+        meta = self.meta.to_dict()
+
+        external_id = self.external_id
 
         field_dict: dict[str, Any] = {}
-        field_dict.update(self.additional_properties)
-        field_dict.update({})
-        if schemas is not UNSET:
-            field_dict["schemas"] = schemas
-        if id is not UNSET:
-            field_dict["id"] = id
-        if user_name is not UNSET:
-            field_dict["userName"] = user_name
-        if name is not UNSET:
-            field_dict["name"] = name
-        if emails is not UNSET:
-            field_dict["emails"] = emails
-        if active is not UNSET:
-            field_dict["active"] = active
-        if meta is not UNSET:
-            field_dict["meta"] = meta
+
+        field_dict.update(
+            {
+                "schemas": schemas,
+                "id": id,
+                "userName": user_name,
+                "name": name,
+                "emails": emails,
+                "active": active,
+                "meta": meta,
+            }
+        )
+        if external_id is not UNSET:
+            field_dict["externalId"] = external_id
 
         return field_dict
 
@@ -93,36 +84,34 @@ class ScimPatchUserResponse200:
         from ..models.scim_patch_user_response_200_name import ScimPatchUserResponse200Name
 
         d = dict(src_dict)
-        schemas = cast(list[str], d.pop("schemas", UNSET))
+        schemas = []
+        _schemas = d.pop("schemas")
+        for schemas_item_data in _schemas:
+            schemas_item = cast(Literal["urn:ietf:params:scim:schemas:core:2.0:User"], schemas_item_data)
+            if schemas_item != "urn:ietf:params:scim:schemas:core:2.0:User":
+                raise ValueError(
+                    f"schemas_item must match const 'urn:ietf:params:scim:schemas:core:2.0:User', got '{schemas_item}'"
+                )
+            schemas.append(schemas_item)
 
-        id = d.pop("id", UNSET)
+        id = d.pop("id")
 
-        user_name = d.pop("userName", UNSET)
+        user_name = d.pop("userName")
 
-        _name = d.pop("name", UNSET)
-        name: ScimPatchUserResponse200Name | Unset
-        if isinstance(_name, Unset):
-            name = UNSET
-        else:
-            name = ScimPatchUserResponse200Name.from_dict(_name)
+        name = ScimPatchUserResponse200Name.from_dict(d.pop("name"))
 
-        _emails = d.pop("emails", UNSET)
-        emails: list[ScimPatchUserResponse200EmailsItem] | Unset = UNSET
-        if _emails is not UNSET:
-            emails = []
-            for emails_item_data in _emails:
-                emails_item = ScimPatchUserResponse200EmailsItem.from_dict(emails_item_data)
+        emails = []
+        _emails = d.pop("emails")
+        for emails_item_data in _emails:
+            emails_item = ScimPatchUserResponse200EmailsItem.from_dict(emails_item_data)
 
-                emails.append(emails_item)
+            emails.append(emails_item)
 
-        active = d.pop("active", UNSET)
+        active = d.pop("active")
 
-        _meta = d.pop("meta", UNSET)
-        meta: ScimPatchUserResponse200Meta | Unset
-        if isinstance(_meta, Unset):
-            meta = UNSET
-        else:
-            meta = ScimPatchUserResponse200Meta.from_dict(_meta)
+        meta = ScimPatchUserResponse200Meta.from_dict(d.pop("meta"))
+
+        external_id = d.pop("externalId", UNSET)
 
         scim_patch_user_response_200 = cls(
             schemas=schemas,
@@ -132,23 +121,7 @@ class ScimPatchUserResponse200:
             emails=emails,
             active=active,
             meta=meta,
+            external_id=external_id,
         )
 
-        scim_patch_user_response_200.additional_properties = d
         return scim_patch_user_response_200
-
-    @property
-    def additional_keys(self) -> list[str]:
-        return list(self.additional_properties.keys())
-
-    def __getitem__(self, key: str) -> Any:
-        return self.additional_properties[key]
-
-    def __setitem__(self, key: str, value: Any) -> None:
-        self.additional_properties[key] = value
-
-    def __delitem__(self, key: str) -> None:
-        del self.additional_properties[key]
-
-    def __contains__(self, key: str) -> bool:
-        return key in self.additional_properties

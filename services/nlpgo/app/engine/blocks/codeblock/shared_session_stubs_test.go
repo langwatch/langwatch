@@ -216,11 +216,11 @@ func (s *sharedSessionStubs) serveCache(w http.ResponseWriter, r *http.Request) 
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
-	if !strings.HasPrefix(r.URL.Path, "/api/agent-cache/") {
+	if !strings.HasPrefix(r.URL.Path, "/api/v1/agent-cache/") {
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
-	name := strings.TrimPrefix(r.URL.Path, "/api/agent-cache/")
+	name := strings.TrimPrefix(r.URL.Path, "/api/v1/agent-cache/")
 	claiming := strings.HasSuffix(name, "/claim")
 	name = strings.TrimSuffix(name, "/claim")
 

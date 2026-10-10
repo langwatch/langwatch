@@ -1,0 +1,319 @@
+import { moduleApi } from "@langwatch/module";
+import { describe, expect, it, vi } from "vitest";
+
+import { ApplicationBuilder } from "../src/application.ts";
+import {
+  defineProcessModule,
+  type FeatureSetup,
+  type ServerRole,
+} from "../src/feature-installer.ts";
+import { ResourceScope, type ResourceOwnership } from "../src/resource-scope.ts";
+import { memberSourceOf } from "./member-source.ts";
+
+interface ProjectApi {
+  name(): string;
+}
+const ProjectApi = moduleApi<ProjectApi>()("project");
+
+/** What one run tells the module below; set by the harness before each boot. */
+interface RunState {
+  events: string[];
+  bootFailure: Error | null;
+  startFailure: Error | null;
+  stopFailure: Error | null;
+  starting: (() => Promise<void>) | null;
+  capture: ((resources: ResourceOwnership) => void) | null;
+}
+
+let run: RunState = {
+  events: [],
+  bootFailure: null,
+  startFailure: null,
+  stopFailure: null,
+  starting: null,
+  capture: null,
+};
+
+/** What one test states about the run, before the harness completes it. */
+type Harness = Readonly<{
+  events: string[];
+  bootFailure?: Error;
+  startFailure?: Error;
+  stopFailure?: Error;
+  starting?: () => Promise<void>;
+  capture?: (resources: ResourceOwnership) => void;
+}>;
+
+class ProjectModule implements ProjectApi {
+  static readonly contract = ProjectApi;
+  static readonly dependencies = {};
+
+  private constructor() {}
+
+  static create({
+    resources,
+  }: FeatureSetup<typeof ProjectModule.dependencies, undefined>): ProjectApi {
+    const members = run;
+    const { events } = members;
+    resources.own("connection", () => {
+      events.push("connection:close");
+    });
+    resources.ownService({
+      name: "subscription",
+      start: async () => {
+        events.push("subscription:start");
+        await members.starting?.();
+        if (members.startFailure) throw members.startFailure;
+      },
+      stop: () => {
+        events.push("subscription:stop");
+        if (members.stopFailure) throw members.stopFailure;
+      },
+    });
+    resources.ownService({
+      name: "followup",
+      start: () => {
+        events.push("followup:start");
+      },
+      stop: () => {
+        events.push("followup:stop");
+      },
+    });
+    members.capture?.(resources);
+    if (members.bootFailure) throw members.bootFailure;
+
+    return new ProjectModule();
+  }
+
+  name(): string {
+    return "project";
+  }
+}
+
+const project = defineProcessModule("project").withApi(ProjectModule).build();
+function graph(harness: Harness, role: ServerRole = "api") {
+  run = {
+    events: harness.events,
+    bootFailure: harness.bootFailure ?? null,
+    startFailure: harness.startFailure ?? null,
+    stopFailure: harness.stopFailure ?? null,
+    starting: harness.starting ?? null,
+    capture: harness.capture ?? null,
+  };
+  return new ApplicationBuilder({ role, stores: memberSourceOf({}) }).withModules([project]);
+}
+
+describe("feature-owned runtime services", () => {
+  /** @scenario "Feature services start before hosts and drain before API bindings close" */
+  it.each(["api", "worker"] as const)(
+    "starts after boot and drains hosts before feature services in %s",
+    async (role) => {
+      const events: string[] = [];
+      let callApi = () => "not installed";
+      const runtime = await graph({ events }, role)
+        .withService({
+          name: "host",
+          start: () => {
+            events.push(`host:start:${callApi()}`);
+          },
+          stop: () => {
+            events.push(`host:stop:${callApi()}`);
+          },
+        })
+        .boot();
+      callApi = () => runtime.module(project).provided.name();
+
+      expect(events).toEqual([]);
+      await Promise.all([runtime.start(), runtime.start()]);
+      expect(events).toEqual(["subscription:start", "followup:start", "host:start:project"]);
+
+      await Promise.all([runtime.stop(), runtime.stop()]);
+      expect(events).toEqual([
+        "subscription:start",
+        "followup:start",
+        "host:start:project",
+        "host:stop:project",
+        "followup:stop",
+        "subscription:stop",
+        "connection:close",
+      ]);
+      expect(callApi).toThrow("closed");
+    },
+  );
+
+  /** @scenario "Unstarted services do not receive stop calls" */
+  it("releases construction allocations on boot failure without starting or stopping inert services", async () => {
+    const events: string[] = [];
+    const failure = new Error("factory failed");
+
+    await expect(graph({ events, bootFailure: failure }).boot()).rejects.toBe(failure);
+    expect(events).toEqual(["connection:close"]);
+  });
+
+  /** @scenario "Subscription readiness gates the API listener" */
+  it("stops only the attempted feature service when its start fails", async () => {
+    const events: string[] = [];
+    const failure = new Error("subscription failed");
+    const hostStart = vi.fn<() => void>();
+    const hostStop = vi.fn<() => void>();
+    const runtime = await graph({ events, startFailure: failure })
+      .withService({ name: "host", start: hostStart, stop: hostStop })
+      .boot();
+
+    await expect(runtime.start()).rejects.toBe(failure);
+    await runtime.stop();
+    expect(events).toEqual(["subscription:start", "subscription:stop", "connection:close"]);
+    expect(hostStart).not.toHaveBeenCalled();
+    expect(hostStop).not.toHaveBeenCalled();
+  });
+
+  it("rolls back a failed host before stopping feature services", async () => {
+    const events: string[] = [];
+    const failure = new Error("listen failed");
+    const runtime = await graph({ events })
+      .withService({
+        name: "host",
+        start: () => {
+          throw failure;
+        },
+        stop: () => {
+          events.push("host:stop");
+        },
+      })
+      .boot();
+
+    await expect(runtime.start()).rejects.toBe(failure);
+    expect(events).toEqual([
+      "subscription:start",
+      "followup:start",
+      "host:stop",
+      "followup:stop",
+      "subscription:stop",
+      "connection:close",
+    ]);
+  });
+
+  /** @scenario "Unstarted services do not receive stop calls" */
+  it("closes allocations without stopping inert services when stopped before start", async () => {
+    const events: string[] = [];
+    const runtime = await graph({ events }).boot();
+
+    await runtime.stop();
+    await expect(runtime.start()).rejects.toThrow("stopped runtime");
+    expect(events).toEqual(["connection:close"]);
+  });
+
+  it("drains a concurrent start before stopping its services", async () => {
+    const events: string[] = [];
+    let release = () => {};
+    const waiting = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const runtime = await graph({ events, starting: () => waiting }).boot();
+    const starting = runtime.start();
+    const stopping = runtime.stop();
+    await Promise.resolve();
+    expect(events).toEqual(["subscription:start"]);
+
+    release();
+    await Promise.all([starting, stopping]);
+    expect(events).toEqual([
+      "subscription:start",
+      "followup:start",
+      "followup:stop",
+      "subscription:stop",
+      "connection:close",
+    ]);
+  });
+
+  it("still closes allocations if a service stop throws and never retries that stop", async () => {
+    const events: string[] = [];
+    const runtime = await graph({
+      events,
+      stopFailure: new Error("unsubscribe failed"),
+    }).boot();
+    await runtime.start();
+    const stopping = runtime.stop();
+
+    await expect(stopping).rejects.toThrow("started services");
+    expect(runtime.stop()).toBe(stopping);
+    expect(events).toEqual([
+      "subscription:start",
+      "followup:start",
+      "followup:stop",
+      "subscription:stop",
+      "connection:close",
+    ]);
+  });
+
+  /** @scenario "Late service registration cannot escape lifecycle ownership" */
+  it("seals service registration after install while allowing startup allocation ownership", async () => {
+    let ownership: ResourceOwnership = new ResourceScope();
+    const closeLateAllocation = vi.fn<() => void>();
+    const runtime = await graph({
+      events: [],
+      capture: (resources) => {
+        ownership = resources;
+      },
+    }).boot();
+
+    expect(() =>
+      ownership.ownService({
+        name: "too late",
+        start: vi.fn<() => void>(),
+        stop: vi.fn<() => void>(),
+      }),
+    ).toThrow("registration is closed");
+    ownership.own("allocated during startup", closeLateAllocation);
+    await runtime.stop();
+    expect(closeLateAllocation).toHaveBeenCalledOnce();
+  });
+
+  /** @scenario "Subscription readiness gates the API listener" */
+  it("does not start the host until the subscription has acknowledged", async () => {
+    const events: string[] = [];
+    let acknowledge = () => {};
+    const acknowledged = new Promise<void>((resolve) => {
+      acknowledge = resolve;
+    });
+    const hostStart = vi.fn<() => void>();
+    const runtime = await graph({ events, starting: () => acknowledged })
+      .withService({ name: "host", start: hostStart, stop: vi.fn<() => void>() })
+      .boot();
+
+    const starting = runtime.start();
+    await new Promise((resume) => setTimeout(resume, 10));
+    expect(events).toEqual(["subscription:start"]);
+    expect(hostStart).not.toHaveBeenCalled();
+
+    acknowledge();
+    await starting;
+    expect(hostStart).toHaveBeenCalledOnce();
+    await runtime.stop();
+  });
+
+  /** @scenario "Feature services start before hosts and drain before API bindings close" */
+  it("closes the API bindings before the construction resources", async () => {
+    const events: string[] = [];
+    let callApi = () => "unbound";
+    const runtime = await graph({
+      events,
+      capture: (resources) => {
+        resources.own("api probe", () => {
+          try {
+            callApi();
+            events.push("api open at resource close");
+          } catch {
+            events.push("api closed at resource close");
+          }
+        });
+      },
+    }).boot();
+    callApi = () => runtime.module(project).provided.name();
+
+    await runtime.stop();
+
+    expect(events).toContain("api closed at resource close");
+    expect(events).not.toContain("api open at resource close");
+  });
+});

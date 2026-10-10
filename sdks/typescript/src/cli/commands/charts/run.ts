@@ -1,41 +1,41 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
+
 import {
   type ChartParameterValue,
   ChartsApiService,
 } from "@/client-sdk/services/charts/charts-api.service";
+
 import { resolveCredentials } from "../../utils/apiKey";
 import { formatTable } from "../../utils/formatting";
-import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 
 /**
- * The datapoint steps the platform offers, in seconds. The API is the source
- * of truth (`LWQL_GRANULARITY_STEPS`, restricted in the route schema); this
- * local copy only exists to refuse an off-list value before a request is made,
- * with a message that names the steps instead of a schema rejection.
+ * The datapoint steps the platform offers, in seconds. The API
+ * (`LWQL_GRANULARITY_STEPS`) is the source of truth; this local copy exists
+ * only to refuse an off-list value early, naming the steps in the message.
  */
 const OFFERED_GRANULARITY_STEPS = [1, 60, 3600] as const;
 
 /**
- * One of the offered datapoint steps, in seconds — validated locally against
- * `OFFERED_GRANULARITY_STEPS` before a request is made. `runQuery` itself
- * accepts the plain `number` the shared query door's request body types it
- * as (issue #7565): the door is not chart-specific, so it does not know
- * about this CLI's offered-steps list.
+ * One of the offered datapoint steps, validated locally against
+ * `OFFERED_GRANULARITY_STEPS`. `runQuery` accepts the plain `number` the
+ * shared query door types it as (#7565): the door doesn't know this CLI's list.
  */
 type ChartRunGranularitySeconds = (typeof OFFERED_GRANULARITY_STEPS)[number];
 
 const OFFERED_GRANULARITY_STEP_NAMES = "1 (1 second), 60 (1 minute), 3600 (1 hour)";
 
+const formatChartCellValue = (value: unknown): string => {
+  if (value === null || value === undefined) return "";
+  if (typeof value === "object") return JSON.stringify(value);
+  return String(value as string | number | boolean);
+};
+
 /**
- * Runs a saved chart by id: reads the chart, then executes its own statement
- * and stored parameter values through the LangWatchQL query door — the same
- * governed execution path every other surface uses, so what this prints is
- * what the workbench would show. `--start`/`--end` fill the reserved
- * `dashboard_context_period_start`/`dashboard_context_period_end` parameters
- * for statements that declare them, and `--granularity` the reserved
- * datapoint step, in seconds.
+ * Runs a saved chart through LangWatchQL (same path as workbench). --start/--end
+ * and --granularity fill reserved dashboard context parameters.
  */
 export const runChartCommand = async (
   id: string,
@@ -49,17 +49,13 @@ export const runChartCommand = async (
   await resolveCredentials({ project: options.project });
 
   if ((options.start === undefined) !== (options.end === undefined)) {
-    console.error(
-      chalk.red("Error: --start and --end must be given together"),
-    );
+    console.error(chalk.red("Error: --start and --end must be given together"));
     process.exit(1);
   }
   let granularitySeconds: ChartRunGranularitySeconds | undefined;
   if (options.granularity !== undefined) {
     const requested = Number(options.granularity);
-    if (
-      !(OFFERED_GRANULARITY_STEPS as readonly number[]).includes(requested)
-    ) {
+    if (!(OFFERED_GRANULARITY_STEPS as readonly number[]).includes(requested)) {
       console.error(
         chalk.red(
           `Error: --granularity must be one of the offered steps: ${OFFERED_GRANULARITY_STEP_NAMES}`,
@@ -80,10 +76,7 @@ export const runChartCommand = async (
     const chart = await service.get(id);
     const result = await service.runQuery({
       sql: chart.definition.sql,
-      parameters: chart.definition.parameters as Record<
-        string,
-        ChartParameterValue
-      >,
+      parameters: chart.definition.parameters as Record<string, ChartParameterValue>,
       ...(options.start !== undefined && options.end !== undefined
         ? { timeWindow: { start: options.start, end: options.end } }
         : {}),
@@ -107,14 +100,7 @@ export const runChartCommand = async (
               Object.fromEntries(
                 headers.map((name) => {
                   const value = row[name];
-                  return [
-                    name,
-                    value === null || value === undefined
-                      ? ""
-                      : typeof value === "object"
-                        ? JSON.stringify(value)
-                        : String(value as string | number | boolean),
-                  ];
+                  return [name, formatChartCellValue(value)];
                 }),
               ),
             ),

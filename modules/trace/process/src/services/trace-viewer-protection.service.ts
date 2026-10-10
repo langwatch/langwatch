@@ -1,0 +1,301 @@
+import type { Authorization, PrincipalRef } from "@langwatch/authorization";
+import type { AuthzApi } from "@langwatch/authz-contract";
+import {
+  describeAudience,
+  isContentVisible,
+  isContentVisibleToPublic,
+  type ContentCategory,
+  type ResolvedCategory,
+  type ResolvedDataPrivacy,
+  type DataPrivacyApi,
+} from "@langwatch/data-privacy-contract";
+import type { PlanProvider } from "@langwatch/entitlement-contract";
+import { createLogger, type Logger } from "@langwatch/observability";
+import type { ProjectApi } from "@langwatch/project-contract";
+import type { Protections } from "@langwatch/trace-contract";
+
+import { policyProjectIdsOf } from "../rules/policy-project-ids.rules.ts";
+import { VisibilityWindowService } from "./trace-visibility-window.service.ts";
+
+export type TraceViewerProtectionOptions = Readonly<{
+  authz: AuthzApi;
+  projects: ProjectApi;
+  plans: PlanProvider;
+  dataPrivacy: DataPrivacyApi;
+  fallbackVisibilityDays: number;
+  now?: () => number;
+  logger?: Logger;
+}>;
+
+export class TraceViewerProtectionService {
+  static create(options: TraceViewerProtectionOptions): TraceViewerProtectionService {
+    return new TraceViewerProtectionService(options);
+  }
+
+  private readonly window: VisibilityWindowService;
+  private readonly logger: Logger;
+  private readonly now: () => number;
+
+  private constructor(private readonly options: TraceViewerProtectionOptions) {
+    this.window = VisibilityWindowService.create(options.plans);
+    this.logger = options.logger ?? createLogger("langwatch:trace:protections");
+    this.now = options.now ?? Date.now;
+  }
+
+  async getVisibilityWindow(projectId: string): Promise<{ visibilityCutoffMs: number | null }> {
+    const dayMs = 24 * 60 * 60 * 1000;
+    try {
+      const project = await this.options.projects.findWithTeam(projectId);
+      const organizationId = project?.team?.organizationId;
+      if (!organizationId) {
+        this.logger.error(
+          { projectId },
+          "visibility window failing closed: project resolves to no organization",
+        );
+        return { visibilityCutoffMs: this.now() - this.options.fallbackVisibilityDays * dayMs };
+      }
+      return await this.window.getVisibilityWindow({ organizationId });
+    } catch (error) {
+      this.logger.error(
+        { projectId, error },
+        "visibility window failing closed: plan resolution failed",
+      );
+      return { visibilityCutoffMs: this.now() - this.options.fallbackVisibilityDays * dayMs };
+    }
+  }
+
+  /** Credential redactions: anonymous resolution + the principal's cost grant. A legacy
+   * API key (no principal) bypasses RBAC for full access. */
+  async resolveForApiKey(
+    input: Readonly<{ projectId: string; principal: PrincipalRef | null }>,
+  ): Promise<Protections> {
+    const [protections, canSeeCosts] = await Promise.all([
+      this.resolve({ projectId: input.projectId, userId: void 0, publiclyShared: false }),
+      this.keyPermitted(input),
+    ]);
+    return { ...protections, canSeeCosts };
+  }
+
+  /** One permission, asked of the CREDENTIAL rather than of whoever holds it. */
+  private async keyPermitted(
+    input: Readonly<{ projectId: string; principal: PrincipalRef | null }>,
+  ): Promise<boolean> {
+    if (input.principal === null) return true;
+    const project = await this.options.projects.findIdentity(input.projectId);
+    if (!project) return false;
+
+    return this.options.authz.can({
+      principal: input.principal,
+      permission: "cost:view",
+      scope: {
+        type: "project",
+        id: project.id,
+        teamId: project.teamId,
+        organizationId: project.organizationId,
+      },
+    });
+  }
+
+  async resolve(
+    input: Readonly<{
+      projectId: string;
+      userId: string | undefined;
+      publiclyShared: boolean;
+      /** The read's proof: the policy is the strictest across it and `projectId` (ADR-177 d9). */
+      authorization?: Authorization;
+    }>,
+  ): Promise<Protections> {
+    const [canSeeCosts, isMember, isAdmin, canWriteTraces, isProjectOwner, { visibilityCutoffMs }] =
+      await Promise.all([
+        this.permitted(input, "cost:view"),
+        this.permitted(input, "traces:view"),
+        this.permitted(input, "project:manage"),
+        this.permitted(input, "traces:update"),
+        this.isProjectOwner(input),
+        this.getVisibilityWindow(input.projectId),
+      ]);
+
+    let policy: ResolvedDataPrivacy;
+    try {
+      policy = await this.options.dataPrivacy.getResolvedForProjects({
+        projectIds: policyProjectIdsOf({
+          projectId: input.projectId,
+          authorization: input.authorization,
+        }),
+      });
+    } catch (error) {
+      this.logger.error(
+        { error, projectId: input.projectId },
+        "data-privacy policy resolution failed; hiding captured content (fail-closed)",
+      );
+      return {
+        canSeeCosts,
+        canSeeCapturedInput: false,
+        canSeeCapturedOutput: false,
+        capturedInputVisibleTo: null,
+        capturedOutputVisibleTo: null,
+        contentCategories: uniformContentCategories(false),
+        hiddenAttributes: [{ pattern: "*", visibleTo: "members of this project" }],
+        visibilityCutoffMs,
+      };
+    }
+
+    const restricted = policy.customAttributes.filter((rule) => rule.disposition === "restrict");
+    const categories = await this.categoriesFor({
+      policy,
+      projectId: input.projectId,
+      userId: input.userId,
+      anonymous: input.publiclyShared || input.userId === undefined,
+      isAdmin,
+      isMember,
+      isMemberRole: canWriteTraces && !isAdmin,
+      isProjectOwner,
+    });
+
+    return {
+      canSeeCosts,
+      canSeeCapturedInput: categories?.input.canSee ?? false,
+      canSeeCapturedOutput: categories?.output.canSee ?? false,
+      capturedInputVisibleTo: categories?.input.restrictVisibleTo ?? null,
+      capturedOutputVisibleTo: categories?.output.restrictVisibleTo ?? null,
+      contentCategories: categories,
+      hiddenAttributes: restricted.map((rule) => ({
+        pattern: rule.pattern,
+        visibleTo: "members of this project",
+      })),
+      restrictedAttributes: restricted.map((rule) => ({
+        pattern: rule.pattern,
+        visibleTo: "members of this project",
+        canSee: false,
+      })),
+      visibilityCutoffMs,
+    };
+  }
+
+  private async categoriesFor({
+    policy,
+    projectId,
+    userId,
+    anonymous,
+    isAdmin,
+    isMember,
+    isMemberRole,
+    isProjectOwner,
+  }: {
+    policy: ResolvedDataPrivacy;
+    projectId: string;
+    userId: string | undefined;
+    anonymous: boolean;
+    isAdmin: boolean;
+    isMember: boolean;
+    isMemberRole: boolean;
+    isProjectOwner: boolean;
+  }): Promise<Protections["contentCategories"]> {
+    const groupIds = anonymous ? [] : await this.groupIdsFor({ policy, projectId, userId });
+
+    return Object.fromEntries(
+      CONTENT_CATEGORIES.map((category) => {
+        const resolved = policy.categories[category];
+        return [
+          category,
+          {
+            canSee: anonymous
+              ? isContentVisibleToPublic(resolved)
+              : isContentVisible(resolved, {
+                  isAdmin,
+                  isMember,
+                  isMemberRole,
+                  isViewer: isMember && !isAdmin && !isMemberRole,
+                  isProjectOwner,
+                  groupIds,
+                }),
+            restrictVisibleTo: formatRestrictLabel(resolved),
+          },
+        ];
+      }),
+    ) as Protections["contentCategories"];
+  }
+
+  /** Whether the viewer owns the project; unknown ownership is not ownership. */
+  private async isProjectOwner(
+    input: Readonly<{ projectId: string; userId: string | undefined }>,
+  ): Promise<boolean> {
+    if (input.userId === undefined) return false;
+    try {
+      const project = await this.options.projects.findWithTeam(input.projectId);
+      return project?.ownerUserId != null && project.ownerUserId === input.userId;
+    } catch (error) {
+      this.logger.error(
+        { projectId: input.projectId, error },
+        "project owner resolution failed; treating the viewer as not the owner (fail-closed)",
+      );
+      return false;
+    }
+  }
+
+  /**
+   * The member's groups in the organization, read only when a content audience names a group.
+   * Fail-closed: a read that throws answers no groups, which can only narrow what they see.
+   */
+  private async groupIdsFor({
+    policy,
+    projectId,
+    userId,
+  }: {
+    policy: ResolvedDataPrivacy;
+    projectId: string;
+    userId: string | undefined;
+  }): Promise<string[]> {
+    const namesGroup = CONTENT_CATEGORIES.some(
+      (category) => policy.categories[category].audience.groupIds.length > 0,
+    );
+    if (userId === undefined || !namesGroup) return [];
+    try {
+      const project = await this.options.projects.findWithTeam(projectId);
+      const organizationId = project?.team?.organizationId;
+      if (!organizationId) return [];
+      const breakdown = await this.options.authz.getAccessBreakdown({
+        organizationId,
+        userId,
+        userName: null,
+        userEmail: null,
+      });
+      return breakdown.groups.map((group) => group.id);
+    } catch (error) {
+      this.logger.error(
+        { projectId, error },
+        "group membership read failed; content audiences by group stay closed (fail-closed)",
+      );
+      return [];
+    }
+  }
+
+  private permitted(
+    input: Readonly<{ projectId: string; userId: string | undefined }>,
+    permission: "cost:view" | "traces:view" | "traces:update" | "project:manage",
+  ): Promise<boolean> {
+    if (input.userId === undefined) return Promise.resolve(false);
+    return this.options.authz.hasPermission({
+      userId: input.userId,
+      permission,
+      projectId: input.projectId,
+    });
+  }
+}
+
+const CONTENT_CATEGORIES = ["input", "output", "system", "tools"] as const;
+
+function uniformContentCategories(canSee: boolean): Protections["contentCategories"] {
+  return Object.fromEntries(
+    CONTENT_CATEGORIES.map((category: ContentCategory) => [
+      category,
+      { canSee, restrictVisibleTo: null },
+    ]),
+  ) as Protections["contentCategories"];
+}
+
+function formatRestrictLabel(category: ResolvedCategory): string | null {
+  return category.disposition === "restrict"
+    ? describeAudience(category.audience, { groups: {} })
+    : null;
+}

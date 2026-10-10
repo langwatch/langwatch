@@ -1,0 +1,326 @@
+// @vitest-environment jsdom
+import { act, renderHook } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+// ─── Mocks set up before the module-under-test is imported ──────────────────
+
+let capturedOnTraceSummaryUpdated: ((traceIds: string[]) => void) | null = null;
+
+vi.mock("../../../use-trace-update-listener.ts", () => ({
+  useTraceUpdateListener: (opts: {
+    onTraceSummaryUpdated?: (ids: string[]) => void;
+    onSpanStored?: (ids: string[]) => void;
+  }) => {
+    capturedOnTraceSummaryUpdated = opts.onTraceSummaryUpdated ?? null;
+    return { connectionState: "connected" as const, lastEventAt: 0 };
+  },
+}));
+
+vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
+  useOrganizationTeamProject: () => ({ project: { id: "proj-1" } }),
+}));
+
+// The discover-freshness subscription opens a real SSE connection when
+// unmocked; these tests only exercise the trace_summary_updated paths.
+vi.mock("@langwatch/browser-host/sse-subscription", () => ({
+  useSSESubscription: () => ({
+    connectionState: "disconnected" as const,
+    retryCount: 0,
+    lastData: null,
+    lastError: null,
+    isConnected: false,
+    isConnecting: false,
+    hasError: false,
+    isDisconnected: true,
+  }),
+}));
+
+// Control what visibleTraceIds returns — overridden per test group.
+let visibleIdsResult = {
+  ids: new Set<string>(),
+  topTimestamp: undefined as number | undefined,
+  page: 1,
+};
+
+// useVisibleTraceIds is in hooks/ (same level as useTraceFreshness), so
+// from __tests__/ the path to reach it is ../useVisibleTraceIds.
+vi.mock("../../../../../features/explorer/behavior/use-visible-trace-ids.ts", () => ({
+  useVisibleTraceIds: () => visibleIdsResult,
+}));
+
+// Capture all calls to the mocked trpcUtils methods.
+const mockListCancel = vi.fn().mockResolvedValue(undefined);
+const mockListInvalidate = vi.fn().mockResolvedValue(undefined);
+const mockNewCountCancel = vi.fn().mockResolvedValue(undefined);
+const mockNewCountInvalidate = vi.fn().mockResolvedValue(undefined);
+const mockDiscoverCancel = vi.fn().mockResolvedValue(undefined);
+const mockDiscoverInvalidate = vi.fn().mockResolvedValue(undefined);
+const mockHeaderInvalidate = vi.fn().mockResolvedValue(undefined);
+const mockSpanTreeInvalidate = vi.fn().mockResolvedValue(undefined);
+const mockEvalsInvalidate = vi.fn().mockResolvedValue(undefined);
+let openDrawerTraceId: string | null = null;
+
+vi.mock("../../../../../behavior/trace-api.ts", () => ({
+  api: {
+    // The hook passes this procedure object to (the mocked)
+    // useSSESubscription — it only needs to exist, not function.
+    traces: { onDiscoverUpdate: {} },
+    useUtils: () => ({
+      traces: {
+        list: {
+          cancel: mockListCancel,
+          invalidate: mockListInvalidate,
+          getData: vi.fn().mockReturnValue(null),
+        },
+        newCount: {
+          cancel: mockNewCountCancel,
+          invalidate: mockNewCountInvalidate,
+        },
+        discover: {
+          cancel: mockDiscoverCancel,
+          invalidate: mockDiscoverInvalidate,
+        },
+        header: { invalidate: mockHeaderInvalidate },
+        spanTree: { invalidate: mockSpanTreeInvalidate },
+        evals: { invalidate: mockEvalsInvalidate },
+        spanDetail: { invalidate: vi.fn().mockResolvedValue(undefined) },
+        spanLangwatchSignals: {
+          invalidate: vi.fn().mockResolvedValue(undefined),
+        },
+        traceEvents: { invalidate: vi.fn().mockResolvedValue(undefined) },
+        resourceInfo: { invalidate: vi.fn().mockResolvedValue(undefined) },
+      },
+    }),
+  },
+}));
+
+// Mocking the module rather than the barrel keeps the rest of the package real for the hook.
+vi.mock("../../../../../behavior/trace-drawer.ts", () => ({
+  getTraceDrawer: () => ({ traceId: openDrawerTraceId, occurredAtMs: null }),
+  useTraceDrawer: (selector: (s: unknown) => unknown) =>
+    selector({ traceId: openDrawerTraceId, occurredAtMs: null }),
+}));
+
+// Mutable live-updates mode — mutated in beforeEach / test body.
+let liveUpdatesMode: "live" | "ask" | "paused" = "live";
+
+vi.mock("../../../../../features/explorer/behavior/sse-status.store.ts", () => ({
+  useSseStatusStore: Object.assign(
+    (selector: (s: unknown) => unknown) =>
+      selector({
+        liveUpdatesMode,
+        liveUpdatesEnabled: true,
+        sseConnectionState: "connected",
+        setSseConnectionState: vi.fn(),
+        setLastEventAt: vi.fn(),
+      }),
+    {
+      getState: () => ({
+        liveUpdatesMode,
+      }),
+    },
+  ),
+}));
+
+// Track pulse calls per traceId.
+const pulseMock = vi.fn();
+
+vi.mock("../../../../../features/explorer/behavior/row-pulse.store.ts", () => ({
+  useRowPulseStore: (selector: (s: { pulse: typeof pulseMock }) => unknown) =>
+    selector({ pulse: pulseMock }),
+}));
+
+// ─── Module under test ────────────────────────────────────────────────────
+import { useTraceFreshness } from "../use-trace-freshness.ts";
+
+// ─── Test lifecycle ───────────────────────────────────────────────────────
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  vi.useFakeTimers();
+  capturedOnTraceSummaryUpdated = null;
+  openDrawerTraceId = null;
+  liveUpdatesMode = "live";
+  visibleIdsResult = { ids: new Set(), topTimestamp: undefined, page: 1 };
+});
+
+afterEach(() => {
+  vi.useRealTimers();
+});
+
+/** newCount invalidation is coalesced (NEWCOUNT_INVALIDATE_DEBOUNCE_MS) — advance past it. */
+async function flushNewCountDebounce() {
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(10_000);
+  });
+}
+
+// ─── Tests ────────────────────────────────────────────────────────────────
+
+describe("useTraceFreshness", () => {
+  describe("given the drawer is open for trace abc123", () => {
+    /** @scenario "Open drawer is invalidated for affected traces" */
+    it("invalidates that trace's header, span tree and evals when an update names it", async () => {
+      openDrawerTraceId = "abc123";
+      renderHook(() => useTraceFreshness());
+
+      await act(async () => {
+        capturedOnTraceSummaryUpdated!(["abc123"]);
+      });
+
+      const key = { projectId: expect.any(String), traceId: "abc123" };
+      expect(mockHeaderInvalidate).toHaveBeenCalledWith(key);
+      expect(mockSpanTreeInvalidate).toHaveBeenCalledWith(key);
+      expect(mockEvalsInvalidate).toHaveBeenCalledWith(key);
+    });
+
+    it("leaves the drawer's reads alone when the update names other traces", async () => {
+      openDrawerTraceId = "abc123";
+      renderHook(() => useTraceFreshness());
+
+      await act(async () => {
+        capturedOnTraceSummaryUpdated!(["other"]);
+      });
+
+      expect(mockHeaderInvalidate).not.toHaveBeenCalled();
+      expect(mockSpanTreeInvalidate).not.toHaveBeenCalled();
+      expect(mockEvalsInvalidate).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given the user is on page 1 and a visible trace is updated", () => {
+    describe("when an SSE trace_summary_updated arrives for a visible traceId", () => {
+      it("pulses that row and does NOT invalidate list", async () => {
+        visibleIdsResult = {
+          ids: new Set(["trace-visible"]),
+          topTimestamp: Date.now(),
+          page: 1,
+        };
+
+        renderHook(() => useTraceFreshness());
+
+        expect(capturedOnTraceSummaryUpdated).not.toBeNull();
+
+        await act(async () => {
+          capturedOnTraceSummaryUpdated!(["trace-visible"]);
+        });
+
+        expect(pulseMock).toHaveBeenCalledWith("trace-visible");
+        expect(mockListInvalidate).not.toHaveBeenCalled();
+        await flushNewCountDebounce();
+        expect(mockNewCountInvalidate).toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("given the user is on page 1 and a new trace arrives", () => {
+    describe("when an SSE event arrives for a traceId not in the visible set", () => {
+      it("cancels and invalidates list", async () => {
+        visibleIdsResult = {
+          ids: new Set(["trace-old-1", "trace-old-2"]),
+          topTimestamp: Date.now() - 5000,
+          page: 1,
+        };
+
+        renderHook(() => useTraceFreshness());
+
+        await act(async () => {
+          capturedOnTraceSummaryUpdated!(["brand-new-trace"]);
+        });
+
+        expect(mockListCancel).toHaveBeenCalled();
+        expect(mockListInvalidate).toHaveBeenCalled();
+        await flushNewCountDebounce();
+        expect(mockNewCountInvalidate).toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("given the user is on page 6 and an off-screen trace is updated", () => {
+    describe("when an SSE event arrives for a traceId on another page", () => {
+      it("does NOT invalidate list but DOES invalidate newCount", async () => {
+        visibleIdsResult = {
+          ids: new Set(["page-6-trace-a", "page-6-trace-b"]),
+          topTimestamp: Date.now() - 10000,
+          page: 6,
+        };
+
+        renderHook(() => useTraceFreshness());
+
+        await act(async () => {
+          capturedOnTraceSummaryUpdated!(["page-3-trace-x"]);
+        });
+
+        expect(mockListCancel).not.toHaveBeenCalled();
+        expect(mockListInvalidate).not.toHaveBeenCalled();
+        await flushNewCountDebounce();
+        expect(mockNewCountInvalidate).toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("given a burst of 20 SSE events in live mode", () => {
+    describe("when all events arrive within 200ms", () => {
+      it("calls cancel before each list invalidate so stale fetches cannot win", async () => {
+        visibleIdsResult = { ids: new Set(), topTimestamp: undefined, page: 1 };
+
+        renderHook(() => useTraceFreshness());
+
+        await act(async () => {
+          for (let i = 0; i < 20; i++) {
+            capturedOnTraceSummaryUpdated!([`trace-new-${i}`]);
+          }
+        });
+
+        expect(mockListCancel).toHaveBeenCalled();
+        expect(mockListInvalidate).toHaveBeenCalled();
+        expect(mockListCancel.mock.calls.length).toBeGreaterThanOrEqual(
+          mockListInvalidate.mock.calls.length,
+        );
+      });
+    });
+  });
+
+  describe("given the user is in ask mode", () => {
+    describe("when an SSE event arrives for a new trace", () => {
+      it("does NOT invalidate list (ask mode suppresses auto-refresh)", async () => {
+        liveUpdatesMode = "ask";
+        visibleIdsResult = { ids: new Set(), topTimestamp: undefined, page: 1 };
+
+        renderHook(() => useTraceFreshness());
+
+        await act(async () => {
+          capturedOnTraceSummaryUpdated!(["new-trace-in-ask-mode"]);
+        });
+
+        expect(mockListInvalidate).not.toHaveBeenCalled();
+        await flushNewCountDebounce();
+        expect(mockNewCountInvalidate).toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("given a burst of trace_summary_updated events for existing traces", () => {
+    describe("when several events land inside the coalescing window", () => {
+      it("invalidates newCount once, not once per event", async () => {
+        visibleIdsResult = {
+          ids: new Set(["trace-a"]),
+          topTimestamp: Date.now(),
+          page: 1,
+        };
+
+        renderHook(() => useTraceFreshness());
+
+        await act(async () => {
+          for (let i = 0; i < 5; i++) {
+            capturedOnTraceSummaryUpdated!(["trace-a"]);
+          }
+        });
+        expect(mockNewCountInvalidate).not.toHaveBeenCalled();
+
+        await flushNewCountDebounce();
+        expect(mockNewCountInvalidate).toHaveBeenCalledTimes(1);
+      });
+    });
+  });
+});

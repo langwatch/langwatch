@@ -1,0 +1,85 @@
+// Shared schema for both pull-request-usage endpoints (project-scoped and
+// org-keyed) so schema changes apply to both.
+import { z } from "zod";
+
+// The three cost numbers each row and the totals carry: what a bundled plan
+// already covered, what is priced per token, and the list-price total of both.
+// All three are null together for a project the caller may read but not price.
+const costSplitShape = {
+  costUsd: z.number().nullable(),
+  billedCostUsd: z.number().nullable(),
+  nonBilledCostUsd: z.number().nullable(),
+};
+
+// One contributor's line. A contributor is a project: a personal workspace is
+// named by the person who owns it, a shared one by itself. There is no
+// per-person split inside a shared project, because the only per-person key a
+// session carries is an opaque id the agent reported about itself.
+const usageRowSchema = z.object({
+  projectId: z.string(),
+  projectSlug: z.string(),
+  contributorLabel: z.string(),
+  contributorIsProject: z.boolean(),
+  agent: z.string(),
+  models: z.array(z.string()),
+  sessionsCount: z.number(),
+  inputTokens: z.number(),
+  outputTokens: z.number(),
+  cacheReadTokens: z.number(),
+  cacheCreationTokens: z.number(),
+  totalTokens: z.number(),
+  ...costSplitShape,
+});
+
+const modelUsageSchema = z.object({
+  model: z.string(),
+  inputTokens: z.number(),
+  outputTokens: z.number(),
+  cacheReadTokens: z.number(),
+  cacheCreationTokens: z.number(),
+  totalTokens: z.number(),
+  costUsd: z.number().nullable(),
+  /** False when only the model's name is known: the totals above are not real. */
+  tokensKnown: z.boolean(),
+});
+
+export const pullRequestUsageResponseSchema = z.object({
+  pullRequest: z.object({
+    repositoryHost: z.string(),
+    repositoryFullName: z.string(),
+    prNumber: z.number(),
+    headBranch: z.string(),
+    htmlUrl: z.string(),
+    state: z.string(),
+    isDraft: z.boolean(),
+    authorLogin: z.string().nullable(),
+    prCreatedAtMs: z.number(),
+    prClosedAtMs: z.number().nullable(),
+    prMergedAtMs: z.number().nullable(),
+  }),
+  rows: z.array(usageRowSchema),
+  totals: z.object({
+    sessionsCount: z.number(),
+    inputTokens: z.number(),
+    outputTokens: z.number(),
+    cacheReadTokens: z.number(),
+    cacheCreationTokens: z.number(),
+    totalTokens: z.number(),
+    ...costSplitShape,
+  }),
+  modelBreakdown: z.array(modelUsageSchema),
+});
+
+export const pullRequestUsageQuerySchema = z.object({
+  repository: z
+    .string()
+    .regex(/^[^/\s]+\/[^/\s]+$/, { message: "repository must be owner/name" })
+    .describe('The repository as "owner/name". Case is folded by the mapping store.'),
+  pullRequest: z.coerce.number().int().positive().describe("The pull request number."),
+  /**
+   * Omitted, it is the GitHub host this instance is bound to, which is
+   * github.com unless an operator named an Enterprise Server. Each door
+   * applies that default, because only the door can read it.
+   */
+  host: z.string().min(1).optional().describe("The repository's host, e.g. github.com."),
+});

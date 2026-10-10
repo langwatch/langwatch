@@ -30,9 +30,9 @@ type Event = langwatch.Event
 // trackEventPath is the canonical LangWatch track-event REST endpoint. It
 // replaces the legacy POST /api/track_event. Submissions go through
 // [Client.rawJSON] so they share the SDK's auth, headers and retry behaviour.
-const trackEventPath = "/api/events/track"
+const trackEventPath = "/api/v1/events/track"
 
-// trackEventRequest is the POST /api/events/track body. It mirrors the server's
+// trackEventRequest is the POST /api/v1/events/track body. It mirrors the server's
 // trackEventRESTParamsValidatorSchema: a trace_id, an event_type, a required
 // numeric metrics map, and optional string event_details. The predefined
 // thumbs_up_down event reads metrics.vote (-1..1) and event_details.feedback.
@@ -56,7 +56,7 @@ type trackEventRequest struct {
 //		Details: map[string]string{"feedback": "loved it"},
 //	})
 //
-// It maps to the LangWatch track-event endpoint (POST /api/events/track). Both
+// It maps to the LangWatch track-event endpoint (POST /api/v1/events/track). Both
 // the trace id and the event type are required; an empty value for either
 // returns an error without sending a request.
 func (s *EventsService) Track(ctx context.Context, traceID string, event Event) error {

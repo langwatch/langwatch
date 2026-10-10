@@ -95,7 +95,7 @@ class TracesFacade:
         Returns:
             Dictionary containing the trace data with spans.
         """
-        response = self._http().get(f"/api/traces/{_quote(trace_id)}")
+        response = self._http().get(f"/api/v1/traces/{_quote(trace_id)}")
         _raise_for_status(response, operation="get")
         return response.json()
 
@@ -125,6 +125,6 @@ class TracesFacade:
             response until the response no longer carries one.
         """
         body = params or {}
-        response = self._http().post("/api/traces/search", json=body)
+        response = self._http().post("/api/v1/traces/search", json=body)
         _raise_for_status(response, operation="search")
         return response.json()

@@ -12,12 +12,13 @@ Platform environment and queries the `conversationtranscripts` table on a
 
 The puller queries two Dataverse tables per run:
 
-| Table | What it provides |
-|---|---|
+| Table                     | What it provides                                           |
+| ------------------------- | ---------------------------------------------------------- |
 | `conversationtranscripts` | Every conversation, stored as Bot Framework activity blobs |
-| `bot` | Agent names, so conversations show which agent answered |
+| `bot`                     | Agent names, so conversations show which agent answered    |
 
 Each conversation produces one trace, with:
+
 - Each user question paired with the agent's answer as a turn
 - Tool calls the agent made, including unfinished ones
 - The person's directory account identifier on each question
@@ -33,7 +34,7 @@ Done once for the whole organisation:
 1. **App registrations** → New registration. Give it a name (e.g. `langwatch-copilot-reader`), choose the single-tenant option.
 2. Copy the **Application (client) ID** and **Directory (tenant) ID** from the overview page.
 3. **Certificates & secrets** → New client secret. Copy the **Value** column immediately; Microsoft never shows it again.
-4. *(Optional)* **API permissions** → Microsoft Graph → Application permissions → `Directory.Read.All` → Grant admin consent. This lets LangWatch show department and job title beside each conversation. Skip it and conversations still arrive, without the org context.
+4. _(Optional)_ **API permissions** → Microsoft Graph → Application permissions → `Directory.Read.All` → Grant admin consent. This lets LangWatch show department and job title beside each conversation. Skip it and conversations still arrive, without the org context.
 
 ### In the Power Platform admin centre
 
@@ -42,18 +43,25 @@ Repeated for every environment that has agents:
 5. **Environments** → pick the environment → Settings → Users + permissions → Application users → New app user.
 6. Paste the Application ID, choose a business unit, and assign the **Service Reader** role.
 
-<Note>Service Reader is the tightest stock role that grants read access to both `bot` and `conversationtranscripts` at organisation-wide reach. The similarly named Bot Transcript Viewer only reads records the account created itself, which for a service account is none. See the [security roles reference](https://learn.microsoft.com/en-us/power-platform/admin/security-roles-privileges) for details.</Note>
+<Note>
+  Service Reader is the tightest stock role that grants read access to both `bot` and
+  `conversationtranscripts` at organisation-wide reach. The similarly named Bot Transcript Viewer
+  only reads records the account created itself, which for a service account is none. See the
+  [security roles
+  reference](https://learn.microsoft.com/en-us/power-platform/admin/security-roles-privileges) for
+  details.
+</Note>
 
 ### In LangWatch
 
 Create a source of type **Microsoft Copilot Studio** and fill in:
 
-| Field | Required | Description |
-|---|---|---|
-| Power Platform environment URL | yes | `https://org12345.crm.dynamics.com`, from the admin centre |
-| Microsoft Entra tenant ID | yes | The directory the app registration lives in |
-| App registration client ID | yes | From the app registration overview |
-| App registration client secret | yes | The secret value (shown once) |
+| Field                          | Required | Description                                                |
+| ------------------------------ | -------- | ---------------------------------------------------------- |
+| Power Platform environment URL | yes      | `https://org12345.crm.dynamics.com`, from the admin centre |
+| Microsoft Entra tenant ID      | yes      | The directory the app registration lives in                |
+| App registration client ID     | yes      | From the app registration overview                         |
+| App registration client secret | yes      | The secret value (shown once)                              |
 
 The environment URL must be an `https` address on a domain Microsoft serves
 Power Platform from (`.dynamics.com`, `.microsoftdynamics.us`,

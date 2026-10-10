@@ -12,7 +12,7 @@ def _get_kwargs() -> dict[str, Any]:
 
     _kwargs: dict[str, Any] = {
         "method": "get",
-        "url": "/api/evaluations/list",
+        "url": "/api/v1/evaluations/list",
     }
 
     return _kwargs

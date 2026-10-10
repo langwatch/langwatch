@@ -1,0 +1,32 @@
+{
+  "name": "@langwatch/organization-client",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The tokens organization lends other modules: its drawers, the join offer and the cards it lends project (ARCHITECTURE.md §10.1).",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc -b"
+  },
+  "dependencies": {
+    "@langwatch/module": "workspace:*",
+    "@langwatch/organization-contract": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/react": "catalog:",
+    "typescript": "catalog:"
+  },
+  "peerDependencies": {
+    "react": "^19.2.7"
+  }
+}

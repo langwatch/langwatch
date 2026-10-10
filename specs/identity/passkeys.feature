@@ -133,6 +133,16 @@ Feature: Passkeys - the fastest way in, and the one phishing cannot take
     Then nothing is offered, about either of them
     But once the interval has passed the offer comes back
 
+  # A brand-new account goes straight into onboarding and its guided tour; a
+  # dialog over that is in the way. The session that created the account gets
+  # no offer, and the next sign-in does.
+  @unit
+  Scenario: The offer waits past the sign-up session
+    Given "sam" has just signed up with a password and holds neither
+    When the signed-in shell asks what to offer "sam" on the session the sign-up started
+    Then nothing is offered
+    But on a later sign-in the offer is made
+
   # ADR-120's rule is that a passkey is offered where it REPLACES a password.
   # Somebody who just signed in through their employer's identity provider did
   # not type one and cannot stop typing one, and somebody who signed in with a
@@ -178,7 +188,7 @@ Feature: Passkeys - the fastest way in, and the one phishing cannot take
     When the Identifier projection is rebuilt from the event log alone
     Then every rebuilt row equals the live row, whole-row
 
-  @integration @unimplemented
+  @integration
   Scenario: A passkey is named, and the name can be changed
     When "sam" registers a passkey
     Then a name is suggested from what the device reported
@@ -192,7 +202,7 @@ Feature: Passkeys - the fastest way in, and the one phishing cannot take
     Then "sam" still holds exactly one identifier for it
     And nothing is duplicated in the list
 
-  @integration @unimplemented
+  @integration
   Scenario: Both kinds of authenticator register, and the list says which
     When "sam" registers a passkey held by the device itself
     And "sam" registers a passkey held by a separate security key
@@ -205,6 +215,30 @@ Feature: Passkeys - the fastest way in, and the one phishing cannot take
     Then no identifier is created and no event is appended
     And the refusal carries the code "identity_passkey_ceremony_failed"
     And "sam" is told to try again or use another way in
+
+  # The three below are the settings section's own behaviour, bound in
+  # `@langwatch/user-browser`'s passkeys suite since the settings S7 move. The
+  # section shipped with no render test at all, so none of this was stated.
+
+  @integration
+  Scenario: A deployment that never mounted passkeys makes no offer
+    Given the deployment did not enable passkeys at boot
+    When "sam" opens their sign-in methods
+    Then nothing about passkeys is rendered, because there is no endpoint
+      behind any of the controls
+
+  @integration
+  Scenario: A dismissed device prompt is not reported as a failure
+    When "sam" opens the device prompt and closes it without completing it
+    Then "sam" is told nothing at all
+    And no passkey is created
+
+  @integration
+  Scenario: A ceremony the device could not run says so
+    Given the device cannot complete the ceremony
+    When "sam" tries to register a passkey
+    Then "sam" is told the attempt did not finish
+    And is offered another way to sign in
 
   @integration @unimplemented
   Scenario: A browser that cannot do the ceremony says so instead of failing silently
@@ -322,7 +356,7 @@ Feature: Passkeys - the fastest way in, and the one phishing cannot take
 
   # ── Removing ───────────────────────────────────────────────────────────
 
-  @integration @unimplemented
+  @integration
   Scenario: Removing a passkey from settings
     Given "sam" holds a passkey and another verified way in
     When "sam" removes the passkey

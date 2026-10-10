@@ -1,46 +1,101 @@
-// ---------------------------------------------------------------------------
-// @langwatch/api -- Public API
-// ---------------------------------------------------------------------------
+// @langwatch/api — transport-agnostic half of the API; shared error vocabulary, access policies,
+// capability ports, Standard Schema boundary. The Hono service framework is `@langwatch/api/rest`;
+// tRPC root and policy middleware are `@langwatch/api/trpc`. Neither is re-exported here: a
+// consumer that wants a transport names it.
 
-export { createService, ServiceBuilder, VersionBuilder } from "./builder.js";
-export { isRpcPath } from "./version-builder.js";
-export type { RpcConfig, RpcPath } from "./version-builder.js";
-export { createErrorHandler, formatError } from "./errors.js";
-export { loggerMiddleware, tracerMiddleware } from "./middleware.js";
+export {
+  AuthenticatedActorRequiredError,
+  SurfaceBlankSecretError,
+  SurfaceCapabilityUnavailableError,
+  SurfaceUnconfiguredError,
+  SurfaceUnverifiedError,
+  OrganizationAuthenticationUnavailableError,
+  OrganizationCredentialClassMismatchError,
+  OrganizationInvalidCredentialsError,
+  OrganizationMissingCredentialsError,
+  OrganizationNotFoundForCredentialError,
+  OrganizationPermissionError,
+  ProjectInvalidCredentialsError,
+  ProjectMissingCredentialsError,
+  ProjectRequiredError,
+  ApiVersionConflictError,
+  BatchingNotSupportedError,
+  createErrorHandler,
+  EnterprisePlanRequiredError,
+  formatError,
+  ProjectInputMismatchError,
+  InvalidApiVersionError,
+  KeyKindRefusedError,
+  MediaTypeMalformedRequestError,
+  PayloadTooLargeError,
+  PlatformPermissionDeniedError,
+  PlatformSurfaceHiddenError,
+  ScopeInputMismatchError,
+  setLedgerCurrent,
+  UnsupportedMediaTypeError,
+} from "./errors.ts";
 
-import type { Hono } from "hono";
-import { handle } from "hono/vercel";
+export type { RateLimiter, ResponseCache, UpgradeHandler } from "./ports.ts";
+export { jsonTextField } from "./json-text-field.ts";
+export { ConnectUpgradeRouter } from "./ports.ts";
+export {
+  WebSocketHost,
+  WebSocketProtocol,
+  type ProtocolConnection,
+  type WebSocketCaller,
+  type WebSocketDoor,
+  type WebSocketSessionCaller,
+  type WebSocketSessionKeyDoor,
+} from "./websocket.ts";
+export {
+  RAW_SOCKET_LIVENESS_PATH,
+  RawSocketHost,
+  RawSocketProtocol,
+  type RawSocketUpgrade,
+} from "./raw-socket.ts";
+export {
+  RawHttpHost,
+  RawHttpProtocol,
+  type RawHttpDoor,
+  type RawHttpExchange,
+  type RawHttpListener,
+} from "./raw-http.ts";
 
-export function routeHandlers(app: Hono) {
-  const h = handle(app);
-  return { GET: h, POST: h, PUT: h, DELETE: h, PATCH: h } as const;
-}
+export type {
+  BoundMiddlewareBindings,
+  FeatureRestHost,
+  FeatureRestMountOptions,
+  FeatureTrpcHost,
+  FeatureTrpcMountOptions,
+  MountableTransport,
+  MiddlewareBinding,
+  TransportPeers,
+} from "./hosting/transport-hosts.ts";
+
+export type { ApiSchema, ApiSchemaOutput } from "./schema.ts";
+
+// The access-policy vocabulary: what credential an operation accepts, and what
+// that credential can reach. Read by the REST route registry, the OpenAPI
+// security generator and the authorization audit alike, so it belongs to no
+// one transport.
+
 export {
-  createSSEResponse,
-  type SSEConfig,
-  type SSEHandler,
-  type TypedSSEStream,
-} from "./sse.js";
+  type AccessPolicy,
+  anyAuthenticated,
+  type CredentialClass,
+  credentialClassFor,
+  type HandlerCredential,
+  handlerManagedAuth,
+  internalSecret,
+  isInternalSecretValid,
+  policyPermissions,
+  publicEndpoint,
+} from "./access-policy.ts";
+
+// Every mounted route and the policy it declared, recorded as each surface mounts.
 export {
-  type BaseApp,
-  type DateVersion,
-  type EndpointConfig,
-  type EndpointDocs,
-  type EndpointRegistration,
-  type Handler,
-  type HttpMethod,
-  httpStatusText,
-  isDateVersion,
-  type MountedRoute,
-  type ServiceConfig,
-  VERSION_LATEST,
-  VERSION_PREVIEW,
-  type VersionStatus,
-} from "./types.js";
-export {
-  type ResolvedEndpoint,
-  type ResolvedVersion,
-  resolveRequestVersion,
-  resolveVersions,
-  type VersionDefinition,
-} from "./versioning.js";
+  allRegisteredRoutes,
+  getRoutePolicy,
+  registerRoutePolicy,
+  type RegisteredRoute,
+} from "./route-registry.ts";

@@ -5,6 +5,9 @@ import httpx
 
 from ... import errors
 from ...client import AuthenticatedClient, Client
+from ...models.patch_api_governance_ingestion_templates_by_id_ottl_rules_body import (
+    PatchApiGovernanceIngestionTemplatesByIdOttlRulesBody,
+)
 from ...models.patch_api_governance_ingestion_templates_by_id_ottl_rules_response_200 import (
     PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse200,
 )
@@ -13,12 +16,6 @@ from ...models.patch_api_governance_ingestion_templates_by_id_ottl_rules_respons
 )
 from ...models.patch_api_governance_ingestion_templates_by_id_ottl_rules_response_401 import (
     PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse401,
-)
-from ...models.patch_api_governance_ingestion_templates_by_id_ottl_rules_response_403 import (
-    PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse403,
-)
-from ...models.patch_api_governance_ingestion_templates_by_id_ottl_rules_response_404 import (
-    PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse404,
 )
 from ...models.patch_api_governance_ingestion_templates_by_id_ottl_rules_response_422 import (
     PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse422,
@@ -30,16 +27,24 @@ from ...types import Response, safe_http_status
 
 
 def _get_kwargs(
-    id: str,
+    ingestion_template_id: str,
+    *,
+    body: PatchApiGovernanceIngestionTemplatesByIdOttlRulesBody,
 ) -> dict[str, Any]:
+    headers: dict[str, Any] = {}
 
     _kwargs: dict[str, Any] = {
         "method": "patch",
-        "url": "/api/governance/ingestion-templates/{id}/ottl-rules".format(
-            id=quote(str(id), safe=""),
+        "url": "/api/v1/governance/ingestion-templates/{ingestion_template_id}/ottl-rules".format(
+            ingestion_template_id=quote(str(ingestion_template_id), safe=""),
         ),
     }
 
+    _kwargs["json"] = body.to_dict()
+
+    headers["Content-Type"] = "application/json"
+
+    _kwargs["headers"] = headers
     return _kwargs
 
 
@@ -49,8 +54,6 @@ def _parse_response(
     PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse200
     | PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse400
     | PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse401
-    | PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse403
-    | PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse404
     | PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse422
     | PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse500
     | None
@@ -69,16 +72,6 @@ def _parse_response(
         response_401 = PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse401.from_dict(response.json())
 
         return response_401
-
-    if response.status_code == 403:
-        response_403 = PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse403.from_dict(response.json())
-
-        return response_403
-
-    if response.status_code == 404:
-        response_404 = PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse404.from_dict(response.json())
-
-        return response_404
 
     if response.status_code == 422:
         response_422 = PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse422.from_dict(response.json())
@@ -102,8 +95,6 @@ def _build_response(
     PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse200
     | PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse400
     | PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse401
-    | PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse403
-    | PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse404
     | PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse422
     | PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse500
 ]:
@@ -119,15 +110,14 @@ def _build_response(
 
 
 def sync_detailed(
-    id: str,
+    ingestion_template_id: str,
     *,
     client: AuthenticatedClient,
+    body: PatchApiGovernanceIngestionTemplatesByIdOttlRulesBody,
 ) -> Response[
     PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse200
     | PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse400
     | PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse401
-    | PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse403
-    | PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse404
     | PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse422
     | PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse500
 ]:
@@ -137,18 +127,20 @@ def sync_detailed(
     platform row before editing it.
 
     Args:
-        id (str):
+        ingestion_template_id (str):
+        body (PatchApiGovernanceIngestionTemplatesByIdOttlRulesBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse200 | PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse400 | PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse401 | PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse403 | PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse404 | PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse422 | PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse500]
+        Response[PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse200 | PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse400 | PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse401 | PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse422 | PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse500]
     """
 
     kwargs = _get_kwargs(
-        id=id,
+        ingestion_template_id=ingestion_template_id,
+        body=body,
     )
 
     response = client.get_httpx_client().request(
@@ -159,15 +151,14 @@ def sync_detailed(
 
 
 def sync(
-    id: str,
+    ingestion_template_id: str,
     *,
     client: AuthenticatedClient,
+    body: PatchApiGovernanceIngestionTemplatesByIdOttlRulesBody,
 ) -> (
     PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse200
     | PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse400
     | PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse401
-    | PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse403
-    | PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse404
     | PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse422
     | PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse500
     | None
@@ -178,32 +169,33 @@ def sync(
     platform row before editing it.
 
     Args:
-        id (str):
+        ingestion_template_id (str):
+        body (PatchApiGovernanceIngestionTemplatesByIdOttlRulesBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse200 | PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse400 | PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse401 | PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse403 | PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse404 | PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse422 | PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse500
+        PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse200 | PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse400 | PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse401 | PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse422 | PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse500
     """
 
     return sync_detailed(
-        id=id,
+        ingestion_template_id=ingestion_template_id,
         client=client,
+        body=body,
     ).parsed
 
 
 async def asyncio_detailed(
-    id: str,
+    ingestion_template_id: str,
     *,
     client: AuthenticatedClient,
+    body: PatchApiGovernanceIngestionTemplatesByIdOttlRulesBody,
 ) -> Response[
     PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse200
     | PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse400
     | PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse401
-    | PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse403
-    | PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse404
     | PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse422
     | PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse500
 ]:
@@ -213,18 +205,20 @@ async def asyncio_detailed(
     platform row before editing it.
 
     Args:
-        id (str):
+        ingestion_template_id (str):
+        body (PatchApiGovernanceIngestionTemplatesByIdOttlRulesBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse200 | PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse400 | PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse401 | PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse403 | PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse404 | PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse422 | PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse500]
+        Response[PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse200 | PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse400 | PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse401 | PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse422 | PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse500]
     """
 
     kwargs = _get_kwargs(
-        id=id,
+        ingestion_template_id=ingestion_template_id,
+        body=body,
     )
 
     response = await client.get_async_httpx_client().request(**kwargs)
@@ -233,15 +227,14 @@ async def asyncio_detailed(
 
 
 async def asyncio(
-    id: str,
+    ingestion_template_id: str,
     *,
     client: AuthenticatedClient,
+    body: PatchApiGovernanceIngestionTemplatesByIdOttlRulesBody,
 ) -> (
     PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse200
     | PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse400
     | PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse401
-    | PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse403
-    | PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse404
     | PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse422
     | PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse500
     | None
@@ -252,19 +245,21 @@ async def asyncio(
     platform row before editing it.
 
     Args:
-        id (str):
+        ingestion_template_id (str):
+        body (PatchApiGovernanceIngestionTemplatesByIdOttlRulesBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse200 | PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse400 | PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse401 | PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse403 | PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse404 | PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse422 | PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse500
+        PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse200 | PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse400 | PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse401 | PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse422 | PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse500
     """
 
     return (
         await asyncio_detailed(
-            id=id,
+            ingestion_template_id=ingestion_template_id,
             client=client,
+            body=body,
         )
     ).parsed

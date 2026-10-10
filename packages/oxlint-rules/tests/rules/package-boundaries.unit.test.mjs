@@ -1,0 +1,531 @@
+import { afterAll, describe, expect, it } from "vitest";
+
+import { boundaryRule } from "../../src/index.mjs";
+import { createFixtureWorkspace, runRule } from "../../src/testing.mjs";
+
+const workspace = createFixtureWorkspace({
+  features: {
+    agent: {
+      roles: {
+        contract: {},
+        process: {},
+        browser: { exports: ["./declaration"] },
+        "query-language": {},
+        client: {},
+      },
+    },
+    project: {
+      roles: {
+        contract: {},
+        process: { exports: [".", "./testing"] },
+        browser: { exports: ["./declaration", "./surfaces/project-picker"] },
+        "query-language": {},
+      },
+    },
+    scenario: {
+      roles: {
+        contract: {},
+        process: { exports: [".", "./scenario-child"] },
+      },
+    },
+  },
+  files: {
+    "enterprise/modules/governance/process/package.json": JSON.stringify({
+      name: "@langwatch/enterprise-governance-process",
+      exports: { ".": "." },
+    }),
+    "enterprise/modules/governance/contract/package.json": JSON.stringify({
+      name: "@langwatch/enterprise-governance-contract",
+      exports: { ".": "." },
+    }),
+    "enterprise/modules/governance/browser/package.json": JSON.stringify({
+      name: "@langwatch/enterprise-governance-browser",
+      exports: { ".": "." },
+    }),
+    "enterprise/modules/governance/client/package.json": JSON.stringify({
+      name: "@langwatch/enterprise-governance-client",
+      exports: { ".": "." },
+    }),
+  },
+});
+
+afterAll(() => workspace.cleanup());
+
+/** The fixture declares no dependencies, so these read every finding but undeclaredDependency. */
+function report(filename, code) {
+  return runRule(boundaryRule, { code, cwd: workspace.cwd, filename }).filter(
+    (entry) => entry.messageId !== "undeclaredDependency",
+  );
+}
+
+function ids(filename, code) {
+  return report(filename, code).map((entry) => entry.messageId);
+}
+
+const SERVICE = "modules/agent/process/src/services/agent.service.ts";
+const SERVICE_TEST = "modules/agent/process/src/services/__tests__/agent.integration.test.ts";
+const BROWSER = "modules/agent/browser/src/behavior/agent-list.ts";
+const LIBRARY = "modules/agent/query-language/src/parse.ts";
+
+describe("given package-boundaries", () => {
+  describe("when a browser package imports another module's browser package", () => {
+    /** @scenario "A browser package importing another module's browser package is reported as crossModuleBrowser" */
+    it("reports crossModuleBrowser at the specifier and names where shared things go", () => {
+      const found = report(
+        BROWSER,
+        'import { z } from "zod";\nimport { Picker } from "@langwatch/project-browser/surfaces/project-picker";',
+      );
+
+      expect(found).toHaveLength(1);
+      expect(found[0]).toMatchObject({ line: 2, messageId: "crossModuleBrowser" });
+      expect(found[0].message).toBe(
+        "`@langwatch/project-browser/surfaces/project-picker` is `project`'s browser package, which is closed to every other module. A browser package is private to its module, so importing it couples two modules' screens." +
+          " Move what this needs out of `project`'s browser package: pure domain logic into the owner's contract," +
+          " shared UI into `@langwatch/design-system`, a framework hook into `@langwatch/browser-host`." +
+          " Where fewer than two modules share it, inline it here instead (ARCHITECTURE.md §3.4).",
+      );
+    });
+  });
+
+  describe("when a process package imports another module's process package", () => {
+    /** @scenario "A process package importing another module's process package is reported as crossModuleProcess" */
+    it("reports crossModuleProcess naming the owner's Api and contract", () => {
+      const found = report(SERVICE, 'import { ProjectService } from "@langwatch/project-process";');
+
+      expect(found.map((entry) => entry.messageId)).toEqual(["crossModuleProcess"]);
+      expect(found[0].data).toMatchObject({
+        api: "ProjectApi",
+        contract: "@langwatch/project-contract",
+      });
+    });
+
+    /** @scenario "A test installs a peer module or reads its test seam" */
+    it("leaves a test's peer installer and the declared ./testing seam alone", () => {
+      expect(
+        report(SERVICE_TEST, 'import { projectProcessModule } from "@langwatch/project-process";'),
+      ).toEqual([]);
+      expect(
+        report(SERVICE_TEST, 'import { fixture } from "@langwatch/project-process/testing";'),
+      ).toEqual([]);
+    });
+
+    /** @scenario "A test installs a peer module or reads its test seam" */
+    it("still reports a test that takes a peer's service", () => {
+      expect(
+        ids(SERVICE_TEST, 'import { ProjectService } from "@langwatch/project-process";'),
+      ).toEqual(["crossModuleProcess"]);
+    });
+
+    /** @scenario "A test installs a peer module or reads its test seam" */
+    it("still reports production code that reads a peer's ./testing seam", () => {
+      expect(ids(SERVICE, 'import { fixture } from "@langwatch/project-process/testing";')).toEqual(
+        ["crossModuleProcess"],
+      );
+    });
+  });
+
+  describe("when a file imports the process package's test peer seam", () => {
+    /** @scenario "The process test peer seam is imported only by tests" */
+    it("leaves a test alone and reports production code as testSeamOutsideTest", () => {
+      const seam = 'import { testPeer } from "@langwatch/process/testing";';
+
+      expect(ids(SERVICE_TEST, seam)).toEqual([]);
+      expect(ids(SERVICE, seam)).toEqual(["testSeamOutsideTest"]);
+      expect(ids("apps/api/src/main.ts", seam)).toEqual(["testSeamOutsideTest"]);
+    });
+  });
+
+  describe("when a module's own test imports its own process package", () => {
+    /** @scenario "A module's own tests import its own process package" */
+    it("reports nothing", () => {
+      expect(
+        report(SERVICE_TEST, 'import { AgentService } from "@langwatch/agent-process";'),
+      ).toEqual([]);
+    });
+  });
+
+  describe("when a browser package imports a process package", () => {
+    /** @scenario "A browser package importing a process package is reported as browserImportsProcess" */
+    it("reports browserImportsProcess", () => {
+      const found = report(BROWSER, 'import { ProjectService } from "@langwatch/project-process";');
+
+      expect(found.map((entry) => entry.messageId)).toEqual(["browserImportsProcess"]);
+      expect(found[0].message).toBe(
+        "`@langwatch/project-process` is process-only, and this is a browser package. Process code runs on the server beside secrets and stores; bundled into the browser it breaks or leaks." +
+          " Call the procedure through this module's derived tRPC client, and import any shared type" +
+          " from the owning module's contract.",
+      );
+    });
+  });
+
+  describe("when a process package imports a browser package", () => {
+    /** @scenario "A process package importing a browser package is reported as processImportsBrowser" */
+    it("reports processImportsBrowser with the specifier", () => {
+      const found = report(
+        SERVICE,
+        'import { Card } from "@langwatch/project-browser/declaration";',
+      );
+
+      expect(found.map((entry) => entry.messageId)).toEqual(["processImportsBrowser"]);
+      expect(found[0].data.specifier).toBe("@langwatch/project-browser/declaration");
+    });
+  });
+
+  describe("when a contract package imports a node runtime module", () => {
+    /** @scenario "A contract package importing a runtime is reported as contractRuntime" */
+    it("reports contractRuntime with the specifier", () => {
+      const found = report(
+        "modules/agent/contract/src/agent.commands.ts",
+        'import { readFileSync } from "node:fs";',
+      );
+
+      expect(found.map((entry) => entry.messageId)).toEqual(["contractRuntime"]);
+      expect(found[0].message).toBe(
+        "A contract package is runtime-neutral: `node:fs` is a node, browser or process runtime. Both process and browser import the contract, so a runtime import drags into the side that cannot run it." +
+          " Keep only schemas, types, errors and the `*Api` token here; move the code that needs" +
+          " `node:fs` into this module's process package, or into its browser package when it is a browser import.",
+      );
+    });
+  });
+
+  describe("when a contract package imports eventing", () => {
+    /** @scenario "A contract may read eventing's table list and no other eventing entry" */
+    it("accepts the tables subpath and reports every other eventing entry as contractRuntime", () => {
+      const contract = "modules/agent/contract/src/agent.commands.ts";
+      const runtimeIds = (specifier) =>
+        report(contract, `import { X } from "${specifier}";`)
+          .map((entry) => entry.messageId)
+          .filter((id) => id === "contractRuntime");
+
+      expect(runtimeIds("@langwatch/eventing/tables")).toEqual([]);
+      expect(runtimeIds("@langwatch/eventing")).toEqual(["contractRuntime"]);
+      expect(runtimeIds("@langwatch/eventing/server")).toEqual(["contractRuntime"]);
+    });
+  });
+
+  describe("when a module library imports a runtime or an implementation package", () => {
+    /** @scenario "A module library importing a runtime or implementation is reported as libraryRuntime" */
+    it("reports libraryRuntime for node, react, framework and implementation packages", () => {
+      for (const specifier of [
+        "node:fs",
+        "react",
+        "@langwatch/process",
+        "@langwatch/agent-process",
+        "@langwatch/agent-browser/declaration",
+        "@langwatch/project-contract",
+      ]) {
+        expect(ids(LIBRARY, `import { x } from "${specifier}";`)).toEqual(["libraryRuntime"]);
+      }
+    });
+
+    /** @scenario "A module client may take react for generic hooks and nothing else of the browser" */
+    it("lets a module client import react, and still reports react-dom and chakra", () => {
+      const client = "modules/agent/client/src/use-agents.ts";
+      expect(ids(client, 'import { useMemo } from "react";')).toEqual([]);
+      expect(ids(LIBRARY, 'import { useMemo } from "react";')).toEqual(["libraryRuntime"]);
+      for (const specifier of ["react-dom", "@chakra-ui/react", "@langwatch/browser"]) {
+        expect(ids(client, `import { x } from "${specifier}";`)).toEqual(["clientRuntime"]);
+      }
+    });
+
+    /** @scenario "A module library importing its own contract and other libraries is left alone" */
+    it("leaves its own contract, another library and a framework-free package alone", () => {
+      const code = [
+        'import type { Agent } from "@langwatch/agent-contract";',
+        'import { parse } from "@langwatch/project-query-language";',
+        'import { z } from "zod";',
+      ].join("\n");
+
+      expect(report(LIBRARY, code)).toEqual([]);
+    });
+  });
+
+  describe("when a package imports a module library", () => {
+    /** @scenario "Process, browser and application code may import any module's library" */
+    it("leaves process, browser and application imports alone", () => {
+      const code = 'import { parse } from "@langwatch/project-query-language";';
+
+      for (const filename of [SERVICE, BROWSER, "apps/api/src/main.ts"]) {
+        expect(report(filename, code)).toEqual([]);
+      }
+    });
+
+    /** @scenario "A contract importing its module's library is reported as contractRuntime" */
+    it("reports contractRuntime when the contract imports it", () => {
+      expect(
+        ids(
+          "modules/agent/contract/src/agent.commands.ts",
+          'import { parse } from "@langwatch/agent-query-language";',
+        ),
+      ).toEqual(["contractRuntime"]);
+    });
+  });
+
+  describe("when a core module imports an enterprise module's process package", () => {
+    /** @scenario "Core code importing an enterprise implementation is reported as coreImportsEnterprise" */
+    it("reports coreImportsEnterprise", () => {
+      expect(
+        ids(
+          SERVICE,
+          'import { governanceProcessModule } from "@langwatch/enterprise-governance-process";',
+        ),
+      ).toContain("coreImportsEnterprise");
+    });
+  });
+
+  describe("when a core module names an enterprise module's peer Api from its contract", () => {
+    /** @scenario "Core code may depend on an enterprise module's contract" */
+    it("reports nothing about the enterprise tier", () => {
+      expect(
+        ids(SERVICE, 'import { GovernanceApi } from "@langwatch/enterprise-governance-contract";'),
+      ).not.toContain("coreImportsEnterprise");
+    });
+  });
+
+  describe("when a core browser reads an enterprise module's client", () => {
+    /** @scenario "A core browser may read an enterprise module's client, and no other enterprise package" */
+    it("reports nothing", () => {
+      expect(
+        report(
+          BROWSER,
+          'import { GovernanceLentToken } from "@langwatch/enterprise-governance-client";',
+        ),
+      ).toEqual([]);
+    });
+
+    /** @scenario "A core browser may read an enterprise module's client, and no other enterprise package" */
+    it("still reports coreImportsEnterprise for the enterprise browser and process packages", () => {
+      expect(
+        ids(
+          BROWSER,
+          'import { governanceBrowser } from "@langwatch/enterprise-governance-browser";',
+        ),
+      ).toContain("coreImportsEnterprise");
+      expect(
+        ids(
+          BROWSER,
+          'import { governanceProcessModule } from "@langwatch/enterprise-governance-process";',
+        ),
+      ).toContain("coreImportsEnterprise");
+    });
+
+    /** @scenario "A core browser may read an enterprise module's client, and no other enterprise package" */
+    it("still lets the enterprise contract through, as before", () => {
+      expect(
+        report(
+          BROWSER,
+          'import { GovernanceApi } from "@langwatch/enterprise-governance-contract";',
+        ),
+      ).toEqual([]);
+    });
+
+    /** @scenario "Core code other than a browser reading an enterprise client is still reported" */
+    it("reports a core service reading it", () => {
+      expect(
+        ids(
+          SERVICE,
+          'import { GovernanceLentToken } from "@langwatch/enterprise-governance-client";',
+        ),
+      ).toEqual(expect.arrayContaining(["clientConsumer", "coreImportsEnterprise"]));
+    });
+  });
+
+  describe("when a package's export subpath is not declared", () => {
+    /** @scenario "An undeclared export subpath is reported as sealedExports" */
+    it("reports sealedExports naming the subpath and package", () => {
+      const found = report(
+        SERVICE,
+        'import { helper } from "@langwatch/project-contract/internal";',
+      );
+
+      expect(found.map((entry) => entry.messageId)).toEqual(["sealedExports"]);
+      expect(found[0].data).toEqual({
+        subpath: "./internal",
+        package: "@langwatch/project-contract",
+      });
+    });
+  });
+
+  describe("when code outside every module imports a process package", () => {
+    /** @scenario "A composition root naming a process package is told to compose through the module" */
+    it("reports compositionRoot in an application's main and in the rest of the application", () => {
+      const found = report(
+        "apps/api/src/main.ts",
+        'import { createAgentReader } from "@langwatch/agent-process";',
+      );
+
+      expect(found.map((entry) => entry.messageId)).toEqual(["compositionRoot"]);
+      expect(found[0].message).toContain("`process-modules.generated.ts`");
+      expect(
+        ids("apps/tasks/src/database.ts", 'import { Task } from "@langwatch/agent-process";'),
+      ).toEqual(["compositionRoot"]);
+    });
+
+    /** @scenario "Code outside a module importing its process package is reported as processOutsideModule" */
+    it("reports processOutsideModule anywhere else", () => {
+      expect(
+        ids(
+          "packages/storage-seed/src/seed.ts",
+          'import { AgentService } from "@langwatch/agent-process";',
+        ),
+      ).toEqual(["processOutsideModule"]);
+    });
+  });
+
+  describe("when code outside every module imports a browser package", () => {
+    /** @scenario "Code outside a module reaching past a browser declaration is reported as browserSideDoor" */
+    it("reports browserSideDoor past the declaration and leaves the declaration alone", () => {
+      const shell = "apps/ui/src/shell/navigation.tsx";
+
+      const found = report(
+        shell,
+        'import { P } from "@langwatch/project-browser/surfaces/project-picker";',
+      );
+
+      expect(found.map((finding) => finding.messageId)).toEqual(["browserSideDoor"]);
+      expect(found[0].message).toContain("useLent(Token)");
+      expect(found[0].message).not.toContain("withCapabilities");
+      expect(report(shell, 'import { d } from "@langwatch/project-browser/declaration";')).toEqual(
+        [],
+      );
+    });
+  });
+
+  describe("when a relative import walks into another module's process package", () => {
+    /** @scenario "A relative import into another package is reported as packageEscape" */
+    it("reports packageEscape", () => {
+      expect(
+        ids(
+          SERVICE,
+          'import { ProjectService } from "../../../../project/process/src/project.service.ts";',
+        ),
+      ).toEqual(["packageEscape"]);
+    });
+  });
+
+  describe("when a process package imports its own module's contract", () => {
+    /** @scenario "A well-formed cross-package import within a module is left alone" */
+    it("reports nothing", () => {
+      expect(report(SERVICE, 'import { AgentCommand } from "@langwatch/agent-contract";')).toEqual(
+        [],
+      );
+    });
+  });
+
+  describe("when a type-only import names another module's browser package", () => {
+    /** @scenario "A type-only import of a browser package is let through, a value import is not" */
+    it("reports nothing for import type, inline type specifiers or export type", () => {
+      const shell = "apps/ui/src/shell/navigation.tsx";
+      const picker = "@langwatch/project-browser/surfaces/project-picker";
+
+      expect(report(BROWSER, `import type { Picker } from "${picker}";`)).toEqual([]);
+      expect(report(BROWSER, `import { type Picker, type Props } from "${picker}";`)).toEqual([]);
+      expect(report(shell, `import type { Picker } from "${picker}";`)).toEqual([]);
+      expect(report(shell, `export type { Picker } from "${picker}";`)).toEqual([]);
+    });
+
+    /** @scenario "A type-only import of a browser package is let through, a value import is not" */
+    it("still reports a value import, and a mixed import that carries one value", () => {
+      const shell = "apps/ui/src/shell/navigation.tsx";
+      const picker = "@langwatch/project-browser/surfaces/project-picker";
+
+      expect(ids(BROWSER, `import { Picker } from "${picker}";`)).toEqual(["crossModuleBrowser"]);
+      expect(ids(BROWSER, `import { type Props, Picker } from "${picker}";`)).toEqual([
+        "crossModuleBrowser",
+      ]);
+      expect(ids(shell, `export { Picker } from "${picker}";`)).toEqual(["browserSideDoor"]);
+      expect(ids(shell, `import "${picker}";`)).toEqual(["browserSideDoor"]);
+    });
+
+    /** @scenario "A type-only import of a browser package is let through, a value import is not" */
+    it("still reports a type-only import of another module's process package", () => {
+      expect(ids(SERVICE, 'import type { P } from "@langwatch/project-process";')).toEqual([
+        "crossModuleProcess",
+      ]);
+    });
+  });
+
+  describe("when apps/tasks' migration runner names a process package", () => {
+    /** @scenario "apps/tasks' migration runner may name a process package, nothing else in an app may" */
+    it.each([
+      "apps/tasks/src/system-migrations-pass.ts",
+      "apps/tasks/src/prisma-migrate.ts",
+      "apps/tasks/src/lwql-provision.ts",
+      "apps/tasks/src/lwql-render-access-config.ts",
+    ])("reports nothing for %s", (file) => {
+      expect(
+        report(file, 'import { ProjectMigrations } from "@langwatch/project-process";'),
+      ).toEqual([]);
+    });
+
+    /** @scenario "apps/tasks' migration runner may name a process package, nothing else in an app may" */
+    it.each([
+      "apps/tasks/src/main.ts",
+      "apps/api/src/prisma-migrate.ts",
+      "apps/tasks/src/storage-seed/migrate.ts",
+    ])("still reports compositionRoot for %s", (file) => {
+      expect(ids(file, 'import { ProjectMigrations } from "@langwatch/project-process";')).toEqual([
+        "compositionRoot",
+      ]);
+    });
+
+    /** @scenario "apps/tasks' migration runner may name a process package, nothing else in an app may" */
+    it("still reports the runner reaching past a browser declaration", () => {
+      expect(
+        ids(
+          "apps/tasks/src/system-migrations-pass.ts",
+          'import { P } from "@langwatch/project-browser/surfaces/project-picker";',
+        ),
+      ).toEqual(["browserSideDoor"]);
+    });
+  });
+  describe("when the scenario child program takes the voice transports", () => {
+    /** @scenario "The scenario child program may take scenario-process's scenario-child subpath, and nothing more" */
+    it("reports nothing for apps/scenario-child/src/main.ts", () => {
+      expect(
+        report(
+          "apps/scenario-child/src/main.ts",
+          'import { createVoiceTransportRegistry } from "@langwatch/scenario-process/scenario-child";',
+        ),
+      ).toEqual([]);
+    });
+
+    /** @scenario "The scenario child program may take scenario-process's scenario-child subpath, and nothing more" */
+    it.each([
+      ["apps/scenario-child/src/main.ts", "@langwatch/scenario-process"],
+      ["apps/scenario-child/src/config.ts", "@langwatch/scenario-process/scenario-child"],
+      ["apps/api/src/main.ts", "@langwatch/scenario-process/scenario-child"],
+    ])("still reports compositionRoot for %s importing %s", (file, specifier) => {
+      expect(ids(file, `import { X } from "${specifier}";`)).toEqual(["compositionRoot"]);
+    });
+  });
+
+  describe("when a package imports a workspace package its package.json does not declare", () => {
+    const declared = createFixtureWorkspace({
+      files: {
+        "packages/widget/package.json": JSON.stringify({
+          name: "@langwatch/widget",
+          dependencies: { "@langwatch/time": "workspace:*" },
+        }),
+      },
+    });
+    afterAll(() => declared.cleanup());
+    const WIDGET = "packages/widget/src/widget.ts";
+    const run = (code) =>
+      runRule(boundaryRule, { code, cwd: declared.cwd, filename: WIDGET }).map(
+        (entry) => entry.messageId,
+      );
+
+    /** @scenario "An @langwatch import the package does not declare is reported as undeclaredDependency" */
+    it("reports undeclaredDependency, and leaves declared and self imports alone", () => {
+      expect(run('import { clock } from "@langwatch/clock/testing";')).toEqual([
+        "undeclaredDependency",
+      ]);
+      expect(run('import type { Clock } from "@langwatch/clock";')).toEqual([
+        "undeclaredDependency",
+      ]);
+      expect(run('import { now } from "@langwatch/time";')).toEqual([]);
+      expect(run('import { w } from "@langwatch/widget/inner";')).toEqual([]);
+    });
+  });
+});

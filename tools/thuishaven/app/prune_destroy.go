@@ -55,6 +55,8 @@ func (o *Orchestrator) DestroyWorktrees(ctx context.Context, gitDir string, dirs
 
 	var wg sync.WaitGroup
 	var removedAny atomic.Bool
+	var mu sync.Mutex
+	var removedSlugs []string
 	slots := make(chan struct{}, destroyConcurrency)
 	for _, dir := range dirs {
 		wg.Add(1)
@@ -62,14 +64,22 @@ func (o *Orchestrator) DestroyWorktrees(ctx context.Context, gitDir string, dirs
 			defer wg.Done()
 			slots <- struct{}{}
 			defer func() { <-slots }()
+			slug, _ := o.slugForDir(canonicalPath(dir))
 			derr := o.destroyWorktreeDir(ctx, dir, primaryCanon, selfCanon, worktrees)
 			if derr == nil {
 				removedAny.Store(true)
+				mu.Lock()
+				removedSlugs = append(removedSlugs, slug)
+				mu.Unlock()
 			}
 			report(dir, derr)
 		}(dir)
 	}
 	wg.Wait()
+	// The homes go one at a time, after the workers: each is a proxy call.
+	for _, slug := range removedSlugs {
+		o.removeStackHome(slug)
+	}
 
 	// One prune after every removal: git's worktree admin is shared state, so it is
 	// mutated exactly once here rather than raced across the workers.

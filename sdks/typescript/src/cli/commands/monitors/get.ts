@@ -1,26 +1,24 @@
-import { scopedApiKey } from "@/internal/credentialContext";
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
-import { resolveCredentials } from "../../utils/apiKey";
-import { failSpinnerFromResponse } from "../../utils/failFromResponse";
-import { failSpinner } from "../../utils/spinnerError";
-import type { CommandResult } from "../../utils/output";
-import { buildAuthHeaders } from "@/internal/api/auth";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
+import { buildRequestHeaders } from "@/internal/api/request-headers";
+import { scopedApiKey } from "@/internal/credentialContext";
 import { langwatchFetch } from "@/internal/http/langwatchFetch";
+
+import { resolveCredentials } from "../../utils/apiKey.ts";
+import { failSpinnerFromResponse } from "../../utils/failFromResponse.ts";
+import type { CommandResult } from "../../utils/output.ts";
+import { createSpinner } from "../../utils/spinner.ts";
+import { failSpinner } from "../../utils/spinnerError.ts";
 /**
  * Returns the monitor rather than printing it: the output port renders it in
  * whatever format the caller asked for (utils/output.ts).
  */
-export const getMonitorCommand = async (
-  id: string
-): Promise<CommandResult | void> => {
+export const getMonitorCommand = async (id: string): Promise<CommandResult | void> => {
   await resolveCredentials();
 
   const apiKey = scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
-  const endpoint =
-    resolveControlPlaneUrl();
+  const endpoint = resolveControlPlaneUrl();
 
   const spinner = createSpinner(`Fetching monitor "${id}"...`).start();
 
@@ -39,8 +37,8 @@ export const getMonitorCommand = async (
     platformUrl?: string;
   };
   try {
-    const response = await langwatchFetch(`${endpoint}/api/monitors/${id}`, {
-      headers: buildAuthHeaders({ apiKey }),
+    const response = await langwatchFetch(`${endpoint}/api/v1/monitors/${id}`, {
+      headers: buildRequestHeaders({ apiKey }),
     });
 
     if (!response.ok) {
@@ -80,19 +78,15 @@ export const getMonitorCommand = async (
       console.log(`  ${chalk.gray("Slug:")}      ${monitor.slug}`);
       console.log(`  ${chalk.gray("Type:")}      ${monitor.checkType}`);
       console.log(
-        `  ${chalk.gray("Status:")}    ${monitor.enabled ? chalk.green("enabled") : chalk.gray("disabled")}`
+        `  ${chalk.gray("Status:")}    ${monitor.enabled ? chalk.green("enabled") : chalk.gray("disabled")}`,
       );
       console.log(`  ${chalk.gray("Mode:")}      ${monitor.executionMode}`);
       console.log(`  ${chalk.gray("Sample:")}    ${Math.round(monitor.sample * 100)}%`);
       console.log(`  ${chalk.gray("Level:")}     ${monitor.level}`);
       if (monitor.evaluatorId) {
-        console.log(
-          `  ${chalk.gray("Evaluator:")} ${monitor.evaluatorId}`
-        );
+        console.log(`  ${chalk.gray("Evaluator:")} ${monitor.evaluatorId}`);
       }
-      console.log(
-        `  ${chalk.gray("Created:")}   ${new Date(monitor.createdAt).toLocaleString()}`
-      );
+      console.log(`  ${chalk.gray("Created:")}   ${new Date(monitor.createdAt).toLocaleString()}`);
       if (monitor.platformUrl) {
         console.log(`  ${chalk.bold("View:")}     ${chalk.underline(monitor.platformUrl)}`);
       }

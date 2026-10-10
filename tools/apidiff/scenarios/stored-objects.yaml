@@ -1,0 +1,290 @@
+# The stored-object round trip: POST createUpload returns a presigned uploadUrl, a PUT of the bytes
+# goes to that URL (absolute-URL step, no side credentials, raw body), POST confirmation makes the
+# object available, GET /api/files/{projectId}/{objectId} reads it back. Main has no upload routes
+# (it answers 404), so these are branch-only like the stored-objects scenarios in uncovered-routes.yaml;
+# the read half (/api/files) is main's. Each scenario runs in its own project shard so
+# the objects it makes are its own. A body that differs from the signed content-length is a
+# 403 SignatureDoesNotMatch from S3 (direct upload) and a 4xx from the product (through-process).
+
+- id: stored-objects-roundtrip-uploads-and-reads-back
+  endpoint: POST /api/stored-objects/uploads/{storedObjectId}/confirmation
+  shard: project
+  setup:
+    - request: POST /api/stored-objects/uploads
+      body:
+        projectId: "{projectId}"
+        purpose: dataset_attachment
+        filename: "vd-{uid}.txt"
+        mediaType: text/plain
+        byteLength: 5
+      capture: { objectId: objectId, uploadUrl: uploadUrl }
+    - request: "PUT {uploadUrl}"
+      bodyRaw: "hello"
+      contentType: text/plain
+      expect: { status: [200, 201, 204] }
+  request:
+    path: /api/stored-objects/uploads/{objectId}/confirmation
+    body: { projectId: "{projectId}" }
+  expect:
+    status: [200, 201]
+  verify:
+    - request: GET /api/files/{projectId}/{objectId}
+      expect: { status: 200, contains: hello }
+    - request: GET /api/files/{objectId}
+      expect: { status: 200, contains: hello }
+
+- id: stored-objects-roundtrip-confirm-is-repeatable
+  endpoint: POST /api/stored-objects/uploads/{storedObjectId}/confirmation
+  shard: project
+  setup:
+    - request: POST /api/stored-objects/uploads
+      body:
+        projectId: "{projectId}"
+        purpose: dataset_attachment
+        filename: "vd-{uid}.txt"
+        mediaType: text/plain
+        byteLength: 5
+      capture: { objectId: objectId, uploadUrl: uploadUrl }
+    - request: "PUT {uploadUrl}"
+      bodyRaw: "hello"
+      contentType: text/plain
+      expect: { status: [200, 201, 204] }
+    - request: POST /api/stored-objects/uploads/{objectId}/confirmation
+      body: { projectId: "{projectId}" }
+      expect: { status: [200, 201] }
+  request:
+    path: /api/stored-objects/uploads/{objectId}/confirmation
+    body: { projectId: "{projectId}" }
+  expect:
+    status: [200, 201]
+  verify:
+    - request: GET /api/files/{projectId}/{objectId}
+      expect: { status: 200, contains: hello }
+
+- id: stored-objects-roundtrip-confirm-without-put-is-refused
+  endpoint: POST /api/stored-objects/uploads/{storedObjectId}/confirmation
+  shard: project
+  setup:
+    - request: POST /api/stored-objects/uploads
+      body:
+        projectId: "{projectId}"
+        purpose: dataset_attachment
+        filename: "vd-{uid}.txt"
+        mediaType: text/plain
+        byteLength: 5
+      capture: { objectId: objectId, uploadUrl: uploadUrl }
+  request:
+    path: /api/stored-objects/uploads/{objectId}/confirmation
+    body: { projectId: "{projectId}" }
+  expect:
+    status: [400, 404, 409, 422]
+  verify:
+    - request: GET /api/files/{projectId}/{objectId}
+      expect: { status: [404, 409, 422] }
+
+- id: stored-objects-roundtrip-short-body-is-refused
+  endpoint: PUT /api/stored-objects/uploads/{storedObjectId}/content
+  shard: project
+  setup:
+    - request: POST /api/stored-objects/uploads
+      body:
+        projectId: "{projectId}"
+        purpose: dataset_attachment
+        filename: "vd-{uid}.txt"
+        mediaType: text/plain
+        byteLength: 5
+      capture: { objectId: objectId, uploadUrl: uploadUrl }
+  request:
+    path: "{uploadUrl}"
+    method: PUT
+    bodyRaw: "hi"
+    contentType: text/plain
+  expect:
+    status: [400, 403, 409, 413, 422]
+  verify:
+    - request: POST /api/stored-objects/uploads/{objectId}/confirmation
+      body: { projectId: "{projectId}" }
+      expect: { status: [400, 404, 409, 422] }
+    - request: GET /api/files/{projectId}/{objectId}
+      expect: { status: [404, 409, 422] }
+
+- id: stored-objects-roundtrip-long-body-is-refused
+  endpoint: PUT /api/stored-objects/uploads/{storedObjectId}/content
+  shard: project
+  setup:
+    - request: POST /api/stored-objects/uploads
+      body:
+        projectId: "{projectId}"
+        purpose: dataset_attachment
+        filename: "vd-{uid}.txt"
+        mediaType: text/plain
+        byteLength: 5
+      capture: { objectId: objectId, uploadUrl: uploadUrl }
+  request:
+    path: "{uploadUrl}"
+    method: PUT
+    bodyRaw: "hello, and a good deal more than five bytes"
+    contentType: text/plain
+  expect:
+    status: [400, 403, 409, 413, 422]
+  verify:
+    - request: POST /api/stored-objects/uploads/{objectId}/confirmation
+      body: { projectId: "{projectId}" }
+      expect: { status: [400, 404, 409, 422] }
+    - request: GET /api/files/{projectId}/{objectId}
+      expect: { status: [404, 409, 422] }
+
+- id: stored-objects-roundtrip-empty-body-is-refused
+  endpoint: PUT /api/stored-objects/uploads/{storedObjectId}/content
+  shard: project
+  setup:
+    - request: POST /api/stored-objects/uploads
+      body:
+        projectId: "{projectId}"
+        purpose: dataset_attachment
+        filename: "vd-{uid}.txt"
+        mediaType: text/plain
+        byteLength: 5
+      capture: { objectId: objectId, uploadUrl: uploadUrl }
+  request:
+    path: "{uploadUrl}"
+    method: PUT
+    bodyRaw: ""
+    contentType: text/plain
+  expect:
+    status: [400, 403, 409, 413, 422]
+  verify:
+    - request: GET /api/files/{projectId}/{objectId}
+      expect: { status: [404, 409, 422] }
+
+- id: stored-objects-roundtrip-tampered-signature-is-refused
+  endpoint: PUT /api/stored-objects/uploads/{storedObjectId}/content
+  shard: project
+  setup:
+    - request: POST /api/stored-objects/uploads
+      body:
+        projectId: "{projectId}"
+        purpose: dataset_attachment
+        filename: "vd-{uid}.txt"
+        mediaType: text/plain
+        byteLength: 5
+      capture: { objectId: objectId, uploadUrl: uploadUrl }
+  request:
+    path: "{uploadUrl}x"
+    method: PUT
+    bodyRaw: "hello"
+    contentType: text/plain
+  expect:
+    status: [400, 401, 403, 404, 422]
+  verify:
+    - request: GET /api/files/{projectId}/{objectId}
+      expect: { status: [404, 409, 422] }
+
+- id: stored-objects-roundtrip-other-project-key-cannot-read-scoped
+  endpoint: GET /api/files/{projectId}/{storedObjectId}
+  auth: project-b
+  shard: project
+  setup:
+    - request: POST /api/stored-objects/uploads
+      body:
+        projectId: "{projectId}"
+        purpose: dataset_attachment
+        filename: "vd-{uid}.txt"
+        mediaType: text/plain
+        byteLength: 5
+      capture: { objectId: objectId, uploadUrl: uploadUrl }
+    - request: "PUT {uploadUrl}"
+      bodyRaw: "hello"
+      contentType: text/plain
+      expect: { status: [200, 201, 204] }
+    - request: POST /api/stored-objects/uploads/{objectId}/confirmation
+      body: { projectId: "{projectId}" }
+      expect: { status: [200, 201] }
+  request:
+    path: "/api/files/{projectId}/{objectId}"
+  expect:
+    status: 403
+    notContains: hello
+  verify:
+    - request: GET /api/files/{projectId}/{objectId}
+      auth: project
+      expect: { status: 200, contains: hello }
+
+- id: stored-objects-roundtrip-other-project-key-cannot-read-under-its-own-id
+  endpoint: GET /api/files/{projectId}/{storedObjectId}
+  auth: project-b
+  shard: project
+  setup:
+    - request: POST /api/stored-objects/uploads
+      body:
+        projectId: "{projectId}"
+        purpose: dataset_attachment
+        filename: "vd-{uid}.txt"
+        mediaType: text/plain
+        byteLength: 5
+      capture: { objectId: objectId, uploadUrl: uploadUrl }
+    - request: "PUT {uploadUrl}"
+      bodyRaw: "hello"
+      contentType: text/plain
+      expect: { status: [200, 201, 204] }
+    - request: POST /api/stored-objects/uploads/{objectId}/confirmation
+      body: { projectId: "{projectId}" }
+      expect: { status: [200, 201] }
+  request:
+    path: "/api/files/{projectIdB}/{objectId}"
+  expect:
+    status: 404
+    notContains: hello
+
+- id: stored-objects-roundtrip-other-project-key-cannot-read-id-only
+  endpoint: GET /api/files/{storedObjectId}
+  auth: project-b
+  shard: project
+  setup:
+    - request: POST /api/stored-objects/uploads
+      body:
+        projectId: "{projectId}"
+        purpose: dataset_attachment
+        filename: "vd-{uid}.txt"
+        mediaType: text/plain
+        byteLength: 5
+      capture: { objectId: objectId, uploadUrl: uploadUrl }
+    - request: "PUT {uploadUrl}"
+      bodyRaw: "hello"
+      contentType: text/plain
+      expect: { status: [200, 201, 204] }
+    - request: POST /api/stored-objects/uploads/{objectId}/confirmation
+      body: { projectId: "{projectId}" }
+      expect: { status: [200, 201] }
+  request:
+    path: "/api/files/{objectId}"
+  expect:
+    status: [403, 404]
+    notContains: hello
+
+- id: stored-objects-roundtrip-other-project-key-cannot-confirm
+  endpoint: POST /api/stored-objects/uploads/{storedObjectId}/confirmation
+  auth: project-b
+  shard: project
+  setup:
+    - request: POST /api/stored-objects/uploads
+      body:
+        projectId: "{projectId}"
+        purpose: dataset_attachment
+        filename: "vd-{uid}.txt"
+        mediaType: text/plain
+        byteLength: 5
+      capture: { objectId: objectId, uploadUrl: uploadUrl }
+    - request: "PUT {uploadUrl}"
+      bodyRaw: "hello"
+      contentType: text/plain
+      expect: { status: [200, 201, 204] }
+  request:
+    path: /api/stored-objects/uploads/{objectId}/confirmation
+    body: { projectId: "{projectId}" }
+  expect:
+    status: [403, 404]
+  verify:
+    - request: GET /api/files/{projectId}/{objectId}
+      auth: project
+      expect: { status: [404, 409, 422] }

@@ -1,0 +1,174 @@
+# Files and media journeys the first file leaves out: clearing a filled file cell, replacing an
+# image cell's image, and replacing a profile photo. Fixtures are the ones in fixtures/. The photo
+# flow is serial like the avatar flow, since it changes the admin's own avatar. Unrun until a check.
+flows:
+  - id: cv2-files-dataset-file-cell-clear
+    title: Clear a filled file cell and find it empty again after a reload
+    setup:
+      - post: /api/dataset
+        body:
+          name: "vd-cv2-dsclear-{uid}"
+          columnTypes:
+            - name: input
+              type: string
+            - name: document
+              type: file
+        as:
+          dsId: id
+          dsSlug: slug
+      - post: /api/dataset/{dsSlug}/records
+        body:
+          entries:
+            - input: vd clear row
+    steps:
+      - action: go
+        with:
+          path: "/{slug}/datasets/{dsId}"
+      - action: expect
+        with:
+          testId: dataset-row-count
+          hasText: /^1 /
+      - action: upload
+        with:
+          selector: '[data-testid="attachment-cell-file"] input[type=file]'
+          fixture: sample.csv
+      - action: expect
+        with:
+          testId: save-status-saved
+          timeout: "20000"
+      - action: expect
+        with:
+          testId: attachment-chip
+          hasText: sample.csv
+          timeout: "20000"
+      - action: hover
+        with:
+          selector: '[data-testid="attachment-cell-file"]'
+      - action: click
+        with:
+          label: Clear file
+      - action: expect
+        with:
+          testId: attachment-chip
+          equals: "0"
+          timeout: "20000"
+      - action: go
+        with:
+          path: "/{slug}/datasets/{dsId}"
+      - action: expect
+        with:
+          testId: dataset-row-count
+          hasText: /^1 /
+          timeout: "20000"
+      - action: expect
+        with:
+          testId: attachment-chip
+          equals: "0"
+
+  - id: cv2-files-dataset-image-cell-replace
+    title: Upload a second image into a filled image cell and find one image there after a reload
+    setup:
+      - post: /api/dataset
+        body:
+          name: "vd-cv2-dsreplace-{uid}"
+          columnTypes:
+            - name: input
+              type: string
+            - name: photo
+              type: image
+        as:
+          dsId: id
+          dsSlug: slug
+      - post: /api/dataset/{dsSlug}/records
+        body:
+          entries:
+            - input: vd replace row
+    steps:
+      - action: go
+        with:
+          path: "/{slug}/datasets/{dsId}"
+      - action: expect
+        with:
+          testId: dataset-row-count
+          hasText: /^1 /
+      - action: upload
+        with:
+          selector: '[data-testid="attachment-cell-image"] input[type=file]'
+          fixture: avatar.png
+      - action: expect
+        with:
+          testId: save-status-saved
+          timeout: "20000"
+      - action: expect
+        with:
+          count: '[data-testid="attachment-cell-image"] img:visible'
+          timeout: "20000"
+      - action: upload
+        with:
+          selector: '[data-testid="attachment-cell-image"] input[type=file]'
+          fixture: avatar.png
+      - action: expect
+        with:
+          testId: save-status-saved
+          timeout: "20000"
+      - action: go
+        with:
+          path: "/{slug}/datasets/{dsId}"
+      - action: expect
+        with:
+          count: '[data-testid="attachment-cell-image"] img:visible'
+          equals: "1"
+          timeout: "20000"
+
+  - id: cv2-files-avatar-replace-photo
+    title: Replace a profile photo with a second upload and see it served after a reload
+    serial: true
+    steps:
+      - action: go
+        with:
+          path: /settings/profile
+      - action: expect
+        with:
+          testId: profile-name-input
+      - action: click
+        with:
+          label: Add profile photo
+          optional: "true"
+      - action: click
+        with:
+          label: Edit profile photo
+          optional: "true"
+      - action: expect
+        with:
+          text: Profile photo
+      - action: upload
+        with:
+          fixture: avatar.png
+      - action: click
+        with:
+          text: Save photo
+      - action: expect
+        with:
+          text: Photo updated
+          timeout: "20000"
+      - action: click
+        with:
+          label: Edit profile photo
+      - action: upload
+        with:
+          fixture: avatar.png
+      - action: click
+        with:
+          text: Save photo
+      - action: expect
+        with:
+          text: Photo updated
+          timeout: "20000"
+      - action: go
+        with:
+          path: /settings/profile
+      - action: expect
+        with:
+          count: img[src*="/api/user-avatar/"]:visible
+          min: "1"
+          timeout: "20000"

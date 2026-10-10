@@ -1,0 +1,73 @@
+/**
+ * @vitest-environment jsdom
+ *
+ * "Judge these results" hands the query, as typed, to the search bar, which
+ * starts the pending chip's run the way Enter does. @see ADR-144
+ */
+
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, fireEvent, screen } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { useExplorerStore } from "../../../../../behavior/explorer.store.ts";
+import "@testing-library/jest-dom/vitest";
+
+import { useSearchSubmitRequestStore } from "../../../../../features/explorer/behavior/search-submit-request.store.ts";
+import { EmptyFilterState } from "../empty-filter-state.tsx";
+
+const QUERY = 'status:error AND eval:"is the user annoyed"';
+
+vi.mock("../../../../../features/explorer/behavior/use-explorer-counts.ts", () => ({
+  useExplorerCounts: () => ({ instantEval: null }),
+}));
+
+let mockChips: { runId: string | null; question: string }[] = [];
+vi.mock("../../../../../features/instant-eval/behavior/use-instant-eval-runs.ts", () => ({
+  useInstantEvalRuns: () => ({ chips: mockChips }),
+}));
+
+vi.mock("../query-breakdown-chips.tsx", () => ({
+  QueryBreakdownChips: () => null,
+}));
+
+function renderEmptyState() {
+  return renderWithDesignSystem(<EmptyFilterState />);
+}
+
+describe("<EmptyFilterState /> under an eval chip no run has answered", () => {
+  beforeEach(() => {
+    useSearchSubmitRequestStore.getState().clear();
+    useExplorerStore.getState().clearAll();
+    useExplorerStore.getState().applyQueryText(QUERY);
+    mockChips = [{ runId: null, question: "is the user annoyed" }];
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+  });
+
+  describe("when Judge these results is clicked", () => {
+    /** @scenario "A chip typed by hand starts its run on Enter" */
+    it("submits the query as typed through the search bar", () => {
+      renderEmptyState();
+
+      fireEvent.click(screen.getByRole("button", { name: "Judge these results" }));
+
+      expect(useSearchSubmitRequestStore.getState().request).toEqual({
+        text: QUERY,
+        nonce: 1,
+      });
+    });
+  });
+
+  describe("when every chip already has a run", () => {
+    it("offers no judge button, since there is nothing left to start", () => {
+      mockChips = [{ runId: "run_1", question: "is the user annoyed" }];
+      renderEmptyState();
+
+      expect(screen.queryByRole("button", { name: "Judge these results" })).not.toBeInTheDocument();
+      expect(useSearchSubmitRequestStore.getState().request).toBeNull();
+    });
+  });
+});

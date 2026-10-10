@@ -1,27 +1,17 @@
 /*
-  Manual evaluation recording for the LangWatch observability SDK.
-
-  This is the OpenTelemetry-native re-implementation of the `add_evaluation`
-  surface that the Python SDK exposes on both spans and traces
-  (`langwatch/telemetry/span.py`, `langwatch/telemetry/tracing.py`) and that the
-  Python evaluation module emits from `_add_evaluation`
-  (`langwatch/evaluation/__init__.py`).
-
-  Parity is by construction: this module emits the SAME OpenTelemetry span event
-  name (`langwatch.evaluation.custom`), the SAME `json_encoded_event` attribute
-  key, and the SAME snake_case payload keys as the Python SDK, so the identical
-  backend collector path parses both.
+  Manual evaluation recording: the OpenTelemetry-native re-implementation of
+  the Python SDK's `add_evaluation`. Parity is by construction — same span
+  event name, attribute key and payload keys, so one collector path parses both.
 */
 
 import { type Span, isSpanContextValid } from "@opentelemetry/api";
 import { generate as generateKsuid } from "xksuid";
+
 import { ATTR_LANGWATCH_EVALUATION_CUSTOM } from "../semconv/attributes";
 
 /**
- * The status of a recorded evaluation.
- *
- * Mirrors the Python `Literal["processed", "skipped", "error"]` accepted by
- * `add_evaluation`.
+ * The status of a recorded evaluation, mirroring the Python
+ * `Literal["processed", "skipped", "error"]` accepted by `add_evaluation`.
  */
 export type EvaluationStatus = "processed" | "skipped" | "error";
 
@@ -38,45 +28,42 @@ export interface EvaluationTimestamps {
 }
 
 /**
- * Parameters for {@link LangWatchSpan.addEvaluation} / recording a manual
- * evaluation result.
- *
- * The field set is derived from the Python `add_evaluation` signature. Only
- * `name` is required; every other field is optional and, when omitted, is
- * emitted as `null` in the JSON payload to match the Python SDK exactly.
- *
- * @property name - Human-readable name of the evaluation (required).
- * @property type - Evaluation type/category (e.g. an evaluator slug).
- * @property evaluationId - Stable id for this evaluation. Auto-generated
- *   (`eval_<ksuid>`) when omitted, mirroring Python's `PKSUID("eval")`.
- * @property isGuardrail - Whether this evaluation acted as a guardrail.
- * @property status - Processing status. Defaults to `"processed"`.
- * @property passed - Whether the evaluation passed.
- * @property score - Numeric score for the evaluation.
- * @property label - Categorical label for the evaluation.
- * @property details - Free-form details/explanation.
- * @property error - Optional error captured while evaluating.
- * @property timestamps - Optional explicit start/finish timestamps.
+ * Parameters for {@link LangWatchSpan.addEvaluation}. Only `name` is
+ * required; every other field mirrors Python's `add_evaluation` signature
+ * and is emitted as `null` when omitted, matching the Python SDK exactly.
  */
 export interface AddEvaluationParams {
+  /** Human-readable name of the evaluation (required). */
   name: string;
+  /** Evaluation type/category (e.g. an evaluator slug). */
   type?: string;
+  /**
+   * Stable id for this evaluation. Auto-generated (`eval_<ksuid>`) when
+   * omitted, mirroring Python's `PKSUID("eval")`.
+   */
   evaluationId?: string;
+  /** Whether this evaluation acted as a guardrail. */
   isGuardrail?: boolean;
+  /** Processing status. Defaults to `"processed"`. */
   status?: EvaluationStatus;
+  /** Whether the evaluation passed. */
   passed?: boolean;
+  /** Numeric score for the evaluation. */
   score?: number;
+  /** Categorical label for the evaluation. */
   label?: string;
+  /** Free-form details/explanation. */
   details?: string;
+  /** Optional error captured while evaluating. */
   error?: unknown;
+  /** Optional explicit start/finish timestamps. */
   timestamps?: EvaluationTimestamps;
 }
 
 /**
- * Error shape emitted in the evaluation payload.
- *
- * Matches the Python `capture_exception` output (`{ message, stacktrace }`),
- * which is the runtime-proven collector path.
+ * Error shape emitted in the evaluation payload, matching the Python
+ * `capture_exception` output (`{ message, stacktrace }`), the
+ * runtime-proven collector path.
  */
 interface EvaluationErrorCapture {
   message: string;
@@ -84,11 +71,9 @@ interface EvaluationErrorCapture {
 }
 
 /**
- * The JSON payload serialized into the `json_encoded_event` attribute.
- *
- * Keys are snake_case to match the Python `_EvaluationTypedDict` emitted by
- * `_add_evaluation`. All keys are always present (with `null` for absent
- * values), matching the Python behavior where every field is passed explicitly.
+ * The JSON payload serialized into the `json_encoded_event` attribute. Keys
+ * are snake_case to match the Python `_EvaluationTypedDict`; all keys are
+ * always present (`null` for absent values), matching Python's explicit-field behavior.
  */
 interface EvaluationEventPayload {
   evaluation_id: string;
@@ -123,23 +108,13 @@ function captureError(error: unknown): EvaluationErrorCapture {
 }
 
 /**
- * Records a manual evaluation result onto the given OpenTelemetry span by
- * emitting a `langwatch.evaluation.custom` span event whose
- * `json_encoded_event` attribute holds the serialized evaluation payload.
- *
- * This is the shared implementation behind both the span-level and trace-level
- * `addEvaluation` surfaces.
- *
+ * Records a manual evaluation onto `span` as a `langwatch.evaluation.custom` span event.
  * @param span - The OpenTelemetry span to attach the evaluation event to.
  * @param params - The evaluation parameters. See {@link AddEvaluationParams}.
  */
-export function emitEvaluationEvent(
-  span: Span,
-  params: AddEvaluationParams,
-): void {
+export function emitEvaluationEvent(span: Span, params: AddEvaluationParams): void {
   const spanContext = span.spanContext();
-  const spanId =
-    spanContext && isSpanContextValid(spanContext) ? spanContext.spanId : null;
+  const spanId = spanContext && isSpanContextValid(spanContext) ? spanContext.spanId : null;
 
   const payload: EvaluationEventPayload = {
     evaluation_id: params.evaluationId ?? `eval_${generateKsuid()}`,

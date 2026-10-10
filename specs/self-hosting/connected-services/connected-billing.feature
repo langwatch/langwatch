@@ -29,6 +29,12 @@ Feature: Billing a connected self-hosted customer
     And bank transfer is offered on its invoices
 
   @unit
+  Scenario: Onboarding a connected customer records connected_customer_onboarded
+    When an operator onboards "ACME" with a term of one year and a commit of 1000 USD
+    Then billing records a connected_customer_onboarded fact for "ACME" naming the operator
+    And billing calls no licensing operation to sync the contract budget
+
+  @unit
   Scenario: Onboarding subscribes the customer to metered usage invoiced quarterly
     When an operator onboards "ACME"
     Then "ACME" has a subscription whose only item is metered hosted usage
@@ -116,6 +122,13 @@ Feature: Billing a connected self-hosted customer
     And its budget is reset and set to 2000 USD for the new term
 
   @unit
+  Scenario: Renewal records connected_term_renewed and the budget resets
+    Given "ACME" was onboarded for a first term
+    When an operator renews "ACME" for a second term
+    Then billing records a connected_term_renewed fact for "ACME" naming the operator
+    And billing calls no licensing operation to reset or sync the contract budget
+
+  @unit
   Scenario: The renewal credit waits for the last usage invoice of the old term
     Given the last usage invoice of the old term has not been finalized
     When an operator renews "ACME"
@@ -140,7 +153,7 @@ Feature: Billing a connected self-hosted customer
     Then it shows the LangWatch bank details and no payment provider bank transfer instructions
 
   @integration
-  Scenario: Finance marks an invoice paid out of band from the backoffice
+  Scenario: Finance marks an invoice paid out of band from the admin console
     Given an open invoice for "ACME" that was paid by wire
     When an operator marks it paid out of band
     Then the invoice is paid without a charge through the payment provider
@@ -157,14 +170,14 @@ Feature: Billing a connected self-hosted customer
     When usage is reported for the month
     Then the spend is reported to the hosted usage meter for the billing customer of "ACME"
 
-  @unit
+  @integration
   Scenario: A connected customer is not skipped for lacking a Cloud plan
     Given "ACME" is a self-hosted customer with no LangWatch Cloud plan
     And hosted spend was recorded under "ACME"
     When usage is reported for the month
     Then "ACME" is not skipped as an organization that is not billed for usage
 
-  @unit
+  @integration
   Scenario: An organization that is neither usage billed nor a self-hosted customer is still skipped
     Given an organization on a plan that is not billed for usage and that is not a self-hosted customer
     When usage is reported for the month
@@ -220,15 +233,43 @@ Feature: Billing a connected self-hosted customer
   @unit
   Scenario: Changing the seats twice for one reissued license invoices once
     Given the added seats of a reissued license were already invoiced
-    When the same change is run again
+    When the seat invoicing pass runs again
     Then no second invoice is created
 
   @unit
   Scenario: A seat invoice that failed at the payment provider is retried without doubling
     Given the seat change recorded its intent and the payment provider call then failed
-    When the daily billing tick runs
+    When the next seat invoicing pass runs
     Then the invoice is created once
-    And the backoffice showed the change as pending until then
+    And the admin console showed the change as pending until then
+
+  @unit
+  Scenario: A seat invoice raised but never recorded is found rather than raised again
+    Given an earlier pass raised the seat invoice and failed before recording it
+    And the payment provider's idempotency key for it has lapsed
+    When the next seat invoicing pass runs
+    Then the invoice the payment provider already holds is recorded
+    And no second invoice is raised
+
+  @unit
+  Scenario: Seat changes are invoiced by a pass every minute on the billing pipeline
+    Given licensing recorded a seat change that raised a linked license
+    When the billing pipeline's scheduled seat invoicing pass wakes, once a minute across the fleet
+    Then the pass decides the change and invoices it
+    And licensing never calls billing
+
+  @unit
+  Scenario: A seat change recorded while billing was down is invoiced from when it happened
+    Given licensing recorded a seat change while no seat invoicing pass ran
+    When the first pass after billing recovers runs
+    Then the change is invoiced prorated from when the seats changed, not from when the pass ran
+
+  @unit
+  Scenario: A seat change billing cannot decide is retried on the next pass
+    Given two recorded seat changes and one of them cannot be decided
+    When the seat invoicing pass runs
+    Then the other change is decided and invoiced
+    And the first is decided on the next pass
 
   @unit
   Scenario: Seat invoices are never paid from the usage commit
@@ -240,9 +281,17 @@ Feature: Billing a connected self-hosted customer
   @unit
   Scenario: A customer with no billing account gets no seat invoice from LangWatch
     Given "ACME" was never onboarded for billing
-    When an operator raises its seats
+    When an operator raises its seats and the seat invoicing pass runs
     Then the license is reissued
-    And the operator is told finance invoices the added seats by hand
+    And the change is stored as not onboarded, so a later onboarding never invoices it
+    And the Billing section tells the operator finance invoices the added seats by hand
+
+  @unit
+  Scenario: Seat changes recorded before they named their organization are filled in the background
+    Given seat changes stored before the organization column existed, naming only their billing account
+    When the background step billing:fill-seat-change-organizations runs
+    Then each names the organization its account belongs to, a batch at a time with a checkpoint
+    And a second run fills nothing, and a dry run writes nothing
 
   # ============================================================================
   # Monthly statement
@@ -253,6 +302,19 @@ Feature: Billing a connected self-hosted customer
     Given "ACME" used hosted services during the month
     When the monthly statement runs
     Then the billing contact of "ACME" receives the spend for the month by service, the commit drawn down so far, the credit remaining and the seats licensed and reported
+
+  @unit
+  Scenario: The commit drawdown reads the contract budget without calling the hosted route
+    Given connect has synced the contract budget of "ACME" and its window opened on its last renewal
+    When the commit drawn down is read
+    Then it is the contract budget's successful debits since that window opened, as the gateway enforces them
+    And billing calls no licensing or hosted operation to read it
+
+  @unit
+  Scenario: The commit drawdown is unavailable before a contract budget exists
+    Given connect has not synced a contract budget for "ACME"
+    When the commit drawn down is read
+    Then it is unavailable rather than zero
 
   @unit
   Scenario: A month with no usage sends no statement
@@ -266,18 +328,50 @@ Feature: Billing a connected self-hosted customer
     When the monthly statement runs again
     Then no second statement is sent
 
+  @unit
+  Scenario: The monthly statement is mailed to the billing contact
+    Given billing is composed with the deployment's mail
+    When the monthly statement for August 2026 runs for "ACME"
+    Then the billing contact of "ACME" is mailed one statement named "August 2026"
+    And the month is recorded as sent
+
+  @unit
+  Scenario: A statement whose mail fails is not recorded as sent
+    Given the mail provider refuses the statement for "ACME"
+    When the monthly statement runs
+    Then the run counts one failure and the month is not recorded, so the next tick sends it
+
   # ============================================================================
-  # Backoffice
+  # Admin console
   # ============================================================================
 
   @integration
-  Scenario: The backoffice shows the commercial state of each connected customer
+  Scenario: The admin console shows the commercial state of each connected customer
     Given "ACME" was onboarded, has used hosted services and has synced
-    When an operator opens the customer in the backoffice
+    When an operator opens the customer in the admin console
     Then they see the commit, the amount drawn down, the overage, the seats licensed and the seats reported, the time of the last sync and the open invoices
 
   @unit
-  Scenario: The backoffice says so when live spend cannot be read
+  Scenario: The Billing section shows a seat change until billing decides it
+    Given licensing recorded a seat change billing has not decided yet
+    When an operator opens the customer in the admin console
+    Then the change is shown as recorded and awaiting billing
+    And once a pass decided it, the change shows that decision
+
+  @integration
+  Scenario: The Billing section shows each seat change and how its invoicing stands
+    Given seat changes that are awaiting, not onboarded, invoiced and owed nothing
+    When an operator opens the customer in the admin console
+    Then each change has its own line saying what finance needs to know
+
+  @unit @unimplemented
+  Scenario: The Billing section updates when a seat change settles
+    Given a seat change awaiting billing or the payment provider
+    When the Billing section is open and the change settles
+    Then the section updates on its server event, with no timer
+
+  @unit
+  Scenario: The admin console says so when live spend cannot be read
     Given the spend ledger cannot be read
-    When an operator opens the customer in the backoffice
+    When an operator opens the customer in the admin console
     Then the drawn down amount is shown as unavailable rather than zero

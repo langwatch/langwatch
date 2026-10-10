@@ -14,12 +14,13 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/langwatch/langwatch/pkg/clog"
+	"github.com/langwatch/langwatch/pkg/config"
 	"github.com/langwatch/langwatch/pkg/herr"
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
 
 // gatewaySignatureWindowSeconds matches `GATEWAY_SIGNATURE_WINDOW_SECONDS`
-// in `platform/app/src/server/routes/gateway-internal.ts`. Both ends must
+// in `modules/gateway/process/src/rules/gateway-internal-identity.rules.ts`. Both ends must
 // use the same value or replay protection becomes asymmetric.
 const gatewaySignatureWindowSeconds = 300
 
@@ -33,7 +34,7 @@ const gatewaySignatureWindowSeconds = 300
 //
 //	METHOD + "\n" + PATH + "\n" + TIMESTAMP + "\n" + hex(sha256(body))
 //
-// Headers (matching `platform/app/ee/governance/services/activity-monitor/ottlGatewayClient.ts`):
+// Headers (matching `enterprise/modules/governance/process/src/channels/http/http.ottl-transform.channel.ts`):
 //
 //	X-LangWatch-Gateway-Signature  hex(hmac_sha256(secret, canonical))
 //	X-LangWatch-Gateway-Timestamp  unix seconds (±300s window)
@@ -73,10 +74,15 @@ func InternalAuthMiddleware(secret string) func(http.Handler) http.Handler {
 				return
 			}
 
-			// Buffer the body once so the downstream handler can re-read it.
-			// /internal/* payloads are small (statements + base64 OTLP),
-			// well within the 32MB ceiling enforced inside the handlers.
-			body, err := io.ReadAll(r.Body)
+			// Buffer the body once, under the gateway-wide ceiling, so the
+			// downstream handler can re-read it.
+			body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, config.DefaultMaxRequestBodyBytes))
+			if bodyReadErrorCode(err) == domain.ErrPayloadTooLarge {
+				herr.WriteHTTP(w, herr.New(r.Context(), domain.ErrPayloadTooLarge, herr.M{
+					"message": "request body exceeds the /internal/* ceiling",
+				}))
+				return
+			}
 			if err != nil {
 				herr.WriteHTTP(w, herr.New(r.Context(), domain.ErrInternal, herr.M{
 					"message": "failed to read request body",

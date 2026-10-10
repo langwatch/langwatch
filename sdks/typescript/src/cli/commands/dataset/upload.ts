@@ -1,19 +1,17 @@
 import { readFileSync } from "fs";
 import { basename } from "path";
+
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
+
 import { resolveCredentials } from "../../utils/apiKey";
 import type { CommandResult } from "../../utils/output";
-import { createDatasetService } from "./service-factory";
+import { createSpinner } from "../../utils/spinner";
 import { handleDatasetCommandError } from "./error-handler";
+import { createDatasetService } from "./service-factory";
 
 /**
- * Uploads a file to a dataset with a configurable strategy for handling existing datasets.
- *
- * Usage:
- * - Append (default):  `langwatch dataset upload <slug> <file>`
- * - Replace:           `langwatch dataset upload <slug> <file> --if-exists replace`
- * - Error if exists:   `langwatch dataset upload <slug> <file> --if-exists error`
+ * Uploads a file to a dataset. `--if-exists` controls collision handling:
+ * append (default), replace, or error.
  */
 export const uploadCommand = async (
   slugOrId: string,
@@ -30,9 +28,7 @@ export const uploadCommand = async (
   const ifExists = (options?.ifExists ?? "append") as "append" | "replace" | "error";
   const validStrategies = ["append", "replace", "error"];
   if (!validStrategies.includes(ifExists)) {
-    console.error(
-      chalk.red(`Error: --if-exists must be one of: ${validStrategies.join(", ")}`),
-    );
+    console.error(chalk.red(`Error: --if-exists must be one of: ${validStrategies.join(", ")}`));
     process.exit(1);
   }
 
@@ -49,15 +45,14 @@ export const uploadCommand = async (
 
   const service = createDatasetService();
 
-  const strategyLabel = ifExists === "append"
-    ? "Uploading"
-    : ifExists === "replace"
-      ? "Replacing records and uploading"
-      : "Uploading (error if exists)";
+  const STRATEGY_LABEL: Record<"append" | "replace" | "error", string> = {
+    append: "Uploading",
+    replace: "Replacing records and uploading",
+    error: "Uploading (error if exists)",
+  };
+  const strategyLabel = STRATEGY_LABEL[ifExists];
 
-  const spinner = createSpinner(
-    `${strategyLabel} ${filename} to dataset "${slugOrId}"...`,
-  ).start();
+  const spinner = createSpinner(`${strategyLabel} ${filename} to dataset "${slugOrId}"...`).start();
 
   try {
     const result = await service.uploadWithStrategy(slugOrId, file, ifExists);
@@ -82,7 +77,9 @@ export const uploadCommand = async (
           console.log(`  ${chalk.bold("Slug:")}    ${result.dataset.slug}`);
           console.log(`  ${chalk.bold("ID:")}      ${result.dataset.id}`);
           if (result.dataset.platformUrl) {
-            console.log(`  ${chalk.bold("View:")}    ${chalk.underline(result.dataset.platformUrl)}`);
+            console.log(
+              `  ${chalk.bold("View:")}    ${chalk.underline(result.dataset.platformUrl)}`,
+            );
           }
         }
       },

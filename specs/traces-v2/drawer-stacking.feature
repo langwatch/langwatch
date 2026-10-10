@@ -1,8 +1,8 @@
 # Drawer back stack - Gherkin Spec
 # Implementation:
-#   platform/app/src/hooks/useDrawer.ts
-#   platform/app/src/components/AddDatasetRecordDrawer.tsx
-#   platform/app/src/features/traces-v2/components/TraceDrawer/useTraceDrawerScaffold.ts
+#   packages/browser-host/src/drawer/behavior/use-drawer.ts
+#   [gone] src/components/AddDatasetRecordDrawer.tsx
+#   modules/trace/browser/src/ui/sections/explorer/trace-drawer/use-trace-drawer-scaffold.ts
 #
 # Drawers open on top of each other: a trace hands over to "Add to Dataset", a
 # simulation run hands over to a trace. Closing the drawer on top has to put the
@@ -34,6 +34,13 @@ Feature: Moving between drawers without losing your place
       And I chose "Add to Dataset" from that trace
       When the records are added to the dataset
       Then I am back on that trace's drawer
+
+    @integration
+    Scenario: Creating a dataset from Add to Dataset opens the dataset editor, then returns
+      Given I chose "Add to Dataset" from a trace
+      When I ask for a new dataset from that drawer
+      Then the dataset editor opens as its own drawer, on top of "Add to Dataset"
+      And saving or closing the editor returns me to "Add to Dataset" with the new dataset chosen
 
     @integration
     Scenario: Closing Add to Dataset opened from the traces list closes it outright

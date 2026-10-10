@@ -1,0 +1,148 @@
+import { describe, expect, it } from "vitest";
+
+import { classifyLangyCanaryOutcome, langyCanaryAnswer } from "../langy-canary.rules.ts";
+
+describe("classifyLangyCanaryOutcome", () => {
+  /** @scenario "The Langy canary classifies a settled turn as main did" */
+  /** @scenario "A completed turn with text is healthy" */
+  it("names a completed turn with text healthy", () => {
+    expect(
+      classifyLangyCanaryOutcome({
+        kind: "settled",
+        settlement: {
+          succeeded: true,
+          outcome: "completed",
+          text: "Hi!",
+          error: null,
+        },
+      }),
+    ).toEqual({ healthy: true });
+  });
+
+  /** @scenario "The Langy canary classifies a settled turn as main did" */
+  /** @scenario "A failed turn is turn_failed" */
+  it("names a failed turn turn_failed", () => {
+    expect(
+      classifyLangyCanaryOutcome({
+        kind: "settled",
+        settlement: {
+          succeeded: false,
+          outcome: "failed",
+          text: null,
+          error: "boom",
+        },
+      }),
+    ).toEqual({ healthy: false, reason: "turn_failed" });
+  });
+
+  /** @scenario "The Langy canary classifies a settled turn as main did" */
+  /** @scenario "A stopped turn is turn_failed" */
+  it("names a stopped turn turn_failed, whatever text it carries", () => {
+    expect(
+      classifyLangyCanaryOutcome({
+        kind: "settled",
+        settlement: { succeeded: true, outcome: "stopped", text: "Hi", error: null },
+      }),
+    ).toMatchObject({ healthy: false, reason: "turn_failed" });
+  });
+
+  /** @scenario "A stopped Langy canary turn reports turn_stopped" */
+  it("names turn_stopped as a stopped turn's cause", () => {
+    expect(
+      classifyLangyCanaryOutcome({
+        kind: "settled",
+        settlement: { succeeded: true, outcome: "stopped", text: "partial", error: null },
+      }),
+    ).toEqual({ healthy: false, reason: "turn_failed", cause: "turn_stopped" });
+  });
+
+  /** @scenario "A failed Langy canary turn reports its cause beside its reason" */
+  it("names the innermost code of a failed turn's error chain as its cause", () => {
+    const error = JSON.stringify({
+      code: "langy_agent_errored",
+      reasons: [{ code: "llm_upstream_error", reasons: [{ code: "insufficient_quota" }] }],
+    });
+    expect(
+      classifyLangyCanaryOutcome({
+        kind: "settled",
+        settlement: { succeeded: false, outcome: "failed", text: null, error },
+      }),
+    ).toEqual({ healthy: false, reason: "turn_failed", cause: "insufficient_quota" });
+  });
+
+  /** @scenario "The Langy canary classifies a settled turn as main did" */
+  /** @scenario "A completed turn with only whitespace is empty_reply" */
+  it("names a completed turn with only whitespace empty_reply", () => {
+    expect(
+      classifyLangyCanaryOutcome({
+        kind: "settled",
+        settlement: {
+          succeeded: true,
+          outcome: "completed",
+          text: "  \n",
+          error: null,
+        },
+      }),
+    ).toEqual({ healthy: false, reason: "empty_reply" });
+  });
+
+  /** @scenario "The Langy canary classifies a settled turn as main did" */
+  /** @scenario "A turn that never settled is timeout" */
+  it("names a turn that never settled timeout", () => {
+    expect(classifyLangyCanaryOutcome(null)).toEqual({ healthy: false, reason: "timeout" });
+    expect(classifyLangyCanaryOutcome({ kind: "stopped" })).toEqual({
+      healthy: false,
+      reason: "timeout",
+    });
+  });
+
+  /** @scenario "A turn that asks the user a question is healthy" */
+  it("names a turn that answered with a question card and waits on the user healthy", () => {
+    expect(
+      classifyLangyCanaryOutcome({ kind: "awaiting_user", question: "What would you like to do?" }),
+    ).toEqual({ healthy: true });
+  });
+});
+
+describe("langyCanaryAnswer", () => {
+  const ids = { conversationId: "c-1", turnId: "t-1", durationMs: 7 };
+
+  /** @scenario "The Langy canary answers main's bodies" */
+  /** @scenario "A healthy run answers 200 with the turn's ids" */
+  it("answers a healthy run 200 ok with the conversation id, turn id and duration", () => {
+    expect(langyCanaryAnswer({ healthy: true, ...ids })).toEqual({
+      status: 200,
+      body: { status: "ok", ...ids },
+    });
+  });
+
+  /** @scenario "The Langy canary answers main's bodies" */
+  /** @scenario "An unhealthy run answers 503 with its reason" */
+  it("answers an unhealthy run 503 with its reason", () => {
+    expect(langyCanaryAnswer({ healthy: false, reason: "empty_reply", ...ids })).toEqual({
+      status: 503,
+      body: { status: "unhealthy", reason: "empty_reply", ...ids },
+    });
+  });
+
+  /** @scenario "The Langy probe answers 503 with the cause beside the reason" */
+  it("answers an unhealthy run with a cause 503 carrying reason and cause", () => {
+    expect(
+      langyCanaryAnswer({
+        healthy: false,
+        reason: "turn_failed",
+        cause: "insufficient_quota",
+        ...ids,
+      }),
+    ).toEqual({
+      status: 503,
+      body: { status: "unhealthy", reason: "turn_failed", cause: "insufficient_quota", ...ids },
+    });
+  });
+
+  /** @scenario "The Langy canary answers main's bodies" */
+  /** @scenario "A busy probe answers 429" */
+  it("answers a busy probe 429", () => {
+    expect(langyCanaryAnswer({ busy: true })).toEqual({ status: 429, body: { status: "busy" } });
+  });
+});

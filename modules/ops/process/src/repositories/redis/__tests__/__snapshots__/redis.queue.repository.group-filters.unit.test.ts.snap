@@ -1,0 +1,113 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`QueueRedisRepository bulk operator filters > when moving blocked groups to the DLQ > with filters {"errorFilter":"TIMEOUT"} it acts on exactly the matching groups 1`] = `
+{
+  "jobsMoved": 1,
+  "movedCount": 1,
+}
+`;
+
+exports[`QueueRedisRepository bulk operator filters > when moving blocked groups to the DLQ > with filters {"errorFilter":"boom"} it acts on exactly the matching groups 1`] = `
+{
+  "jobsMoved": 3,
+  "movedCount": 3,
+}
+`;
+
+exports[`QueueRedisRepository bulk operator filters > when moving blocked groups to the DLQ > with filters {"errorFilter":"nothing matches"} it acts on exactly the matching groups 1`] = `
+{
+  "jobsMoved": 0,
+  "movedCount": 0,
+}
+`;
+
+exports[`QueueRedisRepository bulk operator filters > when moving blocked groups to the DLQ > with filters {"pipelineFilter":"eval","errorFilter":"boom"} it acts on exactly the matching groups 1`] = `
+{
+  "jobsMoved": 0,
+  "movedCount": 0,
+}
+`;
+
+exports[`QueueRedisRepository bulk operator filters > when moving blocked groups to the DLQ > with filters {"pipelineFilter":"eval"} it acts on exactly the matching groups 1`] = `
+{
+  "jobsMoved": 1,
+  "movedCount": 1,
+}
+`;
+
+exports[`QueueRedisRepository bulk operator filters > when moving blocked groups to the DLQ > with filters {"pipelineFilter":"trace","errorFilter":"boom"} it acts on exactly the matching groups 1`] = `
+{
+  "jobsMoved": 1,
+  "movedCount": 1,
+}
+`;
+
+exports[`QueueRedisRepository bulk operator filters > when moving blocked groups to the DLQ > with filters {"pipelineFilter":"trace"} it acts on exactly the matching groups 1`] = `
+{
+  "jobsMoved": 1,
+  "movedCount": 1,
+}
+`;
+
+exports[`QueueRedisRepository bulk operator filters > when moving blocked groups to the DLQ > with filters {} it acts on exactly the matching groups 1`] = `
+{
+  "jobsMoved": 5,
+  "movedCount": 5,
+}
+`;
+
+exports[`QueueRedisRepository bulk operator filters > when replaying the DLQ > with filters {"errorFilter":"TIMEOUT"} it acts on exactly the matching groups 1`] = `
+{
+  "jobsReplayed": 1,
+  "replayedCount": 1,
+}
+`;
+
+exports[`QueueRedisRepository bulk operator filters > when replaying the DLQ > with filters {"errorFilter":"boom"} it acts on exactly the matching groups 1`] = `
+{
+  "jobsReplayed": 3,
+  "replayedCount": 3,
+}
+`;
+
+exports[`QueueRedisRepository bulk operator filters > when replaying the DLQ > with filters {"errorFilter":"nothing matches"} it acts on exactly the matching groups 1`] = `
+{
+  "jobsReplayed": 0,
+  "replayedCount": 0,
+}
+`;
+
+exports[`QueueRedisRepository bulk operator filters > when replaying the DLQ > with filters {"pipelineFilter":"eval","errorFilter":"boom"} it acts on exactly the matching groups 1`] = `
+{
+  "jobsReplayed": 0,
+  "replayedCount": 0,
+}
+`;
+
+exports[`QueueRedisRepository bulk operator filters > when replaying the DLQ > with filters {"pipelineFilter":"eval"} it acts on exactly the matching groups 1`] = `
+{
+  "jobsReplayed": 1,
+  "replayedCount": 1,
+}
+`;
+
+exports[`QueueRedisRepository bulk operator filters > when replaying the DLQ > with filters {"pipelineFilter":"trace","errorFilter":"boom"} it acts on exactly the matching groups 1`] = `
+{
+  "jobsReplayed": 1,
+  "replayedCount": 1,
+}
+`;
+
+exports[`QueueRedisRepository bulk operator filters > when replaying the DLQ > with filters {"pipelineFilter":"trace"} it acts on exactly the matching groups 1`] = `
+{
+  "jobsReplayed": 1,
+  "replayedCount": 1,
+}
+`;
+
+exports[`QueueRedisRepository bulk operator filters > when replaying the DLQ > with filters {} it acts on exactly the matching groups 1`] = `
+{
+  "jobsReplayed": 5,
+  "replayedCount": 5,
+}
+`;

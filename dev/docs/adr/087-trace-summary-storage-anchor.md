@@ -6,7 +6,7 @@
 
 **Extends:** [ADR-071](./071-coding-agent-session-immutable-storage-anchor.md) - sequencing step 3, applied to the fourth table in its inventory. ADR-071 recorded `trace_summaries` as a same-class instance of the anchor defect and deliberately left it unfixed, tracked as [#6312](https://github.com/langwatch/langwatch/issues/6312). This is that fix. The rule is ADR-071's unchanged: a storage anchor is first-observed, frozen, and separate from any business value derived off it.
 
-**Relates to:** [ADR-066](./066-projection-clickhouse-cached-store.md) (the read-back store that writes this row), [ADR-068](./068-windowed-clickhouse-reads.md) (windowed reads, and the `clickhouse_windowed_read_total` outcomes that measured this), [ADR-034](./034-event-sourced-analytics-materialization.md) (the RMT-plus-IN-tuple materialisation shape).
+**Relates to:** [ADR-066](../../../packages/eventing/adrs/066-clickhouse-cached-projections.md) (the read-back store that writes this row), [ADR-068](./068-windowed-clickhouse-reads.md) (windowed reads, and the `clickhouse_windowed_read_total` outcomes that measured this), [ADR-034](./034-event-sourced-analytics-materialization.md) (the RMT-plus-IN-tuple materialisation shape).
 
 ## Context
 
@@ -35,9 +35,9 @@ A third, smaller consequence sat next to it. `resolveOccurredAtRange` takes `min
 
 Migration 00061 fixed exactly this failure mode for `trace_analytics` and only that projection (#6306). Two differences shape the fix here.
 
-Milder: this table's sort key is `(TenantId, TraceId)` and excludes `OccurredAt`, so the ReplacingMergeTree collapses a trace's versions regardless of the anchor moving. ADR-071's consequence 1 - orphaned versions that can never collapse - does not apply, and the sort-key argument that shapes the `trace_analytics` fix is unnecessary. (It collapses *within a partition*, which matters below.)
+Milder: this table's sort key is `(TenantId, TraceId)` and excludes `OccurredAt`, so the ReplacingMergeTree collapses a trace's versions regardless of the anchor moving. ADR-071's consequence 1 - orphaned versions that can never collapse - does not apply, and the sort-key argument that shapes the `trace_analytics` fix is unnecessary. (It collapses _within a partition_, which matters below.)
 
-Sharper: `trace_summaries` rows are read by product paths, not just by analytics. `TraceSummaryData.occurredAt` becomes `trace.timestamps.started_at`, it is the axis the trace list pages on, and it gates the visibility-window teaser redaction in `TraceSummaryService.getByTraceId`. So on this table what the column *means to a reader* has to be handled explicitly, where on `trace_analytics` it did not.
+Sharper: `trace_summaries` rows are read by product paths, not just by analytics. `TraceSummaryData.occurredAt` becomes `trace.timestamps.started_at`, it is the axis the trace list pages on, and it gates the visibility-window teaser redaction in `TraceSummaryService.getByTraceId`. So on this table what the column _means to a reader_ has to be handled explicitly, where on `trace_analytics` it did not.
 
 ## Decision
 
@@ -61,11 +61,11 @@ Two reasons, and the first is decisive.
 
 `OccurredAt` cannot be back-filled with the log's time without also becoming the timing baseline, because the fold reads that one field for both jobs. `SpanTimingService` treats `occurredAt > 0` as "a span has seeded the baseline" and measures the trace's duration from it. Back-filling therefore does not fix a storage bug; it converts it into a metrics bug, in a field customers read.
 
-Second, a back-fill of the existing population is a rewrite with a *re-derived* value, which is the precise thing an anchor exists to prevent. A rebuild reaches a different first event than the original fold did (a replay's first event may be a log or a topic assignment predating the first span), so the rewritten anchor differs from the committed one, moves the row's partition, and moves its TTL deadline. A change whose premise is "an anchor is written once" would open by moving every anchor it touched.
+Second, a back-fill of the existing population is a rewrite with a _re-derived_ value, which is the precise thing an anchor exists to prevent. A rebuild reaches a different first event than the original fold did (a replay's first event may be a log or a topic assignment predating the first span), so the rewritten anchor differs from the committed one, moves the row's partition, and moves its TTL deadline. A change whose premise is "an anchor is written once" would open by moving every anchor it touched.
 
 ### Consequences worth naming
 
-A trace that received an earlier-starting span **late** now anchors on the first span *folded* rather than `min(span start)`, so it can land in a different week partition than it would have before. That is the anchor doing its job - the old value moved backwards on every late span, dragging the TTL deadline towards the row - but it is a real change, not a no-op.
+A trace that received an earlier-starting span **late** now anchors on the first span _folded_ rather than `min(span start)`, so it can land in a different week partition than it would have before. That is the anchor doing its job - the old value moved backwards on every late span, dragging the TTL deadline towards the row - but it is a real change, not a no-op.
 
 One already-committed row moves, deliberately. The anchor is validated on every write, not only when first frozen, so a row whose committed `OccurredAt` is more than a day ahead of fold time fails `MAX_ANCHOR_FUTURE_SKEW_MS` and is rewritten at fold time. Ingest bounds only the past edge, so such a row is reachable today; it was filed in a future partition with a TTL deadline to match and would have outlived its tenant's retention. It converges after that one write.
 
@@ -77,7 +77,7 @@ A logs-only trace stops reporting 1970. `mapTraceSummaryToTrace` now reports the
 
 This is the part that goes wrong quietly, so it is stated once and precisely.
 
-A fold read-back that decodes an old row without a version gate turns a missing column into a default and writes that default back as truth. Here the ambiguity is exact: once both shapes exist, `EarliestSpanStartMs = 0` means either *"pre-split row, the baseline lives in `OccurredAt`"* or *"post-split logs-only trace, the baseline genuinely is 0 and `OccurredAt` is an accept time"*. Reading the second as the first hands `SpanTimingService` an accept time as a span start. Reading the first as the second resets a trace's duration baseline to zero and re-measures the whole trace from its next span. Only the stamp separates them.
+A fold read-back that decodes an old row without a version gate turns a missing column into a default and writes that default back as truth. Here the ambiguity is exact: once both shapes exist, `EarliestSpanStartMs = 0` means either _"pre-split row, the baseline lives in `OccurredAt`"_ or _"post-split logs-only trace, the baseline genuinely is 0 and `OccurredAt` is an accept time"_. Reading the second as the first hands `SpanTimingService` an accept time as a span start. Reading the first as the second resets a trace's duration baseline to zero and re-measures the whole trace from its next span. Only the stamp separates them.
 
 So `TraceSummaryClickHouseRepository.fromClickHouseRecord` branches on it:
 
@@ -105,15 +105,15 @@ Unlike `trace_analytics`, no stamp is refused. `trace_analytics` refuses pre-000
 
 **The anchor stops new sentinel rows. It does not repair existing ones.** Stated plainly, because the alternative is that someone assumes it does.
 
-*Existing sentinel rows are already expired.* Their TTL deadline is `1970 + retention`, so the next TTL merge deletes them. This is not a new consequence of this change; it is the state the table has been in.
+_Existing sentinel rows are already expired._ Their TTL deadline is `1970 + retention`, so the next TTL merge deletes them. This is not a new consequence of this change; it is the state the table has been in.
 
-*A sentinel-anchored trace that receives a further event escapes 196952 - but not via the read-back, and not with its totals.* This is worth stating precisely, because the intuitive account is wrong and the review of #6430 caught a sibling of exactly that error. The fold declares `readWindow` ±7 days, `trustAbsentMiss: true`, and no `refoldOnStoreMiss`. A row in partition 196952 is outside every window a present-day event produces, so the windowed read misses; `trustAbsentMiss` makes that miss authoritative with no unwindowed retry; and the fold proceeds from `init()`. Nothing decodes the old row. What moves the trace into a real partition is the **write** path - `firstUsableAnchor([storageAnchorMs, createdAt], now)`, every step validated - and the accumulated totals survive only if the Redis tier still holds the state.
+_A sentinel-anchored trace that receives a further event escapes 196952 - but not via the read-back, and not with its totals._ This is worth stating precisely, because the intuitive account is wrong and the review of #6430 caught a sibling of exactly that error. The fold declares `readWindow` ±7 days, `trustAbsentMiss: true`, and no `refoldOnStoreMiss`. A row in partition 196952 is outside every window a present-day event produces, so the windowed read misses; `trustAbsentMiss` makes that miss authoritative with no unwindowed retry; and the fold proceeds from `init()`. Nothing decodes the old row. What moves the trace into a real partition is the **write** path - `firstUsableAnchor([storageAnchorMs, createdAt], now)`, every step validated - and the accumulated totals survive only if the Redis tier still holds the state.
 
-That loss is **pre-existing rather than introduced here**, and the anchor is what bounds it. Before this change the same cold-cache miss folded from `init()` and rewrote the row straight back into 196952, so a log-only trace re-lost its totals on *every* such delivery, indefinitely. After it, the loss can happen at most once more: the next write lands the row in a real partition, inside the read window, where every later read-back finds it.
+That loss is **pre-existing rather than introduced here**, and the anchor is what bounds it. Before this change the same cold-cache miss folded from `init()` and rewrote the row straight back into 196952, so a log-only trace re-lost its totals on _every_ such delivery, indefinitely. After it, the loss can happen at most once more: the next write lands the row in a real partition, inside the read window, where every later read-back finds it.
 
-*A sentinel-anchored trace that receives no further event before the reap loses its summary row.* This fold declares no `refoldOnStoreMiss`, so nothing rebuilds it. The trace's spans and log records remain in `stored_spans` and the canonical log store; what is lost is the derived summary - its accumulated cost, tokens and span count.
+_A sentinel-anchored trace that receives no further event before the reap loses its summary row._ This fold declares no `refoldOnStoreMiss`, so nothing rebuilds it. The trace's spans and log records remain in `stored_spans` and the canonical log store; what is lost is the derived summary - its accumulated cost, tokens and span count.
 
-*The source events for that loss are still there, which is what makes a repair feasible.* `event_log` sits in the same `traces` retention category as `trace_summaries` (`RETENTION_TABLE_CATEGORY_MAP`), but its TTL anchors on `EventOccurredAt` - a real event time - while the summary derived from those same events was filed at the epoch. So the derived row dies years before its inputs do, and any affected trace still inside the tenant's trace-retention window is reconstructible from `event_log`. That asymmetry is the argument both for the loss being real and for a repair being possible; it is not an argument about which repair to run.
+_The source events for that loss are still there, which is what makes a repair feasible._ `event_log` sits in the same `traces` retention category as `trace_summaries` (`RETENTION_TABLE_CATEGORY_MAP`), but its TTL anchors on `EventOccurredAt` - a real event time - while the summary derived from those same events was filed at the epoch. So the derived row dies years before its inputs do, and any affected trace still inside the tenant's trace-retention window is reconstructible from `event_log`. That asymmetry is the argument both for the loss being real and for a repair being possible; it is not an argument about which repair to run.
 
 **No repair ships here, and that is a decision rather than an oversight.** Two options exist and both are bigger than this change:
 
@@ -135,7 +135,7 @@ Neither is bundled with the anchor, because the anchor is correct and shippable 
 ## References
 
 - [ADR-071](./071-coding-agent-session-immutable-storage-anchor.md) - the storage-anchor rule, and the inventory this closes an entry in
-- [ADR-066](./066-projection-clickhouse-cached-store.md) - the ClickHouse-cached fold store whose read-back the version gate protects
+- [ADR-066](../../../packages/eventing/adrs/066-clickhouse-cached-projections.md) - the ClickHouse-cached fold store whose read-back the version gate protects
 - [ADR-068](./068-windowed-clickhouse-reads.md) - `queryWindowed`, its fallbacks, and the outcome metric
 - `dev/docs/best_practices/clickhouse-queries.md` - IN-tuple dedup, partition-key filtering
 - `specs/traces/trace-summary-storage-anchor.feature` - the behavioural contract

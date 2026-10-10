@@ -1,14 +1,10 @@
 /**
- * The permission selector: what the box says, and what each key answers.
- *
- * The box is rendered through a fake writer and driven through a fake
- * keypress source, so the test reads the words and the answer rather than the
- * escape sequences.
- *
+ * Permission selector box rendering and key handling.
  * @see specs/typescript-sdk/cli-langy-share-control.feature
  */
 
 import { describe, expect, it } from "vitest";
+
 import type { LocalCall } from "../../../../agent/local-control-protocol";
 import {
   approvalCardFor,
@@ -85,6 +81,12 @@ const bashCall = (command: string): LocalCall => ({
   params: { command },
 });
 
+const paramsFor = (tool: LocalCall["tool"]) => {
+  if (tool === "local_bash") return { command: "x" };
+  if (tool === "local_edit") return { path: ".env", edits: [] };
+  return { path: ".env" };
+};
+
 const card: ApprovalCard = approvalCardFor({
   call: bashCall("uv run pytest"),
   workspaceName: "acme-support-dogfood",
@@ -118,7 +120,7 @@ describe("the options a permission ask offers", () => {
     });
   });
 
-  const limits: Array<[number, string]> = [
+  const limits: [number, string][] = [
     [30, "Stops after 30 seconds if it has not finished."],
     [60, "Stops after 1 minute if it has not finished."],
     [300, "Stops after 5 minutes if it has not finished."],
@@ -147,9 +149,7 @@ describe("the box the selector draws", () => {
     expect(drawn).toContainEqual(
       expect.stringContaining('❯ 1. Yes, allow "uv run" for this session'),
     );
-    expect(drawn).toContainEqual(
-      expect.stringContaining("2. Yes, this time only"),
-    );
+    expect(drawn).toContainEqual(expect.stringContaining("2. Yes, this time only"));
     expect(drawn).toContainEqual(
       expect.stringContaining("3. No, and tell Langy what to do instead"),
     );
@@ -203,7 +203,7 @@ describe("the box the selector draws", () => {
       );
     });
 
-    const sentences: Array<[string, string[], string | null]> = [
+    const sentences: [string, string[], string | null][] = [
       [
         "one pattern",
         [".venv/bin/python -c"],
@@ -223,7 +223,7 @@ describe("the box the selector draws", () => {
     ];
     for (const [what, patterns, sentence] of sentences) {
       describe(`when the grant is ${what}`, () => {
-        it(sentence === null ? "says nothing" : "reads what it covers", () => {
+        it("reads what it covers, or says nothing when it covers nothing", () => {
           expect(grantCoverageSentence(patterns)).toBe(sentence);
         });
       });
@@ -258,9 +258,7 @@ describe("the box the selector draws", () => {
 
       expect(first).toHaveLength(second.length);
       expect(second.filter((line) => line.includes("❯"))).toHaveLength(1);
-      expect(
-        second.find((line) => line.includes("❯")),
-      ).toContain("2. Yes, this time only");
+      expect(second.find((line) => line.includes("❯"))).toContain("2. Yes, this time only");
     });
   });
 
@@ -278,9 +276,7 @@ describe("the box the selector draws", () => {
 });
 
 describe("given a permission selector open in the terminal", () => {
-  const open = (
-    over: { card?: ApprovalCard; reason?: string } = {},
-  ) => {
+  const open = (over: { card?: ApprovalCard; reason?: string } = {}) => {
     const screen = fakeScreen();
     const keys = fakeKeys();
     const asked: string[] = [];
@@ -325,7 +321,7 @@ describe("given a permission selector open in the terminal", () => {
   });
 
   describe("when a digit is pressed", () => {
-    const digits: Array<[string, "allow_pattern" | "allow_once" | "deny"]> = [
+    const digits: [string, "allow_pattern" | "allow_once" | "deny"][] = [
       ["1", "allow_pattern"],
       ["2", "allow_once"],
       ["3", "deny"],
@@ -446,7 +442,7 @@ describe("createTerminalApprovals", () => {
 });
 
 describe("the card a file call produces", () => {
-  const titles: Array<[LocalCall["tool"], string]> = [
+  const titles: [LocalCall["tool"], string][] = [
     ["local_bash", "Langy wants to run in acme"],
     ["local_edit", "Langy wants to change a file in acme"],
     ["local_read", "Langy wants to read a file in acme"],
@@ -459,12 +455,7 @@ describe("the card a file call produces", () => {
         const call = {
           ...envelope,
           tool,
-          params:
-            tool === "local_bash"
-              ? { command: "x" }
-              : tool === "local_edit"
-                ? { path: ".env", edits: [] }
-                : { path: ".env" },
+          params: paramsFor(tool),
         } as LocalCall;
 
         expect(

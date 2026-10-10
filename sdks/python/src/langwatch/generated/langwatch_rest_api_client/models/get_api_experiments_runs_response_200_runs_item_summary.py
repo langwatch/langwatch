@@ -4,7 +4,6 @@ from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, TypeVar
 
 from attrs import define as _attrs_define
-from attrs import field as _attrs_field
 
 from ..types import UNSET, Unset
 
@@ -37,7 +36,6 @@ class GetApiExperimentsRunsResponse200RunsItemSummary:
     dataset_average_duration: float | Unset = UNSET
     evaluations_average_cost: float | Unset = UNSET
     evaluations_average_duration: float | Unset = UNSET
-    additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         evaluations = self.evaluations.to_dict()
@@ -55,7 +53,7 @@ class GetApiExperimentsRunsResponse200RunsItemSummary:
         evaluations_average_duration = self.evaluations_average_duration
 
         field_dict: dict[str, Any] = {}
-        field_dict.update(self.additional_properties)
+
         field_dict.update(
             {
                 "evaluations": evaluations,
@@ -107,21 +105,4 @@ class GetApiExperimentsRunsResponse200RunsItemSummary:
             evaluations_average_duration=evaluations_average_duration,
         )
 
-        get_api_experiments_runs_response_200_runs_item_summary.additional_properties = d
         return get_api_experiments_runs_response_200_runs_item_summary
-
-    @property
-    def additional_keys(self) -> list[str]:
-        return list(self.additional_properties.keys())
-
-    def __getitem__(self, key: str) -> Any:
-        return self.additional_properties[key]
-
-    def __setitem__(self, key: str, value: Any) -> None:
-        self.additional_properties[key] = value
-
-    def __delitem__(self, key: str) -> None:
-        del self.additional_properties[key]
-
-    def __contains__(self, key: str) -> bool:
-        return key in self.additional_properties

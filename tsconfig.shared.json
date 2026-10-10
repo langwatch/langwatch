@@ -1,0 +1,47 @@
+{
+  // The compiler options every workspace package shares, readable by the
+  // TypeScript 6 toolchain the published packages build with (catalog
+  // sdk-toolchain). TypeScript 7-only options live in tsconfig.base.json.
+  //
+  // A package's own tsconfig.json extends this file and then states only what
+  // is its own: its include/exclude, its lib and types, its jsx, its paths,
+  // and its own `tsBuildInfoFile` — the one option that must never be shared,
+  // because two packages pointed at one build-info file clobber each other's
+  // cache and each starts the next check cold.
+  //
+  // Nothing here is a preference: an option earns its place by already being
+  // stated the same way in every package that states it. A package that needs
+  // a different value restates it, and the restatement is then visible as the
+  // exception it is rather than as one line among twenty identical ones.
+  //
+  // See specs/setup/typescript-7.feature and dev/docs/adr/099-typescript-7-is-the-compiler.md.
+  "compilerOptions": {
+    // es2023 for the array copy methods -- toSorted, toReversed, toSpliced,
+    // with -- which `unicorn/no-array-sort` and `unicorn/no-array-reverse`
+    // rewrite the mutating forms into. `engines.node` is ">=24.0.0" and every
+    // one of them has shipped since Node 20, so the runtime was never the
+    // constraint; `lib` defaults from `target` and was simply behind it.
+    "target": "es2023",
+    "module": "preserve",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    // Stated identically by 178 and 176 package configs respectively; here so
+    // they can stop being. `isolatedModules` states what is already true --
+    // every loader in this repo transpiles file by file (Node's type
+    // stripping, vite, esbuild, tsup) and none of them sees the type graph.
+    "verbatimModuleSyntax": true,
+    "noUncheckedIndexedAccess": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "incremental": true,
+    // Node strips types rather than compiling, so a relative import must name
+    // the file on disk. `rewriteRelativeImportExtensions` is what keeps the
+    // emitting packages honest: their declarations still say `.js`.
+    "allowImportingTsExtensions": true,
+    // false here because these configs emit nothing; tsconfig.emit.json turns it
+    // on for the projects that do, which is who the rule is for.
+    "rewriteRelativeImportExtensions": false
+  }
+}

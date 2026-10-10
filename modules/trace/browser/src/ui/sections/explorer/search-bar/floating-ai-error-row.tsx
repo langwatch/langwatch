@@ -1,0 +1,96 @@
+import { Link } from "@langwatch/browser-host/link";
+import { Box, chakra, HStack, Icon, Text } from "@langwatch/design-system/primitives";
+import type { AiActionError } from "@langwatch/trace-contract";
+import { AlertCircle, ChevronDown, ChevronUp, X } from "lucide-react";
+import type React from "react";
+import { useState } from "react";
+
+import { useFilterStore } from "../../../../behavior/explorer.store.ts";
+import { explainAnyError } from "../../errors/index.ts";
+import { AiErrorDetails, hasAiErrorDetails } from "./error-banner-detail.tsx";
+
+/**
+ * Error surface for the FloatingAiBar.
+ */
+const CONFIGURATION_CODES = new Set([
+  "ai_query_provider_error",
+  "ai_call_failed",
+  "model_not_configured",
+  "model_provider_disabled",
+]);
+
+export const FloatingAiErrorRow: React.FC<{ error: AiActionError }> = ({ error }) => {
+  const [expanded, setExpanded] = useState(false);
+  const expandable = hasAiErrorDetails(error);
+  const setAiError = useFilterStore((s) => s.setAiError);
+  const { title, description } = explainAnyError(error.cause);
+  const text = description ? `${title}. ${description}` : title;
+
+  return (
+    <Box
+      role="alert"
+      bg="bg.panel"
+      borderWidth="1px"
+      borderColor="red.emphasized"
+      borderRadius="md"
+      paddingX={2}
+      paddingY={1}
+      boxShadow="0 2px 6px color-mix(in srgb, var(--chakra-colors-bg-scrim) 10%, transparent)"
+      maxWidth="full"
+      // The parent floating strip is click-transparent (it spans the whole
+      // search-bar width); only this pill takes pointer events.
+      pointerEvents="auto"
+    >
+      <HStack gap={1.5} align="center">
+        <Icon color="red.fg" boxSize="11px" flexShrink={0}>
+          <AlertCircle />
+        </Icon>
+        <Text textStyle="2xs" color="red.fg" lineHeight="1.3">
+          {text}
+        </Text>
+        {CONFIGURATION_CODES.has(error.code) && (
+          <Link
+            href="/settings/model-providers"
+            textStyle="2xs"
+            color="blue.fg"
+            fontWeight="600"
+            flexShrink={0}
+            marginLeft={1}
+          >
+            Review model providers
+          </Link>
+        )}
+        {expandable && (
+          <chakra.button
+            aria-label={expanded ? "Hide error details" : "Show error details"}
+            onClick={() => setExpanded((v) => !v)}
+            cursor="pointer"
+            display="inline-flex"
+            alignItems="center"
+            color="fg.muted"
+          >
+            <Icon boxSize="11px">{expanded ? <ChevronUp /> : <ChevronDown />}</Icon>
+          </chakra.button>
+        )}
+        <chakra.button
+          aria-label="Dismiss error"
+          onClick={() => setAiError(null)}
+          cursor="pointer"
+          display="inline-flex"
+          alignItems="center"
+          color="fg.muted"
+          flexShrink={0}
+        >
+          <Icon boxSize="11px">
+            <X />
+          </Icon>
+        </chakra.button>
+      </HStack>
+      {expanded && (
+        <Box paddingTop={1} paddingLeft={4}>
+          <AiErrorDetails error={error} />
+        </Box>
+      )}
+    </Box>
+  );
+};

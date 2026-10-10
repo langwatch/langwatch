@@ -1,13 +1,15 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
+
 import type {
   WebhookDestinationInput,
   WebhookSqsDestinationInput,
 } from "@/client-sdk/services/webhooks/webhooks-api.service";
 import { WebhooksApiService } from "@/client-sdk/services/webhooks/webhooks-api.service";
+
 import { checkOrgApiKey } from "../../utils/apiKey";
-import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 
 export interface CreateWebhookOptions {
   url?: string;
@@ -18,12 +20,9 @@ export interface CreateWebhookOptions {
 }
 
 /**
- * The queue's secret access key, which is never a flag.
- *
- * An argument lands in shell history, in `ps` output for every user on the
- * box, and in CI command logs. A long-lived AWS secret does not go there, so
- * it is read from the environment instead and the flag that would have
- * carried it does not exist.
+ * The queue's secret access key, which is never a flag: an argument lands
+ * in shell history, `ps` output and CI logs. A long-lived AWS secret does
+ * not go there, so it is read from the environment instead.
  */
 export const SQS_SECRET_ENV = "LANGWATCH_SQS_SECRET_ACCESS_KEY";
 
@@ -35,15 +34,11 @@ export function sqsSecretFromEnv(): string | undefined {
 }
 
 /**
- * Which destination the flags describe, and its fields.
- *
- * Naming a queue is what selects the queue destination: there is no separate
- * kind flag to keep in agreement with the address, so the two can never
- * disagree.
+ * Which destination the flags describe, and its fields. Naming a queue is
+ * what selects the queue destination -- there is no separate kind flag to
+ * keep in agreement with the address, so the two can never disagree.
  */
-export function destinationFromOptions(
-  options: CreateWebhookOptions,
-): WebhookDestinationInput {
+export function destinationFromOptions(options: CreateWebhookOptions): WebhookDestinationInput {
   if (options.queueUrl) {
     if (options.url) {
       throw new Error(
@@ -90,7 +85,10 @@ export const createWebhookCommand = async (
   try {
     const endpoint = await service.create({
       ...destinationFromOptions(options),
-      enabled_events: options.events.split(",").map((e) => e.trim()).filter(Boolean),
+      enabled_events: options.events
+        .split(",")
+        .map((e) => e.trim())
+        .filter(Boolean),
     });
     spinner.succeed(`Created endpoint ${endpoint.id}`);
     return {
@@ -110,10 +108,18 @@ export const createWebhookCommand = async (
           );
           console.log();
         }
-        console.log(chalk.gray("Verify deliveries with the X-LangWatch-Signature header (t=,v1= HMAC-SHA256, 5-minute tolerance)."));
+        console.log(
+          chalk.gray(
+            "Verify deliveries with the X-LangWatch-Signature header (t=,v1= HMAC-SHA256, 5-minute tolerance).",
+          ),
+        );
         if (endpoint.destination_kind === "sqs") {
           // The one thing every queue consumer gets wrong on its first run.
-          console.log(chalk.gray("On a queue, that signature is a MESSAGE ATTRIBUTE: pass MessageAttributeNames: [\"All\"] to ReceiveMessage or you will not see it."));
+          console.log(
+            chalk.gray(
+              'On a queue, that signature is a MESSAGE ATTRIBUTE: pass MessageAttributeNames: ["All"] to ReceiveMessage or you will not see it.',
+            ),
+          );
         }
         console.log();
       },

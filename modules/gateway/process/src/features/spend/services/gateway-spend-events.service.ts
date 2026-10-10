@@ -1,0 +1,155 @@
+import type {
+  GatewayConfirmedSpendPage,
+  GatewaySpendDay,
+  GatewayUsageCount,
+  SpendBucket,
+  SpendEventRow,
+  SpendFilters,
+  SpendGroupByKey,
+} from "@langwatch/gateway-contract";
+
+import type {
+  GatewaySpendEventsRepository,
+  SpendEventsPageCursor,
+  SpendSummaryRow,
+} from "../../../repositories/gateway-spend-events.repository.ts";
+
+export class GatewaySpendEventsService {
+  private constructor(private readonly repository: GatewaySpendEventsRepository) {}
+
+  static create(repository: GatewaySpendEventsRepository): GatewaySpendEventsService {
+    return new GatewaySpendEventsService(repository);
+  }
+
+  getSpendEventsPage(input: {
+    tenantId: string;
+    fromMs: number;
+    toMs: number;
+    filters?: SpendFilters;
+    cursor?: SpendEventsPageCursor;
+    limit?: number;
+  }): Promise<{ rows: SpendEventRow[]; nextCursor: SpendEventsPageCursor | null }> {
+    return this.repository.readSpendEventsPage(input);
+  }
+
+  getSpendSummaries(input: {
+    tenantIds: string[];
+    groupBy: SpendGroupByKey[];
+    bucket?: SpendBucket;
+    timezone?: string;
+    fromMs: number;
+    toMs: number;
+    cursor?: string | null;
+    limit?: number;
+    filters?: SpendFilters;
+  }): Promise<{ rows: SpendSummaryRow[]; nextCursor: string | null }> {
+    return this.repository.readSpendSummaries(input);
+  }
+
+  /** Newest first across tenants, one statement per tenant; webhook's events listing. */
+  getSpendEventsAcrossTenants(input: {
+    tenantIds: string[];
+    statuses: string[];
+    fromMs?: number;
+    toMs?: number;
+    cursor?: string | null;
+    limit: number;
+  }): Promise<{ rows: SpendEventRow[]; nextCursor: string | null }> {
+    return this.repository.readSpendEventsAcrossTenants(input);
+  }
+
+  findSpendEventAcrossTenants(input: {
+    tenantIds: string[];
+    gatewayRequestId: string;
+    statuses: string[];
+  }): Promise<SpendEventRow | null> {
+    return this.repository.findSpendEventAcrossTenants(input);
+  }
+
+  walkSpendEvents(input: {
+    tenantIds: string[];
+    fromMs?: number;
+    toMs?: number;
+    cursor?: string | null;
+    limit: number;
+    filters?: SpendFilters;
+  }): Promise<{ rows: SpendEventRow[]; nextCursor: string | null }> {
+    return this.repository.walkSpendEvents(input);
+  }
+
+  /** What one request type has cost these tenants, in integer nano-USD. */
+  sumSpendNanoUsdByRequestType(input: {
+    tenantIds: string[];
+    requestType: string;
+    fromMs?: number;
+    toMs?: number;
+  }): Promise<number> {
+    return this.repository.sumCostNanoUsdByRequestType(input);
+  }
+
+  /** The rows the sum above counts: confirmed, of one request type, under these tenants. */
+  async listConfirmedSpendByRequestType({
+    tenantIds,
+    requestType,
+    cursor,
+    limit,
+  }: {
+    tenantIds: string[];
+    requestType: string;
+    cursor?: string | null;
+    limit: number;
+  }): Promise<GatewayConfirmedSpendPage> {
+    const page = await this.repository.walkSpendEvents({
+      tenantIds,
+      cursor,
+      limit,
+      filters: { requestTypes: [requestType], status: "confirmed" },
+    });
+    return {
+      rows: page.rows.map((row) => ({
+        tenantId: row.tenantId,
+        requestId: row.gatewayRequestId,
+        costNanoUsd: row.costNanoUsd,
+        occurredAt: row.occurredAt.epochMilliseconds,
+      })),
+      nextCursor: page.nextCursor,
+    };
+  }
+
+  /** Main's governance metered-lane read, served by the ledger's owner. */
+  findSpendDaysForOrganizationProjects(input: {
+    tenantIds: readonly string[];
+    fromDay: string;
+    toDay: string;
+  }): Promise<GatewaySpendDay[]> {
+    if (input.tenantIds.length === 0) return Promise.resolve([]);
+    return this.repository.sumDaysForOrganizationProjects(input);
+  }
+
+  getEndUserSpend(input: {
+    tenantIds: string[];
+    endUserId: string;
+    fromMs: number;
+    toMs: number;
+    virtualKeyId?: string;
+  }): Promise<{
+    spendUsd: string;
+    spendNanoUsd: number;
+    requestCount: number;
+    tokensInput: number;
+    tokensOutput: number;
+    tokensCacheRead: number;
+    tokensCacheWrite: number;
+    tokensReasoning: number;
+    tokensInputImage: number;
+    tokensOutputImage: number;
+    imageCount: number;
+  }> {
+    return this.repository.readEndUserSpend(input);
+  }
+
+  /** The usage report's figures (ADR-156, section 10). */
+  countUsage(input: { projectIds: readonly string[]; since?: number }): Promise<GatewayUsageCount> {
+    return this.repository.countUsage(input);
+  }
+}

@@ -1,0 +1,211 @@
+/**
+ * @vitest-environment jsdom
+ * Email notification defaults: preview-only until the author opens 'Customize wording'.
+ * Monaco is stubbed in jsdom; the editors are asserted through their wrapper test ids.
+ */
+import {
+  ALERT_TRIGGER_DEFAULTS,
+  REPORT_TRIGGER_DEFAULTS,
+  TRACE_TRIGGER_DEFAULTS,
+} from "@langwatch/automation-contract";
+import { cleanup, fireEvent, screen, within } from "@testing-library/react";
+import { useState } from "react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+import type { ConfigFormCtx } from "../../../model/provider-types.ts";
+import { fakeAutomationHost, renderWithAutomationHost } from "../../../testing.tsx";
+
+vi.mock("@monaco-editor/react", () => ({ default: () => null }));
+/**
+ * The Liquid editor is Monaco-bound and cannot mount in jsdom. Stub just that one export as a
+ * textarea carrying its `value`, so a test can read back the template the editor was seeded
+ * with: what an author's first keystroke would persist. Everything else in the module stays real.
+ */
+vi.mock("../ui/sections/template-authoring.tsx", async (original) => {
+  const actual = await original<typeof templateAuthoringModule>();
+  return {
+    ...actual,
+    LiquidEditor: ({ value }: { value: string }) => <textarea readOnly value={value} />,
+  };
+});
+vi.mock("@langwatch/design-system/color-mode", () => ({
+  useColorMode: () => ({ colorMode: "light" }),
+}));
+vi.mock("../../../behavior/automation-api.ts", () => ({
+  api: {
+    team: {
+      getTeamWithMembers: {
+        useQuery: () => ({ data: { members: [] }, isLoading: false }),
+      },
+    },
+  },
+}));
+
+import type { EmailPreview } from "@langwatch/automation-contract";
+
+import emailClient, { type EmailSlice } from "../ui/sections/email.client.tsx";
+import type * as templateAuthoringModule from "../ui/sections/template-authoring.tsx";
+
+function makeCtx(
+  overrides: Partial<ConfigFormCtx<EmailPreview>> = {},
+): ConfigFormCtx<EmailPreview> {
+  return {
+    projectId: "project-1",
+    organizationId: "org-1",
+    teamSlug: "team-1",
+    variables: [],
+    example: {},
+    preview: {
+      channel: "email",
+      usedDefault: true,
+      missingVariables: [],
+      errors: [],
+      subject: "A trace matched",
+      html: "<p>hello</p>",
+    },
+    previewLoading: false,
+    cadenceMode: "immediate",
+    notificationCadence: "immediate",
+    setNotificationCadence: vi.fn(),
+    hasEvaluationFilter: false,
+    sourceKind: "trace",
+    ...overrides,
+  };
+}
+
+function Harness({ ctx }: { ctx: ConfigFormCtx<EmailPreview> }) {
+  const [slice, setSlice] = useState<EmailSlice>(emailClient.initialSlice());
+  const Form = emailClient.ConfigForm;
+  return <Form slice={slice} ctx={ctx} onChange={setSlice} />;
+}
+
+const renderForm = (
+  ctx: ConfigFormCtx<EmailPreview> = makeCtx(),
+  { hasEmailProvider = true }: { hasEmailProvider?: boolean } = {},
+) =>
+  renderWithAutomationHost(<Harness ctx={ctx} />, {
+    host: fakeAutomationHost({ hasEmailProvider }),
+  });
+
+describe("EmailConfigForm authoring tiers", () => {
+  afterEach(() => cleanup());
+
+  describe("given a fresh email draft", () => {
+    describe("when the form first renders", () => {
+      it("keeps the subject and body editors hidden", () => {
+        renderForm();
+
+        expect(screen.queryByTestId("email-subject-editor")).not.toBeInTheDocument();
+        expect(screen.queryByTestId("email-body-editor")).not.toBeInTheDocument();
+      });
+
+      it("offers a customize wording expander", () => {
+        renderForm();
+
+        expect(screen.getByRole("button", { name: /customize wording/i })).toBeInTheDocument();
+      });
+    });
+  });
+
+  describe("when the author opens customize wording", () => {
+    it("reveals the subject and body editors", () => {
+      renderForm();
+
+      fireEvent.click(screen.getByRole("button", { name: /customize wording/i }));
+
+      expect(screen.getByTestId("email-subject-editor")).toBeInTheDocument();
+      expect(screen.getByTestId("email-body-editor")).toBeInTheDocument();
+    });
+  });
+});
+
+/**
+ * The editor is seeded with the template dispatch will really render,
+ * since the author's first keystroke persists whatever it was showing --
+ * seed the wrong kind and a report author saves trace copy that renders empty.
+ */
+describe("EmailConfigForm default wording", () => {
+  afterEach(() => cleanup());
+
+  function openedEditors(ctx: ConfigFormCtx<EmailPreview>) {
+    renderForm(ctx);
+    fireEvent.click(screen.getByRole("button", { name: /customize wording/i }));
+    return {
+      subject: within(screen.getByTestId("email-subject-editor")).getByRole("textbox"),
+      body: within(screen.getByTestId("email-body-editor")).getByRole("textbox"),
+    };
+  }
+
+  describe("given a report draft", () => {
+    it("seeds the report subject and body, not the trace ones", () => {
+      const { subject, body } = openedEditors(makeCtx({ sourceKind: "report" }));
+
+      expect(subject).toHaveValue(REPORT_TRIGGER_DEFAULTS.emailSubject);
+      expect(body).toHaveValue(REPORT_TRIGGER_DEFAULTS.emailBody);
+    });
+
+    it("drops the cadence switch — a report runs on its own schedule", () => {
+      renderForm(makeCtx({ sourceKind: "report" }));
+
+      expect(screen.queryByText(/cadence/i)).not.toBeInTheDocument();
+    });
+  });
+
+  describe("given a graph-alert draft", () => {
+    it("seeds the alert subject and body", () => {
+      const { subject, body } = openedEditors(makeCtx({ sourceKind: "graphAlert" }));
+
+      expect(subject).toHaveValue(ALERT_TRIGGER_DEFAULTS.emailSubject);
+      expect(body).toHaveValue(ALERT_TRIGGER_DEFAULTS.emailBody);
+    });
+  });
+
+  describe("given a trace draft", () => {
+    it("seeds the trace subject and body", () => {
+      const { subject, body } = openedEditors(makeCtx());
+
+      expect(subject).toHaveValue(TRACE_TRIGGER_DEFAULTS.emailSubject);
+      expect(body).toHaveValue(TRACE_TRIGGER_DEFAULTS.emailBody);
+    });
+
+    it("renders no cadence switch — timing moved to the drawer's Cadence section", () => {
+      // The digest/immediate choice lives in CadenceSection now (drawer UX
+      // rework); the config form owns only recipients and wording. The
+      // trace-can-digest behavior is covered by
+      // CadenceSection.integration.test.tsx.
+      renderForm(makeCtx());
+
+      expect(screen.queryByText(/cadence/i)).not.toBeInTheDocument();
+    });
+  });
+});
+
+describe("EmailConfigForm on an installation without email", () => {
+  afterEach(() => cleanup());
+
+  describe("given no email provider is configured", () => {
+    /** @scenario "Email delivery setup warns when the installation cannot send email" */
+    it("warns that this installation cannot send email", () => {
+      renderForm(makeCtx(), { hasEmailProvider: false });
+
+      expect(screen.getByTestId("email-provider-missing")).toHaveTextContent(/cannot send email/i);
+    });
+
+    it("still lets the automation be saved once it has a recipient", () => {
+      expect(
+        emailClient.isComplete({
+          ...emailClient.initialSlice(),
+          members: ["someone@example.com"],
+        }),
+      ).toBe(true);
+    });
+  });
+
+  describe("given an email provider is configured", () => {
+    it("shows no warning", () => {
+      renderForm();
+
+      expect(screen.queryByTestId("email-provider-missing")).not.toBeInTheDocument();
+    });
+  });
+});

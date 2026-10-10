@@ -6,6 +6,7 @@ const checkGiB = uint64(1) << 30
 
 // @scenario "haven derives the same limit the JavaScript queue would"
 func TestResolveCheckSlots(t *testing.T) {
+	// @scenario "The default limit is derived from the machine"
 	t.Run("given no explicit limit on a developer machine", func(t *testing.T) {
 		cases := []struct {
 			name string
@@ -27,6 +28,8 @@ func TestResolveCheckSlots(t *testing.T) {
 		}
 	})
 
+	// @scenario "An explicit limit is honored"
+	// @scenario "The limit can be turned off"
 	t.Run("given an explicit CHECK_SLOTS", func(t *testing.T) {
 		if slots, source := ResolveCheckSlots(CheckMachine{TotalRAMBytes: 18 * checkGiB, NumCPU: 11, Pressure: Green}, CheckEnv{CheckSlots: "5", CI: "true"}); slots != 5 || source != "CHECK_SLOTS" {
 			t.Fatalf("an explicit limit must win, even under CI: got %d from %q", slots, source)
@@ -39,6 +42,7 @@ func TestResolveCheckSlots(t *testing.T) {
 		}
 	})
 
+	// @scenario "CI does not queue by default"
 	t.Run("given CI without an explicit limit", func(t *testing.T) {
 		if slots, source := ResolveCheckSlots(CheckMachine{TotalRAMBytes: 18 * checkGiB, NumCPU: 11, Pressure: Green}, CheckEnv{CheckSlots: "", CI: "true"}); slots != 0 || source != "CI" {
 			t.Fatalf("CI must not queue, got %d from %q", slots, source)
@@ -64,6 +68,8 @@ func TestResolveCheckSlots(t *testing.T) {
 	})
 
 	// @scenario "haven ignores an agent's gate-off the same way"
+	// @scenario "An agent shell cannot turn the queue off"
+	// @scenario "A run the queue spawned itself stays unqueued in an agent shell"
 	t.Run("given a gate-off from an agent shell", func(t *testing.T) {
 		machine := CheckMachine{TotalRAMBytes: 18 * checkGiB, NumCPU: 11, Pressure: Green}
 		for _, raw := range []string{"0", "off", "none", "unlimited", "false"} {

@@ -1,8 +1,17 @@
 package app
 
 import (
+	"context"
+	"errors"
+	"os"
+	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
+
+	"go.uber.org/zap"
+
+	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
 
 func TestLangyContainerShell(t *testing.T) {
@@ -15,8 +24,8 @@ func TestLangyContainerShell(t *testing.T) {
 				t.Fatalf("missing loopback publish in: %s", sh)
 			}
 		})
-		t.Run("sets PORT, ENVIRONMENT, pretty logging and the internal secret", func(t *testing.T) {
-			for _, want := range []string{"'PORT=49624'", "'ENVIRONMENT=local'", "'LOG_FORMAT=pretty'", "'LANGY_INTERNAL_SECRET=sekret'"} {
+		t.Run("sets PORT, ENVIRONMENT, structured logging and the internal secret", func(t *testing.T) {
+			for _, want := range []string{"'PORT=49624'", "'ENVIRONMENT=local'", "'LOG_FORMAT=json'", "'LANGY_INTERNAL_SECRET=sekret'"} {
 				if !strings.Contains(sh, want) {
 					t.Fatalf("missing %s in: %s", want, sh)
 				}
@@ -162,4 +171,101 @@ func TestLangyWorkerIdleMS(t *testing.T) {
 			}
 		}
 	})
+}
+
+func TestLangyChildHostTier(t *testing.T) {
+	o := &Orchestrator{cfg: Config{Home: t.TempDir()}}
+	st := domain.Stack{Slug: "demo", LangyTier: domain.LangyTierHostUnsafe}
+	child := o.langyChild(st, PlanOptions{RepoRoot: t.TempDir()}, nil, 4123, "")
+
+	t.Run("accepts the manager's loopback relay over cleartext", func(t *testing.T) {
+		if !slices.Contains(child.Env, "LANGY_EGRESS_REQUIRE_TLS=false") {
+			t.Fatalf("host tier env lacks LANGY_EGRESS_REQUIRE_TLS=false: %v", child.Env)
+		}
+	})
+}
+
+func TestEnsureLangyWorkerBinary(t *testing.T) {
+	bunDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(bunDir, "bun"), []byte("#!/bin/sh\n"), 0o700); err != nil { //nolint:gosec // the fixture needs the exec bit
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", bunDir)
+	run := func(t *testing.T, sup *fakeSupervisor, withBinary bool, tier domain.LangyTier) PlanOptions {
+		t.Helper()
+		repo := t.TempDir()
+		if withBinary {
+			path := langyWorkerBinaryPath(repo)
+			if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(path, []byte("#!/bin/sh\n"), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.Chmod(path, 0o700); err != nil { //nolint:gosec // the fixture needs the exec bit
+				t.Fatal(err)
+			}
+		}
+		o := &Orchestrator{sup: sup, sys: &fakeSystem{}, log: zap.NewNop()}
+		st := domain.Stack{Slug: "demo", WorktreeDir: t.TempDir(), LangyTier: tier}
+		opts := PlanOptions{RepoRoot: repo, Selection: domain.Selection{Langy: true}}
+		o.ensureLangyWorkerBinary(context.Background(), st, &opts)
+		return opts
+	}
+
+	t.Run("builds a missing binary on the host tier and keeps Langy", func(t *testing.T) {
+		sup := &fakeSupervisor{}
+		opts := run(t, sup, false, domain.LangyTierHostUnsafe)
+		if len(sup.shells) != 1 || !strings.Contains(sup.shells[0], "@langwatch/langyworker:build:binary") {
+			t.Fatalf("expected one build, got %v", sup.shells)
+		}
+		if !opts.Selection.Langy {
+			t.Fatal("Langy was deselected after a good build")
+		}
+	})
+
+	t.Run("deselects Langy when the build fails", func(t *testing.T) {
+		sup := &fakeSupervisor{err: errors.New("exit 1")}
+		if run(t, sup, false, domain.LangyTierHostUnsafe).Selection.Langy {
+			t.Fatal("Langy still selected after a failed build")
+		}
+	})
+
+	// @scenario "A Langy that cannot build for want of bun says how to fix it"
+	t.Run("skips the build and deselects Langy when bun is missing", func(t *testing.T) {
+		t.Setenv("PATH", t.TempDir())
+		sup := &fakeSupervisor{}
+		if run(t, sup, false, domain.LangyTierHostUnsafe).Selection.Langy {
+			t.Fatal("Langy still selected with no bun to build its worker")
+		}
+		if len(sup.shells) != 0 {
+			t.Fatalf("a build ran with no bun: %v", sup.shells)
+		}
+	})
+
+	t.Run("does nothing when the binary exists or the tier is a container", func(t *testing.T) {
+		sup := &fakeSupervisor{}
+		run(t, sup, true, domain.LangyTierHostUnsafe)
+		run(t, sup, false, domain.LangyTierSandboxed)
+		if len(sup.shells) != 0 {
+			t.Fatalf("unexpected build: %v", sup.shells)
+		}
+	})
+}
+
+// @scenario "A Langy that cannot start leaves the app no dead agent address"
+func TestDropLocalLangyAgentLeavesNoAgentURL(t *testing.T) {
+	st := domain.Stack{Slug: "demo", Services: []domain.Service{{Name: "app", Port: 4000}, {Name: "langyagent", Port: 4123}}}
+	if !dropLocalLangyAgent(&st) {
+		t.Fatal("a local langyagent port was not dropped")
+	}
+	for _, line := range st.OverlayEnv() {
+		if strings.HasPrefix(line, "LANGY_AGENT_URL=") || strings.HasPrefix(line, "LANGY_INTERNAL_SECRET=") {
+			t.Fatalf("overlay still names the agent after Langy was skipped: %q", line)
+		}
+	}
+	fallback := domain.Stack{Services: []domain.Service{{Name: "langyagent", Port: 4124, IsFallback: true}}}
+	if dropLocalLangyAgent(&fallback) || fallback.Services[0].Port != 4124 {
+		t.Fatal("a baseline stack's langyagent was dropped")
+	}
 }

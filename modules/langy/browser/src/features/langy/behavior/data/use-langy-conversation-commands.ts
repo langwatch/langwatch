@@ -1,0 +1,53 @@
+import { useCallback } from "react";
+
+import { api } from "../../../../behavior/langy-api.ts";
+import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
+import { useLangyDeletedConversationsStore } from "../stores/langy-deleted-conversations.store.ts";
+
+/**
+ * Write commands for Langy conversations, through the defined tRPC API.
+ */
+export function useLangyConversationCommands(): {
+  remove: (id: string) => Promise<void>;
+  rename: (id: string, title: string) => Promise<void>;
+} {
+  const { project } = useOrganizationTeamProject();
+  const utils = api.useUtils();
+  const hideConversation = useLangyDeletedConversationsStore((s) => s.hide);
+  const deleteConversation = api.langy.deleteConversation.useMutation({
+    onSuccess: (result, variables) => {
+      if (result.success) hideConversation(variables.conversationId);
+      void utils.langy.list.invalidate({ projectId: variables.projectId });
+    },
+  });
+  const renameConversation = api.langy.renameConversation.useMutation({
+    onSuccess: (_result, variables) => {
+      void utils.langy.list.invalidate({ projectId: variables.projectId });
+    },
+  });
+
+  const remove = useCallback(
+    async (id: string) => {
+      const projectId = project?.id;
+      if (!projectId) return;
+      await deleteConversation.mutateAsync({ projectId, conversationId: id });
+    },
+    [project?.id, deleteConversation],
+  );
+
+  const rename = useCallback(
+    async (id: string, title: string) => {
+      const projectId = project?.id;
+      const trimmed = title.trim();
+      if (!projectId || !trimmed) return;
+      await renameConversation.mutateAsync({
+        projectId,
+        conversationId: id,
+        title: trimmed,
+      });
+    },
+    [project?.id, renameConversation],
+  );
+
+  return { remove, rename };
+}

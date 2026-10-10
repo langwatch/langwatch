@@ -1,0 +1,134 @@
+import type { Named } from "@langwatch/module";
+import type { Instant } from "@langwatch/time";
+import { z } from "zod";
+
+const browserSessionUserSchema = z
+  .object({
+    id: z.string().min(1),
+    name: z.string().nullable().optional(),
+    email: z.string().nullable().optional(),
+    image: z.string().nullable().optional(),
+    pendingSsoSetup: z.boolean().optional(),
+  })
+  .strict();
+
+/**
+ * Projection of Better Auth's verified session. Not strict to avoid rejecting
+ * valid sessions when additionalFields are present.
+ */
+const verifiedBrowserSessionUserSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().nullable().optional(),
+  email: z.string().nullable().optional(),
+  image: z.string().nullable().optional(),
+  pendingSsoSetup: z.boolean().optional(),
+});
+
+const verifiedBrowserSessionSchemaDefinition = z.object({
+  session: z.object({ id: z.string().min(1), expiresAt: z.coerce.date() }),
+  user: verifiedBrowserSessionUserSchema,
+});
+export interface VerifiedBrowserSessionSchema extends Named<
+  typeof verifiedBrowserSessionSchemaDefinition
+> {}
+export const verifiedBrowserSessionSchema: VerifiedBrowserSessionSchema =
+  verifiedBrowserSessionSchemaDefinition;
+export type VerifiedBrowserSession = z.infer<typeof verifiedBrowserSessionSchema>;
+
+const browserSessionActorSchema = browserSessionUserSchema.pick({
+  id: true,
+  name: true,
+  email: true,
+  image: true,
+});
+
+const browserSessionSchemaDefinition = z
+  .object({
+    user: browserSessionUserSchema.safeExtend({
+      impersonator: browserSessionActorSchema.optional(),
+    }),
+    expires: z.string().datetime(),
+    sessionId: z.string().min(1),
+  })
+  .strict();
+export interface BrowserSessionSchema extends Named<typeof browserSessionSchemaDefinition> {}
+export const browserSessionSchema: BrowserSessionSchema = browserSessionSchemaDefinition;
+export type BrowserSession = z.infer<typeof browserSessionSchema>;
+
+/** Whether Better Auth accepts a session token; no token or no sign-in door reads as anonymous. */
+export type BrowserSessionVerification =
+  | { kind: "verified"; verified: VerifiedBrowserSession }
+  | { kind: "anonymous" };
+
+/** A verified token resolved to a live session; a missing, revoked or expired one is anonymous. */
+export type BrowserSessionResolution =
+  | { kind: "signed_in"; session: BrowserSession }
+  | { kind: "anonymous" };
+
+/**
+ * A session's live impersonation (D06): the operator who really acts, the person whose access they
+ * borrow, the reason given, and when the borrowed access lapses.
+ */
+export type SessionImpersonation = Readonly<{
+  actorUserId: string;
+  subjectUserId: string;
+  reason: string | null;
+  expiresAt: Instant;
+}>;
+
+/** Whether a session acts as its own user or carries a live impersonation. */
+export type SessionImpersonationState =
+  | Readonly<{ kind: "none" }>
+  | Readonly<{ kind: "impersonating"; impersonation: SessionImpersonation }>;
+
+/**
+ * One session as its owner reads it on their devices list. Carries how it
+ * signed in and what that proved, never a token: the list is a reading of
+ * live sessions, and nothing on it can be replayed.
+ */
+const browserSessionInventoryEntrySchemaDefinition = z
+  .object({
+    sessionId: z.string().min(1),
+    /** Which sign-in method minted it; null on every session predating it. */
+    identifierId: z.string().nullable(),
+    /** How it signed in, in words — never `pwd` or `phw`. */
+    method: z.string().min(1),
+    secondFactorProven: z.boolean(),
+    ipAddress: z.string().nullable(),
+    userAgent: z.string().nullable(),
+    signedInAt: z.string().datetime(),
+    /**
+     * Activity to the nearest day: better-auth rolls a live session's expiry
+     * once per `updateAge`, so this tells a browser used this morning from one
+     * untouched since February, which is the only question asked of it.
+     */
+    lastActiveAt: z.string().datetime(),
+    expiresAt: z.string().datetime(),
+    /** Whether this is the session doing the reading. */
+    current: z.boolean(),
+  })
+  .strict();
+export interface BrowserSessionInventoryEntrySchema extends Named<
+  typeof browserSessionInventoryEntrySchemaDefinition
+> {}
+export const browserSessionInventoryEntrySchema: BrowserSessionInventoryEntrySchema =
+  browserSessionInventoryEntrySchemaDefinition;
+export type BrowserSessionInventoryEntry = z.infer<typeof browserSessionInventoryEntrySchema>;
+
+/** Which of the caller's own browser sessions to end. */
+const endBrowserSessionInputSchemaDefinition = z.object({ sessionId: z.string().min(1) }).strict();
+export interface EndBrowserSessionInputSchema extends Named<
+  typeof endBrowserSessionInputSchemaDefinition
+> {}
+export const endBrowserSessionInputSchema: EndBrowserSessionInputSchema =
+  endBrowserSessionInputSchemaDefinition;
+
+/** How many sessions an end request actually ended; zero is an ordinary answer. */
+const browserSessionsEndedSchemaDefinition = z
+  .object({ ended: z.number().int().nonnegative() })
+  .strict();
+export interface BrowserSessionsEndedSchema extends Named<
+  typeof browserSessionsEndedSchemaDefinition
+> {}
+export const browserSessionsEndedSchema: BrowserSessionsEndedSchema =
+  browserSessionsEndedSchemaDefinition;

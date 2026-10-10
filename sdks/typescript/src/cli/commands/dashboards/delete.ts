@@ -1,9 +1,11 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
+
 import { DashboardsApiService } from "@/client-sdk/services/dashboards/dashboards-api.service";
+
 import { resolveCredentials } from "../../utils/apiKey";
-import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 
 /**
  * Returns the deletion outcome rather than printing it: the output port renders
@@ -17,7 +19,9 @@ export const deleteDashboardCommand = async (id: string): Promise<CommandResult 
 
   try {
     const result = await service.delete(id);
-    spinner.succeed(`Deleted dashboard "${chalk.cyan(result.name)}" ${chalk.gray(`(id: ${result.id})`)}`);
+    spinner.succeed(
+      `Deleted dashboard "${chalk.cyan(result.name)}" ${chalk.gray(`(id: ${result.id})`)}`,
+    );
 
     return {
       data: result,

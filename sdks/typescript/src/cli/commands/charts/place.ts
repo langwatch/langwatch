@@ -1,27 +1,26 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
+
 import { ChartsApiService } from "@/client-sdk/services/charts/charts-api.service";
+
 import { resolveCredentials } from "../../utils/apiKey";
-import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 
 const parseGridFlag = (name: string, raw: string | undefined): number | undefined => {
   if (raw === undefined) return undefined;
   const value = Number(raw);
   if (!Number.isInteger(value) || value < 0) {
-    console.error(
-      chalk.red(`Error: ${name} must be a whole number`),
-    );
+    console.error(chalk.red(`Error: ${name} must be a whole number`));
     process.exit(1);
   }
   return value;
 };
 
 /**
- * Returns the placed chart rather than printing it: the output port renders
- * it in whatever format the caller asked for (utils/output.ts). With no grid
- * row given, the platform allocates the next free row on that dashboard,
- * counting charts of every kind.
+ * Returns the placed chart rather than printing it (output port renders
+ * per-format). With no grid row given, the platform allocates the next free
+ * row on that dashboard, counting charts of every kind.
  */
 export const placeChartCommand = async (
   id: string,
@@ -72,9 +71,7 @@ export const placeChartCommand = async (
           `  ${chalk.gray("Grid:")} column ${chart.gridColumn}, row ${chart.gridRow}, spans ${chart.colSpan}x${chart.rowSpan}`,
         );
         if (chart.platformUrl) {
-          console.log(
-            `  ${chalk.bold("View:")} ${chalk.underline(chart.platformUrl)}`,
-          );
+          console.log(`  ${chalk.bold("View:")} ${chalk.underline(chart.platformUrl)}`);
         }
         console.log();
       },

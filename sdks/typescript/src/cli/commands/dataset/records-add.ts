@@ -1,14 +1,13 @@
-import chalk from "chalk";
 import fs from "fs";
-import { createSpinner } from "../../utils/spinner";
+
+import chalk from "chalk";
+
 import { resolveCredentials } from "../../utils/apiKey";
-import {
-  commandValidationError,
-  reportCommandError,
-} from "../../utils/errorOutput";
+import { commandValidationError, reportCommandError } from "../../utils/errorOutput";
 import type { CommandResult } from "../../utils/output";
-import { createDatasetService } from "./service-factory";
+import { createSpinner } from "../../utils/spinner";
 import { handleDatasetCommandError } from "./error-handler";
+import { createDatasetService } from "./service-factory";
 
 /**
  * Reads all data from stdin as a string.
@@ -56,9 +55,7 @@ export const recordsAddCommand = async (
 
   if (!options.json && !options.file && !options.stdin) {
     reportCommandError({
-      error: commandValidationError(
-        "One of --json, --file, or --stdin is required.",
-      ),
+      error: commandValidationError("One of --json, --file, or --stdin is required."),
     });
     process.exit(1);
   }
@@ -82,24 +79,22 @@ export const recordsAddCommand = async (
     entries = parseRecordsJson(jsonStr);
   } catch (error) {
     reportCommandError({
-      error: commandValidationError(
-        error instanceof Error ? error.message : "Invalid JSON input",
-      ),
+      error: commandValidationError(error instanceof Error ? error.message : "Invalid JSON input"),
     });
     process.exit(1);
   }
 
   if (entries.length === 0) {
     reportCommandError({
-      error: commandValidationError(
-        "No records provided. The JSON array is empty.",
-      ),
+      error: commandValidationError("No records provided. The JSON array is empty."),
     });
     process.exit(1);
   }
 
   const service = createDatasetService();
-  const spinner = createSpinner(`Adding ${entries.length} record${entries.length !== 1 ? "s" : ""} to "${slugOrId}"...`).start();
+  const spinner = createSpinner(
+    `Adding ${entries.length} record${entries.length !== 1 ? "s" : ""} to "${slugOrId}"...`,
+  ).start();
 
   try {
     const result = await service.createRecords(slugOrId, entries);

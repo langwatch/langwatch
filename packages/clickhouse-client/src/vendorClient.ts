@@ -1,39 +1,18 @@
 /**
- * Resilience over the vendor client's own `query`/`insert`.
- *
- * Most of this repo's statements still go through `@clickhouse/client`
- * directly rather than through the {@link ClickHouseQueryClient} port, and
- * this class is the policy layer they get: retry on transient read failures,
- * outcome logging that names the cluster, an outcome metric per statement, and
- * the in-band exception guard for streamed results.
- *
- * The vendor package itself is deliberately not imported. Everything here is
- * declared structurally — a client is anything with `query` and `insert`, a
- * result is anything with a `json` method — which is what keeps this package
- * free of the driver dependency and lets a test double be an object literal.
- * The host supplies what is host-specific through ports: where metrics go,
- * where log lines go, how a raised error is translated for its callers, and
- * which queries count as cold scans.
- *
- * Two neighbours carry the parts that are not policy. Reading facts back out of
- * the vendor's untyped params and rows is ./statementShape.ts. Saying what
- * happened — which sink, which level, which counter, and the guarantee that
- * none of it can throw into the caller's path — is ./statementReporting.ts.
+ * Policy layer over the vendor client's `query`/`insert`, for statements
+ * still going through `@clickhouse/client` directly rather than
+ * {@link ClickHouseQueryClient}: retry, outcome metrics, in-band exceptions.
  */
 
-import type { AbortSignalLike } from "./query";
-import { runWithRetry } from "./retry";
+import type { AbortSignalLike } from "./query.ts";
+import { runWithRetry } from "./retry.ts";
 import {
   StatementReporter,
   type StatementLogSink,
   type StatementMetrics,
   type StatementOperation,
-} from "./statementReporting";
-import {
-  extractQueryType,
-  extractTableName,
-  inbandExceptionOf,
-} from "./statementShape";
+} from "./statementReporting.ts";
+import { extractQueryType, extractTableName, inbandExceptionOf } from "./statementShape.ts";
 
 /**
  * Anything that can run the vendor's two statement methods. Method shorthand
@@ -50,10 +29,7 @@ export interface VendorStatementClient {
  * DOM lib to build — the same reason ./retry.ts reaches its timer this way.
  * Every host that can run a query has a monotonic clock.
  */
-const now = (): number =>
-  (
-    globalThis as unknown as { performance: { now(): number } }
-  ).performance.now();
+const now = (): number => globalThis.performance.now();
 
 export interface VendorClientResilienceOptions {
   /**
@@ -78,15 +54,11 @@ export interface VendorClientResilienceOptions {
   /** Per-statement outcome lines: failures, cold scans, debug successes. */
   outcomeLogger?: StatementLogSink | undefined;
   /**
-   * Translates a raised read error into what the host's callers should see —
-   * typically a typed error with remediation. Applied after retries are
-   * exhausted and to in-band exceptions; never to insert failures, whose
-   * callers are queue jobs that classify the raw error themselves. Omit to
-   * raise errors untranslated.
+   * Translates a raised read error into what callers should see, applied
+   * after retries exhaust and to in-band exceptions — never to insert
+   * failures, whose callers classify the raw error themselves.
    */
-  translateQueryError?:
-    | ((input: { error: unknown; durationMs: number }) => unknown)
-    | undefined;
+  translateQueryError?: ((input: { error: unknown; durationMs: number }) => unknown) | undefined;
   /**
    * Names the time-partitioned table a SELECT scans without a prunable time
    * predicate, or null. The table list is host schema knowledge, so the
@@ -95,32 +67,30 @@ export interface VendorClientResilienceOptions {
   detectColdScan?: ((rawQuery: string) => string | null) | undefined;
 }
 
+/** Complete retry/reporting policy supplied to a managed vendor client. */
+export abstract class VendorClientPolicy {
+  abstract wrap<Client extends VendorStatementClient>(client: Client, cluster: string): Client;
+}
+
+/** The standard vendor retry and reporting policy, configured once per process. */
+export class VendorClientResiliencePolicy extends VendorClientPolicy {
+  private constructor(private readonly options: VendorClientResilienceOptions) {
+    super();
+  }
+
+  static create(options: VendorClientResilienceOptions = {}): VendorClientResiliencePolicy {
+    return new VendorClientResiliencePolicy(options);
+  }
+
+  wrap<Client extends VendorStatementClient>(client: Client, cluster: string): Client {
+    return new VendorClientResilience({ ...this.options, cluster }).wrap(client);
+  }
+}
+
 /**
- * The resilience policy a vendor-shaped client is wrapped in, held as one
- * object so it is configured once and applied to every client the same way.
- *
- * Reads retry because they are idempotent and nothing above them will do it: a
- * transient overload would otherwise surface as a failed page.
- *
- * Writes deliberately do not. Every insert in this system is issued from a job
- * on a queue that retries the whole job on its own backoff, so a client-side
- * retry does not add resilience - it multiplies attempts. The two layers
- * compounded: 4 attempts here inside up to 25 there, so one insert could be
- * tried ~100 times against a server that was rejecting precisely because it
- * was overloaded.
- *
- * It was also the unsafe half. These are async inserts (`async_insert` +
- * `wait_for_async_insert`) and `async_insert_deduplicate` is not set anywhere,
- * so it takes ClickHouse's default of off. A failure raised after the server
- * has accepted the batch into its buffer - `Query was cancelled`, or the
- * memory limit hit while executing `WaitForAsyncInsert`, which between them
- * were most of the insert retries in production - can still flush. Retrying
- * then writes the rows twice. ReplacingMergeTree collapses that for the tables
- * keyed to collapse it; the rollup and analytics tables just double-count.
- *
- * If insert retries are ever wanted back, make them idempotent first: set
- * `async_insert_deduplicate`, or pass a deterministic
- * `insert_deduplication_token` per batch.
+ * Reads retry (idempotent); inserts deliberately do not. Every insert already
+ * retries via its queue job, and — being an async insert with no dedup token
+ * set — a retry after the server buffers it can double-write the rows.
  */
 export class VendorClientResilience {
   private readonly maxRetries: number;
@@ -128,10 +98,7 @@ export class VendorClientResilience {
   private readonly maxDelayMs: number;
   private readonly transientMessageFragments: readonly string[];
   private readonly report: StatementReporter;
-  private readonly translateQueryError: (input: {
-    error: unknown;
-    durationMs: number;
-  }) => unknown;
+  private readonly translateQueryError: (input: { error: unknown; durationMs: number }) => unknown;
 
   constructor({
     cluster = "shared",
@@ -161,69 +128,52 @@ export class VendorClientResilience {
 
   /** Build one resilient client over the vendor's, preserving its type. */
   wrap<T extends VendorStatementClient>(client: T): T {
-    const wrapper = Object.create(client) as T;
+    return new Proxy(client, {
+      get: (target, property) => {
+        if (property === "query") return (params: unknown) => this.query(target, params);
+        if (property === "insert") return (params: unknown) => this.insert(target, params);
+        return Reflect.get(target, property, target);
+      },
+    });
+  }
 
-    wrapper.query = (async (params: unknown) => {
-      const queryType = extractQueryType(params);
-      const table = extractTableName(params);
-      const start = now();
-      try {
-        const result = (await this.withTransientRetry({
-          run: () => client.query(params),
-          operation: "query",
-          signal: abortSignalOf(params),
-        })) as { json?: (...args: never[]) => unknown };
-        const durationMs = now() - start;
-        this.report.success({ operation: "query", durationMs, params });
-        this.report.outcome({
-          queryType,
-          table,
-          durationMs,
-          outcome: "success",
-        });
-        return this.guardInbandException({ result, startMs: start, params });
-      } catch (error) {
-        const durationMs = now() - start;
-        this.report.failure({ operation: "query", error, durationMs, params });
-        this.report.outcome({ queryType, table, durationMs, outcome: "error" });
-        // Retries are exhausted at this point: hand the failure to the host's
-        // translator so callers get whatever typed, actionable shape the host
-        // defines for known ClickHouse failures.
-        throw this.translateQueryError({ error, durationMs });
-      }
-    }) as T["query"];
+  private async query(client: VendorStatementClient, params: unknown): Promise<unknown> {
+    const queryType = extractQueryType(params);
+    const table = extractTableName(params);
+    const start = now();
+    try {
+      const result = await this.withTransientRetry({
+        run: () => client.query(params),
+        operation: "query",
+        signal: abortSignalOf(params),
+      });
+      const durationMs = now() - start;
+      this.report.success({ operation: "query", durationMs, params });
+      this.report.outcome({ queryType, table, durationMs, outcome: "success" });
+      return this.guardInbandException({ result, startMs: start, params });
+    } catch (error) {
+      const durationMs = now() - start;
+      this.report.failure({ operation: "query", error, durationMs, params });
+      this.report.outcome({ queryType, table, durationMs, outcome: "error" });
+      throw this.translateQueryError({ error, durationMs });
+    }
+  }
 
-    wrapper.insert = (async (params: unknown) => {
-      const table =
-        ((params as Record<string, unknown> | null)?.table as string) ??
-        "unknown";
-      const start = now();
-      try {
-        // Deliberately NOT retried here. See the note on this class.
-        const result = await client.insert(params);
-        const durationMs = now() - start;
-        this.report.success({ operation: "insert", durationMs, params });
-        this.report.outcome({
-          queryType: "INSERT",
-          table,
-          durationMs,
-          outcome: "success",
-        });
-        return result;
-      } catch (error) {
-        const durationMs = now() - start;
-        this.report.failure({ operation: "insert", error, durationMs, params });
-        this.report.outcome({
-          queryType: "INSERT",
-          table,
-          durationMs,
-          outcome: "error",
-        });
-        throw error;
-      }
-    }) as T["insert"];
-
-    return wrapper;
+  private async insert(client: VendorStatementClient, params: unknown): Promise<unknown> {
+    const table = tableOf(params);
+    const start = now();
+    try {
+      const result = await client.insert(params);
+      const durationMs = now() - start;
+      this.report.success({ operation: "insert", durationMs, params });
+      this.report.outcome({ queryType: "INSERT", table, durationMs, outcome: "success" });
+      return result;
+    } catch (error) {
+      const durationMs = now() - start;
+      this.report.failure({ operation: "insert", error, durationMs, params });
+      this.report.outcome({ queryType: "INSERT", table, durationMs, outcome: "error" });
+      throw error;
+    }
   }
 
   /**
@@ -261,52 +211,29 @@ export class VendorClientResilience {
   }): unknown {
     const error = new Error(message);
     const code = /Code:\s*(\d+)/.exec(message)?.[1];
-    if (code) (error as { code?: string }).code = code;
+    if (code) Object.assign(error, { code });
     return this.translateQueryError({ error, durationMs });
   }
 
   /**
-   * ClickHouse streams results over HTTP. Once rows have been flushed, a
-   * failure can no longer change the 200 status code, so the server writes the
-   * error INTO the output as a final `{"exception": "..."}` line
-   * (`http_write_exception_in_output_format`, on by default). The transport
-   * never throws, the line parses as JSON, and without this guard it reaches
-   * the caller as a "row" with none of the selected columns — which surfaces
-   * as a property access on a missing column deep in a decoder, pointing every
-   * investigation away from ClickHouse. (Observed live: a
-   * MEMORY_LIMIT_EXCEEDED mid-`FINAL` arriving as a data row.)
-   *
-   * Outcome accounting is two-phase for streamed results. The transport-level
-   * "success" is recorded when the query resolves — that cannot be deferred
-   * to consumption, because a caller may stream() or never read the body at
-   * all. When consumption then surfaces an in-band exception, the failure is
-   * recorded HERE (failure log + error counter), so dashboards alerting on
-   * errors see it. The earlier success increment is left standing and
-   * documents itself as "the server accepted and started answering"; an
-   * in-band failure therefore shows up as one success + one error for the
-   * same query, never as silence.
-   *
-   * No transport-level retry happens for in-band exceptions: the body has
-   * been consumed, and the classes that arrive in-band (memory limit, server
-   * timeout) are not transient. Callers that need a retry get it from their
-   * own layer — the job queue re-runs the whole unit of work.
+   * ClickHouse can flush a 200 then write a failure INTO the stream as a final
+   * `{"exception": ...}` row; without this guard it reaches the caller as a
+   * normal row missing every column instead of surfacing as an error.
    */
-  private guardInbandException<
-    R extends { json?: (...args: never[]) => unknown },
-  >({
+  private guardInbandException({
     result,
     startMs,
     params,
   }: {
-    result: R;
+    result: unknown;
     startMs: number;
     params: unknown;
-  }): R {
-    if (typeof result?.json !== "function") return result;
+  }): unknown {
+    if (!isJsonResult(result)) return result;
     const queryType = extractQueryType(params);
     const originalJson = result.json.bind(result);
-    result.json = (async (...args: never[]) => {
-      const rows = (await originalJson(...args)) as unknown;
+    result.json = async (...args: never[]) => {
+      const rows = await originalJson(...args);
       for (const row of Array.isArray(rows) ? rows : [rows]) {
         const exception = inbandExceptionOf(row);
         if (exception !== undefined) {
@@ -326,22 +253,40 @@ export class VendorClientResilience {
         }
       }
       return rows;
-    }) as R["json"];
+    };
     return result;
   }
 }
 
+type JsonResult = { json(...args: never[]): unknown };
+
+function isJsonResult(value: unknown): value is JsonResult {
+  return (
+    value !== null &&
+    typeof value === "object" &&
+    "json" in value &&
+    typeof value.json === "function"
+  );
+}
+
+function tableOf(params: unknown): string {
+  if (params === null || typeof params !== "object" || !("table" in params)) return "unknown";
+  return typeof params.table === "string" ? params.table : "unknown";
+}
+
 /** The caller's `abort_signal`, so an abandoned statement is not retried. */
 function abortSignalOf(params: unknown): AbortSignalLike | undefined {
-  if (!params || typeof params !== "object") return undefined;
-  const signal = (params as { abort_signal?: unknown }).abort_signal;
+  if (params === null || typeof params !== "object" || !("abort_signal" in params))
+    return undefined;
+  const signal = params.abort_signal;
   return isAbortSignalLike(signal) ? signal : undefined;
 }
 
 function isAbortSignalLike(value: unknown): value is AbortSignalLike {
   return (
-    typeof value === "object" &&
     value !== null &&
-    typeof (value as { aborted?: unknown }).aborted === "boolean"
+    typeof value === "object" &&
+    "aborted" in value &&
+    typeof value.aborted === "boolean"
   );
 }

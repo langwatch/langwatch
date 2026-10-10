@@ -3,12 +3,13 @@
  * per-key and per-address limits bound what one caller can consume.
  */
 
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import type { AddressInfo } from "node:net";
 import { createServer, type Server as HttpServer } from "node:http";
+import type { AddressInfo } from "node:net";
 
-import { initConfig } from "../config.js";
-import { createApiKeyVerifier } from "../http-security.js";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+
+import { initConfig } from "../config.ts";
+import { createApiKeyVerifier } from "../http-security.ts";
 import {
   countingVerifier,
   initializeBody,
@@ -17,7 +18,7 @@ import {
   requestUntilThrottled,
   startHarness,
   VALID_KEY,
-} from "./support/http-server-harness.js";
+} from "./support/http-server-harness.ts";
 
 /** Mirrors MAX_SESSIONS_PER_KEY in http-server.ts. */
 const MAX_SESSIONS_PER_KEY = 20;
@@ -166,8 +167,8 @@ describe("Limits", () => {
               Authorization: `Bearer ${VALID_KEY}`,
             },
             body: initializeBody(),
-          })
-        )
+          }),
+        ),
       );
 
       const opened = responses.filter((response) => response.status === 200);
@@ -232,9 +233,7 @@ describe("Verification against the LangWatch API", () => {
       res.writeHead(401).end();
     });
 
-    await new Promise<void>((resolve) =>
-      upstream.listen(0, "127.0.0.1", resolve)
-    );
+    await new Promise<void>((resolve) => upstream.listen(0, "127.0.0.1", resolve));
     upstreamUrl = `http://127.0.0.1:${(upstream.address() as AddressInfo).port}`;
   });
 
@@ -242,13 +241,13 @@ describe("Verification against the LangWatch API", () => {
     await new Promise<void>((resolve) => upstream.close(() => resolve()));
   });
 
-  it("checks a key against GET /api/me/project with the key in a header", async () => {
+  it("checks a key against GET /api/v1/me/project with the key in a header", async () => {
     const verifier = createApiKeyVerifier({ endpoint: upstreamUrl });
 
     await expect(verifier.verify(VALID_KEY)).resolves.toBe(true);
     await expect(verifier.verify("sk-lw-fake")).resolves.toBe(false);
 
-    expect(seenUrls).toEqual(["/api/me/project", "/api/me/project"]);
+    expect(seenUrls).toEqual(["/api/v1/me/project", "/api/v1/me/project"]);
     expect(seenAuthHeaders).toEqual([VALID_KEY, "sk-lw-fake"]);
   });
 

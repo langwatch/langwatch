@@ -1,10 +1,11 @@
-from typing import Any
+from typing import Any, cast
 from urllib.parse import quote
 
 import httpx
 
 from ... import errors
 from ...client import AuthenticatedClient, Client
+from ...models.regenerate_project_api_key_response_200 import RegenerateProjectApiKeyResponse200
 from ...types import Response, safe_http_status
 
 
@@ -22,12 +23,21 @@ def _get_kwargs(
     return _kwargs
 
 
-def _parse_response(*, client: AuthenticatedClient | Client, response: httpx.Response) -> Any | None:
+def _parse_response(
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> Any | RegenerateProjectApiKeyResponse200 | None:
+    if response.status_code == 200:
+        response_200 = RegenerateProjectApiKeyResponse200.from_dict(response.json())
+
+        return response_200
+
     if response.status_code == 401:
-        return None
+        response_401 = cast(Any, None)
+        return response_401
 
     if response.status_code == 403:
-        return None
+        response_403 = cast(Any, None)
+        return response_403
 
     if client.raise_on_unexpected_status:
         raise errors.UnexpectedStatus(response.status_code, response.content)
@@ -35,7 +45,9 @@ def _parse_response(*, client: AuthenticatedClient | Client, response: httpx.Res
         return None
 
 
-def _build_response(*, client: AuthenticatedClient | Client, response: httpx.Response) -> Response[Any]:
+def _build_response(
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> Response[Any | RegenerateProjectApiKeyResponse200]:
     # LangWatch override: use safe_http_status to tolerate non-IANA status codes
     # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
     # Tracked upstream: https://github.com/openapi-generators/openapi-python-client/pull/1407
@@ -51,7 +63,7 @@ def sync_detailed(
     id: str,
     *,
     client: AuthenticatedClient,
-) -> Response[Any]:
+) -> Response[Any | RegenerateProjectApiKeyResponse200]:
     """Regenerate the project API key
 
      Deprecated. Project base keys can be rotated only by a signed-in project administrator in the
@@ -65,7 +77,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Any]
+        Response[Any | RegenerateProjectApiKeyResponse200]
     """
 
     kwargs = _get_kwargs(
@@ -79,11 +91,11 @@ def sync_detailed(
     return _build_response(client=client, response=response)
 
 
-async def asyncio_detailed(
+def sync(
     id: str,
     *,
     client: AuthenticatedClient,
-) -> Response[Any]:
+) -> Any | RegenerateProjectApiKeyResponse200 | None:
     """Regenerate the project API key
 
      Deprecated. Project base keys can be rotated only by a signed-in project administrator in the
@@ -97,7 +109,34 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Any]
+        Any | RegenerateProjectApiKeyResponse200
+    """
+
+    return sync_detailed(
+        id=id,
+        client=client,
+    ).parsed
+
+
+async def asyncio_detailed(
+    id: str,
+    *,
+    client: AuthenticatedClient,
+) -> Response[Any | RegenerateProjectApiKeyResponse200]:
+    """Regenerate the project API key
+
+     Deprecated. Project base keys can be rotated only by a signed-in project administrator in the
+    browser. Organization API keys are always refused with 403.
+
+    Args:
+        id (str):
+
+    Raises:
+        errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
+        httpx.TimeoutException: If the request takes longer than Client.timeout.
+
+    Returns:
+        Response[Any | RegenerateProjectApiKeyResponse200]
     """
 
     kwargs = _get_kwargs(
@@ -107,3 +146,32 @@ async def asyncio_detailed(
     response = await client.get_async_httpx_client().request(**kwargs)
 
     return _build_response(client=client, response=response)
+
+
+async def asyncio(
+    id: str,
+    *,
+    client: AuthenticatedClient,
+) -> Any | RegenerateProjectApiKeyResponse200 | None:
+    """Regenerate the project API key
+
+     Deprecated. Project base keys can be rotated only by a signed-in project administrator in the
+    browser. Organization API keys are always refused with 403.
+
+    Args:
+        id (str):
+
+    Raises:
+        errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
+        httpx.TimeoutException: If the request takes longer than Client.timeout.
+
+    Returns:
+        Any | RegenerateProjectApiKeyResponse200
+    """
+
+    return (
+        await asyncio_detailed(
+            id=id,
+            client=client,
+        )
+    ).parsed

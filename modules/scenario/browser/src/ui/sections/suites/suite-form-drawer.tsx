@@ -1,0 +1,580 @@
+/**
+ * Drawer for creating and editing suite configurations.
+ */
+
+import { getFlowCallbacks, useDrawer, useDrawerParams } from "@langwatch/browser-host/drawer";
+import {
+  applyHandledErrorToForm,
+  describeError,
+  showErrorToast,
+} from "@langwatch/browser-host/errors";
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
+import {
+  Box,
+  Button,
+  Collapsible,
+  HStack,
+  Input,
+  Skeleton,
+  Text,
+  Textarea,
+  VStack,
+} from "@langwatch/design-system/primitives";
+import { Drawer } from "@langwatch/design-system/studio-drawer";
+import { toaster } from "@langwatch/design-system/toaster";
+import { readHandledError } from "@langwatch/handled-error/read-handled-error";
+import { MAX_SUITE_REPEAT_COUNT } from "@langwatch/suite-contract";
+import { ChevronDown, ChevronRight, Play } from "lucide-react";
+import { useCallback, useRef, useState } from "react";
+import { Controller } from "react-hook-form";
+
+import { useAgents } from "../../../behavior/agents/use-agents.ts";
+import { FormServerError } from "../../../behavior/errors.tsx";
+import { useAllPromptsForProject } from "../../../behavior/prompts/use-all-prompts-for-project.ts";
+import { api, type SimulationSuite } from "../../../behavior/scenario-api.ts";
+import { useScenarios } from "../../../behavior/scenarios/use-scenarios.ts";
+import { useSuiteForm } from "../../../behavior/suite/use-suite-form.ts";
+import { useSuiteFormDraft } from "../../../behavior/suites/suite-form-draft.ts";
+import { useArchivedItemsResolution } from "../../../behavior/suites/use-archived-items-resolution.ts";
+import { useSuiteRunMutation } from "../../../behavior/suites/use-suite-run-mutation.ts";
+import { useSuite } from "../../../behavior/suites/use-suite.ts";
+import { useTestSuites } from "../../../behavior/suites/use-test-suites.ts";
+import { type SuiteFormData } from "../../../model/suite/suite-form.types.ts";
+import { ScenarioPicker } from "../../elements/suite/pickers/scenario-picker.tsx";
+import { TargetPicker } from "../../elements/suite/pickers/target-picker.tsx";
+import { ScenarioFormDrawer } from "../scenarios/scenario-form-drawer.tsx";
+import { SimulationModelSelect } from "../scenarios/simulation-model-select.tsx";
+import { PromptTargetMappingSection } from "./prompt-target-mapping-section.tsx";
+
+/** Callbacks passed via flowCallbacks from the parent page. */
+export type SuiteFormDrawerProps = {
+  onSaved?: (suite: SimulationSuite) => void;
+  onRunRequested?: (suite: SimulationSuite) => void;
+};
+
+/** Build the mutation payload from validated form data. */
+function buildMutationPayload(data: SuiteFormData, projectId: string) {
+  return {
+    projectId,
+    name: data.name.trim(),
+    description: data.description.trim() || undefined,
+    scenarioIds: data.selectedScenarioIds,
+    // This drawer only ever picks a list, so it says so: a plan saved here
+    // covers the scenarios it names and nothing else.
+    scope: data.scope,
+    targets: data.selectedTargets,
+    repeatCount: data.repeatCount,
+    labels: data.labels,
+    simulatorModel: data.simulatorModel,
+    judgeModel: data.judgeModel,
+  };
+}
+
+export function SuiteFormDrawer(props: SuiteFormDrawerProps) {
+  const { project } = useOrganizationTeamProject();
+  const { closeDrawer, drawerOpen, openDrawer } = useDrawer();
+  const [scenarioEditorOpen, setScenarioEditorOpen] = useState(false);
+  const [idempotencyKey] = useState(() => crypto.randomUUID());
+  const params = useDrawerParams();
+
+  const isOpen = drawerOpen("suiteEditor");
+  const suiteId = params.suiteId;
+
+  // Get flow callbacks for onSaved / onRunRequested
+  const callbacks = getFlowCallbacks("suiteEditor");
+  const onSaved = props.onSaved ?? callbacks?.onSaved;
+  const onRunRequested = props.onRunRequested ?? callbacks?.onRunRequested;
+
+  // Fetch suite data when editing
+  const { data: suite, isLoading: isSuiteLoading } = useSuite({
+    projectId: project?.id,
+    id: suiteId,
+    enabled: isOpen,
+  });
+
+  // Fetch available scenarios and targets
+  const { data: scenarios } = useScenarios({
+    projectId: project?.id,
+    enabled: isOpen,
+  });
+
+  const { data: agents } = useAgents({
+    projectId: project?.id,
+    enabled: isOpen,
+  });
+
+  const { data: prompts } = useAllPromptsForProject({ enabled: isOpen });
+
+  // A project that uses test suites reads its scenarios under the suite names in
+  // the picker. A project with no suite reads the flat list it always did.
+  const { data: testSuites } = useTestSuites({
+    projectId: project?.id,
+    enabled: isOpen,
+  });
+
+  const isEditMode = !!suiteId;
+  const title = isEditMode ? "Edit Run Plan" : "New Run Plan";
+
+  const suiteForm = useSuiteForm({
+    suite: suite ?? null,
+    isOpen,
+    suiteId,
+    scenarios,
+    agents,
+    prompts,
+  });
+
+  const { archivedScenariosWithNames, archivedTargetsWithNames } = useArchivedItemsResolution({
+    archivedScenarioIds: suiteForm.archivedScenarioIds,
+    archivedTargets: suiteForm.archivedTargets,
+    projectId: project?.id,
+  });
+
+  const { form } = suiteForm;
+  const errors = form.formState.errors;
+
+  const { holdDraft } = useSuiteFormDraft({ form, isOpen, suiteId, suiteLoaded: !!suite });
+  const openHttpAgentEditor = () => {
+    holdDraft();
+    openDrawer("agentHttpEditor");
+  };
+
+  const { handleSave, handleRunNow, isSaving } = useSuiteSave({
+    projectId: project?.id,
+    suite: isEditMode ? (suite ?? null) : null,
+    form,
+    onSaved,
+    onRunRequested,
+    closeDrawer,
+    openDrawer,
+    idempotencyKey,
+  });
+
+  return (
+    <>
+      <Drawer.Root
+        open={isOpen}
+        onOpenChange={(e) => {
+          if (!e.open) closeDrawer();
+        }}
+        placement="end"
+        size="lg"
+      >
+        <Drawer.Content bg="bg">
+          <Drawer.Header>
+            <Drawer.Title>{title}</Drawer.Title>
+            <Drawer.CloseTrigger />
+          </Drawer.Header>
+
+          <Drawer.Body>
+            {isEditMode && isSuiteLoading ? (
+              <VStack gap={4} align="stretch">
+                <Skeleton height="20px" width="60px" />
+                <Skeleton height="40px" />
+                <Skeleton height="20px" width="80px" />
+                <Skeleton height="80px" />
+                <Skeleton height="20px" width="70px" />
+                <Skeleton height="120px" />
+                <Skeleton height="20px" width="60px" />
+                <Skeleton height="120px" />
+              </VStack>
+            ) : (
+              <VStack gap={4} align="stretch">
+                <FormServerError form={form} />
+
+                {/* Name */}
+                <VStack align="start" gap={1}>
+                  <Text fontSize="sm" fontWeight="medium">
+                    Name *
+                  </Text>
+                  {/* Controllers, not `register`: the compiler memoises register's ref, and the
+                      form resets once the suite loads, which would drop every keystroke after. */}
+                  <Controller
+                    control={form.control}
+                    name="name"
+                    render={({ field }) => (
+                      <Input
+                        placeholder="e.g., Critical Path Run Plan"
+                        {...field}
+                        borderColor={errors.name ? "red.fg" : undefined}
+                      />
+                    )}
+                  />
+                  {errors.name && (
+                    <Text fontSize="xs" color="red.fg">
+                      {errors.name.message}
+                    </Text>
+                  )}
+                </VStack>
+
+                {/* Description */}
+                <VStack align="start" gap={1}>
+                  <Text fontSize="sm" fontWeight="medium">
+                    Description (optional)
+                  </Text>
+                  <Controller
+                    control={form.control}
+                    name="description"
+                    render={({ field }) => (
+                      <Textarea
+                        placeholder="Core journeys that must pass before deploy"
+                        {...field}
+                        rows={2}
+                      />
+                    )}
+                  />
+                  {errors.description && (
+                    <Text fontSize="xs" color="red.fg">
+                      {errors.description.message}
+                    </Text>
+                  )}
+                </VStack>
+
+                {/* Scenarios */}
+                <VStack align="start" gap={1}>
+                  <Text fontSize="sm" fontWeight="medium">
+                    Scenarios *
+                  </Text>
+                  <ScenarioPicker
+                    scenarios={suiteForm.filteredScenarios}
+                    selectedIds={suiteForm.selectedScenarioIds}
+                    totalCount={suiteForm.totalScenarioCount}
+                    onToggle={suiteForm.toggleScenario}
+                    onSelectAll={suiteForm.selectAllScenarios}
+                    onClear={suiteForm.clearScenarios}
+                    searchQuery={suiteForm.scenarioSearch}
+                    onSearchChange={suiteForm.setScenarioSearch}
+                    allLabels={suiteForm.allLabels}
+                    activeLabelFilter={suiteForm.activeLabelFilter}
+                    onLabelFilterChange={suiteForm.setActiveLabelFilter}
+                    onCreateNew={() => setScenarioEditorOpen(true)}
+                    hasError={!!errors.selectedScenarioIds}
+                    archivedIds={archivedScenariosWithNames}
+                    onRemoveArchived={suiteForm.removeArchivedScenario}
+                    testSuites={testSuites}
+                  />
+                  {errors.selectedScenarioIds && (
+                    <Text fontSize="xs" color="red.fg">
+                      {errors.selectedScenarioIds.message}
+                    </Text>
+                  )}
+                </VStack>
+
+                {/* Targets */}
+                <VStack align="start" gap={1}>
+                  <Text fontSize="sm" fontWeight="medium">
+                    Target(s) *
+                  </Text>
+                  <TargetPicker
+                    targets={suiteForm.filteredTargets}
+                    selectedTargets={suiteForm.selectedTargets}
+                    totalCount={suiteForm.availableTargets.length}
+                    isTargetSelected={suiteForm.isTargetSelected}
+                    onToggle={suiteForm.toggleTarget}
+                    onSelectAll={suiteForm.selectAllTargets}
+                    onClear={suiteForm.clearTargets}
+                    searchQuery={suiteForm.targetSearch}
+                    onSearchChange={suiteForm.setTargetSearch}
+                    onAddTarget={openHttpAgentEditor}
+                    hasError={!!errors.selectedTargets}
+                    archivedTargets={archivedTargetsWithNames}
+                    onRemoveArchived={suiteForm.removeArchivedTarget}
+                  />
+                  {errors.selectedTargets && (
+                    <Text fontSize="xs" color="red.fg">
+                      {errors.selectedTargets.message}
+                    </Text>
+                  )}
+                </VStack>
+
+                <PromptTargetMappingSection
+                  selectedTargets={suiteForm.selectedTargets}
+                  prompts={prompts}
+                  onMappingChange={suiteForm.setTargetMapping}
+                />
+
+                {/* Models */}
+                <VStack align="start" gap={2}>
+                  <Text fontSize="sm" fontWeight="medium">
+                    Models
+                  </Text>
+                  <Text fontSize="xs" color="fg.muted">
+                    Choose the models that role-play the user and judge the runs. Both default to
+                    your project&apos;s Default model.
+                  </Text>
+                  <SimulationModelSelect
+                    label="User simulator"
+                    featureKey="scenarios.user_simulator"
+                    value={suiteForm.simulatorModel}
+                    onChange={suiteForm.setSimulatorModel}
+                  />
+                  {errors.simulatorModel && (
+                    <Text fontSize="xs" color="red.fg">
+                      {errors.simulatorModel.message}
+                    </Text>
+                  )}
+                  <SimulationModelSelect
+                    label="Judge"
+                    featureKey="scenarios.judge"
+                    value={suiteForm.judgeModel}
+                    onChange={suiteForm.setJudgeModel}
+                  />
+                  {errors.judgeModel && (
+                    <Text fontSize="xs" color="red.fg">
+                      {errors.judgeModel.message}
+                    </Text>
+                  )}
+                </VStack>
+
+                {/* Execution Options */}
+                <Collapsible.Root
+                  open={suiteForm.executionOptionsOpen}
+                  onOpenChange={(d) => suiteForm.setExecutionOptionsOpen(d.open)}
+                >
+                  <Collapsible.Trigger asChild>
+                    <HStack cursor="pointer" gap={2}>
+                      {suiteForm.executionOptionsOpen ? (
+                        <ChevronDown size={14} />
+                      ) : (
+                        <ChevronRight size={14} />
+                      )}
+                      <Text fontSize="sm" fontWeight="medium">
+                        Execution Options
+                      </Text>
+                    </HStack>
+                  </Collapsible.Trigger>
+                  <Collapsible.Content>
+                    <Box
+                      border="1px solid"
+                      borderColor="border"
+                      borderRadius="md"
+                      padding={3}
+                      marginTop={2}
+                    >
+                      <VStack align="start" gap={1}>
+                        <HStack gap={2} align="center">
+                          <Text fontSize="sm">Repeat count</Text>
+                          <Controller
+                            control={form.control}
+                            name="repeatCount"
+                            render={({ field }) => (
+                              <Input
+                                type="number"
+                                size="sm"
+                                width="80px"
+                                min={1}
+                                max={MAX_SUITE_REPEAT_COUNT}
+                                {...field}
+                                onChange={(event) => field.onChange(event.target.valueAsNumber)}
+                                borderColor={errors.repeatCount ? "red.fg" : undefined}
+                              />
+                            )}
+                          />
+                          <Text fontSize="xs" color="fg.muted">
+                            times per scenario x target (max {MAX_SUITE_REPEAT_COUNT})
+                          </Text>
+                        </HStack>
+                        {errors.repeatCount && (
+                          <Text fontSize="xs" color="red.fg">
+                            {errors.repeatCount.message}
+                          </Text>
+                        )}
+                      </VStack>
+                    </Box>
+                  </Collapsible.Content>
+                </Collapsible.Root>
+              </VStack>
+            )}
+          </Drawer.Body>
+
+          <Drawer.Footer>
+            <HStack gap={2}>
+              <Button variant="outline" onClick={handleSave} loading={isSaving}>
+                Save
+              </Button>
+              <Button colorPalette="blue" onClick={handleRunNow} loading={isSaving}>
+                <Play size={14} />
+                Run Now
+              </Button>
+            </HStack>
+          </Drawer.Footer>
+        </Drawer.Content>
+      </Drawer.Root>
+
+      {/* Child drawer: Scenario Editor -- managed via local state */}
+      <ScenarioFormDrawer open={scenarioEditorOpen} onClose={() => setScenarioEditorOpen(false)} />
+    </>
+  );
+}
+
+type SuiteForm = ReturnType<typeof useSuiteForm>["form"];
+
+/** Create or update the run plan, and optionally run it once it is saved. */
+function useSuiteSave({
+  projectId,
+  suite,
+  form,
+  onSaved,
+  onRunRequested,
+  closeDrawer,
+  openDrawer,
+  idempotencyKey,
+}: {
+  projectId: string | undefined;
+  /** The plan being edited; null when creating one. */
+  suite: SimulationSuite | null;
+  form: SuiteForm;
+  onSaved: ((suite: SimulationSuite) => void) | undefined;
+  onRunRequested: ((suite: SimulationSuite) => void) | undefined;
+  closeDrawer: ReturnType<typeof useDrawer>["closeDrawer"];
+  openDrawer: ReturnType<typeof useDrawer>["openDrawer"];
+  idempotencyKey: string;
+}) {
+  const utils = api.useUtils();
+  /** True during a "save and run": the per-call onSuccess then owns closing and running. */
+  const saveAndRunRef = useRef(false);
+  const refuse = (err: unknown, fallbackTitle: string) => {
+    saveAndRunRef.current = false;
+    rejectSave({ error: err, form, fallbackTitle });
+  };
+
+  // -- Mutations --
+
+  const createMutation = api.suites.create.useMutation({
+    onSuccess: (data) => {
+      void utils.suites.getAll.invalidate();
+      // When saveAndRunRef is set, the per-call onSuccess handles
+      // navigation, drawer close, and running — skip the default path.
+      if (saveAndRunRef.current) {
+        saveAndRunRef.current = false;
+        return;
+      }
+      onSaved?.(data);
+      closeDrawer();
+      toaster.create({
+        title: "Run plan created",
+        type: "success",
+      });
+    },
+    onError: (err) => refuse(err, "Couldn't create run plan"),
+  });
+
+  const updateMutation = api.suites.update.useMutation({
+    onSuccess: (data) => {
+      void utils.suites.getAll.invalidate();
+      void utils.suites.getById.invalidate({
+        projectId: projectId ?? "",
+        id: data.id,
+      });
+      // When saveAndRunRef is set, the per-call onSuccess handles
+      // navigation, drawer close, and running — skip the default path.
+      if (saveAndRunRef.current) {
+        saveAndRunRef.current = false;
+        return;
+      }
+      onSaved?.(data);
+      closeDrawer();
+      toaster.create({
+        title: "Run plan updated",
+        type: "success",
+      });
+    },
+    onError: (err) => refuse(err, "Couldn't update run plan"),
+  });
+
+  const { runMutation } = useSuiteRunMutation({
+    onEditSuite: (suiteId) => {
+      openDrawer("suiteEditor", { urlParams: { suiteId } });
+    },
+  });
+
+  const submitForm = useCallback(
+    (data: SuiteFormData) => {
+      if (!projectId) return;
+      const payload = buildMutationPayload(data, projectId);
+
+      if (suite) {
+        updateMutation.mutate({ ...payload, id: suite.id });
+      } else {
+        createMutation.mutate(payload);
+      }
+    },
+    [projectId, suite, createMutation, updateMutation],
+  );
+
+  const submitAndRun = useCallback(
+    (data: SuiteFormData) => {
+      if (!projectId) return;
+      const payload = buildMutationPayload(data, projectId);
+
+      const onSuccess = (saved: SimulationSuite) => {
+        saveAndRunRef.current = false;
+        closeDrawer();
+        if (onRunRequested) {
+          onRunRequested(saved);
+        } else {
+          runMutation.mutate({
+            projectId: payload.projectId,
+            id: saved.id,
+            idempotencyKey,
+          });
+        }
+      };
+
+      if (suite) {
+        saveAndRunRef.current = true;
+        updateMutation.mutate({ ...payload, id: suite.id }, { onSuccess });
+      } else {
+        saveAndRunRef.current = true;
+        createMutation.mutate(payload, { onSuccess });
+      }
+    },
+    [
+      projectId,
+      suite,
+      createMutation,
+      updateMutation,
+      closeDrawer,
+      onRunRequested,
+      runMutation,
+      idempotencyKey,
+    ],
+  );
+
+  const handleSave = useCallback(() => {
+    void form.handleSubmit(submitForm)();
+  }, [form, submitForm]);
+
+  const handleRunNow = useCallback(() => {
+    void form.handleSubmit(submitAndRun)();
+  }, [form, submitAndRun]);
+
+  const isSaving = createMutation.isPending || updateMutation.isPending;
+
+  return { handleSave, handleRunNow, isSaving };
+}
+
+/**
+ * Puts a taken-name rejection under the name field, else any handled field errors under their
+ * fields, else a toast.
+ */
+function rejectSave({
+  error,
+  form,
+  fallbackTitle,
+}: {
+  error: unknown;
+  form: SuiteForm;
+  fallbackTitle: string;
+}): void {
+  if (readHandledError(error)?.code === "suite_name_taken") {
+    form.setError(
+      "name",
+      { type: "server", message: describeError({ error }) },
+      { shouldFocus: true },
+    );
+    return;
+  }
+  if (applyHandledErrorToForm({ error, form, hasFormErrorSlot: true })) return;
+  showErrorToast({ error, fallbackTitle });
+}

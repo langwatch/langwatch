@@ -1,0 +1,345 @@
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
+import { PageLayout } from "@langwatch/design-system/page-layout";
+import { Alert, Box, HStack, Skeleton, Text, VStack } from "@langwatch/design-system/primitives";
+import { useFeatureFlag } from "@langwatch/feature-flag-client";
+import { FrontendFlags } from "@langwatch/feature-flag-contract";
+import { Plus } from "lucide-react";
+import { useState } from "react";
+
+import { analyticsApi as api } from "../../../behavior/analytics-api.ts";
+import { useShowErrorToast } from "../../../behavior/analytics-feedback.ts";
+import {
+  DashboardRefetchIntervalContext,
+  useDashboardAutoRefresh,
+} from "../../../behavior/use-dashboard-auto-refresh.ts";
+import {
+  useDashboardGraphs,
+  useDashboards,
+  useDashboardWidgets,
+  useFirstDashboard,
+} from "../../../behavior/use-dashboards.ts";
+import { useFilterToggle } from "../../../behavior/use-filter-toggle.ts";
+import { useWidgetGranularity } from "../../../features/dashboard-widget/behavior/use-widget-granularity.ts";
+import { CreateDashboardWidgetDrawer } from "../../../features/dashboard-widget/ui/sections/create-dashboard-widget-drawer.tsx";
+import { useAnalyticsHost } from "../../../model/analytics-host.ts";
+import type { ChartGridPlacement } from "../../../model/chart-grid.ts";
+import { Link } from "../../elements/analytics-link.tsx";
+import { withAggregateAnalyticsGate } from "../aggregate-analytics-gate.tsx";
+import AnalyticsLayout from "../analytics-layout.tsx";
+import { DashboardAutoRefreshMenu } from "../dashboard-auto-refresh-menu.tsx";
+import { FilterSidebar } from "../filter-sidebar.tsx";
+import { ReportGrid } from "../report-grid.tsx";
+import { DashboardRefreshedAtContext } from "../use-dashboard-auto-refresh.ts";
+
+function ReportsContent() {
+  const { project, organization } = useOrganizationTeamProject();
+  const host = useAnalyticsHost();
+  // Each write is refused where the server refuses it: on an aggregate (ADR-177) and without
+  // the grant. Grants come from the analytics host; the scope reading carries none.
+  const canAddChart = host.hasPermission("analytics:create");
+  const canRenameDashboard = host.hasPermission("analytics:update");
+  const { showFilters } = useFilterToggle();
+  const showErrorToast = useShowErrorToast();
+  const projectId = project?.id ?? "";
+
+  // Get dashboard ID from URL, or use first dashboard
+  const urlDashboardId = host.route().query.dashboard;
+
+  // Get or create first dashboard
+  const getOrCreateFirst = useFirstDashboard({ projectId, enabled: !urlDashboardId });
+
+  const activeDashboardId = urlDashboardId ?? getOrCreateFirst.data?.id;
+
+  const [isAddChartOpen, setIsAddChartOpen] = useState(false);
+
+  // Gates the new "Add chart" flow client-side to match server enforcement
+  // (enforceCustomChartPlaygroundEnabled): `enabled` defaults false while
+  // loading, so the button starts as the legacy link, never flashing open.
+  const { enabled: customChartPlaygroundEnabled } = useFeatureFlag(
+    FrontendFlags.release_custom_chart_playground,
+    {
+      projectId: project?.id,
+      organizationId: organization?.id,
+      enabled: !!project?.id && !!organization?.id,
+    },
+  );
+
+  // Scheduled refresh: builder graphs poll on the chosen refetchInterval; widgets that run
+  // through a mutation or a frame follow refreshedAt.
+  const utils = api.useUtils();
+  const autoRefresh = useDashboardAutoRefresh();
+
+  // Fetch all dashboards to get current dashboard name
+  const dashboardsQuery = useDashboards({ projectId });
+
+  const currentDashboard = dashboardsQuery.data?.find((d) => d.id === activeDashboardId);
+  const dashboardTitle = currentDashboard?.name ?? "Reports";
+  // A link to a deleted or mistyped dashboard says so, rather than drawing an empty grid.
+  const isMissingDashboard =
+    !!urlDashboardId && dashboardsQuery.data !== undefined && !currentDashboard;
+
+  // Graphs for the active dashboard
+  const graphsQuery = useDashboardGraphs({ projectId, dashboardId: activeDashboardId });
+
+  // `graphs.getAll` answers builder rows only; the placed widgets come from their own list.
+  const widgetsQuery = useDashboardWidgets({
+    projectId,
+    enabled: !!activeDashboardId && customChartPlaygroundEnabled,
+  });
+  const widgets = (widgetsQuery.data ?? []).filter(
+    (widget) => widget.dashboardId === activeDashboardId,
+  );
+  const widgetIds = new Set(widgets.map((widget) => widget.id));
+
+  const deleteGraph = api.graphs.delete.useMutation();
+  const deleteWidget = api.dashboardWidgets.delete.useMutation();
+  const batchUpdateLayouts = api.graphs.batchUpdateLayouts.useMutation();
+  const batchUpdateWidgetLayouts = api.dashboardWidgets.batchUpdateLayouts.useMutation();
+  const renameDashboard = api.dashboards.rename.useMutation();
+
+  const handleTitleSave = (newTitle: string) => {
+    if (activeDashboardId) {
+      renameDashboard.mutate(
+        { projectId, dashboardId: activeDashboardId, name: newTitle },
+        {
+          onSuccess: () => {
+            void dashboardsQuery.refetch();
+          },
+          onError: (error) => {
+            showErrorToast({ error, fallbackTitle: "Couldn't rename this dashboard" });
+          },
+        },
+      );
+    }
+  };
+
+  const handleGraphDelete = (graphId: string) => {
+    if (widgetIds.has(graphId)) {
+      deleteWidget.mutate(
+        { projectId, id: graphId },
+        {
+          onSuccess: () => {
+            void widgetsQuery.refetch();
+          },
+          onError: (error) => {
+            showErrorToast({ error, fallbackTitle: "Couldn't delete this widget" });
+          },
+        },
+      );
+      return;
+    }
+    deleteGraph.mutate(
+      { projectId, id: graphId },
+      {
+        onSuccess: () => {
+          // Every graphs.getAll key, not just this dashboard's: the automation composer
+          // reads the list keyed by {projectId} alone and kept offering a deleted graph.
+          void utils.graphs.getAll.invalidate();
+        },
+        onError: (error) => {
+          showErrorToast({ error, fallbackTitle: "Couldn't delete this graph" });
+        },
+      },
+    );
+  };
+
+  const handleGraphsPlacementChange = (placements: ChartGridPlacement[]) => {
+    const widgetLayouts = placements.filter((placement) => widgetIds.has(placement.graphId));
+    if (widgetLayouts.length > 0) {
+      batchUpdateWidgetLayouts.mutate(
+        { projectId, layouts: widgetLayouts },
+        {
+          onSuccess: () => {
+            void widgetsQuery.refetch();
+          },
+          onError: (error) => {
+            showErrorToast({ error, fallbackTitle: "Couldn't save the dashboard layout" });
+          },
+        },
+      );
+    }
+    const graphLayouts = placements.filter((placement) => !widgetIds.has(placement.graphId));
+    if (graphLayouts.length === 0) return;
+    batchUpdateLayouts.mutate(
+      { projectId, layouts: graphLayouts },
+      {
+        onSuccess: () => {
+          void graphsQuery.refetch();
+        },
+        onError: (error) => {
+          showErrorToast({ error, fallbackTitle: "Couldn't save the dashboard layout" });
+        },
+      },
+    );
+  };
+
+  // Datapoint step per workbench widget, keyed by chart id, held in URL state.
+  // Not a stored column (no migration owns `granularitySeconds` yet); not
+  // component state either, since that would drop on reload and be missing
+  // from a shared link — a coarsened card would show a colleague a different chart.
+  const { granularityByGraphId, setGranularity } = useWidgetGranularity();
+
+  const handleGraphGranularityChange = ({
+    graphId,
+    granularitySeconds,
+  }: {
+    graphId: string;
+    granularitySeconds: number;
+  }) => {
+    setGranularity(graphId, granularitySeconds);
+  };
+
+  const graphs = [
+    ...(graphsQuery.data ?? []).map((graph) => {
+      const picked = granularityByGraphId[graph.id];
+      return picked === undefined ? graph : { ...graph, granularitySeconds: picked };
+    }),
+    ...widgets,
+  ];
+  const hasNoGraphs = graphs.length === 0 && !graphsQuery.isLoading && !widgetsQuery.isLoading;
+
+  // Legacy builder route — used when the playground flag is off (or still
+  // loading), matching main's Add-chart handler.
+  const addChartUrl = activeDashboardId
+    ? `/${project?.slug}/analytics/custom?dashboard=${activeDashboardId}`
+    : `/${project?.slug}/analytics/custom`;
+
+  return (
+    <AnalyticsLayout
+      title={dashboardTitle}
+      railEntry="reports"
+      activeDashboardId={activeDashboardId}
+      analyticsHeaderProps={{
+        isEditable: canRenameDashboard,
+        onTitleSave: handleTitleSave,
+      }}
+      extraHeaderButtons={
+        <>
+          <DashboardAutoRefreshMenu option={autoRefresh.option} onChange={autoRefresh.setOption} />
+          {project && canAddChart ? (
+            <AddChartButton
+              opensDrawer={customChartPlaygroundEnabled}
+              href={addChartUrl}
+              onOpenDrawer={() => setIsAddChartOpen(true)}
+            />
+          ) : null}
+        </>
+      }
+    >
+      {/* The workbench builder's own save path is disabled while the
+          custom-chart-playground is enabled (see DashboardWidgetService /
+          saved_workbench_charts_disabled_for_playground) — a member landing
+          there would hit a Save button that always fails. This drawer is
+          the one "create a new chart" path that still works, and it lands
+          the new widget on this dashboard directly. */}
+      {project && canAddChart && customChartPlaygroundEnabled && (
+        <CreateDashboardWidgetDrawer
+          open={isAddChartOpen}
+          onClose={() => setIsAddChartOpen(false)}
+          projectId={projectId}
+          projectSlug={project.slug}
+          dashboardId={activeDashboardId ?? undefined}
+        />
+      )}
+
+      {isMissingDashboard && (
+        <Alert.Root status="warning" variant="surface" marginBottom={6}>
+          <Alert.Indicator />
+          <VStack align="start">
+            <Alert.Title>This dashboard doesn&apos;t exist</Alert.Title>
+            <Alert.Description>
+              <Text as="span">It may have been deleted. Pick another dashboard from the menu.</Text>
+            </Alert.Description>
+          </VStack>
+        </Alert.Root>
+      )}
+
+      {/* Empty state */}
+      {hasNoGraphs && !isMissingDashboard && (
+        <Alert.Root status="info" variant="surface" marginBottom={6}>
+          <Alert.Indicator />
+          <VStack align="start">
+            <Alert.Title>
+              {canAddChart ? "Add your custom graphs here" : "No custom graphs yet"}
+            </Alert.Title>
+            <Alert.Description>
+              <Text as="span">
+                {canAddChart
+                  ? "You haven't set up any custom graphs yet. Click + Add chart to get started."
+                  : "Nobody has added a custom graph to this dashboard yet."}
+              </Text>
+            </Alert.Description>
+          </VStack>
+        </Alert.Root>
+      )}
+
+      {/* Main content */}
+      <DashboardRefetchIntervalContext.Provider value={autoRefresh.refetchInterval}>
+        <DashboardRefreshedAtContext.Provider value={autoRefresh.refreshedAt}>
+          <HStack align="start" gap={6} width="full">
+            <Box flex={1} minWidth={0}>
+              {graphsQuery.isLoading ? (
+                <Skeleton height="300px" />
+              ) : (
+                <ReportGrid
+                  graphs={graphs}
+                  projectSlug={project?.slug ?? ""}
+                  projectId={projectId}
+                  dashboardId={activeDashboardId ?? undefined}
+                  onGraphDelete={handleGraphDelete}
+                  onGraphGranularityChange={handleGraphGranularityChange}
+                  onGraphsPlacementChange={handleGraphsPlacementChange}
+                  deletingGraphId={pendingDeleteId({ mutations: [deleteGraph, deleteWidget] })}
+                />
+              )}
+            </Box>
+            {showFilters ? <FilterSidebar /> : null}
+          </HStack>
+        </DashboardRefreshedAtContext.Provider>
+      </DashboardRefetchIntervalContext.Provider>
+    </AnalyticsLayout>
+  );
+}
+
+function pendingDeleteId({
+  mutations,
+}: {
+  mutations: readonly { isPending: boolean; variables?: { id: string } }[];
+}): string | null {
+  return mutations.find((mutation) => mutation.isPending)?.variables?.id ?? null;
+}
+
+/**
+ * The page guard is the routes section's, not this module's: stated once via
+ * `withPermissionGuard("analytics:view")` in
+ * `apps/ui/src/features/analytics/ui/sections/analytics-routes.tsx`.
+ */
+function AddChartButton({
+  opensDrawer,
+  href,
+  onOpenDrawer,
+}: {
+  opensDrawer: boolean;
+  href: string;
+  onOpenDrawer: () => void;
+}) {
+  if (opensDrawer) {
+    return (
+      <PageLayout.HeaderButton primary data-testid="analytics-add-chart" onClick={onOpenDrawer}>
+        <Plus /> Add chart
+      </PageLayout.HeaderButton>
+    );
+  }
+  return (
+    <Link href={href} asChild>
+      <PageLayout.HeaderButton primary data-testid="analytics-add-chart">
+        <Plus /> Add chart
+      </PageLayout.HeaderButton>
+    </Link>
+  );
+}
+
+/** Exported for the test that renders the body past the aggregate gate. */
+export { ReportsContent };
+
+export default withAggregateAnalyticsGate("Reports", ReportsContent);

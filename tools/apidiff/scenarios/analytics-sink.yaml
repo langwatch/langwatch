@@ -1,0 +1,29 @@
+# Product-analytics calls caught by analyticssim (haven up +analytics): a scenario created in the
+# app (tRPC scenarios.create, as main's REST create never tracked) reaches PostHog as main's
+# trackServerEvent("scenario_created") and Customer.io as nurturing's
+# identify (scenario_count) plus track. Main has no Customer.io host override, so on main the
+# Customer.io scenario reaches the real vendor, never the sim; read its main side accordingly.
+- id: analytics-scenario-created-reaches-posthog
+  endpoint: POST /api/trpc/scenarios.create
+  auth: session
+  request:
+    path: /api/trpc/scenarios.create
+    body: { projectId: "{projectId}", name: "vd-{uid}", situation: "A customer asks for a refund", criteria: ["Agent apologises"], labels: ["vd"] }
+  capture: { scenarioId: result.data.id }
+  expect:
+    status: 200
+  verify:
+    - analytics: { provider: posthog, kind: event, name: scenario_created, properties: { projectId: "{projectId}" } }
+
+- id: analytics-scenario-created-identifies-in-customerio
+  endpoint: POST /api/trpc/scenarios.create
+  auth: session
+  request:
+    path: /api/trpc/scenarios.create
+    body: { projectId: "{projectId}", name: "vd-{uid}", situation: "A customer asks for a refund", criteria: ["Agent apologises"], labels: ["vd"] }
+  capture: { scenarioId: result.data.id }
+  expect:
+    status: 200
+  verify:
+    - analytics: { provider: customerio, kind: event, name: scenario_created, properties: { scenario_id: "{scenarioId}" } }
+    - analytics: { provider: customerio, kind: identify, properties: { scenario_count: "" } }

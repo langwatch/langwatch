@@ -1,0 +1,245 @@
+/**
+ * `/:project/evaluators`: list, delete (naming the cascade), replicate,
+ * push, sync, history, snippets. Creating, editing and history are
+ * drawers, opened through `host.openOverlay`.
+ */
+
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
+import { PageLayout } from "@langwatch/design-system/page-layout";
+import { Grid, HStack, Skeleton, Spacer, Text, VStack } from "@langwatch/design-system/primitives";
+import { evaluatorClient } from "@langwatch/evaluator-client";
+import { CheckSquare, Plus } from "lucide-react";
+import { useCallback, useState } from "react";
+
+import { evaluatorApi } from "../../behavior/evaluator-api.ts";
+import { SetupWithAgentButton } from "../../behavior/lent-setup-with-agent-button.tsx";
+import { useEvaluatorHost } from "../../model/evaluator-host.ts";
+import { EvaluatorDeleteDialog } from "../blocks/evaluator-delete-dialog.tsx";
+import { EvaluatorGridCard } from "../blocks/evaluator-grid-card.tsx";
+import { EvaluatorPushToCopiesDialog } from "./evaluator-push-to-copies-dialog.tsx";
+import { EvaluatorReplicateDialog } from "./evaluator-replicate-dialog.tsx";
+
+type EvaluatorRef = { id: string; name: string };
+
+/** What else a cascade took, counted from the confirmation's preview of monitor's rows. */
+function cascadeDescription({
+  archivedWorkflow,
+  monitorCount,
+}: {
+  archivedWorkflow: boolean;
+  monitorCount: number;
+}): string | undefined {
+  const parts: string[] = [];
+  if (archivedWorkflow) parts.push("1 workflow");
+  if (monitorCount > 0)
+    parts.push(`${monitorCount} online evaluation${monitorCount > 1 ? "s" : ""}`);
+  return parts.length > 0 ? `Also deleted: ${parts.join(", ")}` : undefined;
+}
+
+export default function EvaluatorsScreen() {
+  const host = useEvaluatorHost();
+  const { projectId } = host.scope();
+  const utils = evaluatorApi.useUtils();
+  const evaluatorUtils = evaluatorClient.useUtils();
+
+  const [evaluatorToDelete, setEvaluatorToDelete] = useState<EvaluatorRef | null>(null);
+  const [evaluatorForCopy, setEvaluatorForCopy] = useState<EvaluatorRef | null>(null);
+  const [evaluatorForPush, setEvaluatorForPush] = useState<EvaluatorRef | null>(null);
+
+  const evaluatorsQuery = evaluatorClient.evaluators.getAll.useQuery(
+    { projectId: projectId ?? "" },
+    { enabled: !!projectId },
+  );
+
+  const syncFromSource = evaluatorClient.evaluators.syncFromSource.useMutation({
+    onSuccess: (_result, variables) => {
+      void evaluatorUtils.evaluators.getAll.invalidate({ projectId: variables.projectId });
+      host.succeeded({
+        title: "Evaluator updated",
+        description: "Evaluator has been updated from source.",
+      });
+    },
+    onError: (error) =>
+      host.failed({ error, fallbackTitle: "Couldn't update evaluator from source" }),
+  });
+
+  const handleSyncFromSource = useCallback(
+    (evaluatorId: string) => {
+      if (!projectId) return;
+      syncFromSource.mutate({ projectId, evaluatorId });
+    },
+    [projectId, syncFromSource],
+  );
+
+  // Asked only while the confirmation is open: the answer is what the dialog's
+  // warning is built from, and asking it per card would fan out with the grid.
+  const relatedEntitiesQuery = evaluatorClient.evaluators.getRelatedEntities.useQuery(
+    { id: evaluatorToDelete?.id ?? "", projectId: projectId ?? "" },
+    { enabled: !!evaluatorToDelete && !!projectId },
+  );
+  // Monitor answers for its own rows; it removes them once evaluator records the delete.
+  const projectMonitorsQuery = evaluatorApi.monitors.getAllForProject.useQuery(
+    { projectId: projectId ?? "" },
+    { enabled: !!evaluatorToDelete && !!projectId },
+  );
+  const linkedMonitors = (projectMonitorsQuery.data ?? [])
+    .filter((monitor) => monitor.evaluatorId === evaluatorToDelete?.id)
+    .map(({ id, name }) => ({ id, name }));
+
+  const deleteMutation = evaluatorClient.evaluators.delete.useMutation({
+    onSuccess: () => {
+      void evaluatorUtils.evaluators.getAll.invalidate({ projectId: projectId ?? "" });
+      void utils.licenseEnforcement.checkLimit.invalidate();
+    },
+  });
+
+  const cascadeArchiveMutation = evaluatorClient.evaluators.cascadeArchive.useMutation({
+    onSuccess: (result) => {
+      const description = cascadeDescription({
+        archivedWorkflow: result.archivedWorkflow !== null,
+        monitorCount: linkedMonitors.length,
+      });
+      setEvaluatorToDelete(null);
+      void evaluatorUtils.evaluators.getAll.invalidate({ projectId: projectId ?? "" });
+      void utils.licenseEnforcement.checkLimit.invalidate();
+      host.succeeded({ title: "Evaluator deleted", description });
+    },
+    onError: (error) => host.failed({ error, fallbackTitle: "Couldn't delete evaluator" }),
+  });
+
+  const openEditor = (evaluator: { id: string; type?: string; config: unknown }) => {
+    if (evaluator.type === "code") {
+      host.openOverlay({
+        drawer: "codeEvaluatorEditor",
+        params: { evaluatorId: evaluator.id },
+      });
+      return;
+    }
+    const config = evaluator.config as { evaluatorType?: string } | null;
+    host.openOverlay({
+      drawer: "evaluatorEditor",
+      params: { evaluatorId: evaluator.id, evaluatorType: config?.evaluatorType },
+    });
+  };
+
+  const openCreate = () => host.openOverlay({ drawer: "evaluatorCategorySelector" });
+
+  const openHistory = (evaluator: EvaluatorRef) =>
+    host.openOverlay({
+      drawer: "evaluatorHistory",
+      params: { evaluatorId: evaluator.id, evaluatorName: evaluator.name },
+    });
+
+  const confirmDelete = () => {
+    if (!evaluatorToDelete || !projectId) return;
+
+    const related = relatedEntitiesQuery.data;
+    const hasRelated = !!related?.workflow || linkedMonitors.length > 0;
+
+    if (hasRelated) {
+      cascadeArchiveMutation.mutate({ id: evaluatorToDelete.id, projectId });
+      return;
+    }
+
+    deleteMutation.mutate(
+      { id: evaluatorToDelete.id, projectId },
+      {
+        onSuccess: () => {
+          setEvaluatorToDelete(null);
+          host.succeeded({ title: "Evaluator deleted" });
+        },
+        onError: (error) => host.failed({ error, fallbackTitle: "Couldn't delete evaluator" }),
+      },
+    );
+  };
+
+  const hasEvaluators = (evaluatorsQuery.data?.length ?? 0) > 0;
+  const showEmptyState = !evaluatorsQuery.isLoading && !hasEvaluators;
+
+  return (
+    <>
+      <PageLayout.Header>
+        <PageLayout.Heading>Evaluators</PageLayout.Heading>
+        <Spacer />
+        <PageLayout.HeaderButton primary data-testid="evaluator-new-open" onClick={openCreate}>
+          <Plus size={16} /> New Evaluator
+        </PageLayout.HeaderButton>
+      </PageLayout.Header>
+
+      {showEmptyState ? (
+        <NoDataInfoBlock
+          title="No evaluators yet"
+          description="Create reusable scoring functions for experiments, online evaluations, and guardrails."
+          icon={<CheckSquare size={24} />}
+        >
+          <HStack gap={2}>
+            <PageLayout.HeaderButton primary data-testid="evaluator-new-open" onClick={openCreate}>
+              <Plus size={16} /> Create your first evaluator
+            </PageLayout.HeaderButton>
+            <SetupWithAgentButton surface="evaluators" />
+          </HStack>
+        </NoDataInfoBlock>
+      ) : (
+        <PageLayout.Container>
+          <VStack gap={6} width="full" align="start">
+            <Text color="fg.muted">
+              Evaluators are reusable scoring functions for experiments, online evaluations, and
+              guardrails.
+            </Text>
+            <Grid templateColumns="repeat(auto-fill, minmax(300px, 1fr))" gap={4} width="full">
+              {evaluatorsQuery.isLoading &&
+                Array.from({ length: 3 }).map((_, index) => (
+                  <Skeleton key={index} height="100px" borderRadius="md" />
+                ))}
+              {evaluatorsQuery.data?.map((evaluator) => (
+                <EvaluatorGridCard
+                  key={evaluator.id}
+                  evaluator={evaluator}
+                  onClick={() => openEditor(evaluator)}
+                  onEdit={() => openEditor(evaluator)}
+                  onDelete={() => setEvaluatorToDelete({ id: evaluator.id, name: evaluator.name })}
+                  onReplicate={() =>
+                    setEvaluatorForCopy({ id: evaluator.id, name: evaluator.name })
+                  }
+                  onPushToCopies={() =>
+                    setEvaluatorForPush({ id: evaluator.id, name: evaluator.name })
+                  }
+                  onSyncFromSource={() => handleSyncFromSource(evaluator.id)}
+                  onViewHistory={() => openHistory({ id: evaluator.id, name: evaluator.name })}
+                />
+              ))}
+            </Grid>
+          </VStack>
+        </PageLayout.Container>
+      )}
+
+      <EvaluatorDeleteDialog
+        open={!!evaluatorToDelete}
+        onClose={() => setEvaluatorToDelete(null)}
+        onConfirm={confirmDelete}
+        isLoading={cascadeArchiveMutation.isPending || deleteMutation.isPending}
+        isLoadingRelated={relatedEntitiesQuery.isLoading || projectMonitorsQuery.isLoading}
+        evaluatorName={evaluatorToDelete?.name ?? ""}
+        workflow={relatedEntitiesQuery.data?.workflow ?? null}
+        monitors={linkedMonitors}
+      />
+
+      <EvaluatorReplicateDialog
+        open={!!evaluatorForCopy}
+        onClose={() => setEvaluatorForCopy(null)}
+        onSuccess={() =>
+          void evaluatorUtils.evaluators.getAll.invalidate({ projectId: projectId ?? "" })
+        }
+        evaluatorId={evaluatorForCopy?.id ?? ""}
+        evaluatorName={evaluatorForCopy?.name ?? ""}
+      />
+
+      <EvaluatorPushToCopiesDialog
+        open={!!evaluatorForPush}
+        onClose={() => setEvaluatorForPush(null)}
+        evaluatorId={evaluatorForPush?.id ?? ""}
+        evaluatorName={evaluatorForPush?.name ?? ""}
+      />
+    </>
+  );
+}

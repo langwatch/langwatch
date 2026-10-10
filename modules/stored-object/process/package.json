@@ -1,0 +1,69 @@
+{
+  "name": "@langwatch/stored-object-process",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Stored Objects service, Postgres store, API, and ClickHouse import.",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "imports": {
+    "#*": {
+      "types": "./dist/*.d.ts",
+      "default": "./src/*.ts"
+    }
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc -b",
+    "test": "vitest run --exclude \"**/*.integration.test.ts\"",
+    "test:integration": "vitest run .integration.test.ts"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "catalog:",
+    "@aws-sdk/s3-request-presigner": "catalog:",
+    "@azure/identity": "catalog:",
+    "@langwatch/api": "workspace:*",
+    "@langwatch/authorization": "workspace:*",
+    "@langwatch/authz-contract": "workspace:*",
+    "@langwatch/aws-client": "workspace:*",
+    "@langwatch/clickhouse-client": "workspace:*",
+    "@langwatch/dataset-contract": "workspace:*",
+    "@langwatch/egress": "workspace:*",
+    "@langwatch/group-queue": "workspace:*",
+    "@langwatch/handled-error": "workspace:*",
+    "@langwatch/ksuid": "workspace:*",
+    "@langwatch/module": "workspace:*",
+    "@langwatch/observability": "workspace:*",
+    "@langwatch/prisma-client": "workspace:*",
+    "@langwatch/process": "workspace:*",
+    "@langwatch/process-stores": "workspace:*",
+    "@langwatch/redis-client": "workspace:*",
+    "@langwatch/stored-object-contract": "workspace:*",
+    "@langwatch/system-migrations": "workspace:*",
+    "@langwatch/task": "workspace:*",
+    "@langwatch/time": "workspace:*",
+    "@langwatch/upgrade": "workspace:*",
+    "@opentelemetry/api": "catalog:",
+    "@trpc/server": "catalog:",
+    "hono": "catalog:",
+    "ioredis": "catalog:",
+    "langwatch": "workspace:*",
+    "prom-client": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@langwatch/test-harness": "workspace:*",
+    "@langwatch/vitest-config": "workspace:*",
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

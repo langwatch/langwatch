@@ -1,0 +1,30 @@
+{
+  "name": "@langwatch/limiter",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Store-neutral concurrency limiting: a bounded limiter that sheds once its wait queue is full, a per-statement wait bound, and the per-tenant statement limiter service with its in-process implementation.",
+  "license": "MIT",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc -b",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "langwatch": {
+    "group": "libraries"
+  }
+}

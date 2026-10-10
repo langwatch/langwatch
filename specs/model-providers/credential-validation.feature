@@ -401,7 +401,7 @@ Feature: Credential Validation
     And I am told what to check
     And I am not shown an internal error code
 
-  @integration
+  @unit
   Scenario: An unreachable provider is not recorded as our own failure
     Given the base URL I entered never answers
     When validation runs
@@ -625,7 +625,7 @@ Feature: Credential Validation
   # here and then worked. Only the gateway's address is asked: a key that
   # answers at another address would pass the check and fail on every request.
   #
-  # Bindings: platform/app/src/server/modelProviders/__tests__/providerValidation.unit.test.ts
+  # Bindings: modules/model-provider/process/src/services/__tests__/http-model-provider-credential-probe.service.unit.test.ts
 
   @unit
   Scenario Outline: A base URL is checked at the address the gateway will call

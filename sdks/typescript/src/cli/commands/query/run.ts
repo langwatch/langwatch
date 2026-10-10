@@ -1,45 +1,23 @@
 /**
- * `langwatch query "<sql>"` — run one LangWatchQL statement.
- *
- * LangWatchQL reached the CLI only through a saved chart (`langwatch chart
- * run`), so a statement had to exist in the product before it could be run.
- * This runs one as written, under the same verbatim contract the REST door has.
- *
- * Two flags carry the export case, and they are the reason this is not just
- * `chart run` without an id.
- *
- * `--format jsonl` writes one JSON object per row with JSON-typed columns
- * parsed back, which is the shape a post-training reader wants and the shape a
- * table renderer cannot produce.
- *
- * `--page-by keyset` walks a result larger than one response by REBINDING the
- * statement's own cursor parameters between pages. The query endpoint has no
- * cursor of its own and this command rewrites nobody's SQL, so the paging lives
- * where it can: in a predicate the author wrote, over parameters the author
- * declared. The statement text is identical on every page.
- *
- * @see ../../../../../platform/app/src/server/analytics/lwql/examples — the
- *   keyset example this pages
+ * `langwatch query "<sql>"` — one statement, run as written. `--page-by keyset`
+ * rebinds the statement's own cursor parameters, never its text.
  * @see specs/analytics/lwql-cli-query.feature
  */
 
-import chalk from "chalk";
 import { writeFileSync } from "node:fs";
+
+import chalk from "chalk";
 
 import {
   type QueryRunResult,
   QueryApiService,
 } from "@/client-sdk/services/query/query-api.service";
+
 import { resolveCredentials } from "../../utils/apiKey";
 import type { CommandResult } from "../../utils/output";
 import { createSpinner } from "../../utils/spinner";
 import { failSpinner } from "../../utils/spinnerError";
-import {
-  type QueryColumn,
-  type QueryOutputFormat,
-  type QueryRow,
-  renderRows,
-} from "./rows";
+import { type QueryColumn, type QueryOutputFormat, type QueryRow, renderRows } from "./rows";
 import {
   type ParameterValue,
   printTable,
@@ -52,12 +30,9 @@ import {
 } from "./run-options";
 
 /**
- * The cursor parameters `--page-by keyset` rebinds.
- *
- * Mirrors the names the platform's keyset example declares. They are a
- * convention rather than a contract the server enforces, which is exactly why
- * the command refuses a statement that does not declare both: silently running
- * page one over and over is the failure this prevents.
+ * The cursor parameters `--page-by keyset` rebinds, a convention the server
+ * does not enforce — which is why a statement declaring neither is refused
+ * rather than run as page one over and over.
  */
 const AFTER_TIMESTAMP_PARAMETER = "after_ts";
 const AFTER_ID_PARAMETER = "after_id";
@@ -83,11 +58,13 @@ export interface QueryRunOptions {
   project?: string;
 }
 
-
-function cursorFrom(rows: readonly QueryRow[]): {
+/** Where the next page of a keyset walk starts. */
+interface KeysetCursor {
   after_ts: string;
   after_id: string;
-} | null {
+}
+
+function cursorFrom(rows: readonly QueryRow[]): KeysetCursor | null {
   const last = rows[rows.length - 1];
   if (!last) return null;
   const timestamp = last[AFTER_TIMESTAMP_PARAMETER];
@@ -109,18 +86,43 @@ function requireCursorColumns(columns: readonly QueryColumn[]): void {
 }
 
 /**
- * Walks every page of a keyset statement, rebinding the cursor.
- *
- * The cursor comes from the row the previous page ended on, read from the two
- * columns the statement projects under the cursor parameters' names. The walk
- * stops on the first short page, on a cursor that did not move, and on the row
- * budget `--limit` set.
+ * Where the page after this one starts, or nothing: a short page is the last
+ * one, the row budget is spent, or the cursor did not move and another page
+ * would repeat this one.
+ */
+function nextCursorAfter({
+  page,
+  cursor,
+  previousPageSize,
+  rows,
+  limit,
+}: {
+  page: QueryRunResult;
+  cursor: KeysetCursor;
+  previousPageSize: number | null;
+  rows: number;
+  limit?: number;
+}): KeysetCursor | null {
+  if (previousPageSize !== null && page.rows.length < previousPageSize) return null;
+  if (limit !== undefined && rows >= limit) return null;
+
+  const next = cursorFrom(page.rows);
+  if (!next) return null;
+
+  return next.after_ts === cursor.after_ts && next.after_id === cursor.after_id ? null : next;
+}
+
+/**
+ * Every page of a keyset statement, the cursor rebound from the row the last
+ * page ended on. Stops on a short page, on a cursor that did not move, and on
+ * the row budget `--limit` set.
  */
 async function walkKeyset({
   service,
   sql,
   parameters,
   timeWindow,
+  projectId,
   limit,
   onPage,
 }: {
@@ -128,6 +130,7 @@ async function walkKeyset({
   sql: string;
   parameters: Record<string, ParameterValue>;
   timeWindow?: { start: string; end: string };
+  projectId?: string;
   limit?: number;
   onPage: (page: QueryRunResult, rows: readonly QueryRow[]) => void;
 }): Promise<{ pages: number; rows: number }> {
@@ -137,7 +140,7 @@ async function walkKeyset({
     );
   }
 
-  let cursor: { after_ts: string; after_id: string } = { ...KEYSET_START };
+  let cursor: KeysetCursor = { ...KEYSET_START };
   let pages = 0;
   let rows = 0;
   let previousPageSize: number | null = null;
@@ -147,6 +150,7 @@ async function walkKeyset({
       sql,
       parameters: { ...parameters, ...cursor },
       ...(timeWindow ? { timeWindow } : {}),
+      ...(projectId === undefined ? {} : { projectId }),
     });
     pages += 1;
     if (page.rows.length === 0) break;
@@ -158,20 +162,9 @@ async function walkKeyset({
     onPage(page, page.rows.slice(0, remaining));
     rows += Math.min(page.rows.length, remaining);
 
-    // A page shorter than the one before it is the end of the result: the
-    // statement's own LIMIT is what sizes a full page, so the first short page
-    // has nothing after it. Checking the ROW COUNT rather than asking for one
-    // more row is what keeps the statement unrewritten.
-    if (previousPageSize !== null && page.rows.length < previousPageSize) break;
+    const next = nextCursorAfter({ page, cursor, previousPageSize, rows, limit });
     previousPageSize = page.rows.length;
-
-    if (limit !== undefined && rows >= limit) break;
-
-    const next = cursorFrom(page.rows);
-    if (!next || (next.after_ts === cursor.after_ts && next.after_id === cursor.after_id)) {
-      // The cursor did not move, so another page would repeat this one.
-      break;
-    }
+    if (!next) break;
     cursor = next;
   }
 
@@ -183,6 +176,7 @@ async function runKeysetWalk({
   statement,
   parameters,
   timeWindow,
+  projectId,
   limit,
   format,
   output,
@@ -191,6 +185,7 @@ async function runKeysetWalk({
   statement: string;
   parameters: Record<string, ParameterValue>;
   timeWindow?: { start: string; end: string };
+  projectId?: string;
   limit?: number;
   format: QueryOutputFormat;
   output?: string;
@@ -204,6 +199,7 @@ async function runKeysetWalk({
       sql: statement,
       parameters,
       timeWindow,
+      projectId,
       limit,
       onPage: (page, rows) => {
         columns = page.columns;
@@ -231,6 +227,7 @@ async function runSinglePage({
   statement,
   parameters,
   timeWindow,
+  projectId,
   limit,
   format,
   output,
@@ -239,6 +236,7 @@ async function runSinglePage({
   statement: string;
   parameters: Record<string, ParameterValue>;
   timeWindow?: { start: string; end: string };
+  projectId?: string;
   limit?: number;
   format: QueryOutputFormat;
   output?: string;
@@ -250,6 +248,7 @@ async function runSinglePage({
       sql: statement,
       ...(Object.keys(parameters).length > 0 ? { parameters } : {}),
       ...(timeWindow ? { timeWindow } : {}),
+      ...(projectId === undefined ? {} : { projectId }),
     });
   } catch (error) {
     failSpinner({ spinner, error, action: "run statement" });
@@ -306,18 +305,23 @@ export const runQueryCommand = async (
     ...(options.out === undefined ? {} : { output: options.out }),
   };
 
-  await resolveCredentials({ project: options.project });
-  const common = { ...resolved, service: new QueryApiService() };
+  // Only an explicit `--project` narrows the run: the personal project the
+  // credential falls back to is not a project the user asked to read alone.
+  const credentials = await resolveCredentials({ project: options.project });
+  const projectId = options.project === undefined ? undefined : credentials.projectId;
+  const common = {
+    ...resolved,
+    ...(projectId === undefined ? {} : { projectId }),
+    service: new QueryApiService(),
+  };
 
   return pageByKeyset ? runKeysetWalk(common) : runSinglePage(common);
 };
 
 /**
- * Writes the rendered body, or prints it.
- *
- * Returns nothing rather than a `CommandResult`: the body is already the bytes
- * the caller asked for, and handing it to the output port would re-serialise
- * a document that is deliberately not JSON.
+ * Writes the rendered body, or prints it. Not a `CommandResult`: the body is
+ * already the bytes asked for, and the output port would re-serialise a
+ * document that is deliberately not JSON.
  */
 function writeOrPrint({
   body,

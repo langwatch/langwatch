@@ -1,7 +1,11 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, type MockInstance, vi } from "vitest";
 
 vi.mock("../../../utils/apiKey", () => ({
-  resolveCredentials: vi.fn(async () => ({ apiKey: "test-key", source: "env", endpoint: "https://app.langwatch.ai" })),
+  resolveCredentials: vi.fn(async () => ({
+    apiKey: "test-key",
+    source: "env",
+    endpoint: "https://app.langwatch.ai",
+  })),
 }));
 
 vi.mock("ora", () => ({
@@ -12,9 +16,10 @@ vi.mock("ora", () => ({
   }),
 }));
 
-import { listSimulationRunsCommand } from "../list";
-import { getSimulationRunCommand } from "../get";
+import { stripAnsi } from "../../../utils/formatting";
 import { setOutputFormat } from "../../../utils/outputScope";
+import { getSimulationRunCommand } from "../get";
+import { listSimulationRunsCommand } from "../list";
 
 class ProcessExitError extends Error {
   constructor(public code: number) {
@@ -26,8 +31,10 @@ const noop = () => {
   // intentionally empty — suppresses output during tests
 };
 
+let exitSpy: MockInstance<typeof process.exit>;
+
 const mockProcessExit = () => {
-  vi.spyOn(process, "exit").mockImplementation((code) => {
+  exitSpy = vi.spyOn(process, "exit").mockImplementation((code) => {
     throw new ProcessExitError(code as number);
   });
 };
@@ -80,7 +87,7 @@ describe("listSimulationRunsCommand()", () => {
       await listSimulationRunsCommand({});
 
       expect(mockFetch).toHaveBeenCalledWith(
-        expect.stringContaining("/api/simulation-runs"),
+        expect.stringContaining("/api/v1/simulation-runs"),
         expect.objectContaining({ method: "GET" }),
       );
     });
@@ -95,8 +102,7 @@ describe("listSimulationRunsCommand()", () => {
 
       await listSimulationRunsCommand({});
 
-      // eslint-disable-next-line @typescript-eslint/unbound-method
-      expect(process.exit).not.toHaveBeenCalled();
+      expect(exitSpy).not.toHaveBeenCalled();
     });
   });
 
@@ -169,9 +175,7 @@ describe("listSimulationRunsCommand()", () => {
 
       setOutputFormat("json");
       try {
-        await expect(
-          listSimulationRunsCommand({ limit: "200" }),
-        ).rejects.toThrow(ProcessExitError);
+        await expect(listSimulationRunsCommand({ limit: "200" })).rejects.toThrow(ProcessExitError);
       } finally {
         setOutputFormat(undefined);
       }
@@ -213,7 +217,7 @@ describe("listSimulationRunsCommand()", () => {
       expect(mockFetch).toHaveBeenCalledTimes(2);
       expect(String(mockFetch.mock.calls[1]?.[0])).toContain("cursor=cursor-1");
       const data = result?.data as {
-        runs: Array<{ scenarioRunId: string }>;
+        runs: { scenarioRunId: string }[];
         scanned: number;
       };
       expect(data.runs).toHaveLength(1);
@@ -267,7 +271,7 @@ describe("getSimulationRunCommand()", () => {
       await getSimulationRunCommand("run_abc123");
 
       expect(mockFetch).toHaveBeenCalledWith(
-        "http://localhost:5560/api/simulation-runs/run_abc123",
+        "http://localhost:5560/api/v1/simulation-runs/run_abc123",
         expect.objectContaining({ method: "GET" }),
       );
     });
@@ -319,17 +323,13 @@ describe("getSimulationRunCommand()", () => {
 
       await getSimulationRunCommand("run_abc123");
 
-      // eslint-disable-next-line @typescript-eslint/unbound-method
-      expect(process.exit).not.toHaveBeenCalled();
+      expect(exitSpy).not.toHaveBeenCalled();
     });
   });
 });
 
 /**
- * The note belongs to the batch and the version is the scenario version the
- * run used. Both read as named fields: the run's raw metadata is internal and
- * never part of what the CLI shows or returns.
- *
+ * The note belongs to the batch and the version is the scenario version the run used.
  * Spec: specs/features/simulation-runs-cli.feature
  */
 describe("the note and the scenario version", () => {
@@ -346,7 +346,7 @@ describe("the note and the scenario version", () => {
     process.env.LANGWATCH_ENDPOINT = "http://localhost:5560";
   });
 
-  const printed = () => vi.mocked(console.log).mock.calls.flat().join("\n");
+  const printed = () => stripAnsi(vi.mocked(console.log).mock.calls.flat().join("\n"));
 
   describe("listSimulationRunsCommand()", () => {
     /** @scenario "List simulation runs shows the note and the scenario version" */
@@ -414,8 +414,7 @@ describe("the note and the scenario version", () => {
     it("shows the note of the batch and the version the run used", async () => {
       mockFetch.mockResolvedValue({
         ok: true,
-        json: async () =>
-          makeRun({ note: "after the retry fix", scenarioVersion: 3 }),
+        json: async () => makeRun({ note: "after the retry fix", scenarioVersion: 3 }),
       });
 
       const result = await getSimulationRunCommand("run_abc123");
@@ -508,7 +507,9 @@ describe("getSimulationRunCommand()", () => {
       expect(printed).toContain("The query groups by month, not by quarter");
       expect(printed).toContain("score 0.8");
       expect(printed).toContain("no table_schema on this scenario");
-      expect((result?.data as { results: { evaluations: unknown[] } }).results.evaluations).toHaveLength(3);
+      expect(
+        (result?.data as { results: { evaluations: unknown[] } } | undefined)?.results.evaluations,
+      ).toHaveLength(3);
     });
   });
 });

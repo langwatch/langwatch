@@ -1,0 +1,1179 @@
+import { GrantExceedsCallerPermissionsError } from "@langwatch/authz-contract";
+import { MemberNotFoundError, OrganizationNotFoundError } from "@langwatch/organization-contract";
+import { OrganizationUserRole, TeamUserRole } from "@langwatch/prisma-client/generated";
+/**
+ * The membership half's rules, over doubled ports.
+ */
+import { nowInstant, Temporal } from "@langwatch/time";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+import type { OrganizationMembershipRepository } from "../../repositories/organization-membership.repository.ts";
+import type {
+  OrganizationGrantCache,
+  OrganizationSeatRevocationNotice,
+} from "../organization-member-role.service.ts";
+import {
+  OrganizationMembershipService,
+  type OrganizationTestArrivals,
+} from "../organization-membership.service.ts";
+import type { OrganizationCreationNotice } from "../organization-provisioning.service.ts";
+import type { OrganizationSeatLicense } from "../organization-seat-license.service.ts";
+
+const mockInvalidateOrganization = vi.fn();
+const mockCheckLimit = vi.fn();
+const mockAssertRoleChangeAllowed = vi.fn();
+const mockMemberDisabled = vi.fn();
+const mockMemberEnabled = vi.fn();
+const mockCreateAndAssign = vi.fn();
+const mockGetProvisioningSummaryById = vi.fn();
+const mockStandingFor = vi.fn<OrganizationTestArrivals["standingFor"]>(async () => ({
+  testing: false,
+}));
+
+const personalWorkspaceArchived = vi.fn(() => Promise.resolve());
+
+describe("OrganizationMembershipService", () => {
+  const mockRepo: OrganizationMembershipRepository = {
+    createMembership: vi.fn(),
+    readJoinerSeat: vi.fn(),
+    findPersonalTeamsInScopes: vi.fn(),
+    findSharedTeamIds: vi.fn(),
+    findTeamGrants: vi.fn(),
+    findCustomRolePermissions: vi.fn(),
+    findUserOrgRoleByTeamId: vi.fn(),
+    getOrganizationIntent: vi.fn(),
+    findActiveAdministratorIds: vi.fn(),
+    findMemberUserIds: vi.fn(),
+    findInvitedMemberIds: vi.fn(),
+    createAndAssign: mockCreateAndAssign,
+    createForProvisioning: vi.fn(),
+    findAllProvisioningSummaries: vi.fn(),
+    getProvisioningSummaryById: mockGetProvisioningSummaryById,
+    deleteProvisionedOrganization: vi.fn(),
+    markSelfHostedCustomer: vi.fn(),
+    findSelfHostedCustomers: vi.fn(),
+    findFoundedBetween: vi.fn(),
+    findRepresentatives: vi.fn(),
+    findAllForUser: vi.fn(),
+    findOrganizationWithMembers: vi.fn(),
+    findMemberById: vi.fn(),
+    findActiveMemberUsers: vi.fn(),
+    findMemberUsersIncludingDeactivated: vi.fn(),
+    findMemberDepartments: vi.fn(),
+    findMemberTeamIds: vi.fn(),
+    findMembersWithDepartments: vi.fn(),
+    assignMemberDepartment: vi.fn(),
+    findTeamsWithDepartments: vi.fn(),
+    assignTeamDepartment: vi.fn(),
+    getMembership: vi.fn(),
+    listAllMembers: vi.fn(),
+    findMemberTeamBindings: vi.fn(),
+    createSsoDomainMembership: vi.fn(),
+    countMembershipsForUser: vi.fn(),
+    deleteMember: vi.fn(),
+    setMemberDisabled: vi.fn(),
+    updateMemberRole: vi.fn(),
+    updateTeamMemberRole: vi.fn(),
+    getAuditLogs: vi.fn(),
+  };
+
+  const mockCreations: OrganizationCreationNotice = {
+    created: vi.fn(),
+    reportError: vi.fn(),
+  };
+  const seats: OrganizationSeatLicense = {
+    checkLimit: mockCheckLimit,
+    assertRoleChangeAllowed: mockAssertRoleChangeAllowed,
+  };
+  const seatNotices: OrganizationSeatRevocationNotice = {
+    memberDisabled: mockMemberDisabled,
+    memberEnabled: mockMemberEnabled,
+  };
+  const grantCache: OrganizationGrantCache = {
+    invalidateOrganization: mockInvalidateOrganization,
+  };
+  /** Nobody here is mid-way through proving a connection; the one test that
+   *  is says so itself. */
+  const testArrivals = { standingFor: mockStandingFor };
+  const attached: unknown[] = [];
+  const completed: unknown[] = [];
+  const admissions = {
+    attachBindings: async (input: unknown) => {
+      attached.push(input);
+      return { attached: [], duplicates: [] };
+    },
+    completeAdmission: async (input: unknown) => {
+      completed.push(input);
+      return true;
+    },
+  };
+
+  let service: OrganizationMembershipService;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    // The directory reads the role-change flow makes, answered empty unless a
+    // test states otherwise.
+    vi.mocked(mockRepo.findPersonalTeamsInScopes).mockResolvedValue([]);
+    vi.mocked(mockRepo.findSharedTeamIds).mockResolvedValue([]);
+    vi.mocked(mockRepo.findTeamGrants).mockResolvedValue([]);
+    vi.mocked(mockRepo.findCustomRolePermissions).mockResolvedValue([]);
+    vi.mocked(mockRepo.deleteMember).mockResolvedValue([]);
+    service = OrganizationMembershipService.create({
+      workspaceNotices: { personalWorkspaceArchived },
+      memberNotices: { memberRemoved: async () => {}, memberDepartmentChanged: async () => {} },
+      repository: mockRepo,
+      creations: mockCreations,
+      seats,
+      seatNotices,
+      grantCache,
+      testArrivals,
+      ceiling: { assertWithinCaller: async () => {} },
+      admissions,
+    });
+    attached.length = 0;
+    completed.length = 0;
+  });
+
+  describe("createAndAssign()", () => {
+    /** @scenario "A test arrival is not sent to the screen that creates an organization" */
+    /** @scenario A test arrival cannot create an organization */
+    it("refuses somebody mid-way through proving a connection", async () => {
+      mockStandingFor.mockResolvedValueOnce({
+        testing: true,
+        connectionId: "local_ssoc_acme",
+        organizationId: "org_acme",
+        organizationName: "Acme",
+      });
+
+      await expect(
+        service.createAndAssign({ userId: "user-456", orgName: "Acme" }),
+      ).rejects.toMatchObject({ code: "sso_test_arrival_cannot_create_organization" });
+      expect(mockCreateAndAssign).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "Every way an organization is created records lw.organization.created" */
+    it("creates one for somebody who simply has no organization yet, and records it", async () => {
+      mockCreateAndAssign.mockResolvedValue({
+        organization: { id: "org-123", name: "Acme" },
+        team: { id: "team-123" },
+      });
+
+      await service.createAndAssign({ userId: "user-456", orgName: "Acme" });
+
+      expect(mockCreateAndAssign).toHaveBeenCalledTimes(1);
+      expect(mockCreations.created).toHaveBeenCalledWith({
+        organizationId: "org-123",
+        organizationName: "Acme",
+      });
+    });
+  });
+
+  describe("when a join admits somebody", () => {
+    beforeEach(() => {
+      vi.mocked(mockRepo.readJoinerSeat).mockResolvedValue("MEMBER");
+      mockCheckLimit.mockResolvedValue({
+        allowed: true,
+        limitType: "members",
+        current: 0,
+        max: 99,
+      });
+    });
+
+    /** @scenario The joiner seat setting is Full by default */
+    it("lands the organization grant audited to the approving admin, then clears the marker", async () => {
+      vi.mocked(mockRepo.createMembership).mockResolvedValue({
+        outcome: "created",
+        seat: "MEMBER",
+        pending: false,
+      });
+
+      await service.createMembership({
+        organizationId: "org-123",
+        userId: "user-456",
+        admittedBy: { actor: { type: "user", id: "admin-1" }, commandId: "approve:jr-1" },
+      });
+
+      const [row] = vi.mocked(mockRepo.createMembership).mock.calls;
+      const grantId = row?.[0].pendingAdmissionId;
+      expect(attached).toEqual([
+        expect.objectContaining({
+          organizationId: "org-123",
+          actor: { type: "user", id: "admin-1" },
+          source: "join-request",
+          commandId: "approve:jr-1",
+          bindings: [
+            expect.objectContaining({ bindingId: grantId, principal: { userId: "user-456" } }),
+          ],
+        }),
+      ]);
+      expect(completed).toEqual([{ organizationId: "org-123", userId: "user-456", grantId }]);
+    });
+
+    it("attaches nothing for somebody who was already a member", async () => {
+      vi.mocked(mockRepo.createMembership).mockResolvedValue({
+        outcome: "already-present",
+        seat: "MEMBER",
+        pending: false,
+      });
+
+      await service.createMembership({
+        organizationId: "org-123",
+        userId: "user-456",
+        admittedBy: { actor: { type: "system", id: "system:join-requests" }, commandId: "c-1" },
+      });
+
+      expect(attached).toEqual([]);
+      expect(completed).toEqual([]);
+    });
+  });
+
+  describe("when a join lands somebody on a Developer seat (ADR-171)", () => {
+    beforeEach(() => {
+      vi.mocked(mockRepo.readJoinerSeat).mockResolvedValue("DEVELOPER");
+      mockCheckLimit.mockResolvedValue({
+        allowed: true,
+        limitType: "members",
+        current: 0,
+        max: 99,
+      });
+    });
+
+    /** @scenario The joiner seat setting lands email joiners as Developers */
+    it("attaches no grant and leaves no admission to complete", async () => {
+      vi.mocked(mockRepo.createMembership).mockResolvedValue({
+        outcome: "created",
+        seat: "DEVELOPER",
+        pending: false,
+      });
+
+      const admission = await service.createMembership({
+        organizationId: "org-123",
+        userId: "user-456",
+        admittedBy: { actor: { type: "system", id: "system:join-requests" }, commandId: "c-1" },
+      });
+
+      expect(admission).toEqual({ outcome: "created", seat: "DEVELOPER", pending: false });
+      expect(attached).toEqual([]);
+      expect(completed).toEqual([]);
+      expect(vi.mocked(mockRepo.createMembership).mock.calls.at(-1)?.[0].via).toBe("domain-join");
+    });
+  });
+
+  describe("when a join arrives past the licence's full member seats", () => {
+    const admittedBy = {
+      actor: { type: "user" as const, id: "admin-1" },
+      commandId: "approve:jr-2",
+    };
+
+    beforeEach(() => {
+      vi.mocked(mockRepo.readJoinerSeat).mockResolvedValue("MEMBER");
+    });
+
+    /** @scenario "An approved join request given a Lite Member seat holds the organization-wide Viewer grant" */
+    it("writes a Lite Member row and lands the organization-wide Viewer grant", async () => {
+      mockCheckLimit.mockImplementation(async ({ resource }: { resource: string }) => ({
+        allowed: resource === "membersLite",
+        limitType: resource,
+        current: 1,
+        max: 1,
+      }));
+      vi.mocked(mockRepo.createMembership).mockResolvedValue({
+        outcome: "created",
+        seat: "EXTERNAL",
+        pending: false,
+      });
+
+      await service.createMembership({ organizationId: "org-123", userId: "user-456", admittedBy });
+
+      expect(vi.mocked(mockRepo.createMembership).mock.calls.at(-1)?.[0]).toMatchObject({
+        seat: "EXTERNAL",
+        pending: false,
+      });
+      const grantId = vi
+        .mocked(mockRepo.createMembership)
+        .mock.calls.at(-1)?.[0].pendingAdmissionId;
+      expect(attached).toEqual([
+        expect.objectContaining({
+          source: "join-request",
+          bindings: [
+            expect.objectContaining({
+              bindingId: grantId,
+              principal: { userId: "user-456" },
+              role: "VIEWER",
+              customRoleId: null,
+              scopeType: "ORGANIZATION",
+              scopeId: "org-123",
+            }),
+          ],
+        }),
+      ]);
+      expect(completed).toEqual([{ organizationId: "org-123", userId: "user-456", grantId }]);
+    });
+
+    /** @scenario "An arrival held pending for want of any seat is given no grant" */
+    it("holds the person pending when the Lite Member seats are used up too", async () => {
+      mockCheckLimit.mockResolvedValue({
+        allowed: false,
+        limitType: "members",
+        current: 1,
+        max: 1,
+      });
+      vi.mocked(mockRepo.createMembership).mockResolvedValue({
+        outcome: "created",
+        seat: "EXTERNAL",
+        pending: true,
+      });
+
+      await service.createMembership({ organizationId: "org-123", userId: "user-456", admittedBy });
+
+      expect(vi.mocked(mockRepo.createMembership).mock.calls.at(-1)?.[0]).toMatchObject({
+        seat: "EXTERNAL",
+        pending: true,
+      });
+      expect(attached).toEqual([]);
+    });
+  });
+
+  describe("when a join is admitted by policy or approved by an administrator", () => {
+    beforeEach(() => {
+      vi.mocked(mockRepo.readJoinerSeat).mockResolvedValue("DEVELOPER");
+      mockCheckLimit.mockResolvedValue({
+        allowed: true,
+        limitType: "members",
+        current: 0,
+        max: 99,
+      });
+    });
+
+    /** @scenario "Every automatic join is on the customer's audit page" */
+    it("writes the same audit row either way, naming the policy as the route when no person approved", async () => {
+      vi.mocked(mockRepo.createMembership).mockResolvedValue({
+        outcome: "created",
+        seat: "DEVELOPER",
+        pending: false,
+      });
+      const viaOf = async (actor: { type: "user" | "system"; id: string }) => {
+        await service.createMembership({
+          organizationId: "org-123",
+          userId: "user-456",
+          admittedBy: { actor, commandId: "c-1" },
+        });
+        return vi.mocked(mockRepo.createMembership).mock.calls.at(-1)?.[0].via;
+      };
+
+      expect(await viaOf({ type: "system", id: "system:join-requests" })).toBe("domain-join");
+      expect(await viaOf({ type: "user", id: "user-admin" })).toBe("join-request-approved");
+    });
+  });
+
+  describe("createMembership()", () => {
+    beforeEach(() => {
+      vi.mocked(mockRepo.readJoinerSeat).mockResolvedValue("MEMBER");
+      mockCheckLimit.mockResolvedValue({
+        allowed: true,
+        limitType: "members",
+        current: 0,
+        max: 99,
+      });
+    });
+
+    it("mints one admission intent per membership, in the ledger's own scheme", async () => {
+      vi.mocked(mockRepo.createMembership).mockResolvedValue({
+        outcome: "created",
+        seat: "MEMBER",
+        pending: false,
+      });
+
+      await service.createMembership({ organizationId: "org-123", userId: "user-456" });
+      await service.createMembership({ organizationId: "org-123", userId: "user-789" });
+
+      const [first, second] = vi.mocked(mockRepo.createMembership).mock.calls;
+      expect(first?.[0]).toMatchObject({ organizationId: "org-123", userId: "user-456" });
+      expect(first?.[0].pendingAdmissionId).toMatch(/^rolebinding_/);
+      expect(second?.[0].pendingAdmissionId).not.toBe(first?.[0].pendingAdmissionId);
+    });
+
+    it("reports a row a concurrent callback already created rather than refusing", async () => {
+      vi.mocked(mockRepo.createMembership).mockResolvedValue({
+        outcome: "already-present",
+        seat: "MEMBER",
+        pending: false,
+      });
+
+      await expect(
+        service.createMembership({ organizationId: "org-123", userId: "user-456" }),
+      ).resolves.toEqual({ outcome: "already-present", seat: "MEMBER", pending: false });
+    });
+  });
+
+  describe("updateMemberRole()", () => {
+    const baseParams = {
+      organizationId: "org-123",
+      userId: "user-456",
+      role: OrganizationUserRole.MEMBER,
+      currentMemberships: [{ teamId: "team-1", role: TeamUserRole.VIEWER }],
+      organizationTeamIds: ["team-1", "team-2"],
+      currentUserId: "admin-789",
+    };
+
+    beforeEach(() => {
+      vi.mocked(mockRepo.updateMemberRole).mockResolvedValue({
+        teamsLeftWithoutAdmin: [],
+      });
+    });
+
+    describe("when a team role update targets a different user", () => {
+      it("refuses with validation_error", async () => {
+        await expect(
+          service.updateMemberRole({
+            caller: { type: "system" },
+            ...baseParams,
+            teamRoleUpdates: [
+              {
+                teamId: "team-1",
+                userId: "wrong-user",
+                role: TeamUserRole.MEMBER,
+              },
+            ],
+          }),
+        ).rejects.toMatchObject({ code: "validation_error" });
+      });
+    });
+
+    describe("when a team role update references a team outside the organization", () => {
+      it("refuses with validation_error", async () => {
+        await expect(
+          service.updateMemberRole({
+            caller: { type: "system" },
+            ...baseParams,
+            teamRoleUpdates: [
+              {
+                teamId: "team-outside",
+                userId: "user-456",
+                role: TeamUserRole.MEMBER,
+              },
+            ],
+          }),
+        ).rejects.toMatchObject({ code: "validation_error" });
+      });
+    });
+
+    describe("when inputs are valid", () => {
+      it("delegates to the repository with effective team role updates", async () => {
+        await service.updateMemberRole({
+          caller: { type: "system" },
+          ...baseParams,
+          teamRoleUpdates: [{ teamId: "team-1", userId: "user-456", role: TeamUserRole.ADMIN }],
+        });
+
+        expect(mockRepo.updateMemberRole).toHaveBeenCalledWith(
+          expect.objectContaining({
+            organizationId: "org-123",
+            userId: "user-456",
+            role: OrganizationUserRole.MEMBER,
+            effectiveTeamRoleUpdates: expect.arrayContaining([
+              expect.objectContaining({
+                teamId: "team-1",
+                role: TeamUserRole.ADMIN,
+              }),
+            ]),
+          }),
+        );
+      });
+    });
+  });
+
+  describe("given a caller who lacks what a role change would confer", () => {
+    const assertWithinCaller = vi.fn(async () => {
+      throw new GrantExceedsCallerPermissionsError(["organization:manage"]);
+    });
+    const refusing = () =>
+      OrganizationMembershipService.create({
+        workspaceNotices: { personalWorkspaceArchived },
+        memberNotices: { memberRemoved: async () => {}, memberDepartmentChanged: async () => {} },
+        repository: mockRepo,
+        creations: mockCreations,
+        seats,
+        seatNotices,
+        grantCache,
+        testArrivals,
+        ceiling: { assertWithinCaller },
+        admissions,
+      });
+
+    /** @scenario "Changing a member's organization role above the caller is refused before the seat changes" */
+    it("refuses an organization role change before any write", async () => {
+      vi.mocked(mockRepo.getMembership).mockResolvedValue({
+        role: OrganizationUserRole.MEMBER,
+      } as never);
+
+      await expect(
+        refusing().changeMemberRole({
+          caller: { type: "user", id: "manager-1" },
+          organizationId: "org-123",
+          userId: "manager-1",
+          role: OrganizationUserRole.ADMIN,
+          currentUserId: "manager-1",
+        }),
+      ).rejects.toMatchObject({
+        code: "grant_exceeds_caller_permissions",
+        meta: { missingPermissions: ["organization:manage"] },
+      });
+      expect(assertWithinCaller).toHaveBeenLastCalledWith({
+        organizationId: "org-123",
+        caller: { type: "user", id: "manager-1" },
+        grants: [{ role: "ADMIN", scopeType: "ORGANIZATION", scopeId: "org-123" }],
+      });
+      expect(mockAssertRoleChangeAllowed).not.toHaveBeenCalled();
+      expect(mockRepo.updateMemberRole).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "A role change that corrects team roles is refused before the seat changes" */
+    it("asks about the team roles the seat change corrects, before any write", async () => {
+      vi.mocked(mockRepo.findSharedTeamIds).mockResolvedValue(["team-1"]);
+      vi.mocked(mockRepo.findTeamGrants).mockResolvedValue([
+        { scopeId: "team-1", role: TeamUserRole.VIEWER, customRoleId: null },
+      ]);
+      vi.mocked(mockRepo.getMembership).mockResolvedValue({
+        userId: "user-456",
+        organizationId: "org-123",
+        role: OrganizationUserRole.EXTERNAL,
+        disabledAt: null,
+        createdAt: Temporal.Instant.from("2026-01-01T00:00:00Z"),
+        updatedAt: Temporal.Instant.from("2026-01-01T00:00:00Z"),
+        user: { id: "user-456", name: null, email: null },
+      });
+
+      await expect(
+        refusing().changeMemberRole({
+          caller: { type: "user", id: "manager-1" },
+          organizationId: "org-123",
+          userId: "user-456",
+          role: OrganizationUserRole.MEMBER,
+          currentUserId: "manager-1",
+        }),
+      ).rejects.toMatchObject({
+        code: "grant_exceeds_caller_permissions",
+        meta: { missingPermissions: ["organization:manage"] },
+      });
+      expect(assertWithinCaller).toHaveBeenLastCalledWith({
+        organizationId: "org-123",
+        caller: { type: "user", id: "manager-1" },
+        grants: [
+          { role: "MEMBER", scopeType: "ORGANIZATION", scopeId: "org-123" },
+          { role: "MEMBER", scopeType: "TEAM", scopeId: "team-1" },
+        ],
+      });
+      expect(mockAssertRoleChangeAllowed).not.toHaveBeenCalled();
+      expect(mockRepo.updateMemberRole).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "Changing a member's team role above the caller is refused before anything is written" */
+    it("refuses a team role change before any write", async () => {
+      await expect(
+        refusing().updateTeamMemberRole({
+          caller: { type: "user", id: "manager-1" },
+          organizationId: "org-123",
+          teamId: "team-1",
+          userId: "manager-1",
+          role: TeamUserRole.ADMIN,
+          currentUserId: "manager-1",
+        }),
+      ).rejects.toMatchObject({ code: "grant_exceeds_caller_permissions" });
+      expect(assertWithinCaller).toHaveBeenLastCalledWith({
+        organizationId: "org-123",
+        caller: { type: "user", id: "manager-1" },
+        grants: [expect.objectContaining({ role: "ADMIN", scopeType: "TEAM", scopeId: "team-1" })],
+      });
+      expect(mockRepo.updateTeamMemberRole).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when removing a member", () => {
+    const membership = {
+      userId: "user-456",
+      organizationId: "org-123",
+      role: OrganizationUserRole.MEMBER,
+      disabledAt: null,
+      createdAt: nowInstant(),
+      updatedAt: nowInstant(),
+      user: { id: "user-456", name: "Member", email: "member@example.com" },
+    };
+
+    describe("when the acting user removes themselves", () => {
+      /** @scenario "A member cannot remove themselves" */
+      it("refuses with cannot_remove_self before touching the repository", async () => {
+        await expect(
+          service.deleteMember({
+            organizationId: "org-123",
+            userId: "user-456",
+            actingUserId: "user-456",
+          }),
+        ).rejects.toMatchObject({ code: "cannot_remove_self" });
+
+        expect(mockRepo.getMembership).not.toHaveBeenCalled();
+        expect(mockRepo.deleteMember).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when the membership does not exist", () => {
+      it("refuses with member_not_found", async () => {
+        vi.mocked(mockRepo.getMembership).mockRejectedValue(new MemberNotFoundError("user-456"));
+
+        await expect(
+          service.deleteMember({
+            organizationId: "org-123",
+            userId: "user-456",
+            actingUserId: "admin-789",
+          }),
+        ).rejects.toMatchObject({ code: "member_not_found" });
+
+        expect(mockRepo.deleteMember).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when another member is removed", () => {
+      it("delegates to the repository", async () => {
+        vi.mocked(mockRepo.getMembership).mockResolvedValue(membership);
+
+        await service.deleteMember({
+          organizationId: "org-123",
+          userId: "user-456",
+          actingUserId: "admin-789",
+        });
+
+        // The acting user travels with the removal: the grant revocation it
+        // emits is attributed to whoever made the decision.
+        expect(mockRepo.deleteMember).toHaveBeenCalledWith({
+          organizationId: "org-123",
+          userId: "user-456",
+          actingUserId: "admin-789",
+        });
+      });
+    });
+
+    describe("when the removed member owned a personal workspace", () => {
+      /** @scenario "Removing a member records their archived personal teams for project" */
+      it("records the archived personal teams for project", async () => {
+        vi.mocked(mockRepo.getMembership).mockResolvedValue(membership);
+        vi.mocked(mockRepo.deleteMember).mockResolvedValueOnce(["team_personal"]);
+
+        await service.deleteMember({ organizationId: "org-123", userId: "user-456" });
+
+        expect(personalWorkspaceArchived).toHaveBeenCalledWith({
+          organizationId: "org-123",
+          userId: "user-456",
+          teamIds: ["team_personal"],
+        });
+      });
+    });
+
+    describe("when the credential acts as nobody", () => {
+      it("cannot trip the self-removal guard", async () => {
+        vi.mocked(mockRepo.getMembership).mockResolvedValue(membership);
+
+        await service.deleteMember({
+          organizationId: "org-123",
+          userId: "user-456",
+        });
+
+        expect(mockRepo.deleteMember).toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("when changing a member's disabled state", () => {
+    describe("when the acting user disables themselves", () => {
+      /** @scenario "A member cannot disable themselves" */
+      it("refuses with cannot_disable_self", async () => {
+        await expect(
+          service.setMemberDisabled({
+            organizationId: "org-123",
+            userId: "user-456",
+            disabled: true,
+            actingUser: { id: "user-456" },
+          }),
+        ).rejects.toMatchObject({ code: "cannot_disable_self" });
+
+        expect(mockRepo.setMemberDisabled).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when the membership does not exist", () => {
+      it("refuses with member_not_found", async () => {
+        vi.mocked(mockRepo.getMembership).mockRejectedValue(new MemberNotFoundError("user-456"));
+
+        await expect(
+          service.setMemberDisabled({
+            organizationId: "org-123",
+            userId: "ghost",
+            disabled: true,
+            actingUser: { id: "admin-789" },
+          }),
+        ).rejects.toMatchObject({ code: "member_not_found" });
+      });
+    });
+
+    describe("when the seat is taken away", () => {
+      const activeMember = {
+        userId: "user-456",
+        organizationId: "org-123",
+        role: OrganizationUserRole.MEMBER,
+        disabledAt: null,
+        createdAt: nowInstant(),
+        updatedAt: nowInstant(),
+        user: { id: "user-456", name: null, email: null },
+      };
+
+      /** @scenario "Disabling a member takes their access away before the call returns" */
+      it("writes the membership and retires the cached authz answers before it returns", async () => {
+        vi.mocked(mockRepo.getMembership).mockResolvedValue(activeMember);
+        const order: string[] = [];
+        vi.mocked(mockRepo.setMemberDisabled).mockImplementationOnce(async () => {
+          order.push("membership");
+        });
+        mockMemberDisabled.mockImplementationOnce(async () => {
+          order.push("recorded");
+        });
+        mockInvalidateOrganization.mockImplementationOnce(async () => {
+          order.push("authz");
+        });
+
+        await service.setMemberDisabled({
+          organizationId: "org-123",
+          userId: "user-456",
+          disabled: true,
+          actingUser: { id: "admin-789" },
+        });
+
+        // Both refusals are in place once the call returns; only the sessions are eventual.
+        expect(order).toEqual(["membership", "recorded", "authz"]);
+        expect(mockRepo.setMemberDisabled).toHaveBeenCalledWith({
+          organizationId: "org-123",
+          userId: "user-456",
+          disabled: true,
+        });
+        expect(mockInvalidateOrganization).toHaveBeenCalledWith({ organizationId: "org-123" });
+      });
+
+      /** @scenario "Disabling a member records that their seat was taken away" */
+      it("records the member as disabled after the membership write", async () => {
+        vi.mocked(mockRepo.getMembership).mockResolvedValue(activeMember);
+
+        await service.setMemberDisabled({
+          organizationId: "org-123",
+          userId: "user-456",
+          disabled: true,
+          actingUser: { id: "admin-789" },
+        });
+
+        // The membership write comes first: recording the revocation and then failing the
+        // write would sign out a member whose seat was never taken.
+        expect(vi.mocked(mockRepo.setMemberDisabled).mock.invocationCallOrder[0]).toBeLessThan(
+          mockMemberDisabled.mock.invocationCallOrder[0] ?? 0,
+        );
+        expect(mockMemberDisabled).toHaveBeenCalledWith({
+          organizationId: "org-123",
+          userId: "user-456",
+          disabledByUserId: "admin-789",
+        });
+      });
+
+      /** @scenario "Re-enabling a member records no seat revocation" */
+      it("records nothing when the seat is given back", async () => {
+        vi.mocked(mockRepo.getMembership).mockResolvedValue({
+          ...activeMember,
+          disabledAt: Temporal.Instant.from("2026-08-01T00:00:00Z"),
+        });
+        mockCheckLimit.mockResolvedValue({
+          allowed: true,
+          limitType: "members",
+          current: 1,
+          max: 5,
+        });
+
+        await service.setMemberDisabled({
+          organizationId: "org-123",
+          userId: "user-456",
+          disabled: false,
+          actingUser: { id: "admin-789" },
+        });
+
+        expect(mockMemberDisabled).not.toHaveBeenCalled();
+      });
+
+      /** @scenario "Re-enabling a member records that their seat was given back" */
+      it("records the member as re-enabled after the membership write", async () => {
+        vi.mocked(mockRepo.getMembership).mockResolvedValue({
+          ...activeMember,
+          disabledAt: Temporal.Instant.from("2026-08-01T00:00:00Z"),
+        });
+        mockCheckLimit.mockResolvedValue({
+          allowed: true,
+          limitType: "members",
+          current: 1,
+          max: 5,
+        });
+
+        await service.setMemberDisabled({
+          organizationId: "org-123",
+          userId: "user-456",
+          disabled: false,
+          actingUser: { id: "admin-789" },
+        });
+
+        expect(vi.mocked(mockRepo.setMemberDisabled).mock.invocationCallOrder[0]).toBeLessThan(
+          mockMemberEnabled.mock.invocationCallOrder[0] ?? 0,
+        );
+        expect(mockMemberEnabled).toHaveBeenCalledWith({
+          organizationId: "org-123",
+          userId: "user-456",
+          enabledByUserId: "admin-789",
+        });
+      });
+
+      /** @scenario "A process that cannot record the seat revocation refuses the disable" */
+      it("refuses the disable when the revocation cannot be recorded", async () => {
+        const unrecorded = OrganizationMembershipService.create({
+          workspaceNotices: { personalWorkspaceArchived },
+          memberNotices: { memberRemoved: async () => {}, memberDepartmentChanged: async () => {} },
+          repository: mockRepo,
+          creations: mockCreations,
+          seats,
+          seatNotices: {
+            memberDisabled: () =>
+              Promise.reject(new Error("organization_lifecycle is not registered in this process")),
+            memberEnabled: async () => {},
+          },
+          grantCache,
+          testArrivals,
+          ceiling: { assertWithinCaller: async () => {} },
+          admissions,
+        });
+        vi.mocked(mockRepo.getMembership).mockResolvedValue(activeMember);
+
+        await expect(
+          unrecorded.setMemberDisabled({
+            organizationId: "org-123",
+            userId: "user-456",
+            disabled: true,
+            actingUser: { id: "admin-789" },
+          }),
+        ).rejects.toThrow("organization_lifecycle is not registered in this process");
+      });
+    });
+
+    describe("when disabling another member", () => {
+      /** @scenario Disabling or re-enabling a membership takes effect on the next request */
+      it("retires the organization's cached authorization answers", async () => {
+        // Disabling writes a column, not a grant, so nothing else bumps the
+        // authz epoch. Without this the revocation an admin just performed
+        // stays invisible to any cached snapshot until it ages out.
+        vi.mocked(mockRepo.getMembership).mockResolvedValue({
+          userId: "user-456",
+          organizationId: "org-123",
+          role: OrganizationUserRole.MEMBER,
+          disabledAt: null,
+          createdAt: nowInstant(),
+          updatedAt: nowInstant(),
+          user: { id: "user-456", name: null, email: null },
+        });
+
+        await service.setMemberDisabled({
+          organizationId: "org-123",
+          userId: "user-456",
+          disabled: true,
+          actingUser: { id: "admin-789" },
+        });
+
+        expect(mockInvalidateOrganization).toHaveBeenCalledWith({
+          organizationId: "org-123",
+        });
+      });
+
+      /** @scenario Disabling or re-enabling a membership takes effect on the next request */
+      it("retires them again on re-enable, so nobody waits out a cache to get back in", async () => {
+        vi.mocked(mockRepo.getMembership).mockResolvedValue({
+          userId: "user-456",
+          organizationId: "org-123",
+          role: OrganizationUserRole.MEMBER,
+          disabledAt: Temporal.Instant.from("2026-08-01T00:00:00Z"),
+          createdAt: nowInstant(),
+          updatedAt: nowInstant(),
+          user: { id: "user-456", name: null, email: null },
+        });
+        mockCheckLimit.mockResolvedValue({
+          allowed: true,
+          limitType: "members",
+          current: 1,
+          max: 5,
+        });
+
+        await service.setMemberDisabled({
+          organizationId: "org-123",
+          userId: "user-456",
+          disabled: false,
+          actingUser: { id: "admin-789" },
+        });
+
+        expect(mockInvalidateOrganization).toHaveBeenCalledWith({
+          organizationId: "org-123",
+        });
+      });
+
+      it("delegates to the repository without a seat check", async () => {
+        vi.mocked(mockRepo.getMembership).mockResolvedValue({
+          userId: "user-456",
+          organizationId: "org-123",
+          role: OrganizationUserRole.MEMBER,
+          disabledAt: null,
+          createdAt: nowInstant(),
+          updatedAt: nowInstant(),
+          user: { id: "user-456", name: null, email: null },
+        });
+
+        await service.setMemberDisabled({
+          organizationId: "org-123",
+          userId: "user-456",
+          disabled: true,
+          actingUser: { id: "admin-789" },
+        });
+
+        expect(mockRepo.setMemberDisabled).toHaveBeenCalledWith({
+          organizationId: "org-123",
+          userId: "user-456",
+          disabled: true,
+        });
+        // Disabling frees a seat, so consulting the seat limit here would
+        // refuse the very action that makes room. Named, or a regression that
+        // adds the check still passes this test.
+        expect(mockCheckLimit).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when re-enabling a member the plan has no seat for", () => {
+      /** @scenario Re-enabling a member is refused when it would exceed the seats */
+      /** @scenario "Re-enabling a member checks the seat limit" */
+      it("refuses with member_seat_limit_reached", async () => {
+        vi.mocked(mockRepo.getMembership).mockResolvedValue({
+          userId: "user-456",
+          organizationId: "org-123",
+          role: OrganizationUserRole.MEMBER,
+          disabledAt: nowInstant(),
+          createdAt: nowInstant(),
+          updatedAt: nowInstant(),
+          user: { id: "user-456", name: null, email: null },
+        });
+        mockCheckLimit.mockResolvedValue({
+          allowed: false,
+          limitType: "members",
+          current: 5,
+          max: 5,
+        });
+
+        await expect(
+          service.setMemberDisabled({
+            organizationId: "org-123",
+            userId: "user-456",
+            disabled: false,
+            actingUser: { id: "admin-789" },
+          }),
+        ).rejects.toMatchObject({ code: "member_seat_limit_reached" });
+
+        expect(mockRepo.setMemberDisabled).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when re-enabling a member the plan has a seat for", () => {
+      /** @scenario A disabled member can be re-enabled when a seat is free */
+      it("delegates to the repository", async () => {
+        vi.mocked(mockRepo.getMembership).mockResolvedValue({
+          userId: "user-456",
+          organizationId: "org-123",
+          role: OrganizationUserRole.MEMBER,
+          disabledAt: nowInstant(),
+          createdAt: nowInstant(),
+          updatedAt: nowInstant(),
+          user: { id: "user-456", name: null, email: null },
+        });
+        mockCheckLimit.mockResolvedValue({
+          allowed: true,
+          limitType: "members",
+          current: 1,
+          max: 5,
+        });
+
+        await service.setMemberDisabled({
+          organizationId: "org-123",
+          userId: "user-456",
+          disabled: false,
+          actingUser: { id: "admin-789" },
+        });
+
+        expect(mockRepo.setMemberDisabled).toHaveBeenCalledWith({
+          organizationId: "org-123",
+          userId: "user-456",
+          disabled: false,
+        });
+      });
+    });
+  });
+
+  describe("when reading one member", () => {
+    describe("when the user is not a member", () => {
+      it("refuses with member_not_found", async () => {
+        vi.mocked(mockRepo.getMembership).mockRejectedValue(new MemberNotFoundError("user-456"));
+
+        await expect(
+          service.getMember({ organizationId: "org-123", userId: "ghost" }),
+        ).rejects.toMatchObject({ code: "member_not_found" });
+      });
+    });
+
+    describe("when the member exists", () => {
+      /** @scenario "Fetching a member includes their team bindings" */
+      it("returns the membership with its team bindings", async () => {
+        vi.mocked(mockRepo.getMembership).mockResolvedValue({
+          userId: "user-456",
+          organizationId: "org-123",
+          role: OrganizationUserRole.MEMBER,
+          disabledAt: null,
+          createdAt: nowInstant(),
+          updatedAt: nowInstant(),
+          user: { id: "user-456", name: "Member", email: "m@example.com" },
+        });
+        vi.mocked(mockRepo.findMemberTeamBindings).mockResolvedValue([
+          {
+            teamId: "team-1",
+            teamName: "Core",
+            role: TeamUserRole.MEMBER,
+            customRoleId: null,
+            customRoleName: null,
+          },
+        ]);
+
+        const member = await service.getMember({
+          organizationId: "org-123",
+          userId: "user-456",
+        });
+
+        expect(member.role).toBe(OrganizationUserRole.MEMBER);
+        expect(member.teams).toEqual([
+          {
+            teamId: "team-1",
+            teamName: "Core",
+            role: TeamUserRole.MEMBER,
+            customRoleId: null,
+            customRoleName: null,
+          },
+        ]);
+      });
+    });
+  });
+
+  describe("when listing members of an organization over a lapsed license's seats", () => {
+    /** @scenario "Nobody loses their seat on the day a license lapses" */
+    it("returns every member still active without ever consulting the seat license", async () => {
+      const members = [
+        { userId: "user-1", role: OrganizationUserRole.MEMBER, disabledAt: null },
+        { userId: "user-2", role: OrganizationUserRole.MEMBER, disabledAt: null },
+      ];
+      vi.mocked(mockRepo.listAllMembers).mockResolvedValue({
+        members: members as never,
+        totalCount: members.length,
+      });
+      // Over-seats: a lapsed license for fewer members than the organization
+      // already holds. A read must not consult this at all.
+      mockCheckLimit.mockResolvedValue({ allowed: false });
+
+      const result = await service.listMembers({ organizationId: "org-123" });
+
+      expect(
+        result.members.every((member) => (member as { disabledAt: null }).disabledAt === null),
+      ).toBe(true);
+      expect(mockCheckLimit).not.toHaveBeenCalled();
+      expect(mockRepo.setMemberDisabled).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("updateTeamMemberRole()", () => {
+    beforeEach(() => {
+      vi.mocked(mockRepo.updateTeamMemberRole).mockResolvedValue(undefined);
+    });
+
+    describe("when role is a custom role and customRoleId is missing", () => {
+      it("refuses with validation_error", async () => {
+        await expect(
+          service.updateTeamMemberRole({
+            caller: { type: "system" },
+            organizationId: "org-1",
+            teamId: "team-1",
+            userId: "user-456",
+            role: "custom:some-role",
+            customRoleId: undefined,
+            currentUserId: "admin-789",
+          }),
+        ).rejects.toMatchObject({ code: "validation_error" });
+      });
+    });
+
+    describe("when role is a custom role and customRoleId is provided", () => {
+      it("delegates to the repository with customRoleId", async () => {
+        await service.updateTeamMemberRole({
+          caller: { type: "system" },
+          organizationId: "org-1",
+          teamId: "team-1",
+          userId: "user-456",
+          role: "custom:some-role",
+          customRoleId: "role-abc",
+          currentUserId: "admin-789",
+        });
+
+        expect(mockRepo.updateTeamMemberRole).toHaveBeenCalledWith(
+          expect.objectContaining({ customRoleId: "role-abc" }),
+        );
+      });
+    });
+
+    describe("when role is a built-in role", () => {
+      it("delegates to the repository without customRoleId", async () => {
+        await service.updateTeamMemberRole({
+          caller: { type: "system" },
+          organizationId: "org-1",
+          teamId: "team-1",
+          userId: "user-456",
+          role: TeamUserRole.ADMIN,
+          currentUserId: "admin-789",
+        });
+
+        expect(mockRepo.updateTeamMemberRole).toHaveBeenCalledWith(
+          expect.objectContaining({ customRoleId: undefined }),
+        );
+      });
+    });
+  });
+
+  describe("when the provisioning door reads one organization", () => {
+    describe("given the organization exists", () => {
+      it("answers its provisioning summary", async () => {
+        const summary = { id: "org-1", name: "Acme", slug: "acme", createdAt: nowInstant() };
+        mockGetProvisioningSummaryById.mockResolvedValue(summary);
+
+        await expect(service.getProvisioningSummary("org-1")).resolves.toBe(summary);
+      });
+    });
+
+    describe("given no organization has the id", () => {
+      it("refuses with the provisioning door's not_found", async () => {
+        mockGetProvisioningSummaryById.mockRejectedValue(
+          new OrganizationNotFoundError("org-missing"),
+        );
+
+        await expect(service.getProvisioningSummary("org-missing")).rejects.toMatchObject({
+          code: "not_found",
+        });
+      });
+    });
+  });
+});

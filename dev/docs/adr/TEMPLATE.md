@@ -15,6 +15,7 @@ State your decision in clear, active sentences (e.g., "We will..."). Explain how
 ## Rationale / Trade-offs (optional)
 
 Discuss why this decision was chosen over alternatives:
+
 - Which needs are addressed
 - Which needs are compromised
 - What trade-offs were accepted and why

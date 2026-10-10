@@ -1,0 +1,48 @@
+/**
+ * Reads the active gateway scope (organization, project, team); permissions come from the host.
+ * Landing policy moved to the platform hook; this hook now handles only the reading half.
+ */
+
+import { useMemo } from "react";
+
+import {
+  useGatewayHost,
+  type GatewayActor,
+  type GatewayOrganization,
+  type GatewayPlan,
+  type GatewayProject,
+  type GatewayTeam,
+} from "../model/gateway-host.ts";
+
+export type GatewayScopeReading = {
+  organization: GatewayOrganization | undefined;
+  project: GatewayProject | undefined;
+  team: GatewayTeam | undefined;
+};
+
+export function useOrganizationTeamProject(): GatewayScopeReading {
+  const host = useGatewayHost();
+  return useMemo(
+    () => ({
+      organization: host.organization(),
+      project: host.project(),
+      team: host.team(),
+    }),
+    [host],
+  );
+}
+
+/** Who is signed in, for the surfaces that stamp a key with its owner. */
+export function useCurrentUser(): GatewayActor | null {
+  return useGatewayHost().currentUser();
+}
+
+/** Which plan the organization is on, for the enterprise-gated surfaces. */
+export function useActivePlan(): GatewayPlan {
+  return useGatewayHost().plan();
+}
+
+/** What kind of deployment this is, and where its gateway answers. */
+export function useGatewayDeployment() {
+  return useGatewayHost().deployment();
+}

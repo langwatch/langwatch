@@ -1,0 +1,1101 @@
+/**
+ * The grants ledger's app-side writer (ADR-092 §13): the ONE storage engine
+ * behind every grant mutation, waiting (bounded) for the projection to land
+ * attach- and role-shaped writes before returning (ADR-007's breaker doctrine).
+ */
+import type { LedgerActor } from "@langwatch/authorization";
+import {
+  AuthzGrantNotConfirmedError,
+  bindingScopeCanGrantPermission,
+  GrantValidationError,
+  PlatformPermissionNotAssignableError,
+  PLATFORM_OPERATOR_ROLE_ID,
+  PLATFORM_TENANT_ID,
+  type AuthzAttachSharedProjectGrantInput,
+  type AuthzAttachSharedProjectGrantOutput,
+  type AuthzAwaitSharedProjectGrantsInput,
+  type AuthzFindLiveSharedProjectGrantsInput,
+  type AuthzLedgerResourceTerms,
+  type AuthzRevokeSharedProjectGrantsInput,
+  type AuthzSharedProjectGrant,
+  type DefineRoleCommandData,
+  type GrantEventSource,
+  newAuthzGrantId,
+  type RevokeGrantCommandData,
+} from "@langwatch/authz-contract";
+import { createLogger } from "@langwatch/observability";
+import { Temporal, nowInstant } from "@langwatch/time";
+import { z } from "zod";
+
+import type { AuthzCompatibilityLedger } from "../app/authz.app.ts";
+import type { AuthzEpochRepository } from "../repositories/authz-epoch.repository.ts";
+import { BindingMissingError, type GrantWrite } from "../repositories/authz-grant.repository.ts";
+import type { AuthzLedgerReadRepository } from "../repositories/authz-ledger-read.repository.ts";
+import type { AuthzMembershipStampRepository } from "../repositories/authz-membership-stamp.repository.ts";
+import type { ScopeLineageRepository } from "../repositories/authz-read.repository.ts";
+import type { AuthzRevocationRepository } from "../repositories/authz-revocation.repository.ts";
+import { bindingIdentityKey } from "../repositories/eventing/eventing.authz-grant.mapper.ts";
+import { sharedProjectReadsOf } from "../repositories/eventing/eventing.authz-read.mapper.ts";
+import {
+  compatBindingFromGrantFact,
+  grantRowToFact,
+} from "../repositories/prisma/prisma.authz-grant.mapper.ts";
+import {
+  grantWhereFromBindingWhere,
+  grantIdentityWhere,
+  newCommandId,
+  principalForWhere,
+  roleKeyFor,
+  samePermissions,
+} from "../repositories/prisma/prisma.authz-ledger.mapper.ts";
+import {
+  membershipFenceFields,
+  userIdsNeedingStamp,
+  validateMembershipBootstrap,
+} from "../rules/membership-stamp-fence.rules.ts";
+import type { AuthzGrantsCommandDispatcher } from "../services/authz-grants-command-dispatcher.service.ts";
+
+const logger = createLogger("langwatch:authz:ledger");
+
+const storedPermissionsSchema = z.array(z.string());
+
+/**
+ * Which writer authored a runtime fact — the event's `source` field.
+ */
+type LedgerWriteSource = GrantEventSource;
+
+// A background caller waiting on this read-your-writes poll is not being
+// watched by a person — the only cost of a lazy poll is a job slot, and the
+// alternative (acting on a fact the log may not hold yet) is the defect this
+// wait exists to prevent. Over an 8s window, 250ms costs at most thirty-two
+// reads and no accuracy.
+const CONVERGENCE_POLL_MS = 250;
+const CONVERGENCE_TIMEOUT_MS = 8_000;
+
+export type LedgerBindingAttach = Omit<GrantWrite, "organizationId"> & {
+  /** Internal generation captured by a membership transaction. Callers that
+   *  create the membership before emitting leave this unset; the writer reads
+   *  and locks the live row itself. */
+  membershipStamp?: string;
+  /** Founder-only marker for a membership created in the same transaction. */
+  membershipBootstrap?: boolean;
+};
+
+/**
+ * The audience a resource fact names. `ShareVisibility`'s three values in the ledger's own
+ * vocabulary — PUBLIC is "anyone" (id null, because there is nobody to name), and the
+ * other two name the organization or project whose members the link is for.
+ */
+type LedgerResourcePrincipal =
+  | { type: "anyone"; id: null }
+  | { type: "organization"; id: string }
+  | { type: "project"; id: string };
+
+/**
+ * The one principal a write names, in the ledger's exactly-one shape. Call sites carry three
+ * optional columns (the legacy row shape); the ledger carries a union that makes "two
+ * principals on one row" unrepresentable, and this is the single place the two meet.
+ */
+type AttachOutcome = {
+  /** Binding ids actually emitted (duplicates skipped when asked to). */
+  attached: string[];
+  /** Binding ids of pre-existing identical rows the write skipped. */
+  duplicates: string[];
+};
+
+type EventingAuthzLedgerAdapterOptions = {
+  /** The live Grant and Role heads every read-your-writes hold polls. */
+  reads: AuthzLedgerReadRepository;
+  dispatcher: AuthzGrantsCommandDispatcher;
+  /** Where a shared-read attach asks that both projects sit in the organization. */
+  lineage: Pick<ScopeLineageRepository, "findProjectLineage">;
+  epoch: AuthzEpochRepository;
+  revocation: AuthzRevocationRepository;
+  /** The membership lifetime a USER attach is fenced to. */
+  membershipStamps: AuthzMembershipStampRepository;
+  now?: () => number;
+  newCommandId?: () => string;
+  poll?: { intervalMs: number; timeoutMs: number };
+};
+
+export type AuthzRoleBindingFilter = Record<string, unknown> & {
+  apiKeyId?: unknown;
+  groupId?: unknown;
+  userId?: unknown;
+  customRoleId?: unknown;
+  scopeType?: unknown;
+  scopeId?: unknown;
+  id?: unknown;
+  organizationId?: unknown;
+};
+
+/** Each fresh binding attaches if its own id holds its identity, else the holder duplicates. */
+function splitByHeld({
+  fresh,
+  held,
+  duplicates,
+}: {
+  fresh: LedgerBindingAttach[];
+  held: Map<string, string>;
+  duplicates: string[];
+}): AttachOutcome {
+  const attached: string[] = [];
+  for (const binding of fresh) {
+    const heldId = held.get(bindingIdentityKey(binding));
+    if (heldId === undefined || heldId === binding.bindingId) attached.push(binding.bindingId);
+    else duplicates.push(heldId);
+  }
+  return { attached, duplicates };
+}
+
+/** The organization-scoped writes never address the platform tier's tenant. */
+function refusePlatformTenant(organizationId: string): void {
+  if (organizationId === PLATFORM_TENANT_ID) {
+    throw new GrantValidationError("The platform tier is not an organization", { organizationId });
+  }
+}
+
+/**
+ * The injected ledger adapter. Every verb bumps the organization's authz
+ * epoch after its write lands (decision 19: the epoch stays until contract;
+ * the projection cursor is alongside, not instead).
+ */
+export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
+  /**
+   * Only the one sanctioned direct projection write (decision 7) — typed to
+   * exactly that member so the writer cannot quietly grow a dependency on
+   * the projection store's fold-side surface.
+   */
+  static create(options: EventingAuthzLedgerAdapterOptions): EventingAuthzLedgerAdapter {
+    return new EventingAuthzLedgerAdapter(options);
+  }
+
+  private constructor(private readonly options: EventingAuthzLedgerAdapterOptions) {}
+
+  private now(): number {
+    return this.options.now?.() ?? nowInstant().epochMilliseconds;
+  }
+
+  private commands() {
+    return this.options.dispatcher.commands();
+  }
+
+  /**
+   * INSERT one or more binding facts. An arrow instance property, not a
+   * prototype method, so a test's stand-in stub can be asserted on directly.
+   */
+  attachBindings = async ({
+    organizationId,
+    bindings,
+    actor,
+    source = "grants-service",
+    onDuplicate,
+    commandId,
+    occurredAtMs: occurredAtOverrideMs,
+    awaitProjection = true,
+    requireProjection = awaitProjection,
+  }: {
+    organizationId: string;
+    bindings: LedgerBindingAttach[];
+    actor: LedgerActor;
+    source?: LedgerWriteSource;
+    onDuplicate: "attach" | "skip";
+    /**
+     * A caller-derived command id, for writes that are not a user action and therefore have no
+     * retry to remember one (decision 23: migration-shaped writers derive theirs from the
+     * source row).
+     */
+    commandId?: string;
+    /**
+     * The fact's business time. Backdating writers pass the source row's own timestamp so the
+     * grant keeps the time it really started — and so a content-derived grant id, whose KSUID
+     * timestamp IS this value, stays stable across re-emissions.
+     */
+    occurredAtMs?: number;
+    /**
+     * Whether to hold for the projection to land the rows. On by default: a caller that just
+     * wrote usually reads next.
+     */
+    awaitProjection?: boolean;
+    /**
+     * Whether an unlanded projection is an error. Follows `awaitProjection`:
+     * a caller that waits is a caller that reads next, so a wait that ran out
+     * is {@link AuthzGrantNotConfirmedError} rather than a silent lie.
+     */
+    requireProjection?: boolean;
+  }): Promise<AttachOutcome> => {
+    refusePlatformTenant(organizationId);
+    if (bindings.length === 0) return { attached: [], duplicates: [] };
+
+    for (const binding of bindings) {
+      validateMembershipBootstrap({ organizationId, binding });
+    }
+
+    const { fresh, duplicates } = await this.partitionByIdentity({
+      organizationId,
+      bindings,
+      onDuplicate,
+    });
+    if (fresh.length === 0) return { attached: [], duplicates };
+
+    const occurredAtMs = occurredAtOverrideMs ?? this.now();
+    // An import states the lifetime its own inventory read, so it neither
+    // needs nor may take the live lock.
+    const membershipStamps =
+      source === "migration"
+        ? new Map<string, string>()
+        : await this.captureMembershipStamps({ organizationId, bindings: fresh });
+    // One command per grant, and a command id derived from the batch's own
+    // so a retry of the same attach dedupes per grant at the event store.
+    const batchId = commandId ?? this.options.newCommandId?.() ?? newCommandId();
+    const senders = (await this.commands()).commands;
+    await Promise.all(
+      fresh.map((binding) =>
+        senders.attachGrant.send({
+          tenantId: organizationId,
+          organizationId,
+          commandId: `${batchId}:${binding.bindingId}`,
+          grant: {
+            grantId: binding.bindingId,
+            principal: principalForWhere(binding.principal),
+            roleKey: roleKeyFor(binding),
+            scope: { type: binding.scopeType, id: binding.scopeId },
+            // Omitted when absent: every event before end dates carries no key,
+            // and the two must serialise alike.
+            ...(binding.expiresAtMs !== undefined ? { expiresAtMs: binding.expiresAtMs } : {}),
+            source,
+            actor,
+            occurredAtMs,
+            ...membershipFenceFields(binding, membershipStamps),
+            ...(onDuplicate === "skip" ? { onDuplicate } : {}),
+          },
+        }),
+      ),
+    );
+
+    const wanted = fresh.map((binding) => binding.bindingId);
+    const held =
+      awaitProjection || requireProjection
+        ? await this.confirmAttach({
+            organizationId,
+            fresh,
+            occurredAtMs,
+            onDuplicate,
+            requireProjection,
+          })
+        : new Map<string, string>();
+    await this.options.epoch.bump({ organizationId });
+    if (held.size === 0) return { attached: wanted, duplicates };
+    return splitByHeld({ fresh, held, duplicates });
+  };
+
+  /**
+   * Hold until the attach landed. A skipping attach the fold dropped because an
+   * identical grant landed first is confirmed by that grant: the answer maps each
+   * identity to the id holding it, and is empty when every own id landed.
+   */
+  private async confirmAttach({
+    organizationId,
+    fresh,
+    occurredAtMs,
+    onDuplicate,
+    requireProjection,
+  }: {
+    organizationId: string;
+    fresh: LedgerBindingAttach[];
+    occurredAtMs: number;
+    onDuplicate: "attach" | "skip";
+    requireProjection: boolean;
+  }): Promise<Map<string, string>> {
+    const held = new Map<string, string>();
+    await this.awaitProjection({
+      what: `attach of ${fresh.length} binding(s)`,
+      organizationId,
+      // The CANONICAL Grant head, not the compat RoleBinding rows: a
+      // compatibility-only row is one the fold has not authored, and a
+      // revoked one confirms an attach that no longer grants anything.
+      check: async () => {
+        const present = await this.options.reads.countLandedGrants({
+          organizationId,
+          grants: fresh.map((binding) => ({
+            id: binding.bindingId,
+            ...grantIdentityWhere(binding),
+          })),
+          occurredSince: Temporal.Instant.fromEpochMilliseconds(occurredAtMs),
+        });
+        if (present === fresh.length || onDuplicate !== "skip") return present === fresh.length;
+        const byIdentity = await this.findExistingByIdentity({ organizationId, bindings: fresh });
+        for (const [key, heldId] of byIdentity) held.set(key, heldId);
+        return fresh.every((binding) => byIdentity.has(bindingIdentityKey(binding)));
+      },
+      required: requireProjection,
+    });
+    return held;
+  }
+
+  /**
+   * Each USER principal's current lifetime, read under its membership row
+   * lock. A user with no live membership refuses the batch: letting the grant
+   * through unstamped is the race this exists to close.
+   */
+  private async captureMembershipStamps({
+    organizationId,
+    bindings,
+  }: {
+    organizationId: string;
+    bindings: LedgerBindingAttach[];
+  }): Promise<Map<string, string>> {
+    const userIds = userIdsNeedingStamp(bindings);
+    if (userIds.length === 0) return new Map();
+
+    const rows = await this.options.membershipStamps.findLockedStamps({
+      organizationId,
+      userIds,
+    });
+    const stamps = new Map(rows.map((row) => [row.userId, row.membershipStamp]));
+    if (userIds.some((userId) => !stamps.has(userId))) throw new BindingMissingError();
+    return stamps;
+  }
+
+  /**
+   * Split a batch into the bindings that are genuinely new and the ids of the identical live
+   * grants already present. A repeat inside the same batch counts as a duplicate of itself.
+   */
+  private async partitionByIdentity({
+    organizationId,
+    bindings,
+    onDuplicate,
+  }: {
+    organizationId: string;
+    bindings: LedgerBindingAttach[];
+    onDuplicate: "attach" | "skip";
+  }): Promise<{ fresh: LedgerBindingAttach[]; duplicates: string[] }> {
+    if (onDuplicate === "attach") return { fresh: bindings, duplicates: [] };
+    // ONE query for the whole batch, keyed by the identity tuples: a
+    // `findFirst` per binding made a SCIM sync of 200 seats 200 round trips.
+    // `OR` over the same tuple the per-binding lookup built, so the rows it
+    // can match are identical — only the number of queries changed.
+    const existingByIdentity = await this.findExistingByIdentity({
+      organizationId,
+      bindings,
+    });
+
+    const fresh: LedgerBindingAttach[] = [];
+    const duplicates: string[] = [];
+    const seen = new Set<string>();
+    for (const binding of bindings) {
+      const key = bindingIdentityKey(binding);
+      // A repeat inside the same batch counts as a duplicate of itself, and
+      // answers with the id the batch itself minted — the row is not in
+      // storage yet, so there is none to name.
+      const existingId = seen.has(key) ? binding.bindingId : existingByIdentity.get(key);
+      if (existingId !== undefined) {
+        duplicates.push(existingId);
+        continue;
+      }
+      seen.add(key);
+      fresh.push(binding);
+    }
+    return { fresh, duplicates };
+  }
+
+  /** The stored rows that already carry one of the batch's identities, keyed
+   *  by the same identity string the partition compares on. */
+  private async findExistingByIdentity({
+    organizationId,
+    bindings,
+  }: {
+    organizationId: string;
+    bindings: LedgerBindingAttach[];
+  }): Promise<Map<string, string>> {
+    if (bindings.length === 0) return new Map();
+    const rows = await this.options.reads.findLiveGrantsByIdentity({
+      organizationId,
+      identities: bindings.map((binding) => grantIdentityWhere(binding)),
+    });
+    const byIdentity = new Map<string, string>();
+    for (const row of rows) {
+      const compat = compatBindingFromGrantFact({
+        grant: grantRowToFact(row),
+        organizationId,
+      });
+      if (compat.kind === "noCompatForm") continue;
+      const binding = compat.row;
+      byIdentity.set(
+        bindingIdentityKey({
+          principal: binding,
+          role: binding.role,
+          customRoleId: binding.customRoleId,
+          scopeType: binding.scopeType,
+          scopeId: binding.scopeId,
+        }),
+        binding.id,
+      );
+    }
+    return byIdentity;
+  }
+
+  /**
+   * INSERT one resource fact — a share link, as the ledger states it
+   * (ADR-057's possession model intact, delivery-plan decision 22).
+   */
+  async attachResourceGrant({
+    organizationId,
+    grantId,
+    projectId,
+    resource,
+    principal,
+    scopeId,
+    actor,
+    commandId,
+  }: {
+    organizationId: string;
+    /** The compat `ShareLink` row's id: minted by the caller, adopted here. */
+    grantId: string;
+    /** Where the shared resource lives — the compat head's tenancy column. */
+    projectId: string;
+    /** The fact's own terms; `projectId` travels separately as the compat head's tenancy. */
+    resource: AuthzLedgerResourceTerms;
+    principal: LedgerResourcePrincipal;
+    /** The shared resource's id, and nothing else — the RESOURCE scope. */
+    scopeId: string;
+    actor: LedgerActor;
+    commandId?: string;
+  }): Promise<void> {
+    refusePlatformTenant(organizationId);
+    await (
+      await this.commands()
+    ).commands.attachGrant.send({
+      tenantId: organizationId,
+      organizationId,
+      commandId: commandId ?? this.options.newCommandId?.() ?? newCommandId(),
+      grant: {
+        grantId,
+        principal,
+        roleKey: null,
+        scope: { type: "RESOURCE", id: scopeId },
+        resource: { ...resource, projectId },
+        source: "grants-service",
+        actor,
+        occurredAtMs: this.now(),
+      },
+    });
+    await this.awaitProjection({
+      what: `attach of resource grant ${grantId}`,
+      organizationId,
+      check: () =>
+        this.options.reads.hasLiveGrant({
+          grantId,
+          organizationId,
+          projectId,
+          scopeType: "RESOURCE",
+        }),
+    });
+    await this.options.epoch.bump({ organizationId });
+  }
+
+  /**
+   * INSERT one shared project read (ADR-177): the reader holds `project-reader` on the member's
+   * PROJECT scope, carrying the condition the proof copies. Both projects must sit in this
+   * organization; a live grant for the pair is answered as it stands, so a reconciler may rerun.
+   */
+  async attachSharedProjectGrant({
+    organizationId,
+    readerProjectId,
+    memberProjectId,
+    condition,
+    actor,
+    source = "aggregate-reconciler",
+    commandId,
+    awaitProjection = true,
+  }: AuthzAttachSharedProjectGrantInput): Promise<AuthzAttachSharedProjectGrantOutput> {
+    refusePlatformTenant(organizationId);
+    if (readerProjectId === memberProjectId) {
+      throw new GrantValidationError("A project cannot share a read with itself", {
+        projectId: readerProjectId,
+      });
+    }
+    for (const projectId of [readerProjectId, memberProjectId]) {
+      const lineage = await this.options.lineage.findProjectLineage({ projectId });
+      if (lineage?.organizationId !== organizationId) {
+        throw new GrantValidationError("Project is not in this organization", { projectId });
+      }
+    }
+    const live = await this.findLiveSharedProjectGrants({ organizationId, readerProjectId });
+    const existing = live.find((grant) => grant.memberProjectId === memberProjectId);
+    if (existing) return { grantId: existing.grantId, wasAttached: false };
+
+    const principal = { type: "project" as const, id: readerProjectId };
+    const scope = { type: "PROJECT" as const, id: memberProjectId };
+    const grantId = newAuthzGrantId();
+    await (
+      await this.commands()
+    ).commands.attachGrant.send({
+      tenantId: organizationId,
+      organizationId,
+      commandId: commandId ?? this.options.newCommandId?.() ?? newCommandId(),
+      grant: {
+        grantId,
+        principal,
+        roleKey: sharedProjectReadsOf({ organizationId, readerProjectId }).roleKey,
+        scope,
+        condition,
+        source,
+        actor,
+        occurredAtMs: this.now(),
+      },
+    });
+    if (awaitProjection) {
+      await this.awaitSharedProjectGrants({ organizationId, grantIds: [grantId] });
+    } else {
+      await this.options.epoch.bump({ organizationId });
+    }
+    return { grantId, wasAttached: true };
+  }
+
+  /** One read-your-writes wait for a batch of shared reads; bumps the epoch once they land. */
+  async awaitSharedProjectGrants({
+    organizationId,
+    grantIds,
+  }: AuthzAwaitSharedProjectGrantsInput): Promise<void> {
+    if (grantIds.length === 0) return;
+    await this.awaitProjection({
+      what: `attach of ${grantIds.length} shared read(s)`,
+      organizationId,
+      check: async () =>
+        (
+          await this.options.reads.findLiveGrantIds({
+            where: { organizationId, id: { in: [...grantIds] } },
+          })
+        ).length === grantIds.length,
+    });
+    await this.options.epoch.bump({ organizationId });
+  }
+
+  /** A reader's live shared reads; a row whose window no longer parses is still revocable. */
+  async findLiveSharedProjectGrants({
+    organizationId,
+    readerProjectId,
+  }: AuthzFindLiveSharedProjectGrantsInput): Promise<AuthzSharedProjectGrant[]> {
+    return this.options.reads.findLiveSharedProjectGrants({ organizationId, readerProjectId });
+  }
+
+  /** Revoke a reader's live shared reads, all or those on `memberProjectIds`; answers the ids. */
+  async revokeSharedProjectGrants({
+    organizationId,
+    readerProjectId,
+    memberProjectIds,
+    actor,
+    reason,
+  }: AuthzRevokeSharedProjectGrantsInput): Promise<string[]> {
+    const live = await this.findLiveSharedProjectGrants({ organizationId, readerProjectId });
+    const bindingIds = live
+      .filter(
+        (grant) =>
+          memberProjectIds === undefined || memberProjectIds.includes(grant.memberProjectId),
+      )
+      .map((grant) => grant.grantId);
+    await this.revokeBindings({ organizationId, bindingIds, actor, ...(reason ? { reason } : {}) });
+    return bindingIds;
+  }
+
+  /**
+   * DELETE resource facts.
+   */
+  async revokeResourceGrants({
+    organizationId,
+    grantIds,
+    actor,
+    reason,
+  }: {
+    organizationId: string;
+    grantIds: string[];
+    actor: LedgerActor;
+    reason?: string;
+  }): Promise<void> {
+    refusePlatformTenant(organizationId);
+    if (grantIds.length === 0) return;
+    const revocation: {
+      organizationId: string;
+      bindingIds: string[];
+      actor: LedgerActor;
+      reason?: string;
+    } = {
+      organizationId,
+      bindingIds: grantIds,
+      actor,
+    };
+    if (reason) revocation.reason = reason;
+    await this.appendGrantRevocation(revocation);
+  }
+
+  /** The ledger revocation itself: append, enforce synchronously, bump. */
+  private async appendGrantRevocation({
+    organizationId,
+    bindingIds,
+    actor,
+    reason,
+  }: {
+    organizationId: string;
+    bindingIds: string[];
+    actor: LedgerActor;
+    reason?: string;
+  }): Promise<void> {
+    // A revoke names its grant id: a selector cannot address an aggregate,
+    // so resolving "every grant this principal holds" into ids is the
+    // caller's job now, and the deny below is what makes that safe.
+    const revokedAtMs = this.now();
+    const batchId = this.options.newCommandId?.() ?? newCommandId();
+    const senders = (await this.commands()).commands;
+    // One send at a time: in memory mode a send resolves once its job ran, and a batch as wide as
+    // the queue's concurrency starves the projection jobs those commands wait on. A move onto the
+    // Developer seat (ADR-171) revokes that many rows as a matter of course.
+    for (const grantId of bindingIds) {
+      const command: RevokeGrantCommandData & { tenantId: string } = {
+        tenantId: organizationId,
+        organizationId,
+        commandId: `${batchId}:${grantId}`,
+        grantId,
+        actor,
+        occurredAtMs: revokedAtMs,
+      };
+      if (reason) command.reason = reason;
+      await senders.revokeGrant.send(command);
+    }
+    await this.options.revocation.enforceGrantRevocation({
+      organizationId,
+      grantIds: bindingIds,
+      reason: "revocation",
+      // The same instant and reason the events above carry, so the row the
+      // deny marks is byte-identical to what the queued write would state —
+      // the queue's `revokedAt: null` guard makes this mark the durable one.
+      revokedAt: Temporal.Instant.fromEpochMilliseconds(revokedAtMs),
+      revokedReason: reason ?? null,
+    });
+    await this.options.epoch.bump({ organizationId });
+  }
+
+  /**
+   * UPDATE the role one binding carries, keeping its identity. A binding with
+   * no live grant is missing; a sibling holding the target role is allowed.
+   */
+  async changeBindingRole({
+    organizationId,
+    bindingId,
+    role,
+    customRoleId,
+    actor,
+  }: {
+    organizationId: string;
+    bindingId: string;
+    role: GrantWrite["role"];
+    customRoleId: string | null;
+    actor: LedgerActor;
+  }): Promise<void> {
+    refusePlatformTenant(organizationId);
+    const row = await this.options.reads.findLiveGrant({ grantId: bindingId, organizationId });
+    if (row === null) throw new BindingMissingError();
+    const compat = compatBindingFromGrantFact({
+      grant: grantRowToFact(row),
+      organizationId,
+    });
+    if (compat.kind === "noCompatForm") throw new BindingMissingError();
+
+    const to = roleKeyFor({ role, customRoleId });
+    if (row.roleKey === to) return;
+
+    await (
+      await this.commands()
+    ).commands.changeGrantRole.send({
+      tenantId: organizationId,
+      organizationId,
+      commandId: this.options.newCommandId?.() ?? newCommandId(),
+      grantId: bindingId,
+      from: roleKeyFor(compat.row),
+      to,
+      actor,
+      occurredAtMs: this.now(),
+    });
+    await this.awaitProjection({
+      what: `role change on binding ${bindingId}`,
+      organizationId,
+      check: async () => {
+        const updated = await this.options.reads.findLiveGrantRoleKey({
+          grantId: bindingId,
+          organizationId,
+        });
+        return updated?.roleKey === to;
+      },
+    });
+    await this.options.epoch.bump({ organizationId });
+  }
+
+  /**
+   * DELETE binding facts — revocation-class (decision 7): the deny is applied synchronously
+   * on this path after the append, by marking the authoritative `Grant` row `revokedAt`.
+   */
+  async revokeBindings({
+    organizationId,
+    bindingIds,
+    actor,
+    reason,
+  }: {
+    organizationId: string;
+    bindingIds: string[];
+    actor: LedgerActor;
+    reason?: string;
+  }): Promise<void> {
+    refusePlatformTenant(organizationId);
+    if (bindingIds.length === 0) return;
+    const revocation: {
+      organizationId: string;
+      bindingIds: string[];
+      actor: LedgerActor;
+      reason?: string;
+    } = {
+      organizationId,
+      bindingIds,
+      actor,
+    };
+    if (reason) revocation.reason = reason;
+    await this.appendGrantRevocation(revocation);
+  }
+
+  /**
+   * Revoke every binding matching a filter; answers how many it revoked. An
+   * arrow instance property, not a prototype method, so a test's stand-in
+   * stub can be asserted on directly.
+   */
+  revokeBindingsWhere = async ({
+    organizationId,
+    where,
+    actor,
+    reason,
+  }: {
+    organizationId: string;
+    where: AuthzRoleBindingFilter;
+    actor: LedgerActor;
+    reason?: string;
+  }): Promise<number> => {
+    refusePlatformTenant(organizationId);
+    if (!organizationId) {
+      throw new Error(
+        "revokeBindingsWhere refused a filter with no organization: a grant revocation is always tenant-scoped",
+      );
+    }
+    const translation = grantWhereFromBindingWhere(where, organizationId);
+    if (translation.kind === "untranslatable") {
+      throw new Error("revokeBindingsWhere refused a filter the grant head cannot express");
+    }
+    const bindingIds = await this.options.reads.findLiveGrantIds({ where: translation.where });
+    // revokeBindings early-returns on an empty id list, so no selector-only
+    // fact is appended when nothing matched — the behaviour the old
+    // skipAppendWhenNoMatches flag stood in for, now intrinsic.
+    const revocation: {
+      organizationId: string;
+      bindingIds: string[];
+      actor: LedgerActor;
+      reason?: string;
+    } = {
+      organizationId,
+      bindingIds,
+      actor,
+    };
+    if (reason) revocation.reason = reason;
+    await this.revokeBindings(revocation);
+    return bindingIds.length;
+  };
+
+  /**
+   * Record one member's offboarding: the fact carries every revoked grant id the caller
+   * could see, and enforcement deletes those heads synchronously.
+   */
+  async offboardMember({
+    organizationId,
+    userId,
+    revokedGrantIds,
+    actor,
+  }: {
+    organizationId: string;
+    userId: string;
+    revokedGrantIds: string[];
+    actor: LedgerActor;
+  }): Promise<void> {
+    refusePlatformTenant(organizationId);
+    // Offboarding is N revocations sharing one reason, not an event of its
+    // own: a person is not an aggregate here, and an event that named one
+    // would have to straddle every grant they hold.
+    const offboardedAtMs = this.now();
+    const batchId = this.options.newCommandId?.() ?? newCommandId();
+    const senders = (await this.commands()).commands;
+    await Promise.all(
+      revokedGrantIds.map((grantId) =>
+        senders.revokeGrant.send({
+          tenantId: organizationId,
+          organizationId,
+          commandId: `${batchId}:${grantId}`,
+          grantId,
+          reason: `offboarded:${userId}`,
+          actor,
+          occurredAtMs: offboardedAtMs,
+        }),
+      ),
+    );
+    await this.options.revocation.enforceGrantRevocation({
+      organizationId,
+      grantIds: revokedGrantIds,
+      reason: "offboard",
+      // Same instant and reason as the events above — see appendGrantRevocation.
+      revokedAt: Temporal.Instant.fromEpochMilliseconds(offboardedAtMs),
+      revokedReason: `offboarded:${userId}`,
+    });
+    await this.options.epoch.bump({ organizationId });
+  }
+
+  /**
+   * Define (or redefine) one role. `role_defined` carries the whole fact, so
+   * a rename and a permissions change are the same verb — the fold upserts.
+   */
+  async defineRole({
+    organizationId,
+    roleId,
+    name,
+    description,
+    permissions,
+    kind,
+    actor,
+    requireProjection = true,
+  }: {
+    organizationId: string;
+    roleId: string;
+    name: string;
+    description?: string;
+    permissions: string[];
+    kind: "custom" | "system_api_key";
+    actor: LedgerActor;
+    /**
+     * Whether an unlanded projection is an error, same contract as
+     * {@link EventingAuthzLedgerAdapter.attachBindings}: turned on before
+     * handing out the credential, so an unreadable role refuses the mint.
+     */
+    requireProjection?: boolean;
+  }): Promise<void> {
+    refusePlatformTenant(organizationId);
+    if (kind === "custom") {
+      await this.refuseAddedPlatformPermissions({ organizationId, roleId, permissions });
+    }
+    const occurredAtMs = this.now();
+    const role: DefineRoleCommandData["role"] = {
+      roleId,
+      name,
+      permissions,
+      kind,
+      occurredAtMs,
+    };
+    if (description) role.description = description;
+    await (
+      await this.commands()
+    ).commands.defineRole.send({
+      tenantId: organizationId,
+      organizationId,
+      commandId: this.options.newCommandId?.() ?? newCommandId(),
+      role,
+      actor,
+    });
+    // Always held. A role row is a foreign key target: the grant attach that
+    // normally follows writes a compat RoleBinding pointing at this role, and
+    // that write fails if the role row is not there yet. Commands are queued
+    // per command name, not per organization, so `attachGrants` can be picked
+    // up before `defineRoles` and cannot stand in for this hold.
+    await this.awaitProjection({
+      what: `definition of role ${roleId}`,
+      organizationId,
+      // The CANONICAL Role head, like every other read-your-writes check
+      // here: a deleted row confirms nothing, and the compat CustomRole rows
+      // can carry a definition the fold never authored.
+      check: async () => {
+        const row = await this.options.reads.findLiveRole({ roleId, organizationId });
+        return (
+          row !== null &&
+          row.name === name &&
+          (row.description ?? null) === (description || null) &&
+          samePermissions({
+            stored: row.permissions,
+            wanted: permissions,
+          })
+        );
+      },
+      required: requireProjection,
+    });
+    await this.options.epoch.bump({ organizationId });
+  }
+
+  /**
+   * Delete one role definition. Bindings carrying the role are the caller's to revoke first
+   * (`revokeBindingsWhere({ customRoleId })`) — revocation enforcement makes the deny
+   * instant; the definition's disappearance follows through the fold.
+   */
+  async deleteRole({
+    organizationId,
+    roleId,
+    actor,
+    awaitProjection = true,
+  }: {
+    organizationId: string;
+    roleId: string;
+    actor: LedgerActor;
+    /**
+     * Whether to hold for the projection to drop the role row. On by default: a caller that
+     * deletes a role usually needs the name free again straight away.
+     */
+    awaitProjection?: boolean;
+  }): Promise<void> {
+    refusePlatformTenant(organizationId);
+    await (
+      await this.commands()
+    ).commands.deleteRole.send({
+      tenantId: organizationId,
+      organizationId,
+      commandId: this.options.newCommandId?.() ?? newCommandId(),
+      roleId,
+      actor,
+      occurredAtMs: this.now(),
+    });
+    if (awaitProjection) {
+      await this.awaitProjection({
+        what: `deletion of role ${roleId}`,
+        organizationId,
+        check: async () => !(await this.options.reads.hasLiveRole({ roleId, organizationId })),
+      });
+    }
+    await this.options.epoch.bump({ organizationId });
+  }
+
+  /**
+   * A custom role may not gain a platform permission; one it already lists stays, inert under the
+   * fence, so a legacy role can still be renamed. A key's private role is never refused here.
+   */
+  private async refuseAddedPlatformPermissions({
+    organizationId,
+    roleId,
+    permissions,
+  }: {
+    organizationId: string;
+    roleId: string;
+    permissions: readonly string[];
+  }): Promise<void> {
+    const platformOnly = permissions.filter(
+      (permission) => !bindingScopeCanGrantPermission({ scopeType: "ORGANIZATION", permission }),
+    );
+    if (platformOnly.length === 0) return;
+
+    const found = await this.options.reads.findLiveRole({ roleId, organizationId });
+    const kept = new Set(storedPermissionsSchema.safeParse(found?.permissions).data ?? []);
+    const added = platformOnly.filter((permission) => !kept.has(permission));
+    if (added.length > 0) throw new PlatformPermissionNotAssignableError({ permissions: added });
+  }
+
+  /**
+   * Attach one platform-operator grant to a user at the PLATFORM tier. The rules (who may,
+   * never to yourself) are the platform-operator service's; this only writes and waits.
+   */
+  async attachPlatformGrant({
+    grantId,
+    userId,
+    actor,
+    source,
+    commandId,
+  }: {
+    grantId: string;
+    userId: string;
+    actor: LedgerActor;
+    source: LedgerWriteSource;
+    commandId?: string;
+  }): Promise<void> {
+    await (
+      await this.commands()
+    ).commands.attachGrant.send({
+      tenantId: PLATFORM_TENANT_ID,
+      organizationId: PLATFORM_TENANT_ID,
+      commandId: commandId ?? this.options.newCommandId?.() ?? newCommandId(),
+      grant: {
+        grantId,
+        principal: { type: "user", id: userId },
+        roleKey: PLATFORM_OPERATOR_ROLE_ID,
+        scope: { type: "PLATFORM", id: PLATFORM_TENANT_ID },
+        source,
+        actor,
+        occurredAtMs: this.now(),
+      },
+    });
+    await this.awaitProjection({
+      what: `attach of platform grant ${grantId}`,
+      organizationId: PLATFORM_TENANT_ID,
+      check: () =>
+        this.options.reads.hasLiveGrant({
+          grantId,
+          organizationId: PLATFORM_TENANT_ID,
+          scopeType: "PLATFORM",
+        }),
+    });
+  }
+
+  /** Revoke platform-tier grants by id; the deny lands synchronously, as every revoke's does. */
+  async revokePlatformGrants({
+    grantIds,
+    actor,
+    reason,
+  }: {
+    grantIds: string[];
+    actor: LedgerActor;
+    reason?: string;
+  }): Promise<void> {
+    if (grantIds.length === 0) return;
+    await this.appendGrantRevocation({
+      organizationId: PLATFORM_TENANT_ID,
+      bindingIds: grantIds,
+      actor,
+      ...(reason ? { reason } : {}),
+    });
+  }
+
+  /**
+   * Bounded read-your-writes: poll until the projection reflects the write.
+   * The append is durable either way; an unlanded write is
+   * {@link AuthzGrantNotConfirmedError} unless the caller said it may converge later.
+   */
+  private async awaitProjection({
+    what,
+    organizationId,
+    check,
+    required = true,
+  }: {
+    what: string;
+    organizationId: string;
+    check: () => Promise<boolean>;
+    required?: boolean;
+  }): Promise<boolean> {
+    const poll = this.options.poll ?? {
+      intervalMs: CONVERGENCE_POLL_MS,
+      timeoutMs: CONVERGENCE_TIMEOUT_MS,
+    };
+    // Deadline uses wall-clock time, not `this.now()`: `deps.now` is
+    // injectable business time (frozen in tests for deterministic
+    // `occurredAtMs`), and a frozen clock would make this poll loop unable to
+    // ever time out.
+    const deadline = nowInstant().epochMilliseconds + poll.timeoutMs;
+    let isConverged = await check();
+    while (!isConverged && nowInstant().epochMilliseconds < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, poll.intervalMs));
+      isConverged = await check();
+    }
+    if (isConverged) return true;
+
+    logger.warn(
+      { organizationId, what },
+      "grants projection did not land a write within the read-your-writes window; the append is durable and the fold will converge",
+    );
+    if (required) throw new AuthzGrantNotConfirmedError();
+    return false;
+  }
+}

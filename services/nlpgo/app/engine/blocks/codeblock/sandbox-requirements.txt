@@ -27,5 +27,7 @@ pydantic
 #
 # Installed from sdks/python/ in the monorepo, not from PyPI. The Dockerfile
 # COPYs it into /tmp/langwatch-sdk/ so the sandbox gets the same version as
-# the commit that built the image.
+# the commit that built the image. Its langwatch-ksuid dependency is the
+# workspace package packages/ksuid-python, COPYd into /tmp/langwatch-ksuid/.
+/tmp/langwatch-ksuid
 /tmp/langwatch-sdk

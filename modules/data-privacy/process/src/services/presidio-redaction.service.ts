@@ -1,0 +1,142 @@
+import { LangevalsPiiDetectionError } from "@langwatch/evaluation-contract";
+import { normalizePresidioMarkers } from "@langwatch/redaction";
+import type { PIIRedactionLevel } from "@langwatch/trace-contract";
+
+import type { PresidioChannel } from "../channels/presidio.channel.ts";
+import {
+  PII_ANALYSIS_TEXT_BUDGET,
+  presidioEntitiesFor,
+  redactSparingNamesAndPlaces,
+  type PiiClearing,
+} from "../rules/pii-analysis.rules.ts";
+import type { PiiAnalysisMetricsOtelService } from "./pii-analysis-metrics-otel.service.ts";
+
+/** A batch through langevals' Presidio, reached directly (R5, Alex 2026-10-06): `clearPresidio`. */
+export class PresidioRedactionService {
+  static create(input: {
+    presidio: PresidioChannel;
+    metrics: Pick<
+      PiiAnalysisMetricsOtelService,
+      "analysisCalled" | "analysisObserved" | "analysisFinished"
+    >;
+    timeoutMs: number;
+  }): PresidioRedactionService {
+    return new PresidioRedactionService(input.presidio, input.metrics, input.timeoutMs);
+  }
+
+  #configured: Promise<boolean> | undefined;
+
+  private constructor(
+    private readonly presidio: PresidioChannel,
+    private readonly metrics: Pick<
+      PiiAnalysisMetricsOtelService,
+      "analysisCalled" | "analysisObserved" | "analysisFinished"
+    >,
+    private readonly timeoutMs: number,
+  ) {}
+
+  /** Asked once, with an empty batch that sends nothing; a failed answer is asked again. */
+  isConfigured(): Promise<boolean> {
+    this.#configured ??= this.presidio
+      .detect({ texts: [], entities: [], signal: new AbortController().signal })
+      .then((outcome) => outcome.kind !== "not_configured")
+      .catch((error: unknown) => {
+        this.#configured = undefined;
+        throw error;
+      });
+    return this.#configured;
+  }
+
+  /** One anonymized text per input, or null where Presidio left it as it was. */
+  async clear(input: {
+    texts: readonly string[];
+    piiRedactionLevel: PIIRedactionLevel;
+    entities?: readonly string[] | undefined;
+    projectId?: string | undefined;
+    /** Per text: a model, provider or tool name, spared name and place findings. */
+    spareNamesAndPlaces?: readonly boolean[] | undefined;
+  }): Promise<(string | null)[]> {
+    if (input.texts.length === 0) return [];
+
+    this.metrics.analysisCalled("presidio");
+    const truncated = input.texts.map((text) => ({
+      input: text.slice(0, PII_ANALYSIS_TEXT_BUDGET),
+      remaining: text.slice(PII_ANALYSIS_TEXT_BUDGET),
+    }));
+    const startedAt = performance.now();
+    const outcome = await this.#detect({ ...input, texts: truncated.map((t) => t.input) });
+    this.metrics.analysisObserved(performance.now() - startedAt);
+
+    if (outcome.kind === "not_configured") {
+      throw new Error("LANGEVALS_ENDPOINT is not set, PII check cannot be performed");
+    }
+
+    return truncated.map((entry, i) => {
+      const result = outcome.results[i];
+      if (!result) throw new Error(`Presidio returned no result for text ${i}`);
+      this.metrics.analysisFinished(result.status);
+      if (result.status === "error") throw new Error(result.details);
+      if (result.status !== "processed") return null;
+      const clearing = clearingOf({
+        input: entry.input,
+        rawResponse: result.raw_response,
+        spareNamesAndPlaces: input.spareNamesAndPlaces?.[i] ?? false,
+      });
+      return clearing.kind === "redacted" ? clearing.text + entry.remaining : null;
+    });
+  }
+
+  async #detect(input: {
+    texts: readonly string[];
+    piiRedactionLevel: PIIRedactionLevel;
+    entities?: readonly string[] | undefined;
+    projectId?: string | undefined;
+  }) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
+    const startedAt = performance.now();
+    try {
+      return await this.presidio.detect({
+        texts: input.texts,
+        entities: presidioEntitiesFor(input.piiRedactionLevel, input.entities),
+        signal: controller.signal,
+        ...(input.projectId ? { projectId: input.projectId } : {}),
+      });
+    } catch (error) {
+      if (error instanceof LangevalsPiiDetectionError) {
+        this.metrics.analysisObserved(performance.now() - startedAt);
+        this.metrics.analysisFinished("error");
+      }
+      throw error;
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+}
+
+/**
+ * How one analysed input was cleared. A flagged input whose findings cannot be placed keeps
+ * Presidio's own full redaction rather than going unredacted.
+ */
+function clearingOf({
+  input,
+  rawResponse,
+  spareNamesAndPlaces,
+}: {
+  input: string;
+  rawResponse: unknown;
+  spareNamesAndPlaces: boolean;
+}): PiiClearing {
+  const response = typeof rawResponse === "object" && rawResponse !== null ? rawResponse : {};
+  if (spareNamesAndPlaces) {
+    const spared = redactSparingNamesAndPlaces({
+      text: input,
+      findings: "results" in response ? response.results : undefined,
+    });
+    if (spared.kind !== "unplaceable") return spared;
+  }
+  const anonymized = "anonymized" in response ? response.anonymized : undefined;
+  return typeof anonymized === "string" && anonymized
+    ? { kind: "redacted", text: normalizePresidioMarkers(anonymized) }
+    : { kind: "unchanged" };
+}

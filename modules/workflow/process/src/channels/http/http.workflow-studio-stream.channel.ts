@@ -1,0 +1,81 @@
+/**
+ * Engine's streaming studio route; HTTP POST with SSE stream, no per-project Lambda routing.
+ */
+import { nlpInternalSecretHeaders } from "@langwatch/process/nlp-internal-secret";
+import { nowInstant } from "@langwatch/time";
+
+import { s3CacheKeyHeaders } from "../../rules/s3-cache-key.rules.ts";
+import {
+  type WorkflowStudioStream,
+  type WorkflowStudioStreamInput,
+} from "../nlp-lambda.channel.ts";
+
+/** The engine's streaming studio route at a single configured address. */
+export class HttpWorkflowStudioStreamAdapter implements WorkflowStudioStream {
+  static create(options: {
+    /** Where the engine answers, for example `http://127.0.0.1:5561`. */
+    serviceUrl: string;
+    /** Injected so a test drives the wire without a listener. */
+    fetch?: typeof fetch;
+    /** The engine hop's shared credential, as the process resolved it. */
+    internalSecret?: string | undefined;
+    /** Main's `S3_KEY_SALT`; unset sends no per-project cache key. */
+    cacheKeySalt?: string | undefined;
+  }): HttpWorkflowStudioStreamAdapter {
+    return new HttpWorkflowStudioStreamAdapter(options);
+  }
+
+  private constructor(
+    private readonly options: {
+      serviceUrl: string;
+      fetch?: typeof fetch;
+      internalSecret?: string | undefined;
+      cacheKeySalt?: string | undefined;
+    },
+  ) {}
+
+  async open(input: WorkflowStudioStreamInput): Promise<ReadableStreamDefaultReader<Uint8Array>> {
+    const call = this.options.fetch ?? fetch;
+    const response = await call(`${this.options.serviceUrl.replace(/\/$/, "")}/go/studio/execute`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-LangWatch-Origin": input.origin,
+        ...nlpInternalSecretHeaders({ secret: this.options.internalSecret }),
+        ...s3CacheKeyHeaders({
+          projectId: input.projectId,
+          salt: this.options.cacheKeySalt,
+          now: nowInstant(),
+        }),
+      },
+      body: JSON.stringify(input.body),
+    });
+
+    const body = response.body;
+    if (!body) {
+      throw new Error("No response body");
+    }
+    return body.getReader();
+  }
+}
+
+/**
+ * The engine this deployment did not configure. Refuses by name: a run
+ * dispatched at no address is one whose result nobody will ever see, not a
+ * `fetch` at `undefined/go/...` reporting an opaque URL parse failure.
+ */
+export class UnconfiguredWorkflowStudioStreamAdapter implements WorkflowStudioStream {
+  /** `reason` names why, where the deployment named an engine it cannot use. */
+  static create(input: { reason?: string } = {}): UnconfiguredWorkflowStudioStreamAdapter {
+    return new UnconfiguredWorkflowStudioStreamAdapter(
+      input.reason ??
+        "This process was composed without an NLP engine address, so it cannot run the optimization studio.",
+    );
+  }
+
+  private constructor(private readonly reason: string) {}
+
+  open(): Promise<ReadableStreamDefaultReader<Uint8Array>> {
+    return Promise.reject(new Error(this.reason));
+  }
+}

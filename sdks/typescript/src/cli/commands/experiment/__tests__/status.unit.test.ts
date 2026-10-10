@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+
 import type * as ExperimentsApiModule from "@/client-sdk/services/experiments/experiments-api.service";
 
 const oraMocks = vi.hoisted(() => ({
@@ -15,7 +16,11 @@ vi.mock("@/client-sdk/services/experiments/experiments-api.service", async (impo
 });
 
 vi.mock("../../../utils/apiKey", () => ({
-  resolveCredentials: vi.fn(async () => ({ apiKey: "test-key", source: "env", endpoint: "https://app.langwatch.ai" })),
+  resolveCredentials: vi.fn(async () => ({
+    apiKey: "test-key",
+    source: "env",
+    endpoint: "https://app.langwatch.ai",
+  })),
 }));
 
 vi.mock("ora", () => ({
@@ -29,6 +34,7 @@ vi.mock("ora", () => ({
 }));
 
 import { ExperimentsApiService } from "@/client-sdk/services/experiments/experiments-api.service";
+
 import { experimentStatusCommand } from "../status";
 
 class ProcessExitError extends Error {
@@ -54,12 +60,14 @@ describe("experimentStatusCommand()", () => {
     mockListRuns = vi.fn().mockResolvedValue({
       runs: [{ runId: "latest_run" }, { runId: "older_run" }],
     });
-    vi.mocked(ExperimentsApiService).mockImplementation(function () { return ({
-      startRun: vi.fn(),
-      getRunStatus: mockGetRunStatus,
-      getRunResults: mockGetRunResults,
-      listRuns: mockListRuns,
-    }) as unknown as ExperimentsApiService; });
+    vi.mocked(ExperimentsApiService).mockImplementation(function () {
+      return {
+        startRun: vi.fn(),
+        getRunStatus: mockGetRunStatus,
+        getRunResults: mockGetRunResults,
+        listRuns: mockListRuns,
+      } as unknown as ExperimentsApiService;
+    });
     logSpy = vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
     vi.spyOn(process, "exit").mockImplementation((code) => {
@@ -149,21 +157,17 @@ describe("experimentStatusCommand()", () => {
 
     it("propagates a real fallback error instead of masking it as not-found", async () => {
       mockGetRunStatus.mockRejectedValue(new Error("Run not found"));
-      mockGetRunResults.mockRejectedValue(
-        new Error("get run results: 500 Internal Server Error"),
-      );
-      await expect(
-        experimentStatusCommand("doc-qa", { runId: "sdk_run" }),
-      ).rejects.toMatchObject({ code: 1 });
+      mockGetRunResults.mockRejectedValue(new Error("get run results: 500 Internal Server Error"));
+      await expect(experimentStatusCommand("doc-qa", { runId: "sdk_run" })).rejects.toMatchObject({
+        code: 1,
+      });
     });
   });
 
   /**
-   * Waiting used to be the caller's job, written as `sleep 30; langwatch
-   * experiment status`. That is one command that prints nothing for half a
-   * minute, so an agent driving a page showed the sleep as the work in
-   * progress, and a turn that ended while it was open lost the run it was
-   * waiting for. The command waits for itself now.
+   * Waiting used to be the caller's job (`sleep 30; langwatch experiment
+   * status`), which showed as idle progress and could lose the run if a
+   * turn ended mid-sleep. The command waits for itself now.
    */
   describe("given the caller asks to wait for the run", () => {
     /** @scenario "Waiting for a run returns as soon as the run reaches a terminal state" */

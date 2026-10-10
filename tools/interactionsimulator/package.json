@@ -1,0 +1,24 @@
+{
+  "name": "@langwatch/interactionsimulator",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Walks the product as a user would: Sonnet plans each feature's journeys, jev picks every action and judges every step, and the run hands back findings, visualdiff flows and a map of what works.",
+  "type": "module",
+  "scripts": {
+    "simulate": "node --experimental-transform-types src/interactionsimulator.entrypoint.ts",
+    "typecheck": "tsc -b",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@langwatch/visual-diff-runner": "workspace:*",
+    "js-yaml": "catalog:",
+    "playwright": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@langwatch/vitest-config": "workspace:*",
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

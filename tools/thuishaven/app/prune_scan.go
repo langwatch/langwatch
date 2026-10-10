@@ -69,6 +69,11 @@ type PruneMeta struct {
 	OriginGone bool          // the branch's upstream ref was deleted (merged + pruned)
 	LastActive time.Time     // when the worktree was last worked on (zero = unknown)
 	StaleFor   time.Duration // now - LastActive, clamped at 0 (0 when LastActive is unknown)
+	// Class is why this worktree may be reclaimed ahead of the idle clock —
+	// temporary scratch or a branch already on main — and Reason is the one line
+	// naming it. domain.ClassNone (with an empty Reason) is the ordinary case.
+	Class  domain.WorktreeClass
+	Reason string
 }
 
 // PlanPrune enumerates the repo's worktrees and computes each one's cheap identity
@@ -206,6 +211,26 @@ func (o *Orchestrator) scanMeta(row PruneRow, chDBs, pgDBs []string, now time.Ti
 			meta.StaleFor = d
 		}
 	}
+	// The temporary rule reads the directory's own mtime, never LastActivity's
+	// committer date: a diff drive checked out at an old ref would otherwise read
+	// as months idle the moment it was created.
+	var untouched time.Duration
+	touchedAt, untouchedKnown := o.hyg.LastTouched(row.Dir)
+	if untouchedKnown {
+		if d := now.Sub(touchedAt); d > 0 {
+			untouched = d
+		}
+	}
+	meta.Class, meta.Reason = domain.ClassifyWorktree(domain.WorktreeFacts{
+		Dir:            row.Dir,
+		Branch:         row.Branch,
+		IsProtected:    !row.Deletable(),
+		IsDirty:        meta.IsDirty,
+		IsLive:         row.IsLive,
+		MergedIntoMain: o.hyg.MergedIntoMain(row.Dir, row.Branch),
+		UntouchedFor:   untouched,
+		UntouchedKnown: untouchedKnown,
+	})
 	// A worktree only owns per-slug databases if it has a valid, unprotected slug —
 	// the same gate pruneDatabases applies before touching any DDL.
 	if row.Slug != "" && domain.ValidSlug(row.Slug) {
@@ -247,7 +272,15 @@ func (o *Orchestrator) scanDatabaseLists(ctx context.Context) (chDBs, pgDBs []st
 // hand-ticked act), and idle for at least threshold. It reads only the meta pass,
 // so pre-selection is ready before any size is measured. Live and dirty worktrees
 // can still be selected by hand — this decides the default, not what is permitted.
+// A worktree the meta pass classified as temporary or merged is pre-ticked
+// whatever its idle age, because that class is the reason it is reclaimable.
 func DefaultSelected(row PruneRow, meta PruneMeta, threshold time.Duration) bool {
+	// A classified worktree is pre-ticked on its class rather than its age: the
+	// classification already applied every guard DefaultSelected applies, and
+	// temporary scratch and a branch on main are reclaimable long before five days.
+	if meta.Class != domain.ClassNone {
+		return true
+	}
 	return row.Deletable() &&
 		!row.IsLive &&
 		!meta.IsDirty &&

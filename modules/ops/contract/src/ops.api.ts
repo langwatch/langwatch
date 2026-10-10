@@ -1,0 +1,709 @@
+import type {
+  FeatureFlagRules,
+  OperatorFeatureFlagCatalogue,
+} from "@langwatch/feature-flag-contract";
+import { moduleApi } from "@langwatch/module";
+import type { SearchProjectsResult } from "@langwatch/project-contract";
+import type { z } from "zod";
+
+import type {
+  DeleteBlobInput,
+  DeleteBlobResult,
+  GetBlobInput,
+  ListBlobsInput,
+  OpsBlobPage,
+  OpsBlobSummary,
+  OpsBlobStoreStats,
+  BlobSweepReport,
+  RunBlobCleanupInput,
+} from "./blob-store.ts";
+import type {
+  AdminImpersonationStarted,
+  AdminImpersonationStopped,
+  AdminOperationResult,
+  RunAdminOperationInput,
+  StartAdminImpersonationInput,
+  StopAdminImpersonationInput,
+} from "./features/admin/admin-operation.ts";
+import type {
+  AdminIdentity,
+  StartImpersonationInput,
+  StopImpersonationInput,
+} from "./features/admin/admin.ts";
+import type { CheckupAnswer, UsageReportAnswer } from "./features/checkup/checkup.trpc.ts";
+import type {
+  CheckupResult,
+  ExplicitCheckInput,
+  ProjectCheckupReport,
+} from "./features/checkup/checkup.ts";
+import type { Anomaly, AnomalyKind } from "./features/dashboard/ops-anomaly.ts";
+import type {
+  DashboardData,
+  GroupInfo,
+  OpsSignUpHealthInput,
+  QueueInfo,
+  QueueSummaryInfo,
+  SignUpHealth,
+} from "./features/dashboard/ops-dashboard.ts";
+import type { OpsSnapshotAbortSignal } from "./features/dashboard/ops-snapshot.service.ts";
+import type {
+  AggregateDiscovery,
+  AggregateEventView,
+  AggregateSearchResult,
+  ProjectionStateAtEvent,
+} from "./features/event-log/ops-event-log.ts";
+import type { ReplayHistoryEntry, ReplayStatus } from "./features/event-log/ops-replay.ts";
+import type {
+  OpsMigrationCohortResult,
+  OpsMigrationEnrollmentListing,
+  OpsMigrationOrganizationMatch,
+  OpsMigrationOverview,
+  OpsMigrationTargetedRunResult,
+} from "./features/migrations/ops-system-migration.ts";
+import type {
+  OpsUpgradeIdInput,
+  OpsUpgradeListRunsInput,
+  OpsUpgradeListStepsInput,
+  OpsUpgradeListTenantsInput,
+  OpsUpgradePreview,
+  OpsUpgradePreviewInput,
+  OpsUpgradeReleasePage,
+  OpsUpgradeRun,
+  OpsUpgradeRunPage,
+  OpsUpgradeStatus,
+  OpsUpgradeStepDetail,
+  OpsUpgradeStepPage,
+  OpsUpgradeTargetSummary,
+  OpsUpgradeTenantPage,
+} from "./features/migrations/ops-upgrade.ts";
+import type {
+  AggregateProcessManager,
+  DeadLetterCount,
+  DeadOutboxMessageView,
+  opsListProcessInstancesInputSchema,
+  OutboxAttemptView,
+  ProcessAuditEntryView,
+  ProcessFleetSummary,
+  ProcessInstanceDetail,
+  ProcessInstanceRow,
+  ProcessOutboxMessageView,
+  ProcessWakeRow,
+} from "./features/process/ops-process.ts";
+import type {
+  OpsBlockedSummary,
+  opsListParkedQueueGroupsInputSchema,
+  opsListQueueGroupJobsInputSchema,
+  opsListQueueGroupsInputSchema,
+  OpsParkedGroupsPage,
+  OpsParkedTenantsPage,
+  OpsQueueDlqGroup,
+  OpsQueueDlqGroupWithQueue,
+  OpsQueueDrainPreview,
+  OpsQueueGroupsPage,
+  opsQueueGroupInputSchema,
+  OpsQueueJobsPage,
+  OpsQueueReapedStrandedGroups,
+  OpsQueueReconcileOutcome,
+} from "./features/queue/ops-queue.ts";
+import type {
+  BugReport,
+  BugReportListing,
+  ListBugReportsInput,
+  SubmitBugReport,
+} from "./ops-bug-report.ts";
+import type { OpsPlatformOperator } from "./ops-operators.ts";
+import type {
+  ListPausedSchedulesInput,
+  ListScheduledJobsInput,
+  ListSchedulerActionsInput,
+  OpsScheduledJob,
+  ScheduleControlInput,
+  SchedulerAuditEntryView,
+  SetScheduleActiveInput,
+} from "./ops-scheduler.ts";
+import type { ProductAnalyticsTarget } from "./ops.config.ts";
+import type {
+  OpsApiGetBadgeCountsOutput,
+  OpsDoorAnswer,
+  OpsEventLogSearchWindow,
+  OpsExplainAnswer,
+  OpsExplainRequest,
+  OpsGrafanaLinkConfig,
+  OpsOperator,
+  OpsOperatorPermission,
+  OpsPipelineRegistrations,
+  OpsScope,
+} from "./ops.responses.ts";
+
+export type DiscoverAggregatesInput = {
+  projectionNames: string[];
+  since: string;
+  tenantIds: string[];
+};
+
+export type GetAggregateEventsInput = {
+  aggregateId: string;
+  tenantId: string;
+  limit: number;
+};
+
+export type GetForAggregateInput = {
+  aggregateType: string;
+  projectId: string;
+  aggregateId: string;
+};
+
+export type RequeueDeadMessagesInput = {
+  processName: string;
+  projectId: string;
+  processKey: string;
+  messageKeyPrefix?: string;
+  requestedBy: string;
+};
+
+export type RequeueDeadMessagesResult = { requeued: number };
+
+export type GetDeadLettersInput = {
+  processName?: string;
+  page: number;
+  pageSize: number;
+};
+
+export type GetDeadLettersResult = {
+  messages: DeadOutboxMessageView[];
+  total: number;
+  byProcess: DeadLetterCount[];
+};
+
+export type GetInstancesInput = z.infer<typeof opsListProcessInstancesInputSchema>;
+
+export type GetInstancesResult = { instances: ProcessInstanceRow[]; total: number };
+
+export type GetUpcomingWakesInput = { limit: number };
+
+export type FindInstanceDetailInput = {
+  ref: { processName: string; projectId: string; processKey: string };
+};
+
+export type GetOutboxInput = {
+  ref: { processName: string; projectId: string; processKey: string };
+  page: number;
+  pageSize: number;
+};
+
+export type GetOutboxResult = { messages: ProcessOutboxMessageView[]; total: number };
+
+export type ListRecentActionsInput = { limit: number };
+
+export type WakeNowInput = {
+  ref: { processName: string; projectId: string; processKey: string };
+  actorUserId: string;
+};
+
+export type WakeNowResult = { woke: boolean };
+
+export type RedriveDeadInstanceInput = {
+  ref: { processName: string; projectId: string; processKey: string };
+  actorUserId: string;
+};
+
+export type RedriveDeadInstanceResult = { requeued: number };
+
+export type RedriveDeadMessageInput = {
+  ref: { processName: string; projectId: string; processKey: string };
+  messageId: string;
+  actorUserId: string;
+};
+
+export type RedriveDeadMessageResult = { redriven: boolean };
+
+export type DiscardDeadMessageInput = {
+  ref: { processName: string; projectId: string; processKey: string };
+  messageId: string;
+  actorUserId: string;
+};
+
+export type DiscardDeadMessageResult = { discarded: boolean };
+
+export type RedriveDeadLettersInput = {
+  processName?: string;
+  actorUserId: string;
+};
+
+export type RedriveDeadLettersResult = { redriven: number };
+
+export type DiscardDeadLettersInput = {
+  processName?: string;
+  actorUserId: string;
+};
+
+export type DiscardDeadLettersResult = { discarded: number };
+
+export type GetOutboxAttemptsInput = { outboxId: string; projectId: string };
+
+export type ReleaseLapsedLeaseInput = {
+  ref: { processName: string; projectId: string; processKey: string };
+  messageId: string;
+  actorUserId: string;
+};
+
+export type ReleaseLapsedLeaseResult = { released: boolean };
+
+export type FindHistoryEntryInput = { runId: string };
+
+export type StartReplayInput = {
+  projectionNames: string[];
+  since: string;
+  tenantIds: string[];
+  aggregateIds?: string[];
+  fullRebuild?: boolean;
+  description: string;
+  userName: string;
+  /** The operator's user id; the requested replay event is filed under it (§9). */
+  requestedByUserId?: string | undefined;
+};
+
+export type StartReplayResult = { runId: string };
+
+export type CancelReplayResult = { cancelled: boolean };
+
+export type PauseQueuePipelineInput = { queueName: string; key: string };
+
+export type UnpauseQueuePipelineInput = { queueName: string; key: string };
+
+export type ListPausedQueueKeysInput = { queueName: string };
+
+export type PauseQueueTenantInput = { queueName: string; tenantId: string };
+
+export type UnpauseQueueTenantInput = { queueName: string; tenantId: string };
+
+export type ListPausedQueueTenantsInput = { queueName: string };
+
+export type ListQueueDlqGroupsInput = { queueName: string };
+
+export type ScanQueuesInput = { queueNames: string[] };
+
+export type ReadQueuePendingDriftInput = { queueNames: string[] };
+
+export type ListPausedSchedulesResult = { schedules: OpsScheduledJob[]; total: number };
+
+export type ListQueueGroupsInput = z.infer<typeof opsListQueueGroupsInputSchema>;
+
+export type FindQueueGroupInput = z.infer<typeof opsQueueGroupInputSchema>;
+
+export type ListQueueGroupJobsInput = z.infer<typeof opsListQueueGroupJobsInputSchema>;
+
+export type ListParkedQueueGroupsInput = z.infer<typeof opsListParkedQueueGroupsInputSchema>;
+
+export type UnblockQueueGroupInput = {
+  queueName: string;
+  groupId: string;
+  requestedBy: string;
+};
+
+export type UnblockQueueGroupResult = { wasBlocked: boolean };
+
+export type UnblockAllQueueGroupsInput = {
+  queueName: string;
+  requestedBy: string;
+};
+
+export type UnblockAllQueueGroupsResult = { unblockedCount: number };
+
+export type ReapStrandedQueueGroupsInput = { requestedBy: string };
+
+export type DrainQueueGroupInput = {
+  queueName: string;
+  groupId: string;
+  requestedBy: string;
+};
+
+export type DrainQueueGroupResult = { jobsRemoved: number };
+
+export type RetryBlockedQueueJobInput = {
+  queueName: string;
+  groupId: string;
+  jobId: string;
+};
+
+export type RetryBlockedQueueJobResult = { wasBlocked: boolean };
+
+export type DrainQueueTenantInput = {
+  queueName: string;
+  tenantId: string;
+  groupIdContains?: string;
+  requestedBy: string;
+};
+
+export type DrainQueueTenantResult = { groupsDrained: number; jobsDrained: number };
+
+export type MoveQueueGroupToDlqInput = {
+  queueName: string;
+  groupId: string;
+  requestedBy: string;
+};
+
+export type MoveQueueGroupToDlqResult = { jobsMoved: number };
+
+export type ReplayQueueGroupFromDlqInput = {
+  queueName: string;
+  groupId: string;
+};
+
+export type ReplayQueueGroupFromDlqResult = { jobsReplayed: number };
+
+export type ReplayAllQueueGroupsFromDlqInput = {
+  queueName: string;
+  pipelineFilter?: string;
+  errorFilter?: string;
+};
+
+export type ReplayAllQueueGroupsFromDlqResult = { replayedCount: number; jobsReplayed: number };
+
+export type RedriveQueueDlqGroupsInput = {
+  queueName: string;
+  groupIds: string[];
+  requestedBy: string;
+};
+
+export type RedriveQueueDlqGroupsResult = { redrivenCount: number; jobsRedriven: number };
+
+export type DiscardQueueDlqGroupsInput = {
+  queueName: string;
+  groupIds: string[];
+  requestedBy: string;
+};
+
+export type DiscardQueueDlqGroupsResult = { discardedCount: number; jobsDiscarded: number };
+
+export type CanaryRedriveQueueDlqInput = {
+  queueName: string;
+  count?: number;
+  pipelineFilter?: string;
+};
+
+export type CanaryRedriveQueueDlqResult = { redrivenCount: number; groupIds: string[] };
+
+export type CanaryUnblockQueueGroupsInput = {
+  queueName: string;
+  count?: number;
+  pipelineFilter?: string;
+};
+
+export type CanaryUnblockQueueGroupsResult = { unblockedCount: number; groupIds: string[] };
+
+export type GetQueueDrainPreviewInput = {
+  queueName: string;
+  pipelineFilter?: string;
+  errorFilter?: string;
+};
+
+export type ReconcileQueuePendingInput = { queueName: string };
+
+export type ListParkedQueueTenantsInput = {
+  queueNames: string[];
+  maxTenants: number;
+};
+
+export type MoveAllBlockedQueueGroupsToDlqInput = {
+  queueName: string;
+  pipelineFilter?: string;
+  errorFilter?: string;
+  requestedBy: string;
+};
+
+export type MoveAllBlockedQueueGroupsToDlqResult = { movedCount: number; jobsMoved: number };
+
+export type StreamDashboardInput = { signal?: OpsSnapshotAbortSignal };
+
+export type RunBlobCleanupCommand = RunBlobCleanupInput & {
+  operator: OpsOperator | null;
+  confirm?: string | undefined;
+};
+
+export interface OpsApi {
+  startAdminImpersonation(input: StartAdminImpersonationInput): Promise<AdminImpersonationStarted>;
+  stopAdminImpersonation(input: StopAdminImpersonationInput): Promise<AdminImpersonationStopped>;
+  runAdminOperation(input: RunAdminOperationInput): Promise<AdminOperationResult>;
+  startImpersonation(input: StartImpersonationInput): Promise<void>;
+  stopImpersonation(input: StopImpersonationInput): Promise<void>;
+  listBlobQueues(): Promise<string[]>;
+  getBlobStoreStats(): Promise<OpsBlobStoreStats>;
+  listBlobs(input: ListBlobsInput): Promise<OpsBlobPage>;
+  findBlob(input: GetBlobInput): Promise<OpsBlobSummary | null>;
+  /** A real sweep destroys blobs, so it asks the operator's confirmation; a dry run does not. */
+  runBlobCleanup(input: RunBlobCleanupCommand): Promise<BlobSweepReport>;
+  deleteBlob(input: DeleteBlobInput): Promise<DeleteBlobResult>;
+  listAnomalies(): Promise<Anomaly[]>;
+  dismissAnomaly(input: { tenantId: string; kind: AnomalyKind }): Promise<boolean>;
+  listScheduledJobs(input: ListScheduledJobsInput): Promise<OpsScheduledJob[]>;
+  listPausedSchedules(input: ListPausedSchedulesInput): Promise<ListPausedSchedulesResult>;
+  listSchedulerActions(input: ListSchedulerActionsInput): Promise<SchedulerAuditEntryView[]>;
+  setScheduleActive(input: SetScheduleActiveInput): Promise<OpsScheduledJob>;
+  clearStuckScheduleSlot(input: ScheduleControlInput): Promise<OpsScheduledJob>;
+  runScheduleNow(input: ScheduleControlInput): Promise<OpsScheduledJob>;
+  listQueues(): Promise<QueueSummaryInfo[]>;
+  listQueueGroups(input: ListQueueGroupsInput): Promise<OpsQueueGroupsPage>;
+  findQueueGroup(input: FindQueueGroupInput): Promise<GroupInfo | null>;
+  listQueueGroupJobs(input: ListQueueGroupJobsInput): Promise<OpsQueueJobsPage>;
+  getBlockedQueueSummary(): Promise<OpsBlockedSummary>;
+  listParkedQueueGroups(input: ListParkedQueueGroupsInput): Promise<OpsParkedGroupsPage>;
+  listAllQueueDlqGroups(): Promise<OpsQueueDlqGroupWithQueue[]>;
+  unblockQueueGroup(input: UnblockQueueGroupInput): Promise<UnblockQueueGroupResult>;
+  unblockAllQueueGroups(input: UnblockAllQueueGroupsInput): Promise<UnblockAllQueueGroupsResult>;
+  reapStrandedQueueGroups(
+    input: ReapStrandedQueueGroupsInput,
+  ): Promise<OpsQueueReapedStrandedGroups>;
+  drainQueueGroup(input: DrainQueueGroupInput): Promise<DrainQueueGroupResult>;
+  pauseQueuePipeline(input: PauseQueuePipelineInput): Promise<void>;
+  unpauseQueuePipeline(input: UnpauseQueuePipelineInput): Promise<void>;
+  retryBlockedQueueJob(input: RetryBlockedQueueJobInput): Promise<RetryBlockedQueueJobResult>;
+  listPausedQueueKeys(input: ListPausedQueueKeysInput): Promise<string[]>;
+  pauseQueueTenant(input: PauseQueueTenantInput): Promise<void>;
+  unpauseQueueTenant(input: UnpauseQueueTenantInput): Promise<void>;
+  listPausedQueueTenants(input: ListPausedQueueTenantsInput): Promise<string[]>;
+  drainQueueTenant(input: DrainQueueTenantInput): Promise<DrainQueueTenantResult>;
+  moveQueueGroupToDlq(input: MoveQueueGroupToDlqInput): Promise<MoveQueueGroupToDlqResult>;
+  moveAllBlockedQueueGroupsToDlq(
+    input: MoveAllBlockedQueueGroupsToDlqInput,
+  ): Promise<MoveAllBlockedQueueGroupsToDlqResult>;
+  replayQueueGroupFromDlq(
+    input: ReplayQueueGroupFromDlqInput,
+  ): Promise<ReplayQueueGroupFromDlqResult>;
+  replayAllQueueGroupsFromDlq(
+    input: ReplayAllQueueGroupsFromDlqInput,
+  ): Promise<ReplayAllQueueGroupsFromDlqResult>;
+  redriveQueueDlqGroups(input: RedriveQueueDlqGroupsInput): Promise<RedriveQueueDlqGroupsResult>;
+  discardQueueDlqGroups(input: DiscardQueueDlqGroupsInput): Promise<DiscardQueueDlqGroupsResult>;
+  canaryRedriveQueueDlq(input: CanaryRedriveQueueDlqInput): Promise<CanaryRedriveQueueDlqResult>;
+  canaryUnblockQueueGroups(
+    input: CanaryUnblockQueueGroupsInput,
+  ): Promise<CanaryUnblockQueueGroupsResult>;
+  listQueueDlqGroups(input: ListQueueDlqGroupsInput): Promise<OpsQueueDlqGroup[]>;
+  getQueueDrainPreview(input: GetQueueDrainPreviewInput): Promise<OpsQueueDrainPreview>;
+  discoverQueueNames(): Promise<string[]>;
+  scanQueues(input: ScanQueuesInput): Promise<QueueInfo[]>;
+  reconcileQueuePending(input: ReconcileQueuePendingInput): Promise<OpsQueueReconcileOutcome>;
+  readQueuePendingDrift(input: ReadQueuePendingDriftInput): Promise<number>;
+  listParkedQueueTenants(input: ListParkedQueueTenantsInput): Promise<OpsParkedTenantsPage>;
+  /** Whether this identity holds `ops:view` at the platform: the platform-operator grant. */
+  isAdmin(identity: AdminIdentity): Promise<boolean>;
+  assertDestructiveOperator(operator: OpsOperator | null, confirmation: string | undefined): void;
+  /**
+   * The caller's operator reach. `{ kind: "none" }` is an answer rather than a
+   * refusal, so the global menu can poll it on every page load.
+   */
+  operatorScope(operator: OpsOperator | null): Promise<OpsScope>;
+  /** Refuses anyone who does not hold the permission at the platform tier. */
+  admitOperator(operator: OpsOperator | null, permission: OpsOperatorPermission): Promise<void>;
+  /**
+   * The staff list, refused as not-found so a probe learns nothing about the
+   * surface, and only where ops's cloud-ops capability is on (§3.5).
+   */
+  admitCloudAdmin(operator: OpsOperator | null): Promise<OpsOperator>;
+  /** Whether Cloud admin is on here: the one answer the browser's public config projects. */
+  offersCloudOps(): boolean;
+  /** One operator EXPLAIN, guardrails and fail-closed rule included. */
+  explainClickHouseQuery(input: OpsExplainRequest): Promise<OpsExplainAnswer>;
+  /** One EXPLAIN as the operator door received it, answered in the bodies the tool parses. */
+  explainClickHouseRequest(input: { request: OpsExplainRequest }): Promise<OpsDoorAnswer>;
+  listPipelineRegistrations(): OpsPipelineRegistrations;
+  getEventLogSearchWindow(): OpsEventLogSearchWindow;
+  /** Null when no Grafana is configured: callers render no link, not a dead one. */
+  findGrafanaLinkConfig(): OpsGrafanaLinkConfig;
+  /** This deployment's product-analytics target; empty where it configured none. */
+  findProductAnalyticsTargets(): ProductAnalyticsTarget[];
+  listSystemMigrations(): Promise<OpsMigrationOverview[]>;
+  /** Tenant rows across the tenant steps, newest movement first; `cursor` pages them. */
+  listUpgradeTenants(input: OpsUpgradeListTenantsInput): Promise<OpsUpgradeTenantPage>;
+  listMigrationEnrollments(input: { requestedBy: string }): Promise<OpsMigrationEnrollmentListing>;
+  searchMigrationOrganizations(input: { query: string }): Promise<OpsMigrationOrganizationMatch[]>;
+  enrollMigrationTenant(input: {
+    organizationId: string;
+    migrationName: string;
+    operator: OpsOperator | null;
+    confirm?: string | undefined;
+  }): Promise<void>;
+  enrollMigrationCohort(input: {
+    migrationName: string;
+    sampleSize: number;
+    includeEnterprise: boolean;
+    includePrivateDataplane: boolean;
+    operator: OpsOperator | null;
+    confirm?: string | undefined;
+  }): Promise<OpsMigrationCohortResult>;
+  withdrawMigrationTenant(input: {
+    organizationId: string;
+    migrationName: string;
+    actorUserId: string;
+  }): Promise<void>;
+  runSystemMigrationForOrganization(input: {
+    organizationId: string;
+    migrationName: string;
+    operator: OpsOperator | null;
+    confirm?: string | undefined;
+  }): Promise<OpsMigrationTargetedRunResult>;
+  /** Asks a worker for one pass now; resolves once the request is recorded, not the pass. */
+  runSystemMigrationPass(input: { operator: OpsOperator | null }): Promise<void>;
+  assertSystemMigrationLegacyWritersDrained(input: {
+    migrationName: string;
+    tenantId: string;
+    minimumWriterGeneration: string;
+    operator: OpsOperator | null;
+    confirm?: string | undefined;
+  }): Promise<void>;
+  rollBackSystemMigrationTenant(input: {
+    migrationName: string;
+    tenantId: string;
+    operator: OpsOperator | null;
+    confirm?: string | undefined;
+  }): Promise<void>;
+  /**
+   * One page of the support inbox, audited before it is answered: reports
+   * carry transcripts and contact addresses, so who opened it is worth
+   * keeping. Search TEXT never reaches the audit row - it can be an email.
+   */
+  listBugReports(input: ListBugReportsInput & { actorUserId: string }): Promise<BugReportListing>;
+  /** One report in full, audited before it is answered. */
+  getBugReport(input: { id: string; actorUserId: string }): Promise<BugReport>;
+  /**
+   * File one report from a customer's coding agent. Unauthenticated on
+   * purpose: the reporter may be struggling because setup failed, so a
+   * report must never require a working login.
+   */
+  submitBugReport(input: {
+    report: SubmitBugReport;
+    callerKey: string;
+    /** The project the intake door verified the reporter's key for; null files unlinked. */
+    linkedProjectId?: string | null;
+  }): Promise<{ id: string }>;
+  /** One report as the intake door received it, answered in the bodies released builds read. */
+  receiveBugReport(input: {
+    report: SubmitBugReport;
+    forwardedFor: string | null;
+    linkedProjectId: string | null;
+  }): Promise<OpsDoorAnswer>;
+  findDashboardData(): DashboardData | null;
+  badgeCounts(): OpsApiGetBadgeCountsOutput;
+  streamDashboard(input: StreamDashboardInput): AsyncIterable<DashboardData>;
+  getQueueGroup(input: { queueName: string; groupId: string }): Promise<GroupInfo>;
+  computeProjectionState(input: {
+    aggregateId: string;
+    tenantId: string;
+    projectionName: string;
+    eventIndex: number;
+  }): Promise<ProjectionStateAtEvent>;
+  searchProjects(input: {
+    query: string;
+    organizationId?: string;
+    limit?: number;
+  }): Promise<SearchProjectsResult[]>;
+  /** The orphaned-organization rate for a window, derived from stored rows (D12). */
+  getSignUpHealth(input: OpsSignUpHealthInput): Promise<SignUpHealth>;
+  /** Every live platform operator, named, oldest first. */
+  listPlatformOperators(): Promise<OpsPlatformOperator[]>;
+  /** Grants the role to the account an address belongs to, by a signed-in operator. */
+  grantPlatformOperator(input: {
+    email: string;
+    operator: OpsOperator | null;
+  }): Promise<OpsPlatformOperator>;
+  /** Revokes one holder; authz refuses the last holder. */
+  revokePlatformOperator(input: { grantId: string; operator: OpsOperator | null }): Promise<void>;
+  featureFlagCatalogue(): Promise<OperatorFeatureFlagCatalogue>;
+  setFeatureFlagEnabled(input: {
+    key: string;
+    enabled: boolean;
+    lastEditedBy: string | null;
+  }): Promise<void>;
+  setFeatureFlagRules(input: {
+    key: string;
+    rules: FeatureFlagRules;
+    lastEditedBy: string | null;
+  }): Promise<void>;
+  clearFeatureFlag(input: { key: string; lastEditedBy: string | null }): Promise<void>;
+  discoverAggregates(input: DiscoverAggregatesInput): Promise<AggregateDiscovery>;
+  /**
+   * The event-log search. `sinceMs` is optional because the explorer's own
+   * default lookback is the module's rule, not the door's: two doors asking
+   * the same question must not disagree about how far back it reaches.
+   */
+  searchAggregates(input: {
+    query: string;
+    tenantIds: string[];
+    sinceMs?: number | undefined;
+  }): Promise<AggregateSearchResult[]>;
+  getAggregateEvents(input: GetAggregateEventsInput): Promise<AggregateEventView[]>;
+  getForAggregate(input: GetForAggregateInput): Promise<AggregateProcessManager[]>;
+  requeueDeadMessages(input: RequeueDeadMessagesInput): Promise<RequeueDeadMessagesResult>;
+  getFleetSummary(): Promise<ProcessFleetSummary[]>;
+  getDeadLetters(input: GetDeadLettersInput): Promise<GetDeadLettersResult>;
+  getDeadLetterCounts(): Promise<DeadLetterCount[]>;
+  getInstances(input: GetInstancesInput): Promise<GetInstancesResult>;
+  getUpcomingWakes(input: GetUpcomingWakesInput): Promise<ProcessWakeRow[]>;
+  findInstanceDetail(input: FindInstanceDetailInput): Promise<ProcessInstanceDetail | null>;
+  getOutbox(input: GetOutboxInput): Promise<GetOutboxResult>;
+  listRecentActions(input: ListRecentActionsInput): Promise<ProcessAuditEntryView[]>;
+  wakeNow(input: WakeNowInput): Promise<WakeNowResult>;
+  redriveDeadInstance(input: RedriveDeadInstanceInput): Promise<RedriveDeadInstanceResult>;
+  redriveDeadMessage(input: RedriveDeadMessageInput): Promise<RedriveDeadMessageResult>;
+  discardDeadMessage(input: DiscardDeadMessageInput): Promise<DiscardDeadMessageResult>;
+  redriveDeadLetters(input: RedriveDeadLettersInput): Promise<RedriveDeadLettersResult>;
+  discardDeadLetters(input: DiscardDeadLettersInput): Promise<DiscardDeadLettersResult>;
+  getOutboxAttempts(input: GetOutboxAttemptsInput): Promise<OutboxAttemptView[]>;
+  releaseLapsedLease(input: ReleaseLapsedLeaseInput): Promise<ReleaseLapsedLeaseResult>;
+  getHistory(): Promise<ReplayHistoryEntry[]>;
+  findHistoryEntry(input: FindHistoryEntryInput): Promise<ReplayHistoryEntry | null>;
+  startReplay(input: StartReplayInput): Promise<StartReplayResult>;
+  getStatus(): Promise<ReplayStatus>;
+  cancelReplay(): Promise<CancelReplayResult>;
+  listAnomalies(): Promise<Anomaly[]>;
+  dismissAnomaly(input: { tenantId: string; kind: AnomalyKind }): Promise<boolean>;
+
+  // -- Settings, Checkup of a self-hosted install; LangWatch Cloud answers
+  // `{ deployment: "saas" }` (specs/self-hosting/checkup/checkup.feature) ---
+
+  /** The free checks; details only where `operator` is an install admin. */
+  getCheckup(input: {
+    organizationId: string;
+    operator: OpsOperator | null;
+  }): Promise<CheckupAnswer>;
+  /** The checks that cost egress or money, run because someone asked. */
+  runCheckup(
+    input: {
+      organizationId: string;
+      operator: OpsOperator | null;
+      requestedBy?: string;
+    } & ExplicitCheckInput,
+  ): Promise<CheckupAnswer>;
+  /** The install's report for an install admin; the organization's own figures otherwise. */
+  getUsageReport(input: {
+    organizationId: string;
+    operator: OpsOperator | null;
+  }): Promise<UsageReportAnswer>;
+  setUsageReportSwitches(input: {
+    organizationId: string;
+    operator: OpsOperator | null;
+    optionalMetricsOptOut?: boolean;
+    hostnameOptOut?: boolean;
+  }): Promise<UsageReportAnswer>;
+  /** What `langwatch doctor` reads over a project key, which is never an install admin. */
+  getProjectCheckup(input: { projectId: string }): Promise<ProjectCheckupReport>;
+  /** The paid checks over a project key; refused on LangWatch Cloud. */
+  runProjectCheckup(input: { projectId: string } & ExplicitCheckInput): Promise<CheckupResult>;
+  // -- Ops, Upgrades: the upgrade ledger through UpgradeReader, read only (round 8, U2-API) ---
+  getUpgradeStatus(): Promise<OpsUpgradeStatus>;
+  listUpgradeReleases(): Promise<OpsUpgradeReleasePage>;
+  listUpgradeSteps(input: OpsUpgradeListStepsInput): Promise<OpsUpgradeStepPage>;
+  /** Refuses with `upgrade_not_found` when the ledger and the image hold no such step. */
+  getUpgradeStep(input: OpsUpgradeIdInput): Promise<OpsUpgradeStepDetail>;
+  listUpgradeRuns(input: OpsUpgradeListRunsInput): Promise<OpsUpgradeRunPage>;
+  /** Refuses with `upgrade_not_found` when the ledger holds no such run. */
+  getUpgradeRun(input: OpsUpgradeIdInput): Promise<OpsUpgradeRun>;
+  /** The plan narrowed to `to`, beside the preflight; `upgrade_plan_unavailable` when unwired. */
+  previewUpgrade(input: OpsUpgradePreviewInput): Promise<OpsUpgradePreview>;
+  listUpgradeTargets(): Promise<OpsUpgradeTargetSummary[]>;
+  /** Reopens a failed step for the worker; refuses a step not failed or not in the ledger. */
+  retryUpgradeStep(input: OpsUpgradeIdInput): Promise<OpsUpgradeStepDetail>;
+}
+
+export const OpsApi = moduleApi<OpsApi>()("ops");

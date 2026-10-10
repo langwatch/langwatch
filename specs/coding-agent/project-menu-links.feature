@@ -1,15 +1,15 @@
 # Project menu links for coding-agent activity
 #
 # Implementation:
-#   platform/app/prisma/schema.prisma                                                                              (Project.lastCodingAgentSessionAt / lastCodingAgentPullRequestAt)
-#   platform/app/src/server/app-layer/projects/project.service.ts                                                  (the throttled touch methods)
-#   platform/app/src/server/app-layer/projects/repositories/project.prisma.repository.ts                           (the staleness-guarded write)
-#   platform/app/src/server/event-sourcing/pipelines/coding-agent-processing/projections/codingAgentSessionSeen.touch.ts (the fold-commit stamp)
-#   platform/app/src/server/app-layer/github/github-pull-request-mapping.service.ts                                (the pull-request trigger)
-#   platform/app/src/components/sidebar/codingAgentActivity.ts                                                     (the recency rule)
-#   platform/app/src/components/MainMenu.tsx                                                                       (the two destinations)
-#   platform/app/src/pages/[project]/sessions.tsx                                                                  (the project Sessions page)
-#   platform/app/src/pages/[project]/pull-requests.tsx                                                             (the project Pull Requests page)
+#   packages/prisma-client/prisma/schema.prisma                                                                    (Project.lastCodingAgentSessionAt / lastCodingAgentPullRequestAt)
+#   modules/project/process/src/services/project.service.ts                                               (the throttled touch methods)
+#   modules/project/process/src/repositories/prisma/prisma.project.repository.ts                         (the staleness-guarded write)
+#   modules/coding-agent/process/src/services/coding-agent-session-seen.service.ts (the fold-commit stamp)
+#   modules/github/process/src/services/github-pull-request-mapping.service.ts                          (the pull-request trigger)
+#   modules/navigation/browser/src/model/coding-agent-activity.ts                                                     (the recency rule)
+#   modules/navigation/browser/src/ui/sections/main-menu.tsx                                                                       (the two destinations)
+#   [gone] src/pages/[project]/sessions.tsx                                                                  (the project Sessions page)
+#   [gone] src/pages/[project]/pull-requests.tsx                                                             (the project Pull Requests page)
 #
 # Related specs:
 #   specs/coding-agent/sessions-screen.feature       , what the Sessions table shows
@@ -151,7 +151,10 @@ Rule: A pull request found for a project's own session records it on that projec
     When the organization's GitHub connection answers with no pull request
     Then the project records nothing about pull requests
 
-  @integration
+  # The chain crosses coding-agent, github and project. Its halves are bound by
+  # "Connecting GitHub backfills recent branches" and "A pull request found for
+  # a project's session records it on the project"; no test composes them yet.
+  @integration @unimplemented
   Scenario: Connecting GitHub records the backfilled pull requests on their projects
     Given a project whose recorded sessions name their branches
     When the organization connects GitHub and the backfill finds a pull request for one of those branches

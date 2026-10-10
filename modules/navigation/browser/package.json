@@ -1,0 +1,75 @@
+{
+  "name": "@langwatch/navigation-browser",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Browser-safe navigation: the application shell, the product registry, the landing redirect and the switchers the chrome renders.",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "exports": {
+    "./declaration": {
+      "langwatch-declaration-source": "./src/navigation.web.ts",
+      "types": "./dist/navigation.web.d.ts",
+      "default": "./src/navigation.web.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc -b",
+    "test": "vitest run",
+    "test:browser": "playwright install --with-deps chromium && vitest run --config vitest.browser.config.ts"
+  },
+  "dependencies": {
+    "@langwatch/agent-contract": "workspace:*",
+    "@langwatch/api": "workspace:*",
+    "@langwatch/authorization": "workspace:*",
+    "@langwatch/browser": "workspace:*",
+    "@langwatch/browser-host": "workspace:*",
+    "@langwatch/dataset-client": "workspace:*",
+    "@langwatch/design-system": "workspace:*",
+    "@langwatch/enterprise-licensing-contract": "workspace:*",
+    "@langwatch/evaluator-client": "workspace:*",
+    "@langwatch/feature-flag-client": "workspace:*",
+    "@langwatch/feature-flag-contract": "workspace:*",
+    "@langwatch/identity-contract": "workspace:*",
+    "@langwatch/langy-contract": "workspace:*",
+    "@langwatch/navigation-client": "workspace:*",
+    "@langwatch/navigation-contract": "workspace:*",
+    "@langwatch/ops-contract": "workspace:*",
+    "@langwatch/organization-client": "workspace:*",
+    "@langwatch/project-contract": "workspace:*",
+    "@langwatch/prompt-client": "workspace:*",
+    "@langwatch/time": "workspace:*",
+    "@langwatch/user-contract": "workspace:*",
+    "lucide-react": "catalog:",
+    "next-themes": "catalog:",
+    "react-error-boundary": "catalog:",
+    "react-icons": "catalog:",
+    "usehooks-ts": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@chakra-ui/react": "catalog:",
+    "@emotion/react": "catalog:",
+    "@langwatch/vitest-config": "workspace:*",
+    "@testing-library/jest-dom": "catalog:",
+    "@testing-library/react": "catalog:",
+    "@testing-library/user-event": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "@vitest/browser": "catalog:",
+    "@vitest/browser-playwright": "catalog:",
+    "jsdom": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:",
+    "vitest-browser-react": "catalog:"
+  },
+  "peerDependencies": {
+    "@chakra-ui/react": "^3.36.0",
+    "@emotion/react": "^11.14.0",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
+  }
+}

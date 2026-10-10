@@ -1,3 +1,4 @@
+import type { LangWatchHandledErrorShape } from "@langwatch/handled-error/langwatch-handled-error";
 /**
  * The code-keyed fallback table: exact-code hits, clean misses, and the rule
  * that advice the platform sent always beats advice the CLI shipped with.
@@ -5,13 +6,12 @@
  * @see specs/typescript-sdk/cli-management-apis.feature
  */
 import { describe, expect, it } from "vitest";
-import type { CliHandledError } from "@langwatch/langy/cards/handled-error";
-import {
-  fallbackSuggestionsFor,
-  withFallbackSuggestions,
-} from "../errorSuggestions";
 
-const domain = (overrides: Partial<CliHandledError> = {}): CliHandledError => ({
+import { fallbackSuggestionsFor, withFallbackSuggestions } from "../errorSuggestions";
+
+const domain = (
+  overrides: Partial<LangWatchHandledErrorShape> = {},
+): LangWatchHandledErrorShape => ({
   code: "not_found",
   kind: "not_found",
   message: "Dataset not found: sales-q3",
@@ -19,6 +19,7 @@ const domain = (overrides: Partial<CliHandledError> = {}): CliHandledError => ({
   meta: {},
   isHandled: true,
   ...overrides,
+  retryable: overrides.retryable ?? false,
 });
 
 describe("fallbackSuggestionsFor", () => {
@@ -43,9 +44,7 @@ describe("fallbackSuggestionsFor", () => {
   it("points a missing default model at the Default Models settings page", () => {
     const explanation = fallbackSuggestionsFor("model_not_configured");
 
-    expect(
-      explanation?.suggestions.some((s) => s.includes("Default Models")),
-    ).toBe(true);
+    expect(explanation?.suggestions.some((s) => s.includes("Default Models"))).toBe(true);
     expect(explanation?.docUrl).toContain("/platform/model-providers");
   });
 
@@ -53,14 +52,10 @@ describe("fallbackSuggestionsFor", () => {
   it("tells a caller refused as owner-only who holds the agent and how to share it", () => {
     const explanation = fallbackSuggestionsFor("agent_owner_only");
 
-    expect(
-      explanation?.suggestions.some((s) => s.includes("owner of the key")),
-    ).toBe(true);
-    expect(
-      explanation?.suggestions.some((s) =>
-        s.includes("LANGWATCH_AGENT_ENVIRONMENT"),
-      ),
-    ).toBe(true);
+    expect(explanation?.suggestions.some((s) => s.includes("owner of the key"))).toBe(true);
+    expect(explanation?.suggestions.some((s) => s.includes("LANGWATCH_AGENT_ENVIRONMENT"))).toBe(
+      true,
+    );
     expect(explanation?.docUrl).toContain("/agent-testing/connect-your-agent");
   });
 
@@ -68,14 +63,10 @@ describe("fallbackSuggestionsFor", () => {
   it("points an unresolved environment at the agents list and the shared environment", () => {
     const explanation = fallbackSuggestionsFor("agent_environment_unresolved");
 
-    expect(
-      explanation?.suggestions.some((s) => s.includes("langwatch agent list")),
-    ).toBe(true);
-    expect(
-      explanation?.suggestions.some((s) =>
-        s.includes("LANGWATCH_AGENT_ENVIRONMENT"),
-      ),
-    ).toBe(true);
+    expect(explanation?.suggestions.some((s) => s.includes("langwatch agent list"))).toBe(true);
+    expect(explanation?.suggestions.some((s) => s.includes("LANGWATCH_AGENT_ENVIRONMENT"))).toBe(
+      true,
+    );
   });
 
   it("answers undefined for a code it does not know — no invented advice", () => {
@@ -90,11 +81,11 @@ describe("fallbackSuggestionsFor", () => {
 
 describe("withFallbackSuggestions", () => {
   it("fills suggestions and docUrl when the platform sent neither", () => {
-    const enriched = withFallbackSuggestions(domain({ code: "missing_api_key", kind: "missing_api_key" }));
-
-    expect(enriched.suggestions).toEqual(
-      fallbackSuggestionsFor("missing_api_key")?.suggestions,
+    const enriched = withFallbackSuggestions(
+      domain({ code: "missing_api_key", kind: "missing_api_key" }),
     );
+
+    expect(enriched.suggestions).toEqual(fallbackSuggestionsFor("missing_api_key")?.suggestions);
     expect(enriched.docUrl).toBe("https://langwatch.ai/docs/integration/cli");
   });
 
@@ -121,9 +112,7 @@ describe("withFallbackSuggestions", () => {
     );
 
     expect(suggestionsOnly.suggestions).toEqual(["The server's own next step"]);
-    expect(suggestionsOnly.docUrl).toBe(
-      "https://langwatch.ai/docs/integration/cli",
-    );
+    expect(suggestionsOnly.docUrl).toBe("https://langwatch.ai/docs/integration/cli");
 
     // Server sent docUrl but no suggestions → fallback fills suggestions only.
     const docUrlOnly = withFallbackSuggestions(
@@ -134,9 +123,7 @@ describe("withFallbackSuggestions", () => {
       }),
     );
 
-    expect(docUrlOnly.suggestions).toEqual(
-      fallbackSuggestionsFor("missing_api_key")?.suggestions,
-    );
+    expect(docUrlOnly.suggestions).toEqual(fallbackSuggestionsFor("missing_api_key")?.suggestions);
     expect(docUrlOnly.docUrl).toBe("https://langwatch.ai/docs/server-page");
   });
 
@@ -149,8 +136,8 @@ describe("withFallbackSuggestions", () => {
 
 describe("given the API refuses a management call because the plan is below Enterprise", () => {
   const planRefusal = (
-    overrides: Partial<CliHandledError> = {},
-  ): CliHandledError =>
+    overrides: Partial<LangWatchHandledErrorShape> = {},
+  ): LangWatchHandledErrorShape =>
     domain({
       code: "enterprise_plan_required",
       kind: "enterprise_plan_required",

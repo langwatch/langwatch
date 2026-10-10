@@ -32,8 +32,8 @@ on:
       - "services/aigateway/**"
       - "pkg/**"
       - "cmd/**"
-      - "go.mod"
-      - "go.sum"
+      - "*/go.mod"
+      - "*/go.sum"
       - "infra/docker/Dockerfile.go_service"
       - ".github/workflows/go-services.yaml"
       # from `chart`
@@ -44,14 +44,12 @@ on:
       - "sdks/go/**"
       - "infra/docker/Dockerfile.langyagent"
       - "sdks/typescript/**"
-      - "packages/langy/**"
+      - "modules/langy/contract/**"
       - "skills/**"
       - "feature-map.json"
-      - "platform/app/src/server/tracer/types.ts"
-      - "platform/app/src/server/filters/types.ts"
-      - "platform/app/src/server/evaluations/types.ts"
-      - "platform/app/src/server/modelProviders/llmModels.json"
-      - "platform/app/src/app/api/openapiLangWatch.json"
+      - "modules/trace/contract/src/trace-format.schemas.ts"
+      - "modules/evaluator/contract/src/evaluators.native.ts"
+      - "modules/model-provider/contract/src/catalog/model-catalog.json"
       - "services/langevals/ts-integration/evaluators.generated.ts"
   workflow_dispatch:
 
@@ -77,22 +75,25 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          # The gate reads no working-tree content: on pull_request events
-          # dorny/paths-filter takes the changed-file list from the API, and
-          # every file this job needs on disk lives under .github/. Checking
-          # out the rest of the tree is pure runner time.
+          # The gate reads no working-tree content: dorny/paths-filter lists
+          # changed paths from git trees, and every file this job needs on disk
+          # lives under .github/. Checking out the rest of the tree is pure
+          # runner time.
           sparse-checkout: .github
       - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
         if: github.event_name != 'workflow_dispatch'
         id: filter
         with:
+          # Empty: diff with git, never the files API, which stops at 3,000
+          # files (specs/ci/path-filters.feature).
+          token: ""
           filters: |
             service:
               - 'services/aigateway/**'
               - 'pkg/**'
               - 'cmd/**'
-              - 'go.mod'
-              - 'go.sum'
+              - '*/go.mod'
+              - '*/go.sum'
               - 'infra/docker/Dockerfile.go_service'
               - '.github/workflows/go-services.yaml'
             chart:
@@ -108,7 +109,7 @@ jobs:
               # The langyagent image bakes in the langwatch CLI, and that CLI is
               # generated AT IMAGE-BUILD TIME from inputs OUTSIDE the Go tree:
               # sdks/typescript/ + skills/ + feature-map.json + a handful of
-              # platform/app + services/langevals source files (sdks/typescript/copy-types.sh +
+              # packages + apps/api + services/langevals source files (sdks/typescript/copy-types.sh +
               # generate-skills-bundle.mjs). A change to any of those can break
               # `docker build -f infra/docker/Dockerfile.langyagent` with no Go source
               # touched — exactly the gap that shipped a broken build once
@@ -119,18 +120,16 @@ jobs:
               - 'pkg/**'
               - 'cmd/**'
               - 'sdks/go/**'
-              - 'go.mod'
-              - 'go.sum'
+              - '*/go.mod'
+              - '*/go.sum'
               - 'infra/docker/Dockerfile.langyagent'
               - 'sdks/typescript/**'
-              - 'packages/langy/**'
+              - 'modules/langy/contract/**'
               - 'skills/**'
               - 'feature-map.json'
-              - 'platform/app/src/server/tracer/types.ts'
-              - 'platform/app/src/server/filters/types.ts'
-              - 'platform/app/src/server/evaluations/types.ts'
-              - 'platform/app/src/server/modelProviders/llmModels.json'
-              - 'platform/app/src/app/api/openapiLangWatch.json'
+              - 'modules/trace/contract/src/trace-format.schemas.ts'
+              - 'modules/evaluator/contract/src/evaluators.native.ts'
+              - 'modules/model-provider/contract/src/catalog/model-catalog.json'
               - 'services/langevals/ts-integration/evaluators.generated.ts'
               - '.github/workflows/go-services.yaml'
 

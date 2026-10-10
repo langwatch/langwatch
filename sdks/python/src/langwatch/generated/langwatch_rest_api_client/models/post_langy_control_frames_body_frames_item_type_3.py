@@ -1,16 +1,11 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Any, Literal, TypeVar, cast
 
 from attrs import define as _attrs_define
+from attrs import field as _attrs_field
 
-from ..models.post_langy_control_frames_body_frames_item_type_3_protocol import (
-    PostLangyControlFramesBodyFramesItemType3Protocol,
-)
-from ..models.post_langy_control_frames_body_frames_item_type_3_type import (
-    PostLangyControlFramesBodyFramesItemType3Type,
-)
 from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
@@ -26,8 +21,8 @@ T = TypeVar("T", bound="PostLangyControlFramesBodyFramesItemType3")
 class PostLangyControlFramesBodyFramesItemType3:
     """
     Attributes:
-        protocol (PostLangyControlFramesBodyFramesItemType3Protocol):
-        type_ (PostLangyControlFramesBodyFramesItemType3Type):
+        protocol (Literal[1]):
+        type_ (Literal['permission_required']):
         call_id (str):
         summary (str):
         pattern (str):
@@ -37,8 +32,8 @@ class PostLangyControlFramesBodyFramesItemType3:
         timeout_seconds (int | Unset):
     """
 
-    protocol: PostLangyControlFramesBodyFramesItemType3Protocol
-    type_: PostLangyControlFramesBodyFramesItemType3Type
+    protocol: Literal[1]
+    type_: Literal["permission_required"]
     call_id: str
     summary: str
     pattern: str
@@ -46,11 +41,12 @@ class PostLangyControlFramesBodyFramesItemType3:
     skip_offered: bool
     segments: list[PostLangyControlFramesBodyFramesItemType3SegmentsItem] | Unset = UNSET
     timeout_seconds: int | Unset = UNSET
+    additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        protocol = self.protocol.value
+        protocol = self.protocol
 
-        type_ = self.type_.value
+        type_ = self.type_
 
         call_id = self.call_id
 
@@ -72,7 +68,7 @@ class PostLangyControlFramesBodyFramesItemType3:
         timeout_seconds = self.timeout_seconds
 
         field_dict: dict[str, Any] = {}
-
+        field_dict.update(self.additional_properties)
         field_dict.update(
             {
                 "protocol": protocol,
@@ -98,9 +94,13 @@ class PostLangyControlFramesBodyFramesItemType3:
         )
 
         d = dict(src_dict)
-        protocol = PostLangyControlFramesBodyFramesItemType3Protocol(d.pop("protocol"))
+        protocol = cast(Literal[1], d.pop("protocol"))
+        if protocol != 1:
+            raise ValueError(f"protocol must match const 1, got '{protocol}'")
 
-        type_ = PostLangyControlFramesBodyFramesItemType3Type(d.pop("type"))
+        type_ = cast(Literal["permission_required"], d.pop("type"))
+        if type_ != "permission_required":
+            raise ValueError(f"type must match const 'permission_required', got '{type_}'")
 
         call_id = d.pop("callId")
 
@@ -135,4 +135,21 @@ class PostLangyControlFramesBodyFramesItemType3:
             timeout_seconds=timeout_seconds,
         )
 
+        post_langy_control_frames_body_frames_item_type_3.additional_properties = d
         return post_langy_control_frames_body_frames_item_type_3
+
+    @property
+    def additional_keys(self) -> list[str]:
+        return list(self.additional_properties.keys())
+
+    def __getitem__(self, key: str) -> Any:
+        return self.additional_properties[key]
+
+    def __setitem__(self, key: str, value: Any) -> None:
+        self.additional_properties[key] = value
+
+    def __delitem__(self, key: str) -> None:
+        del self.additional_properties[key]
+
+    def __contains__(self, key: str) -> bool:
+        return key in self.additional_properties

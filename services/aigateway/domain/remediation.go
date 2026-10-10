@@ -309,16 +309,6 @@ func RemediationDocsPaths() []string {
 	return paths
 }
 
-// RemediationCodes returns every code the registry answers for, so a test can
-// assert the codes that most need remediation actually have it.
-func RemediationCodes() []herr.Code {
-	codes := make([]herr.Code, 0, len(registry))
-	for code := range registry {
-		codes = append(codes, code)
-	}
-	return codes
-}
-
 func (r remediation) String() string {
 	return fmt.Sprintf("remediation{tips:%d docsPath:%q}", len(r.tips), r.docsPath)
 }

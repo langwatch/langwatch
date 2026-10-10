@@ -184,6 +184,14 @@ Feature: A test suite groups scenarios
     When the suite editor tries to name the scenarios directly
     Then the change is refused with "validation_error"
 
+  # The list route sends includeArchived; the service parsed the whole input
+  # through a strict id schema and refused the key it then read.
+  @unit
+  Scenario: Listing test suites with archived ones included answers
+    Given a project with archived and active test suites
+    When the test suites are listed with archived ones included
+    Then the repository is asked for that project with archived suites included
+
   # --- Fields on a test suite ---
 
   # A test suite declares typed fields beyond situation and criteria, and a
@@ -319,3 +327,15 @@ Feature: A test suite groups scenarios
     And a run plan carrying its own copy of that same evaluator with a required input left unmapped
     When a run of that suite is started with that plan
     Then the run is not refused, because the suite's attachment is the one that executes
+
+  @unit
+  Scenario: The suite editor saves a test suite's name, fields and evaluators through suites.testSuites.update
+    Given a test suite the suite editor has open
+    When it saves a new name, fields and evaluators through suites.testSuites.update
+    Then the suite service receives them unchanged for that suite
+
+  @unit
+  Scenario: A test suite is created with its fields and evaluators through suites.testSuites.create
+    Given the suite editor fills in a new test suite's name, fields and evaluators
+    When it creates the suite through suites.testSuites.create
+    Then the suite service receives the fields and evaluators unchanged

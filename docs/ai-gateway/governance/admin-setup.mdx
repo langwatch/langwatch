@@ -28,6 +28,7 @@ You need:
     Scope is fixed after you save. To move a credential to another scope, delete it and create it again.
 
     Click **Save**, then open the row menu and click **Test Connection** to confirm the credential works.
+
   </Step>
 
   <Step title="Set the routing handle and the gateway options">
@@ -41,6 +42,7 @@ You need:
     |---|---|
     | Fallback priority | The order used when a virtual key has no routing policy. The lower number is tried first. Rows with the same number are tried in creation order. |
     | Provider config (JSON) | Provider-specific routing hints, such as a Bedrock region or an Azure deployment override. It must be a JSON object. |
+
   </Step>
 </Steps>
 
@@ -53,7 +55,10 @@ Tick **Make this the default where it applies** so new keys in that scope pick i
 Expand **Restrictions** and add one rule now, so you have something to test at the end. Under **Tools**, put `^shell_.*` in the **Refuse** box. Any request that declares a tool whose name starts with `shell_` is then refused before it reaches a provider.
 
 <Frame caption="The policy drawer: where it applies, the providers in order, and the model tiers.">
-  <img src="/images/ai-gateway/routing-policy-editor.png" alt="The New routing policy drawer with the scope, the ordered providers and the model tiers" />
+  <img
+    src="/images/ai-gateway/routing-policy-editor.png"
+    alt="The New routing policy drawer with the scope, the ordered providers and the model tiers"
+  />
 </Frame>
 
 **Also check:** [Routing policies](/ai-gateway/governance/routing-policies) for the sections of a policy and the permissions to manage one.

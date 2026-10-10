@@ -9,6 +9,7 @@ from ...models.post_api_v1_query_response_200 import PostApiV1QueryResponse200
 from ...models.post_api_v1_query_response_400 import PostApiV1QueryResponse400
 from ...models.post_api_v1_query_response_401 import PostApiV1QueryResponse401
 from ...models.post_api_v1_query_response_403 import PostApiV1QueryResponse403
+from ...models.post_api_v1_query_response_404 import PostApiV1QueryResponse404
 from ...models.post_api_v1_query_response_422 import PostApiV1QueryResponse422
 from ...models.post_api_v1_query_response_500 import PostApiV1QueryResponse500
 from ...types import Response, safe_http_status
@@ -40,6 +41,7 @@ def _parse_response(
     | PostApiV1QueryResponse400
     | PostApiV1QueryResponse401
     | PostApiV1QueryResponse403
+    | PostApiV1QueryResponse404
     | PostApiV1QueryResponse422
     | PostApiV1QueryResponse500
     | None
@@ -64,6 +66,11 @@ def _parse_response(
 
         return response_403
 
+    if response.status_code == 404:
+        response_404 = PostApiV1QueryResponse404.from_dict(response.json())
+
+        return response_404
+
     if response.status_code == 422:
         response_422 = PostApiV1QueryResponse422.from_dict(response.json())
 
@@ -87,6 +94,7 @@ def _build_response(
     | PostApiV1QueryResponse400
     | PostApiV1QueryResponse401
     | PostApiV1QueryResponse403
+    | PostApiV1QueryResponse404
     | PostApiV1QueryResponse422
     | PostApiV1QueryResponse500
 ]:
@@ -110,6 +118,7 @@ def sync_detailed(
     | PostApiV1QueryResponse400
     | PostApiV1QueryResponse401
     | PostApiV1QueryResponse403
+    | PostApiV1QueryResponse404
     | PostApiV1QueryResponse422
     | PostApiV1QueryResponse500
 ]:
@@ -137,6 +146,12 @@ def sync_detailed(
     from more than one project come back flagged with the `MULTI_PROJECT_RESULT` diagnostic — to read a
     single project, filter inside the statement with `WHERE TenantId = '<project id>'`.
 
+    To run over one project only, send its id as `projectId` in the body: the run then reads that
+    project's rows alone, redacted by that project's own protections. A `projectId` the key cannot read
+    `analytics:view` on, in its own organization, is refused with `project_not_found` (404), the same
+    answer as a project that does not exist. Without `projectId` the run spans every project the key can
+    read.
+
     A statement that names no `LIMIT` is capped at 10,000 rows: that `LIMIT` is appended before the
     query runs. A statement whose own `LIMIT` asks for more is refused with `LIMIT_TOO_HIGH` — lower it
     and page the rest with `LIMIT`/`OFFSET` and an `ORDER BY`. When using `UNION`, every top-level
@@ -155,7 +170,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[PostApiV1QueryResponse200 | PostApiV1QueryResponse400 | PostApiV1QueryResponse401 | PostApiV1QueryResponse403 | PostApiV1QueryResponse422 | PostApiV1QueryResponse500]
+        Response[PostApiV1QueryResponse200 | PostApiV1QueryResponse400 | PostApiV1QueryResponse401 | PostApiV1QueryResponse403 | PostApiV1QueryResponse404 | PostApiV1QueryResponse422 | PostApiV1QueryResponse500]
     """
 
     kwargs = _get_kwargs(
@@ -178,6 +193,7 @@ def sync(
     | PostApiV1QueryResponse400
     | PostApiV1QueryResponse401
     | PostApiV1QueryResponse403
+    | PostApiV1QueryResponse404
     | PostApiV1QueryResponse422
     | PostApiV1QueryResponse500
     | None
@@ -206,6 +222,12 @@ def sync(
     from more than one project come back flagged with the `MULTI_PROJECT_RESULT` diagnostic — to read a
     single project, filter inside the statement with `WHERE TenantId = '<project id>'`.
 
+    To run over one project only, send its id as `projectId` in the body: the run then reads that
+    project's rows alone, redacted by that project's own protections. A `projectId` the key cannot read
+    `analytics:view` on, in its own organization, is refused with `project_not_found` (404), the same
+    answer as a project that does not exist. Without `projectId` the run spans every project the key can
+    read.
+
     A statement that names no `LIMIT` is capped at 10,000 rows: that `LIMIT` is appended before the
     query runs. A statement whose own `LIMIT` asks for more is refused with `LIMIT_TOO_HIGH` — lower it
     and page the rest with `LIMIT`/`OFFSET` and an `ORDER BY`. When using `UNION`, every top-level
@@ -224,7 +246,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        PostApiV1QueryResponse200 | PostApiV1QueryResponse400 | PostApiV1QueryResponse401 | PostApiV1QueryResponse403 | PostApiV1QueryResponse422 | PostApiV1QueryResponse500
+        PostApiV1QueryResponse200 | PostApiV1QueryResponse400 | PostApiV1QueryResponse401 | PostApiV1QueryResponse403 | PostApiV1QueryResponse404 | PostApiV1QueryResponse422 | PostApiV1QueryResponse500
     """
 
     return sync_detailed(
@@ -242,6 +264,7 @@ async def asyncio_detailed(
     | PostApiV1QueryResponse400
     | PostApiV1QueryResponse401
     | PostApiV1QueryResponse403
+    | PostApiV1QueryResponse404
     | PostApiV1QueryResponse422
     | PostApiV1QueryResponse500
 ]:
@@ -269,6 +292,12 @@ async def asyncio_detailed(
     from more than one project come back flagged with the `MULTI_PROJECT_RESULT` diagnostic — to read a
     single project, filter inside the statement with `WHERE TenantId = '<project id>'`.
 
+    To run over one project only, send its id as `projectId` in the body: the run then reads that
+    project's rows alone, redacted by that project's own protections. A `projectId` the key cannot read
+    `analytics:view` on, in its own organization, is refused with `project_not_found` (404), the same
+    answer as a project that does not exist. Without `projectId` the run spans every project the key can
+    read.
+
     A statement that names no `LIMIT` is capped at 10,000 rows: that `LIMIT` is appended before the
     query runs. A statement whose own `LIMIT` asks for more is refused with `LIMIT_TOO_HIGH` — lower it
     and page the rest with `LIMIT`/`OFFSET` and an `ORDER BY`. When using `UNION`, every top-level
@@ -287,7 +316,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[PostApiV1QueryResponse200 | PostApiV1QueryResponse400 | PostApiV1QueryResponse401 | PostApiV1QueryResponse403 | PostApiV1QueryResponse422 | PostApiV1QueryResponse500]
+        Response[PostApiV1QueryResponse200 | PostApiV1QueryResponse400 | PostApiV1QueryResponse401 | PostApiV1QueryResponse403 | PostApiV1QueryResponse404 | PostApiV1QueryResponse422 | PostApiV1QueryResponse500]
     """
 
     kwargs = _get_kwargs(
@@ -308,6 +337,7 @@ async def asyncio(
     | PostApiV1QueryResponse400
     | PostApiV1QueryResponse401
     | PostApiV1QueryResponse403
+    | PostApiV1QueryResponse404
     | PostApiV1QueryResponse422
     | PostApiV1QueryResponse500
     | None
@@ -336,6 +366,12 @@ async def asyncio(
     from more than one project come back flagged with the `MULTI_PROJECT_RESULT` diagnostic — to read a
     single project, filter inside the statement with `WHERE TenantId = '<project id>'`.
 
+    To run over one project only, send its id as `projectId` in the body: the run then reads that
+    project's rows alone, redacted by that project's own protections. A `projectId` the key cannot read
+    `analytics:view` on, in its own organization, is refused with `project_not_found` (404), the same
+    answer as a project that does not exist. Without `projectId` the run spans every project the key can
+    read.
+
     A statement that names no `LIMIT` is capped at 10,000 rows: that `LIMIT` is appended before the
     query runs. A statement whose own `LIMIT` asks for more is refused with `LIMIT_TOO_HIGH` — lower it
     and page the rest with `LIMIT`/`OFFSET` and an `ORDER BY`. When using `UNION`, every top-level
@@ -354,7 +390,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        PostApiV1QueryResponse200 | PostApiV1QueryResponse400 | PostApiV1QueryResponse401 | PostApiV1QueryResponse403 | PostApiV1QueryResponse422 | PostApiV1QueryResponse500
+        PostApiV1QueryResponse200 | PostApiV1QueryResponse400 | PostApiV1QueryResponse401 | PostApiV1QueryResponse403 | PostApiV1QueryResponse404 | PostApiV1QueryResponse422 | PostApiV1QueryResponse500
     """
 
     return (

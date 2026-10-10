@@ -1,0 +1,28 @@
+{
+  "name": "@langwatch/onboarding-client",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The tokens onboarding lends other modules: its guided offer, tour and path hooks, and first-touch attribution (ARCHITECTURE.md §10.1).",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc -b"
+  },
+  "dependencies": {
+    "@langwatch/module": "workspace:*",
+    "@langwatch/onboarding-contract": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "catalog:"
+  }
+}

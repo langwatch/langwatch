@@ -1,0 +1,67 @@
+import { ApiKeyNotFoundError } from "@langwatch/api-key-contract";
+import { ProjectNotFoundError } from "@langwatch/project-contract";
+import { fromDate, toDate, type Instant } from "@langwatch/time";
+
+import {
+  LangySessionKeyRepository,
+  type LangySessionKeyRecord,
+} from "../langy-session-key.repository.ts";
+import type { LangyDatabase } from "./langy-database.mapper.ts";
+
+export class PrismaLangySessionKeyRepository extends LangySessionKeyRepository {
+  private constructor(private readonly database: LangyDatabase) {
+    super();
+  }
+
+  static create(database: LangyDatabase): PrismaLangySessionKeyRepository {
+    return new PrismaLangySessionKeyRepository(database);
+  }
+
+  async getProjectScope(projectId: string): Promise<{
+    teamId: string;
+    organizationId: string;
+  }> {
+    const project = await this.database.project.findUnique({
+      where: { id: projectId },
+      select: { teamId: true, team: { select: { organizationId: true } } },
+    });
+    if (!project?.team)
+      throw new ProjectNotFoundError("Project not found", { meta: { projectId } });
+
+    return {
+      teamId: project.teamId,
+      organizationId: project.team.organizationId,
+    };
+  }
+
+  async getById(input: { apiKeyId: string; projectId: string }): Promise<LangySessionKeyRecord> {
+    const key = await this.database.apiKey.findUnique({
+      where: { id: input.apiKeyId },
+      select: {
+        id: true,
+        name: true,
+        revokedAt: true,
+        roleBindings: {
+          where: { scopeType: "PROJECT", scopeId: input.projectId },
+          select: { id: true },
+          take: 1,
+        },
+      },
+    });
+    if (!key) throw new ApiKeyNotFoundError(input.apiKeyId);
+
+    return {
+      id: key.id,
+      name: key.name,
+      revokedAt: key.revokedAt && fromDate(key.revokedAt),
+      isScopedToProject: key.roleBindings.length > 0,
+    };
+  }
+
+  async revoke(apiKeyId: string, revokedAt: Instant): Promise<void> {
+    await this.database.apiKey.update({
+      where: { id: apiKeyId },
+      data: { revokedAt: toDate(revokedAt) },
+    });
+  }
+}

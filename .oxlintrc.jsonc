@@ -1,0 +1,27 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+
+  // Every rule, for the editor, `pnpm lint:fix` and the Nx targets. `pnpm lint`
+  // runs the three parts as parallel processes instead (dev/nx/lint.mjs).
+  // Categories take the last extended value: the native config stays last.
+  // ignorePatterns are not inherited, so they live here; the runner reads them.
+  "extends": ["./.oxlintrc.types.jsonc", "./.oxlintrc.plugin.jsonc", "./.oxlintrc.native.jsonc"],
+
+  // A suppression that suppresses nothing is a lie about the code.
+  "options": { "reportUnusedDisableDirectives": "error" },
+
+  // Generated files are fixed in their generator (the SDK's openapi client is
+  // written by sdks/typescript/scripts/generate-openapi-types.mjs);
+  // `session-context.mjs` and `session-guidance.mjs` are vendored minified
+  // bundles the plugin ships and builds elsewhere.
+  "ignorePatterns": [
+    "**/*.generated.ts",
+    "**/*.generated.tsx",
+    "**/*.generated.js",
+    "sdks/typescript/src/internal/generated/openapi/api-client.ts",
+    "plugins/langwatch/scripts/session-context.mjs",
+    "plugins/langwatch/scripts/session-guidance.mjs",
+    "tools/apidiff/inventory/**",
+    "tools/readmegen/extract/**",
+  ],
+}

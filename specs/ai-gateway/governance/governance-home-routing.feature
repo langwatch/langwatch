@@ -420,7 +420,8 @@ Feature: Governance home — route, nav promotion, persona detection
       | hasIngestionSources  | boolean | any non-archived IngestionSource in org   |
       | hasAnomalyRules      | boolean | any non-archived AnomalyRule in org       |
       | hasRecentActivity    | boolean | any gateway_activity_event in last 30d    |
-      | governanceActive     | boolean | OR of the five hasFoo flags above         |
+      | hasApplicationTraces | boolean | any project in org that has traces        |
+      | governanceActive     | boolean | OR of the first five flags above          |
     And the procedure is gated on "governance:view" — an org member
       without it is refused (governance.rbac.integration.test.ts pins
       the FORBIDDEN), not the any-member read this scenario once claimed
@@ -532,3 +533,11 @@ Feature: Governance home — route, nav promotion, persona detection
       for the organization
     When the admin cold-loads "/governance/billed"
     Then the not-found scene is shown instead of an unfinished page
+
+  @bdd @ui @governance-home @billed-cost-flag @integration
+  Scenario: A reader without governanceCost:view is told which grant Costs needs
+    Given "release_ui_governance_billed_cost_enabled" is enabled for the organization
+    And the reader does not hold governanceCost:view
+    When the reader opens "/governance/costs"
+    Then the page names the governanceCost:view grant
+    And no cost read is issued

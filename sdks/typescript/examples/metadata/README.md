@@ -9,24 +9,24 @@ Two examples demonstrating how to send metadata and labels to LangWatch:
 
 ### SDK (OpenTelemetry attributes)
 
-| Attribute | Type | Description |
-|-----------|------|-------------|
-| `gen_ai.conversation.id` | string | Thread/conversation ID (OTEL semconv, primary) |
-| `langwatch.thread.id` | string | Legacy alias for conversation ID |
-| `langwatch.user.id` | string | End user identifier |
-| `langwatch.customer.id` | string | Customer/tenant identifier |
-| `langwatch.labels` | JSON string | Array of categorization tags |
-| `metadata` | JSON string | Custom key-value metadata |
+| Attribute                | Type        | Description                                    |
+| ------------------------ | ----------- | ---------------------------------------------- |
+| `gen_ai.conversation.id` | string      | Thread/conversation ID (OTEL semconv, primary) |
+| `langwatch.thread.id`    | string      | Legacy alias for conversation ID               |
+| `langwatch.user.id`      | string      | End user identifier                            |
+| `langwatch.customer.id`  | string      | Customer/tenant identifier                     |
+| `langwatch.labels`       | JSON string | Array of categorization tags                   |
+| `metadata`               | JSON string | Custom key-value metadata                      |
 
 ### REST API (`metadata` object)
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `user_id` | string | End user identifier |
-| `thread_id` | string | Conversation/session ID |
-| `customer_id` | string | Customer/tenant ID |
-| `labels` | string[] | Categorization tags |
-| *other keys* | any | Stored as custom metadata |
+| Field         | Type     | Description               |
+| ------------- | -------- | ------------------------- |
+| `user_id`     | string   | End user identifier       |
+| `thread_id`   | string   | Conversation/session ID   |
+| `customer_id` | string   | Customer/tenant ID        |
+| `labels`      | string[] | Categorization tags       |
+| _other keys_  | any      | Stored as custom metadata |
 
 ## Running
 

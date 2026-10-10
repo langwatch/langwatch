@@ -1,0 +1,100 @@
+{
+  "name": "@langwatch/langy-process",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Canonical server-side Langy service.",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "imports": {
+    "#*": {
+      "types": "./dist/*.d.ts",
+      "default": "./src/*.ts"
+    }
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    },
+    "./streaming/langy-frame-auth": {
+      "types": "./dist/rules/langy-frame-auth.rules.d.ts",
+      "default": "./src/rules/langy-frame-auth.rules.ts"
+    },
+    "./rules/langy-turn-settlement": {
+      "types": "./dist/rules/langy-turn-settlement.rules.d.ts",
+      "default": "./src/rules/langy-turn-settlement.rules.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc -b",
+    "test": "vitest run",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "generate:setup-skill-bodies": "node --experimental-strip-types scripts/generate-setup-skill-bodies.ts"
+  },
+  "dependencies": {
+    "@langwatch/agent-contract": "workspace:*",
+    "@langwatch/api": "workspace:*",
+    "@langwatch/api-key-contract": "workspace:*",
+    "@langwatch/authorization": "workspace:*",
+    "@langwatch/authz-contract": "workspace:*",
+    "@langwatch/data-retention-contract": "workspace:*",
+    "@langwatch/dataset-contract": "workspace:*",
+    "@langwatch/entitlement-contract": "workspace:*",
+    "@langwatch/evaluator-contract": "workspace:*",
+    "@langwatch/eventing": "workspace:*",
+    "@langwatch/experiment-contract": "workspace:*",
+    "@langwatch/feature-flag-contract": "workspace:*",
+    "@langwatch/gateway-contract": "workspace:*",
+    "@langwatch/github-contract": "workspace:*",
+    "@langwatch/handled-error": "workspace:*",
+    "@langwatch/ksuid": "workspace:*",
+    "@langwatch/langy-contract": "workspace:*",
+    "@langwatch/model-provider-contract": "workspace:*",
+    "@langwatch/module": "workspace:*",
+    "@langwatch/monitor-contract": "workspace:*",
+    "@langwatch/notification-contract": "workspace:*",
+    "@langwatch/observability": "workspace:*",
+    "@langwatch/onboarding-contract": "workspace:*",
+    "@langwatch/plans": "workspace:*",
+    "@langwatch/presence-contract": "workspace:*",
+    "@langwatch/prisma-client": "workspace:*",
+    "@langwatch/process": "workspace:*",
+    "@langwatch/process-stores": "workspace:*",
+    "@langwatch/project-contract": "workspace:*",
+    "@langwatch/prompt-contract": "workspace:*",
+    "@langwatch/redis-client": "workspace:*",
+    "@langwatch/scenario-contract": "workspace:*",
+    "@langwatch/secret-contract": "workspace:*",
+    "@langwatch/secrets": "workspace:*",
+    "@langwatch/time": "workspace:*",
+    "@langwatch/trace-contract": "workspace:*",
+    "@langwatch/user-contract": "workspace:*",
+    "@langwatch/workflow-contract": "workspace:*",
+    "@opentelemetry/api": "catalog:",
+    "@trpc/server": "catalog:",
+    "ai": "catalog:",
+    "hono": "catalog:",
+    "langwatch": "workspace:*",
+    "nanoid": "catalog:",
+    "prom-client": "catalog:",
+    "ws": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@langwatch/feature-flag-process": "workspace:*",
+    "@langwatch/test-harness": "workspace:*",
+    "@langwatch/vitest-config": "workspace:*",
+    "@opentelemetry/sdk-trace-base": "catalog:",
+    "@opentelemetry/sdk-trace-node": "catalog:",
+    "@testcontainers/redis": "catalog:",
+    "@types/node": "catalog:",
+    "@types/ws": "catalog:",
+    "ioredis": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

@@ -1,17 +1,7 @@
-// Loaded into the Playwright MCP process by dev/scripts/playwright-mcp.sh
-// (node --require). See specs/setup/mcp-browser-lifecycle.feature.
-//
-// When the session that spawned an MCP dies hard, nothing signals the MCP: it
-// reparents to launchd and keeps running, and the Chrome it launched outlives
-// even that, because a browser detaches from its parent's fate on purpose.
-// Observed: 20 orphaned Chromes and 7.4 GB of their profiles, each from a
-// dogfooding session that was long gone.
-//
-// macOS has no die-with-parent, so the process watches for itself: poll the
-// parent pid, and on orphaning ask everything to shut down the way a clean
-// disconnect would - SIGTERM to the direct children (the browser), SIGTERM to
-// self (which runs the MCP's own shutdown handlers), and a hard exit only if
-// those hang.
+// Loaded into the Playwright MCP process (node --require); see
+// specs/setup/mcp-browser-lifecycle.feature. macOS has no die-with-parent,
+// so this polls the parent pid and, on orphaning, cascades a clean
+// shutdown: SIGTERM to children, then self, then a hard exit if that hangs.
 
 const { execFileSync } = require("node:child_process");
 

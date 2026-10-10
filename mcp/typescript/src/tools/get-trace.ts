@@ -1,11 +1,9 @@
-import { getTraceById as apiGetTraceById } from "../langwatch-api.js";
-import { formatEvaluationLines } from "../utils/format-evaluations.js";
+import { getTraceById as apiGetTraceById } from "../langwatch-api.ts";
+import { formatEvaluationLines } from "../utils/format-evaluations.ts";
 
 /**
- * Handles the get_trace MCP tool invocation.
- *
- * Retrieves a single trace by ID. In digest mode (default), returns the
- * AI-readable formatted digest. In json mode, returns the full raw JSON.
+ * Handles the get_trace MCP tool: retrieves a trace by ID as an
+ * AI-readable digest (default) or full raw JSON.
  */
 export async function handleGetTrace(params: {
   traceId: string;
@@ -20,11 +18,20 @@ export async function handleGetTrace(params: {
 
   const lines: string[] = [];
   lines.push(`# Trace: ${params.traceId}\n`);
+  addTraceDigest(lines, result);
 
+  lines.push('\n> Tip: Use `get_trace` with `format: "json"` to get the full raw trace data.');
+
+  return lines.join("\n");
+}
+
+function addTraceDigest(
+  lines: string[],
+  result: Awaited<ReturnType<typeof apiGetTraceById>>,
+): void {
   if (result.timestamps) {
     lines.push(`**Started**: ${result.timestamps.started_at}`);
-    if (result.timestamps.updated_at)
-      lines.push(`**Updated**: ${result.timestamps.updated_at}`);
+    if (result.timestamps.updated_at) lines.push(`**Updated**: ${result.timestamps.updated_at}`);
   }
 
   if (result.metadata) {
@@ -39,13 +46,5 @@ export async function handleGetTrace(params: {
     lines.push("\n## Evaluations", ...formatEvaluationLines(result.evaluations));
   }
 
-  if (result.formatted_trace) {
-    lines.push(`\n## Trace Details\n${result.formatted_trace}`);
-  }
-
-  lines.push(
-    '\n> Tip: Use `get_trace` with `format: "json"` to get the full raw trace data.'
-  );
-
-  return lines.join("\n");
+  if (result.formatted_trace) lines.push(`\n## Trace Details\n${result.formatted_trace}`);
 }

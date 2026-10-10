@@ -1,0 +1,81 @@
+import { describe, expect, it } from "vitest";
+
+import { StubAuthzListingRepository } from "../repositories/__tests__/support/authz-listing.stub.ts";
+import { StubAuthzManagedGrantRepository } from "../repositories/__tests__/support/authz-managed-grant.stub.ts";
+import { makeReader } from "../repositories/__tests__/support/authz-read.stub.ts";
+import { AuthzService } from "../services/authz.service.ts";
+
+const ORG = "org-123";
+
+function makeService({ listing = new StubAuthzListingRepository() } = {}) {
+  return AuthzService.create({
+    isOnEngine: async () => true,
+    repository: makeReader(),
+    listing,
+    bindings: new StubAuthzManagedGrantRepository(),
+  });
+}
+
+describe("AuthzService custom role listing", () => {
+  describe("when the organization is not on an Enterprise plan", () => {
+    /** @scenario "Non-enterprise org can list custom roles" */
+    it("still returns the custom roles created while it was on Enterprise", async () => {
+      const mockRoles = [
+        {
+          id: "role-1",
+          name: "Data Analyst",
+          description: "Can view analytics and datasets",
+          permissions: ["analytics:view", "datasets:view"],
+          organizationId: ORG,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+        {
+          id: "role-2",
+          name: "Experiment Manager",
+          description: "Can manage experiments",
+          permissions: ["workflows:manage"],
+          organizationId: ORG,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+      ];
+      const listing = new StubAuthzListingRepository();
+      listing.findUserCreatedRoles.mockResolvedValue(mockRoles);
+
+      const service = makeService({ listing });
+
+      // Enterprise-plan gating on custom-role reads happens above this
+      // service, at the router boundary — the read-only listing itself is
+      // never plan-gated, so the service answers regardless of plan.
+      const result = await service.listUserCreatedRoles({ organizationId: ORG });
+
+      expect(result).toEqual(mockRoles);
+      expect(listing.findUserCreatedRoles).toHaveBeenCalledWith({ organizationId: ORG });
+    });
+  });
+});
+
+describe("AuthzService role permissions by id", () => {
+  it("passes the organization and ids through and reads a malformed permission set as granting nothing", async () => {
+    const listing = new StubAuthzListingRepository();
+    listing.findRolePermissionRows.mockResolvedValue([
+      { id: "role-key", name: "apikey:key-1", permissions: ["project:view"] },
+      { id: "role-bad", name: "broken", permissions: "project:view" },
+    ]);
+
+    const result = await makeService({ listing }).findRolePermissions({
+      organizationId: ORG,
+      roleIds: ["role-key", "role-bad"],
+    });
+
+    expect(result).toEqual([
+      { id: "role-key", name: "apikey:key-1", permissions: ["project:view"] },
+      { id: "role-bad", name: "broken", permissions: [] },
+    ]);
+    expect(listing.findRolePermissionRows).toHaveBeenCalledWith({
+      organizationId: ORG,
+      roleIds: ["role-key", "role-bad"],
+    });
+  });
+});

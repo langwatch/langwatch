@@ -17,6 +17,7 @@ Feature: CLI 402 license gate on /api/auth/cli/governance/*
     And alice is an org ADMIN of "acme" with a valid CLI device-flow access token
     And bob is an org ADMIN of "globex" with a valid CLI device-flow access token
 
+  @unit
   Scenario: GET /api/auth/cli/governance/status returns 402 for non-enterprise
     When alice's CLI calls `GET /api/auth/cli/governance/status`
     Then the response status is 402
@@ -29,35 +30,63 @@ Feature: CLI 402 license gate on /api/auth/cli/governance/*
       }
       """
 
+  @unit
   Scenario: GET /api/auth/cli/governance/ingest/sources returns 402 for non-enterprise
     When alice's CLI calls `GET /api/auth/cli/governance/ingest/sources`
     Then the response status is 402
     And the response body has `error: "payment_required"`
     And the response body has `upgrade_url` pointing at `/settings/subscription`
 
+  @unit
   Scenario: GET /api/auth/cli/governance/ingest/sources/:id/events returns 402 for non-enterprise
     Given an IngestionSource "src-123" exists in acme
     When alice's CLI calls `GET /api/auth/cli/governance/ingest/sources/src-123/events`
     Then the response status is 402
     And the response body has `error: "payment_required"`
 
+  @unit
   Scenario: GET /api/auth/cli/governance/ingest/sources/:id/health returns 402 for non-enterprise
     Given an IngestionSource "src-123" exists in acme
     When alice's CLI calls `GET /api/auth/cli/governance/ingest/sources/src-123/health`
     Then the response status is 402
     And the response body has `error: "payment_required"`
 
+  # The 401 is the framework's canonical refusal, not main's OAuth-shaped body (Alex, 2026-10-06,
+  # wire codes: the canonical envelope everywhere but the legacy-* families and the collector).
+  @unit
   Scenario: 401 fires before 402 — unauthenticated requests don't leak plan info
     When an anonymous CLI calls `GET /api/auth/cli/governance/status` with no Authorization header
     Then the response status is 401
-    And the response body has `error: "unauthorized"`
+    And the response body is the canonical missing-credentials refusal
     And the response body does NOT contain `payment_required`
 
+  @unit
+  Scenario: 402 fires before 403 — a non-enterprise member without the permission sees the plan refusal
+    Given carol is an org MEMBER of "acme" without `ingestionSources:view`, with a valid CLI device-flow access token
+    When carol's CLI calls `GET /api/auth/cli/governance/ingest/sources`
+    Then the response status is 402
+    And the response body has `error: "payment_required"`
+
+  @unit
+  Scenario: An enterprise member without the permission is refused in the CLI body
+    Given dave is an org MEMBER of "globex" without `ingestionSources:view`, with a valid CLI device-flow access token
+    When dave's CLI calls `GET /api/auth/cli/governance/ingest/sources`
+    Then the response status is 403
+    And the response body is:
+      """
+      {
+        "error": "forbidden",
+        "error_description": "Missing required permission 'ingestionSources:view' on this organization"
+      }
+      """
+
+  @unit
   Scenario: Enterprise org passes the gate cleanly
     When bob's CLI calls `GET /api/auth/cli/governance/status`
     Then the response status is 200
     And the response body has the org's setup-state OR-of-flags shape
 
+  @unit
   Scenario: CLI surfaces the upgrade URL in stderr on 402
     Given alice's CLI receives the 402 envelope from any governance endpoint
     When the CLI handles the GovernanceCliError

@@ -1,0 +1,534 @@
+/**
+ * The pure text rules behind the Postgres migration scanner: no imports, no
+ * I/O — the test reads the folders and passes the SQL in. Every finding carries
+ * its own fix, the way a lint message does. ADR-155.
+ */
+
+/** S9's floor and lock rules and W-01's foreign-key rule, held only above the rules marker. */
+export const FLOOR_AND_LOCK_RULES: ReadonlySet<string> = new Set([
+  "new-foreign-key",
+  "retirement-note-above-floor",
+  "contract-without-archive-note",
+  "set-not-null-on-populated-column",
+  "enum-recreated",
+  "unique-or-validated-constraint-on-existing-table",
+  "plain-index-on-existing-table",
+  "alter-column-type",
+]);
+
+/** The rules that keep the api serving through the upgrade (Alex, 2026-10-09), above the floor. */
+export const GRACEFUL_RULES: ReadonlySet<string> = new Set([
+  "inline-dml-on-existing-table",
+  "volatile-default-on-existing-table",
+  "several-alters-on-one-table",
+  "lock-timeout-above-ceiling",
+]);
+
+/** The runner's lock_timeout; a migration never waits longer for a lock. */
+export const LOCK_TIMEOUT_CEILING_MS = 2_000;
+
+/** One refusal: what is wrong, and what to write instead. */
+export interface MigrationFinding {
+  readonly migration: string;
+  readonly rule: string;
+  readonly problem: string;
+  readonly fix: string;
+}
+
+/** A migration as the scanner sees it: its sortable name and its whole SQL. */
+export interface MigrationSource {
+  readonly name: string;
+  readonly sql: string;
+}
+
+const RETIREMENT_MARKER = /--[ \t]*contract:[ \t]*retired in[ \t]+(\S+)/gi;
+
+const RETIREMENT_FIX =
+  "if the code stopped reading and writing it a full release ago, put " +
+  "`-- contract: retired in <release>` above the statement, naming the release that stopped " +
+  "using it; if it has not, ship that code first — a rollback to the previous image must " +
+  "still find its schema.";
+
+const ARCHIVE_NOTE = /^[ \t]*--[ \t]*archive:[ \t]*(?:none[ \t]*\(.+\)|(?!none\b)\S+)/im;
+
+const ARCHIVE_FIX =
+  "add `-- archive: <table>` naming each table the contract archives (archive-or-fail copies " +
+  "it into _retired_<table>_<release> before the drop), or `-- archive: none (<reason>)` " +
+  "when the dropped data has no value, for example an empty or derived column.";
+
+const RENAME_FIX =
+  "never rename in place: add the new name, backfill it, write both (or read both), switch " +
+  "the readers, then retire the old name under the removal rule. Each step is its own " +
+  "release, and every one of them has a way back.";
+
+/** Comment bodies blanked out, offsets preserved, so statements and markers never mix. */
+export function maskComments(sql: string): string {
+  let out = "";
+  let index = 0;
+  while (index < sql.length) {
+    if (sql.startsWith("--", index)) {
+      const newline = sql.indexOf("\n", index);
+      const stop = newline === -1 ? sql.length : newline;
+      out += " ".repeat(stop - index);
+      index = stop;
+      continue;
+    }
+    if (sql.startsWith("/*", index)) {
+      const close = sql.indexOf("*/", index + 2);
+      const stop = close === -1 ? sql.length : close + 2;
+      out += sql.slice(index, stop).replaceAll(/[^\n]/g, " ");
+      index = stop;
+      continue;
+    }
+    out += sql[index];
+    index += 1;
+  }
+  return out;
+}
+
+function retiredBefore(sql: string, statementOffset: number): boolean {
+  return [...sql.matchAll(RETIREMENT_MARKER)].some((match) => match.index < statementOffset);
+}
+
+type Finding = Omit<MigrationFinding, "migration">;
+
+/** `3.20.1`, `v3.20.1` or `langwatch@v3.20.1` as comparable numbers; null when it is no release. */
+export function parseRelease(text: string): [number, number, number] | null {
+  const match = /^(?:langwatch@)?v?(\d+)\.(\d+)\.(\d+)(?:[-+].*)?$/i.exec(text.trim());
+  return match ? [Number(match[1]), Number(match[2]), Number(match[3])] : null;
+}
+
+function releaseAtOrBelow({ release, floor }: { release: string; floor: string }): boolean {
+  const note = parseRelease(release);
+  const bound = parseRelease(floor);
+  if (!note || !bound) return false;
+  for (const [index, part] of note.entries()) {
+    if (part !== bound[index]) return part < bound[index]!;
+  }
+  return true;
+}
+
+function noteBefore(sql: string, statementOffset: number): string | undefined {
+  return [...sql.matchAll(RETIREMENT_MARKER)]
+    .filter((match) => match.index < statementOffset)
+    .at(-1)?.[1];
+}
+
+const IDENT = '(?:"[^"]+"|\\w+)(?:\\s*\\.\\s*(?:"[^"]+"|\\w+))?';
+
+/** `"public"."Project"` and `Project` both become `project`. */
+function bareName(identifier: string): string {
+  return identifier.replaceAll('"', "").split(".").at(-1)!.trim().toLowerCase();
+}
+
+function statementsOf(live: string): { text: string; offset: number }[] {
+  const out: { text: string; offset: number }[] = [];
+  let offset = 0;
+  for (const part of live.split(";")) {
+    if (part.trim().length > 0) {
+      out.push({ text: part, offset: offset + part.length - part.trimStart().length });
+    }
+    offset += part.length + 1;
+  }
+  return out;
+}
+
+/** Tables this migration creates are empty and unread, so locking rules leave them alone. */
+function createdTables(live: string): Set<string> {
+  const pattern = new RegExp(`\\bCREATE\\s+TABLE\\s+(?:IF\\s+NOT\\s+EXISTS\\s+)?(${IDENT})`, "gi");
+  return new Set([...live.matchAll(pattern)].map((match) => bareName(match[1]!)));
+}
+
+function alteredTable(statement: string): string | undefined {
+  const pattern = new RegExp(
+    `^\\s*ALTER\\s+TABLE\\s+(?:IF\\s+EXISTS\\s+)?(?:ONLY\\s+)?(${IDENT})`,
+    "i",
+  );
+  const match = pattern.exec(statement);
+  return match ? bareName(match[1]!) : undefined;
+}
+
+/** The ops pre-build note: a comment above it naming `INDEX CONCURRENTLY` and this index. */
+function hasPrebuildNote({ sql, offset, index }: { sql: string; offset: number; index: string }) {
+  const comments = [...sql.matchAll(/--[^\n]*|\/\*[\s\S]*?\*\//g)]
+    .filter((match) => match.index < offset)
+    .map((match) => match[0])
+    .join("\n");
+  return /INDEX\s+CONCURRENTLY/i.test(comments) && comments.includes(index);
+}
+
+function dropFindings({
+  sql,
+  live,
+  floor,
+}: {
+  sql: string;
+  live: string;
+  floor: string;
+}): Finding[] {
+  const pattern = /\bDROP\s+(COLUMN|TABLE|TYPE)\s+(?:IF\s+EXISTS\s+)?"?([\w.]+)"?/gi;
+  const first = [...live.matchAll(pattern)].find((match) => match[1]!.toUpperCase() !== "TYPE");
+  const unarchived: Finding[] =
+    first && !ARCHIVE_NOTE.test(sql)
+      ? [
+          {
+            rule: "contract-without-archive-note",
+            problem: `drops ${first[1]!.toLowerCase()} ${first[2]} with no archive note`,
+            fix: ARCHIVE_FIX,
+          },
+        ]
+      : [];
+  const retirements = [...live.matchAll(pattern)].flatMap((match): Finding[] => {
+    const what = `${match[1]!.toLowerCase()} ${match[2]}`;
+    if (!retiredBefore(sql, match.index)) {
+      return [
+        {
+          rule: "drop-without-retirement-note",
+          problem: `drops ${what} with no retirement note above it`,
+          fix: RETIREMENT_FIX,
+        },
+      ];
+    }
+    const release = noteBefore(sql, match.index)!;
+    if (releaseAtOrBelow({ release, floor })) return [];
+    const unparsed = parseRelease(release) === null;
+    return [
+      {
+        rule: "retirement-note-above-floor",
+        problem: unparsed
+          ? `drops ${what} under a note naming "${release}", which is not a release`
+          : `drops ${what} under a note naming ${release}, above the LTS floor ${floor}`,
+        fix: unparsed
+          ? "name the release that stopped using it as MAJOR.MINOR.PATCH, for example `-- contract: retired in 3.21.0`."
+          : `an installation on ${floor} still reads it, and the floor is the oldest release the ` +
+            `window promises to serve. Keep the ${match[1]!.toLowerCase()} until ` +
+            `packages/upgrade/releases/lts-floor.json names ${release} or later; the first ` +
+            `release cut after the floor reaches ${release} is the first one this drop may ship in.`,
+      },
+    ];
+  });
+  return [...retirements, ...unarchived];
+}
+
+function notNullFindings(live: string): Finding[] {
+  const pattern = /\bADD\s+COLUMN\s+(?:IF\s+NOT\s+EXISTS\s+)?"?(\w+)"?([^;]*)/gi;
+  return [...live.matchAll(pattern)]
+    .filter((match) => /\bNOT\s+NULL\b/i.test(match[2] ?? ""))
+    .filter((match) => !/\bDEFAULT\b/i.test(match[2] ?? ""))
+    .map((match) => ({
+      rule: "add-not-null-column-without-default",
+      problem: `adds NOT NULL column ${match[1]} with no DEFAULT`,
+      fix:
+        "give it a DEFAULT, or add it nullable now and set NOT NULL in a later release after a " +
+        "backfill — an INSERT from the image still serving does not name this column, and " +
+        "without a default every one of those inserts fails the moment the migration lands.",
+    }));
+}
+
+const SET_NOT_NULL_FIX =
+  "SET NOT NULL scans the table under ACCESS EXCLUSIVE, and a row the still-serving image " +
+  "inserts without the column then fails. A backfill beside it does not help: the old image " +
+  "writes nulls after it. Enforce it in the application, or add `CHECK (col IS NOT NULL) NOT " +
+  "VALID` and VALIDATE it in a later release, once every writer fills the column.";
+
+function setNotNullFindings({ live, created }: Scoped): Finding[] {
+  return statementsOf(live).flatMap(({ text }) => {
+    const table = alteredTable(text);
+    if (!table || created.has(table)) return [];
+    return [...text.matchAll(/\bALTER\s+COLUMN\s+"?(\w+)"?\s+SET\s+NOT\s+NULL/gi)].map((match) => ({
+      rule: "set-not-null-on-populated-column",
+      problem: `sets ${match[1]} NOT NULL on existing table ${table}`,
+      fix: SET_NOT_NULL_FIX,
+    }));
+  });
+}
+
+type Scoped = { live: string; created: Set<string> };
+
+function alterTypeFindings({ live, created }: Scoped): Finding[] {
+  return statementsOf(live).flatMap(({ text }) => {
+    const table = alteredTable(text);
+    if (!table || created.has(table)) return [];
+    return [
+      ...text.matchAll(/\bALTER\s+COLUMN\s+"?(\w+)"?\s+(?:SET\s+DATA\s+)?TYPE\s+(\S+)/gi),
+    ].map((match) => ({
+      rule: "alter-column-type",
+      problem: `changes the type of ${table}.${match[1]} to ${match[2]}`,
+      fix:
+        "a type change rewrites the table under ACCESS EXCLUSIVE while the previous image still " +
+        "reads and writes the old type. Add a column of the new type, backfill it, write both, " +
+        "switch the readers, then retire the old column under the removal rule.",
+    }));
+  });
+}
+
+function enumFindings(live: string): Finding[] {
+  const renamed = [
+    ...live.matchAll(
+      new RegExp(`\\bALTER\\s+TYPE\\s+(${IDENT})\\s+RENAME\\s+TO\\s+(${IDENT})`, "gi"),
+    ),
+  ].map((match) => ({
+    rule: "enum-recreated",
+    problem: `renames type ${match[1]} to ${match[2]}, the first step of recreating an enum`,
+    fix: ENUM_FIX,
+  }));
+  const dropped = new Set(
+    [...live.matchAll(/\bDROP\s+TYPE\s+(?:IF\s+EXISTS\s+)?([\w".]+)/gi)].map((match) =>
+      bareName(match[1]!),
+    ),
+  );
+  const recreated = [...live.matchAll(new RegExp(`\\bCREATE\\s+TYPE\\s+(${IDENT})`, "gi"))]
+    .filter((match) => dropped.has(bareName(match[1]!)))
+    .map((match) => ({
+      rule: "enum-recreated",
+      problem: `drops and recreates type ${match[1]}`,
+      fix: ENUM_FIX,
+    }));
+  return [...renamed, ...recreated];
+}
+
+const ENUM_FIX =
+  "recreating an enum rewrites every column using it and drops the values the previous image " +
+  "still writes. Add values with `ALTER TYPE ... ADD VALUE`; to remove one, stop writing it, " +
+  "migrate the rows in a later release and leave the value in the type (or add a new type " +
+  "and column and retire the old under the removal rule).";
+
+const CONSTRAINT_FIX =
+  "building a UNIQUE or PRIMARY KEY constraint, or validating a CHECK, scans " +
+  "the table under a lock and fails on a row the old image can still write. Pre-build the " +
+  "index CONCURRENTLY and attach it with `ADD CONSTRAINT ... USING INDEX`, or add the " +
+  "constraint `NOT VALID` and `VALIDATE CONSTRAINT` it as its own later step.";
+
+const INDEX_PATTERN = new RegExp(
+  `^\\s*CREATE\\s+(UNIQUE\\s+)?INDEX\\s+(CONCURRENTLY\\s+)?(?:IF\\s+NOT\\s+EXISTS\\s+)?(${IDENT})\\s+ON\\s+(?:ONLY\\s+)?(${IDENT})`,
+  "i",
+);
+
+const PREBUILD_FIX =
+  "an index build on an existing table blocks its writes for as long as it runs, and " +
+  "CONCURRENTLY cannot run inside Prisma's transaction. Put the ops pre-build note above the " +
+  "statement: a comment with `CREATE INDEX CONCURRENTLY IF NOT EXISTS` and the index name, as " +
+  "in 20261006120000_process_outbox_lease_by_process_index, so an operator builds it ahead.";
+
+function indexAndConstraintFindings({ sql, live, created }: Scoped & { sql: string }): Finding[] {
+  return statementsOf(live).flatMap(({ text, offset }): Finding[] => {
+    const index = INDEX_PATTERN.exec(text);
+    if (index) {
+      const [, unique, concurrently, name, table] = index;
+      const bare = name!.replaceAll('"', "");
+      if (concurrently || created.has(bareName(table!))) return [];
+      const noted = hasPrebuildNote({ sql, offset, index: bare });
+      if (noted) return [];
+      return [
+        unique
+          ? {
+              rule: "unique-or-validated-constraint-on-existing-table",
+              problem: `builds unique index ${name} on existing table ${bareName(table!)} with no ops pre-build note`,
+              fix: `${CONSTRAINT_FIX} A unique index may instead carry the ops pre-build note. ${PREBUILD_FIX}`,
+            }
+          : {
+              rule: "plain-index-on-existing-table",
+              problem: `builds index ${name} on existing table ${bareName(table!)} with no ops pre-build note`,
+              fix: PREBUILD_FIX,
+            },
+      ];
+    }
+    const table = alteredTable(text);
+    if (!table || created.has(table)) return [];
+    const pattern = /\bADD\s+(?:CONSTRAINT\s+"?\w+"?\s+)?(UNIQUE|PRIMARY\s+KEY|EXCLUDE|CHECK)\b/i;
+    const match = pattern.exec(text);
+    if (!match) return [];
+    const kind = match[1]!.toUpperCase().replace(/\s+/g, " ");
+    const safe = /^CHECK$/.test(kind)
+      ? /\bNOT\s+VALID\b/i.test(text)
+      : /\bUSING\s+INDEX\b/i.test(text);
+    if (safe) return [];
+    return [
+      {
+        rule: "unique-or-validated-constraint-on-existing-table",
+        problem: `adds a ${kind} constraint to existing table ${table} that is validated at once`,
+        fix: CONSTRAINT_FIX,
+      },
+    ];
+  });
+}
+
+const FOREIGN_KEY_FIX =
+  "no new foreign key: keep the reference a plain column with an index. " +
+  "The owning service deletes its dependents; another module's go by a fact and that " +
+  "module's purge subscriber. The postgres-migration skill shows the shape.";
+
+function foreignKeyFindings(live: string): Finding[] {
+  return statementsOf(live)
+    .filter(({ text }) => /\bFOREIGN\s+KEY\b|\bREFERENCES\s+[\w".]+\s*\(/i.test(text))
+    .map(({ text }) => {
+      const table = alteredTable(text) ?? [...createdTables(text)][0] ?? "a table";
+      return {
+        rule: "new-foreign-key",
+        problem: `adds a foreign key on ${table}`,
+        fix: FOREIGN_KEY_FIX,
+      };
+    });
+}
+
+function renameFindings(live: string): Finding[] {
+  const columns = [...live.matchAll(/\bRENAME\s+COLUMN\s+"?(\w+)"?\s+TO\s+"?(\w+)"?/gi)].map(
+    (match) => ({
+      rule: "rename-in-place",
+      problem: `renames column ${match[1]} to ${match[2]}`,
+      fix: RENAME_FIX,
+    }),
+  );
+  const tables = [
+    ...live.matchAll(
+      /\bALTER\s+TABLE\s+(?:IF\s+EXISTS\s+)?"?([\w.]+)"?\s+RENAME\s+TO\s+"?(\w+)"?/gi,
+    ),
+  ].map((match) => ({
+    rule: "rename-in-place",
+    problem: `renames table ${match[1]} to ${match[2]}`,
+    fix: RENAME_FIX,
+  }));
+  return [...columns, ...tables];
+}
+
+const DML = new RegExp(
+  `(?<!\\bDO\\s+)\\bUPDATE\\s+(?:ONLY\\s+)?(${IDENT})\\s+(?:AS\\s+)?(?:\\w+\\s+)?SET\\b|\\bDELETE\\s+FROM\\s+(?:ONLY\\s+)?(${IDENT})`,
+  "gi",
+);
+
+function inlineDmlFindings({ live, created }: Scoped): Finding[] {
+  return [...live.matchAll(DML)].flatMap((match): Finding[] => {
+    const table = bareName(match[1] ?? match[2]!);
+    if (created.has(table)) return [];
+    return [
+      {
+        rule: "inline-dml-on-existing-table",
+        problem: `${match[1] ? "updates" : "deletes from"} existing table ${table} inside the migration`,
+        fix:
+          "an UPDATE or DELETE locks every row it touches until it finishes, so the api's " +
+          "writes to those rows wait for the whole statement. Ship the change as a background step " +
+          "(defineMigrationStep, mode background) that works in batches with a checkpoint; " +
+          "the migration-data-step skill shows the shape.",
+      },
+    ];
+  });
+}
+
+const VOLATILE_DEFAULT =
+  /\bDEFAULT\s+\(?\s*(gen_random_uuid|uuid_generate_v\w+|random|clock_timestamp|timeofday|nextval)\s*\(/i;
+
+function volatileDefaultFindings({ live, created }: Scoped): Finding[] {
+  return statementsOf(live).flatMap(({ text }) => {
+    const table = alteredTable(text);
+    if (!table || created.has(table)) return [];
+    return text
+      .split(/\bADD\s+COLUMN\s+(?:IF\s+NOT\s+EXISTS\s+)?/i)
+      .slice(1)
+      .flatMap((column): Finding[] => {
+        const name = /^"?(\w+)"?/.exec(column)?.[1] ?? "a column";
+        const volatile =
+          VOLATILE_DEFAULT.exec(column)?.[1] ??
+          /^"?\w+"?\s+((?:SMALL|BIG)?SERIAL)\b/i.exec(column)?.[1];
+        if (!volatile) return [];
+        return [
+          {
+            rule: "volatile-default-on-existing-table",
+            problem: `adds ${table}.${name} with a volatile default (${volatile})`,
+            fix:
+              "a volatile default is computed per row, so Postgres rewrites the whole table under " +
+              "ACCESS EXCLUSIVE and every live read waits. Add the column nullable (or with a " +
+              "constant default), fill it with a background data step, and let the application " +
+              "set it on insert. now() and CURRENT_TIMESTAMP are stable, not volatile, and are fine.",
+          },
+        ];
+      });
+  });
+}
+
+function severalAltersFindings({ live, created }: Scoped): Finding[] {
+  const counts = new Map<string, number>();
+  for (const { text } of statementsOf(live)) {
+    const table = alteredTable(text);
+    if (table && !created.has(table)) counts.set(table, (counts.get(table) ?? 0) + 1);
+  }
+  return [...counts]
+    .filter(([, count]) => count > 1)
+    .map(([table, count]) => ({
+      rule: "several-alters-on-one-table",
+      problem: `alters existing table ${table} in ${count} statements`,
+      fix:
+        "each ALTER TABLE queues for ACCESS EXCLUSIVE and every live read on the table queues " +
+        "behind each wait in turn; one statement waits once. Write one ALTER TABLE with its " +
+        "actions separated by commas, or ship the others in later migrations.",
+    }));
+}
+
+const LOCK_TIMEOUT =
+  /\b(?:SET\s+(?:LOCAL\s+|SESSION\s+)?lock_timeout\s*(?:=|TO)\s*|set_config\s*\(\s*'lock_timeout'\s*,\s*)'?(\d+)\s*(ms|s|min|h)?'?/gi;
+const UNIT_MS: Record<string, number> = { ms: 1, s: 1_000, min: 60_000, h: 3_600_000 };
+
+function lockTimeoutFindings(live: string): Finding[] {
+  return [...live.matchAll(LOCK_TIMEOUT)].flatMap((match): Finding[] => {
+    const ms = Number(match[1]) * UNIT_MS[(match[2] ?? "ms").toLowerCase()]!;
+    if (ms > 0 && ms <= LOCK_TIMEOUT_CEILING_MS) return [];
+    return [
+      {
+        rule: "lock-timeout-above-ceiling",
+        problem:
+          ms === 0
+            ? "turns lock_timeout off"
+            : `sets lock_timeout to ${ms} ms, above the ${LOCK_TIMEOUT_CEILING_MS} ms ceiling`,
+        fix:
+          `the runner sets lock_timeout ${LOCK_TIMEOUT_CEILING_MS} ms and retries a migration a ` +
+          "lock cancelled; a longer wait queues every live read behind the lock the migration " +
+          "waits for. Remove the SET; if one lock cannot be had in time, split the migration so " +
+          "each one takes a single lock.",
+      },
+    ];
+  });
+}
+
+/**
+ * Every rule the Postgres scanner applies to one migration folder's SQL. `floor` is the
+ * LTS floor release: a retirement note must name a release at or below it.
+ */
+export function scanPostgresMigration({
+  name,
+  sql,
+  floor,
+}: MigrationSource & { floor: string }): MigrationFinding[] {
+  const live = maskComments(sql);
+  const created = createdTables(live);
+  return [
+    ...dropFindings({ sql, live, floor }),
+    ...notNullFindings(live),
+    ...setNotNullFindings({ live, created }),
+    ...alterTypeFindings({ live, created }),
+    ...enumFindings(live),
+    ...indexAndConstraintFindings({ sql, live, created }),
+    ...foreignKeyFindings(live),
+    ...renameFindings(live),
+    ...inlineDmlFindings({ live, created }),
+    ...volatileDefaultFindings({ live, created }),
+    ...severalAltersFindings({ live, created }),
+    ...lockTimeoutFindings(live),
+  ].map((finding) => ({ migration: name, ...finding }));
+}
+
+/** The committed baseline file: one migration name per line, `#` comments ignored. */
+export function parseBaseline(text: string): string[] {
+  return text
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0 && !line.startsWith("#"));
+}
+
+/** The findings, as the failing test prints them. */
+export function formatFindings(findings: readonly MigrationFinding[]): string {
+  return findings
+    .map(
+      (finding) =>
+        `${finding.migration}\n  ${finding.rule}: ${finding.problem}\n    fix: ${finding.fix}`,
+    )
+    .join("\n\n");
+}

@@ -4,7 +4,7 @@ Feature: Developer seat
   I want a Developer seat that gives a person their own project and nothing shared
   So that developers can send traces today without using a capped seat
 
-  # Design record: dev/docs/adr/143-developer-seat.md (Accepted).
+  # Design record: dev/docs/adr/171-developer-seat.md (Accepted).
   # A Developer owns a personal project, may act inside it (CLI, queries,
   # evaluations), never sees a shared project, is counted but never capped,
   # and may be downgraded from a Full seat. One organisation setting decides

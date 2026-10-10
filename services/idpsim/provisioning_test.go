@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
 	"strings"
 	"sync"
 	"testing"
@@ -67,11 +66,15 @@ func (f *fakeServiceProvider) seen() ([]string, []string) {
 	return append([]string(nil), f.requests...), append([]string(nil), f.tokens...)
 }
 
-func postForm(t *testing.T, s *Server, path string, form url.Values) *httptest.ResponseRecorder {
-	t.Helper()
-	req := httptest.NewRequest(http.MethodPost, testBase+path, strings.NewReader(form.Encode()))
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	return do(s, req)
+// connectFromPage sends the tenant page's connection fields.
+func connectFromPage(s *Server, target, token string) *httptest.ResponseRecorder {
+	body, _ := json.Marshal(map[string]string{"target": target, "token": token})
+	return apiRequest(s, http.MethodPut, "/api/t/1/provisioning", string(body))
+}
+
+// press is one of the page's provisioning buttons: push, pull or sync.
+func press(s *Server, action string) *httptest.ResponseRecorder {
+	return apiRequest(s, http.MethodPost, "/api/t/1/provisioning/"+action, "")
 }
 
 // connect points tenant 1 at a service provider through the control API.
@@ -100,21 +103,12 @@ func TestProvisioningConnect(t *testing.T) {
 	tenant, _ := s.Tenant(1)
 	const token = "langwatch-scim-token-thirty-two-plus"
 
-	// renderPage swallows template errors, which on a half-rendered page looks
-	// like a missing panel rather than a fault — so the unconnected page is
-	// checked for the form and for having run to the end.
-	before := do(s, httptest.NewRequest(http.MethodGet, testBase+"/t/1/", nil))
-	require.Equal(t, http.StatusOK, before.Code)
-	assert.Contains(t, before.Body.String(), "Provision into LangWatch")
-	assert.Contains(t, before.Body.String(), `action="`+tenant.BaseURL+`/provisioning"`)
-	assert.True(t, strings.HasSuffix(strings.TrimSpace(before.Body.String()), "</html>"))
+	before := getJSON(t, s, "/api/t/1")
+	assert.Equal(t, false, before["provisioning"].(map[string]any)["configured"])
 
 	// The endpoint somebody was last looking at works as well as the base.
-	rec := postForm(t, s, "/t/1/provisioning", url.Values{
-		"target": {"https://app.example.langwatch.localhost/api/scim/v2/Users"},
-		"token":  {token},
-	})
-	require.Equal(t, http.StatusSeeOther, rec.Code, rec.Body.String())
+	rec := connectFromPage(s, "https://app.example.langwatch.localhost/api/scim/v2/Users", token)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 
 	assert.Equal(t, ProvisioningTarget{
 		BaseURL: "https://app.example.langwatch.localhost/api/scim/v2", Token: token,
@@ -126,14 +120,11 @@ func TestProvisioningConnect(t *testing.T) {
 	assert.NotEqual(t, token, shown, "the whole token is not ours to hand back")
 	assert.Contains(t, shown, token[:6], "enough of it to tell which one was pasted")
 
-	page := do(s, httptest.NewRequest(http.MethodGet, testBase+"/t/1/", nil))
+	page := do(s, httptest.NewRequest(http.MethodGet, testBase+"/api/t/1", nil))
 	assert.Contains(t, page.Body.String(), "app.example.langwatch.localhost/api/scim/v2")
 	assert.NotContains(t, page.Body.String(), token)
-	assert.True(t, strings.HasSuffix(strings.TrimSpace(page.Body.String()), "</html>"))
 
-	refused := postForm(t, s, "/t/1/provisioning", url.Values{
-		"target": {"app.example.langwatch.localhost"}, "token": {token},
-	})
+	refused := connectFromPage(s, "app.example.langwatch.localhost", token)
 	assert.Equal(t, http.StatusBadRequest, refused.Code)
 	assert.Contains(t, refused.Body.String(), "not an address this tenant can reach")
 	assert.Equal(t, "https://app.example.langwatch.localhost/api/scim/v2",
@@ -145,16 +136,12 @@ func TestProvisioningRefusesTheTenantsOwnToken(t *testing.T) {
 	s := newTestServer(t, 1)
 	tenant, _ := s.Tenant(1)
 
-	rec := postForm(t, s, "/t/1/provisioning", url.Values{
-		"target": {"https://app.example.langwatch.localhost/api/scim/v2"},
-		"token":  {tenant.SCIMToken},
-	})
+	rec := connectFromPage(s, "https://app.example.langwatch.localhost/api/scim/v2", tenant.SCIMToken)
 	require.Equal(t, http.StatusBadRequest, rec.Code)
-	body := rec.Body.String()
-	// The page HTML-escapes apostrophes, so the assertions take the halves
-	// without one rather than the escape sequence.
-	assert.Contains(t, body, "token, not LangWatch")
-	assert.Contains(t, body, "guards the simulator")
+	var notice refusalNotice
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &notice))
+	assert.Equal(t, "That is this tenant's token, not LangWatch's", notice.Title)
+	assert.Contains(t, notice.Detail, "guards the simulator")
 	assert.False(t, tenant.Provisioning().Configured())
 }
 
@@ -166,8 +153,8 @@ func TestProvisioningPushUsesTheConnection(t *testing.T) {
 	target := (&fakeServiceProvider{}).start(t)
 	connect(t, s, target.URL+"/scim/v2", "langwatch-scim-token-thirty-two-plus")
 
-	rec := postForm(t, s, "/t/1/provisioning/push", nil)
-	require.Equal(t, http.StatusSeeOther, rec.Code, rec.Body.String())
+	rec := press(s, "push")
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 
 	outcome := tenant.LastProvisioning()
 	require.NotNil(t, outcome)
@@ -192,8 +179,8 @@ func TestProvisioningReadBack(t *testing.T) {
 	target := provider.start(t)
 	connect(t, s, target.URL+"/scim/v2", "langwatch-scim-token-thirty-two-plus")
 
-	require.Equal(t, http.StatusSeeOther, postForm(t, s, "/t/1/provisioning/push", nil).Code)
-	require.Equal(t, http.StatusSeeOther, postForm(t, s, "/t/1/provisioning/pull", nil).Code)
+	require.Equal(t, http.StatusOK, press(s, "push").Code)
+	require.Equal(t, http.StatusOK, press(s, "pull").Code)
 
 	outcome := tenant.LastProvisioning()
 	require.NotNil(t, outcome)
@@ -211,7 +198,7 @@ func TestProvisioningReadBack(t *testing.T) {
 	provider.mu.Lock()
 	provider.refuse = true
 	provider.mu.Unlock()
-	require.Equal(t, http.StatusSeeOther, postForm(t, s, "/t/1/provisioning/pull", nil).Code)
+	require.Equal(t, http.StatusOK, press(s, "pull").Code)
 	refusedOutcome := tenant.LastProvisioning()
 	require.NotNil(t, refusedOutcome)
 	assert.True(t, refusedOutcome.Refused)

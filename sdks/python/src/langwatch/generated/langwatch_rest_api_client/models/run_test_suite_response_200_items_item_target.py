@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from attrs import define as _attrs_define
-from attrs import field as _attrs_field
 
 from ..models.run_test_suite_response_200_items_item_target_type import RunTestSuiteResponse200ItemsItemTargetType
 from ..types import UNSET, Unset
@@ -12,6 +11,9 @@ from ..types import UNSET, Unset
 if TYPE_CHECKING:
     from ..models.run_test_suite_response_200_items_item_target_run_parameters import (
         RunTestSuiteResponse200ItemsItemTargetRunParameters,
+    )
+    from ..models.run_test_suite_response_200_items_item_target_scenario_mappings import (
+        RunTestSuiteResponse200ItemsItemTargetScenarioMappings,
     )
 
 
@@ -23,40 +25,50 @@ class RunTestSuiteResponse200ItemsItemTarget:
     """What it was run against.
 
     Attributes:
-        type_ (RunTestSuiteResponse200ItemsItemTargetType): What kind of thing the scenarios run against. A connected
-            agent is one registered from code with the SDK.
-        reference_id (str): The id of the prompt, agent or workflow to run against. A connected target may also say
-            <name>@<environment>, for example support-agent@production, which resolves to the agent id.
-        run_parameters (RunTestSuiteResponse200ItemsItemTargetRunParameters | Unset): Parameter values this target alone
-            runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name
-            the same agent with different values: that is how one run compares one agent on two models, and the results show
-            one column for each target.
+        type_ (RunTestSuiteResponse200ItemsItemTargetType):
+        reference_id (str):
+        scenario_mappings (RunTestSuiteResponse200ItemsItemTargetScenarioMappings | Unset):
+        run_parameters (RunTestSuiteResponse200ItemsItemTargetRunParameters | Unset):
+        run_secret_parameter_names (list[str] | Unset):
     """
 
     type_: RunTestSuiteResponse200ItemsItemTargetType
     reference_id: str
+    scenario_mappings: RunTestSuiteResponse200ItemsItemTargetScenarioMappings | Unset = UNSET
     run_parameters: RunTestSuiteResponse200ItemsItemTargetRunParameters | Unset = UNSET
-    additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
+    run_secret_parameter_names: list[str] | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         type_ = self.type_.value
 
         reference_id = self.reference_id
 
+        scenario_mappings: dict[str, Any] | Unset = UNSET
+        if not isinstance(self.scenario_mappings, Unset):
+            scenario_mappings = self.scenario_mappings.to_dict()
+
         run_parameters: dict[str, Any] | Unset = UNSET
         if not isinstance(self.run_parameters, Unset):
             run_parameters = self.run_parameters.to_dict()
 
+        run_secret_parameter_names: list[str] | Unset = UNSET
+        if not isinstance(self.run_secret_parameter_names, Unset):
+            run_secret_parameter_names = self.run_secret_parameter_names
+
         field_dict: dict[str, Any] = {}
-        field_dict.update(self.additional_properties)
+
         field_dict.update(
             {
                 "type": type_,
                 "referenceId": reference_id,
             }
         )
+        if scenario_mappings is not UNSET:
+            field_dict["scenarioMappings"] = scenario_mappings
         if run_parameters is not UNSET:
             field_dict["runParameters"] = run_parameters
+        if run_secret_parameter_names is not UNSET:
+            field_dict["runSecretParameterNames"] = run_secret_parameter_names
 
         return field_dict
 
@@ -65,11 +77,21 @@ class RunTestSuiteResponse200ItemsItemTarget:
         from ..models.run_test_suite_response_200_items_item_target_run_parameters import (
             RunTestSuiteResponse200ItemsItemTargetRunParameters,
         )
+        from ..models.run_test_suite_response_200_items_item_target_scenario_mappings import (
+            RunTestSuiteResponse200ItemsItemTargetScenarioMappings,
+        )
 
         d = dict(src_dict)
         type_ = RunTestSuiteResponse200ItemsItemTargetType(d.pop("type"))
 
         reference_id = d.pop("referenceId")
+
+        _scenario_mappings = d.pop("scenarioMappings", UNSET)
+        scenario_mappings: RunTestSuiteResponse200ItemsItemTargetScenarioMappings | Unset
+        if isinstance(_scenario_mappings, Unset):
+            scenario_mappings = UNSET
+        else:
+            scenario_mappings = RunTestSuiteResponse200ItemsItemTargetScenarioMappings.from_dict(_scenario_mappings)
 
         _run_parameters = d.pop("runParameters", UNSET)
         run_parameters: RunTestSuiteResponse200ItemsItemTargetRunParameters | Unset
@@ -78,27 +100,14 @@ class RunTestSuiteResponse200ItemsItemTarget:
         else:
             run_parameters = RunTestSuiteResponse200ItemsItemTargetRunParameters.from_dict(_run_parameters)
 
+        run_secret_parameter_names = cast(list[str], d.pop("runSecretParameterNames", UNSET))
+
         run_test_suite_response_200_items_item_target = cls(
             type_=type_,
             reference_id=reference_id,
+            scenario_mappings=scenario_mappings,
             run_parameters=run_parameters,
+            run_secret_parameter_names=run_secret_parameter_names,
         )
 
-        run_test_suite_response_200_items_item_target.additional_properties = d
         return run_test_suite_response_200_items_item_target
-
-    @property
-    def additional_keys(self) -> list[str]:
-        return list(self.additional_properties.keys())
-
-    def __getitem__(self, key: str) -> Any:
-        return self.additional_properties[key]
-
-    def __setitem__(self, key: str, value: Any) -> None:
-        self.additional_properties[key] = value
-
-    def __delitem__(self, key: str) -> None:
-        del self.additional_properties[key]
-
-    def __contains__(self, key: str) -> bool:
-        return key in self.additional_properties

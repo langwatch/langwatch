@@ -16,7 +16,7 @@ Feature: Persona-aware home resolver
   Plus an override: `User.lastHomePath` (when explicitly set by user pinning).
 
   Spec scope: the resolver function contract and its 4 personas. Implementation
-  in `platform/app/src/server/governance/personaResolver.service.ts`. UI plumbing
+  in `enterprise/modules/governance/contract/src/persona-home.ts`. UI plumbing
   in `pages/index.tsx` via the existing client-side hook + redirect pattern
   (the Vite SPA architecture rarely uses `getServerSideProps`; the tRPC
   procedure `api.governance.resolveHome` runs the resolver server-side).
@@ -29,6 +29,7 @@ Feature: Persona-aware home resolver
   # Persona 1 — Personal-only (just CLI users)
   # ---------------------------------------------------------------------------
 
+  @unit
   Scenario: Personal-only user → /me
     Given user "jane@acme.com" has a personal VirtualKey
     And the user belongs to no projects (no ProjectMember rows)
@@ -41,6 +42,7 @@ Feature: Persona-aware home resolver
   # Persona 2 — Mixed (personal + project)
   # ---------------------------------------------------------------------------
 
+  @unit
   Scenario: User has personal VK + project membership → /me with WorkspaceSwitcher flip available
     Given user "alex@acme.com" has a personal VirtualKey
     And the user is a member of project "alex-team-prod" (has ProjectMember row)
@@ -53,6 +55,7 @@ Feature: Persona-aware home resolver
   # Persona 3 — Project-only LLMOps (the existing customer majority — DO NOT BREAK)
   # ---------------------------------------------------------------------------
 
+  @unit
   Scenario: Existing LLMOps customer with no governance + no personal-VK → /[project]
     Given user "ben@acme.com" has NO personal VirtualKey
     And the user is a member of project "ben-team-prod"
@@ -63,6 +66,7 @@ Feature: Persona-aware home resolver
     And the destination matches Persona 3 (project-only LLMOps)
     And the resolver chose the user's first ProjectMember.project as the projectSlug
 
+  @unit
   Scenario: Org admin with no governance state stays on project (does not jump to /governance)
     Given user "carol@acme.com" has the "organization:manage" permission
     And the user is on the Enterprise plan
@@ -79,6 +83,7 @@ Feature: Persona-aware home resolver
   # Persona 4 — Super-admin governance
   # ---------------------------------------------------------------------------
 
+  @unit
   Scenario: Org admin on Enterprise plan with governance ingest active → /governance
     Given user "carol@acme.com" has the "organization:manage" permission
     And the user is on the Enterprise plan
@@ -97,6 +102,7 @@ Feature: Persona-aware home resolver
   # project home, the pre-governance LLMOps experience. An explicit user pin is
   # the exception: it could only have been set while the surface was reachable.
 
+  @unit
   Scenario: Personal-VK user in a non-governance org → project home, not /me
     Given user "jane@acme.com" has a personal VirtualKey
     And the user is a member of project "jane-team-prod"
@@ -105,6 +111,7 @@ Feature: Persona-aware home resolver
     Then the resolver returns "/<projectSlug>"
     And NOT "/me"
 
+  @unit
   Scenario: Would-be governance admin in a non-governance org → project home, not /governance
     Given user "carol@acme.com" has the "organization:manage" permission
     And the user is on the Enterprise plan
@@ -115,6 +122,7 @@ Feature: Persona-aware home resolver
     Then the resolver returns "/<projectSlug>"
     And NOT "/governance"
 
+  @unit
   Scenario: Non-governance org member with no projects → onboarding, not the gated /me
     Given user "dave@acme.com" belongs to no projects (no ProjectMember rows)
     But the org does not have the governance UI enabled
@@ -127,6 +135,7 @@ Feature: Persona-aware home resolver
   # User override
   # ---------------------------------------------------------------------------
 
+  @unit
   Scenario: A user-pinned lastHomePath wins over persona detection
     Given user "alex@acme.com" matches Persona 2 (mixed)
     And the user has explicitly pinned `User.lastHomePath = "/<projectSlug>"`
@@ -139,6 +148,7 @@ Feature: Persona-aware home resolver
   # Fail-safe behaviour
   # ---------------------------------------------------------------------------
 
+  @unit
   Scenario: setupState query failure → resolver falls back to default project home
     Given the api.governance.setupState query throws on resolve
     And the user is a member of at least one project
@@ -147,6 +157,7 @@ Feature: Persona-aware home resolver
     And the resolver does NOT crash
     And the LLMOps majority experience is preserved on transient backend errors
 
+  @unit
   Scenario: User has no project membership AND setupState fails → resolver falls back to /me
     Given the api.governance.setupState query throws on resolve
     And the user belongs to no projects
@@ -159,6 +170,8 @@ Feature: Persona-aware home resolver
   # Integration with `pages/index.tsx`
   # ---------------------------------------------------------------------------
 
+  # Gap: landing.screen.integration.test.tsx proves the replace to the resolver destination, not the LoadingScreen or the absence of any other home.
+  @unimplemented
   Scenario: Authenticated user hits / → client-side query + redirect to resolver destination
     Given a user is authenticated
     And `api.governance.resolveHome` returns a destination path
@@ -168,11 +181,19 @@ Feature: Persona-aware home resolver
     And the client `router.replace`s to the resolver destination
     And no other home is rendered before the redirect
 
+  # Gap: no test covers the signed-out root address.
+  @unimplemented
   Scenario: Unauthenticated user hits / → existing /signin redirect, resolver does not run
     Given a user is not authenticated
     When the user navigates to "/"
     Then the existing signin redirect chain runs
     And the resolver does not execute
+
+  @unit
+  Scenario: The resolution carries the same project slug it routed with
+    Given the resolver is called with a caller-supplied firstProjectSlug
+    When it resolves a destination for any persona
+    Then the result echoes back the same firstProjectSlug the caller supplied
 
   # Client-side "/" landing is covered by specs/navigation/navigation-v2-landing.feature.
   # The device's per-organization product memory decides ahead of the server

@@ -1,0 +1,367 @@
+import { Link } from "@langwatch/browser-host/link";
+import { FormattedDate } from "@langwatch/design-system/formatted-date";
+import { ListPageSkeleton } from "@langwatch/design-system/list-page";
+import {
+  Badge,
+  Alert,
+  Box,
+  Button,
+  Card,
+  Center,
+  HStack,
+  Progress,
+  Status,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
+import { CompactStat } from "@langwatch/design-system/stat-tile";
+import { HandledErrorAlert } from "@langwatch/error-views";
+import type { ReplayHistoryEntry, ReplayStatus } from "@langwatch/ops-contract";
+import { nowInstant, toEpochMs } from "@langwatch/time";
+import { ArrowLeft } from "lucide-react";
+
+import { api } from "../../../../behavior/ops-api.ts";
+import { useOpsPermission } from "../../../../behavior/ops-session.ts";
+import { formatDuration } from "../../../../model/ops-formatters.ts";
+import { useReplayStatus } from "../../behavior/use-replay-status.ts";
+import { parseActiveProjections } from "../../model/replay-presentation.ts";
+import { CowboyAnimation } from "../elements/cowboy-animation.tsx";
+import { PhaseTimeline } from "../elements/phase-timeline.tsx";
+import { replayStateColor } from "../elements/replay-state-badge.tsx";
+
+export function ReplayProgressContent({ runId }: { runId: string }) {
+  const statusQuery = useReplayStatus();
+  const historyQuery = api.ops.getReplayRun.useQuery({ runId });
+  const cancelMutation = api.ops.cancelReplay.useMutation({
+    onSuccess: () => {
+      void statusQuery.refetch();
+    },
+  });
+
+  const { hasAccess } = useOpsPermission();
+
+  const liveStatus = statusQuery.data;
+  const historyEntry = historyQuery.data;
+
+  // Use live status when it matches this run, otherwise fall back to history
+  const isLiveRun = liveStatus?.runId === runId && liveStatus.state !== "idle";
+  const isRunning = isLiveRun && liveStatus?.state === "running";
+
+  const stateColor = replayStateColor(
+    isLiveRun ? (liveStatus?.state ?? "idle") : (historyEntry?.state ?? "idle"),
+  );
+
+  const progressPercent =
+    isLiveRun && liveStatus && liveStatus.aggregatesTotal > 0
+      ? Math.round((liveStatus.aggregatesProcessed / liveStatus.aggregatesTotal) * 100)
+      : 0;
+
+  const isLoading = statusQuery.isLoading || historyQuery.isLoading;
+  const hasData = isLiveRun || historyEntry;
+
+  return (
+    <VStack align="stretch" gap={4}>
+      <HStack marginBottom={4}>
+        <Link href="/ops/projections" _hover={{ textDecoration: "none" }}>
+          <HStack gap={1} color="fg.muted" _hover={{ color: "fg" }}>
+            <ArrowLeft size={14} />
+            <Text textStyle="xs">Back to Projections</Text>
+          </HStack>
+        </Link>
+      </HStack>
+
+      {isLoading && !hasData && <ListPageSkeleton label="Loading replay progress" />}
+      {(historyQuery.isError || statusQuery.isError) && (
+        <HandledErrorAlert
+          error={historyQuery.error ?? statusQuery.error}
+          fallbackTitle={
+            hasData
+              ? "Replay progress could not refresh; showing the last snapshot"
+              : "Replay progress could not load"
+          }
+        />
+      )}
+
+      {!isLoading && !hasData && !historyQuery.isError && !statusQuery.isError && (
+        <Center paddingY={20}>
+          <VStack gap={2}>
+            <Text textStyle="sm" color="fg.muted">
+              No replay found for this run ID.
+            </Text>
+            <Link href="/ops/projections">
+              <Button size="sm" variant="outline">
+                Back to Projections
+              </Button>
+            </Link>
+          </VStack>
+        </Center>
+      )}
+
+      {hasData && isLiveRun && liveStatus && (
+        <LiveRunView
+          status={liveStatus}
+          stateColor={stateColor}
+          progressPercent={progressPercent}
+          isRunning={!!isRunning}
+          hasAccess={hasAccess}
+          cancelMutation={cancelMutation}
+        />
+      )}
+
+      {hasData && !isLiveRun && historyEntry && (
+        <HistoricalRunView entry={historyEntry} stateColor={stateColor} />
+      )}
+    </VStack>
+  );
+}
+
+function LiveRunView({
+  status,
+  stateColor,
+  progressPercent,
+  isRunning,
+  hasAccess,
+  cancelMutation,
+}: {
+  status: ReplayStatus;
+  stateColor: string;
+  progressPercent: number;
+  isRunning: boolean;
+  hasAccess: boolean;
+  cancelMutation: { isPending: boolean; mutate: () => void };
+}) {
+  const activeProjectionNames = parseActiveProjections(status.currentProjection);
+  const activeProjections = new Set(activeProjectionNames);
+
+  return (
+    <VStack align="stretch" gap={4}>
+      {/* Phase timeline */}
+      <PhaseTimeline
+        currentPhase={status.currentPhase}
+        completedState={!isRunning ? (status.state as "completed" | "failed" | "cancelled") : null}
+      />
+
+      <ReplayStatBar status={status} />
+
+      {/* Progress bar */}
+      {isRunning && status.aggregatesTotal > 0 && (
+        <VStack align="stretch" gap={1}>
+          <Progress.Root size="sm" value={progressPercent} colorPalette="orange">
+            <Progress.Track>
+              <Progress.Range />
+            </Progress.Track>
+          </Progress.Root>
+          <Text textStyle="xs" color="fg.muted" textAlign="end">
+            {progressPercent}%
+          </Text>
+        </VStack>
+      )}
+
+      {/* Status card with compact cowboy */}
+      <Card.Root variant="outline">
+        <Card.Body padding={4}>
+          <VStack align="stretch" gap={3}>
+            <HStack justify="space-between" wrap="wrap">
+              <HStack gap={2}>
+                <Status.Root colorPalette={stateColor}>
+                  <Status.Indicator />
+                </Status.Root>
+                <Text textStyle="sm" fontWeight="semibold">
+                  Replay {status.state === "running" ? "in progress" : status.state}
+                </Text>
+                {activeProjectionNames.length > 0 && isRunning && (
+                  <Badge size="sm" variant="subtle">
+                    {activeProjectionNames.length === 1
+                      ? activeProjectionNames[0]
+                      : `${activeProjectionNames.length} projections`}
+                  </Badge>
+                )}
+              </HStack>
+              {isRunning && hasAccess && (
+                <Button
+                  size="sm"
+                  colorPalette="red"
+                  variant="outline"
+                  loading={cancelMutation.isPending}
+                  onClick={() => cancelMutation.mutate()}
+                >
+                  Cancel Replay
+                </Button>
+              )}
+            </HStack>
+
+            {status.description && (
+              <Text textStyle="xs" color="fg.muted">
+                {status.description}
+              </Text>
+            )}
+
+            {status.state === "failed" && status.error && (
+              <Alert.Root status="error">
+                <Alert.Indicator />
+                <Alert.Content>
+                  <Alert.Title>Replay failed</Alert.Title>
+                  <Alert.Description overflowWrap="anywhere">{status.error}</Alert.Description>
+                </Alert.Content>
+              </Alert.Root>
+            )}
+
+            {status.startedAt && status.userName && (
+              <Text textStyle="xs" color="fg.muted">
+                Started by {status.userName}
+              </Text>
+            )}
+
+            <HStack gap={2} flexWrap="wrap">
+              {status.projectionNames.map((name) => (
+                <Badge
+                  key={name}
+                  size="sm"
+                  variant={isRunning && activeProjections.has(name) ? "solid" : "subtle"}
+                  colorPalette={isRunning && activeProjections.has(name) ? "orange" : "gray"}
+                >
+                  {name}
+                </Badge>
+              ))}
+            </HStack>
+
+            {/* Compact cowboy animation */}
+            {isRunning && (
+              <Center overflow="hidden" maxHeight="60px">
+                <Box transform="scale(0.75)" transformOrigin="center">
+                  <CowboyAnimation phase={status.currentPhase} />
+                </Box>
+              </Center>
+            )}
+          </VStack>
+        </Card.Body>
+      </Card.Root>
+    </VStack>
+  );
+}
+
+function HistoricalRunView({
+  entry,
+  stateColor,
+}: {
+  entry: ReplayHistoryEntry;
+  stateColor: string;
+}) {
+  return (
+    <VStack align="stretch" gap={4}>
+      {/* Phase timeline — all done for completed, none for failed */}
+      <PhaseTimeline currentPhase={null} completedState={entry.state} />
+
+      {/* Status card */}
+      <Card.Root variant="outline">
+        <Card.Body padding={4}>
+          <VStack align="stretch" gap={3}>
+            <HStack gap={2}>
+              <Status.Root colorPalette={stateColor}>
+                <Status.Indicator />
+              </Status.Root>
+              <Text textStyle="sm" fontWeight="semibold">
+                Replay {entry.state}
+              </Text>
+            </HStack>
+
+            {entry.description && (
+              <Text textStyle="xs" color="fg.muted">
+                {entry.description}
+              </Text>
+            )}
+
+            <HStack gap={4} flexWrap="wrap">
+              <Text textStyle="xs" color="fg.muted">
+                {entry.aggregatesProcessed.toLocaleString()} aggregates
+              </Text>
+              <Text textStyle="xs" color="fg.muted">
+                {entry.eventsProcessed.toLocaleString()} events
+              </Text>
+              <Text textStyle="xs" color="fg.muted">
+                Duration: {formatDuration(entry.startedAt, entry.completedAt)}
+              </Text>
+              {entry.completedAt && (
+                <Text textStyle="xs" color="fg.muted">
+                  {entry.state === "completed" ? "Completed" : "Ended"} at{" "}
+                  <FormattedDate value={entry.completedAt} />
+                </Text>
+              )}
+              {entry.userName && (
+                <Text textStyle="xs" color="fg.muted">
+                  Started by {entry.userName}
+                </Text>
+              )}
+            </HStack>
+
+            {entry.state === "failed" && entry.error && (
+              <Alert.Root status="error">
+                <Alert.Indicator />
+                <Alert.Content>
+                  <Alert.Title>Replay failed</Alert.Title>
+                  <Alert.Description overflowWrap="anywhere">{entry.error}</Alert.Description>
+                </Alert.Content>
+              </Alert.Root>
+            )}
+
+            <HStack gap={2} flexWrap="wrap">
+              {entry.projectionNames.map((name) => (
+                <Badge key={name} size="sm" variant="subtle">
+                  {name}
+                </Badge>
+              ))}
+            </HStack>
+
+            {entry.tenantIds.length > 0 && (
+              <VStack align="stretch" gap={1}>
+                <Text textStyle="xs" color="fg.muted">
+                  Tenants
+                </Text>
+                <HStack gap={1} flexWrap="wrap">
+                  {entry.tenantIds.map((id) => (
+                    <Badge key={id} size="xs" variant="outline">
+                      {id}
+                    </Badge>
+                  ))}
+                </HStack>
+              </VStack>
+            )}
+          </VStack>
+        </Card.Body>
+      </Card.Root>
+    </VStack>
+  );
+}
+
+/** Aggregates, events, throughput and elapsed time of one replay run. */
+function ReplayStatBar({ status }: { status: ReplayStatus }) {
+  const throughputRate = (() => {
+    if (!status.startedAt || !status.eventsProcessed) return null;
+    const end = status.completedAt ? toEpochMs(status.completedAt) : nowInstant().epochMilliseconds;
+    const elapsed = (end - toEpochMs(status.startedAt)) / 1000;
+    if (elapsed < 1) return null;
+    return Math.round(status.eventsProcessed / elapsed);
+  })();
+
+  return (
+    <Card.Root variant="subtle">
+      <Card.Body>
+        <HStack gap={6} wrap="wrap">
+          <CompactStat
+            label="Aggregates"
+            value={`${status.aggregatesProcessed.toLocaleString()}${status.aggregatesTotal > 0 ? ` / ${status.aggregatesTotal.toLocaleString()}` : ""}`}
+          />
+          <CompactStat label="Events" value={status.eventsProcessed.toLocaleString()} />
+          <CompactStat
+            label="Events/s"
+            value={throughputRate !== null ? throughputRate.toLocaleString() : "—"}
+          />
+          <CompactStat
+            label="Elapsed"
+            value={status.startedAt ? formatDuration(status.startedAt, status.completedAt) : "—"}
+          />
+        </HStack>
+      </Card.Body>
+    </Card.Root>
+  );
+}

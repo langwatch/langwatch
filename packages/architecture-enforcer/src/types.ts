@@ -1,0 +1,73 @@
+export type FeaturePackageRole = "contract" | "process" | "browser";
+
+export type ApplicationPackageRole = "ui" | "api" | "worker" | "server" | "tasks" | "backend";
+
+export type EnterpriseCompositionRole = "api" | "worker";
+
+export type FeatureClassification = "core" | "enterprise";
+
+export type FeatureCatalogueEntry = {
+  id: string;
+  root: string;
+  classification: FeatureClassification;
+  subjects: readonly string[];
+};
+
+export type PackageKind =
+  | FeaturePackageRole
+  | "client"
+  | "library"
+  | "application"
+  | "dev-runtime"
+  | "enterprise-root"
+  | "enterprise-composition"
+  | "config"
+  | "design-system"
+  | "tooling";
+
+export type PackageManifest = {
+  name?: string;
+  private?: boolean;
+  /** `false` records a contract package that deliberately declares no callable `*Api`. */
+  callable?: boolean;
+  /** The plan (dev/docs/plans/<name>.md) a designed but unbuilt process package waits on. */
+  staged?: string;
+  license?: string;
+  exports?: unknown;
+  scripts?: Record<string, string>;
+  dependencies?: Record<string, string>;
+  devDependencies?: Record<string, string>;
+  peerDependencies?: Record<string, string>;
+  optionalDependencies?: Record<string, string>;
+};
+
+export type ClassifiedPackage = {
+  name: string;
+  root: string;
+  manifestPath: string;
+  manifest: PackageManifest;
+  kind: PackageKind;
+  applicationRole?: ApplicationPackageRole;
+  enterpriseCompositionRole?: EnterpriseCompositionRole;
+  feature?: string;
+  featureRoot?: string;
+  subjects?: readonly string[];
+  enterprise: boolean;
+};
+
+export type ArchitectureViolation = {
+  policy: string;
+  file: string;
+  line?: number;
+  specifier?: string;
+  message: string;
+  allowed?: string;
+};
+
+export type LintWorkspaceOptions = {
+  root: string;
+  changedFiles?: readonly string[];
+  declarations?: boolean;
+  /** Registry ids to run; every policy when absent. */
+  only?: readonly string[];
+};

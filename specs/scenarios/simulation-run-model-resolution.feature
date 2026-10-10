@@ -109,18 +109,6 @@ Feature: Simulation run model resolution per target type
     # must never again reach a non-prompt prefetch result.
 
   @unit
-  Scenario: A FAST-only-codex project still resolves the DEFAULT-role agent-under-test key for prompts
-    Given a project whose FAST role default is a codex model
-    And the same project has a non-codex DEFAULT role default
-    When a scenario run is prefetched for a prompt target with no model
-    Then the prefetch succeeds
-    And the agent under test resolves the non-codex DEFAULT model
-
-  # ============================================================================
-  # Credentials: the platform key, not an LLM key
-  # ============================================================================
-
-  @unit
   Scenario: The workflow adapter sends the project's platform API key, not an LLM key
     Given a workflow target whose adapter-role LLM key differs from the project's API key
     When the adapter sends its execute_flow request

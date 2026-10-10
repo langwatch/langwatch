@@ -1,0 +1,221 @@
+/**
+ * Application chrome: top bar, sidebar, content. Mode: product-switcher or icon-rail.
+ * Drawer mounted separately (portal-based). Moved from platform/app; DashboardLayout deleted.
+ */
+
+import { UiPageForbidden } from "@langwatch/browser/page-fallbacks";
+import { ICON_RAIL_WIDTH } from "@langwatch/design-system/app-shell";
+import { Box, HStack } from "@langwatch/design-system/primitives";
+import { useEffect, useRef, type ReactNode } from "react";
+
+import {
+  useNavigationShellState,
+  type NavigationShellReadyState,
+  type NavigationShellState,
+} from "../../behavior/use-navigation-shell-state.ts";
+import { useOrglessAddressRedirect } from "../../behavior/use-orgless-address-redirect.ts";
+import { useProjectAddressRedirect } from "../../behavior/use-project-address-redirect.ts";
+import { APP_HEADER_HEIGHT } from "../../model/menu-widths.ts";
+import { useNavigationHost } from "../../model/navigation-host.ts";
+import { LANGY_DOCK_TRANSITION, shellContentMaxWidth } from "../../model/shell-layout.ts";
+import { ProductIconRail } from "./icon-rail.tsx";
+import { MobileShell } from "./mobile-shell.tsx";
+import { ProductSidebar } from "./product-sidebar.tsx";
+import { ShellPageBody } from "./shell-page-body.tsx";
+import { ShellTopBar } from "./shell-top-bar.tsx";
+
+export type NavigationShellProps = {
+  children: ReactNode;
+  /** The two arrangements of this chrome. */
+  mode?: "product-switcher" | "icon-rail";
+  /** Personal-scope addresses need no organization to draw the chrome. */
+  personalScope?: boolean;
+  /** Organization-scope addresses need no project to draw the chrome. */
+  orgScope?: boolean;
+  /** Overrides the title this shell would compose from the address. */
+  pageTitle?: string;
+  /** A full-screen tool: the same gates, then the page alone with no bars. */
+  fullScreen?: boolean;
+};
+
+export function NavigationShell({
+  children,
+  mode = "product-switcher",
+  personalScope = false,
+  orgScope = false,
+  pageTitle,
+  fullScreen = false,
+}: NavigationShellProps) {
+  const host = useNavigationHost();
+  const reading = useNavigationShellState({
+    isPersonalScope: personalScope,
+    isOrgScope: orgScope,
+  });
+  useProjectAddressRedirect();
+  useOrglessAddressRedirect({ personalScope });
+  const lastReady = useRef<NavigationShellReadyState | null>(null);
+  if (reading.status === "ready") lastReady.current = reading;
+
+  if (reading.status === "not-found") return <>{host.notFound()}</>;
+  // Only the first load waits on the splash: a scope or permission re-settle on
+  // a later navigation keeps the last chrome and blanks just the page.
+  const state = reading.status === "loading" ? lastReady.current : reading;
+  if (state === null) return <>{host.waiting()}</>;
+  const page =
+    reading.status === "loading" ? null : <SeatGate state={reading}>{children}</SeatGate>;
+  if (state.status === "chromeless" || fullScreen) return <>{page}</>;
+
+  const isIconRail = mode === "icon-rail";
+
+  // A phone has room for the page or the chrome, not both: one compact bar and
+  // a full-screen menu replace the sidebar and the rail in both modes.
+  if (state.isMobile) {
+    return (
+      <Box width="full" minHeight="100vh" background="bg.page">
+        <ShellTitle pageTitle={pageTitle} state={state} />
+        <MobileShell state={state}>
+          <ShellPageBody personalScope={personalScope}>{page}</ShellPageBody>
+        </MobileShell>
+      </Box>
+    );
+  }
+
+  return (
+    <Box
+      width="full"
+      minHeight="100vh"
+      background="bg.page"
+      overflowX={["auto", "auto", "hidden"]}
+      display="flex"
+      alignItems="stretch"
+    >
+      <ShellTitle pageTitle={pageTitle} state={state} />
+
+      {isIconRail && (
+        <ProductIconRail
+          activeProductId={state.activeProductId}
+          isSettingsActive={state.isSettingsRoute}
+        />
+      )}
+
+      <Box flex={1} minWidth={0}>
+        <ShellTopBar state={state} shouldShowProductCluster={!isIconRail} />
+
+        <ShellContentRow state={state} isIconRail={isIconRail}>
+          <ShellPageBody personalScope={personalScope}>{page}</ShellPageBody>
+        </ShellContentRow>
+      </Box>
+    </Box>
+  );
+}
+
+/**
+ * The one seat gate for every page in the shell (ARCHITECTURE.md §10): a page
+ * whose product the seat does not reach draws the standard permission alert.
+ */
+function SeatGate({ state, children }: { state: NavigationShellState; children: ReactNode }) {
+  if (state.status !== "ready" || !state.seatRefusal) return <>{children}</>;
+  return <UiPageForbidden permission={state.seatRefusal.permission} />;
+}
+
+/**
+ * The document's title, composed from the project and the open
+ * destination — moved off a `next/head` shim a governed package may not
+ * import. The host writes it and restores what a shell found on unmount.
+ */
+function ShellTitle({
+  pageTitle,
+  state,
+}: {
+  pageTitle: string | undefined;
+  state: NavigationShellReadyState;
+}) {
+  const host = useNavigationHost();
+  const { project, currentRoute } = state;
+  const title =
+    pageTitle ??
+    `LangWatch${project ? ` - ${project.name}` : ""}${
+      currentRoute && currentRoute.title !== "Home" ? ` - ${currentRoute.title}` : ""
+    }`;
+
+  // Called as a method rather than through a lifted reference: the port is a
+  // CLASS, and an unbound `host.setDocumentTitle` loses the receiver its own
+  // fields hang off.
+  useEffect(() => host.setDocumentTitle(title), [host, title]);
+
+  return null;
+}
+
+/**
+ * The sidebar and the content card below the top bar.
+ */
+function ShellContentRow({
+  state,
+  isIconRail,
+  children,
+}: {
+  state: NavigationShellReadyState;
+  isIconRail: boolean;
+  children: ReactNode;
+}) {
+  const { activeProductId, isCompactSidebar, menuWidth } = state;
+  const host = useNavigationHost();
+  // The rail is a sibling of this column, so its width is room the page does
+  // not have, the same as the sidebar's.
+  const contentMaxWidth = shellContentMaxWidth({
+    menuWidth,
+    railWidth: isIconRail ? ICON_RAIL_WIDTH : null,
+  });
+
+  return host.langyDockRoom({
+    render: (langyDockInset) => (
+      <HStack
+        width="full"
+        alignItems="stretch"
+        gap={0}
+        minHeight={`calc(100vh - ${APP_HEADER_HEIGHT}px)`}
+      >
+        <ProductSidebar surface={activeProductId ?? "settings"} isCompact={isCompactSidebar} />
+
+        <Box
+          data-testid="shell-content-column"
+          width="full"
+          height="full"
+          background="bg.page"
+          minHeight={`calc(100vh - ${APP_HEADER_HEIGHT}px)`}
+          maxHeight={`calc(100vh - ${APP_HEADER_HEIGHT}px)`}
+          maxWidth={contentMaxWidth}
+          paddingRight={`${langyDockInset}px`}
+          transition={`padding-right ${LANGY_DOCK_TRANSITION}`}
+        >
+          <Box
+            width="full"
+            height="full"
+            background="bg"
+            borderTopLeftRadius="xl"
+            borderTopWidth="1px"
+            borderLeftWidth="1px"
+            borderStyle="solid"
+            // In light mode `border.muted` is the same grey as `bg.page`, so the
+            // panel edge needs the stronger token to read at all. Dark keeps the
+            // muted one, which already contrasts against the page there.
+            borderColor="border"
+            borderTopRightRadius={langyDockInset > 0 ? "xl" : 0}
+            borderRightWidth={langyDockInset > 0 ? "1px" : 0}
+            _dark={{
+              borderColor: "border.muted",
+            }}
+            overflow="auto"
+            display="flex"
+            minHeight={`calc(100vh - ${APP_HEADER_HEIGHT}px)`}
+            maxHeight={`calc(100vh - ${APP_HEADER_HEIGHT}px)`}
+            position="relative"
+            data-tour="main-content"
+          >
+            {children}
+          </Box>
+        </Box>
+      </HStack>
+    ),
+  });
+}

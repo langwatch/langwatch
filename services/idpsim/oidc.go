@@ -5,8 +5,6 @@ import (
 	"crypto/subtle"
 	"encoding/base64"
 	"encoding/json"
-	"fmt"
-	"html/template"
 	"math/big"
 	"net/http"
 	"net/url"
@@ -24,8 +22,13 @@ func (s *Server) handleDiscovery(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{
-		"issuer":                                t.BaseURL,
+	writeJSON(w, http.StatusOK, discoveryDocument(t))
+}
+
+// discoveryDocument is the metadata; a provider-shaped tenant's issuer has its provider's shape.
+func discoveryDocument(t *Tenant) map[string]any {
+	doc := map[string]any{
+		"issuer":                                t.Issuer(),
 		"authorization_endpoint":                t.BaseURL + "/oauth/authorize",
 		"token_endpoint":                        t.BaseURL + "/oauth/token",
 		"userinfo_endpoint":                     t.BaseURL + "/oauth/userinfo",
@@ -41,73 +44,85 @@ func (s *Server) handleDiscovery(w http.ResponseWriter, r *http.Request) {
 			"sub", "email", "email_verified", "name", "given_name", "family_name",
 			"nickname", "preferred_username", "picture", "groups",
 		},
-	})
+	}
+	if t.LegacyProvider() == LegacyProviderAzure {
+		azureDiscovery(t, doc)
+	}
+	return doc
 }
 
-// handleJWKS publishes the tenant's signing key.
+// handleJWKS publishes the tenant's signing keys: the current one, and the
+// previous one while a rotation has not dropped it.
 func (s *Server) handleJWKS(w http.ResponseWriter, r *http.Request) {
 	t, ok := s.tenantFor(r)
 	if !ok {
 		http.NotFound(w, r)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{
-		"keys": []map[string]any{{
+	signing := t.SigningKeys()
+	keys := make([]map[string]any, 0, len(signing))
+	for _, k := range signing {
+		keys = append(keys, map[string]any{
 			"kty": "RSA",
 			"use": "sig",
 			"alg": "RS256",
-			"kid": t.KeyID(),
-			"n":   base64.RawURLEncoding.EncodeToString(t.Key.N.Bytes()),
-			"e":   base64.RawURLEncoding.EncodeToString(big.NewInt(int64(t.Key.E)).Bytes()),
-		}},
-	})
+			"kid": k.KID,
+			"n":   base64.RawURLEncoding.EncodeToString(k.Key.N.Bytes()),
+			"e":   base64.RawURLEncoding.EncodeToString(big.NewInt(int64(k.Key.E)).Bytes()),
+		})
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"keys": keys})
 }
-
-// pickerTemplate is the account picker served when authorize gets no login
-// hint: each user links back into the same authorize request with the hint
-// filled in, so a browser test is two clicks and an automated test is one
-// query parameter.
-var pickerTemplate = template.Must(template.New("picker").Parse(`<!doctype html>
-<title>idpsim tenant {{.TenantID}} — choose an account</title>
-<style>body{font-family:system-ui;margin:3rem auto;max-width:28rem}a{display:block;padding:.75rem 1rem;border:1px solid #ccc;border-radius:.5rem;margin:.5rem 0;text-decoration:none;color:inherit}</style>
-<h1>Choose an account</h1>
-<p>Simulated identity provider — tenant {{.TenantID}}</p>
-{{range .Users}}<a href="{{.URL}}"><strong>{{.Name}}</strong><br>{{.Email}}</a>{{end}}
-`))
 
 // handleAuthorize implements the authorization endpoint. With a login hint
 // (login_hint or user) it redirects back immediately with a code — no browser
-// needed; without one it serves the account picker.
+// needed; without one it serves the console's account picker, whose users
+// each link back into this same request with the hint filled in.
 func (s *Server) handleAuthorize(w http.ResponseWriter, r *http.Request) {
 	t, ok := s.tenantFor(r)
 	if !ok {
 		http.NotFound(w, r)
 		return
 	}
+	s.authorize(w, r, t, "oidc.authorize")
+}
+
+// authorize is the authorization endpoint every protocol shares; kind names
+// the feed entries, so a social sign-in reads as itself on the tenant page.
+// cancel=1 is the picker's way out: the person declined, as access_denied.
+func (s *Server) authorize(w http.ResponseWriter, r *http.Request, t *Tenant, kind string) {
 	req := parseAuthorizeRequest(r.URL.Query())
 	if req.RedirectURI == "" {
 		http.Error(w, "redirect_uri is required", http.StatusBadRequest)
 		return
 	}
-	if s.refuseUnregisteredRedirect(w, t, req) {
+	if s.refuseUnregisteredRedirect(w, r, t, kind) {
 		return
 	}
 	if req.ResponseType != "code" {
 		s.record(t, Event{
-			Kind: "oidc.authorize", Outcome: OutcomeRefused, Client: req.ClientID,
+			Kind: kind, Outcome: OutcomeRefused, Client: req.ClientID,
 			Detail: "unsupported response_type " + req.ResponseType + " — this provider issues authorization codes",
 		})
 		oauthRedirectError(w, r, req.errorOf("unsupported_response_type"))
 		return
 	}
+	if r.URL.Query().Get("cancel") == "1" {
+		s.record(t, Event{
+			Kind: kind, Outcome: OutcomeRefused, Client: req.ClientID,
+			Detail: "the person cancelled at the account picker, sending access_denied back to " + req.RedirectURI,
+		})
+		oauthRedirectError(w, r, req.errorOf("access_denied"))
+		return
+	}
 	if req.Hint == "" {
-		s.serveAccountPicker(w, t, r.URL)
+		s.serveConsolePage(w, r, http.StatusOK)
 		return
 	}
 	user, ok := t.FindUser(req.Hint)
 	if !ok || !user.Active {
 		s.record(t, Event{
-			Kind: "oidc.authorize", Outcome: OutcomeRefused, Client: req.ClientID,
+			Kind: kind, Outcome: OutcomeRefused, Client: req.ClientID,
 			Subject: req.Hint, Detail: "no active user matches the login hint " + req.Hint,
 		})
 		oauthRedirectError(w, r, req.errorOf("access_denied"))
@@ -115,7 +130,7 @@ func (s *Server) handleAuthorize(w http.ResponseWriter, r *http.Request) {
 	}
 	code := t.MintCode(req.codeFor(user), s.now())
 	s.record(t, Event{
-		Kind: "oidc.authorize", Outcome: OutcomeOK, Client: req.ClientID, Subject: user.Email,
+		Kind: kind, Outcome: OutcomeOK, Client: req.ClientID, Subject: user.Email,
 		Detail: "signed in as " + user.Email + ", sending an authorization code back to " + req.RedirectURI,
 	})
 	req.redirectWithCode(w, r, code)
@@ -184,18 +199,30 @@ func (req authorizeRequest) redirectWithCode(w http.ResponseWriter, r *http.Requ
 //
 // The refusal is a page rather than a redirect on purpose: bouncing an error
 // to an address the client never registered is the exact move a real identity
-// provider must refuse, and someone who has just mistyped a redirect address
-// learns far more from a page naming both than from a silent bounce.
-func (s *Server) refuseUnregisteredRedirect(w http.ResponseWriter, t *Tenant, req authorizeRequest) bool {
-	app, registered := t.ApplicationByClientID(req.ClientID)
-	if !registered || app.redirectAllowed(req.RedirectURI) {
+// provider must refuse. The console's page reads the reason back through
+// /api/t/{tenant}/sign-in, which asks unregisteredRedirect the same question.
+func (s *Server) refuseUnregisteredRedirect(w http.ResponseWriter, r *http.Request, t *Tenant, kind string) bool {
+	req := parseAuthorizeRequest(r.URL.Query())
+	notice, app, refused := unregisteredRedirect(t, req)
+	if !refused {
 		return false
 	}
 	s.record(t, Event{
-		Kind: "oidc.authorize", Outcome: OutcomeRefused, Client: req.ClientID,
+		Kind: kind, Outcome: OutcomeRefused, Client: req.ClientID,
 		Detail: "redirect address " + req.RedirectURI + " is not registered for " + app.Name,
 	})
-	s.refusalPage(w, t, refusalNotice{
+	s.serveConsolePage(w, r, notice.Status)
+	return true
+}
+
+// unregisteredRedirect names the refusal when a registered client asks to be
+// sent back to an address it did not register.
+func unregisteredRedirect(t *Tenant, req authorizeRequest) (refusalNotice, *Application, bool) {
+	app, registered := t.ApplicationByClientID(req.ClientID)
+	if !registered || app.redirectAllowed(req.RedirectURI) {
+		return refusalNotice{}, nil, false
+	}
+	return refusalNotice{
 		Status: http.StatusBadRequest,
 		Title:  "That redirect address is not registered",
 		Detail: "The application " + app.Name + " asked to be sent back to " + req.RedirectURI +
@@ -203,25 +230,7 @@ func (s *Server) refuseUnregisteredRedirect(w http.ResponseWriter, t *Tenant, re
 		Hint: "Register that address on the tenant page, or fix the redirect address in the " +
 			"application's own configuration. A {placeholder} segment matches any single segment, " +
 			"so the address LangWatch shows before a connection exists can be registered exactly as written.",
-	})
-	return true
-}
-
-func (s *Server) serveAccountPicker(w http.ResponseWriter, t *Tenant, authorizeURL *url.URL) {
-	type row struct{ Name, Email, URL string }
-	var rows []row
-	for _, u := range t.Users() {
-		if !u.Active {
-			continue
-		}
-		link := *authorizeURL
-		lq := link.Query()
-		lq.Set("login_hint", u.ID)
-		link.RawQuery = lq.Encode()
-		rows = append(rows, row{Name: u.DisplayName(), Email: u.Email, URL: link.String()})
-	}
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_ = pickerTemplate.Execute(w, map[string]any{"TenantID": t.ID, "Users": rows})
+	}, app, true
 }
 
 // authError is one OAuth authorization-endpoint refusal, on its way back to
@@ -261,33 +270,8 @@ func (s *Server) handleToken(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
-	if err := r.ParseForm(); err != nil {
-		oauthError(w, "invalid_request", "unparseable form body")
-		return
-	}
-	if grant := r.PostForm.Get("grant_type"); grant != "authorization_code" {
-		oauthError(w, "unsupported_grant_type", "only authorization_code is supported")
-		return
-	}
-	req := parseTokenRequest(r)
-	// Authenticate the client BEFORE redeeming: a code is single-use, so
-	// burning one on a request that fails client authentication would turn a
-	// wrong secret into a second, confusing "already used" failure on retry.
-	if !s.clientAuthenticated(w, t, req) {
-		return
-	}
-	code, ok := s.redeemForExchange(w, t, req)
+	user, code, req, ok := s.exchange(w, r, t, "oidc.token")
 	if !ok {
-		return
-	}
-	user, ok := t.UserByID(code.UserID)
-	if !ok {
-		s.refuseToken(w, t, tokenRefusal{
-			ClientID: req.ClientID, Code: "invalid_grant",
-			Description: "the code's user no longer exists",
-			Detail:      "the user the code was issued for no longer exists",
-		})
 		return
 	}
 	idToken, err := s.mintIDToken(t, user, audience{ClientID: req.ClientID, Nonce: code.Nonce})
@@ -311,8 +295,46 @@ func (s *Server) handleToken(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// exchange runs the checks every token endpoint shares, answering any
+// refusal itself: form, grant type, client, code, and the code's user.
+func (s *Server) exchange(w http.ResponseWriter, r *http.Request, t *Tenant, kind string) (*User, *authCode, tokenRequest, bool) {
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+	if err := r.ParseForm(); err != nil {
+		oauthError(w, "invalid_request", "unparseable form body")
+		return nil, nil, tokenRequest{}, false
+	}
+	if grant := r.PostForm.Get("grant_type"); grant != "authorization_code" {
+		oauthError(w, "unsupported_grant_type", "only authorization_code is supported")
+		return nil, nil, tokenRequest{}, false
+	}
+	req := parseTokenRequest(r)
+	req.Kind = kind
+	// Authenticate the client BEFORE redeeming: a code is single-use, so
+	// burning one on a request that fails client authentication would turn a
+	// wrong secret into a second, confusing "already used" failure on retry.
+	if !s.clientAuthenticated(w, t, req) {
+		return nil, nil, req, false
+	}
+	code, ok := s.redeemForExchange(w, t, req)
+	if !ok {
+		return nil, nil, req, false
+	}
+	user, ok := t.UserByID(code.UserID)
+	if !ok {
+		s.refuseToken(w, t, req.Kind, tokenRefusal{
+			ClientID: req.ClientID, Code: "invalid_grant",
+			Description: "the code's user no longer exists",
+			Detail:      "the user the code was issued for no longer exists",
+		})
+		return nil, nil, req, false
+	}
+	return user, code, req, true
+}
+
 // tokenRequest is one parsed token-endpoint exchange.
 type tokenRequest struct {
+	// Kind names the feed entries this exchange files.
+	Kind         string
 	ClientID     string
 	ClientSecret string
 	Code         string
@@ -341,9 +363,9 @@ type tokenRefusal struct {
 
 // refuseToken answers the client and files the refusal in one step, so each
 // check in the exchange stays about the thing it checks.
-func (s *Server) refuseToken(w http.ResponseWriter, t *Tenant, ref tokenRefusal) {
+func (s *Server) refuseToken(w http.ResponseWriter, t *Tenant, kind string, ref tokenRefusal) {
 	s.record(t, Event{
-		Kind: "oidc.token", Outcome: OutcomeRefused,
+		Kind: kind, Outcome: OutcomeRefused,
 		Client: ref.ClientID, Detail: ref.Detail,
 	})
 	oauthError(w, ref.Code, ref.Description)
@@ -360,7 +382,7 @@ func (s *Server) clientAuthenticated(w http.ResponseWriter, t *Tenant, req token
 	if subtle.ConstantTimeCompare([]byte(req.ClientSecret), []byte(app.Secret)) == 1 {
 		return true
 	}
-	s.refuseToken(w, t, tokenRefusal{
+	s.refuseToken(w, t, req.Kind, tokenRefusal{
 		ClientID: req.ClientID, Code: "invalid_client",
 		Description: "the client secret does not match the one registered for " + app.Name,
 		Detail:      "wrong client secret for " + app.Name,
@@ -373,7 +395,7 @@ func (s *Server) clientAuthenticated(w http.ResponseWriter, t *Tenant, req token
 func (s *Server) redeemForExchange(w http.ResponseWriter, t *Tenant, req tokenRequest) (*authCode, bool) {
 	code, ok := t.RedeemCode(req.Code, s.now())
 	if !ok {
-		s.refuseToken(w, t, tokenRefusal{
+		s.refuseToken(w, t, req.Kind, tokenRefusal{
 			ClientID: req.ClientID, Code: "invalid_grant",
 			Description: "unknown, expired or already-used code",
 			Detail:      "the authorization code was unknown, expired, or already exchanged",
@@ -381,7 +403,7 @@ func (s *Server) redeemForExchange(w http.ResponseWriter, t *Tenant, req tokenRe
 		return nil, false
 	}
 	if code.ClientID != "" && req.ClientID != code.ClientID {
-		s.refuseToken(w, t, tokenRefusal{
+		s.refuseToken(w, t, req.Kind, tokenRefusal{
 			ClientID: req.ClientID, Code: "invalid_grant",
 			Description: "code was issued to a different client",
 			Detail:      "the code was issued to " + code.ClientID + ", not " + req.ClientID,
@@ -389,7 +411,7 @@ func (s *Server) redeemForExchange(w http.ResponseWriter, t *Tenant, req tokenRe
 		return nil, false
 	}
 	if req.RedirectURI != "" && req.RedirectURI != code.RedirectURI {
-		s.refuseToken(w, t, tokenRefusal{
+		s.refuseToken(w, t, req.Kind, tokenRefusal{
 			ClientID: req.ClientID, Code: "invalid_grant",
 			Description: "redirect_uri does not match the authorization request",
 			Detail:      "redirect address " + req.RedirectURI + " does not match the one the code was issued for",
@@ -397,7 +419,7 @@ func (s *Server) redeemForExchange(w http.ResponseWriter, t *Tenant, req tokenRe
 		return nil, false
 	}
 	if !pkceSatisfied(code, req.Verifier) {
-		s.refuseToken(w, t, tokenRefusal{
+		s.refuseToken(w, t, req.Kind, tokenRefusal{
 			ClientID: req.ClientID, Code: "invalid_grant",
 			Description: "PKCE verification failed",
 			Detail:      "PKCE verification failed — the code verifier does not match the challenge",
@@ -432,30 +454,37 @@ type audience struct{ ClientID, Nonce string }
 // mintIDToken signs the tenant's ID token with the standard claims the app's
 // profile mapping reads (email, picture, and the name-fallback family).
 func (s *Server) mintIDToken(t *Tenant, user *User, aud audience) (string, error) {
-	clientID, nonce := aud.ClientID, aud.Nonce
-	now := s.now()
-	claims := jwt.MapClaims{
-		"iss":                t.BaseURL,
-		"sub":                t.Subject(user),
-		"aud":                clientID,
-		"iat":                now.Unix(),
-		"exp":                now.Add(time.Hour).Unix(),
-		"email":              user.Email,
-		"email_verified":     true,
-		"name":               user.DisplayName(),
-		"given_name":         user.GivenName,
-		"family_name":        user.FamilyName,
-		"nickname":           user.UserName,
-		"preferred_username": user.UserName,
-		"picture":            fmt.Sprintf("%s/avatar/%s.png", t.BaseURL, user.ID),
-		"groups":             user.Groups,
+	now := s.now().Add(t.Skew())
+	claims := t.profileClaims(user, now)
+	claims["iss"] = t.Issuer()
+	claims["aud"] = aud.ClientID
+	claims["iat"] = now.Unix()
+	claims["exp"] = now.Add(time.Hour).Unix()
+	if aud.Nonce != "" {
+		claims["nonce"] = aud.Nonce
 	}
-	if nonce != "" {
-		claims["nonce"] = nonce
+	tamper, previousNonce := t.takeTamper(aud.Nonce)
+	breakClaims(claims, tokenBreak{Mode: tamper, PreviousNonce: previousNonce, Now: now})
+	signed, err := t.sign(claims)
+	if err != nil || tamper == TamperNone {
+		return signed, err
 	}
+	s.record(t, Event{
+		Kind: "oidc.token", Outcome: OutcomeOK, Client: aud.ClientID, Subject: user.Email,
+		Detail: "deliberately broke this ID token: " + string(tamper),
+	})
+	if tamper == TamperBadSignature {
+		return corruptSignature(signed), nil
+	}
+	return signed, nil
+}
+
+// sign signs claims with the tenant's current key, naming it in the header.
+func (t *Tenant) sign(claims jwt.MapClaims) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
-	token.Header["kid"] = t.KeyID()
-	return token.SignedString(t.Key)
+	current := t.currentKey()
+	token.Header["kid"] = current.KID
+	return token.SignedString(current.Key)
 }
 
 // handleUserinfo returns the claims for a bearer access token.
@@ -465,20 +494,8 @@ func (s *Server) handleUserinfo(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	token, ok := bearerToken(r)
+	user, ok := bearerUser(w, r, t, s.now())
 	if !ok {
-		w.Header().Set("WWW-Authenticate", "Bearer")
-		http.Error(w, "a bearer access token is required", http.StatusUnauthorized)
-		return
-	}
-	grant, ok := t.GrantForToken(token, s.now())
-	if !ok {
-		http.Error(w, "unknown or expired access token", http.StatusUnauthorized)
-		return
-	}
-	user, ok := t.UserByID(grant.UserID)
-	if !ok {
-		http.Error(w, "the token's user no longer exists", http.StatusUnauthorized)
 		return
 	}
 	s.record(t, Event{
@@ -487,18 +504,29 @@ func (s *Server) handleUserinfo(w http.ResponseWriter, r *http.Request) {
 		Subject: user.Email,
 		Detail:  "returned the profile claims for " + user.Email,
 	})
-	writeJSON(w, http.StatusOK, map[string]any{
-		"sub":                t.Subject(user),
-		"email":              user.Email,
-		"email_verified":     true,
-		"name":               user.DisplayName(),
-		"given_name":         user.GivenName,
-		"family_name":        user.FamilyName,
-		"nickname":           user.UserName,
-		"preferred_username": user.UserName,
-		"picture":            fmt.Sprintf("%s/avatar/%s.png", t.BaseURL, user.ID),
-		"groups":             user.Groups,
-	})
+	writeJSON(w, http.StatusOK, t.profileClaims(user, s.now()))
+}
+
+// bearerUser is the user a request's bearer access token was issued for,
+// answering a 401 itself when there is none.
+func bearerUser(w http.ResponseWriter, r *http.Request, t *Tenant, now time.Time) (*User, bool) {
+	token, ok := bearerToken(r)
+	if !ok {
+		w.Header().Set("WWW-Authenticate", "Bearer")
+		http.Error(w, "a bearer access token is required", http.StatusUnauthorized)
+		return nil, false
+	}
+	grant, ok := t.GrantForToken(token, now)
+	if !ok {
+		http.Error(w, "unknown or expired access token", http.StatusUnauthorized)
+		return nil, false
+	}
+	user, ok := t.UserByID(grant.UserID)
+	if !ok {
+		http.Error(w, "the token's user no longer exists", http.StatusUnauthorized)
+		return nil, false
+	}
+	return user, true
 }
 
 // oauthError is the RFC 6749 token-endpoint error shape.

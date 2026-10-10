@@ -1,15 +1,15 @@
 /**
- * The identity notice's contract: exact one-line wording per mode, stderr
- * only, TTY-gated colour, and the 30-minute per-(credential, mode)
- * suppression window backed by notice-state.json next to config.json.
- *
+ * The identity notice's contract: one-line wording per mode, stderr only,
+ * TTY-gated colour, 30-minute per-(credential, mode) suppression.
  * Feature: specs/ai-governance/cli-onboarding/me-credentials.feature
  */
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
+
 import chalk from "chalk";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
 import {
   maybePrintIdentityNotice,
   NOTICE_SUPPRESSION_MS,
@@ -27,15 +27,15 @@ describe("maybePrintIdentityNotice()", () => {
   let savedChalkLevel: number;
   let savedIsTTY: boolean | undefined;
 
-  const stderrLines = () =>
-    errorSpy.mock.calls.map((c: unknown[]) => String(c[0]));
+  const stderrLines = () => errorSpy.mock.calls.map((c: unknown[]) => String(c[0]));
 
   const okFetch = (name: string): typeof fetch =>
-    vi.fn(async () =>
-      new Response(JSON.stringify({ id: "p1", name, slug: "s", isPersonal: false }), {
-        status: 200,
-        headers: { "content-type": "application/json" },
-      }),
+    vi.fn(
+      async () =>
+        new Response(JSON.stringify({ id: "p1", name, slug: "s", isPersonal: false }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        }),
     ) as unknown as typeof fetch;
 
   beforeEach(() => {

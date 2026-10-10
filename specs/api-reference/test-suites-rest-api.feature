@@ -14,6 +14,11 @@ Feature: The test suites REST API
   #   PATCH  /api/v1/test-suites/{id}       rename a test suite
   #   DELETE /api/v1/test-suites/{id}       archive a test suite and its scenarios
   #   POST   /api/v1/test-suites/{id}/run   run the suite against the targets sent
+  #
+  # The family publishes its routes under /api/v1 only: it carries its version
+  # in its base path, so it is one of the four families the /api-and-/api/v1
+  # twinning leaves alone — there is no bare alias and no dated segment to
+  # answer on.
 
   Scenario: Listing test suites returns the test suites only
     Given the project holds one test suite and one run plan
@@ -72,10 +77,12 @@ Feature: The test suites REST API
     When I run a test suite id the project does not hold
     Then the response is 404 with the code suite_not_found
 
-  Scenario: A dated test suites path and the bare alias both answer
+  Scenario: The test suites family answers only under /api/v1
     Given the project holds one test suite
-    When I list the test suites through the dated path 2026-08-27
-    Then the list matches the one the bare alias returns
+    When I list the test suites at /api/v1/test-suites
+    Then the list is returned
+    And the bare alias /api/test-suites answers 404
+    And the dated path /api/v1/test-suites/2026-08-27 answers 404
 
   Scenario: An unknown test suites version segment answers 404
     When I list the test suites through the version segment 2020-01-01

@@ -189,12 +189,28 @@ Feature: The run dialog
     And choosing it opens the instructions to set an agent up
 
   @integration
+  Scenario: The reason a refused run cannot start is readable without a mouse
+    Given a project with no agent and no prompt to test
+    When the run dialog is opened
+    Then Run is off
+    And the dialog reads "Choose an agent to run against." beside it
+    And the refused Run control is described by that sentence
+
+  @integration
   Scenario: A run with no target selected is refused
     Given the run dialog is open with no target selected
     When Run is chosen
     Then the run is refused with "suite_targets_required"
     And the dialog stays open and says a target is needed
     And no run is scheduled
+
+  @integration
+  Scenario: The only agent of a project is not chosen for a scenario with no saved agent
+    Given a project with one agent and a scenario that has no saved agent
+    When the run dialog is opened
+    Then the agent card is not marked chosen
+    And Run sends no target and the dialog says a target is needed
+    And choosing the card marks it and Run sends that agent
 
   # --- Chips ---
 

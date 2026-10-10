@@ -1,0 +1,630 @@
+/**
+ * @vitest-environment node
+ * The signed-out front door: the procedures, the throttles, the refusals.
+ * @see specs/auth/signup-does-not-strand-an-account.feature
+ */
+import {
+  bindTrpcMiddlewareContext,
+  browserSessionContext,
+  callerAddressContext,
+  createTrpcRuntime,
+} from "@langwatch/api/trpc";
+import {
+  type FrontDoorRateLimitedError,
+  type AuthApi,
+  InvalidAuthOriginError,
+  NoAddressToConfirmError,
+} from "@langwatch/auth-contract";
+import { EmailAlreadyRegisteredError } from "@langwatch/user-contract";
+import { initTRPC } from "@trpc/server";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+import { authRequestHeadersContext, authTrpcTransport, callerEmailContext } from "../auth.trpc.ts";
+import { authTrpcTestMembers, type AuthTrpcTestContext } from "./auth.trpc.harness.ts";
+
+const CHALLENGE = "c".repeat(43);
+const isWithinBudget = vi.fn<AuthApi["isWithinBudget"]>();
+const route = vi.fn<AuthApi["route"]>();
+const addressIsRegistered = vi.fn<AuthApi["addressIsRegistered"]>();
+const requestSignUpVerification = vi.fn<AuthApi["requestSignUpVerification"]>();
+const assertSignUpOrigin = vi.fn<AuthApi["assertSignUpOrigin"]>();
+const requestNewAccountVerification = vi.fn<AuthApi["requestNewAccountVerification"]>();
+const sendMyAddressConfirmation = vi.fn<AuthApi["sendMyAddressConfirmation"]>();
+const readInviteLanding = vi.fn<AuthApi["readInviteLanding"]>();
+const requestFreshInvite = vi.fn<AuthApi["requestFreshInvite"]>();
+const getSignUpEnrollment = vi.fn<AuthApi["getSignUpEnrollment"]>();
+const getMyAddressConfirmation = vi.fn<AuthApi["getMyAddressConfirmation"]>();
+const getPriorSession = vi.fn<AuthApi["getPriorSession"]>();
+const listBrowserSessions = vi.fn<AuthApi["listBrowserSessions"]>();
+const endBrowserSession = vi.fn<AuthApi["endBrowserSession"]>();
+const deactivateAccount = vi.fn<AuthApi["deactivateAccount"]>();
+const setOwnFirstPassword = vi.fn<AuthApi["setOwnFirstPassword"]>();
+const changeOwnPassword = vi.fn<AuthApi["changeOwnPassword"]>();
+const unlinkOwnAccount = vi.fn<AuthApi["unlinkOwnAccount"]>();
+const registerCredentialAccount = vi.fn<AuthApi["registerCredentialAccount"]>();
+
+/** The seven operations this surface calls; the rest of the module refuses. */
+const door: AuthApi = {
+  countUsage: vi.fn(),
+  countUsageForMembers: vi.fn(),
+  offersPasskeys: () => false,
+  offersTwoStepVerification: () => false,
+  getSignedInWith: () => unreached("getSignedInWith"),
+  findDialableIdentityProviderOrigins: () => unreached("findDialableIdentityProviderOrigins"),
+  findMountedSocialMethodIds: () => unreached("findMountedSocialMethodIds"),
+  getImpersonation: () => unreached("getImpersonation"),
+  startImpersonation: () => unreached("startImpersonation"),
+  stopImpersonation: () => unreached("stopImpersonation"),
+  isWithinBudget,
+  route,
+  addressIsRegistered,
+  requestSignUpVerification,
+  assertSignUpOrigin,
+  requestNewAccountVerification,
+  sendMyAddressConfirmation,
+  claimSignUpAddressProof: () => unreached("claimSignUpAddressProof"),
+  claimUnconfirmedSignUpAddressProof: () => unreached("claimUnconfirmedSignUpAddressProof"),
+  getSignUpEnrollment,
+  getMyAddressConfirmation,
+  getPriorSession,
+  findSessionAmr: () => unreached("findSessionAmr"),
+  findAssertedAmrForIdentifiers: () => unreached("findAssertedAmrForIdentifiers"),
+  disableTwoStepVerification: () => unreached("disableTwoStepVerification"),
+  linkProviderAccount: () => unreached("linkProviderAccount"),
+  readInviteLanding,
+  requestFreshInvite,
+  resolveAuthProvider: () => unreached("resolveAuthProvider"),
+  verifyBrowserSession: () => unreached("verifyBrowserSession"),
+  resolveBrowserSession: () => unreached("resolveBrowserSession"),
+  getCliAccessSession: () => unreached("getCliAccessSession"),
+  issueProjectCliSession: () => unreached("issueProjectCliSession"),
+  refreshCliSession: () => unreached("refreshCliSession"),
+  findCliTokenRecordsForUser: () => unreached("findCliTokenRecordsForUser"),
+  revokeCliTokens: () => unreached("revokeCliTokens"),
+  listBrowserSessions,
+  endBrowserSession,
+  endBrowserSessionsForIdentifier: () => unreached("endBrowserSessionsForIdentifier"),
+  revokeAllBrowserSessions: () => unreached("revokeAllBrowserSessions"),
+  revokeBrowserSession: () => unreached("revokeBrowserSession"),
+  revokeOtherBrowserSessions: () => unreached("revokeOtherBrowserSessions"),
+  retireLegacySsoAccess: () => unreached("retireLegacySsoAccess"),
+  countLegacySsoAccess: () => unreached("countLegacySsoAccess"),
+  findFederatedAccountProviders: () => unreached("findFederatedAccountProviders"),
+  getSsoSetupStatus: () => unreached("getSsoSetupStatus"),
+  issuesOwnPasswords: () => unreached("issuesOwnPasswords"),
+  getSignInSecuritySettings: () => unreached("getSignInSecuritySettings"),
+  saveSignInSecuritySettings: () => unreached("saveSignInSecuritySettings"),
+  releaseHeldAccount: () => unreached("releaseHeldAccount"),
+  changeFederatedPassword: () => unreached("changeFederatedPassword"),
+  deactivateUser: () => unreached("deactivateUser"),
+  deactivateAccount,
+  setOwnFirstPassword,
+  changeOwnPassword,
+  unlinkOwnAccount,
+  registerCredentialAccount,
+  changeUserEmail: () => unreached("changeUserEmail"),
+};
+
+/** The front door reaches no session operation: naming one here would be a bug. */
+function unreached(operation: string): never {
+  throw new Error(`the front door called ${operation}`);
+}
+
+const trpc = initTRPC.context<AuthTrpcTestContext>().create();
+const router = createTrpcRuntime<AuthTrpcTestContext>({
+  root: trpc,
+  procedure: trpc.procedure,
+  anonymousProcedure: trpc.procedure,
+  members: authTrpcTestMembers(),
+}).mount(authTrpcTransport, () => door, {
+  middlewareContext: [
+    bindTrpcMiddlewareContext(callerAddressContext, (ctx) => ctx.address ?? null),
+    bindTrpcMiddlewareContext(callerEmailContext, (ctx) => ctx.email ?? null),
+    bindTrpcMiddlewareContext(authRequestHeadersContext, (ctx) => ctx.headers ?? null),
+    bindTrpcMiddlewareContext(browserSessionContext, (ctx) => ctx.sessionId ?? null),
+  ],
+});
+
+const visitor = router.createCaller({ address: "203.0.113.7" });
+
+describe("the signed-out front door", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    isWithinBudget.mockResolvedValue({ allowed: true });
+  });
+
+  describe("given the mounted router", () => {
+    it("publishes exactly the procedure names the signed-out screens call", () => {
+      expect(Object.keys(router._def.procedures).toSorted()).toEqual([
+        "browserSessions",
+        "changePassword",
+        "deactivate",
+        "endBrowserSession",
+        "inviteLanding",
+        "myAddressConfirmation",
+        "priorSession",
+        "register",
+        "requestFreshInvite",
+        "requestSignUpVerification",
+        "route",
+        "sendMyAddressConfirmation",
+        "setPassword",
+        "signUpEnrollment",
+        "unlinkAccount",
+      ]);
+    });
+
+    it("reads the invitation with a query and writes with everything else", () => {
+      const kinds = Object.fromEntries(
+        Object.entries(router._def.procedures).map(([name, procedure]) => [
+          name,
+          (procedure as { _def: { type: string } })._def.type,
+        ]),
+      );
+
+      expect(kinds).toEqual({
+        route: "mutation",
+        requestSignUpVerification: "mutation",
+        inviteLanding: "query",
+        requestFreshInvite: "mutation",
+        sendMyAddressConfirmation: "mutation",
+        myAddressConfirmation: "query",
+        signUpEnrollment: "mutation",
+        priorSession: "query",
+        deactivate: "mutation",
+        browserSessions: "query",
+        endBrowserSession: "mutation",
+        setPassword: "mutation",
+        changePassword: "mutation",
+        unlinkAccount: "mutation",
+        register: "mutation",
+      });
+    });
+  });
+
+  describe("when a signed-in person reads or ends their own browsers", () => {
+    /** @scenario "The browser session procedures answer on auth's namespace" */
+    it("asks for the caller's own sessions, naming the reading browser as current", async () => {
+      listBrowserSessions.mockResolvedValue([]);
+      endBrowserSession.mockResolvedValue({ ended: 1 });
+      const person = router.createCaller({ actor: { id: "user-1" }, sessionId: "session-0" });
+
+      await expect(person.browserSessions({})).resolves.toEqual([]);
+      await expect(person.endBrowserSession({ sessionId: "session-2" })).resolves.toEqual({
+        ended: 1,
+      });
+      expect(listBrowserSessions).toHaveBeenCalledWith({
+        userId: "user-1",
+        currentSessionId: "session-0",
+      });
+      expect(endBrowserSession).toHaveBeenCalledWith({
+        userId: "user-1",
+        sessionId: "session-2",
+        currentSessionId: "session-0",
+      });
+    });
+  });
+
+  describe("when a signed-in person deactivates their own account", () => {
+    /** @scenario "The deactivate procedure answers on auth's namespace" */
+    it("hands auth the caller as themselves and answers success, as user.deactivate did", async () => {
+      deactivateAccount.mockResolvedValue(undefined);
+      const person = router.createCaller({ actor: { id: "user-1" } });
+
+      await expect(person.deactivate({ userId: "user-1" })).resolves.toEqual({ success: true });
+      expect(deactivateAccount).toHaveBeenCalledWith({
+        userId: "user-1",
+        caller: { id: "user-1", operatorId: "user-1", impersonated: false },
+      });
+    });
+  });
+
+  describe("when a signed-in person sets or changes their own password", () => {
+    /** @scenario "The password procedures answer on auth's namespace" */
+    it("hands auth the caller as themselves and answers success, as user.* did", async () => {
+      setOwnFirstPassword.mockResolvedValue(undefined);
+      changeOwnPassword.mockResolvedValue(undefined);
+      const person = router.createCaller({ actor: { id: "user-1" } });
+      const caller = { id: "user-1", operatorId: "user-1", impersonated: false };
+
+      await expect(person.setPassword({ password: "a-first-pw-1" })).resolves.toEqual({
+        success: true,
+      });
+      await expect(
+        person.changePassword({ currentPassword: "old-pw-123", newPassword: "new-pw-1234" }),
+      ).resolves.toEqual({ success: true });
+      expect(setOwnFirstPassword).toHaveBeenCalledWith(
+        expect.objectContaining({ userId: "user-1", password: "a-first-pw-1", caller }),
+      );
+      expect(changeOwnPassword).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: "user-1",
+          currentPassword: "old-pw-123",
+          newPassword: "new-pw-1234",
+          caller,
+        }),
+      );
+    });
+  });
+
+  describe("when a signed-in person removes one of their own sign-in methods", () => {
+    /** @scenario "The password procedures answer on auth's namespace" */
+    it("hands auth the caller's own id and answers success, as user.unlinkAccount did", async () => {
+      unlinkOwnAccount.mockResolvedValue(undefined);
+      const person = router.createCaller({ actor: { id: "user-1" } });
+
+      await expect(person.unlinkAccount({ accountId: "account-9" })).resolves.toEqual({
+        success: true,
+      });
+      expect(unlinkOwnAccount).toHaveBeenCalledWith({ userId: "user-1", accountId: "account-9" });
+    });
+  });
+
+  describe("when a signed-out visitor asks where an address signs in", () => {
+    it("meters the attempt on the address the process resolved, not on the identifier", async () => {
+      route.mockResolvedValue({
+        outcome: "route_to_signup",
+        methodSet: [],
+        reasonCode: "identifier_unknown",
+      });
+
+      await visitor.route({ identifier: "ana@acme.com", breakGlass: undefined });
+
+      expect(isWithinBudget).toHaveBeenCalledWith({
+        key: "auth.route:203.0.113.7",
+        windowSeconds: 3600,
+        max: 200,
+      });
+      expect(route).toHaveBeenCalledWith({ identifier: "ana@acme.com", breakGlass: false });
+    });
+
+    it("spends one shared budget for every caller whose address the process could not resolve", async () => {
+      route.mockResolvedValue({
+        outcome: "route_to_signup",
+        methodSet: [],
+        reasonCode: "identifier_unknown",
+      });
+
+      await router.createCaller({}).route({ identifier: null, breakGlass: undefined });
+
+      expect(isWithinBudget).toHaveBeenCalledWith({
+        key: "auth.route:unknown",
+        windowSeconds: 3600,
+        max: 200,
+      });
+    });
+
+    it("refuses past the budget rather than asking the router again", async () => {
+      isWithinBudget.mockResolvedValue({ allowed: false });
+
+      await expect(
+        visitor.route({ identifier: "ana@acme.com", breakGlass: undefined }),
+      ).rejects.toThrow("Too many sign-in attempts. Please try again later.");
+      expect(route).not.toHaveBeenCalled();
+    });
+
+    /** @scenario A throttled door says how long the wait is */
+    it("refuses with the throttle's own code, never as an absent collaborator", async () => {
+      isWithinBudget.mockResolvedValue({ allowed: false, retryAfterSeconds: 90 });
+
+      const refusal = await visitor
+        .route({ identifier: "ana@acme.com", breakGlass: undefined })
+        .catch((error: unknown) => error);
+
+      expect((refusal as { cause?: FrontDoorRateLimitedError }).cause?.code).toBe(
+        "auth_rate_limited",
+      );
+    });
+
+    /** @scenario A throttled door says how long the wait is */
+    it("carries the seconds to wait, which is what names the minutes", async () => {
+      isWithinBudget.mockResolvedValue({ allowed: false, retryAfterSeconds: 90 });
+
+      const refusal = await visitor
+        .route({ identifier: "ana@acme.com", breakGlass: undefined })
+        .catch((error: unknown) => error);
+
+      expect((refusal as { cause?: FrontDoorRateLimitedError }).cause?.meta).toMatchObject({
+        retryAfterSeconds: 90,
+      });
+    });
+  });
+
+  describe("when a sign-up address already has an account", () => {
+    it("says so rather than mailing a link, so nobody is stranded half-created", async () => {
+      requestNewAccountVerification.mockRejectedValueOnce(new EmailAlreadyRegisteredError());
+
+      const refusal = await visitor
+        .requestSignUpVerification({ email: "ana@acme.com" })
+        .catch((err: unknown) => err);
+
+      expect((refusal as { cause?: EmailAlreadyRegisteredError }).cause?.code).toBe(
+        "email_already_registered",
+      );
+    });
+
+    it("asks for a new account's link for the address the visitor typed", async () => {
+      requestNewAccountVerification.mockResolvedValue({ sent: true });
+
+      await expect(visitor.requestSignUpVerification({ email: "ana@acme.com" })).resolves.toEqual({
+        sent: true,
+      });
+      expect(requestNewAccountVerification).toHaveBeenCalledWith({ email: "ana@acme.com" });
+    });
+
+    it("hands the screen the unconfirmed proof where no link could be sent", async () => {
+      requestNewAccountVerification.mockResolvedValue({ sent: false, addressProof: "proof-1" });
+
+      await expect(visitor.requestSignUpVerification({ email: "ana@acme.com" })).resolves.toEqual({
+        sent: false,
+        addressProof: "proof-1",
+      });
+    });
+  });
+
+  describe("when a signed-out visitor submits the sign-up form", () => {
+    /** @scenario "The register procedure answers on auth's namespace" */
+    it("hands auth the form, the caller's address and origin, and answers the new id", async () => {
+      registerCredentialAccount.mockResolvedValue({ id: "user-1" });
+
+      await expect(
+        router
+          .createCaller({ address: "203.0.113.7", headers: { origin: "http://localhost:5560" } })
+          .register({ email: "sam@acme.com", password: "supersecret", addressProof: "proof-1" }),
+      ).resolves.toEqual({ id: "user-1" });
+      expect(registerCredentialAccount).toHaveBeenCalledWith({
+        name: null,
+        email: "sam@acme.com",
+        password: "supersecret",
+        addressProof: "proof-1",
+        callerAddress: "203.0.113.7",
+        origin: "http://localhost:5560",
+        referer: null,
+      });
+    });
+  });
+
+  describe("when a sign-up starts on a web address the installation is not set up for", () => {
+    /** @scenario "A sign-up started on a web address the installation is not set up for issues nothing" */
+    it("refuses with the invalid origin code before mailing a link or issuing a proof", async () => {
+      assertSignUpOrigin.mockRejectedValueOnce(new InvalidAuthOriginError());
+
+      await expect(
+        router
+          .createCaller({ address: "203.0.113.7", headers: { origin: "http://localhost:18560" } })
+          .requestSignUpVerification({ email: "sam@acme.com" }),
+      ).rejects.toMatchObject({ cause: { code: "auth_invalid_origin" } });
+      expect(assertSignUpOrigin).toHaveBeenCalledWith({
+        origin: "http://localhost:18560",
+        referer: null,
+      });
+      expect(requestNewAccountVerification).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when one caller asks for confirmation link after confirmation link", () => {
+    /** @scenario "Asking again and again for a confirmation link stops being answered" */
+    it("refuses with the wait once the caller's hour is spent, and mails nothing", async () => {
+      isWithinBudget.mockResolvedValue({ allowed: false, retryAfterSeconds: 120 });
+
+      await expect(
+        visitor.requestSignUpVerification({ email: "someone-new@acme.com" }),
+      ).rejects.toMatchObject({
+        cause: { code: "auth_rate_limited", meta: { retryAfterSeconds: 120 } },
+      });
+      expect(isWithinBudget).toHaveBeenCalledWith({
+        key: "auth.requestSignUpVerification:203.0.113.7",
+        windowSeconds: 3600,
+        max: 20,
+      });
+      expect(requestNewAccountVerification).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when a visitor opens an invitation link", () => {
+    it("answers what the landing page may say, and nothing that names a person", async () => {
+      readInviteLanding.mockResolvedValue({
+        organizationName: "Acme",
+        inviterName: "Ana",
+        alreadyAccepted: false,
+      });
+
+      await expect(visitor.inviteLanding({ inviteCode: "code-1" })).resolves.toEqual({
+        organizationName: "Acme",
+        inviterName: "Ana",
+        alreadyAccepted: false,
+      });
+    });
+
+    it("mints nothing when the holder of a stale code asks for another", async () => {
+      requestFreshInvite.mockResolvedValue(undefined);
+
+      await expect(visitor.requestFreshInvite({ inviteCode: "code-1" })).resolves.toEqual({
+        asked: true,
+      });
+      expect(requestFreshInvite).toHaveBeenCalledWith({ inviteCode: "code-1" });
+    });
+  });
+
+  describe("when a signed-in person asks for their own confirmation link", () => {
+    it("hands over the caller and the address the session named, never one the caller typed", async () => {
+      const signedIn = router.createCaller({ actor: { id: "user_ana" }, email: "ana@acme.com" });
+
+      sendMyAddressConfirmation.mockResolvedValueOnce({ identifierId: "idf_own" });
+
+      await expect(
+        signedIn.sendMyAddressConfirmation({ codeChallenge: CHALLENGE }),
+      ).resolves.toEqual({ sent: true, identifierId: "idf_own" });
+
+      expect(sendMyAddressConfirmation).toHaveBeenCalledWith({
+        actorId: "user_ana",
+        email: "ana@acme.com",
+        codeChallenge: CHALLENGE,
+      });
+    });
+
+    it("hands over an account the process resolved no address for as having none", async () => {
+      const caller = router.createCaller({ actor: { id: "user_ana" }, email: null });
+      sendMyAddressConfirmation.mockRejectedValueOnce(new NoAddressToConfirmError());
+
+      await expect(caller.sendMyAddressConfirmation({ codeChallenge: CHALLENGE })).rejects.toThrow(
+        "This account has no email address to confirm.",
+      );
+      expect(sendMyAddressConfirmation).toHaveBeenCalledWith({
+        actorId: "user_ana",
+        email: null,
+        codeChallenge: CHALLENGE,
+      });
+    });
+
+    it("refuses a challenge that is not an S256 digest before reaching the app", async () => {
+      const signedIn = router.createCaller({ actor: { id: "user_ana" }, email: "ana@acme.com" });
+
+      await expect(
+        signedIn.sendMyAddressConfirmation({ codeChallenge: "plain" }),
+      ).rejects.toMatchObject({
+        code: "BAD_REQUEST",
+      });
+      expect(sendMyAddressConfirmation).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when a signed-in person asks whether their own address is confirmed", () => {
+    it("asks about the address the session named, never one the caller typed", async () => {
+      getMyAddressConfirmation.mockResolvedValueOnce({
+        email: "ana@acme.com",
+        confirmed: true,
+        canSendConfirmation: true,
+      });
+      const signedIn = router.createCaller({ actor: { id: "user_ana" }, email: "ana@acme.com" });
+
+      await expect(signedIn.myAddressConfirmation()).resolves.toEqual({
+        email: "ana@acme.com",
+        confirmed: true,
+        canSendConfirmation: true,
+      });
+      expect(getMyAddressConfirmation).toHaveBeenCalledWith({ email: "ana@acme.com" });
+    });
+  });
+
+  describe("when a visitor holding an address proof asks what they may enrol", () => {
+    it("hands over the address and its proof, and answers the enrollment", async () => {
+      getSignUpEnrollment.mockResolvedValueOnce({
+        outcome: "enroll",
+        methodSet: [{ id: "password", kind: "password", connectionId: null }],
+        reasonCode: "no_domain_match",
+      });
+
+      await expect(
+        visitor.signUpEnrollment({ email: "sam@example.com", addressProof: "proof-1" }),
+      ).resolves.toMatchObject({ outcome: "enroll" });
+      expect(getSignUpEnrollment).toHaveBeenCalledWith({
+        email: "sam@example.com",
+        addressProof: "proof-1",
+      });
+    });
+
+    it("refuses a proof that does not hold, by its code", async () => {
+      getSignUpEnrollment.mockRejectedValueOnce(new NoAddressToConfirmError());
+
+      await expect(
+        visitor.signUpEnrollment({ email: "sam@example.com", addressProof: "stale" }),
+      ).rejects.toMatchObject({ cause: { code: "auth_no_address_to_confirm" } });
+    });
+  });
+
+  describe("when a signed-out visitor asks why they are here", () => {
+    it("hands the auth module the cookie the caller presented, and nothing they typed", async () => {
+      getPriorSession.mockResolvedValue({ kind: "expired", email: "ana@acme.com" });
+
+      await expect(
+        router
+          .createCaller({ headers: { cookie: "better-auth.session_token=tok.sig" } })
+          .priorSession(),
+      ).resolves.toEqual({ kind: "expired", email: "ana@acme.com" });
+
+      const [call] = getPriorSession.mock.calls;
+      expect(call?.[0].headers.get("cookie")).toBe("better-auth.session_token=tok.sig");
+    });
+
+    it("answers a request that arrived with no headers as a caller holding no cookie", async () => {
+      getPriorSession.mockResolvedValue({ kind: "unknown" });
+
+      await expect(router.createCaller({}).priorSession()).resolves.toEqual({ kind: "unknown" });
+      expect(getPriorSession.mock.calls[0]?.[0].headers.get("cookie")).toBeNull();
+    });
+  });
+  describe("when one visitor asks the sign-in router about a different address every time", () => {
+    /** @scenario "Asking about address after address from one place is eventually refused" */
+    it("answers until the visitor's hour is spent, then refuses with the wait and asks the router no more", async () => {
+      const spent = new Map<string, number>();
+      isWithinBudget.mockImplementation(async ({ key, max }) => {
+        const used = (spent.get(key) ?? 0) + 1;
+        spent.set(key, used);
+        return used <= max ? { allowed: true } : { allowed: false, retryAfterSeconds: 1800 };
+      });
+      route.mockResolvedValue({
+        outcome: "route_to_signup",
+        methodSet: [],
+        reasonCode: "identifier_unknown",
+      });
+
+      for (let asked = 0; asked < 200; asked += 1) {
+        await visitor.route({ identifier: `person-${asked}@acme.com`, breakGlass: undefined });
+      }
+      await expect(
+        visitor.route({ identifier: "person-200@acme.com", breakGlass: undefined }),
+      ).rejects.toMatchObject({
+        cause: { code: "auth_rate_limited", meta: { retryAfterSeconds: 1800 } },
+      });
+
+      expect(new Set(isWithinBudget.mock.calls.map(([call]) => call.key))).toEqual(
+        new Set(["auth.route:203.0.113.7"]),
+      );
+      expect(route).toHaveBeenCalledTimes(200);
+    });
+  });
+
+  describe("when each public entrance decides whose budget a request spends", () => {
+    const entrances = {
+      route: (caller: typeof visitor) =>
+        caller.route({ identifier: "ana@acme.com", breakGlass: undefined }),
+      requestSignUpVerification: (caller: typeof visitor) =>
+        caller.requestSignUpVerification({ email: "ana@acme.com" }),
+      inviteLanding: (caller: typeof visitor) => caller.inviteLanding({ inviteCode: "code-1" }),
+      requestFreshInvite: (caller: typeof visitor) =>
+        caller.requestFreshInvite({ inviteCode: "code-1" }),
+    };
+
+    /** @scenario "Every public auth entrance resolves its caller the same way" */
+    it.each(Object.keys(entrances) as (keyof typeof entrances)[])(
+      "%s counts the caller the process resolved, never one a header claims or a shared hop",
+      async (entrance) => {
+        route.mockResolvedValue({
+          outcome: "route_to_signup",
+          methodSet: [],
+          reasonCode: "identifier_unknown",
+        });
+        assertSignUpOrigin.mockResolvedValue(undefined);
+        requestNewAccountVerification.mockResolvedValue({ sent: true });
+        readInviteLanding.mockResolvedValue({
+          organizationName: "Acme",
+          inviterName: "Ana",
+          alreadyAccepted: false,
+        });
+        requestFreshInvite.mockResolvedValue(undefined);
+        const claim = { "x-forwarded-for": "10.9.9.9", origin: "http://localhost:18560" };
+
+        await entrances[entrance](router.createCaller({ address: "203.0.113.7", headers: claim }));
+        await entrances[entrance](router.createCaller({ address: "198.51.100.9", headers: claim }));
+        await entrances[entrance](router.createCaller({ headers: claim }));
+
+        expect(isWithinBudget.mock.calls.map(([call]) => call.key)).toEqual([
+          `auth.${entrance}:203.0.113.7`,
+          `auth.${entrance}:198.51.100.9`,
+          `auth.${entrance}:unknown`,
+        ]);
+      },
+    );
+  });
+});

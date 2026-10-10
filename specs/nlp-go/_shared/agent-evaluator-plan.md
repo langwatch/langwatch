@@ -1,7 +1,7 @@
 # Agent + Evaluator node kinds in nlpgo — scope + plan
 
 > Scoping doc for tasks (b) + (c) per @rchaves's iter-17 direction:
-> *"agent and evaluator should just work man!! they are simple (ish) they just call langwatch back, using langwatch api itself, the tricky part for evaluators is to propagate back the cost, score, details, passed, everything. ADD e2e TESTS FOR IT, EVALUATORS SPECIALLY"*
+> _"agent and evaluator should just work man!! they are simple (ish) they just call langwatch back, using langwatch api itself, the tricky part for evaluators is to propagate back the cost, score, details, passed, everything. ADD e2e TESTS FOR IT, EVALUATORS SPECIALLY"_
 
 ## What's wrong today
 
@@ -9,14 +9,14 @@ The Go engine returns `unsupported_node_kind` (501) for any of `agent`, `evaluat
 `retriever`, `custom`. This forces the TS feature flag to fall back to Python for
 any workflow that uses these — which is most workflows in production.
 
-Per @rchaves, the goal is *"never fall back to python as much as possible"*, so:
+Per @rchaves, the goal is _"never fall back to python as much as possible"_, so:
 
-| Kind        | New behavior in nlpgo                            |
-|-------------|--------------------------------------------------|
-| `agent`     | **Implement natively** — calls back to langwatch API |
+| Kind        | New behavior in nlpgo                                                                                        |
+| ----------- | ------------------------------------------------------------------------------------------------------------ |
+| `agent`     | **Implement natively** — calls back to langwatch API                                                         |
 | `evaluator` | **Implement natively** — calls back to langwatch evaluator API; propagates cost/score/details/passed exactly |
-| `retriever` | **Throw an error** — feature is retired |
-| `custom`    | **Throw an error** — not a real node kind |
+| `retriever` | **Throw an error** — feature is retired                                                                      |
+| `custom`    | **Throw an error** — not a real node kind                                                                    |
 
 ## Reference: how Python NLP does it today
 
@@ -68,6 +68,7 @@ the unsupported-kind rejection is at execution time, not parse time).
 ### Step 2 — Evaluator block
 
 `services/nlpgo/app/engine/blocks/evaluatorblock/`:
+
 - `block.go` — `EvaluatorBlock` implementing `engine.Block`.
 - `client.go` — typed HTTP client for LangWatch evaluator API:
   - `POST {LANGWATCH_BASE_URL}/api/evaluators/{evaluator_slug}/evaluate`
@@ -78,6 +79,7 @@ the unsupported-kind rejection is at execution time, not parse time).
   `Status / Score / Passed / Details / Label / Cost / Duration`.
 
 The block's `Execute(ctx, input)` should:
+
 1. Validate required fields (`evaluator` slug, `api_key`, optional `name` + `settings`).
 2. Build the data payload from the node's resolved input fields
    (input/output/expected_output/contexts/expected_contexts depending on the
@@ -89,6 +91,7 @@ The block's `Execute(ctx, input)` should:
 ### Step 3 — Agent block
 
 `services/nlpgo/app/engine/blocks/agentblock/`:
+
 - Spec is fuzzier; need to read the Python registry + custom_node to map exact
   behavior. Defer to a follow-up sub-plan once the evaluator block lands and
   proves the langwatch-API-callback pattern works.
@@ -99,6 +102,7 @@ The block's `Execute(ctx, input)` should:
 ### Step 4 — Retired kinds
 
 Engine emits a typed error for `retriever` and `custom` kinds:
+
 - `retriever` → `engine_error` event with `kind: "retired_node_kind"`,
   `message: "retriever was retired; remove the node from the workflow"`.
 - `custom` → same shape, message: "custom node kind is not supported".
@@ -108,6 +112,7 @@ These errors propagate through the SSE stream so the Studio UI surfaces them.
 ### Step 5 — E2E tests
 
 Per rchaves, **mandatory**:
+
 1. New TS integration test in `platform/app/src/server/workflows/__tests__/`:
    - Creates a project + workflow with `entry → signature → evaluator → end` shape.
    - Forces FF=on.

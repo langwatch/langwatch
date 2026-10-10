@@ -1,0 +1,90 @@
+# Sign-up's confirmation link opened more than once, through the mail sim: the first opening
+# confirms the address and offers the credential step, a second opening in another browser
+# before the account exists offers a fresh link (the proof was spent), and once the account
+# exists the same link reads as "Your account is ready" with the way in. The link is spent by
+# POST /api/auth/sign-up/confirm-address; its refusals are apidiff auth-sign-up-confirm.yaml.
+flows:
+  - id: auth-signup-link-reopened
+    title: A sign-up link reopened offers a fresh link before the account exists and the way in after
+    steps:
+      - action: go
+        with:
+          path: /auth/signup
+          anonymous: first
+      - action: fill
+        with:
+          field: Email
+          value: vd-reopen-{uid}@mail.langwatch.localhost
+          anonymous: first
+      - action: click
+        with:
+          text: /^\s*continue\s*$/i
+          anonymous: first
+      - action: expect
+        with:
+          testId: verification-sent
+          timeout: "20000"
+          anonymous: first
+      - action: mail
+        with:
+          to: vd-reopen-{uid}@mail.langwatch.localhost
+          subject: Confirm your email
+          as: confirmLink
+      - action: go
+        with:
+          path: "{confirmLink}"
+          anonymous: first
+      - action: expect
+        with:
+          testId: verified-address
+          timeout: "20000"
+          anonymous: first
+      - action: go
+        with:
+          path: "{confirmLink}"
+          anonymous: second
+      - action: expect
+        with:
+          text: That confirmation link no longer works
+          timeout: "20000"
+          anonymous: second
+      - action: expect
+        with:
+          text: Send a new link
+          anonymous: second
+      - action: fill
+        with:
+          selector: input[name="password"]
+          value: Vd!Reopen-{uid}-Zq7
+          anonymous: first
+      - action: fill
+        with:
+          selector: input[name="confirmPassword"]
+          value: Vd!Reopen-{uid}-Zq7
+          anonymous: first
+      - action: click
+        with:
+          text: /^\s*create account\s*$/i
+          anonymous: first
+      - action: expect
+        with:
+          url: /\/(onboarding|auth\/join)/
+          timeout: "20000"
+          anonymous: first
+      - action: go
+        with:
+          path: "{confirmLink}"
+          anonymous: third
+      - action: expect
+        with:
+          testId: account-ready
+          timeout: "20000"
+          anonymous: third
+      - action: expect
+        with:
+          text: Your account is ready
+          anonymous: third
+      - action: expect
+        with:
+          testId: method-picker
+          anonymous: third

@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -105,6 +107,86 @@ func TestReadSelectionKeepsDefaultsForServicesTheFileNeverNames(t *testing.T) {
 	})
 }
 
+// A worktree's .haven.json may still carry the developer-tool lanes'
+// pre-rename spellings. "storybook" still decodes onto design-system, and the
+// new key wins when a file somehow states both. Mail-room's old "mail" shim
+// is retired: that key now states the mail sink lane, so a pre-rename file's
+// "mail": true reads as the sink (its default anyway) and the mail room is
+// turned on again by hand.
+//
+// @scenario "A stored old-name developer-tool selection migrates on load"
+func TestReadSelectionMigratesTheOldDeveloperToolNames(t *testing.T) {
+	s := New(t.TempDir())
+
+	t.Run("given a file written before the rename", func(t *testing.T) {
+		dir := t.TempDir()
+		writeSelectionJSON(t, dir, `{"services":{"storybook":true,"mail":true}}`)
+
+		t.Run("when the selection is read", func(t *testing.T) {
+			sel, ok := s.ReadSelection(dir)
+			if !ok {
+				t.Fatal("a file stating the old names was treated as never written")
+			}
+			if !sel.DesignSystem {
+				t.Errorf("got %+v, want the design system read back on from its old key", sel)
+			}
+			if sel.MailRoom {
+				t.Errorf("got %+v, want the mail room left off: the old \"mail\" spelling now states the sink", sel)
+			}
+			if !sel.Mail {
+				t.Errorf("got %+v, want \"mail\": true read as the mail sink lane", sel)
+			}
+		})
+
+		t.Run("when it is re-saved, the file switches to the new keys", func(t *testing.T) {
+			sel, ok := s.ReadSelection(dir)
+			if !ok {
+				t.Fatal("a file stating the old names was treated as never written")
+			}
+			if err := s.WriteSelection(dir, sel); err != nil {
+				t.Fatalf("WriteSelection: %v", err)
+			}
+			b, err := os.ReadFile(selectionPath(dir))
+			if err != nil {
+				t.Fatalf("read back: %v", err)
+			}
+			var raw struct {
+				Services map[string]any `json:"services"`
+			}
+			if err := json.Unmarshal(b, &raw); err != nil {
+				t.Fatalf("written file is not valid JSON: %v", err)
+			}
+			if _, stated := raw.Services["storybook"]; stated {
+				t.Error("the re-saved file still carries the old \"storybook\" key")
+			}
+			if v, _ := raw.Services["mail"].(bool); !v {
+				t.Error("the re-saved file does not state \"mail\": true for the sink lane")
+			}
+			if v, _ := raw.Services["design-system"].(bool); !v {
+				t.Error("the re-saved file does not state \"design-system\": true")
+			}
+			if v, stated := raw.Services["mail-room"].(bool); !stated || v {
+				t.Error("the re-saved file should state \"mail-room\": false under its own key")
+			}
+		})
+	})
+
+	t.Run("given a file naming both the old and the new key", func(t *testing.T) {
+		dir := t.TempDir()
+		writeSelectionJSON(t, dir, `{"services":{"storybook":false,"design-system":true}}`)
+
+		t.Run("when the selection is read, the new key wins", func(t *testing.T) {
+			sel, ok := s.ReadSelection(dir)
+			if !ok {
+				t.Fatal("a file stating a service was treated as never written")
+			}
+			if !sel.DesignSystem {
+				t.Error("got design-system off, want the new key (true) to win over the old one (false)")
+			}
+		})
+	})
+}
+
 // The read side keeps defaults for what a file does not state; the write side
 // must never lean on that, or a service haven itself turned off would come back
 // on the next read.
@@ -120,7 +202,7 @@ func TestWriteSelectionStatesEveryService(t *testing.T) {
 				t.Fatalf("WriteSelection: %v", err)
 			}
 
-			b, err := os.ReadFile(filepath.Join(dir, ".haven.json"))
+			b, err := os.ReadFile(selectionPath(dir))
 			if err != nil {
 				t.Fatalf("read back: %v", err)
 			}
@@ -131,7 +213,11 @@ func TestWriteSelectionStatesEveryService(t *testing.T) {
 				t.Fatalf("written file is not valid JSON: %v", err)
 			}
 			for _, svc := range domain.SelectableServices {
-				if _, stated := raw.Services[svc]; !stated {
+				key := svc
+				if svc == "payment" {
+					key = "paymentsim" // stored under its own key; see store.go
+				}
+				if _, stated := raw.Services[key]; !stated {
 					t.Errorf("written file omits %q, so reading it back would restore its default", svc)
 				}
 			}
@@ -148,7 +234,7 @@ func TestWriteSelectionStatesEveryService(t *testing.T) {
 
 	t.Run("given a selection with everything on", func(t *testing.T) {
 		dir := t.TempDir()
-		on := domain.Selection{Workers: true, Gateway: true, NLP: true, Langy: true}
+		on := domain.Selection{Gateway: true, NLP: true, Langy: true, IDP: true}
 
 		t.Run("when it is written and read back", func(t *testing.T) {
 			if err := s.WriteSelection(dir, on); err != nil {
@@ -175,7 +261,7 @@ func TestWriteSelectionStatesEveryService(t *testing.T) {
 func TestObserveDurationKeepsEveryKeyWhenRunsFinishTogether(t *testing.T) {
 	t.Run("given many runs recording different commands at the same moment", func(t *testing.T) {
 		store := New(t.TempDir())
-		keys := []string{"unit", "integration", "typecheck", "lint", "biome", "tsgo"}
+		keys := []string{"unit", "integration", "typecheck", "lint", "oxlint", "tsgo"}
 
 		var wg sync.WaitGroup
 		for _, key := range keys {
@@ -220,5 +306,156 @@ func TestReapEventsPersistBoundedNewestLast(t *testing.T) {
 	}
 	if events[0].At.Equal(time.Unix(0, 0)) {
 		t.Fatal("the oldest event past the cap must be dropped")
+	}
+}
+
+// @scenario "haven machine slot explain shows each holder and waiter with class, age and effective priority"
+func TestWaiterSnapshotsListsLiveRegistrations(t *testing.T) {
+	s := New(t.TempDir())
+
+	if got := s.WaiterSnapshots("checks"); got != nil {
+		t.Fatalf("an empty registry must report no waiters, got %v", got)
+	}
+
+	queuedAt := time.Now().Add(-90 * time.Second)
+	release, err := s.ClaimWaiter(os.Getpid(), "checks", WaiterClaim{
+		Command:  "pnpm test:unit",
+		Caller:   domain.SubAgent,
+		AgentID:  "agent_7",
+		QueuedAt: queuedAt,
+	})
+	if err != nil {
+		t.Fatalf("claim: %v", err)
+	}
+	defer release()
+
+	got := s.WaiterSnapshots("checks")
+	if len(got) != 1 {
+		t.Fatalf("expected 1 waiter, got %d", len(got))
+	}
+	if got[0].PID != os.Getpid() || got[0].Caller != domain.SubAgent || got[0].AgentID != "agent_7" {
+		t.Fatalf("waiter snapshot lost its own fields: %+v", got[0])
+	}
+	if !got[0].QueuedAt.Equal(queuedAt) {
+		t.Fatalf("queuedAt = %v, want %v", got[0].QueuedAt, queuedAt)
+	}
+
+	release()
+	if got := s.WaiterSnapshots("checks"); len(got) != 0 {
+		t.Fatalf("a released waiter must not still be listed, got %v", got)
+	}
+}
+
+// @scenario "haven machine slot explain shows each holder and waiter with class, age and effective priority"
+func TestWaiterSnapshotsDropsDeadAndExpiredEntries(t *testing.T) {
+	s := New(t.TempDir())
+	dir := s.waitersDir("checks")
+	if err := os.MkdirAll(dir, 0o750); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+
+	// A pid nothing alive uses.
+	deadPID := 999999
+	writeWaiterFixture(t, dir, deadPID, WaiterClaim{Command: "x", QueuedAt: time.Now()})
+
+	// A live pid (this test process) whose marker is far older than the TTL.
+	writeWaiterFixture(t, dir, os.Getpid(), WaiterClaim{Command: "x", QueuedAt: time.Now().Add(-3 * WaiterClaimTTL)})
+
+	if got := s.WaiterSnapshots("checks"); len(got) != 0 {
+		t.Fatalf("a dead pid and an expired marker must both be dropped, got %v", got)
+	}
+	if _, err := os.Stat(filepath.Join(dir, strconv.Itoa(deadPID)+".json")); !os.IsNotExist(err) {
+		t.Fatal("a dead pid's marker must be swept as it is found")
+	}
+}
+
+// @scenario "A malformed entry from another branch cannot crash the queue"
+func TestWaiterSnapshotsDropsAnUnparseableEntry(t *testing.T) {
+	s := New(t.TempDir())
+	dir := s.waitersDir("checks")
+	if err := os.MkdirAll(dir, 0o750); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, strconv.Itoa(os.Getpid())+".json"), []byte("not json"), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	if got := s.WaiterSnapshots("checks"); len(got) != 0 {
+		t.Fatalf("a malformed entry must be dropped rather than crash the reader, got %v", got)
+	}
+}
+
+func writeWaiterFixture(t *testing.T, dir string, pid int, claim WaiterClaim) {
+	t.Helper()
+	b, err := json.Marshal(claim)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, strconv.Itoa(pid)+".json"), b, 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+}
+
+func TestHolderSnapshotsListsLiveClaimsAndDropsStaleOnes(t *testing.T) {
+	s := New(t.TempDir())
+	if got := s.HolderSnapshots("checks"); got != nil {
+		t.Fatalf("no holders registered, got %v", got)
+	}
+	release, err := s.ClaimHolder(os.Getpid(), "checks", HolderClaim{Label: "lint", StartedAt: time.Now()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := s.HolderSnapshots("checks")
+	if len(got) != 1 || got[0].PID != os.Getpid() || got[0].Label != "lint" {
+		t.Fatalf("want the one live holder, got %v", got)
+	}
+	release()
+	if got := s.HolderSnapshots("checks"); len(got) != 0 {
+		t.Fatalf("a released holder must disappear, got %v", got)
+	}
+	expired, err := s.ClaimHolder(os.Getpid(), "checks", HolderClaim{Label: "old", StartedAt: time.Now().Add(-2 * HeavyRunClaimTTL)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer expired()
+	if got := s.HolderSnapshots("checks"); len(got) != 0 {
+		t.Fatalf("a claim past the TTL must be dropped, got %v", got)
+	}
+}
+
+// @scenario "Every haven stack runs paymentsim unless the worktree turned it off"
+func TestReadSelectionIgnoresTheOptInEraPaymentKey(t *testing.T) {
+	s := New(t.TempDir())
+	dir := t.TempDir()
+	writeSelectionJSON(t, dir, `{"services":{"payment":false}}`)
+	if sel, _ := s.ReadSelection(dir); !sel.Payment {
+		t.Error(`"payment": false from the opt-in era turned paymentsim off`)
+	}
+	writeSelectionJSON(t, dir, `{"services":{"paymentsim":false}}`)
+	if sel, _ := s.ReadSelection(dir); sel.Payment {
+		t.Error(`a stated "paymentsim": false (haven up -payment) was ignored`)
+	}
+}
+
+// @scenario "The stack mode is not sticky"
+// A file an older haven wrote with a saved mode reads as still, and the next write drops the keys.
+func TestSelectionIgnoresAndDropsTheRetiredModes(t *testing.T) {
+	s, dir := New(t.TempDir()), t.TempDir()
+	writeSelectionJSON(t, dir, `{"held":true,"watch":true,"watch-ui":true,"bundled-ui":true,"dev-ui":true,"services":{}}`)
+	got, ok := s.ReadSelection(dir)
+	if !ok || !got.IsStill() || !got.IsBuiltUI() {
+		t.Fatalf("a saved mode should read as still, got %+v ok=%v", got, ok)
+	}
+	if err := s.WriteSelection(dir, got); err != nil {
+		t.Fatalf("WriteSelection: %v", err)
+	}
+	b, err := os.ReadFile(selectionPath(dir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, key := range []string{"held", `"watch"`, "watch-ui", "bundled-ui", "dev-ui"} {
+		if strings.Contains(string(b), key) {
+			t.Errorf("the next write kept %s:\n%s", key, b)
+		}
 	}
 }

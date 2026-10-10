@@ -1,0 +1,158 @@
+import type { AutomationGraphNotifier } from "../channels/automation-graph-alert.channel.ts";
+import type { AutomationRunawayNotice } from "../channels/automation-runaway-notice.channel.ts";
+import { AutomationTestFire } from "../channels/automation-test-fire.channel.ts";
+import { AutomationDispatchError } from "../features/graph-alert/services/automation-graph-activity.service.ts";
+import { AutomationEmailCapService } from "../features/runaway/services/email-cap.service.ts";
+import type { AutomationRunawaySignals } from "../features/runaway/services/runaway-containment.service.ts";
+import { AutomationSlackConnectionService } from "../features/slack/services/automation-slack-connection.service.ts";
+import { SlackDestinationService } from "../features/slack/services/slack-destination.service.ts";
+import { AutomationRunawayRepository } from "../repositories/automation-runaway.repository.ts";
+import type { TriggerSecretSeal } from "../repositories/trigger.repository.ts";
+import { AutomationLogger } from "../services/automation.service.ts";
+
+/** Stores secrets as given, as the memory trigger repository does, for fixtures that read none. */
+const PLAIN_SECRETS: TriggerSecretSeal = {
+  openSecret: ({ sealed }) => sealed,
+  sealSecret: ({ plain }) => plain,
+};
+
+/** Slack as a project with no connections: every destination is the automation's own. */
+export function createTestSlackDestinations(): SlackDestinationService {
+  return SlackDestinationService.create({
+    slack: { findUsableSlackSecret: async () => [] },
+    triggers: PLAIN_SECRETS,
+  });
+}
+
+/** Saves that name no connection and claims that land nowhere. */
+export function createTestSlackConnections(): AutomationSlackConnectionService {
+  return AutomationSlackConnectionService.create({
+    slack: {
+      getUsableSlackConnection: () =>
+        Promise.reject(new Error("no Slack connection in this fixture")),
+      findOrCreateSlackConnectionForSecret: () =>
+        Promise.reject(new Error("no Slack connection in this fixture")),
+      claimConnection: async () => {},
+      releaseConnection: async () => {},
+    },
+    projects: { getOrganizationId: async () => "organization-test" },
+    triggers: PLAIN_SECRETS,
+  });
+}
+
+/**
+ * The graph-alert vertical's fixtures, so a composition root can prove its own
+ * wiring against the same rows the feature's own suite uses rather than
+ * inventing a second stand-in that agrees with nothing.
+ */
+export {
+  breachingAnalytics,
+  createGraphActivityPrismaDouble,
+  customGraphRow,
+  FROZEN_NOW,
+  graphTriggerRow,
+  OneProject,
+  RecordingDelivery,
+  SilentLogger,
+  TestDispatchErrors,
+} from "./fixtures/graph-activity.fixture.ts";
+import { MemoryAutomationEmailCapRepository } from "../repositories/memory/memory.automation-email-cap.repository.ts";
+
+class TestNotifier implements AutomationGraphNotifier {
+  async dispatch() {
+    return {
+      channel: "none" as const,
+      didSend: false,
+      missingVariables: [],
+      renderErrors: [],
+    };
+  }
+}
+class TestLogger extends AutomationLogger {
+  error(): void {}
+  debug(): void {}
+  info(): void {}
+  warn(): void {}
+}
+class TestDispatchErrors extends AutomationDispatchError {
+  isTerminal(): boolean {
+    return false;
+  }
+  createTerminal(message: string): unknown {
+    return new Error(message);
+  }
+}
+class TestRunaway
+  extends AutomationRunawayRepository
+  implements AutomationRunawayNotice, AutomationRunawaySignals
+{
+  async countProjectTraces24h() {
+    return 0;
+  }
+  async notificationRecipients() {
+    return [];
+  }
+  async sendLimitEmail() {}
+  async findNextStep() {
+    return undefined;
+  }
+  async claimOnce() {
+    return "already-claimed" as const;
+  }
+  async releaseClaim() {}
+  async projectName() {
+    return "Project";
+  }
+  async automationUrl() {
+    return "http://automation.test";
+  }
+  onCeilingBreach() {}
+  onAutoPaused() {}
+  onContainmentFailed() {}
+  error() {}
+  info() {}
+}
+
+class TestFireDelivery extends AutomationTestFire {
+  async sendEmail(): Promise<void> {}
+  async sendSlack(): Promise<void> {}
+  async sendSlackBot(): Promise<void> {}
+  async sendWebhook(): Promise<{ status: number }> {
+    return { status: 200 };
+  }
+}
+
+export function createAutomationTestFire(): AutomationTestFire {
+  return new TestFireDelivery();
+}
+
+/** Complete deterministic graph capability for service tests that do not
+ * exercise analytics/provider delivery. */
+export function createAutomationTestRuntime(): {
+  emailCaps: AutomationEmailCapService;
+  projects: never;
+  analytics: never;
+  notifier: TestNotifier;
+  baseHost: string;
+  logger: TestLogger;
+  slackDestinations: SlackDestinationService;
+  dispatchErrors: TestDispatchErrors;
+  runaway: TestRunaway;
+  testFire: TestFireDelivery;
+} {
+  return {
+    emailCaps: AutomationEmailCapService.create({
+      store: MemoryAutomationEmailCapRepository.create(),
+      fallback: MemoryAutomationEmailCapRepository.create(),
+    }),
+    projects: {} as never,
+    analytics: {} as never,
+    notifier: new TestNotifier(),
+    baseHost: "http://automation.test",
+    logger: new TestLogger(),
+    slackDestinations: createTestSlackDestinations(),
+    dispatchErrors: new TestDispatchErrors(),
+    runaway: new TestRunaway(),
+    testFire: new TestFireDelivery(),
+  };
+}

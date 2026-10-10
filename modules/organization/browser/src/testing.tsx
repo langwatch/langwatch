@@ -1,0 +1,226 @@
+/**
+ * What this package's suites mount the screen inside: a test constructs
+ * the abstract host port rather than mocking a module. Not exported.
+ */
+
+import { DesignSystemTestProvider } from "@langwatch/design-system/testing";
+import type { UiAnalytics } from "@langwatch/browser-host/analytics";
+import { UiHostServicesContextProvider } from "@langwatch/browser-host/capabilities";
+import {
+  uiDeclarations,
+  type ReleaseFlagToken,
+  type UiDrawerToken,
+} from "@langwatch/browser-host/declarations";
+import { createUiHostServicesFromHost } from "@langwatch/browser-host/testing";
+import { ContactSalesToken } from "@langwatch/enterprise-billing-client";
+import { render } from "@testing-library/react";
+import type { ReactElement, ReactNode } from "react";
+
+import {
+  type AuthenticationOverviewCard,
+  type DirectorySummaryBand,
+  type OrganizationActor,
+  type OrganizationProjectReading,
+  type OrganizationSuccessNotice,
+  OrganizationHostApi,
+  OrganizationHostProvider,
+  type OrganizationDownload,
+  type OrganizationFailureNotice,
+  type OrganizationReading,
+  type OrganizationRouteReading,
+  type OrganizationScope,
+} from "./model/organization-host.ts";
+
+const DEFAULT_ACTOR: OrganizationActor = {
+  id: "user-1",
+  name: "Ada",
+  email: "ada@example.com",
+  image: null,
+};
+
+const DEFAULT_ORGANIZATION: OrganizationReading = {
+  id: "org-1",
+  name: "Acme",
+  teams: [
+    {
+      id: "team-1",
+      name: "Engineering",
+      slug: "engineering",
+      projects: [
+        { id: "proj-1", name: "Web App", slug: "web-app" },
+        { id: "proj-2", name: "Batch", slug: "batch" },
+      ],
+    },
+  ],
+};
+
+export class FakeOrganizationHost extends OrganizationHostApi {
+  readonly downloads: OrganizationDownload[] = [];
+  readonly successes: OrganizationSuccessNotice[] = [];
+  readonly overlays: { name: string | null; props?: object }[] = [];
+  readonly failures: OrganizationFailureNotice[] = [];
+  readonly navigations: string[] = [];
+  readonly queries: Record<string, string | undefined>[] = [];
+
+  constructor(
+    private readonly options: {
+      scope?: Partial<OrganizationScope>;
+      organization?: OrganizationReading | undefined;
+      grants?: ReadonlySet<string>;
+      query?: Readonly<Record<string, string | undefined>>;
+      projectSwitcher?: ReactNode | null;
+      currentUser?: OrganizationActor | undefined;
+      activeProject?: OrganizationProjectReading | undefined;
+      isEnterprise?: boolean;
+      isPlanLoading?: boolean;
+      hasEmailProvider?: boolean;
+      flags?: ReadonlySet<string>;
+      overviewCards?: readonly AuthenticationOverviewCard[];
+      directorySummary?: DirectorySummaryBand;
+    } = {},
+  ) {
+    super();
+  }
+
+  scope(): OrganizationScope {
+    return {
+      organizationId: "org-1",
+      projectId: void 0,
+      projectSlug: "web-app",
+      ...this.options.scope,
+    };
+  }
+
+  organization(): OrganizationReading | undefined {
+    return "organization" in this.options ? this.options.organization : DEFAULT_ORGANIZATION;
+  }
+
+  hasPermission(permission: string): boolean {
+    return (this.options.grants ?? new Set(["organization:view", "organization:manage"])).has(
+      permission,
+    );
+  }
+
+  /**
+   * The settings addresses are all the organization's own, so the fake
+   * answers both questions the same way, like the real browser adapter.
+   */
+  hasOrganizationPermission(permission: string): boolean {
+    return this.hasPermission(permission);
+  }
+
+  currentUser(): OrganizationActor | undefined {
+    return this.options.currentUser ?? DEFAULT_ACTOR;
+  }
+
+  activeProject(): OrganizationProjectReading | undefined {
+    return this.options.activeProject;
+  }
+
+  isEnterprise(): boolean {
+    return this.options.isEnterprise ?? false;
+  }
+
+  isPlanLoading(): boolean {
+    return this.options.isPlanLoading ?? false;
+  }
+
+  hasEmailProvider(): boolean {
+    return this.options.hasEmailProvider ?? true;
+  }
+
+  isFeatureEnabled({ name }: ReleaseFlagToken): boolean {
+    return (this.options.flags ?? new Set<string>()).has(name);
+  }
+
+  openOverlay<Props>(drawer: UiDrawerToken<Props>, props?: Partial<Props>): void {
+    this.overlays.push({ name: drawer.key, props });
+  }
+
+  closeOverlay(): void {
+    this.overlays.push({ name: null });
+  }
+
+  succeeded(notice: OrganizationSuccessNotice): void {
+    this.successes.push(notice);
+  }
+
+  route(): OrganizationRouteReading {
+    return { params: {}, query: this.options.query ?? {} };
+  }
+
+  setQuery(next: Readonly<Record<string, string | undefined>>): void {
+    this.queries.push({ ...next });
+  }
+
+  projectSwitcher(): ReactNode | null {
+    return this.options.projectSwitcher ?? null;
+  }
+
+  navigate(to: string): void {
+    this.navigations.push(to);
+  }
+
+  download(file: OrganizationDownload): void {
+    this.downloads.push(file);
+  }
+
+  signedOut = false;
+
+  signOut(): void {
+    this.signedOut = true;
+  }
+
+  authenticationOverviewCards(): readonly AuthenticationOverviewCard[] {
+    return this.options.overviewCards ?? [];
+  }
+
+  directorySummary(): DirectorySummaryBand | undefined {
+    return this.options.directorySummary;
+  }
+
+  failed(failure: OrganizationFailureNotice): void {
+    this.failures.push(failure);
+  }
+}
+
+/** Billing lends the sales card by token, as its declaration does in the browser app. */
+const billingLendsContactSales = {
+  ...createUiHostServicesFromHost({ route: () => ({ params: {}, query: {} }), navigate: () => {} }),
+  declarations: uiDeclarations([
+    {
+      name: "billing",
+      installation: {
+        capabilities: {},
+        lends: [
+          {
+            token: ContactSalesToken,
+            load: async () => ({
+              default: () => <div data-testid="contact-sales-block">Need more?</div>,
+            }),
+          },
+        ],
+      },
+    },
+  ]),
+};
+
+/** Renders the screen inside the Design System's provider and a host. */
+export function renderWithOrganizationHost(
+  element: ReactElement,
+  host: FakeOrganizationHost = new FakeOrganizationHost(),
+  { analytics }: { analytics?: UiAnalytics } = {},
+) {
+  return {
+    host,
+    ...render(
+      <DesignSystemTestProvider>
+        <UiHostServicesContextProvider
+          value={{ ...billingLendsContactSales, ...(analytics ? { analytics } : {}) }}
+        >
+          <OrganizationHostProvider value={host}>{element}</OrganizationHostProvider>
+        </UiHostServicesContextProvider>
+      </DesignSystemTestProvider>,
+    ),
+  };
+}

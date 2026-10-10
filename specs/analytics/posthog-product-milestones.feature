@@ -124,3 +124,60 @@ Feature: PostHog product milestones
     When the user copies every copyable element on every tab
     Then no emitted analytics payload contains the API key
     And no emitted analytics payload contains the copied text
+
+  # Trace and scenario record the facts (a first or later real trace, a succeeded connected-agent
+  # run); nurturing derives the active day from them and owns PostHog, as main's
+  # trackServerEvent did. One event per project and UTC day, against the organization's admin.
+  @unit
+  Scenario: the first signal of the day tracks the project's active day
+    Given a project that has sent no signal today
+    When its first signal of the day arrives
+    Then project_active_day is tracked with the days since signup and the experiment property
+    And a trace-sourced or scenario-sourced day carries both, an unknown variant counting as none
+
+  @unit
+  Scenario: subsequent signals the same day do not re-track
+    Given a project whose active day is already tracked today
+    When another signal arrives the same day
+    Then nothing is tracked
+
+  @unit
+  Scenario: the first signal of the next UTC day tracks again
+    Given a project whose active day is already tracked today
+    When a signal arrives after midnight UTC
+    Then project_active_day is tracked once more for the new day
+
+  @unit
+  Scenario: a succeeded scenario run against a connected agent is a signal of the day
+    Given a project that has sent no signal today
+    When a scenario run against a connected agent finishes with a verdict
+    Then project_active_day is tracked with the source "scenario_run"
+    And a run that ended ungraded or against another target tracks nothing
+
+  @unit
+  Scenario: the days since signup count whole days from the organization's creation
+    Given an organization created three and a half days before the signal
+    When the active day is derived
+    Then the days since signup are 3
+    And a signal dated before the creation counts 0 days
+
+  # Nurturing sends the server-side milestones through POSTHOG_KEY and POSTHOG_HOST, shared
+  # deployment config, as main's trackServerEvent did.
+  @unit
+  Scenario: Nurturing's milestones send nothing where the deployment named no PostHog key
+    Given a deployment that names no PostHog target
+    When nurturing tracks a milestone
+    Then no PostHog client is built and nothing is sent
+    And closing the channel succeeds
+
+  @unit
+  Scenario: Nurturing builds its PostHog client on its first milestone, not at boot
+    Given nurturing composed its PostHog channel
+    When two milestones are tracked
+    Then the targets were read once, on the first
+
+  @unit
+  Scenario: PostHog signed_up still fires when the signup is unverified
+    Given a sign-up whose address is not yet verified, so organization admission is skipped
+    When the user is created
+    Then signed_up is still tracked

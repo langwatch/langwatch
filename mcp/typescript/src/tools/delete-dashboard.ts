@@ -1,4 +1,4 @@
-import { deleteDashboard as apiDeleteDashboard } from "../langwatch-api-dashboards.js";
+import { deleteDashboard as apiDeleteDashboard } from "../langwatch-api-dashboards.ts";
 
 export async function handleDeleteDashboard(params: { id: string }): Promise<string> {
   const result = await apiDeleteDashboard(params.id);

@@ -1,0 +1,43 @@
+import type { TransportPeers } from "@langwatch/api";
+import type { StoresMemberSource } from "@langwatch/process-stores";
+
+import { ApplicationBuilder } from "./application.ts";
+import type {
+  InstallableServerFeature,
+  ModuleOperatorReadsScope,
+  ModuleSecretsScope,
+  ServerRole,
+} from "./feature-installer.ts";
+import type { ExposedSurface } from "./process-supply.ts";
+import type { TestPeer } from "./testing.ts";
+
+/** Runtime translation after process composition has resolved its declared supplies. */
+export async function bootInstalledProcess(options: {
+  role: ServerRole;
+  modules: readonly InstallableServerFeature[];
+  config: Readonly<Record<string, unknown>>;
+  /** The stores this process opened; an installation test hands `memoryStores()`. */
+  stores: StoresMemberSource;
+  /** Scopes the process resolver per module; omitted where none was stated. */
+  secrets?: ModuleSecretsScope;
+  /** Scopes the stores' operator reads per module; omitted where the stores mint none. */
+  operatorReads?: ModuleOperatorReadsScope;
+  surface?: (peers: TransportPeers) => ExposedSurface<unknown, unknown>;
+  /** Stand-ins for uninstalled peers: `testPeer` from `@langwatch/process/testing`. */
+  peers?: readonly TestPeer[];
+}) {
+  let surface: ExposedSurface<unknown, unknown> | undefined;
+  const builder = new ApplicationBuilder<Record<string, unknown>, unknown, unknown>(options);
+  const mounted = options.surface
+    ? builder.withTransports(
+        (peers) => {
+          surface = options.surface?.(peers);
+          if (!surface) throw new Error("The API surface was not constructed.");
+          return surface.hosts;
+        },
+        () => surface?.serve(),
+      )
+    : builder;
+  // Each declaration validates its config before constructing its App.
+  return mounted.withModules(options.modules as readonly InstallableServerFeature[]).boot();
+}

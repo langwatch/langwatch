@@ -17,10 +17,9 @@ const breakingFooterPattern = /^BREAKING[ -]CHANGE:/m;
 
 // A pin is the remediation this guard prints: one commit per component that
 // edits only that component's shim and carries one `Release-As:` footer.
-// release-please reads the footer per commit and routes it by the paths that
-// commit touched, so the shim edit and the footer are one mechanism. The guard
-// sees files per pull request rather than per commit, so it binds the two by
-// version: the footer has to name the version the shim records.
+// release-please routes each footer by the paths its commit touched, so the
+// guard binds the two per pull request by version: the footer must name the
+// version the shim records.
 const releaseAsPattern = /^[ \t]*Release-As:[ \t]*v?(\S+)[ \t]*$/gim;
 const shimNextPattern = /next:[ \t]*v?(\S+)/i;
 
@@ -33,10 +32,7 @@ export type ReleaseComponent = {
 };
 
 type ReleasePleaseConfig = {
-  packages?: Record<
-    string,
-    { component?: string; "exclude-paths"?: string[] } | undefined
-  >;
+  packages?: Record<string, { component?: string; "exclude-paths"?: string[] } | undefined>;
 };
 
 /**
@@ -47,9 +43,7 @@ type ReleasePleaseConfig = {
 const isUnder = (file: string, path: string): boolean =>
   path === rootPath || file.indexOf(`${path}/`) === 0;
 
-export const releaseComponents = (
-  config: ReleasePleaseConfig,
-): ReleaseComponent[] =>
+export const releaseComponents = (config: ReleasePleaseConfig): ReleaseComponent[] =>
   Object.entries(config.packages ?? {}).map(([path, packageConfig]) => ({
     path,
     name: packageConfig?.component ?? path,
@@ -60,8 +54,7 @@ export const releaseComponents = (
 
 export const carriesBreakingChange = (messages: string[]): boolean =>
   messages.some(
-    (message) =>
-      breakingHeaderPattern.test(message) || breakingFooterPattern.test(message),
+    (message) => breakingHeaderPattern.test(message) || breakingFooterPattern.test(message),
   );
 
 /**
@@ -73,9 +66,7 @@ const isBumped = (component: ReleaseComponent, files: string[]): boolean => {
   const owned = files.filter((file) => isUnder(file, component.path));
   return (
     owned.length > 0 &&
-    !owned.every((file) =>
-      component.excludePaths.some((excluded) => isUnder(file, excluded)),
-    )
+    !owned.every((file) => component.excludePaths.some((excluded) => isUnder(file, excluded)))
   );
 };
 
@@ -89,7 +80,7 @@ export const bumpedComponents = (
 ): ReleaseComponent[] => {
   const nested = components
     .filter((component) => component.path !== rootPath)
-    .sort((a, b) => b.path.length - a.path.length);
+    .toSorted((a, b) => b.path.length - a.path.length);
 
   return components.filter((component) => {
     if (component.path === rootPath) {
@@ -97,18 +88,21 @@ export const bumpedComponents = (
     }
 
     const owned = files.filter(
-      (file) =>
-        nested.find((candidate) => isUnder(file, candidate.path))?.path ===
-        component.path,
+      (file) => nested.find((candidate) => isUnder(file, candidate.path))?.path === component.path,
     );
     return isBumped(component, owned);
   });
 };
 
+/**
+ * Where a component's pin marker lives: beside the component, except the
+ * root component, whose path is the whole tree. That home is `dev/`, not
+ * `.github/`, which is excluded from the root component and would go unseen.
+ */
+export const rootShimPath = "dev/.release-please-shim";
+
 export const shimPath = (component: ReleaseComponent): string =>
-  component.path === rootPath
-    ? ".release-please-shim"
-    : `${component.path}/.release-please-shim`;
+  component.path === rootPath ? rootShimPath : `${component.path}/.release-please-shim`;
 
 /** Every `Release-As:` footer version the pull request carries, in order. */
 export const releaseAsVersions = (messages: string[]): string[] =>
@@ -135,10 +129,9 @@ export type ComponentPin = {
 };
 
 /**
- * A component counts as pinned only with both halves in place. A shim edit
- * alone moves nothing, since release-please reads the version off the footer;
- * a footer alone cannot be attributed to a component, since only the paths a
- * commit touched route it. The version recorded in the shim binds them.
+ * A component counts as pinned only with both halves in place: a shim edit
+ * alone moves nothing since release-please reads the version off the footer,
+ * and a footer alone can't be attributed without the paths a commit touched.
  */
 export const componentPins = ({
   components,
@@ -159,9 +152,7 @@ export const componentPins = ({
 
     const recorded = shimVersion(readShim(shim) ?? "");
     const pinned =
-      recorded !== undefined && footerVersions.includes(recorded)
-        ? recorded
-        : undefined;
+      recorded !== undefined && footerVersions.includes(recorded) ? recorded : undefined;
     return { component, shim, shimChanged: true, recorded, pinned };
   });
 
@@ -171,8 +162,7 @@ const readLines = (path: string): string[] =>
     .map((line) => line.trim())
     .filter((line) => line !== "");
 
-const readJson = <T>(path: string): T =>
-  JSON.parse(readFileSync(path, "utf8")) as T;
+const readJson = <T>(path: string): T => JSON.parse(readFileSync(path, "utf8")) as T;
 
 /**
  * A shim the pull request deletes, or one under a path this checkout does not
@@ -200,9 +190,7 @@ const reportHalfDonePins = ({
   pins: ComponentPin[];
   footerVersions: string[];
 }): void => {
-  const halfDone = pins.filter(
-    (pin) => pin.pinned === undefined && pin.shimChanged,
-  );
+  const halfDone = pins.filter((pin) => pin.pinned === undefined && pin.shimChanged);
 
   if (halfDone.length > 0) {
     console.error("A pin takes both halves: the shim edit, which is what");
@@ -221,9 +209,7 @@ const reportHalfDonePins = ({
     }
     if (footerVersions.length > 0) {
       console.error("");
-      console.error(
-        `Footers on this pull request: ${unique(footerVersions).join(", ")}.`,
-      );
+      console.error(`Footers on this pull request: ${unique(footerVersions).join(", ")}.`);
     }
     console.error("");
     return;
@@ -241,18 +227,8 @@ const reportHalfDonePins = ({
 
 /**
  * A pin used to exempt a component here. It no longer does, and #4998 is why:
- * `Release-As:` overrides the version and nothing else, so a pinned component
- * still takes the other component's `BREAKING CHANGE:` note into its own
- * changelog. That pull request pinned the platform to 3.13.0 and the Go SDK's
- * two breaks were still filed under the platform's release.
- *
- * Squash is this repository's only merge method, so the per-component pin
- * commits the old procedure asked for collapse into one commit whose body is
- * every branch commit's body concatenated. #4998 came out of that with two
- * competing `Release-As:` footers at lines 353 and 372 of a 402-line body, and
- * the platform pin did not apply — it released 4.0.0, not the 3.13.0 it asked
- * for. One message cannot carry one pin per component, however the parser
- * resolves the collision, so splitting is what actually scopes a break.
+ * `Release-As:` overrides only the version, so a pinned component still takes
+ * another's `BREAKING CHANGE:` note — one squashed message can't carry one pin per component.
  */
 const reportPinsDoNotExempt = (pins: ComponentPin[]): void => {
   const pinned = pins.filter((pin) => pin.pinned !== undefined);
@@ -278,9 +254,7 @@ const report = ({
   versions: Record<string, string>;
   footerVersions: string[];
 }): void => {
-  console.error(
-    "This pull request carries a breaking-change marker and touches more than",
-  );
+  console.error("This pull request carries a breaking-change marker and touches more than");
   console.error("one release component. release-please splits commits by path");
   console.error("but applies the whole commit message to every component the");
   console.error("commit touched, so the break reaches every one of these:");
@@ -288,9 +262,7 @@ const report = ({
   for (const pin of pins) {
     const current = versions[pin.component.path] ?? "unknown";
     const pinned = pin.pinned === undefined ? "" : `, pinned to ${pin.pinned}`;
-    console.error(
-      `- ${pin.component.name} (${pin.component.path}), now ${current}${pinned}`,
-    );
+    console.error(`- ${pin.component.name} (${pin.component.path}), now ${current}${pinned}`);
   }
   console.error("");
   reportPinsDoNotExempt(pins);
@@ -316,9 +288,7 @@ const main = (): number => {
     return 2;
   }
 
-  const messages = readLines(messagesArg).map(
-    (line) => JSON.parse(line) as string,
-  );
+  const messages = readLines(messagesArg).map((line) => JSON.parse(line) as string);
   if (!carriesBreakingChange(messages)) {
     console.log("no breaking-change marker, release scope check skipped");
     return 0;
@@ -348,16 +318,13 @@ const main = (): number => {
   // exemption: see reportPinsDoNotExempt. More than one bumped component with a
   // breaking marker fails, and the `multi-component-major` label — checked by
   // the workflow before this script runs — is the only way past it.
-  const versions = readJson<Record<string, string>>(
-    resolve(repoRoot, manifestFile),
-  );
+  const versions = readJson<Record<string, string>>(resolve(repoRoot, manifestFile));
   report({ pins, versions, footerVersions });
   return 1;
 };
 
 const isEntrypoint = (): boolean =>
-  process.argv[1] !== undefined &&
-  import.meta.url === pathToFileURL(resolve(process.argv[1])).href;
+  process.argv[1] !== undefined && import.meta.url === pathToFileURL(resolve(process.argv[1])).href;
 
 if (isEntrypoint()) {
   process.exitCode = main();

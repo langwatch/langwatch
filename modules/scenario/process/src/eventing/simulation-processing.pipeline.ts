@@ -1,0 +1,249 @@
+import {
+  defineAggregate,
+  defineEventingModule,
+  definePipeline,
+  type AppendStore,
+  type EventingSetup,
+  type FoldProjectionStore,
+  type LaneAlias,
+  type ProcessManagerApplier,
+  type Projection,
+  type RegisteredCommand,
+  type RetentionPolicyResolver,
+  type StaticPipelineDefinition,
+} from "@langwatch/eventing";
+import type { ResourceOwnership } from "@langwatch/process";
+import type { SimulationProcessingEvent, SimulationService } from "@langwatch/scenario-contract";
+import {
+  SimulationRunQueuedEventSchema,
+  SimulationRunStartedEventSchema,
+  SimulationMessageSnapshotEventSchema,
+  SimulationRunFinishedEventSchema,
+  SimulationRunEvaluatedEventSchema,
+  SimulationTextMessageStartEventSchema,
+  SimulationTextMessageEndEventSchema,
+  SimulationRunMetricsComputedEventSchema,
+  SimulationRunCancelRequestedEventSchema,
+  SimulationRunAgentInstanceRecordedEventSchema,
+  SimulationRunCutAtLimitRecordedEventSchema,
+  SimulationRunDeletedEventSchema,
+  SimulationSetArchivedEventSchema,
+} from "@langwatch/scenario-contract";
+import { SPAN_RECEIVED_EVENT_TYPE, spanReceivedEventDataSchema } from "@langwatch/trace-contract";
+
+import type { ScenarioModule } from "../app/scenario.app.ts";
+import { ComputeRunMetricsCommand } from "./compute-run-metrics.commands.ts";
+import { FinishRunCommand } from "./finish-run.commands.ts";
+import { QueueRunCommand } from "./queue-run.commands.ts";
+import { RecordEvaluationsCommand } from "./record-evaluations.commands.ts";
+import { SimulationProcessingCommandsAdapter } from "./simulation-processing.commands.ts";
+import {
+  SimulationRunMetricsMapProjection,
+  type SimulationRunMetricsProjectionRecord,
+} from "./simulation-run-metrics.projection.ts";
+import {
+  type SimulationRunStateData,
+  SimulationRunStateFoldProjection,
+} from "./simulation-run-state.projection.ts";
+import {
+  createSnapshotUpdateBroadcastSubscriber,
+  type SnapshotUpdateBroadcastSubscriberDeps,
+} from "./snapshot-update-broadcast.subscriber.ts";
+import {
+  createTraceMetricsSyncSubscriber,
+  createTraceSpanMetricsSyncHandler,
+  TRACE_SPAN_METRICS_SETTLE_MS,
+  type TraceMetricsSyncSubscriberDeps,
+  type TraceSpanMetricsSyncDeps,
+} from "./trace-metrics-sync.subscriber.ts";
+
+interface SimulationProcessingPipelineDeps {
+  simulationRunStore: FoldProjectionStore<SimulationRunStateData>;
+  /**
+   * The metrics map projection's own append seat, named as the PORT it is.
+   * A process that only PRODUCES commands folds nothing and has no such
+   * adapter to hand — naming the concrete class here blocked it registering at all.
+   */
+  simulationRunMetricsStore: AppendStore<SimulationRunMetricsProjectionRecord>;
+  queueRunCommand: QueueRunCommand;
+  finishRunCommand: FinishRunCommand;
+  recordEvaluationsCommand: RecordEvaluationsCommand;
+  computeRunMetricsCommand: ComputeRunMetricsCommand;
+  scenarioRunExecution: { name: string; process: ProcessManagerApplier<SimulationProcessingEvent> };
+  scenarioEvaluations: { name: string; process: ProcessManagerApplier<SimulationProcessingEvent> };
+  simulations: SimulationService;
+  snapshotUpdateBroadcast: SnapshotUpdateBroadcastSubscriberDeps;
+  traceMetricsSync: TraceMetricsSyncSubscriberDeps;
+  traceSpanMetricsSync: TraceSpanMetricsSyncDeps;
+  /** Each tenant's retention, stamped on the run rows in place of the default (§9). */
+  retention?: RetentionPolicyResolver;
+}
+
+/** Main's simulation lanes that moved here or into the process manager that replaced them. */
+function mainSimulationLaneAliases({
+  evaluationsProcess,
+}: {
+  evaluationsProcess: string;
+}): readonly LaneAlias[] {
+  return [
+    {
+      from: "simulation_processing:subscriber:scenarioEvaluations",
+      to: { jobType: "subscriber", lane: `pm:${evaluationsProcess}` },
+      removeAfter: "3.21.0",
+    },
+    {
+      from: "simulation_processing:job:scenarioEvaluations",
+      tombstone:
+        "grading is an intent of the scenario_evaluations process; a job has no finished event to open it",
+      removeAfter: "3.21.0",
+    },
+    {
+      from: "simulation_processing:job:deferredComputeRunMetrics",
+      to: { jobType: "command", lane: "computeRunMetrics" },
+      removeAfter: "3.21.0",
+    },
+    {
+      from: "trace_processing:reactor:simulationMetricsSync",
+      to: { jobType: "subscriber", lane: "traceSpanMetricsSync" },
+      eventTypes: [SPAN_RECEIVED_EVENT_TYPE],
+      removeAfter: "3.21.0",
+    },
+  ];
+}
+
+function buildSimulationProcessingPipelineDefinition(
+  deps: SimulationProcessingPipelineDeps,
+): SimulationProcessingPipelineDefinition {
+  const commands = SimulationProcessingCommandsAdapter.create();
+  const traceSpanMetricsSync = createTraceSpanMetricsSyncHandler(deps.traceSpanMetricsSync);
+
+  const pipeline = definePipeline({
+    name: "simulation_processing",
+    aggregate: defineAggregate({
+      type: "simulation_run",
+    }),
+  })
+    .withEvents([
+      SimulationRunQueuedEventSchema,
+      SimulationRunStartedEventSchema,
+      SimulationMessageSnapshotEventSchema,
+      SimulationRunFinishedEventSchema,
+      SimulationRunEvaluatedEventSchema,
+      SimulationTextMessageStartEventSchema,
+      SimulationTextMessageEndEventSchema,
+      SimulationRunMetricsComputedEventSchema,
+      SimulationRunCancelRequestedEventSchema,
+      SimulationRunAgentInstanceRecordedEventSchema,
+      SimulationRunCutAtLimitRecordedEventSchema,
+      SimulationRunDeletedEventSchema,
+      SimulationSetArchivedEventSchema,
+    ])
+    .withClickHouseFoldProjection(
+      SimulationRunStateFoldProjection.create({ store: deps.simulationRunStore }),
+    )
+    .withClickHouseMapProjection(
+      SimulationRunMetricsMapProjection.create({ store: deps.simulationRunMetricsStore }),
+    )
+    .withEventSubscriber(
+      "snapshotUpdateBroadcast",
+      createSnapshotUpdateBroadcastSubscriber(deps.snapshotUpdateBroadcast),
+    )
+    .withEventSubscriber(
+      "traceMetricsSync",
+      createTraceMetricsSyncSubscriber(deps.traceMetricsSync),
+    )
+    .withPeerSubscriber("traceSpanMetricsSync", {
+      eventType: SPAN_RECEIVED_EVENT_TYPE,
+      // Reads no span field: the folded summary is read through TraceApi at handling.
+      data: spanReceivedEventDataSchema.pick({}),
+      options: {
+        delay: TRACE_SPAN_METRICS_SETTLE_MS,
+        deduplication: {
+          makeId: (event) =>
+            `subscriber:traceSpanMetricsSync:${event.tenantId}:${String(event.aggregateId)}`,
+          ttlMs: TRACE_SPAN_METRICS_SETTLE_MS,
+        },
+      },
+      handle: (_data, context) =>
+        traceSpanMetricsSync({
+          tenantId: String(context.tenantId),
+          traceId: String(context.aggregateId),
+          occurredAt: context.occurredAt,
+        }),
+    })
+    .withProcessManager(deps.scenarioRunExecution.name, deps.scenarioRunExecution.process)
+    .withProcessManager(deps.scenarioEvaluations.name, deps.scenarioEvaluations.process)
+    .withCommandInstance({
+      name: "queueRun",
+      handlerClass: QueueRunCommand,
+      instance: deps.queueRunCommand,
+    })
+    .withCommand("startRun", commands.startRun)
+    .withCommand("messageSnapshot", commands.messageSnapshot)
+    .withCommand("textMessageStart", commands.textMessageStart)
+    .withCommand("textMessageEnd", commands.textMessageEnd)
+    .withCommandInstance({
+      name: "finishRun",
+      handlerClass: FinishRunCommand,
+      instance: deps.finishRunCommand,
+    })
+    .withCommandInstance({
+      name: "recordEvaluations",
+      handlerClass: RecordEvaluationsCommand,
+      instance: deps.recordEvaluationsCommand,
+    })
+    .withCommand("cancelRun", commands.cancelRun)
+    .withCommand("deleteRun", commands.deleteRun)
+    .withCommand("recordAgentInstance", commands.recordAgentInstance)
+    .withCommand("recordCutAtLimit", commands.recordCutAtLimit)
+    .withCommandInstance({
+      name: "computeRunMetrics",
+      handlerClass: ComputeRunMetricsCommand,
+      instance: deps.computeRunMetricsCommand,
+      options: {
+        deduplication: {
+          makeId: (
+            ...args: Parameters<typeof ComputeRunMetricsCommand.makeJobId>
+          ): ReturnType<typeof ComputeRunMetricsCommand.makeJobId> =>
+            ComputeRunMetricsCommand.makeJobId(...args),
+          ttlMs: 60_000,
+        },
+      },
+    })
+    .withLaneAliases(
+      mainSimulationLaneAliases({ evaluationsProcess: deps.scenarioEvaluations.name }),
+    );
+  return (deps.retention ? pipeline.withRetention(deps.retention) : pipeline).build();
+}
+
+/** The pipeline `SimulationProcessingPipelineAdapter.create` answers, its commands erased. */
+export type SimulationProcessingPipelineDefinition = StaticPipelineDefinition<
+  SimulationProcessingEvent,
+  Record<string, Projection>,
+  RegisteredCommand
+>;
+
+export class SimulationProcessingPipelineAdapter {
+  static create(deps: SimulationProcessingPipelineDeps): SimulationProcessingPipelineDefinition {
+    return buildSimulationProcessingPipelineDefinition(deps);
+  }
+
+  private constructor() {}
+}
+
+/** simulation_processing, built by the app in both roles; its senders carry every run write. */
+export const simulationProcessingEventing = defineEventingModule({
+  pipeline: "simulation_processing",
+  build: ({
+    app,
+    participation,
+    priorEvents,
+    resources,
+  }: EventingSetup<never, ScenarioModule, Pick<ResourceOwnership, "own">>) =>
+    app.simulationPipeline({
+      participation,
+      ...(priorEvents ? { priorEvents } : {}),
+      ...(resources ? { resources } : {}),
+    }),
+  connect: ({ app, commands }) => app.connectSimulationCommands(commands),
+});

@@ -1,0 +1,24 @@
+import { api } from "../../../../behavior/governance-api.ts";
+import { Link } from "../../../../ui/elements/governance-link.tsx";
+import { QuarantineFillAlert as EnterpriseQuarantineFillAlert } from "../elements/quarantine-fill-alert.tsx";
+/** Application data adapter for the portable Enterprise warning surface. */
+export function QuarantineFillAlert({ organizationId }: { organizationId: string }) {
+  const { data } = api.governance.quarantineFillStats.useQuery(
+    { organizationId },
+    {
+      enabled: !!organizationId,
+      refetchOnWindowFocus: false,
+    },
+  );
+
+  return (
+    <EnterpriseQuarantineFillAlert
+      stats={data}
+      reviewLink={
+        <Link href="/governance/inventory?tab=sources" fontSize="sm" color="orange.fg">
+          Review ingestion sources →
+        </Link>
+      }
+    />
+  );
+}

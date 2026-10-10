@@ -8,10 +8,14 @@ import (
 func TestObservabilityEnvIsEmittedOnlyWhenTheStackIsUp(t *testing.T) {
 	st := Stack{Slug: "portless", APIPort: 4000, Services: []Service{{Name: "app", Port: 3001, URL: "https://app.portless.langwatch.localhost"}}}
 
-	for _, key := range []string{"OTEL_EXPORTER_OTLP_ENDPOINT", "OTEL_DEBUG_COLLECTOR_ENDPOINT", "PINO_OTEL_ENABLED", "OTEL_METRICS_ENABLED"} {
+	for _, key := range []string{"OTEL_EXPORTER_OTLP_ENDPOINT", "OTEL_LOGS_EXPORTER"} {
 		if got := valueOf(st.OverlayEnv(), key); got != "" {
 			t.Errorf("with no collector running, %s must be unset; got %q", key, got)
 		}
+	}
+	// Absence is stated, not implied: a stale shell endpoint must not become a sink.
+	if got := valueOf(st.OverlayEnv(), "OTEL_METRICS_ENABLED"); got != "false" {
+		t.Errorf("with no collector running, OTEL_METRICS_ENABLED = %q, want false", got)
 	}
 
 	st.ObservabilityOTLPPort = 4318
@@ -23,11 +27,15 @@ func TestObservabilityEnvIsEmittedOnlyWhenTheStackIsUp(t *testing.T) {
 	if got, want := valueOf(env, "OTEL_DEBUG_COLLECTOR_ENDPOINT"), "http://127.0.0.1:4318"; got != want {
 		t.Errorf("OTEL_DEBUG_COLLECTOR_ENDPOINT = %q, want %q", got, want)
 	}
-	if got := valueOf(env, "PINO_OTEL_ENABLED"); got != "true" {
-		t.Errorf("PINO_OTEL_ENABLED = %q, want true", got)
+	for _, key := range []string{"OTEL_LOGS_EXPORTER", "OTEL_METRICS_EXPORTER"} {
+		if got := valueOf(env, key); got != "otlp" {
+			t.Errorf("%s = %q, want otlp", key, got)
+		}
 	}
-	if got := valueOf(env, "OTEL_METRICS_ENABLED"); got != "true" {
-		t.Errorf("OTEL_METRICS_ENABLED = %q, want true", got)
+	for _, key := range []string{"PINO_OTEL_ENABLED", "OTEL_METRICS_ENABLED"} {
+		if got := valueOf(env, key); got != "" {
+			t.Errorf("deprecated %s must not be set; got %q", key, got)
+		}
 	}
 }
 
@@ -41,6 +49,9 @@ func TestObservabilityEnvEnablesBrowserTelemetryWithTheStack(t *testing.T) {
 	}
 
 	up := Stack{Slug: "portless", ObservabilityOTLPPort: 4318}
+	if got := valueOf(up.OverlayEnv(), "RUM_COLLECTOR_ENDPOINT"); got == "" {
+		t.Error("RUM_COLLECTOR_ENDPOINT must be set so the rum module does not warn about the deprecated OTEL fallback")
+	}
 	if got := valueOf(up.OverlayEnv(), "RUM_ENABLED"); got != "true" {
 		t.Errorf("RUM_ENABLED = %q, want true", got)
 	}

@@ -19,6 +19,13 @@ Feature: Organization authentication settings
       And where the connection stands is said in words, never as a state name
 
     @integration
+    Scenario: The sign-on card says up front that single sign-on needs an Enterprise plan
+      Given "acme" is not on an Enterprise plan
+      When "ana" opens the authentication page
+      Then the sign-on card says single sign-on is an Enterprise feature
+      And it offers no way to prove a domain or set it up
+
+    @integration
     Scenario: A domain whose record has gone says so on the overview
       Given "acme" proved "acme.com" and its published record has been missing
       for two days
@@ -201,9 +208,8 @@ Feature: Organization authentication settings
     @integration
     Scenario: The two ways a domain matters are told apart
       When "ana" reads the who-can-join policy
-      Then it says a verified domain is what lets colleagues join automatically
-      And it says asking to join needs only one member with a verified address,
-      because "ana" approves each request herself
+      Then it says people on a verified domain join without waiting for approval
+      And it says people with a verified company address can ask to join
 
     @integration @unimplemented
     Scenario: A domain is proved in one place, and the policy points at it
@@ -221,3 +227,12 @@ Feature: Organization authentication settings
       Then its organization policies remain available for password sign-ins
       And the page explains that single sign-on is not required
       And activating or removing a connection does not change the saved policies
+
+  Rule: the Authentication pages share one rail
+
+    @integration
+    Scenario: The Authentication pages share main's rail
+      Given an administrator on any of Overview, Identity provider or Connectors
+      When the page renders
+      Then a rail lists Overview, Identity provider and Connectors in that order
+      And the page the reader is on is marked as the current entry

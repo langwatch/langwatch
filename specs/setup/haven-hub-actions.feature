@@ -9,11 +9,11 @@ Feature: The haven hub — one place to see and act on every stack
   # (DownStack, DestroyWorktree and their guards), `domain/footprint.go`
   # (the memory partitioner) and `adapters/hubtui/` (the TUI itself).
   # Scenarios are bound by Go tests (`go test ./...` in tools/thuishaven):
-  # `adapters/hubtui/hubtui_test.go` (TestHubModel: enter/g opens git,
+  # `adapters/hubtui/hubtui_test.go` (TestHubModel: g opens git,
   # d+confirm downs, x+type-the-name destroys) and `app/hub_test.go`
   # (TestDownStack, TestDestroyWorktree with the primary-checkout and
   # running-from refusals). The parity checker
-  # (`platform/app/scripts/check-feature-parity.ts`) scans tools/thuishaven's
+  # (`packages/architecture-enforcer/src/check-feature-parity.ts`) scans tools/thuishaven's
   # Go tests: @unit scenarios are bound by `// @scenario` annotations above
   # those test funcs; the live-terminal flows remain `@unimplemented`.
 
@@ -35,7 +35,7 @@ Feature: The haven hub — one place to see and act on every stack
   @unit
   Scenario: Jumping into a stack's git view from the hub
     Given a stack is selected in the hub
-    When I press enter (or "g")
+    When I press "g"
     Then the git TUI opens for that stack's worktree
     And quitting the git TUI returns me to the hub
 
@@ -48,7 +48,7 @@ Feature: The haven hub — one place to see and act on every stack
     And its databases are kept for the next start
 
   # Boundary with the never-delete-uncommitted-work guardrail: automated
-  # cleanup (`haven clean`) never touches a dirty worktree. Destroying one
+  # cleanup (`haven machine clean`) never touches a dirty worktree. Destroying one
   # is only possible here, where a person deliberately types the stack's
   # exact name to confirm — that explicit confirmation is the sanctioned
   # exception, not a loophole in the guardrail.
@@ -164,3 +164,31 @@ Feature: The haven hub — one place to see and act on every stack
     When the page renders
     Then the memory chart, the idle worktrees and the recent reaping appear
     And the shared servers are stated once instead of repeating on every stack card
+
+  # The hub's two lifecycle actions, over HTTP. The dashboard already showed
+  # every stack and every worktree with nothing running in it, and could act on
+  # none of them — so the answer to "bounce that one" was to find the terminal
+  # it was started from.
+
+  @unit
+  Scenario: A running stack can be restarted from the dashboard
+    Given a stack running in the browser dashboard's list
+    When its restart button is pressed
+    Then its services are bounced and the page says what happened
+    And a stack whose launcher is gone offers no restart, because there is nothing to signal
+    And a haven built without the action renders no button at all
+
+  @unit
+  Scenario: A worktree with nothing running can be started from the dashboard
+    Given a worktree the dashboard lists as having no stack
+    When its start button is pressed
+    Then a launcher is spawned in that worktree and the stack appears as its services come up
+    And only a directory git lists as a worktree of this repository may be started
+    And a worktree whose stack is already live is refused rather than started twice
+
+  @unit
+  Scenario: Only the dashboard's own page may take a lifecycle action
+    Given a page on another site posting at the daemon's loopback port
+    When it asks for a restart or a start
+    Then the request is refused, because these actions start and signal processes
+    And a request that says nothing about where it came from is refused too

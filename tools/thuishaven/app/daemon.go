@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"time"
 
 	"go.uber.org/zap"
@@ -36,7 +37,7 @@ func (o *Orchestrator) ensureDaemon(worktreeDir string) {
 
 func (o *Orchestrator) daemonAlive() bool {
 	info, ok := o.store.Daemon()
-	if !ok || !o.sys.ProcessAlive(info.PID) {
+	if !ok || !o.pidIsOurs(info.PID, info.Start) {
 		return false
 	}
 	// PID liveness alone is unreliable: when the daemon dies its PID is recycled
@@ -49,9 +50,10 @@ func (o *Orchestrator) daemonAlive() bool {
 
 // RunDaemon is the singleton server + monitor. It registers the shared surfaces
 // (dashboard, telemetry, observability), serves them, and reaps stacks whose
-// launcher has exited or gone stale.
-func (o *Orchestrator) RunDaemon(ctx context.Context, dash Dashboard) error {
-	if o.daemonAlive() {
+// launcher has exited or gone stale. A non-zero after is the predecessor this
+// daemon succeeds: it waits for that daemon to let go of the lock (D10).
+func (o *Orchestrator) RunDaemon(ctx context.Context, dash Dashboard, after int) error {
+	if after == 0 && o.daemonAlive() {
 		fmt.Println("haven daemon already running")
 		return nil
 	}
@@ -65,27 +67,20 @@ func (o *Orchestrator) RunDaemon(ctx context.Context, dash Dashboard) error {
 		return err
 	}
 	port := ports[0]
-	info := DaemonInfo{PID: o.sys.Getpid(), Port: port, URL: fmt.Sprintf("http://127.0.0.1:%d", port)}
+	info := DaemonInfo{PID: o.sys.Getpid(), Start: o.sys.ProcessStart(o.sys.Getpid()), Port: port, URL: fmt.Sprintf("http://127.0.0.1:%d", port)}
 	// Atomically claim the singleton slot BEFORE wiring routes — this both makes
 	// `up` find us immediately and closes the startup race where two `up`s slip
 	// past the daemonAlive() check above (which needs the port listening) and each
-	// spawn a daemon. O_EXCL lets exactly one racer win. If we lose to a live owner
-	// we defer to it; a record left by a crashed daemon (dead PID) is cleared and
-	// the claim retried. ProcessAlive is the right liveness test here, not the
-	// port: the winner has just written its own PID and may not be listening yet.
-	for {
-		claimed, err := o.store.ClaimDaemon(info)
-		if err != nil {
-			return err
-		}
-		if claimed {
-			break
-		}
-		if owner, ok := o.store.Daemon(); ok && o.sys.ProcessAlive(owner.PID) {
-			fmt.Println("haven daemon already running")
-			return nil
-		}
-		o.store.ClearDaemon() // stale record from a crashed daemon — drop and retry
+	// spawn a daemon. The flock lets exactly one racer win and is held for life;
+	// the kernel drops it when its holder dies, so a crashed daemon's record is
+	// simply overwritten by the next claim (D9).
+	claimed, err := o.claimDaemon(ctx, info, after)
+	if err != nil {
+		return err
+	}
+	if !claimed {
+		fmt.Println("haven daemon already running")
+		return nil
 	}
 	defer o.store.ClearDaemon()
 
@@ -93,11 +88,13 @@ func (o *Orchestrator) RunDaemon(ctx context.Context, dash Dashboard) error {
 	_ = o.proxy.Register(domain.HubService, "", port) // hub.langwatch.localhost (dashboard)
 	_ = o.proxy.Register(p, "", port)                 // langwatch.localhost (legacy alias)
 	_ = o.proxy.Register("telemetry", "", port)       // telemetry.langwatch.localhost (fan-out)
+	o.routeStackHomes(port)                           // <slug>.langwatch.localhost (stack homes)
 	o.refreshObservability(ctx)
 	defer func() {
 		o.proxy.Remove(domain.HubService, "")
 		o.proxy.Remove(p, "")
 		o.proxy.Remove("telemetry", "")
+		o.unrouteStackHomes()
 	}()
 
 	scheme, pport := o.proxy.Endpoint()
@@ -105,7 +102,57 @@ func (o *Orchestrator) RunDaemon(ctx context.Context, dash Dashboard) error {
 		zap.Int("port", port),
 		zap.String("dashboard", o.cfg.Naming.URL(domain.HubService, "", scheme, pport)))
 	go o.monitorLoop(ctx)
+	defer o.reconcileWaitRoutes(port, true)
+	go o.waitRouteLoop(ctx, port)
 	return dash.Serve(ctx, port)
+}
+
+// successorWait bounds how long a successor waits for its predecessor's lock.
+const successorWait = 30 * time.Second
+
+// claimDaemon takes the singleton lock; a successor retries until its
+// predecessor has exited, and gives up quietly if another daemon won meanwhile.
+func (o *Orchestrator) claimDaemon(ctx context.Context, info DaemonInfo, after int) (bool, error) {
+	deadline := time.Now().Add(successorWait)
+	for {
+		claimed, err := o.store.ClaimDaemon(info)
+		if claimed || err != nil || after == 0 || time.Now().After(deadline) {
+			return claimed, err
+		}
+		select {
+		case <-ctx.Done():
+			return false, nil
+		case <-time.After(100 * time.Millisecond):
+		}
+	}
+}
+
+// StartDaemonSuccessor spawns a daemon that takes over once pid exits. The
+// successor runs DaemonArgv, so a rebuilt or reinstalled binary is what serves.
+func (o *Orchestrator) StartDaemonSuccessor(pid int, dir string) error {
+	argv := append(slices.Clone(o.cfg.DaemonArgv), "--after", strconv.Itoa(pid))
+	return o.sys.SpawnDetached(argv, dir, filepath.Join(o.cfg.Home, "haven.log"))
+}
+
+// RestartDaemon replaces the running daemon with a fresh one and returns the
+// new pid. Stacks are untouched: their launchers are in their own sessions and
+// the daemon signals nobody on exit. No daemon running means one is started.
+func (o *Orchestrator) RestartDaemon(dir string) (int, error) {
+	old, ok := o.store.Daemon()
+	if !ok || !o.daemonAlive() {
+		o.ensureDaemon(dir)
+	} else {
+		if err := o.StartDaemonSuccessor(old.PID, dir); err != nil {
+			return 0, err
+		}
+		o.sys.Terminate(old.PID)
+	}
+	for deadline := time.Now().Add(successorWait); time.Now().Before(deadline); time.Sleep(100 * time.Millisecond) {
+		if info, ok := o.store.Daemon(); ok && info.PID != old.PID && o.daemonAlive() {
+			return info.PID, nil
+		}
+	}
+	return 0, fmt.Errorf("no haven daemon came up within %s; see %s", successorWait, filepath.Join(o.cfg.Home, "haven.log"))
 }
 
 // monitorLoop prunes stacks whose launcher has died (crashed pnpm dev, closed
@@ -123,14 +170,14 @@ func (o *Orchestrator) monitorLoop(ctx context.Context) {
 			cycles++
 			// Every ~10 min, prune orphaned git worktree admin entries — the only
 			// disk hygiene safe to do unattended (it never touches a live tree).
-			// node_modules reclamation stays explicit (`haven prune --yes`).
+			// node_modules reclamation stays explicit (`haven machine clean --yes`).
 			if o.hyg != nil && o.cfg.RepoRoot != "" && cycles%60 == 1 {
 				o.hyg.PruneGitWorktrees(o.cfg.RepoRoot)
 			}
 			// Every ~10 min, refresh the idle clock of every registered stack's
 			// databases, and prune databases whose worktree has not been up in
 			// DBIdleTTL — the unattended counterpart of the interactive reclaim in
-			// `haven clean` (`down` itself never discards data).
+			// `haven machine clean` (`down` itself never discards data).
 			if cycles%60 == 1 {
 				o.reapTestContainers(ctx)
 				// Fail closed: this clock guards destructive pruning, so if any
@@ -146,16 +193,32 @@ func (o *Orchestrator) monitorLoop(ctx context.Context) {
 				}
 				if touchesPersisted {
 					o.pruneIdleDatabases(ctx)
+					o.pruneStrayDatabasesQuietly(ctx)
 				}
+			}
+			// Once a day (and once on the first tick after a daemon start),
+			// reclaim the two categories that grow without bound while nobody
+			// is looking: worktrees a tool made and forgot or whose branch is
+			// already on main, and the scratch of finished agent jobs.
+			if cycles%dailyCycles == 1 {
+				o.reapReclaimableWorktrees(ctx)
+				o.reapJobScratch()
 			}
 			o.reapDeadStacks()
 			o.governPressure()
 			o.governProcesses()
+			o.reapOrphanNxDaemons()
 			o.refreshObservability(ctx)
 			o.reapClickHouse()
+			o.stopColimaIfIdle(ctx)
 		}
 	}
 }
+
+// dailyCycles is a day expressed in monitor ticks — the cadence of the
+// disk-reclaim passes, which are slow (a `du` and a git question per worktree)
+// and have nothing to gain from running more often than the disk fills.
+const dailyCycles = int((24 * time.Hour) / (10 * time.Second))
 
 // reapDeadStacks is the tick's route-to-backend reconciliation: every 10s it
 // compares each registered stack against the process that is supposed to be
@@ -169,7 +232,10 @@ func (o *Orchestrator) monitorLoop(ctx context.Context) {
 func (o *Orchestrator) reapDeadStacks() {
 	now := o.sys.Now()
 	for _, s := range o.store.Stacks() {
-		dead := s.LauncherPID != 0 && !o.sys.ProcessAlive(s.LauncherPID)
+		if o.superviseKeeper(s) {
+			continue
+		}
+		dead := s.LauncherPID != 0 && !o.launcherIsOurs(s)
 		if stale := s.Stale(now, o.cfg.IdleTTL); dead || stale {
 			o.reapStack(s, dead, stale)
 		}
@@ -182,13 +248,14 @@ func (o *Orchestrator) reapDeadStacks() {
 // outlived the stack that owned it.
 func (o *Orchestrator) reapStack(s domain.Stack, dead, stale bool) {
 	timedOut := stale && !dead
-	if timedOut {
+	if timedOut && s.LauncherPID != 0 {
 		o.sys.Terminate(s.LauncherPID) // let the launcher stop its own children
 	}
 	if !s.PortlessDisabled {
 		o.removeStackRoutes(s.Slug, s.Services)
 	}
 	o.store.RemoveStack(s.Slug)
+	removeKeeperPlan(s.WorktreeDir, s.Slug)
 	reason := "launcher died"
 	if timedOut {
 		reason = "heartbeat stale past the idle TTL"
@@ -280,7 +347,7 @@ func (o *Orchestrator) publishPressure(level domain.Pressure) {
 // the daemon, and every group operation here would then be aimed at haven
 // itself.
 func (o *Orchestrator) governable(s domain.Stack) bool {
-	return s.LauncherPID != 0 && o.sys.ProcessAlive(s.LauncherPID)
+	return s.LauncherPID != 0 && o.launcherIsOurs(s)
 }
 
 func (o *Orchestrator) restoreDemoted(stacks []domain.Stack) {
@@ -353,7 +420,7 @@ func (o *Orchestrator) recordReap(kind, target, reason string) {
 func (o *Orchestrator) fattestStack() (slug string, rss uint64) {
 	stackRSS := o.StackRSSByLauncher()
 	for _, s := range o.store.Stacks() {
-		if !o.sys.ProcessAlive(s.LauncherPID) {
+		if !o.launcherIsOurs(s) {
 			continue
 		}
 		if got := stackRSS[s.LauncherPID]; got > rss {

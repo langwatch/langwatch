@@ -1,15 +1,15 @@
 /**
- * The request path every management family shares: what it does with a success
- * that carries no body, and what it refuses before a request is made.
- *
+ * The request path every management family shares: what it does with a success that
+ * carries no body, and what it refuses before a request is made.
  * @see specs/typescript-sdk/cli-management-apis.feature
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
 import {
   INSTANCE_ADMIN_KEY_ENV,
   OrganizationsAdminApiService,
 } from "../../organizations-admin/organizations-admin-api.service";
-import { createManagementRequest } from "../management-request";
+import { createManagementRequest, managementPath } from "../management-request";
 
 let mockFetch: ReturnType<typeof vi.fn>;
 
@@ -41,7 +41,7 @@ describe("createManagementRequest", () => {
       await expect(
         request({
           operation: "revoke SCIM token",
-          path: "/api/scim-tokens/scim_1",
+          path: "/api/v1/scim-tokens/scim_1",
           method: "DELETE",
         }),
       ).resolves.toBeUndefined();
@@ -57,7 +57,7 @@ describe("createManagementRequest", () => {
       });
 
       await expect(
-        request({ operation: "list custom roles", path: "/api/roles" }),
+        request({ operation: "list custom roles", path: "/api/v1/roles" }),
       ).resolves.toEqual({ success: true });
     });
   });
@@ -76,9 +76,7 @@ describe("OrganizationsAdminApiService", () => {
     it("names the credential to set instead of sending an empty one", () => {
       delete process.env[INSTANCE_ADMIN_KEY_ENV];
 
-      expect(() => new OrganizationsAdminApiService()).toThrow(
-        new RegExp(INSTANCE_ADMIN_KEY_ENV),
-      );
+      expect(() => new OrganizationsAdminApiService()).toThrow(new RegExp(INSTANCE_ADMIN_KEY_ENV));
       // And nothing left for the platform to answer 404 to.
       expect(mockFetch).not.toHaveBeenCalled();
     });
@@ -98,9 +96,18 @@ describe("OrganizationsAdminApiService", () => {
       }).list();
 
       const [, init] = mockFetch.mock.calls[0] as [string, RequestInit];
-      expect(
-        (init.headers as Record<string, string>).Authorization,
-      ).toBe("Bearer instance-secret");
+      expect((init.headers as Record<string, string>).Authorization).toBe("Bearer instance-secret");
     });
+  });
+});
+
+describe("managementPath", () => {
+  it("addresses the latest namespace explicitly, with the collection root at no trailing slash", () => {
+    // A family root answers at `/{version}`; `/{version}/` is a 404.
+    expect(managementPath("/api/v1/roles")).toBe("/api/v1/roles/latest");
+    expect(managementPath("/api/v1/roles/permissions")).toBe("/api/v1/roles/latest/permissions");
+    expect(managementPath("/api/v1/organization/invites/invite_1")).toBe(
+      "/api/v1/organization/latest/invites/invite_1",
+    );
   });
 });

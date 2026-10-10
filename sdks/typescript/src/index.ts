@@ -1,10 +1,6 @@
 import { ConsoleLogger, NoOpLogger } from "./logger";
 
-export {
-  getLangWatchTracer,
-  getLangWatchLogger,
-  attributes,
-} from "./observability-sdk";
+export { getLangWatchTracer, getLangWatchLogger, attributes } from "./observability-sdk";
 
 export {
   FilterableBatchSpanProcessor,
@@ -14,29 +10,9 @@ export { LangWatchExporter } from "./observability-sdk/exporters";
 export { LangWatch, FetchPolicy, type GetPromptOptions } from "./client-sdk";
 
 /**
- * Typed API failures.
- *
- * When the platform DECLINES a request it says why, in a structure: a `code`
- * you can switch on, the `meta` that makes it actionable, and the trace id to
- * quote at support. Narrow with `isLangWatchHandledError` and match the `code`
- * rather than the message — the message is written for humans and may change;
- * the code is the contract.
- *
- * ```ts
- * try {
- *   await langwatch.prompts.get("nope");
- * } catch (error) {
- *   if (isLangWatchHandledError(error) && error.code === "prompt_not_found") {
- *     // ...
- *   }
- *   throw error;
- * }
- * ```
- *
- * Failures the platform did NOT name — a 5xx, a dead socket, a proxy's HTML —
- * still arrive as the generic errors they always did. A domain error means the
- * platform understood you and said no; anything else means it fell over, and
- * the two must not look alike.
+ * Typed API failures: `code` to switch on, `meta`, and a trace id. Narrow
+ * with `isLangWatchHandledError` and match `code`, not the message — an
+ * unnamed failure (5xx, dead socket) still arrives as a generic error.
  */
 export {
   LangWatchHandledError,
@@ -44,26 +20,26 @@ export {
   LangWatchApiError,
 } from "./internal/api/errors";
 export type {
-  CliHandledError as LangWatchHandledErrorShape,
-  CliHandledErrorReason as LangWatchHandledErrorReason,
-} from "@langwatch/langy/cards/handled-error";
+  LangWatchHandledErrorShape,
+  LangWatchHandledErrorReason,
+} from "@langwatch/handled-error/langwatch-handled-error";
 
 // Experiments API exports
 export {
   Experiment,
   ExperimentsFacade,
-  type EvaluationStatus as ExperimentEvaluationStatus,
+  type ExperimentEvaluationStatus,
   type TargetType,
   type TargetMetadata,
   type TargetInfo,
-  type EvaluationResult as ExperimentEvaluationResult,
+  type ExperimentEvaluationResult,
   type ComparisonMetric,
   type ComparisonOptions,
   type ComparisonStatus,
   type ComparisonVerdict,
   type ExperimentInitOptions,
   type LogOptions,
-  type EvaluateOptions as ExperimentEvaluateOptions,
+  type ExperimentEvaluateOptions,
   type RunOptions,
   type RunCallback,
   type RunContext,
@@ -215,10 +191,9 @@ export {
 } from "./client-sdk/services/gateway-budgets/gateway-budgets-api.service";
 
 /**
- * Provisioning teams and projects, the two things an integration has to
- * create before anything else exists to write to. Both families want an
- * organization API key; creating a project also mints that project's own
- * service API key, served once in the create response.
+ * Provisioning teams and projects, the two things an integration creates
+ * before anything else exists to write to. Both want an organization API
+ * key; creating a project also mints its own service API key, once.
  */
 export {
   TeamsApiService,
@@ -246,10 +221,9 @@ export const logger = {
 };
 
 /**
- * The HTTP client every SDK request to the LangWatch API goes through. It
- * follows a redirect only when it upgrades http to https on the same URL and
- * refuses every other one with `LangWatchRedirectError`. `createLangWatchFetch`
- * builds one over another transport or logger.
+ * The HTTP client every SDK request goes through, following a redirect
+ * only when it upgrades http to https on the same URL, refusing every
+ * other one with `LangWatchRedirectError`.
  */
 export {
   langwatchFetch,

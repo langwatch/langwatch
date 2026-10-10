@@ -15,16 +15,16 @@ dependencies:
     condition: prometheus.chartManaged
   - name: clickhouse-serverless
     alias: clickhouse
-    version: '>= 0.0.0'
+    version: ">= 0.0.0"
     repository: file://../clickhouse-serverless
     condition: clickhouse.chartManaged
   - name: langwatch-gateway
     alias: gateway
-    version: '>= 0.0.0'
+    version: ">= 0.0.0"
     repository: file://../gateway
     condition: gateway.chartManaged
   - name: langwatch-langyagent
     alias: langyagent
-    version: '>= 0.0.0'
+    version: ">= 0.0.0"
     repository: file://../langyagent
     condition: langyagent.chartManaged

@@ -1,14 +1,9 @@
 /**
  * `scenario run` is a run plan scoped to one scenario.
- *
- * It sends ONE request. No suite is created for it and none is deleted
- * afterwards, which is what the first assertions here pin: the old command
- * minted an ephemeral suite, ran it and cleaned it up, so a failure between
- * those steps left rubbish in the project.
- *
  * Spec: specs/features/scenario-cli.feature
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+
 import { stdoutDocuments } from "../../../utils/__tests__/stdout-documents";
 import { AGENT_MODE_ENV_VARS } from "../../../utils/output";
 
@@ -182,10 +177,7 @@ describe("runScenarioCommand()", () => {
     /** @scenario "Run a scenario against one agent on two models" */
     it("sends two targets, each with its own values", async () => {
       await runScenarioCommand("scenario_1", {
-        target: [
-          "http:agent_abc123?model=gpt-5",
-          "http:agent_abc123?model=gpt-5-mini",
-        ],
+        target: ["http:agent_abc123?model=gpt-5", "http:agent_abc123?model=gpt-5-mini"],
       });
 
       expect(runSpy).toHaveBeenCalledWith(
@@ -217,9 +209,7 @@ describe("runScenarioCommand()", () => {
         name: "Login checks",
       });
 
-      expect(runSpy).toHaveBeenCalledWith(
-        expect.objectContaining({ name: "Login checks" }),
-      );
+      expect(runSpy).toHaveBeenCalledWith(expect.objectContaining({ name: "Login checks" }));
     });
   });
 
@@ -242,9 +232,7 @@ describe("runScenarioCommand()", () => {
   describe("when no target is given", () => {
     /** @scenario "Run a scenario with no target" */
     it("refuses before anything is scheduled", async () => {
-      await expect(runScenarioCommand("scenario_1", {})).rejects.toThrow(
-        ProcessExitError,
-      );
+      await expect(runScenarioCommand("scenario_1", {})).rejects.toThrow(ProcessExitError);
 
       expect(runSpy).not.toHaveBeenCalled();
     });
@@ -283,6 +271,7 @@ describe("runScenarioCommand()", () => {
 
   describe("when --note is given", () => {
     /** @scenario "Run a scenario with a note" */
+    /** @scenario "A note given on the command line is stored with the batch" */
     it("schedules the run with that note", async () => {
       await runScenarioCommand("scenario_1", {
         target: ["http:agent_abc123"],

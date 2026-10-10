@@ -1,0 +1,389 @@
+import type { Named } from "@langwatch/module";
+import { z } from "zod";
+
+import {
+  persistedEvaluationsV3StateSchema,
+  persistedResultsSchema,
+  type PersistedEvaluationsV3State,
+} from "./experiment-workbench-persistence.ts";
+import {
+  COMPARISON_COLUMN_REFUSAL,
+  isComparisonEvaluatorType,
+  type ComparisonEvaluatorConfig,
+  type PairwiseEvaluatorConfig,
+} from "./experiment-workbench.ts";
+import { InvalidWorkbenchStateError } from "./experiment.errors.ts";
+
+export const WORKBENCH_ACTOR_LABELS = ["user", "langy", "api"] as const;
+
+export const workbenchActorLabelSchema = z.enum(WORKBENCH_ACTOR_LABELS);
+export type WorkbenchActorLabel = z.infer<typeof workbenchActorLabelSchema>;
+
+// Signal-then-refetch: names WHAT changed and at which version, never the
+// state itself. Client compares versions and refetches through the normal
+// read path when it is behind. Shape lives here with the wire publisher.
+const experimentUpdateSignalSchemaDefinition = z.object({
+  event: z.literal("experiment_updated"),
+  experimentId: z.string(),
+  slug: z.string(),
+  version: z.number().int(),
+  actorLabel: workbenchActorLabelSchema,
+  /**
+   * The run that wrote this version, when a run wrote it. The page that
+   * started that run adopts the version rather than treating its own run's
+   * write as a stranger's.
+   */
+  runId: z.string().optional(),
+});
+export interface ExperimentUpdateSignalSchema extends Named<
+  typeof experimentUpdateSignalSchemaDefinition
+> {}
+export const experimentUpdateSignalSchema: ExperimentUpdateSignalSchema =
+  experimentUpdateSignalSchemaDefinition;
+export type ExperimentUpdateSignal = z.infer<typeof experimentUpdateSignalSchema>;
+
+const workbenchActorSchemaDefinition = z.object({
+  userId: z.string().optional(),
+  label: workbenchActorLabelSchema,
+  runId: z.string().optional(),
+});
+export interface WorkbenchActorSchema extends Named<typeof workbenchActorSchemaDefinition> {}
+export const workbenchActorSchema: WorkbenchActorSchema = workbenchActorSchemaDefinition;
+export type WorkbenchActor = z.infer<typeof workbenchActorSchema>;
+
+export const workbenchReferenceTypeSchema = z.enum([
+  "prompt",
+  "agent",
+  "evaluator",
+  "workflow",
+  "dataset",
+]);
+export type WorkbenchReferenceType = z.infer<typeof workbenchReferenceTypeSchema>;
+
+const targetReferenceByType = {
+  prompt: { refType: "prompt", field: "promptId" },
+  agent: { refType: "agent", field: "dbAgentId" },
+  evaluator: { refType: "evaluator", field: "targetEvaluatorId" },
+  workflow: { refType: "workflow", field: "workflowId" },
+} as const satisfies Record<
+  PersistedEvaluationsV3State["targets"][number]["type"],
+  { refType: WorkbenchReferenceType; field: string }
+>;
+
+/** References the executor resolves from a persisted workbench state. */
+export const collectWorkbenchReferences = (
+  state: PersistedEvaluationsV3State,
+): Map<WorkbenchReferenceType, string[]> => {
+  const grouped = new Map<WorkbenchReferenceType, Set<string>>();
+  const add = (type: WorkbenchReferenceType, id?: string) => {
+    if (!id) {
+      return;
+    }
+
+    const ids = grouped.get(type) ?? new Set<string>();
+    ids.add(id);
+    grouped.set(type, ids);
+  };
+
+  for (const target of state.targets) {
+    const reference = targetReferenceByType[target.type];
+    add(reference.refType, target[reference.field]);
+  }
+
+  for (const evaluator of state.evaluators) {
+    add("evaluator", evaluator.dbEvaluatorId);
+  }
+
+  for (const dataset of state.datasets) {
+    if (dataset.type === "saved") {
+      add("dataset", dataset.datasetId);
+    }
+  }
+
+  return new Map([...grouped].map(([type, ids]) => [type, [...ids]]));
+};
+
+const workbenchValidationIssueSchemaDefinition = z.object({
+  path: z.string(),
+  message: z.string(),
+});
+export interface WorkbenchValidationIssueSchema extends Named<
+  typeof workbenchValidationIssueSchemaDefinition
+> {}
+export const workbenchValidationIssueSchema: WorkbenchValidationIssueSchema =
+  workbenchValidationIssueSchemaDefinition;
+export type WorkbenchValidationIssue = z.infer<typeof workbenchValidationIssueSchema>;
+
+const workbenchStateViewSchemaDefinition = z.object({
+  experimentId: z.string(),
+  slug: z.string(),
+  name: z.string().nullable(),
+  state: persistedEvaluationsV3StateSchema.nullable(),
+  version: z.number(),
+  updatedAt: z.date(),
+  actorLabel: workbenchActorLabelSchema.optional(),
+  runId: z.string().optional(),
+});
+export interface WorkbenchStateViewSchema extends Named<
+  typeof workbenchStateViewSchemaDefinition
+> {}
+export const workbenchStateViewSchema: WorkbenchStateViewSchema =
+  workbenchStateViewSchemaDefinition;
+export type WorkbenchStateView = z.infer<typeof workbenchStateViewSchema>;
+
+const workbenchSaveResultSchemaDefinition = z.object({
+  experimentId: z.string(),
+  slug: z.string(),
+  version: z.number(),
+});
+export interface WorkbenchSaveResultSchema extends Named<
+  typeof workbenchSaveResultSchemaDefinition
+> {}
+export const workbenchSaveResultSchema: WorkbenchSaveResultSchema =
+  workbenchSaveResultSchemaDefinition;
+export type WorkbenchSaveResult = z.infer<typeof workbenchSaveResultSchema>;
+
+const workbenchVersionSummarySchemaDefinition = z.object({
+  version: z.number(),
+  counterVersion: z.number(),
+  autoSaved: z.boolean(),
+  commitMessage: z.string().nullable(),
+  authorId: z.string().nullable(),
+  authorLabel: z.string(),
+  createdAt: z.date(),
+  updatedAt: z.date(),
+});
+export interface WorkbenchVersionSummarySchema extends Named<
+  typeof workbenchVersionSummarySchemaDefinition
+> {}
+export const workbenchVersionSummarySchema: WorkbenchVersionSummarySchema =
+  workbenchVersionSummarySchemaDefinition;
+export type WorkbenchVersionSummary = z.infer<typeof workbenchVersionSummarySchema>;
+
+const workbenchLocatorSchema = z.object({
+  projectId: z.string(),
+  id: z.string().optional(),
+  slug: z.string().optional(),
+});
+
+export const getWorkbenchStateInputSchema = workbenchLocatorSchema;
+export type GetWorkbenchStateInput = z.infer<typeof getWorkbenchStateInputSchema>;
+
+const saveWorkbenchStateInputSchemaDefinition = z.object({
+  ...workbenchLocatorSchema.shape,
+  state: z.unknown(),
+  expectedVersion: z.number().optional(),
+  actor: workbenchActorSchema,
+  commitMessage: z.string().optional(),
+});
+export interface SaveWorkbenchStateInputSchema extends Named<
+  typeof saveWorkbenchStateInputSchemaDefinition
+> {}
+export const saveWorkbenchStateInputSchema: SaveWorkbenchStateInputSchema =
+  saveWorkbenchStateInputSchemaDefinition;
+export type SaveWorkbenchStateInput = z.infer<typeof saveWorkbenchStateInputSchema>;
+
+const createEvaluationsV3InputSchemaDefinition = z.object({
+  projectId: z.string(),
+  id: z.string().optional(),
+  name: z.string().optional(),
+  state: z.unknown(),
+  actor: workbenchActorSchema,
+  commitMessage: z.string().optional(),
+});
+export interface CreateEvaluationsV3InputSchema extends Named<
+  typeof createEvaluationsV3InputSchemaDefinition
+> {}
+export const createEvaluationsV3InputSchema: CreateEvaluationsV3InputSchema =
+  createEvaluationsV3InputSchemaDefinition;
+export type CreateEvaluationsV3Input = z.infer<typeof createEvaluationsV3InputSchema>;
+
+const commitWorkbenchVersionInputSchemaDefinition = z.object({
+  projectId: z.string(),
+  id: z.string(),
+  commitMessage: z.string(),
+  actor: workbenchActorSchema,
+});
+export interface CommitWorkbenchVersionInputSchema extends Named<
+  typeof commitWorkbenchVersionInputSchemaDefinition
+> {}
+export const commitWorkbenchVersionInputSchema: CommitWorkbenchVersionInputSchema =
+  commitWorkbenchVersionInputSchemaDefinition;
+export type CommitWorkbenchVersionInput = z.infer<typeof commitWorkbenchVersionInputSchema>;
+
+const listWorkbenchVersionsInputSchemaDefinition = z.object({
+  projectId: z.string(),
+  id: z.string(),
+  limit: z.number().optional(),
+  cursor: z.number().optional(),
+});
+export interface ListWorkbenchVersionsInputSchema extends Named<
+  typeof listWorkbenchVersionsInputSchemaDefinition
+> {}
+export const listWorkbenchVersionsInputSchema: ListWorkbenchVersionsInputSchema =
+  listWorkbenchVersionsInputSchemaDefinition;
+export type ListWorkbenchVersionsInput = z.infer<typeof listWorkbenchVersionsInputSchema>;
+
+const workbenchVersionsPageSchemaDefinition = z.object({
+  versions: z.array(workbenchVersionSummarySchema),
+  nextCursor: z.number().nullable(),
+});
+export interface WorkbenchVersionsPageSchema extends Named<
+  typeof workbenchVersionsPageSchemaDefinition
+> {}
+export const workbenchVersionsPageSchema: WorkbenchVersionsPageSchema =
+  workbenchVersionsPageSchemaDefinition;
+export type WorkbenchVersionsPage = z.infer<typeof workbenchVersionsPageSchema>;
+
+const restoreWorkbenchVersionInputSchemaDefinition = z.object({
+  projectId: z.string(),
+  id: z.string(),
+  version: z.number(),
+  actor: workbenchActorSchema,
+});
+export interface RestoreWorkbenchVersionInputSchema extends Named<
+  typeof restoreWorkbenchVersionInputSchemaDefinition
+> {}
+export const restoreWorkbenchVersionInputSchema: RestoreWorkbenchVersionInputSchema =
+  restoreWorkbenchVersionInputSchemaDefinition;
+export type RestoreWorkbenchVersionInput = z.infer<typeof restoreWorkbenchVersionInputSchema>;
+
+/**
+ * Writes the cells produced by one completed run into the current workbench.
+ * The runner computes the scoped merge from its execution plan; the service
+ * owns the read-version-write compare-and-set that makes it a durable change.
+ */
+const recordWorkbenchRunResultsInputSchemaDefinition = z.object({
+  projectId: z.string(),
+  id: z.string(),
+  results: persistedResultsSchema,
+  expectedVersion: z.number(),
+  actor: workbenchActorSchema,
+  commitMessage: z.string(),
+});
+export interface RecordWorkbenchRunResultsInputSchema extends Named<
+  typeof recordWorkbenchRunResultsInputSchemaDefinition
+> {}
+export const recordWorkbenchRunResultsInputSchema: RecordWorkbenchRunResultsInputSchema =
+  recordWorkbenchRunResultsInputSchemaDefinition;
+export type RecordWorkbenchRunResultsInput = z.infer<typeof recordWorkbenchRunResultsInputSchema>;
+
+const MAX_REPORTED_ISSUES = 10;
+
+const comparisonColumnIssues = (state: PersistedEvaluationsV3State): WorkbenchValidationIssue[] =>
+  state.evaluators.flatMap((evaluator, index) =>
+    evaluator.comparison && !isComparisonEvaluatorType(evaluator.evaluatorType)
+      ? [
+          {
+            path: `evaluators.${index}.comparison`,
+            message: `Evaluator ${evaluator.id} is a ${evaluator.evaluatorType}. ${COMPARISON_COLUMN_REFUSAL}`,
+          },
+        ]
+      : [],
+  );
+
+/** Parse incoming state before a write so validation errors retain their wire code. */
+export const parseWorkbenchState = (state: unknown): PersistedEvaluationsV3State => {
+  const result = persistedEvaluationsV3StateSchema.safeParse(state);
+  if (!result.success) {
+    throw new InvalidWorkbenchStateError({
+      issues: result.error.issues.slice(0, MAX_REPORTED_ISSUES).map((issue) => ({
+        path: issue.path.join("."),
+        message: issue.message,
+      })),
+    });
+  }
+
+  const issues = comparisonColumnIssues(result.data);
+  if (issues.length > 0) {
+    throw new InvalidWorkbenchStateError({
+      issues: issues.slice(0, MAX_REPORTED_ISSUES),
+    });
+  }
+
+  return result.data;
+};
+
+const fromPairwise = (pairwise: PairwiseEvaluatorConfig): ComparisonEvaluatorConfig => {
+  const variants = [pairwise.variantA, pairwise.variantB];
+  const variantOutputPaths: Record<string, string[]> = {};
+
+  if (pairwise.variantA && pairwise.variantAOutputPath?.length) {
+    variantOutputPaths[pairwise.variantA] = pairwise.variantAOutputPath;
+  }
+  if (pairwise.variantB && pairwise.variantBOutputPath?.length) {
+    variantOutputPaths[pairwise.variantB] = pairwise.variantBOutputPath;
+  }
+
+  return {
+    variants,
+    ...(Object.keys(variantOutputPaths).length > 0 ? { variantOutputPaths } : {}),
+    hasGoldenAnswer: pairwise.hasGoldenAnswer ?? true,
+    goldenField: pairwise.goldenField,
+    includeMetrics: pairwise.includeMetrics ?? [],
+    randomizeOrder: true,
+  };
+};
+
+type PersistedWorkbenchEvaluator = PersistedEvaluationsV3State["evaluators"][number];
+
+const normalizeEvaluator = (
+  evaluator: PersistedWorkbenchEvaluator,
+): PersistedWorkbenchEvaluator => {
+  if (evaluator.comparison || !evaluator.pairwise) return evaluator;
+
+  const { pairwise: _pairwise, ...withoutPairwise } = evaluator;
+  return { ...withoutPairwise, comparison: fromPairwise(_pairwise) };
+};
+
+const savedStateSchema = z.looseObject({ targets: z.array(z.unknown()) });
+const targetWithHttpConfigSchema = z.looseObject({ httpConfig: z.looseObject({}) });
+const experimentRowSchema = z.looseObject({ workbenchState: savedStateSchema });
+
+const targetWithoutHttpCredentials = (target: unknown): unknown => {
+  const parsed = targetWithHttpConfigSchema.safeParse(target);
+  if (!parsed.success) return target;
+  const { auth: _auth, headers: _headers, ...httpConfig } = parsed.data.httpConfig;
+
+  return { ...parsed.data, httpConfig };
+};
+
+/** An old saved state's HTTP targets carry a dead copy of the agent's credentials;
+ * it is dropped on read. */
+export const workbenchStateWithoutHttpCredentials = (state: unknown): unknown => {
+  const parsed = savedStateSchema.safeParse(state);
+
+  return parsed.success
+    ? { ...parsed.data, targets: parsed.data.targets.map(targetWithoutHttpCredentials) }
+    : state;
+};
+
+/** An experiment row as read: its saved state without the dead credential copy. */
+export const experimentRowWithoutHttpCredentials = (row: unknown): unknown => {
+  const parsed = experimentRowSchema.safeParse(row);
+
+  return parsed.success
+    ? {
+        ...parsed.data,
+        workbenchState: workbenchStateWithoutHttpCredentials(parsed.data.workbenchState),
+      }
+    : row;
+};
+
+/** Repair only legacy data: evaluator comparisons and the dead HTTP credential copy;
+ * results stay intact. */
+export const normalizeWorkbenchState = (stored: unknown): PersistedEvaluationsV3State | null => {
+  const state =
+    (workbenchStateWithoutHttpCredentials(stored) as PersistedEvaluationsV3State | null) ?? null;
+  if (!state || !Array.isArray(state.evaluators)) return state;
+
+  return { ...state, evaluators: state.evaluators.map(normalizeEvaluator) };
+};
+
+/** Version snapshots keep setup, not run output or evaluator scores. */
+export const stripWorkbenchResults = (
+  state: PersistedEvaluationsV3State,
+): PersistedEvaluationsV3State => {
+  const { results: _results, ...withoutResults } = state;
+  return withoutResults;
+};

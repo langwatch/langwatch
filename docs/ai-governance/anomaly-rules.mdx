@@ -18,15 +18,15 @@ This page documents what the detector evaluates and what is preview-only, so tha
 
 The schema holds every rule type below; the detector evaluates one of them today.
 
-| Rule type | Detector coverage | What it detects | Threshold config keys |
-|-----------|------------------|------------------|------------------------|
-| **`spend_spike`** | ✅ Live | Cost-USD growth in a rolling window vs a baseline window | `windowSec`, `baselineOffsetSec`, `ratioVsBaseline`, `minBaselineUsd` |
-| `rate_limit` | ⏳ Preview | Volume of actions per actor per window | (config schema TBD) |
-| `tool_mismatch` | ⏳ Preview | Tool invocation outside the policy_rules.tools.allow set | (config schema TBD) |
-| `after_hours` | ⏳ Preview | Activity outside org-configured business-hours window | (config schema TBD) |
-| `unusual_model` | ⏳ Preview | Model used for actor that's not on their typical short-list | (config schema TBD) |
-| `pii_leak` | ⏳ Preview | Outbound payload matches a PII regex set | (config schema TBD) |
-| `custom` | ⏳ Preview | User-defined CEL, SQL predicate | (config schema TBD) |
+| Rule type         | Detector coverage | What it detects                                             | Threshold config keys                                                 |
+| ----------------- | ----------------- | ----------------------------------------------------------- | --------------------------------------------------------------------- |
+| **`spend_spike`** | ✅ Live           | Cost-USD growth in a rolling window vs a baseline window    | `windowSec`, `baselineOffsetSec`, `ratioVsBaseline`, `minBaselineUsd` |
+| `rate_limit`      | ⏳ Preview        | Volume of actions per actor per window                      | (config schema TBD)                                                   |
+| `tool_mismatch`   | ⏳ Preview        | Tool invocation outside the policy_rules.tools.allow set    | (config schema TBD)                                                   |
+| `after_hours`     | ⏳ Preview        | Activity outside org-configured business-hours window       | (config schema TBD)                                                   |
+| `unusual_model`   | ⏳ Preview        | Model used for actor that's not on their typical short-list | (config schema TBD)                                                   |
+| `pii_leak`        | ⏳ Preview        | Outbound payload matches a PII regex set                    | (config schema TBD)                                                   |
+| `custom`          | ⏳ Preview        | User-defined CEL, SQL predicate                             | (config schema TBD)                                                   |
 
 A **⏳ Preview** rule type is persisted and reads as `active`, but the detector logs `debug` and skips it, so no alert is produced. Until the detector slice for each ships, treat such a rule as stored for later rather than as watching anything.
 
@@ -60,30 +60,30 @@ These are the fields a rule carries and the detector reads. No screen collects t
 }
 ```
 
-| Key | Default | Meaning |
-|-----|---------|---------|
-| `windowSec` | `86400` (24 h) | The "current" window the detector sums spend across, ending at the latest event timestamp. |
-| `baselineOffsetSec` | `604800` (7 d) | How far back from the current window the detector pulls the baseline window from. With the defaults, the baseline is the same-shape 24-hour window from 7 days ago. |
-| `ratioVsBaseline` | `2.0` | Multiplier, the detector fires when current spend ≥ baseline × ratio. `2.0` means "double the spend of last week's same-window." |
-| `minBaselineUsd` | `1.0` | Floor, the detector skips evaluation when the baseline window is below this value. Prevents trivial alerts on cold sources where last week's spend was ~$0.01 and a 2× rise is meaningless. |
+| Key                 | Default        | Meaning                                                                                                                                                                                     |
+| ------------------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `windowSec`         | `86400` (24 h) | The "current" window the detector sums spend across, ending at the latest event timestamp.                                                                                                  |
+| `baselineOffsetSec` | `604800` (7 d) | How far back from the current window the detector pulls the baseline window from. With the defaults, the baseline is the same-shape 24-hour window from 7 days ago.                         |
+| `ratioVsBaseline`   | `2.0`          | Multiplier, the detector fires when current spend ≥ baseline × ratio. `2.0` means "double the spend of last week's same-window."                                                            |
+| `minBaselineUsd`    | `1.0`          | Floor, the detector skips evaluation when the baseline window is below this value. Prevents trivial alerts on cold sources where last week's spend was ~$0.01 and a 2× rise is meaningless. |
 
 Sensible starting values:
 
-| Goal | `windowSec` | `baselineOffsetSec` | `ratioVsBaseline` | `minBaselineUsd` |
-|------|---------------|------------------------|----------------------|---------------------|
-| Day-over-week catch (default) | 86400 | 604800 | 2.0 | 1.0 |
-| Hour-over-day catch (tighter) | 3600 | 86400 | 3.0 | 0.10 |
-| Week-over-week catch (looser) | 604800 | 2592000 | 1.5 | 5.0 |
+| Goal                          | `windowSec` | `baselineOffsetSec` | `ratioVsBaseline` | `minBaselineUsd` |
+| ----------------------------- | ----------- | ------------------- | ----------------- | ---------------- |
+| Day-over-week catch (default) | 86400       | 604800              | 2.0               | 1.0              |
+| Hour-over-day catch (tighter) | 3600        | 86400               | 3.0               | 0.10             |
+| Week-over-week catch (looser) | 604800      | 2592000             | 1.5               | 5.0              |
 
 ## Scope coverage
 
-| Scope | Detector coverage | Notes |
-|-------|------------------|-------|
-| `organization` | ✅ Evaluated | Fires on any IngestionSource in the org. Best default. |
-| `source_type` | ✅ Evaluated | Fires on every source whose `sourceType` matches (e.g. all `otel_generic` sources). |
-| `source` | ✅ Evaluated | Fires on a single named IngestionSource. |
-| `team` | ⏳ Preview | Persisted but not filtered by the detector today. Don't rely on it. |
-| `project` | ⏳ Preview | Same. |
+| Scope          | Detector coverage | Notes                                                                               |
+| -------------- | ----------------- | ----------------------------------------------------------------------------------- |
+| `organization` | ✅ Evaluated      | Fires on any IngestionSource in the org. Best default.                              |
+| `source_type`  | ✅ Evaluated      | Fires on every source whose `sourceType` matches (e.g. all `otel_generic` sources). |
+| `source`       | ✅ Evaluated      | Fires on a single named IngestionSource.                                            |
+| `team`         | ⏳ Preview        | Persisted but not filtered by the detector today. Don't rely on it.                 |
+| `project`      | ⏳ Preview        | Same.                                                                               |
 
 ## Dispatch coverage
 

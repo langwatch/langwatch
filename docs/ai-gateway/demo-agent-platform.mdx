@@ -8,7 +8,8 @@ keywords: demo, agent billing, rebilling example, webhook receiver example, refe
 [`langwatch/agent-billing-demo`](https://github.com/langwatch/agent-billing-demo) is a small agent-platform SaaS: customers sign up, create agents and chat with them. The platform meters every LLM call and rebills its customers through the LangWatch AI Gateway, with no metering code of its own. Run it to see the [metering and rebilling pattern](/ai-gateway/cookbooks/metering-and-rebilling) end to end, then copy the parts you need.
 
 <Tip>
-Point your coding agent at the repo as the reference example for gateway provisioning, webhook ingestion and budgets. The README carries the same contracts these docs describe.
+  Point your coding agent at the repo as the reference example for gateway provisioning, webhook
+  ingestion and budgets. The README carries the same contracts these docs describe.
 </Tip>
 
 ## What it demonstrates
@@ -28,11 +29,11 @@ A React + Tailwind single page app, built by Vite and served by the Express serv
 
 One `POST` mints the virtual key and attaches three real budgets to it:
 
-| Budget | Scope | Window | Limit | On breach |
-|---|---|---|---|---|
-| Hard cap | `virtual_key` | `manual` | $5.00 | `block` |
-| Soft cap | `virtual_key` | `manual` | $2.50 | `warn` |
-| Per-seat allowance | `attributed_user` anchored to the key | `month` | $1.00 | `block` |
+| Budget             | Scope                                 | Window   | Limit | On breach |
+| ------------------ | ------------------------------------- | -------- | ----- | --------- |
+| Hard cap           | `virtual_key`                         | `manual` | $5.00 | `block`   |
+| Soft cap           | `virtual_key`                         | `manual` | $2.50 | `warn`    |
+| Per-seat allowance | `attributed_user` anchored to the key | `month`  | $1.00 | `block`   |
 
 The form then opens the dashboard with a message that names the caps it created. A workspace name that is already taken comes back as a `409` with `code: "customer_exists"` and an offer to open the existing workspace.
 
@@ -72,14 +73,14 @@ The message you tried to send stays in the input for a retry.
 
 Every file you would copy exists in TypeScript and in Python:
 
-| Surface | TypeScript | Python |
-|---|---|---|
-| Signature verification | `ts/src/verify-signature.ts` | `python/verify_signature.py` |
-| Webhook receiver | `ts/src/receiver.ts` | `python/receiver.py` |
-| Billing ledger | `ts/src/ledger.ts` | `python/ledger.py` |
-| Reconciliation | `ts/src/reconcile.ts` | `python/reconcile.py` |
-| Provisioning | `ts/src/provision.ts` | `python/provision.py` |
-| App shell | `app/` (Express + React, `:4100`) | `python/app.py` (FastAPI, `:4200`) |
+| Surface                | TypeScript                        | Python                             |
+| ---------------------- | --------------------------------- | ---------------------------------- |
+| Signature verification | `ts/src/verify-signature.ts`      | `python/verify_signature.py`       |
+| Webhook receiver       | `ts/src/receiver.ts`              | `python/receiver.py`               |
+| Billing ledger         | `ts/src/ledger.ts`                | `python/ledger.py`                 |
+| Reconciliation         | `ts/src/reconcile.ts`             | `python/reconcile.py`              |
+| Provisioning           | `ts/src/provision.ts`             | `python/provision.py`              |
+| App shell              | `app/` (Express + React, `:4100`) | `python/app.py` (FastAPI, `:4200`) |
 
 The app's own receiver is `app/src/webhooks.ts` and implements the same contract as the standalone ones. Both standalone receivers run side by side against the same LangWatch instance, each registered as its own endpoint with its own secret, so every request lands in both ledgers.
 
@@ -108,5 +109,7 @@ python python/receiver.py  # the standalone Python receiver on :4102
 The full walkthrough, environment variables and sequence diagrams are in the [repo README](https://github.com/langwatch/agent-billing-demo).
 
 <Note>
-**Also check:** [Metering and rebilling](/ai-gateway/cookbooks/metering-and-rebilling) for the cookbook this demo implements, [Billing and spend events](/ai-gateway/billing-events) for the event payload, and [Webhooks](/features/webhooks) for endpoints, signatures and retries.
+  **Also check:** [Metering and rebilling](/ai-gateway/cookbooks/metering-and-rebilling) for the
+  cookbook this demo implements, [Billing and spend events](/ai-gateway/billing-events) for the
+  event payload, and [Webhooks](/features/webhooks) for endpoints, signatures and retries.
 </Note>

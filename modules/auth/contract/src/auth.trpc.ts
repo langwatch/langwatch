@@ -1,0 +1,119 @@
+import { routingDecisionSchema } from "@langwatch/identity-contract";
+/**
+ * Every `auth.*` procedure, declared once (D13, ADR-117 §6). The names
+ * are the browser's cache keys, so they are the wire names the signed-out
+ * screens have always called.
+ */
+import { defineTrpcContract } from "@langwatch/module";
+import { inviteLandingSchema } from "@langwatch/organization-contract";
+import {
+  createdUserSchema,
+  userApiChangePasswordInputSchema,
+  userApiUnlinkAccountInputSchema,
+  userApiRegisterInputSchema,
+  userApiSetPasswordInputSchema,
+  userApiSuccessSchema,
+  userApiUserInputSchema,
+} from "@langwatch/user-contract";
+import { z } from "zod";
+
+import {
+  browserSessionInventoryEntrySchema,
+  browserSessionsEndedSchema,
+  endBrowserSessionInputSchema,
+} from "./browser-session.ts";
+import {
+  addressConfirmationSchema,
+  frontDoorAskedSchema,
+  frontDoorOwnAddressSentSchema,
+  priorSessionSchema,
+  signUpEnrollmentSchema,
+  signUpVerificationRequestSchema,
+} from "./front-door.responses.ts";
+import {
+  signUpVerificationInputSchema,
+  frontDoorInviteCodeInputSchema,
+  frontDoorOwnAddressInputSchema,
+  frontDoorRouteInputSchema,
+  signUpEnrollmentInputSchema,
+} from "./front-door.schemas.ts";
+
+export const authTrpc = defineTrpcContract("auth")
+  /** The methods a proven address may enrol; the proof is validated, not spent. */
+  .mutation("signUpEnrollment")
+  .withInput(signUpEnrollmentInputSchema)
+  .withOutput(signUpEnrollmentSchema)
+
+  /**
+   * A mutation rather than a query on purpose: a query would be cached and
+   * refetched per address, and a per-address cache entry is an
+   * account-existence oracle built out of network timing.
+   */
+  .mutation("route")
+  .withInput(frontDoorRouteInputSchema)
+  .withOutput(routingDecisionSchema)
+
+  .mutation("requestSignUpVerification")
+  .withInput(signUpVerificationInputSchema)
+  .withOutput(signUpVerificationRequestSchema)
+
+  .query("inviteLanding")
+  .withInput(frontDoorInviteCodeInputSchema)
+  .withOutput(inviteLandingSchema)
+
+  .mutation("requestFreshInvite")
+  .withInput(frontDoorInviteCodeInputSchema)
+  .withOutput(frontDoorAskedSchema)
+
+  .query("myAddressConfirmation")
+  .withInput(z.void())
+  .withOutput(addressConfirmationSchema)
+
+  .mutation("sendMyAddressConfirmation")
+  .withInput(frontDoorOwnAddressInputSchema)
+  .withOutput(frontDoorOwnAddressSentSchema)
+
+  /** Reads only the cookie the caller presented, so it can describe no one else's session. */
+  .query("priorSession")
+  .withInput(z.void())
+  .withOutput(priorSessionSchema)
+
+  /** Retires the named account: oneself, or anybody for a platform operator not impersonating. */
+  .mutation("deactivate")
+  .withInput(userApiUserInputSchema)
+  .withOutput(userApiSuccessSchema)
+
+  /**
+   * The caller's own browsers, and ending one of them, moved from `user.*` (D-A1U-3). The
+   * session id never names whose it is, so nothing here reaches somebody else's list.
+   */
+  .query("browserSessions")
+  .withInput(z.object({}))
+  .withOutput(browserSessionInventoryEntrySchema.array())
+
+  .mutation("endBrowserSession")
+  .withInput(endBrowserSessionInputSchema)
+  .withOutput(browserSessionsEndedSchema)
+
+  /** The caller's own password doors, moved from `user.*` with their wire (D-A1U-4). */
+  .mutation("setPassword")
+  .withInput(userApiSetPasswordInputSchema)
+  .withOutput(userApiSuccessSchema)
+
+  .mutation("changePassword")
+  .withInput(userApiChangePasswordInputSchema)
+  .withOutput(userApiSuccessSchema)
+
+  /** Removing one of the caller's own sign-in methods, moved from `user.*` with its wire. */
+  .mutation("unlinkAccount")
+  .withInput(userApiUnlinkAccountInputSchema)
+  .withOutput(userApiSuccessSchema)
+
+  /**
+   * The signup form's backend, moved from `user.*` with its wire (D-A1U-2). The account
+   * predates itself here, so it runs with no caller at all.
+   */
+  .mutation("register")
+  .withInput(userApiRegisterInputSchema)
+  .withOutput(createdUserSchema)
+  .build();

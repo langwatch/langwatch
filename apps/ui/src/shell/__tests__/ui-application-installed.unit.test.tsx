@@ -1,0 +1,89 @@
+/**
+ * The application a composing host actually gets from `@langwatch/ui`.
+ */
+
+import { createUiApplication } from "@langwatch/browser/application";
+import { uiRoutePageKeys, type UiPageLoaderRegistry } from "@langwatch/browser/feature-install";
+import type { UiPublicTelemetry } from "@langwatch/browser/inner-providers";
+import { installedModuleScreens } from "@langwatch/browser/module-screens";
+import type { ReactNode } from "react";
+import { describe, expect, it } from "vitest";
+
+import { browserModules } from "../../browser-modules.generated.ts";
+import { uiRouteTable } from "../ui-route-table";
+
+const publicAppConfig: UiPublicTelemetry = {
+  mode: "test",
+  telemetry: { browserTracing: false, sampleRatio: 0 },
+};
+
+function PassThrough({ children }: { children: ReactNode }) {
+  return <>{children}</>;
+}
+
+/**
+ * A host registry missing governance's keys — a composition fault ONLY if
+ * nothing else supplies them. Here `installedModuleScreens(browserModules)`
+ * does, exactly as `main.tsx` composes it (ARCHITECTURE §10.1, §11).
+ */
+function hostRegistryWithoutGovernance(): UiPageLoaderRegistry {
+  const loaders: Record<string, () => Promise<{ default: () => null }>> = {};
+  for (const key of uiRoutePageKeys(uiRouteTable)) {
+    if (key.startsWith("pages/governance/")) continue;
+    loaders[key] = async () => ({ default: () => null });
+  }
+  return loaders;
+}
+
+function applicationFromPackageEntry() {
+  return createUiApplication({
+    providers: {
+      attribution: PassThrough,
+      session: PassThrough,
+      transport: PassThrough,
+      graphicsQuality: PassThrough,
+      commandBar: PassThrough,
+      toaster: () => null,
+      usePublicAppConfig: () => ({ data: publicAppConfig }),
+      isDevelopment: false,
+    },
+    pages: {
+      table: uiRouteTable,
+      shellLayouts: {
+        auth: async () => ({ default: () => null }),
+        chrome: async () => ({ default: () => null }),
+        "full-screen": async () => ({ default: () => null }),
+      },
+      loaders: hostRegistryWithoutGovernance(),
+      errorFallback: () => null,
+      rootErrorBoundary: () => null,
+    },
+    features: { loaders: installedModuleScreens(browserModules).loaders },
+    sessionQueryKey: ["test", "session"],
+  });
+}
+
+describe("given a host that registers no governance loader, and the installed governance module does", () => {
+  describe("when the package entry composes the application", () => {
+    it("builds a router, because the installed module covers what the host left out", () => {
+      expect(() => applicationFromPackageEntry()).not.toThrow();
+    });
+
+    it("routes every /governance address the table names", () => {
+      const application = applicationFromPackageEntry();
+      const paths = new Set<string>();
+
+      const walk = (routes: readonly { path?: string; children?: readonly unknown[] }[]) => {
+        for (const route of routes) {
+          if (route.path) paths.add(route.path);
+          if (route.children) walk(route.children as typeof routes);
+        }
+      };
+      walk(application.router.routes as never);
+
+      expect(paths.has("/governance")).toBe(true);
+      expect(paths.has("/governance/inventory")).toBe(true);
+      expect(paths.has("/governance/users/:id")).toBe(true);
+    });
+  });
+});

@@ -1,21 +1,20 @@
 import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
+
+import { type LangWatch } from "../../../dist";
 import {
   runAlwaysFetchPolicy,
   runCacheTtlPolicy,
   runDefaultFetchPolicy,
   runMaterializedOnlyPolicy,
 } from "../../../examples/prompt-management/fetch-policy";
-import { HandleUtil } from "./helpers/handle.util";
-import { TempDirUtil } from "./helpers/temp-dir.util";
-import { type LangWatch } from "../../../dist";
 import { getLangwatchSDK } from "../../helpers/get-sdk";
 import { CliRunner } from "../cli/helpers/cli-runner";
+import { HandleUtil } from "./helpers/handle.util";
+import { TempDirUtil } from "./helpers/temp-dir.util";
 
 /**
- * NOTE: This test leaves prompts in the test DB
- * Since the test DB is ephemeral, this is not a problem
- * and not work the overhead of code/CI time to clean up,
- * but it is something to be aware of.
+ * Leaves prompts in the test DB deliberately -- it's ephemeral, so cleanup
+ * isn't worth the code/CI time.
  */
 
 describe("Prompt fetch policies (real API)", () => {
@@ -56,14 +55,10 @@ describe("Prompt fetch policies (real API)", () => {
       prompt: "Hello from default policy",
     });
 
-    const { result: prompt, calls } = await withFetchSpy(() =>
-      runDefaultFetchPolicy(handle),
-    );
+    const { result: prompt, calls } = await withFetchSpy(() => runDefaultFetchPolicy(handle));
     expect(prompt).toBeTruthy();
     expect(prompt?.handle).toContain("default-policy");
-    expect((prompt)?.prompt ?? "").toContain(
-      "Hello from default policy",
-    );
+    expect(prompt?.prompt ?? "").toContain("Hello from default policy");
     expect(calls).toBeGreaterThan(0);
     await langwatch.prompts.delete(handle);
   }, 60_000);
@@ -72,12 +67,10 @@ describe("Prompt fetch policies (real API)", () => {
     const handle = HandleUtil.unique("always-fetch");
     await langwatch.prompts.create({ handle, prompt: "Always fetch from API" });
 
-    const { result: prompt, calls } = await withFetchSpy(() =>
-      runAlwaysFetchPolicy(handle),
-    );
+    const { result: prompt, calls } = await withFetchSpy(() => runAlwaysFetchPolicy(handle));
     expect(prompt).toBeTruthy();
     expect(prompt?.handle).toContain("always-fetch");
-    expect((prompt)?.prompt ?? "").toContain("Always fetch from API");
+    expect(prompt?.prompt ?? "").toContain("Always fetch from API");
     expect(calls).toBeGreaterThan(0);
     await langwatch.prompts.delete(handle);
   }, 60_000);

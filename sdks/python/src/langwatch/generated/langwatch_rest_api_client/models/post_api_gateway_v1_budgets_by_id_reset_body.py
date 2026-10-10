@@ -15,7 +15,7 @@ T = TypeVar("T", bound="PostApiGatewayV1BudgetsByIdResetBody")
 class PostApiGatewayV1BudgetsByIdResetBody:
     """
     Attributes:
-        reason (str | Unset): Free-text operator note, audit-logged with the reset.
+        reason (str | Unset):
     """
 
     reason: str | Unset = UNSET

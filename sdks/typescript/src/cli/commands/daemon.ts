@@ -1,18 +1,13 @@
 /**
- * `langwatch daemon start|stop|status`
- *
- * The daemon normally manages itself — it is auto-spawned on first use and
- * self-exits when idle. These commands exist for the cases where you need to
- * see it, restart it, or make sure it is gone.
+ * `langwatch daemon start|stop|status`: manual override for a daemon that
+ * normally manages itself (auto-spawned on first use, self-exits when
+ * idle) -- for when you need to see it, restart it, or confirm it's gone.
  */
 
 import chalk from "chalk";
 
-import {
-  requestStatus,
-  requestStop,
-  type DaemonStatus,
-} from "../daemon/client";
+import { requestStatus, requestStop, type DaemonStatus } from "../daemon/client";
+import { collectForwardedEnv } from "../daemon/eligibility";
 import {
   inspectSocketTrust,
   isDaemonSupported,
@@ -29,7 +24,6 @@ import {
 } from "../daemon/server";
 import { spawnDaemon } from "../daemon/spawn";
 import { warmCommandModules } from "../daemon/warmup";
-import { collectForwardedEnv } from "../daemon/eligibility";
 
 declare const __CLI_VERSION__: string;
 
@@ -50,20 +44,10 @@ function resolveIdleTimeout(option?: string): number {
 }
 
 /**
- * The trust problems that mean "something is WRONG", as opposed to the two that
- * simply mean "no daemon is running here yet".
- *
- * `requestStatus`/`requestStop` collapse every problem into `null`/`false`,
- * which is right for them — an untrusted socket is exactly "no daemon" on the
- * hot path. It is wrong for these commands: the user explicitly asked about the
- * daemon, so silently reporting "not running" (or worse, "starting in the
- * background" for a daemon that will immediately die) hides the one fact they
- * need. `socket-missing` and `socket-dir-missing` are the ordinary empty state
- * and are deliberately NOT in here.
+ * Trust problems that mean "something is WRONG" (not just "daemon not
+ * running"). Reported explicitly because user asked about the daemon.
  */
-function describeTrustProblem(
-  problem: SocketTrustProblem,
-): string | null {
+function describeTrustProblem(problem: SocketTrustProblem): string | null {
   switch (problem) {
     case "socket-missing":
     case "socket-dir-missing":
@@ -94,9 +78,7 @@ function reportUntrustedSocket(socketPath: string): boolean {
   const description = describeTrustProblem(problem);
   if (description === null) return false;
 
-  console.error(
-    chalk.red(`Refusing to use the langwatch daemon: ${description}.`),
-  );
+  console.error(chalk.red(`Refusing to use the langwatch daemon: ${description}.`));
   console.error(chalk.gray(`  socket: ${socketPath}`));
   console.error(
     chalk.gray(
@@ -110,9 +92,7 @@ function reportUntrustedSocket(socketPath: string): boolean {
 function requireSupport(): void {
   if (isDaemonSupported()) return;
   console.error(
-    chalk.red(
-      "The langwatch daemon is not available on this platform. Commands run in-process.",
-    ),
+    chalk.red("The langwatch daemon is not available on this platform. Commands run in-process."),
   );
   process.exit(1);
 }
@@ -140,9 +120,7 @@ export async function daemonStartCommand(options: {
     const existing = await requestStatus(identity.socketPath);
     if (existing) {
       console.log(
-        chalk.gray(
-          `Daemon already running (pid ${existing.pid}) at ${existing.socketPath}`,
-        ),
+        chalk.gray(`Daemon already running (pid ${existing.pid}) at ${existing.socketPath}`),
       );
       return;
     }
@@ -155,9 +133,7 @@ export async function daemonStartCommand(options: {
     });
     console.log(chalk.green("Daemon starting in the background."));
     console.log(chalk.gray(`  socket: ${identity.socketPath}`));
-    console.log(
-      chalk.gray(`  idle timeout: ${Math.round(idleTimeoutMs / 1000)}s`),
-    );
+    console.log(chalk.gray(`  idle timeout: ${Math.round(idleTimeoutMs / 1000)}s`));
     return;
   }
 
@@ -231,9 +207,7 @@ export async function daemonStopCommand(): Promise<void> {
   );
 }
 
-export async function daemonStatusCommand(options: {
-  json?: boolean;
-}): Promise<void> {
+export async function daemonStatusCommand(options: { json?: boolean }): Promise<void> {
   const identity = resolveIdentity(process.env);
   const status: DaemonStatus | null = isDaemonSupported()
     ? await requestStatus(identity.socketPath)
@@ -246,7 +220,7 @@ export async function daemonStatusCommand(options: {
           running: status !== null,
           supported: isDaemonSupported(),
           socketPath: identity.socketPath,
-          ...(status ?? {}),
+          ...status,
         },
         null,
         2,
@@ -270,14 +244,8 @@ export async function daemonStatusCommand(options: {
   console.log(chalk.gray(`  pid:          ${status.pid}`));
   console.log(chalk.gray(`  version:      ${status.cliVersion}`));
   console.log(chalk.gray(`  socket:       ${status.socketPath}`));
-  console.log(
-    chalk.gray(`  uptime:       ${Math.round(status.uptimeMs / 1000)}s`),
-  );
-  console.log(
-    chalk.gray(
-      `  idle timeout: ${Math.round(status.idleTimeoutMs / 1000)}s`,
-    ),
-  );
+  console.log(chalk.gray(`  uptime:       ${Math.round(status.uptimeMs / 1000)}s`));
+  console.log(chalk.gray(`  idle timeout: ${Math.round(status.idleTimeoutMs / 1000)}s`));
   console.log(chalk.gray(`  served:       ${status.served}`));
   console.log(chalk.gray(`  in flight:    ${status.inflight}`));
 }

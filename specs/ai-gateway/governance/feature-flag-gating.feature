@@ -13,9 +13,9 @@ Feature: Governance visibility rides a single feature flag
 
   Spec scope: the gating contract itself — what's hidden, when, and how
   operators control it. The default lives in
-  `platform/app/src/server/featureFlag/registry.ts`; frontend exposure in
-  `platform/app/src/server/featureFlag/frontendFeatureFlags.ts`; the CLI
-  device-login gate in `platform/app/src/server/routes/auth-cli.ts`
+  `modules/feature-flag/contract/src/feature-flag-registry.ts`; frontend exposure in
+  `modules/feature-flag/contract/src/frontend-feature-flags.ts`; the CLI
+  device-login gate in `modules/auth/process/src/transport/api-rest/auth-cli-device-flow.api.ts`
   (ADR-038 Decision 7 pins the registry default and the gate fallback as
   a pair that moves together).
 
@@ -47,13 +47,19 @@ Feature: Governance visibility rides a single feature flag
       | My Workspace dashboard             | /me                               |
       | My Workspace settings              | /me/settings                      |
       | Admin Routing Policies             | /gateway/routing-policies         |
-      | Admin Activity Monitor             | /settings/activity-monitor        |
-      | Admin Provider Catalog             | /settings/providers               |
-      | Admin IngestionSource setup        | /settings/ingestion-sources       |
+      | Governance overview                | /governance                       |
+      | Governance inventory (sources)     | /governance/inventory             |
+      | Governance people                  | /governance/people                |
       | "My Workspace" avatar dropdown link| (DashboardLayout user menu)        |
       | WorkspaceSwitcher (personal scope) | (top-bar context dropdown)         |
     And no governance API calls fire from the client
     And the existing AI Gateway menu still renders (different flag)
+
+  Scenario: A governance address with the flag off is a 404 with no product sidebar
+    Given `release_ui_ai_governance_enabled` evaluates to false for a user
+    When they open /governance/costs by address
+    Then they see the page-not-found screen
+    And no Governance product sidebar is drawn around it
 
   Scenario: Operators force the flag off via env override
     Given an operator disables governance for the whole installation via env override
@@ -87,7 +93,7 @@ Feature: Governance visibility rides a single feature flag
   Scenario: Gating contract documented for downstream contributors
     Given a contributor is adding a new governance UI page
     When they read `dev/docs/adr/038-intent-forked-onboarding-governance-vs-llmops.md`
-      and the flag's entry in `platform/app/src/server/featureFlag/registry.ts`
+      and the flag's entry in `modules/feature-flag/contract/src/feature-flag-registry.ts`
     Then they explain:
       | concern                                                        |
       | which flag to use (release_ui_ai_governance_enabled, not gateway) |

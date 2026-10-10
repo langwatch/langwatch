@@ -22,10 +22,9 @@ SCRIPT_DIR="$(cd "$(dirname "$BATS_TEST_FILENAME")/.." && pwd)"
 setup() {
   TEST_DIR="$(mktemp -d)"
 
-  # Workdir whose platform/app subdir lets run_frontend_only's trailing
-  # `(cd platform/app && ... pnpm dev)` succeed without a real checkout.
+  # Workdir standing in for a checkout: run_frontend_only's trailing `pnpm dev`
+  # runs from the workspace root, so no subdirectory has to exist.
   WORKDIR="$TEST_DIR/work"
-  mkdir -p "$WORKDIR/platform/app"
 
   # redis-cli stub that answers PING with PONG (a real, usable local Redis).
   STUB_PONG="$TEST_DIR/bin-pong"

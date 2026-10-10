@@ -32,6 +32,7 @@ settings/              Model Providers
 ```
 
 Key structural decisions:
+
 - **No "integrations" category** — SDKs/frameworks enable features, they aren't features themselves. Each feature declares its own SDK surface.
 - **Library** contains reusable shared components (evaluators, datasets, agents, workflows).
 - **Annotations** live in Observability (they annotate traces).
@@ -45,6 +46,7 @@ Each feature has two main access paths:
 - **`platform`** — no-code via UI or MCP tools (UI route, MCP tool, platform skill)
 
 Plus cross-cutting:
+
 - **`api`** — REST/Hono API endpoint namespace
 - **`docs`** — canonical documentation URL
 
@@ -54,12 +56,12 @@ Fields point to **namespaces**, not individual methods (e.g., `"python": "langwa
 
 The `sync` field captures how code and platform relate for each feature:
 
-| Value | Meaning | Example |
-|---|---|---|
-| `null` | Separate or single-mode only | Annotations (platform only) |
-| `"bidirectional"` | Code ↔ Platform, synced | Prompts (via `prompt sync`) |
-| `"code-to-platform"` | Code generates, platform displays | Tracing, Experiments |
-| `"platform-to-code"` | Platform configures, code consumes | (none currently) |
+| Value                | Meaning                            | Example                     |
+| -------------------- | ---------------------------------- | --------------------------- |
+| `null`               | Separate or single-mode only       | Annotations (platform only) |
+| `"bidirectional"`    | Code ↔ Platform, synced            | Prompts (via `prompt sync`) |
+| `"code-to-platform"` | Code generates, platform displays  | Tracing, Experiments        |
+| `"platform-to-code"` | Platform configures, code consumes | (none currently)            |
 
 `plannedSync` captures known future intent (e.g., scenarios will become `"bidirectional"`).
 
@@ -67,14 +69,14 @@ The `sync` field captures how code and platform relate for each feature:
 
 The naming pattern is: **skill name = feature map leaf ID**. The code/platform distinction is handled INSIDE the skill via disambiguation, not by separate skills.
 
-| Skill | Feature Map ID | What it replaced |
-|---|---|---|
-| `tracing` | `observability.tracing` | `instrument` |
-| `evaluations` | `evaluations.*` | `evaluation` + `platform-experiment` |
-| `scenarios` | `agent-simulations.scenarios` | `scenario-test` + `platform-scenario` + `red-team` |
-| `prompts` | `prompt-management.prompts` | `prompt-versioning` |
-| `analytics` | `observability.analytics` | `analytics` (unchanged) |
-| `level-up` | meta | `level-up` (unchanged) |
+| Skill         | Feature Map ID                | What it replaced                                   |
+| ------------- | ----------------------------- | -------------------------------------------------- |
+| `tracing`     | `observability.tracing`       | `instrument`                                       |
+| `evaluations` | `evaluations.*`               | `evaluation` + `platform-experiment`               |
+| `scenarios`   | `agent-simulations.scenarios` | `scenario-test` + `platform-scenario` + `red-team` |
+| `prompts`     | `prompt-management.prompts`   | `prompt-versioning`                                |
+| `analytics`   | `observability.analytics`     | `analytics` (unchanged)                            |
+| `level-up`    | meta                          | `level-up` (unchanged)                             |
 
 **6 skills instead of 9.** Each handles both code and platform approaches, and both onboarding (general setup) and targeted (specific addition) use cases.
 
@@ -83,12 +85,14 @@ The naming pattern is: **skill name = feature map leaf ID**. The code/platform d
 Each merged skill starts with two detection steps:
 
 **Detect Context** (code vs platform):
+
 1. Check if there's a codebase (package.json, pyproject.toml, etc.)
 2. If YES → code approach (SDK, write files)
 3. If NO → platform approach (MCP tools, no files)
 4. If ambiguous → ask the user
 
 **Determine Scope** (onboarding vs targeted):
+
 - **General** ("add scenarios to my project"): Read full codebase, study git history, generate comprehensive coverage
 - **Specific** ("test the refund flow"): Focus on the specific request, optionally fix agent code
 
@@ -111,6 +115,7 @@ Not in `skills/` (broader than skills), not in `specs/` (not a spec), not in `do
 JSON is consumable by all our tools: the skills compiler, platform frontend, docs site, and agents. TypeScript/JavaScript ecosystem default.
 
 **What we gave up:**
+
 - Separate platform skills were simpler to write and test individually. The merged skills are more complex but better for users.
 - The `instrument` name was intuitive as a user verb. `tracing` is the product concept, which aligns with the feature map but is slightly less action-oriented.
 

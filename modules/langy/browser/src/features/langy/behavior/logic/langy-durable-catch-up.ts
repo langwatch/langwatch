@@ -1,0 +1,140 @@
+import {
+  compareLangyEventCursors,
+  isLangyTurnProjectionTerminal,
+  type LangyEventCursor,
+} from "@langwatch/langy-contract";
+
+import type { api } from "../../../../behavior/langy-api.ts";
+import { useLangyStore } from "../../../../behavior/langy.store.ts";
+import { useLangyDevLog } from "../stores/langy-dev-log.ts";
+
+type LangyUtils = ReturnType<typeof api.useUtils>["langy"];
+
+/** The two query utils a catch-up reads the durable tail with and refreshes the messages by. */
+type ApiUtils = {
+  langy: {
+    conversationEventsAfter: Pick<LangyUtils["conversationEventsAfter"], "fetch">;
+    messages: Pick<LangyUtils["messages"], "invalidate">;
+  };
+};
+
+/** Pages of durable tail one catch-up will fold before it gives up and refetches. */
+const MAX_CATCH_UP_PAGES = 3;
+
+/**
+ * How a tail fold ended.
+ */
+type TailFoldOutcome = "caught-up" | "behind" | "abandoned";
+
+/**
+ * Fetch and fold the durable tail from `from`, one page at a time.
+ */
+async function foldDurableTail({
+  utils,
+  projectId,
+  conversationId,
+  from,
+}: {
+  utils: ApiUtils;
+  projectId: string;
+  conversationId: string;
+  from: LangyEventCursor;
+}): Promise<TailFoldOutcome> {
+  let after = from;
+  for (let page = 0; page < MAX_CATCH_UP_PAGES; page++) {
+    const tail = await utils.langy.conversationEventsAfter.fetch({
+      projectId,
+      conversationId,
+      after,
+    });
+    if (useLangyStore.getState().activeConversationId !== conversationId) {
+      return "abandoned";
+    }
+    // The inspector's durable lane: the EVENT LOG as this client received it,
+    // recorded before the fold so the tape shows what arrived even if applying
+    // it turns out to be the bug.
+    for (const event of tail.events) {
+      useLangyDevLog.getState().recordDurableEvent(event);
+    }
+    useLangyStore.getState().applyTurnEvents(tail.events);
+    after = tail.cursor;
+    if (!tail.truncated) return "caught-up";
+  }
+  return "behind";
+}
+
+/**
+ * Bring the open conversation's LOCAL turn fold up to a durable cursor by fetching and
+ * folding the event tail (ADR-059).
+ */
+export async function catchUpConversationFold({
+  utils,
+  projectId,
+  conversationId,
+  targetCursor,
+}: {
+  utils: ApiUtils;
+  projectId: string;
+  conversationId: string;
+  targetCursor: LangyEventCursor | null | undefined;
+}): Promise<void> {
+  const store = useLangyStore.getState();
+  // A durable cursor naming the conversation is proof it exists — confirms a
+  // freshly-minted conversation so the history read's not-found stops
+  // presenting as pending (see `unconfirmedConversations`).
+  store.confirmConversation(conversationId);
+  const local = store.turnProjection.cursor;
+  if (!targetCursor || !local) {
+    // Pre-cursor server build, or the snapshot has not seeded the local fold
+    // yet — the plain signal-then-refetch path is the honest fallback.
+    void utils.langy.messages.invalidate({ projectId, conversationId });
+    return;
+  }
+  if (compareLangyEventCursors(targetCursor, local) <= 0) return;
+
+  const outcome = await foldDurableTail({
+    utils,
+    projectId,
+    conversationId,
+    from: local,
+  });
+  // Nobody is looking at this conversation any more, so there is no view to
+  // repair and no history worth refetching.
+  if (outcome === "abandoned") return;
+
+  const { turnProjection } = useLangyStore.getState();
+  const turnEnded = isLangyTurnProjectionTerminal(turnProjection);
+  // A tail that stopped short of the cursor it was told about cannot carry the fold there (a
+  // process with no event log serves an empty one), so the snapshot has to.
+  const shortOfTarget =
+    !turnProjection.cursor || compareLangyEventCursors(targetCursor, turnProjection.cursor) > 0;
+  if (outcome === "behind" || turnEnded || shortOfTarget) {
+    void utils.langy.messages.invalidate({ projectId, conversationId });
+  }
+}
+
+/**
+ * Bring the fold up to a transcript snapshot: fold the tail up to its cursor, and where the tail
+ * cannot reach it, take the snapshot's cursor and in-flight turn instead.
+ */
+export async function catchUpToSnapshot({
+  utils,
+  projectId,
+  conversationId,
+  snapshot,
+}: {
+  utils: ApiUtils;
+  projectId: string;
+  conversationId: string;
+  snapshot: { cursor: LangyEventCursor; currentTurnId: string | null };
+}): Promise<void> {
+  await catchUpConversationFold({
+    utils,
+    projectId,
+    conversationId,
+    targetCursor: snapshot.cursor,
+  });
+  const store = useLangyStore.getState();
+  if (store.activeConversationId !== conversationId) return;
+  store.seedTurnProjection(snapshot);
+}

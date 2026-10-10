@@ -48,24 +48,24 @@ This verifies the full `gateway → OTLP → ingest → cost-calc` chain, not ju
 
 Each cell is a single `t.Run` in `provider_matrix_test.go`. Build-tagged per provider so CI's default `go test ./...` never spends real credits.
 
-| Provider | Simple | Streamed | Tool calling | Structured outputs | Build tag |
-|----------|:------:|:--------:|:------------:|:------------------:|-----------|
-| openai    | 🚧 | 🚧 | 🚧 | 🚧 | `live_openai` |
-| anthropic | 🚧 | 🚧 | 🚧 | 🚧 | `live_anthropic` |
-| gemini    | 🚧 | 🚧 | 🚧 | 🚧 | `live_gemini` |
-| bedrock   | 🚧 | 🚧 | 🚧 | 🚧 | `live_bedrock` |
-| azure     | 🚧 | 🚧 | 🚧 | 🚧 | `live_azure` |
-| vertex    | 🚧 | 🚧 | 🚧 | 🚧 | `live_vertex` |
+| Provider  | Simple | Streamed | Tool calling | Structured outputs | Build tag        |
+| --------- | :----: | :------: | :----------: | :----------------: | ---------------- |
+| openai    |   🚧   |    🚧    |      🚧      |         🚧         | `live_openai`    |
+| anthropic |   🚧   |    🚧    |      🚧      |         🚧         | `live_anthropic` |
+| gemini    |   🚧   |    🚧    |      🚧      |         🚧         | `live_gemini`    |
+| bedrock   |   🚧   |    🚧    |      🚧      |         🚧         | `live_bedrock`   |
+| azure     |   🚧   |    🚧    |      🚧      |         🚧         | `live_azure`     |
+| vertex    |   🚧   |    🚧    |      🚧      |         🚧         | `live_vertex`    |
 
 24 cells total. As each lands green, flag ✅ with duration + captured cost in `.claude/AI-GATEWAY-TEST-MATRIX.md`.
 
 ## Model defaults (cheapest that supports all 4 shapes)
 
-| Provider | Default model | Env override |
-|----------|---------------|--------------|
-| openai    | `gpt-5-mini` | `OPENAI_MODEL` |
-| anthropic | `claude-haiku-4-5-20251001` | `ANTHROPIC_MODEL` |
-| gemini    | `gemini-2.5-flash` | `GEMINI_MODEL` |
-| bedrock   | `anthropic.claude-3-5-haiku-20241022-v1:0` | `BEDROCK_MODEL` |
-| azure     | `gpt-5-mini` (via the `langwatchopenaisweden` deployment) | `AZURE_MODEL` |
-| vertex    | `gemini-2.5-flash` (us-central1) | `VERTEX_MODEL` |
+| Provider  | Default model                                             | Env override      |
+| --------- | --------------------------------------------------------- | ----------------- |
+| openai    | `gpt-5-mini`                                              | `OPENAI_MODEL`    |
+| anthropic | `claude-haiku-4-5-20251001`                               | `ANTHROPIC_MODEL` |
+| gemini    | `gemini-2.5-flash`                                        | `GEMINI_MODEL`    |
+| bedrock   | `anthropic.claude-3-5-haiku-20241022-v1:0`                | `BEDROCK_MODEL`   |
+| azure     | `gpt-5-mini` (via the `langwatchopenaisweden` deployment) | `AZURE_MODEL`     |
+| vertex    | `gemini-2.5-flash` (us-central1)                          | `VERTEX_MODEL`    |

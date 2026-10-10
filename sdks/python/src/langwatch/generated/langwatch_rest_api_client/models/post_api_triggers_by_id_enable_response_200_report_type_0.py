@@ -4,7 +4,6 @@ from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, TypeVar
 
 from attrs import define as _attrs_define
-from attrs import field as _attrs_field
 
 if TYPE_CHECKING:
     from ..models.post_api_triggers_by_id_enable_response_200_report_type_0_schedule import (
@@ -26,8 +25,7 @@ T = TypeVar("T", bound="PostApiTriggersByIdEnableResponse200ReportType0")
 
 @_attrs_define
 class PostApiTriggersByIdEnableResponse200ReportType0:
-    """What a report renders and when. Null for anything else.
-
+    """
     Attributes:
         source (PostApiTriggersByIdEnableResponse200ReportType0SourceType0 |
             PostApiTriggersByIdEnableResponse200ReportType0SourceType1 |
@@ -43,7 +41,6 @@ class PostApiTriggersByIdEnableResponse200ReportType0:
     )
     schedule: PostApiTriggersByIdEnableResponse200ReportType0Schedule
     compare_to_previous: bool = False
-    additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         from ..models.post_api_triggers_by_id_enable_response_200_report_type_0_source_type_0 import (
@@ -66,7 +63,7 @@ class PostApiTriggersByIdEnableResponse200ReportType0:
         compare_to_previous = self.compare_to_previous
 
         field_dict: dict[str, Any] = {}
-        field_dict.update(self.additional_properties)
+
         field_dict.update(
             {
                 "source": source,
@@ -135,21 +132,4 @@ class PostApiTriggersByIdEnableResponse200ReportType0:
             compare_to_previous=compare_to_previous,
         )
 
-        post_api_triggers_by_id_enable_response_200_report_type_0.additional_properties = d
         return post_api_triggers_by_id_enable_response_200_report_type_0
-
-    @property
-    def additional_keys(self) -> list[str]:
-        return list(self.additional_properties.keys())
-
-    def __getitem__(self, key: str) -> Any:
-        return self.additional_properties[key]
-
-    def __setitem__(self, key: str, value: Any) -> None:
-        self.additional_properties[key] = value
-
-    def __delitem__(self, key: str) -> None:
-        del self.additional_properties[key]
-
-    def __contains__(self, key: str) -> bool:
-        return key in self.additional_properties

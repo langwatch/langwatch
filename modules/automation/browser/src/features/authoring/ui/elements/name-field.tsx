@@ -1,0 +1,47 @@
+import { Field, Input } from "@langwatch/design-system/primitives";
+import { useEffect, useRef } from "react";
+
+const NAME_PLACEHOLDER = {
+  trace: "e.g., Flag failing traces",
+  customGraph: "e.g., High latency",
+  report: "e.g., Weekly quality digest",
+} as const;
+
+/** Controlled identity field shared by the authoring host and browser shells. */
+export function AutomationNameField({
+  source,
+  value,
+  isEdit: _isEdit,
+  configComplete,
+  noun,
+  onChange,
+}: {
+  source: keyof typeof NAME_PLACEHOLDER;
+  value: string;
+  isEdit: boolean;
+  configComplete: boolean;
+  noun: string;
+  onChange: (value: string) => void;
+}) {
+  const nameMissing = value.trim().length === 0 && configComplete;
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const raf = requestAnimationFrame(() => inputRef.current?.focus());
+    return () => cancelAnimationFrame(raf);
+  }, []);
+
+  return (
+    <Field.Root invalid={nameMissing}>
+      <Field.Label>Name</Field.Label>
+      <Input
+        ref={inputRef}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={NAME_PLACEHOLDER[source]}
+        data-testid="automation-name-input"
+      />
+      {nameMissing ? <Field.ErrorText>Name this {noun} to save it.</Field.ErrorText> : null}
+    </Field.Root>
+  );
+}

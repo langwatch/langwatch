@@ -1,10 +1,10 @@
 """LangWatch's own model pricing, registered into LiteLLM's cost map.
 
 The app keeps a static model catalog with per-token prices
-(platform/app/src/server/modelProviders/llmModels.json plus the hand-curated
-llmModels.overlay.json). LangEvals registers those prices with LiteLLM once at
-startup, so evaluation costs match the prices the app shows and never depend
-on a price list fetched at runtime.
+(modules/model-provider/contract/src/catalog/model-catalog.json plus the
+hand-curated model-catalog.overlay.json). LangEvals registers those prices with
+LiteLLM once at startup, so evaluation costs match the prices the app shows and
+never depend on a price list fetched at runtime.
 
 The catalog is read from LANGWATCH_MODEL_PRICING_DIR (the image copies both
 files there) or, in a checkout, straight from the app's source tree.
@@ -21,15 +21,15 @@ import litellm
 from litellm._logging import verbose_logger
 
 PRICING_DIR_ENV = "LANGWATCH_MODEL_PRICING_DIR"
-CATALOG_FILES = ("llmModels.json", "llmModels.overlay.json")
+CATALOG_FILES = ("model-catalog.json", "model-catalog.overlay.json")
 
 _CHECKOUT_DIR = (
     Path(__file__).resolve().parents[4]
-    / "platform"
-    / "app"
+    / "modules"
+    / "model-provider"
+    / "contract"
     / "src"
-    / "server"
-    / "modelProviders"
+    / "catalog"
 )
 
 # Our catalog field -> LiteLLM cost map field.

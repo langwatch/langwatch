@@ -108,6 +108,23 @@ Feature: Activating a self-hosted install with a code
     When another attempt arrives
     Then it is refused as rate limited before the registry is read
 
+  @unit
+  Scenario: The connect host's door finds the code and the redemption claims it
+    Given a valid single-use code
+    When an install posts it to the connect host as its bearer
+    Then the licence token door looks the code up without claiming it
+    And the redemption is handed the code and the install the door found, never the bearer
+    And the redemption claims the code and answers with the minted license
+
+  @unit
+  Scenario: A revoked, expired or already redeemed code is refused at the connect host with its own code
+    Given a code that is revoked, past its expiry, or already redeemed
+    When an install posts it to the connect host
+    Then a revoked code is refused at the door as activation_code_not_found with status 401
+    And an expired code is refused at the door as activation_code_expired with status 403
+    And a code claimed first by another install is refused by the claim as activation_code_already_redeemed with status 403
+    And nothing is minted
+
   # ============================================================================
   # Exactly once
   # ============================================================================
@@ -151,7 +168,7 @@ Feature: Activating a self-hosted install with a code
     When LangWatch answers with a signed license
     Then the install validates and stores it the way it stores a pasted one
 
-  @unimplemented @unit
+  @unit
   Scenario: An install with connect switched off refuses to redeem
     Given an install with connect switched off
     When an operator enters a code

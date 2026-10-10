@@ -1,10 +1,12 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
+
 import { WorkflowsApiService } from "@/client-sdk/services/workflows/workflows-api.service";
+
 import { resolveCredentials } from "../../utils/apiKey";
 import { formatTable, formatRelativeTime } from "../../utils/formatting";
-import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 
 export const listWorkflowsCommand = async (): Promise<CommandResult | void> => {
   await resolveCredentials();
@@ -15,9 +17,7 @@ export const listWorkflowsCommand = async (): Promise<CommandResult | void> => {
   try {
     const workflows = await service.getAll();
 
-    spinner.succeed(
-      `Found ${workflows.length} workflow${workflows.length !== 1 ? "s" : ""}`,
-    );
+    spinner.succeed(`Found ${workflows.length} workflow${workflows.length !== 1 ? "s" : ""}`);
 
     return {
       data: workflows,
@@ -55,9 +55,7 @@ export const listWorkflowsCommand = async (): Promise<CommandResult | void> => {
 
         console.log();
         console.log(
-          chalk.gray(
-            `Use ${chalk.cyan("langwatch workflow get <id>")} to view workflow details`,
-          ),
+          chalk.gray(`Use ${chalk.cyan("langwatch workflow get <id>")} to view workflow details`),
         );
       },
     };

@@ -1,9 +1,10 @@
 import { createServer, type Server } from "node:http";
+
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { initConfig } from "../config.js";
-import { fetchDocumentation, resolveDocumentationUrl } from "../documentation-fetch.js";
-import { countingVerifier } from "./support/http-server-harness.js";
+import { initConfig } from "../config.ts";
+import { fetchDocumentation, resolveDocumentationUrl } from "../documentation-fetch.ts";
+import { countingVerifier } from "./support/http-server-harness.ts";
 
 const TEST_API_KEY = "security-regression-test";
 
@@ -14,13 +15,21 @@ const MCP_HEADERS = {
 };
 
 describe("MCP documentation fetch security", () => {
-  describe("URL validation", () => {
+  describe("resolveDocumentationUrl()", () => {
     /** @scenario A documentation tool accepts its own trusted HTTPS pages */
     it.each([
       ["langwatch" as const, undefined, "https://langwatch.ai/docs/llms.txt"],
       ["scenario" as const, undefined, "https://langwatch.ai/scenario/llms.txt"],
-      ["langwatch" as const, "observability/tracing", "https://langwatch.ai/docs/observability/tracing.md"],
-      ["scenario" as const, "/scenario/guides/quickstart", "https://langwatch.ai/scenario/guides/quickstart.md"],
+      [
+        "langwatch" as const,
+        "observability/tracing",
+        "https://langwatch.ai/docs/observability/tracing.md",
+      ],
+      [
+        "scenario" as const,
+        "/scenario/guides/quickstart",
+        "https://langwatch.ai/scenario/guides/quickstart.md",
+      ],
       [
         "langwatch" as const,
         "https://langwatch.ai/docs/llms.txt?format=raw",
@@ -44,7 +53,9 @@ describe("MCP documentation fetch security", () => {
       ["scenario" as const, "https://langwatch.ai/scenario-evil/page.md"],
       ["langwatch" as const, "https://langwatch.ai/docs/../scenario/llms.txt"],
     ])("rejects untrusted %s documentation URL %s", (kind, input) => {
-      expect(() => resolveDocumentationUrl(kind, input)).toThrow(/trusted LangWatch documentation URL/);
+      expect(() => resolveDocumentationUrl(kind, input)).toThrow(
+        /trusted LangWatch documentation URL/,
+      );
     });
   });
 
@@ -58,7 +69,11 @@ describe("MCP documentation fetch security", () => {
       return new Response("# documentation");
     };
 
-    const text = await fetchDocumentation("langwatch", "https://langwatch.ai/docs/llms.txt", fetchForTest);
+    const text = await fetchDocumentation(
+      "langwatch",
+      "https://langwatch.ai/docs/llms.txt",
+      fetchForTest,
+    );
 
     expect(text).toBe("# documentation");
     expect(receivedRedirectMode).toBe("error");
@@ -71,12 +86,12 @@ describe("MCP documentation fetch security", () => {
         headers: { "Content-Type": "text/html" },
       });
 
-    await expect(fetchDocumentation("langwatch", "https://langwatch.ai/docs/llms.txt", fetchForTest)).rejects.toThrow(
-      /unexpected content type/
-    );
+    await expect(
+      fetchDocumentation("langwatch", "https://langwatch.ai/docs/llms.txt", fetchForTest),
+    ).rejects.toThrow(/unexpected content type/);
   });
 
-  describe("HTTP tool transport", () => {
+  describe("when documentation tools go through the HTTP transport", () => {
     let mcpServer: Server;
     let targetServer: Server;
     let mcpPort: number;
@@ -97,7 +112,7 @@ describe("MCP documentation fetch security", () => {
       targetPort = typeof targetAddress === "object" && targetAddress ? targetAddress.port : 0;
 
       initConfig({ endpoint: "https://app.langwatch.ai" });
-      const { startHttpServer } = await import("../http-server.js");
+      const { startHttpServer } = await import("../http-server.ts");
       // These cases are about SSRF in the documentation tools, so the key check
       // is stubbed to keep the test on its own subject.
       const { verifier } = countingVerifier([TEST_API_KEY]);
@@ -120,7 +135,7 @@ describe("MCP documentation fetch security", () => {
         }),
       });
       sessionId = initializeResponse.headers.get("mcp-session-id") ?? "";
-      expect(sessionId).not.toBe("");
+      if (sessionId === "") throw new Error("setup: the MCP server issued no session id");
 
       await fetch(`http://127.0.0.1:${mcpPort}/mcp`, {
         method: "POST",
@@ -145,7 +160,7 @@ describe("MCP documentation fetch security", () => {
 
     async function callDocumentationTool(
       name: "fetch_langwatch_docs" | "fetch_scenario_docs",
-      url: string
+      url: string,
     ): Promise<string> {
       const response = await fetch(`http://127.0.0.1:${mcpPort}/mcp`, {
         method: "POST",
@@ -170,11 +185,14 @@ describe("MCP documentation fetch security", () => {
 
         expect(body).toContain("trusted LangWatch documentation URL");
         expect(targetHits).toBe(hitsBefore);
-      }
+      },
     );
 
     it("blocks cross-namespace fetches through the real MCP handler", async () => {
-      const body = await callDocumentationTool("fetch_langwatch_docs", "https://langwatch.ai/scenario/llms.txt");
+      const body = await callDocumentationTool(
+        "fetch_langwatch_docs",
+        "https://langwatch.ai/scenario/llms.txt",
+      );
 
       expect(body).toContain("trusted LangWatch documentation URL");
     });

@@ -1,9 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
+
 import type { LangwatchApiClient } from "@/internal/api/client";
-import {
-  InstantEvalsApiError,
-  InstantEvalsApiService,
-} from "../instant-evals-api.service";
+
+import { InstantEvalsApiError, InstantEvalsApiService } from "../instant-evals-api.service";
 
 const serviceWith = (result: {
   data?: unknown;
@@ -35,9 +34,7 @@ describe("InstantEvalsApiService", () => {
     ])("when %s is called", (_name, call) => {
       /** @scenario "A failed response with no body is reported as a failed request" */
       it("raises an API error carrying the 502 status", async () => {
-        const failure = await call(serviceWith(emptyBadGateway())).catch(
-          (error: unknown) => error,
-        );
+        const failure = await call(serviceWith(emptyBadGateway())).catch((error: unknown) => error);
         expect(failure).toBeInstanceOf(InstantEvalsApiError);
         expect((failure as InstantEvalsApiError).status).toBe(502);
         expect((failure as InstantEvalsApiError).message).toContain("502");

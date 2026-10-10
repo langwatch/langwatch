@@ -1,0 +1,81 @@
+import { moduleApi } from "@langwatch/module";
+
+import type {
+  PresenceCursorEvent,
+  PresenceCursorSubscription,
+  PresenceCursorInput,
+  PresenceEvent,
+  PresenceLeaveInput,
+  PresenceProjectInput,
+  PresenceSession,
+  PresenceUpdateInput,
+} from "./presence.ts";
+import type { ReadHint, ReadHintsWatchInput, UpgradeReadHintsWatchInput } from "./read-hints.ts";
+
+/** Portable cancellation shape; browser and Node AbortSignals satisfy it. */
+export type PresenceStreamSignal = unknown;
+/**
+ * A project-wide signal a peer publishes on the tenant fabric, presence being its one publisher.
+ * The consumer filters per user: a `langy_conversation_updated` payload carries its owner.
+ * A `tier` spends the project's allowance for it first, and a spent allowance drops the event.
+ */
+export type PresenceProjectEvent = Readonly<{
+  projectId: string;
+  channel:
+    | "export_progress"
+    | "langy_conversation_updated"
+    | "trace_updated"
+    | "discover_updated"
+    | "simulation_updated"
+    | "experiment_updated";
+  event: string;
+  tier?: "structural" | "delta";
+}>;
+
+/** Who else is looking at this project, where they are, and where their cursor is. */
+export interface PresenceApi {
+  isEnabledForProject(input: PresenceProjectInput): Promise<boolean>;
+  /**
+   * One browser session's heartbeat: its location now, and that it is still here. `user` is the
+   * presenter the door resolved (authenticated id, session name and image), never the payload's.
+   */
+  update(input: PresenceUpdateInput): Promise<void>;
+  leave(input: PresenceLeaveInput): Promise<void>;
+  list(input: PresenceProjectInput): Promise<PresenceSession[]>;
+  broadcastCursor(input: PresenceCursorInput): Promise<void>;
+  events(
+    input: PresenceProjectInput & { signal?: PresenceStreamSignal },
+  ): AsyncGenerator<PresenceEvent>;
+  cursors(
+    input: PresenceCursorSubscription & { signal?: PresenceStreamSignal },
+  ): AsyncGenerator<PresenceCursorEvent>;
+  /** {@link PresenceBroadcastFabric}: the tenant's live-update signals. */
+  getTenantEmitter(tenantId: string): PresenceTenantEmitter;
+  /** {@link PresenceBroadcastFabric}: releases the tenant emitter a subscription borrowed. */
+  cleanupTenantEmitter(tenantId: string): void;
+  publishProjectEvent(input: PresenceProjectEvent): Promise<void>;
+  /** The read hints of one user, organisation and project until the signal aborts. */
+  readHints(input: ReadHintsWatchInput): AsyncIterable<ReadHint>;
+  /** The upgrade runner's platform-scoped hints, for the Ops Upgrades pages, until the abort. */
+  upgradeReadHints(input: UpgradeReadHintsWatchInput): AsyncIterable<ReadHint>;
+}
+
+export const PresenceApi = moduleApi<PresenceApi>()("presence");
+
+/**
+ * Structural so this portable contract avoids a Node dependency while remaining
+ * compatible with Node's `EventEmitter` and test doubles.
+ */
+export type PresenceTenantEmitter = Readonly<{
+  on(event: string, listener: (...args: unknown[]) => void): unknown;
+  off(event: string, listener: (...args: unknown[]) => void): unknown;
+}>;
+
+/**
+ * Read-only peer token exposing per-tenant broadcast: one shared emitter per
+ * tenant avoids duplicate fabric subscriptions across peers.
+ */
+export abstract class PresenceBroadcastFabric {
+  abstract getTenantEmitter(tenantId: string): PresenceTenantEmitter;
+  abstract cleanupTenantEmitter(tenantId: string): void;
+}

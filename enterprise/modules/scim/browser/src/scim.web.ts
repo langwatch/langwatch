@@ -1,0 +1,49 @@
+/**
+ * What a browser installs when it installs scim: the connectors screen, the back
+ * office's directory sync, the overview's directory card and the Directory's status
+ * band. Always installed — scim refuses per-organization on entitlement, never by tier.
+ */
+
+import { defineBrowserModule } from "@langwatch/browser";
+import { DirectorySummaryToken } from "@langwatch/enterprise-scim-client";
+import { AuthenticationOverviewCardToken } from "@langwatch/organization-client";
+
+export const scimWeb = defineBrowserModule("scim")
+  .withHosts({
+    requires: ["ScimHostApi"],
+    mounts: { ScimHostApi: { load: () => import("./behavior/scim-host-mount.tsx") } },
+  })
+  .withScreens({
+    // Placed by the application's settings table until a settings anchor
+    // accepts declared routes; the loader is this module's either way.
+    "pages/settings/authentication/connectors": {
+      path: "/settings/authentication/connectors",
+      within: "settings",
+      label: "Connectors",
+      requires: "sso:view",
+      load: () => import("./ui/sections/connectors.screen.tsx"),
+    },
+    // Ops' directory sync across every customer: operators only, as main's
+    // admin shell guarded it; the server refuses everyone else as not found.
+    "pages/ops/directory-sync": {
+      requires: "ops:manage",
+      load: () => import("./ui/sections/directory-sync-view.screen.tsx"),
+    },
+  })
+  // Opened by token from the single sign-on go-live step (Q61).
+  .withDrawers({
+    provisioningSetup: {
+      load: async () => ({
+        default: (await import("./ui/sections/provisioning-setup-drawer.tsx"))
+          .ProvisioningSetupDrawer,
+      }),
+    },
+  })
+  // How accounts arrive, drawn on organization's Authentication overview.
+  .lends(AuthenticationOverviewCardToken, {
+    load: () => import("./ui/sections/directory-overview-card.tsx"),
+  })
+  // What the directory has been doing, above organization's Directory tabs.
+  .lends(DirectorySummaryToken, {
+    load: () => import("./ui/sections/directory-summary.tsx"),
+  });

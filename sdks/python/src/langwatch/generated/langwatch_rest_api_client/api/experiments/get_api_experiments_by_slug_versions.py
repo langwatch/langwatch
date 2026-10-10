@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, cast
 from urllib.parse import quote
 
 import httpx
@@ -6,16 +6,13 @@ import httpx
 from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.get_api_experiments_by_slug_versions_response_200 import GetApiExperimentsBySlugVersionsResponse200
-from ...models.get_api_experiments_by_slug_versions_response_400 import GetApiExperimentsBySlugVersionsResponse400
-from ...models.get_api_experiments_by_slug_versions_response_401 import GetApiExperimentsBySlugVersionsResponse401
-from ...models.get_api_experiments_by_slug_versions_response_404 import GetApiExperimentsBySlugVersionsResponse404
 from ...types import UNSET, Response, Unset, safe_http_status
 
 
 def _get_kwargs(
     slug: str,
     *,
-    limit: int | Unset = 50,
+    limit: int | Unset = UNSET,
     cursor: int | Unset = UNSET,
 ) -> dict[str, Any]:
 
@@ -29,7 +26,7 @@ def _get_kwargs(
 
     _kwargs: dict[str, Any] = {
         "method": "get",
-        "url": "/api/experiments/{slug}/versions".format(
+        "url": "/api/v1/experiments/{slug}/versions".format(
             slug=quote(str(slug), safe=""),
         ),
         "params": params,
@@ -40,31 +37,22 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> (
-    GetApiExperimentsBySlugVersionsResponse200
-    | GetApiExperimentsBySlugVersionsResponse400
-    | GetApiExperimentsBySlugVersionsResponse401
-    | GetApiExperimentsBySlugVersionsResponse404
-    | None
-):
+) -> Any | GetApiExperimentsBySlugVersionsResponse200 | None:
     if response.status_code == 200:
         response_200 = GetApiExperimentsBySlugVersionsResponse200.from_dict(response.json())
 
         return response_200
 
     if response.status_code == 400:
-        response_400 = GetApiExperimentsBySlugVersionsResponse400.from_dict(response.json())
-
+        response_400 = cast(Any, None)
         return response_400
 
     if response.status_code == 401:
-        response_401 = GetApiExperimentsBySlugVersionsResponse401.from_dict(response.json())
-
+        response_401 = cast(Any, None)
         return response_401
 
     if response.status_code == 404:
-        response_404 = GetApiExperimentsBySlugVersionsResponse404.from_dict(response.json())
-
+        response_404 = cast(Any, None)
         return response_404
 
     if client.raise_on_unexpected_status:
@@ -75,12 +63,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[
-    GetApiExperimentsBySlugVersionsResponse200
-    | GetApiExperimentsBySlugVersionsResponse400
-    | GetApiExperimentsBySlugVersionsResponse401
-    | GetApiExperimentsBySlugVersionsResponse404
-]:
+) -> Response[Any | GetApiExperimentsBySlugVersionsResponse200]:
     # LangWatch override: use safe_http_status to tolerate non-IANA status codes
     # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
     # Tracked upstream: https://github.com/openapi-generators/openapi-python-client/pull/1407
@@ -96,14 +79,9 @@ def sync_detailed(
     slug: str,
     *,
     client: AuthenticatedClient,
-    limit: int | Unset = 50,
+    limit: int | Unset = UNSET,
     cursor: int | Unset = UNSET,
-) -> Response[
-    GetApiExperimentsBySlugVersionsResponse200
-    | GetApiExperimentsBySlugVersionsResponse400
-    | GetApiExperimentsBySlugVersionsResponse401
-    | GetApiExperimentsBySlugVersionsResponse404
-]:
+) -> Response[Any | GetApiExperimentsBySlugVersionsResponse200]:
     """List an experiment's versions
 
      Every saved version of the experiment's setup, newest first. A commit, an agent write and a restore
@@ -112,7 +90,7 @@ def sync_detailed(
 
     Args:
         slug (str):
-        limit (int | Unset):  Default: 50.
+        limit (int | Unset):
         cursor (int | Unset):
 
     Raises:
@@ -120,7 +98,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[GetApiExperimentsBySlugVersionsResponse200 | GetApiExperimentsBySlugVersionsResponse400 | GetApiExperimentsBySlugVersionsResponse401 | GetApiExperimentsBySlugVersionsResponse404]
+        Response[Any | GetApiExperimentsBySlugVersionsResponse200]
     """
 
     kwargs = _get_kwargs(
@@ -140,15 +118,9 @@ def sync(
     slug: str,
     *,
     client: AuthenticatedClient,
-    limit: int | Unset = 50,
+    limit: int | Unset = UNSET,
     cursor: int | Unset = UNSET,
-) -> (
-    GetApiExperimentsBySlugVersionsResponse200
-    | GetApiExperimentsBySlugVersionsResponse400
-    | GetApiExperimentsBySlugVersionsResponse401
-    | GetApiExperimentsBySlugVersionsResponse404
-    | None
-):
+) -> Any | GetApiExperimentsBySlugVersionsResponse200 | None:
     """List an experiment's versions
 
      Every saved version of the experiment's setup, newest first. A commit, an agent write and a restore
@@ -157,7 +129,7 @@ def sync(
 
     Args:
         slug (str):
-        limit (int | Unset):  Default: 50.
+        limit (int | Unset):
         cursor (int | Unset):
 
     Raises:
@@ -165,7 +137,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        GetApiExperimentsBySlugVersionsResponse200 | GetApiExperimentsBySlugVersionsResponse400 | GetApiExperimentsBySlugVersionsResponse401 | GetApiExperimentsBySlugVersionsResponse404
+        Any | GetApiExperimentsBySlugVersionsResponse200
     """
 
     return sync_detailed(
@@ -180,14 +152,9 @@ async def asyncio_detailed(
     slug: str,
     *,
     client: AuthenticatedClient,
-    limit: int | Unset = 50,
+    limit: int | Unset = UNSET,
     cursor: int | Unset = UNSET,
-) -> Response[
-    GetApiExperimentsBySlugVersionsResponse200
-    | GetApiExperimentsBySlugVersionsResponse400
-    | GetApiExperimentsBySlugVersionsResponse401
-    | GetApiExperimentsBySlugVersionsResponse404
-]:
+) -> Response[Any | GetApiExperimentsBySlugVersionsResponse200]:
     """List an experiment's versions
 
      Every saved version of the experiment's setup, newest first. A commit, an agent write and a restore
@@ -196,7 +163,7 @@ async def asyncio_detailed(
 
     Args:
         slug (str):
-        limit (int | Unset):  Default: 50.
+        limit (int | Unset):
         cursor (int | Unset):
 
     Raises:
@@ -204,7 +171,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[GetApiExperimentsBySlugVersionsResponse200 | GetApiExperimentsBySlugVersionsResponse400 | GetApiExperimentsBySlugVersionsResponse401 | GetApiExperimentsBySlugVersionsResponse404]
+        Response[Any | GetApiExperimentsBySlugVersionsResponse200]
     """
 
     kwargs = _get_kwargs(
@@ -222,15 +189,9 @@ async def asyncio(
     slug: str,
     *,
     client: AuthenticatedClient,
-    limit: int | Unset = 50,
+    limit: int | Unset = UNSET,
     cursor: int | Unset = UNSET,
-) -> (
-    GetApiExperimentsBySlugVersionsResponse200
-    | GetApiExperimentsBySlugVersionsResponse400
-    | GetApiExperimentsBySlugVersionsResponse401
-    | GetApiExperimentsBySlugVersionsResponse404
-    | None
-):
+) -> Any | GetApiExperimentsBySlugVersionsResponse200 | None:
     """List an experiment's versions
 
      Every saved version of the experiment's setup, newest first. A commit, an agent write and a restore
@@ -239,7 +200,7 @@ async def asyncio(
 
     Args:
         slug (str):
-        limit (int | Unset):  Default: 50.
+        limit (int | Unset):
         cursor (int | Unset):
 
     Raises:
@@ -247,7 +208,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        GetApiExperimentsBySlugVersionsResponse200 | GetApiExperimentsBySlugVersionsResponse400 | GetApiExperimentsBySlugVersionsResponse401 | GetApiExperimentsBySlugVersionsResponse404
+        Any | GetApiExperimentsBySlugVersionsResponse200
     """
 
     return (

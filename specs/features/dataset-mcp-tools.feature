@@ -36,6 +36,38 @@ Feature: Dataset MCP Tools
     When the formatting function processes the response
     Then the output includes a column table and record entries
 
+  @unit
+  Scenario: Get dataset previews a dataset of any size and says how many records it left out
+    Given a dataset with 5000 records
+    When I call platform_get_dataset with format "json"
+    Then I receive the dataset's metadata and its first 100 records
+    And the answer counts the records left out and names the tool that reads them
+
+  @unit
+  Scenario: Get dataset digest names the records a preview left out
+    Given a dataset with 5000 records
+    When I call platform_get_dataset
+    Then the digest ends with a note that 4900 records are left out
+
+  @unit
+  Scenario: Get dataset asks for a smaller preview page when the server refuses one as too large
+    Given a dataset whose first 100 records are too large for one response
+    When I call platform_get_dataset
+    Then the preview page is asked for again with the page size the refusal suggests
+    And the preview is cut at 1 MB of records with a note of the records left out
+
+  @unit
+  Scenario: Get dataset shows every record of a small dataset without a note
+    Given a dataset with 3 records
+    When I call platform_get_dataset
+    Then I receive all 3 records and no note
+
+  @unit
+  Scenario: Get dataset reads the whole dataset in one response on a server without paged metadata
+    Given a self-hosted server whose records pages do not carry the dataset
+    When I call platform_get_dataset
+    Then the dataset is read with the single request
+
   @integration
   Scenario: Get dataset with non-existent slug returns an error
     When I call platform_get_dataset with slug "does-not-exist"

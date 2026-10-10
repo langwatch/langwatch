@@ -1,9 +1,9 @@
 # Trace View (Summary Tab) — Gherkin Spec
 # Implementation:
-#   platform/app/src/features/traces-v2/components/TraceDrawer/traceAccordions/TraceSummaryAccordions.tsx
-#   platform/app/src/features/traces-v2/components/TraceDrawer/IOViewer.tsx
-#   platform/app/src/features/traces-v2/components/TraceDrawer/AttributeTable.tsx
-#   platform/app/src/features/traces-v2/components/TraceDrawer/useIOViewerState.ts
+#   modules/trace/browser/src/ui/sections/explorer/trace-drawer/trace-accordions/trace-summary-accordions.tsx
+#   modules/trace/browser/src/ui/sections/explorer/trace-drawer/io-viewer.tsx
+#   modules/trace/browser/src/ui/sections/explorer/trace-drawer/attribute-table.tsx
+#   modules/trace/browser/src/ui/sections/explorer/trace-drawer/use-io-viewer-state.ts
 #
 # Audited 2026-05-01:
 #   - The drawer tab is "Summary" (`activeTab === "summary"`), not
@@ -38,7 +38,7 @@ Rule: Summary tab accordion layout
 
   Scenario: Summary tab is active by default when the drawer opens
     When the drawer opens with no `drawer.span` and no `drawer.tab` URL hint
-    Then `drawerStore.activeTab === "summary"`
+    Then the summary tab is active
     And `<TraceSummaryAccordions>` renders below the SpanTabBar
 
   Scenario: Returning to the summary tab from a span tab

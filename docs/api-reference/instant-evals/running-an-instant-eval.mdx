@@ -25,7 +25,7 @@ Add an `ORDER BY` when your statement carries a `LIMIT`. The run reads your stat
 ```sql
 SELECT
   TraceId,
-  eval_passed(conversation(ConversationId), 'Did the agent refuse the request?') AS refused
+  eval_passed(llm_readable_thread(ConversationId, 16000), 'Did the agent refuse the request?') AS refused
 FROM analytics.trace_metrics
 WHERE OccurredAt >= subtractDays(now(), 30) AND ConversationId != ''
 GROUP BY TraceId, ConversationId
@@ -61,17 +61,17 @@ When the statement matches more rows than the limit, the run judges the first pa
 
 `POST /api/v1/instant-evals` accepts the statement and answers `202` with the run, whose `status` is `QUEUED`. Poll `GET /api/v1/instant-evals/{id}` for progress:
 
-| Field | What it says |
-|---|---|
-| `status` | `QUEUED`, `PLANNING`, `RUNNING`, `FINISHED`, `FAILED` or `CANCELLED` |
-| `total` | Rows the statement matched, once the run has counted them |
-| `progress` | Rows judged so far |
-| `matched` | Judgements that matched, across the boolean questions. Null when the run asked none |
-| `matchedByQuestion` | Matches for a boolean question, judged rows for a score or a category one |
-| `failed` | Rows the judge could not answer |
-| `skipped` | Rows the judge declined, for instance because the text was too large |
-| `tokens` | Input tokens billed so far |
-| `priceUsd` | What the run has cost you, written when it finishes |
+| Field               | What it says                                                                        |
+| ------------------- | ----------------------------------------------------------------------------------- |
+| `status`            | `QUEUED`, `PLANNING`, `RUNNING`, `FINISHED`, `FAILED` or `CANCELLED`                |
+| `total`             | Rows the statement matched, once the run has counted them                           |
+| `progress`          | Rows judged so far                                                                  |
+| `matched`           | Judgements that matched, across the boolean questions. Null when the run asked none |
+| `matchedByQuestion` | Matches for a boolean question, judged rows for a score or a category one           |
+| `failed`            | Rows the judge could not answer                                                     |
+| `skipped`           | Rows the judge declined, for instance because the text was too large                |
+| `tokens`            | Input tokens billed so far                                                          |
+| `priceUsd`          | What the run has cost you, written when it finishes                                 |
 
 `GET /api/v1/instant-evals` lists the project's runs newest first, paged with `before` as an ISO 8601 cursor.
 

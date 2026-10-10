@@ -1,0 +1,2825 @@
+[
+  {
+    "round": 1,
+    "group": "D",
+    "ids": [
+      "signin-signup-screens:205",
+      "signin-signup-screens:347",
+      "signin-signup-screens:579",
+      "signin-signup-screens:957",
+      "signin-signup-screens:965",
+      "signin-signup-screens:972",
+      "signin-signup-screens:979",
+      "passkeys:432",
+      "Q65",
+      "org-access-cluster:35",
+      "org-access-cluster:47",
+      "org-access-cluster:54",
+      "org-access-cluster:70",
+      "organization-authentication-settings:36",
+      "organization-authentication-settings:129",
+      "scim-sso-signin:28",
+      "sso-credential-enforcement:111",
+      "mfa-and-session-shape:610",
+      "langy-choice-questions:57",
+      "langy-choice-questions:174",
+      "langy-choice-questions:187",
+      "langy-composer-feedback-and-cards:109",
+      "langy-guided-onboarding:405",
+      "langy-guided-onboarding:412",
+      "langy-guided-onboarding:428",
+      "langy-guided-onboarding:1341",
+      "langy-session-key:90",
+      "Q134",
+      "instant-eval-billing:210",
+      "ui-contract:125",
+      "audit-log:371",
+      "evaluation-execution:230",
+      "governance-cost-screen:529",
+      "pulled-rows-home-and-leak-gate:43",
+      "pulled-rows-home-and-leak-gate:56",
+      "credential-validation:482",
+      "scenario-input-mapping:197",
+      "license-registry:64",
+      "Q45",
+      "Q96",
+      "Q156"
+    ],
+    "questions": [
+      {
+        "question": "Eight sign-in and passkey scenarios that main proved with tests have no matching code on this branch (signin-signup-screens.feature :205 :347 :579 :957 :965 :972 :979; passkeys.feature:432). Restore main's behaviour, reword the scenarios to today's screens, or rule them one by one? (Q65)",
+        "header": "Sign-in rows",
+        "options": [
+          {
+            "label": "Restore all as main (Recommended)",
+            "description": "Port main's code and tests. :347 refuses a passkey sign-up for an address now routed to SSO; :432 stops inventing an error code."
+          },
+          {
+            "label": "Reword to today's code",
+            "description": "Keep the current screens; the eight scenarios are rewritten to what the branch does and main's behaviour is dropped."
+          },
+          {
+            "label": "Ask per row",
+            "description": "I rule each of the eight separately in a later round."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "Nine identity scenarios main proved are missing here: the Access tab gathering grants per holder with counts (org-access-cluster.feature :35 :47 :54 :70), organization-authentication-settings :36 and :129, scim-sso-signin:28, sso-credential-enforcement:111 and mfa-and-session-shape:610. Restore them as main had them?",
+        "header": "Access rows",
+        "options": [
+          {
+            "label": "Restore all as main (Recommended)",
+            "description": "Includes main's role-holders Access tab (over 150 lines), the SCIM ownership refusal and the in-transaction membership read."
+          },
+          {
+            "label": "Restore all but Access tab",
+            "description": "Keep one row per grant and reword the four org-access-cluster rows to it; restore the other five."
+          },
+          {
+            "label": "Ask per row",
+            "description": "I rule each of the nine separately in a later round."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "Nine Langy card scenarios have a clear spec and a test on main but no code here (langy-choice-questions :57 :174 :187, langy-composer-feedback-and-cards:109, langy-guided-onboarding :405 :412 :428 :1341, langy-session-key:90). Build them to the spec, or keep today's cards? (Q134)",
+        "header": "Langy cards",
+        "options": [
+          {
+            "label": "Build to the spec (Recommended)",
+            "description": "Bare questions without Other, choices outside the 'Made by Langy' frame, idle cards stop locking the field, quiet links, GitHub mark, path rows, non-delegable refusal copy."
+          },
+          {
+            "label": "Build, reword :174, :428",
+            "description": "As above, but keep today's card frame and icon and reword those two rows."
+          },
+          {
+            "label": "Ask per row",
+            "description": "I rule each of the nine separately in a later round."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "Ten product scenarios main proved are missing or differ here: instant-eval-billing:210, ui-contract:125, audit-log:371, evaluation-execution:230, governance-cost-screen:529, pulled-rows-home-and-leak-gate :43 :56, credential-validation:482, scenario-input-mapping:197, license-registry:64. Restore them as main had them? (Q45, Q96, Q156)",
+        "header": "Product rows",
+        "options": [
+          {
+            "label": "Restore all as main (Recommended)",
+            "description": "Includes the one-line run-start fix (:230), the Codex gateway ping (:482), Scenario Mappings in the HTTP agent drawer (:197) and main's generate-license script (:64)."
+          },
+          {
+            "label": "Small now, ask the rest",
+            "description": "Fix :230, :371 and :482 now; ask me again about :64, :125, :197, :210, :529 and the leak-gate sweep."
+          },
+          {
+            "label": "Ask per row",
+            "description": "I rule each of the ten separately in a later round."
+          }
+        ],
+        "multiSelect": false
+      }
+    ]
+  },
+  {
+    "round": 2,
+    "group": "D",
+    "ids": ["ingest-api-key-lifecycle:233", "Q157", "P8484-R1", "P8484-R2", "P8484-R3"],
+    "questions": [
+      {
+        "question": "ingest-api-key-lifecycle.feature:233: when the CLI refreshes a session past the organisation's maximum session duration, main refused and revoked its login and ingest keys with cause 'expired'. Here the refresh is refused and only the refresh token dropped; a separate reaper revokes the keys later. Which is wanted? (Q157)",
+        "header": "Session cap",
+        "options": [
+          {
+            "label": "Revoke on refresh (Recommended)",
+            "description": "Restore main: the refused refresh also revokes both keys with cause 'expired' at once (code in modules/auth); the reaper stays as a backstop."
+          },
+          {
+            "label": "Reword to the reaper",
+            "description": "The refresh only refuses; the scenario says the reaper retires the keys, which stay valid until its next pass."
+          },
+          {
+            "label": "Retire the scenario",
+            "description": "Drop the row; the reaper's own scenario covers expiry."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "Trace list page size: main's tRPC trace list now refuses a page size above 1000, while this branch silently clamps to the plan's ruled bound (1000, 2000 or 4000) and refuses only above 4000. The scenario 'A trace list read above the page cap is rejected' stays unbound until you choose. (P8484-R1)",
+        "header": "List cap",
+        "options": [
+          {
+            "label": "Refuse above plan bound (Recommended)",
+            "description": "Keep each plan's bound and refuse past it by name, as main refuses; paid plans keep their larger pages."
+          },
+          {
+            "label": "Keep the clamp",
+            "description": "Amend the scenario to the silent clamp; no refusal below 4000."
+          },
+          {
+            "label": "Cap tRPC at 1000",
+            "description": "As main; paid plans lose their larger bound over tRPC."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "Trace download page size: main accepts a download read of up to 10000 rows; this branch refuses above 4000 and clamps to the plan. One scenario stays unbound until you choose the download ceiling. (P8484-R2)",
+        "header": "Download cap",
+        "options": [
+          {
+            "label": "Fixed 10000 as main (Recommended)",
+            "description": "A constant in the trace contract; downloads match main on every plan."
+          },
+          {
+            "label": "Per-plan key",
+            "description": "A new tracesDownloadPageSizeMax plan registry key, so plans can differ."
+          },
+          {
+            "label": "Keep 4000",
+            "description": "Amend the scenario; downloads stay smaller than main's."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "Main's annotations list has a filtered mode that walks trace pages (useTraceIdsAcrossPages); this branch's AllAnnotationsList lacks it, so two scenarios are unbound. Restoring needs analytics' filter parameters, which annotation's browser package cannot import without a new edge. (P8484-R3)",
+        "header": "Annot. pages",
+        "options": [
+          {
+            "label": "Restore with a seam (Recommended)",
+            "description": "The shell passes the filter parameters in; annotation takes no analytics edge."
+          },
+          {
+            "label": "Restore with the edge",
+            "description": "annotation-browser imports analytics' use-filter-params hook directly."
+          },
+          {
+            "label": "Record a parity gap",
+            "description": "Leave the mode out; the two scenarios stay unbound as a known gap."
+          }
+        ],
+        "multiSelect": false
+      }
+    ]
+  },
+  {
+    "round": 3,
+    "group": "D",
+    "ids": ["Q209", "Q205(A)", "Q207(A)", "Q207(B)", "Q207(C)", "Q207(D)", "Q207(F)"],
+    "questions": [
+      {
+        "question": "Offloaded trace fields: trace reads one event's payload from event_log in the api, but the api's event store refuses every read by ruled design, so offloaded fields silently fall back to the 64 KB preview, a regression against main. How should trace read one event? (Q209)",
+        "header": "Event reads",
+        "options": [
+          {
+            "label": "Narrow read seat (Recommended)",
+            "description": "A separate single-event read beside the producer-only store, keeping main's 2-day window; the producer-only rule stands."
+          },
+          {
+            "label": "Read-capable api log",
+            "description": "The api role reads its own event log; the producer-only specs and tests are amended."
+          },
+          {
+            "label": "Table exception",
+            "description": "Trace reads event_log directly as a named policy exception."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "Cross-owner ClickHouse reads flagged by the table-ownership policy: governance, experiment and evaluation read trace's trace_summaries; webhook reads gateway's gateway_spend; trace reads instant_eval_judgments, simulation_runs, evaluation_runs and log_records, some as subqueries inside one statement. How should these reads work? (Q207)",
+        "header": "CH reads",
+        "options": [
+          {
+            "label": "Api reads, rest ruled (Recommended)",
+            "description": "New trace and gateway *Api query operations for plain reads; the one-statement subqueries become named policy exceptions."
+          },
+          {
+            "label": "Denormalise",
+            "description": "Owners copy what they need through subscribers; no cross reads remain (the largest change)."
+          },
+          {
+            "label": "All exceptions",
+            "description": "Record every finding as an accepted exception; nothing moves."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "Analytics queries trace's analytics tables by design and keeps its own copy of trace's 'has signal' SQL predicate, so the two copies can drift. Who owns those tables? (Q207)",
+        "header": "Trace tables",
+        "options": [
+          {
+            "label": "Analytics owns them (Recommended)",
+            "description": "Ownership moves to analytics; trace drops its copy of the predicate."
+          },
+          {
+            "label": "Trace query source",
+            "description": "Trace keeps ownership and publishes a query-source contract that analytics composes."
+          },
+          {
+            "label": "Exception",
+            "description": "Record analytics' reads as an accepted exception; both copies stay."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "The table-ownership policy finds no module owning event_log (written by the eventing framework) or six legacy or externally written ClickHouse tables with no TypeScript writer. Record them in the policy as framework or legacy owned, or drop the legacy tables? (Q207)",
+        "header": "Unowned CH",
+        "options": [
+          {
+            "label": "Record as owned (Recommended)",
+            "description": "The policy names them framework or legacy owned; nothing is dropped."
+          },
+          {
+            "label": "Drop the legacy six",
+            "description": "Retire them through contract steps at the LTS floor; event_log stays framework owned."
+          }
+        ],
+        "multiSelect": false
+      }
+    ]
+  },
+  {
+    "round": 4,
+    "group": "D",
+    "ids": ["Q205(B)", "Q205(C)", "Q208(D)", "Q208(A)", "Q208(B)"],
+    "questions": [
+      {
+        "question": "Eventing's event tables: data-retention rewrites them, and analytics publishes them as customer-queryable LWQL views behind project:manage. Both break the table-ownership policy. How may other modules touch eventing's tables? (Q205)",
+        "header": "Event tables",
+        "options": [
+          {
+            "label": "Eventing surfaces (Recommended)",
+            "description": "Eventing exposes a retention operation and declares its own LWQL catalogue entries, which analytics composes."
+          },
+          {
+            "label": "Exceptions",
+            "description": "Record both as accepted policy exceptions."
+          },
+          {
+            "label": "Retire the views",
+            "description": "Drop the event-table LWQL views, a customer-visible product change."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "Trace and gateway publish './testing' package exports whose fixtures other modules' tests import, and the boundary policy flags them. Keep test-only exports, or move the fixtures into each consuming module? (Q208)",
+        "header": "Test exports",
+        "options": [
+          {
+            "label": "Keep, banned in prod (Recommended)",
+            "description": "Keep test-only subpath exports, lint-banned outside tests, like the test-only peer seam already ruled."
+          },
+          {
+            "label": "Move into consumers",
+            "description": "Each consumer owns its fixtures; the './testing' exports go."
+          },
+          {
+            "label": "Ask per export",
+            "description": "I rule each export separately."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "The architecture enforcer classes each modules/<name>/client package as a portable library, which may not depend on @langwatch/api or React, but the record (section 3.4) gives every module a <name>-client that does. Which one changes? (Q208)",
+        "header": "Client role",
+        "options": [
+          {
+            "label": "Add a client role (Recommended)",
+            "description": "The enforcer gains a 'client' role allowing those dependencies; the linter follows the record."
+          },
+          {
+            "label": "Change the record",
+            "description": "Client packages become portable libraries and the record is amended."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "Auth's browser package exports './session' and './auth', and navigation's exports './chrome' and './navigation', as side doors; their only users are nine type-only imports in apps/ui and one test mock. Where should these shell-facing types live before the side doors go? (Q208)",
+        "header": "Shell types",
+        "options": [
+          {
+            "label": "The module's contract (Recommended)",
+            "description": "Auth and navigation contracts export the types and apps/ui imports them type-only; the owner keeps them."
+          },
+          {
+            "label": "browser-host",
+            "description": "The framework package holds them as shared shell ports that the modules implement."
+          }
+        ],
+        "multiSelect": false
+      }
+    ]
+  },
+  {
+    "round": 5,
+    "group": "D",
+    "ids": ["Q212(R4)", "Q212(R2)", "Q212(R3)", "Q211(C)"],
+    "questions": [
+      {
+        "question": "Better Auth's storage adapter needs raw Prisma, Redis and the cipher, and ops' event replay needs raw Redis and ClickHouse plus eventing's pipeline definitions. Repositories normally receive only their own store. May these two sites hold raw clients? (Q212)",
+        "header": "Raw clients",
+        "options": [
+          {
+            "label": "Named exceptions (Recommended)",
+            "description": "Linted exceptions with a written reason, like auth's AsyncLocalStorage one; ops' memory registry may require eventing."
+          },
+          {
+            "label": "Framework surfaces",
+            "description": "packages/process hands each a typed surface instead; more framework work first."
+          },
+          {
+            "label": "Ask per site",
+            "description": "I rule each site separately."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "Four ops repositories call another module's Api (two audit repositories call the audit log, the Redis anomaly rate tracker calls feature flags, the replay runtime calls data retention), so ops' registry cannot build them. Move those calls into ops' services so each repository takes only its own store? (Q212)",
+        "header": "Ops repos",
+        "options": [
+          {
+            "label": "Move into services (Recommended)",
+            "description": "Repositories hold only ops' own state; services make the peer calls, as the record says."
+          },
+          {
+            "label": "Registry takes peers",
+            "description": "The registry is handed the peer Apis and repositories keep calling them, against the one-store rule."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "Ops' ClickHouse health repository needs the CLICKHOUSE_URL secret to probe the database. Should ops' registry resolve it through secrets.into, the standard secret-handle path, and pass it in? (Q212)",
+        "header": "CH health",
+        "options": [
+          {
+            "label": "Through secrets.into (Recommended)",
+            "description": "Resolved at boot through the handle; no process.env read in the module."
+          },
+          {
+            "label": "Reuse the store client",
+            "description": "The health probe uses the ClickHouse store client it already has, with no separate secret."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "packages/group-queue (a framework package) imports stored-object's contract for its tiered blob store, so framework depends on a module. Invert the dependency or move the store? (Q211)",
+        "header": "Blob store",
+        "options": [
+          {
+            "label": "Inject mintUri (Recommended)",
+            "description": "group-queue takes a mint function and a generic destination type; no module import."
+          },
+          {
+            "label": "Move the store",
+            "description": "The tiered blob store moves out of group-queue, touching packages/eventing and trace."
+          }
+        ],
+        "multiSelect": false
+      }
+    ]
+  },
+  {
+    "round": 6,
+    "group": "D",
+    "ids": ["Q211(B)", "Q211(D)", "Q202(2)", "Q203", "Q202(3)", "Q204(A)"],
+    "questions": [
+      {
+        "question": "packages/clickhouse-migrations (framework) depends on data-retention's contract to learn which tables retention manages. How should that managed-table list reach the ClickHouse reconciler? (Q211)",
+        "header": "CH tbl list",
+        "options": [
+          {
+            "label": "Inject via constructor (Recommended)",
+            "description": "apps/tasks passes the list into ClickHouseMigrateTask; about 12 test fixtures change and the dependency goes."
+          },
+          {
+            "label": "Accept as exception",
+            "description": "Keep the import as a named policy exception."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "Two trace rules files (trace-query-fields.rules.ts, trace-query-evaluation-scope.rules.ts) import the ClickHouse facet registry from repositories/, which the layer rules forbid. Either fix touches 20+ files. Which? (Q211)",
+        "header": "Facet rules",
+        "options": [
+          {
+            "label": "Files to services (Recommended)",
+            "description": "The two files become services, which may read repository mappers; rules stay free of ClickHouse."
+          },
+          {
+            "label": "Registry into rules",
+            "description": "The 400-line registry, with its ClickHouse column expressions, moves into rules/; the mapper imports it."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "Lent components and drawers whose props name another module's types (for example the prompt editor drawers naming experiment's LocalPromptConfig and workflow's FieldMapping) cannot get typed tokens without a contract cycle or new edges; about 15 callers in 8 modules open them by bare name meanwhile. Where do those props live? (Q202, Q203)",
+        "header": "Lend props",
+        "options": [
+          {
+            "label": "Structural props (Recommended)",
+            "description": "Restate the props as portable structural shapes, as the workflow-card ruling did; no new edges."
+          },
+          {
+            "label": "Types move down",
+            "description": "The shared types move to a contract both modules already use."
+          },
+          {
+            "label": "Owner takes edges",
+            "description": "prompt-contract takes the experiment and workflow edges and owns the tokens (no cycle today)."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "Some lent components (hoverableBigText, redactedField, datasetEditorTable, joinOffer, tracePreviewHoverCard and others) take ReactNode or HTMLDivElement props, but contracts import no framework (record section 2). How are those props typed? (Q202, Q204)",
+        "header": "React types",
+        "options": [
+          {
+            "label": "Keep contracts strict (Recommended)",
+            "description": "The token types such props without React (render slots typed unknown, narrowed by browser-host)."
+          },
+          {
+            "label": "Type-only exception",
+            "description": "A contract may import React types type-only; the contract purity test is relaxed."
+          },
+          {
+            "label": "Owner's browser types",
+            "description": "Props are typed in the owner's browser package and readers import them type-only."
+          }
+        ],
+        "multiSelect": false
+      }
+    ]
+  },
+  {
+    "round": 7,
+    "group": "D",
+    "ids": ["Q204(B)", "Q202(1)", "Q204(C)", "Q206", "Q39", "D3"],
+    "questions": [
+      {
+        "question": "Some lends are plain objects of methods or hooks rather than components (guidedOnboarding, guidedPathActive, sidebar, sampleChoice). Which token kind should carry them? (Q204)",
+        "header": "Lent hooks",
+        "options": [
+          {
+            "label": "Hooks token (Recommended)",
+            "description": "A hooks token like GuidedTourToken, read through useLentHooks; follows an existing precedent."
+          },
+          {
+            "label": "A new token kind",
+            "description": "browser-host gains a token kind for plain method objects."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "Converting the remaining bare-name lends and drawers to typed tokens adds browser-to-contract edges: experiment to trace; trace and user to onboarding; project to navigation and organisation; onboarding to navigation and governance; organisation to licensing, sso and scim; navigation and api-key to organisation. Allow them? (Q202, Q204, Q206)",
+        "header": "Lend edges",
+        "options": [
+          {
+            "label": "Allow the acyclic ones (Recommended)",
+            "description": "Any edge that closes no cycle is allowed; a cyclic one comes back to me."
+          },
+          {
+            "label": "Allow none",
+            "description": "Those sites keep opening by bare name for now."
+          },
+          {
+            "label": "Ask per edge",
+            "description": "I rule each edge separately."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "The dashboard graph field arrives over tRPC as JSON text. Parse it inside the tRPC contract schema (the browser's inferred types then see the transform) or with a framework helper? (Q39)",
+        "header": "Graph JSON",
+        "options": [
+          {
+            "label": "Framework helper (Recommended)",
+            "description": "A JSON-text field helper in packages/api; the browser's inferred types stay stable."
+          },
+          {
+            "label": "Contract transform",
+            "description": "Parse inside the tRPC contract schema; the browser's types change with it."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "Your 'each module declares its own migrations, no central list': code steps already use .withMigrations per module. Does it cover the SQL files too? Today Postgres and ClickHouse SQL sit in two central folders. (D3)",
+        "header": "SQL owners",
+        "options": [
+          {
+            "label": "Attribute only (Recommended)",
+            "description": "SQL stays central; each migration is attributed to its table's owner and a check refuses one touching two owners."
+          },
+          {
+            "label": "Move files to modules",
+            "description": "Per-module SQL folders assembled by the runner, a goose table per owner; moves about 463 files."
+          },
+          {
+            "label": "New SQL in modules",
+            "description": "History stays central; new migrations live in their module."
+          }
+        ],
+        "multiSelect": false
+      }
+    ]
+  },
+  {
+    "round": 8,
+    "group": "D",
+    "ids": ["T1-D2-canon", "T1-D2-deps-extra", "U2-API", "U2-LIVE"],
+    "questions": [
+      {
+        "question": "Cutting trace's peer call to coding-agent: coding-agent's session facts need spans decoded and canonicalised (the model and token counts lifted to gen_ai.* fields). TraceApi has canonicalizeLogRecord but no span twin, and the ruling said no new TraceApi operation. The span-facts cut waits on this. (T1-D2-canon)",
+        "header": "Span canon",
+        "options": [
+          {
+            "label": "Add the span operation (Recommended)",
+            "description": "TraceApi.canonicalizeSpanAttributes, the twin of canonicalizeLogRecord; small, but against the ruling's letter."
+          },
+          {
+            "label": "Move canonicalisers",
+            "description": "Move about 20 span canonicaliser services and rules into trace-contract; a much larger lane."
+          },
+          {
+            "label": "Decode only",
+            "description": "No canonicalisation; the session events' model column goes empty for claude-code spans."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "The OTLP decoder moving into trace-contract also imports ESpanKind and two types from @opentelemetry/otlp-transformer-next and validateTenantId from @langwatch/eventing. Add those dependencies to trace-contract, or inline the enum and the tenant check? The span-facts cut waits on this. (T1-D2-deps-extra)",
+        "header": "Decoder deps",
+        "options": [
+          {
+            "label": "Inline both (Recommended)",
+            "description": "No new contract dependency; a small enum and tenant check are copied, which could drift."
+          },
+          {
+            "label": "Add both dependencies",
+            "description": "trace-contract depends on otlp-transformer-next and eventing (on the Node-only subpath)."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "The ops Upgrades page needs six reads (status, releases, steps, step, runs, run). Every ops tRPC procedure calls OpsApi, and the UI plan proposed no new OpsApi operations, so nothing was built. How should ops expose them? (U2-API)",
+        "header": "Upgrade API",
+        "options": [
+          {
+            "label": "Six OpsApi reads (Recommended)",
+            "description": "Six new operations backed by an ops service over UpgradeReader."
+          },
+          {
+            "label": "One sub-object",
+            "description": "The same reads grouped under OpsApi.upgrades."
+          },
+          {
+            "label": "Router calls a service",
+            "description": "A packages/api change letting a router call a service directly; OpsApi does not grow."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "The Upgrades page was asked to poll while a run holds the lease, but the record forbids timer polling (your 2026-10-01 ruling), so nothing was built. How does the page stay live during a run? (U2-LIVE)",
+        "header": "Live status",
+        "options": [
+          {
+            "label": "Runner raises a hint (Recommended)",
+            "description": "The upgrade runner publishes a read hint the api relays; the page refreshes on it, no polling."
+          },
+          {
+            "label": "Polling exception",
+            "description": "Poll only while a run holds the lease, like the suites page's exception."
+          },
+          {
+            "label": "Refresh on show",
+            "description": "The page reads when opened or refreshed; no live updates."
+          }
+        ],
+        "multiSelect": false
+      }
+    ]
+  },
+  {
+    "round": 9,
+    "group": "D",
+    "ids": ["U2-PHASES", "held:72", "S3-ROLLBACK", "CH-1", "Trace-9-wire"],
+    "questions": [
+      {
+        "question": "The Upgrades run view shows steps per release but not the run's phases (preflight, schema per release, reconcile); the phases scenario is @unimplemented. Record phases? (U2-PHASES)",
+        "header": "Run phases",
+        "options": [
+          {
+            "label": "In the run report (Recommended)",
+            "description": "The runner writes phases in a fixed shape the reader parses; no new table."
+          },
+          {
+            "label": "Phase table",
+            "description": "A new ledger table for phases."
+          },
+          {
+            "label": "Steps are enough",
+            "description": "Drop phases from the page and retire its scenario."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "On cloud, a serving process whose presence heartbeat keeps failing drops out of the presence table while still serving, so 'old writers gone' can turn true early and a contract step may run under it. What should that process do? (cloud presence, held line 72)",
+        "header": "Lapsed gate",
+        "options": [
+          {
+            "label": "Stop serving (Recommended)",
+            "description": "The serving gate stops serving once its last good presence write is older than the stale bound (60 s)."
+          },
+          {
+            "label": "Accept the window",
+            "description": "Document it; a step may start before that writer stops."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "Self-hosted rollback: background steps are reopened only when an older image itself runs upgrade. A rollback that never runs upgrade (the Helm pre-roll job runs only on upgrade) goes undetected, so level-triggered background steps stay closed. Detect it? (S3-ROLLBACK)",
+        "header": "Rollbacks",
+        "options": [
+          {
+            "label": "From presence (Recommended)",
+            "description": "An older image's live presence row after the last run reopens those steps."
+          },
+          {
+            "label": "Accept",
+            "description": "Only an older image that runs upgrade reopens them; document the gap."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "Transient 503 refusals lose their code: main answered ClickHouse overload with clickhouse_overloaded, and the tracked-event routes now refuse with service_unavailable when no recorder is installed, but the 5xx masking rule turns both into internal_error, so callers cannot tell them from a fault. Unmask them? (CH-1)",
+        "header": "Masked 503s",
+        "options": [
+          {
+            "label": "Unmask transient 503s (Recommended)",
+            "description": "These refusals keep their code (no customer data; clients retry on it); amends the 5xx masking ruling."
+          },
+          {
+            "label": "Keep the mask",
+            "description": "Record the parity gap; callers see internal_error."
+          }
+        ],
+        "multiSelect": false
+      }
+    ]
+  },
+  {
+    "round": 10,
+    "group": "D",
+    "ids": ["OTLP-REPORT", "Q-U9", "Q-U6", "Q-U7"],
+    "questions": [
+      {
+        "question": "TraceApi.otlpReportError has no production caller since main's #8489 port: OTLP parse failures now log a client warning instead. Remove the unused operation from the trace contract and app? (OTLP-REPORT)",
+        "header": "OTLP report",
+        "options": [
+          {
+            "label": "Remove it (Recommended)",
+            "description": "Less dead contract surface; easy to re-add if a caller appears."
+          },
+          {
+            "label": "Keep it",
+            "description": "Keep it for a future caller."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "Ten operator-only ops system-migration tRPC procedures on main's wire become ops.upgrade.*. Rename outright, or keep the old names as aliases for one release? (Q-U9)",
+        "header": "Ops renames",
+        "options": [
+          {
+            "label": "Rename, no aliases (Recommended)",
+            "description": "Accept the wire difference; operator tooling calling the old names breaks."
+          },
+          {
+            "label": "Aliases for a release",
+            "description": "Keep the old names for one release, then remove them."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "Should LangWatch's own cloud regions send the same usage report as self-hosted installs, so one fleet page shows versions across cloud and self-hosted? (Q-U6)",
+        "header": "Cloud fleet",
+        "options": [
+          {
+            "label": "One fleet page (Recommended)",
+            "description": "Regions report like any install; one place shows every version."
+          },
+          {
+            "label": "Per region",
+            "description": "Each region keeps its own page; cloud is absent from the fleet page."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "Self-hosted upgrade alerts (a failed or held upgrade): should they email platform operators and show the operator banner, with Slack only where ops' notifier is configured? (Q-U7)",
+        "header": "Alerts",
+        "options": [
+          {
+            "label": "Email and banner (Recommended)",
+            "description": "Uses the existing notification edge plus the banner; Slack only if configured."
+          },
+          {
+            "label": "Banner only",
+            "description": "No email; operators see the banner when they open the app."
+          }
+        ],
+        "multiSelect": false
+      }
+    ]
+  },
+  {
+    "round": 11,
+    "group": "C",
+    "ids": ["D1", "D2", "D4", "D5"],
+    "questions": [
+      {
+        "question": "Upgrade ledger model: cloud and self-hosted share one ledger keyed by step id (and target). Version numbers matter only for self-hosted stepping and the support floor; cloud, released gradually, is tracked by step id plus presence, never a build number. Keep? (D1)",
+        "header": "One model",
+        "options": [
+          {
+            "label": "One model (Recommended)",
+            "description": "As built (ADR-173, Proposed); one code path for both."
+          },
+          {
+            "label": "Cloud build number",
+            "description": "Cloud gets its own version counter beside step ids."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "Knowing old code has stopped: api and worker report their image and declared step ids to a runner-owned presence table, and the runner computes when no old writer remains. This replaces the operator-typed minimumWriterGeneration drain assertion, which stays as an override. Keep? (D2)",
+        "header": "Presence",
+        "options": [
+          {
+            "label": "Presence (Recommended)",
+            "description": "Automatic, and safe for cloud's gradual release."
+          },
+          {
+            "label": "Manual assertion",
+            "description": "Operators keep typing the drain assertion."
+          },
+          {
+            "label": "Deploy-tool signal",
+            "description": "Read rollout completion from Helm or ArgoCD instead."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "The ruled per-target step status (a failed ClickHouse target fails the run) is stored in a new child table, _langwatch_upgrade_target; the step's own status stays the aggregate. Additive, no key change. Keep? (D4)",
+        "header": "Target table",
+        "options": [
+          {
+            "label": "Child table (Recommended)",
+            "description": "As built; existing rows untouched."
+          },
+          {
+            "label": "Widen the key",
+            "description": "The step primary key becomes (step, target); rewrites the table."
+          },
+          {
+            "label": "Target in step id",
+            "description": "Encode the target in the id; no schema change, longer ids."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "The serving refusal (do not serve while blocking steps are missing) hooks in as a Server preamble step, withUpgradeGate, in packages/process, for api and worker only, after stores open and before serving; it also writes presence. Keep? (D5)",
+        "header": "Gate hook",
+        "options": [
+          {
+            "label": "Preamble step (Recommended)",
+            "description": "As built; one place covers every serving process."
+          },
+          {
+            "label": "Call in main.ts",
+            "description": "Each app calls the gate itself."
+          },
+          {
+            "label": "Readiness only",
+            "description": "Processes serve but report not ready; no refusal."
+          }
+        ],
+        "multiSelect": false
+      }
+    ]
+  },
+  {
+    "round": 12,
+    "group": "C",
+    "ids": ["D6", "D7", "D8", "D9"],
+    "questions": [
+      {
+        "question": "The migration guard also refuses lock-heavy shapes (a plain index on an existing table without the pre-build note, enum recreation, a unique or validated constraint on an existing table, a column type change), and migration sessions set lock_timeout. Keep? (D6)",
+        "header": "Lock guard",
+        "options": [
+          {
+            "label": "Keep the guard (Recommended)",
+            "description": "Prevents long table locks during rolling deploys."
+          },
+          {
+            "label": "Warn only",
+            "description": "Report these shapes without refusing them."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "Migration CI has four gates: a per-PR N-1 job (old code on the new schema, cloud's side-by-side proof), a nightly LTS-floor image job, a Prisma drift job, and a manifest stamp in the release PR. Keep all four? (D7)",
+        "header": "CI gates",
+        "options": [
+          {
+            "label": "All four (Recommended)",
+            "description": "As built; how strict each is comes in later questions."
+          },
+          {
+            "label": "Ask per gate",
+            "description": "I rule each gate separately."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "Contract steps (dropping old columns or tables) wait for the LTS floor on cloud too, so one tree has one window and cloud never contracts early. Keep? (D8)",
+        "header": "Cloud floor",
+        "options": [
+          {
+            "label": "Wait on cloud too (Recommended)",
+            "description": "Identical everywhere; cloud carries old columns a little longer."
+          },
+          {
+            "label": "Cloud contracts early",
+            "description": "Cloud drops sooner; needs a cloud-only path."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "Release manifests live in packages/upgrade/releases/<version>.json and the support floor in packages/upgrade/releases/lts-floor.json, not in a new top-level migrations/ folder. Keep? (D9)",
+        "header": "Manifests",
+        "options": [
+          {
+            "label": "In packages/upgrade (Recommended)",
+            "description": "As built; beside the code that reads them."
+          },
+          {
+            "label": "Top-level migrations/",
+            "description": "A new root folder for manifests and floor."
+          }
+        ],
+        "multiSelect": false
+      }
+    ]
+  },
+  {
+    "round": 13,
+    "group": "C",
+    "ids": ["D10", "D11", "Q-U5", "Q-U10"],
+    "questions": [
+      {
+        "question": "The first LTS floor is the last release cut before this branch merges (3.20.1 today); installs older than that must upgrade to it first. Keep, moving it to whatever is newest at merge? (D10)",
+        "header": "First floor",
+        "options": [
+          {
+            "label": "Newest at merge (Recommended)",
+            "description": "3.20.1 today; older installs take one extra stop."
+          },
+          {
+            "label": "An older floor",
+            "description": "Name an older release; more history must stay steppable."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "Migration ordering collisions are handled by keys plus the migration-order check, extended to refuse a goose number main already used; no Atlas-style checksum file. Keep? (D11)",
+        "header": "Collisions",
+        "options": [
+          {
+            "label": "Keys and check (Recommended)",
+            "description": "As built; no extra file to merge on every PR."
+          },
+          {
+            "label": "Add a checksum file",
+            "description": "An Atlas-style sum file every migration PR updates."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "Upgrade rollback rules, built as default: (1) a serving process refuses to start below the ledger's recorded floor; (2) level-triggered background steps re-run after a rollback and re-upgrade. Keep both? (Q-U5)",
+        "header": "Floor rules",
+        "options": [
+          {
+            "label": "Both rules (Recommended)",
+            "description": "Old images cannot serve on a schema past them, and background data re-converges."
+          },
+          {
+            "label": "Floor only",
+            "description": "Drop the re-run; data an old image wrote during a rollback may stay unconverged."
+          },
+          {
+            "label": "Neither",
+            "description": "Remove both; rollbacks are the operator's risk."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "Should organisation admins (not platform operators) see that their tenant is held or archived by an upgrade? Default built: no; the legacy path keeps serving them and refusals stay opaque (record section 3.5). (Q-U10)",
+        "header": "Org admins",
+        "options": [
+          {
+            "label": "No org surface (Recommended)",
+            "description": "Only platform operators see held or archived state, on the Upgrades page."
+          },
+          {
+            "label": "Show org admins",
+            "description": "A notice in organisation settings; needs a new read and copy."
+          }
+        ],
+        "multiSelect": false
+      }
+    ]
+  },
+  {
+    "round": 14,
+    "group": "C",
+    "ids": ["Q-U11", "Q-U8", "UP-3", "Q-U8 (ops-upgrade-image-steps)", "S4-TARGETS"],
+    "questions": [
+      {
+        "question": "Every migration step must carry a one-line description shown in the Upgrades UI and the CLI; SQL steps take their first comment line, and a step without one is refused. Keep this requirement? (Q-U11)",
+        "header": "Step text",
+        "options": [
+          {
+            "label": "Required (Recommended)",
+            "description": "As built; every step reads clearly in UI and CLI."
+          },
+          {
+            "label": "Optional",
+            "description": "Steps may omit it; the UI shows the bare step id."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "Upgrade framework split: the upgrade run registers every declared step in the ledger; ops builds the upgrade and event-upcast readers over its Postgres handle; background steps run in the worker under their declaring module. The record's 'the runner belongs to ops' becomes 'ops reads and requests; the framework runs'. Keep? (Q-U8, UP-3)",
+        "header": "Who runs",
+        "options": [
+          {
+            "label": "Framework runs (Recommended)",
+            "description": "As built for steps (upcast reader to be wired the same way); the record is amended."
+          },
+          {
+            "label": "Ops runs it",
+            "description": "Keep the record; the runner moves into ops."
+          },
+          {
+            "label": "Ledger only",
+            "description": "Ops reads only the ledger, with step metadata copied at run time."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "imageSteps (the step ids an image carries) lives in a new packages/upgrade/src/image-steps.ts, exported from the @langwatch/upgrade package root, and ops and tasks both call it; exporting it from the gate or manifest subpath would create an import cycle. Keep? (Q-U8)",
+        "header": "imageSteps",
+        "options": [
+          {
+            "label": "Package root (Recommended)",
+            "description": "As built; no cycle."
+          },
+          {
+            "label": "Its own subpath",
+            "description": "A new @langwatch/upgrade/image-steps export, also cycle-free."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "When a release is applied to several ClickHouse targets, every target runs even after one fails, each is reported, and the release counts as failed (as ruled: a failed target fails the run). Keep? (S4-TARGETS)",
+        "header": "CH targets",
+        "options": [
+          {
+            "label": "Run all, then fail (Recommended)",
+            "description": "As built; one run shows the state of every target."
+          },
+          {
+            "label": "Stop at first failure",
+            "description": "Fail fast; later targets wait for the next run."
+          }
+        ],
+        "multiSelect": false
+      }
+    ]
+  },
+  {
+    "round": 15,
+    "group": "C",
+    "ids": ["mig-declare (checkpoint)", "mig-declare (upcasts)", "mig-declare (rules)", "UP-1"],
+    "questions": [
+      {
+        "question": "A long migration step's checkpoint is { resumeFrom, save({ report }) }: the step resumes from its last saved report, and the runner keeps both in the ledger's step report. Keep this shape? (mig-declare)",
+        "header": "Checkpoint",
+        "options": [
+          {
+            "label": "This shape (Recommended)",
+            "description": "As built; resumable steps with visible progress."
+          },
+          {
+            "label": "Bare resumeFrom",
+            "description": "Progress only in the report the step returns at the end."
+          },
+          {
+            "label": "Cursor string",
+            "description": "An opaque string cursor."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "Event upcasts are declared by the owning pipeline with .withUpcasts, not as .withMigrations steps; eventing turns each into a ledger step. The alternative: the owning module declares each rewrite with .withMigrations. Keep .withUpcasts? (mig-declare)",
+        "header": "Upcast decl",
+        "options": [
+          {
+            "label": ".withUpcasts (Recommended)",
+            "description": "As built and in the record; upcasts stay with their pipeline."
+          },
+          {
+            "label": ".withMigrations",
+            "description": "Rewrites become ordinary module steps."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "Migration step checks: per-step rules (blank description, a blocking step that is not kind data, an id not shaped <module>:<kebab-name>) refuse at boot when the module binds; list rules (foreign prefix, duplicate id) refuse when steps are collected. .withMigrations also accepts a plain list. Keep? (mig-declare)",
+        "header": "Step checks",
+        "options": [
+          {
+            "label": "As built (Recommended)",
+            "description": "Bad steps fail at the earliest point each rule can see."
+          },
+          {
+            "label": "All at collection",
+            "description": "Check everything when the list is collected."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "In the upgrade ledger an event upcast is recorded as its own step kind, event-upcast (background), so the Upgrades page lists upcasts apart from data steps; the record already says so. Keep, or record kind data with an upcast marker? (UP-1)",
+        "header": "Upcast kind",
+        "options": [
+          {
+            "label": "event-upcast kind (Recommended)",
+            "description": "As built and recorded."
+          },
+          {
+            "label": "data plus a marker",
+            "description": "No new kind; the page filters on the marker."
+          }
+        ],
+        "multiSelect": false
+      }
+    ]
+  },
+  {
+    "round": 16,
+    "group": "C",
+    "ids": ["UP-2", "UP-4", "UP-5", "held:69 (fresh-install upcast)"],
+    "questions": [
+      {
+        "question": "Upcast step ids read upcast:<pipeline>:<stored type>, not the usual <module>:<name>, because a pipeline does not know its module and pipeline names are already unique. Keep? (UP-2)",
+        "header": "Upcast id",
+        "options": [
+          {
+            "label": "Pipeline ids (Recommended)",
+            "description": "As built."
+          },
+          {
+            "label": "Module ids",
+            "description": "Pipelines learn their module so ids read <module>:<name>."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "The optional upcast rewrite re-inserts corrected copies into event_log (reads dedupe by event id). Originals of a renamed aggregate (a different sort key) are deleted only later, as a contract step at the LTS floor, since steps copy and never move. Build it so? (UP-4)",
+        "header": "Rewrite",
+        "options": [
+          {
+            "label": "Copy, delete at floor (Recommended)",
+            "description": "Safe while old and new code run; renamed aggregates take double space until the floor."
+          },
+          {
+            "label": "Delete after copy",
+            "description": "Delete originals right after copying; breaks the copy-never-move rule."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "An upcast's drain (routing jobs queued under a renamed pipeline's old keys) should be removed one release later, but nothing enforces that. Proposed: a lint names any drain older than one release. (UP-5)",
+        "header": "Drain life",
+        "options": [
+          {
+            "label": "Lint old drains (Recommended)",
+            "description": "Drift caught by lint, as ruled; the finding says to delete the drain."
+          },
+          {
+            "label": "Ops warning",
+            "description": "Ops warns once the old keys hold no jobs; removal stays manual."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "On a fresh install the planner marks data, tenant and procedure steps not-needed, as the plan lists; event-upcast steps are planned by their mode instead, harmless on an empty install. Keep, or mark them not-needed too? (mig-s2-manifests)",
+        "header": "Fresh inst.",
+        "options": [
+          {
+            "label": "Plan by mode (Recommended)",
+            "description": "As built; they run and find nothing."
+          },
+          {
+            "label": "Not-needed too",
+            "description": "Skip them on a fresh install; fewer no-op runs."
+          }
+        ],
+        "multiSelect": false
+      }
+    ]
+  },
+  {
+    "round": 17,
+    "group": "C",
+    "ids": ["U1-a", "U1-b", "U1-c", "S3-REFUSED-RUN"],
+    "questions": [
+      {
+        "question": "An install with no upgrade recorded yet: the Upgrades page reads 'Behind' with reason no-upgrade-recorded and the summary 'No upgrade recorded yet', rather than an eighth state beside the UI plan's seven. Keep? (U1-a)",
+        "header": "Empty ledger",
+        "options": [
+          {
+            "label": "Behind with reason (Recommended)",
+            "description": "As built; the seven states stay."
+          },
+          {
+            "label": "Eighth state",
+            "description": "A distinct 'never upgraded' state in reader and UI."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "Before the lease table exists, an upgrade run with no finish time counts as 'Upgrading', so a crashed run reads Upgrading until the lease table lands; after that only an unexpired lease counts. Keep? (U1-b)",
+        "header": "Upgrading",
+        "options": [
+          {
+            "label": "Run stands in (Recommended)",
+            "description": "As built."
+          },
+          {
+            "label": "Lease only",
+            "description": "Never show Upgrading before the lease table exists."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "The upgrade reader returns instants as ISO 8601 UTC strings and refuses a missing step or run with a plain UpgradeReadError (upgrade_not_found, upgrade_invalid_cursor), since packages/upgrade has no handled-error dependency. Keep until ops' transport maps the codes? (U1-c)",
+        "header": "Reader wire",
+        "options": [
+          {
+            "label": "Plain error (Recommended)",
+            "description": "As built; ops maps the codes at its transport."
+          },
+          {
+            "label": "Use HandledError",
+            "description": "Add the dependency and extend HandledError now."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "A refused upgrade (the install is below the floor, or the image is below the ledger's floor) is recorded as a failed upgrade run with report.refused, so the Upgrades page shows the refusal. Keep? (S3-REFUSED-RUN)",
+        "header": "Refused run",
+        "options": [
+          {
+            "label": "Record as failed (Recommended)",
+            "description": "As built; operators see why nothing ran."
+          },
+          {
+            "label": "Do not record",
+            "description": "The refusal shows only in logs and the exit code."
+          }
+        ],
+        "multiSelect": false
+      }
+    ]
+  },
+  {
+    "round": 18,
+    "group": "C",
+    "ids": ["S3-IMAGE", "held:67 (ledger widening)", "U3-a", "U3-b"],
+    "questions": [
+      {
+        "question": "An image's release is its newest manifest in packages/upgrade/releases/; a git-<sha> build is that release plus a virtual release for its unreleased steps. Keep? (S3-IMAGE)",
+        "header": "Image ver",
+        "options": [
+          {
+            "label": "Newest manifest (Recommended)",
+            "description": "As built; no extra build input."
+          },
+          {
+            "label": "Build-time version",
+            "description": "Stamp the version into the image at build instead."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "Presence and lease checks run on the database clock: findLivePresence takes only staleAfterMs and no 'now', so caller clock skew cannot revive a writer. Also: only a lease's owner renews or releases it, and registering steps never changes a status. Keep? (mig-ledger-widen)",
+        "header": "DB clock",
+        "options": [
+          {
+            "label": "Database clock (Recommended)",
+            "description": "As built; one clock for every judgement."
+          },
+          {
+            "label": "Caller's now",
+            "description": "Pass a Temporal.Instant; adds @langwatch/time to packages/upgrade."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "Ops checkup: a failed ClickHouse blocking step reuses the existing checkup_clickhouse_migrations_pending code with the detail 'failed', rather than a new code; a row names at most five step ids and counts the rest. Keep? (U3-a)",
+        "header": "Checkup row",
+        "options": [
+          {
+            "label": "Reuse the code (Recommended)",
+            "description": "As built; the shared code registry does not grow."
+          },
+          {
+            "label": "New failed code",
+            "description": "Add checkup_clickhouse_migration_failed to the shared registry."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "npx @langwatch/server doctor prints the same text as 'pnpm task upgrade status' by running that task against the local Postgres, never bundling a database client into the CLI. An unreachable database prints 'status unavailable' and leaves the exit code alone. Keep? (U3-b)",
+        "header": "Doctor",
+        "options": [
+          {
+            "label": "Run the task (Recommended)",
+            "description": "As built; the CLI stays small."
+          },
+          {
+            "label": "Fail when unknown",
+            "description": "An unreachable database makes doctor exit non-zero."
+          }
+        ],
+        "multiSelect": false
+      }
+    ]
+  },
+  {
+    "round": 19,
+    "group": "C",
+    "ids": [
+      "held:70 (presence clock)",
+      "held:71 (oldWritersGoneFor)",
+      "held:75 (presence name)",
+      "held:89 (presence timings)"
+    ],
+    "questions": [
+      {
+        "question": "createPresence takes no clock parameter, though its manifest named one, because presence is stamped and judged on the database clock; a process clock would bring skew back. Keep? (mig-cloud-presence)",
+        "header": "No clock",
+        "options": [
+          {
+            "label": "No clock (Recommended)",
+            "description": "As built."
+          },
+          {
+            "label": "Inject a clock",
+            "description": "Easier to test; risks mixing clocks."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "When no process is live at all, presence answers 'old writers gone' as true for every step, so an upgrade with everything stopped proceeds. Keep, or refuse to answer when no live row exists? (mig-cloud-presence)",
+        "header": "No writers",
+        "options": [
+          {
+            "label": "True (Recommended)",
+            "description": "As built; offline upgrades just work."
+          },
+          {
+            "label": "Refuse",
+            "description": "The runner waits or fails when nothing reports presence."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "The upgrade framework's 'presence' table shares its name with the presence module (PresenceApi, browser broadcast). Keep the name inside packages/upgrade, or rename it, for example to 'serving roster'? (mig-cloud-presence)",
+        "header": "Name clash",
+        "options": [
+          {
+            "label": "Keep 'presence' (Recommended)",
+            "description": "Scoped to packages/upgrade; no rename churn."
+          },
+          {
+            "label": "Rename it",
+            "description": "Clearer; touches the table, code and docs."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "Presence timing: each serving process refreshes its row every 15 s and is stale after 60 s; it names its image by its newest release manifest and itself as host:pid:role. Keep these? (mig-entry-points)",
+        "header": "Heartbeat",
+        "options": [
+          {
+            "label": "15 and 60 seconds (Recommended)",
+            "description": "As built."
+          },
+          {
+            "label": "Other numbers",
+            "description": "Tell me the refresh and stale bounds you want."
+          }
+        ],
+        "multiSelect": false
+      }
+    ]
+  },
+  {
+    "round": 20,
+    "group": "C",
+    "ids": [
+      "held:84 (gate data source)",
+      "S3-NO-CLICKHOUSE",
+      "S3-FIRST-INSTALL",
+      "S3-PREPARE-PASS"
+    ],
+    "questions": [
+      {
+        "question": "The serving gate opens its own one-connection Postgres pool from DATABASE_URL, lazily, closes it on refusal or release, and admits when there is no DATABASE_URL (memory tier). It takes the image's step ids from its own migration files. One extra connection per process. Keep? (mig-entry-points)",
+        "header": "Gate pool",
+        "options": [
+          {
+            "label": "Own pool (Recommended)",
+            "description": "As built; no change to process boot."
+          },
+          {
+            "label": "Boot hands the store",
+            "description": "Boot passes the opened Postgres to the gate; a process-server change and a raw SQL member."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "The serving gate ignores ClickHouse steps only when the process has no ClickHouse target at all. With one configured they count, so SKIP_CLICKHOUSE_MIGRATE refuses serving by name until upgrade records them. Nothing is marked not-needed. Keep? (S3-NO-CLICKHOUSE)",
+        "header": "No CH target",
+        "options": [
+          {
+            "label": "Ignore only if absent (Recommended)",
+            "description": "As built; read-only and reversible, and adding ClickHouse later still runs its steps."
+          },
+          {
+            "label": "Mark not-needed",
+            "description": "Never re-run, even if ClickHouse is added later."
+          },
+          {
+            "label": "Always count them",
+            "description": "The gate refuses whenever ClickHouse steps are pending."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "On a first install the api's serving gate runs 'pnpm task upgrade' once inside the image, then reads the ledger again; a non-zero exit refuses by name. The worker never runs it, and the tenant migration pass is skipped (no tenants yet). Keep? (S3-FIRST-INSTALL)",
+        "header": "First boot",
+        "options": [
+          {
+            "label": "Api runs it once (Recommended)",
+            "description": "As built; a fresh install comes up on its own."
+          },
+          {
+            "label": "Operator runs it",
+            "description": "A first install refuses until someone runs upgrade by hand."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "The tenant (system-migrations) pass moved from every serving start into the one preparation script, after upgrade; the gate does not check that the pass finished. Keep, or drop it from entry points and rely on ops' scheduled redrive in the worker? (S3-PREPARE-PASS)",
+        "header": "Tenant pass",
+        "options": [
+          {
+            "label": "After upgrade (Recommended)",
+            "description": "As built; tenants converge before serving."
+          },
+          {
+            "label": "Worker redrive only",
+            "description": "Faster start; tenants converge later."
+          }
+        ],
+        "multiSelect": false
+      }
+    ]
+  },
+  {
+    "round": 21,
+    "group": "C",
+    "ids": ["S3-BOOTSTRAP", "S3-TIMINGS", "S3-RETRY", "held:64 (NEW_RULES_FROM)"],
+    "questions": [
+      {
+        "question": "On a database with tables but no Prisma history, Prisma refuses its first deploy, so the runner cannot create its ledger first. The runner applies the Postgres schema first, outside its lease (Prisma's own lock serialises it), then plans a fresh install. Keep? (S3-BOOTSTRAP)",
+        "header": "Bootstrap",
+        "options": [
+          {
+            "label": "Schema first (Recommended)",
+            "description": "As built; proved end to end."
+          },
+          {
+            "label": "Ledger in own schema",
+            "description": "Move the ledger to its own Postgres schema so it can exist first."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "Upgrade runner timings: lease 60 s renewed every 15 s; a second runner waits up to 10 min, polling every 5 s; lock_timeout 10 s; 3 retries from 2 s, doubling. All are options of createUpgradeRunner. Keep these defaults? (S3-TIMINGS)",
+        "header": "Timings",
+        "options": [
+          {
+            "label": "Keep defaults (Recommended)",
+            "description": "As built."
+          },
+          {
+            "label": "Other numbers",
+            "description": "Tell me which numbers to change."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "Prisma applies a migration statement by statement, so one cancelled by lock_timeout keeps its earlier statements. The runner retries only failures that left no failed Prisma row; for a failed row it stops and names 'prisma migrate resolve --rolled-back'. Never auto-resolve? (S3-RETRY)",
+        "header": "Retry",
+        "options": [
+          {
+            "label": "Never auto-resolve (Recommended)",
+            "description": "As built; the safest, an operator resolves."
+          },
+          {
+            "label": "Auto-resolve one-liners",
+            "description": "Auto-resolve when the log shows a lock timeout and the migration is one statement."
+          },
+          {
+            "label": "Re-runnable rule",
+            "description": "A guard rule makes new migrations re-runnable, then auto-resolve."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "The Prisma migration scanner applies its six new floor and lock rules only to migrations after 20261006170527; this branch's earlier unmerged migrations (indexes on existing tables) answer to the four old rules through a marker in the test. Keep, or have them carry the ops pre-build note? (mig-guard)",
+        "header": "Old indexes",
+        "options": [
+          {
+            "label": "Marker (Recommended)",
+            "description": "As built; those migrations stay untouched."
+          },
+          {
+            "label": "Add the notes",
+            "description": "Edit the unmerged migrations to carry the pre-build note and drop the marker."
+          }
+        ],
+        "multiSelect": false
+      }
+    ]
+  },
+  {
+    "round": 22,
+    "group": "C",
+    "ids": [
+      "held:65 (two-owner check)",
+      "held:66 (set-not-null)",
+      "held:68 (stamp owners)",
+      "mig-ci stamp"
+    ],
+    "questions": [
+      {
+        "question": "If SQL stays in the central folders, a check should refuse a migration touching two modules' tables. Ownership is computed by the architecture enforcer, which the migration packages cannot reach. Proposed: the enforcer runs the check as a whole-tree policy over the migration folders. (mig-guard)",
+        "header": "Two owners",
+        "options": [
+          {
+            "label": "Enforcer policy (Recommended)",
+            "description": "Runs in lint:architecture; no new package dependency."
+          },
+          {
+            "label": "Generated owner map",
+            "description": "The enforcer emits a table-to-owner map the migration test reads."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "The guard's rule against SET NOT NULL on a populated column has no escape hatch; the only route is a NOT VALID check validated later. Alternative: a '-- contract: written in <release>' note checked against the floor. Keep no escape until a real case needs one? (mig-guard)",
+        "header": "NOT NULL",
+        "options": [
+          {
+            "label": "No escape hatch (Recommended)",
+            "description": "As built."
+          },
+          {
+            "label": "Add the note",
+            "description": "Allow it once all writers since a release at or below the floor fill the column."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "Release manifests name each step's owning module, but the stamp has no table-to-owner map (3 of 4 backfilled steps show no owner; no ClickHouse map exists). Proposed, if SQL stays central: the enforcer prints the generated map and the release-PR job passes it in. (mig-s2-manifests)",
+        "header": "Owner map",
+        "options": [
+          {
+            "label": "Enforcer prints map (Recommended)",
+            "description": "One map shared with the two-owner check."
+          },
+          {
+            "label": "devDependency",
+            "description": "packages/upgrade depends on the enforcer and computes the map itself."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "Until owner attribution and step declaration land, the release-PR stamp job runs without owners (owner null) and without declared code steps. Keep it running that way meanwhile? (mig-ci)",
+        "header": "Stamp now",
+        "options": [
+          {
+            "label": "Stamp without owners (Recommended)",
+            "description": "Manifests ship now; owners fill in later."
+          },
+          {
+            "label": "Hold the stamp",
+            "description": "No stamp job until owners can be named."
+          }
+        ],
+        "multiSelect": false
+      }
+    ]
+  },
+  {
+    "round": 23,
+    "group": "C",
+    "ids": ["mig-ci D7a", "mig-ci D7b", "mig-ci D7c", "mig-ci D7d"],
+    "questions": [
+      {
+        "question": "The migration-compat CI checks run only on PRs touching migrations, so they cannot be required checks as they stand. Keep them advisory for one green month, then convert them to always-run with a skipped job and an all-green gate? (mig-ci D7a)",
+        "header": "Advisory CI",
+        "options": [
+          {
+            "label": "Advisory for a month (Recommended)",
+            "description": "As built; no PR blocked by a new, unproven gate."
+          },
+          {
+            "label": "Required now",
+            "description": "Convert immediately; every PR runs them."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "Prisma drift exists today (42 foreign keys dropped under relationMode prisma, 3 tables only in SQL, index renames, a nullability gap). The CI gate fails only drift a PR adds over its base; fixing the historic drift is a separate lane. Keep? (mig-ci D7b)",
+        "header": "Prisma drift",
+        "options": [
+          {
+            "label": "Fail new drift only (Recommended)",
+            "description": "As built; history fixed separately."
+          },
+          {
+            "label": "Fix history first",
+            "description": "The gate stays off until historic drift is fixed."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "When the base branch lacks the live api test suite (as in the branch-into-main merge PR), the N-1 and Prisma drift jobs warn and pass rather than fail. Keep? (mig-ci D7c)",
+        "header": "No live base",
+        "options": [
+          {
+            "label": "Warn and pass (Recommended)",
+            "description": "As built; this PR is not blocked by its own base."
+          },
+          {
+            "label": "Fail",
+            "description": "Block until the base carries the suite."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "The N-1 smoke runs the base's api-executable and api-trpc-record live suites; the floor-image smoke boots, checks /api/health and scans logs for missing columns or tables, for the floor release only, not also the previous release. Keep? (mig-ci D7d)",
+        "header": "Smoke scope",
+        "options": [
+          {
+            "label": "As built (Recommended)",
+            "description": "Floor only; one image per night."
+          },
+          {
+            "label": "Add previous release",
+            "description": "A second image smoke; doubles that job's cost."
+          }
+        ],
+        "multiSelect": false
+      }
+    ]
+  },
+  {
+    "round": 24,
+    "group": "C",
+    "ids": ["mig-ci D11", "AD-2", "oversized-operator-surface", "LE-1"],
+    "questions": [
+      {
+        "question": "For PRs into a long-running branch, a goose migration number already used on main's tip is refused (the check fails), not merely warned; Prisma timestamps are exempt. Released code-step files are frozen by their quoted id; helper files they import are not. Keep? (mig-ci D11)",
+        "header": "Goose number",
+        "options": [
+          {
+            "label": "Refuse (Recommended)",
+            "description": "As built."
+          },
+          {
+            "label": "Warn only",
+            "description": "Report the clash without failing the check."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "Live test fixtures (bootLiveApi, bootLiveWorker, api-executable; about 19 files) are refused by the serving gate unless upgrade has run on the test database. Default built: both fixtures run upgrade once, memoised, in a controlled environment. Keep? (AD-2)",
+        "header": "Live fixture",
+        "options": [
+          {
+            "label": "Run upgrade once (Recommended)",
+            "description": "As built; tests boot like production."
+          },
+          {
+            "label": "Bypass the gate",
+            "description": "Tests skip the gate; quicker but less faithful."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "Object storage retention confirmation is now OBJECT_RETENTION_CONFIRMED (chart: app.dataplane.objectRetentionConfirmed). The old AZURE_BLOB_SPOOL_RETENTION_CONFIRMED still works through a second config leaf, because each leaf reads one variable. Keep the name and the two leaves? (oversized-operator-surface)",
+        "header": "Retention",
+        "options": [
+          {
+            "label": "Keep (Recommended)",
+            "description": "As built; old installs keep working."
+          },
+          {
+            "label": "Name it differently",
+            "description": "Tell me the name; chart and docs follow."
+          },
+          {
+            "label": "Multi-name leaf",
+            "description": "packages/config lets one leaf read several variable names, replacing the two leaves."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "For 75 REST operations (18 families) that published main's flat {error, message} body, the root error string is added only at statuses each route documents. Main sent it on every status; undocumented ones (mostly 403) now lack it, and released clients parse only documented statuses. Keep? (LE-1)",
+        "header": "Legacy body",
+        "options": [
+          {
+            "label": "Documented only (Recommended)",
+            "description": "As built; the published schema and the body agree."
+          },
+          {
+            "label": "Every refusal",
+            "description": "Add it on every refusal of those families; one line in packages/api/src/rest/legacy-error.ts."
+          }
+        ],
+        "multiSelect": false
+      }
+    ]
+  },
+  {
+    "round": 25,
+    "group": "C",
+    "ids": ["LE-3", "Q29", "apidiff (dataset records)", "AD-1"],
+    "questions": [
+      {
+        "question": "Other legacy error shapes are not restored: {error, kind?, meta?} on evaluations-legacy, guardrails and dataset evaluate, and the CLI OAuth {error, error_description} (about 20 operations). They change only if the apidiff tool names a client break. Keep? (LE-3)",
+        "header": "Other bodies",
+        "options": [
+          {
+            "label": "Leave until a break (Recommended)",
+            "description": "No wire work now; apidiff guards released clients."
+          },
+          {
+            "label": "Restore them now",
+            "description": "Give these families main's exact bodies through the framework."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "New dashboard graphs: main defaults their size to 1x1. Default taken: REST keeps main's 1x1 and the tRPC path the UI uses defaults to 4 columns by 3 rows. Keep? (Q29)",
+        "header": "Graph size",
+        "options": [
+          {
+            "label": "REST 1x1, UI 4x3 (Recommended)",
+            "description": "As built (0517d1ebfc)."
+          },
+          {
+            "label": "1x1 everywhere",
+            "description": "As main on both paths."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "GET /api/dataset/{slugOrId}/records gains an additive 'dataset' summary on this branch; main returns only {data, pagination}. Keep the addition? (apidiff)",
+        "header": "Dataset sum",
+        "options": [
+          {
+            "label": "Keep, additive (Recommended)",
+            "description": "Old clients ignore the new field."
+          },
+          {
+            "label": "Remove it",
+            "description": "Match main exactly."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "The tRPC procedures agents.testRun and agents.testTurn were renamed scenarios.testAgent* without a ruling; the UI is their only caller. Accept as an internal rename and add it to the parity rulings? (AD-1)",
+        "header": "Agent rename",
+        "options": [
+          {
+            "label": "Accept the rename (Recommended)",
+            "description": "As built (d9936d6739)."
+          },
+          {
+            "label": "Restore old names",
+            "description": "Keep agents.testRun and agents.testTurn."
+          }
+        ],
+        "multiSelect": false
+      }
+    ]
+  },
+  {
+    "round": 26,
+    "group": "C",
+    "ids": ["Q166(1)", "T1-D2-deps", "T1-D2-deps (review)", "Q55"],
+    "questions": [
+      {
+        "question": "REST 402 (payment required) refusals carry error type internal_error today, because the status-to-type map has no 402 entry; main's builder never had one either. Proposed: add type payment_required. (Q166)",
+        "header": "402 type",
+        "options": [
+          {
+            "label": "Add payment_required (Recommended)",
+            "description": "A small wire change: plan refusals get a truthful type."
+          },
+          {
+            "label": "Keep internal_error",
+            "description": "Matches main."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "Moving the OTLP span decoder into trace-contract (ruled) needs @langwatch/ksuid, Node crypto and OpenTelemetry's TraceState. Default: add those dependencies and publish the decoder on a Node-only subpath, @langwatch/trace-contract/otlp-decoding. Keep, or move it without the record id? (T1-D2-deps)",
+        "header": "OTLP decoder",
+        "options": [
+          {
+            "label": "Node-only subpath (Recommended)",
+            "description": "As built; the browser never loads it."
+          },
+          {
+            "label": "Without the record id",
+            "description": "Trace adds the id afterwards; needs an Omit<NormalizedSpan,'id'> type."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "For review: the session-groups move added CodingAgentApi.readSessionGroupsForViewer (precedent: readTranscriptForViewer) and a typed TraceApi.readSessionGroups signature. Accept both contract operations? (T1-D2-deps)",
+        "header": "New reads",
+        "options": [
+          {
+            "label": "Accept both (Recommended)",
+            "description": "As built."
+          },
+          {
+            "label": "Review first",
+            "description": "Show me the signatures before accepting."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "Two workflow-spec scenarios about how an evaluation run's credential is judged are proved in auth's door test. Proposed: move them into auth's spec, where the behaviour lives. (Q55)",
+        "header": "Cred specs",
+        "options": [
+          {
+            "label": "Move to auth (Recommended)",
+            "description": "Specs sit with their owner."
+          },
+          {
+            "label": "Leave in workflow",
+            "description": "No spec move."
+          }
+        ],
+        "multiSelect": false
+      }
+    ]
+  },
+  {
+    "round": 27,
+    "group": "C",
+    "ids": ["Q62 (binds)", "Q62 (sso-onboarding-tiers:85)", "Q88", "Q168 (OKTA)"],
+    "questions": [
+      {
+        "question": "Two identity binds are weak: the operator invite-resend test proves only that it delegates, and the SSO tiers test asserts one lifecycle order. Proposed: accept these binds as they are. (Q62)",
+        "header": "Weak binds",
+        "options": [
+          {
+            "label": "Accept as weak (Recommended)",
+            "description": "Counted bound now."
+          },
+          {
+            "label": "Strengthen tests",
+            "description": "Write fuller tests before counting them."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "sso-onboarding-tiers.feature:85 says every tier drives one connection through identical lifecycle sequences; the test asserts one lifecycle order. Proposed: reword the scenario to one lifecycle order. (Q62)",
+        "header": "Tiers order",
+        "options": [
+          {
+            "label": "Reword (Recommended)",
+            "description": "Scenario matches what is proved."
+          },
+          {
+            "label": "Prove identical",
+            "description": "Add a test comparing each tier's full sequence."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "Authz's offboardUser (reads and deletes) sits on AuthzLedgerReadRepository, the repository the ruling named, though it also writes. Proposed: leave it there rather than give it its own repository. (Q88)",
+        "header": "Offboarding",
+        "options": [
+          {
+            "label": "Leave it (Recommended)",
+            "description": "As built."
+          },
+          {
+            "label": "Own repository",
+            "description": "A separate offboarding repository with its own memory twin."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "Organisation groups show a named directory product uppercased ('OKTA') on their chip; the scenario only says the chip names the directory. Keep the uppercase? (Q168)",
+        "header": "OKTA chip",
+        "options": [
+          {
+            "label": "Keep uppercase (Recommended)",
+            "description": "As built."
+          },
+          {
+            "label": "Capitalise",
+            "description": "Show 'Okta'; a copy change."
+          }
+        ],
+        "multiSelect": false
+      }
+    ]
+  },
+  {
+    "round": 28,
+    "group": "C",
+    "ids": [
+      "Q168 (SCIM dialog)",
+      "Q168 (break-glass)",
+      "Q169 (organization guard)",
+      "Q169 (SAML rows)"
+    ],
+    "questions": [
+      {
+        "question": "For directory-synced groups, the organisation group delete dialog says 'This SCIM group will be re-created by your IdP on next sync. Delete anyway?' (groups.screen.tsx). Keep that copy? (Q168)",
+        "header": "Delete copy",
+        "options": [
+          {
+            "label": "Keep the copy (Recommended)",
+            "description": "As built; shown only for SCIM-sourced groups."
+          },
+          {
+            "label": "Neutral wording",
+            "description": "Say 'directory' instead of 'SCIM'."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "When revoking access, identity's revokePreservingRecovery counts live break-glass grants, not only walkable ones, when deciding a recovery path remains. Keep counting live grants? (Q168)",
+        "header": "Break-glass",
+        "options": [
+          {
+            "label": "Count live grants (Recommended)",
+            "description": "As built."
+          },
+          {
+            "label": "Walkable only",
+            "description": "Stricter: only grants that can actually be used count."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "Security regression: this branch's Prisma organization guard accepts organizationId {not: x} and {in: [...]} as a tenant key; main refused them. Being ported: add main's refusals only, stopping if a live product path relies on the loose rule. Confirm? (Q169)",
+        "header": "Org guard",
+        "options": [
+          {
+            "label": "Port main's refusals (Recommended)",
+            "description": "Closes the regression."
+          },
+          {
+            "label": "Keep the loose rule",
+            "description": "Leave the guard as it is."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "The existing-user SAML sign-in scenarios are proved in a live-api test, with the SAML response signer in packages/test-harness. Confirm that home? (Q169)",
+        "header": "SAML tests",
+        "options": [
+          {
+            "label": "Live-api test (Recommended)",
+            "description": "Crosses the real route end to end."
+          },
+          {
+            "label": "Unit tests in sso",
+            "description": "Narrower; does not cross the route."
+          }
+        ],
+        "multiSelect": false
+      }
+    ]
+  },
+  {
+    "round": 29,
+    "group": "C",
+    "ids": ["Q172", "Q201(1)", "Q201(2)", "audit-log:83"],
+    "questions": [
+      {
+        "question": "cli-login-personal-guard.feature ('allows an org admin who is not a direct team member') says that admin can write; the code asks project:view. Proposed: reword to 'can view' and bind it with an authz-side test. (Q172)",
+        "header": "Login guard",
+        "options": [
+          {
+            "label": "Reword to view (Recommended)",
+            "description": "Scenario matches the code; authz proves it."
+          },
+          {
+            "label": "Require write",
+            "description": "Change the code to ask a write permission."
+          },
+          {
+            "label": "Leave unbound",
+            "description": "No change; the row stays unbound."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "For a team outside the key's organisation, the API door throws organisation's TeamNotFoundError (404 team_not_found), as main and six scenarios answer. Keep, rather than a not-found error defined in packages/api? (Q201)",
+        "header": "Team 404",
+        "options": [
+          {
+            "label": "Organisation's error (Recommended)",
+            "description": "As built; same wire as main."
+          },
+          {
+            "label": "Framework error",
+            "description": "packages/api defines its own not-found."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "An API key granted only on team A is refused 403 on team A's own routes, because the door checks the route permission at the organisation, as main does. Keep main's behaviour? Changing it needs a packages/api change. (Q201)",
+        "header": "Team keys",
+        "options": [
+          {
+            "label": "Keep as main (Recommended)",
+            "description": "Team-only keys stay limited."
+          },
+          {
+            "label": "Allow own team",
+            "description": "The door checks at the team; team-only keys work on their team's routes."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "audit-log.feature:83 'A recorded mutation lands on the audit trail with the scopes it named': the behaviour lives in packages/api's tRPC host. Proposed: a coordinator lane adds a host-level test in packages/api and binds it. (audit-log:83)",
+        "header": "Audit test",
+        "options": [
+          {
+            "label": "Test in packages/api (Recommended)",
+            "description": "Proves the real recording path."
+          },
+          {
+            "label": "Bind existing test",
+            "description": "Bind the narrower audit-target unit test."
+          }
+        ],
+        "multiSelect": false
+      }
+    ]
+  },
+  {
+    "round": 30,
+    "group": "C",
+    "ids": ["audit-log:91", "audit-log:177", "authz package-boundary:125", "Q195"],
+    "questions": [
+      {
+        "question": "audit-log.feature:91 says the trail resolves its connection when a row is written; stores are now handed over at boot. Proposed rewording: 'A process that installed no audit log says so once per unrecorded mutation'. (audit-log:91)",
+        "header": "Audit conn",
+        "options": [
+          {
+            "label": "Take the rewording (Recommended)",
+            "description": "Scenario matches the code, then bound."
+          },
+          {
+            "label": "Retire it",
+            "description": "Drop the row."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "audit-log.feature:177 says only an organisation administrator may open the audit trail; the product gates it by the auditLog:view permission. Proposed rewording: 'Only a reader holding auditLog:view may open the audit trail'. (audit-log:177)",
+        "header": "Audit access",
+        "options": [
+          {
+            "label": "Reword to auditLog:view (Recommended)",
+            "description": "Scenario matches the product."
+          },
+          {
+            "label": "Admins only",
+            "description": "Change the product to require an organisation admin."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "authz package-boundary.feature:125 says each process installs only its own authz responsibilities. Today every process installs every module and the api registers pipelines producer-only. Proposed: reword to that. (authz:125)",
+        "header": "Authz boot",
+        "options": [
+          {
+            "label": "Reword (Recommended)",
+            "description": "Scenario matches the composition."
+          },
+          {
+            "label": "Per-role installs",
+            "description": "Build role-specific installs to match the scenario."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "An apps/api integration test bumps authz's private Redis epoch key itself after deleting grants. Proposed: replace that with an authz-exported test helper the next time authz is touched. (Q195)",
+        "header": "Epoch helper",
+        "options": [
+          {
+            "label": "Queue it (Recommended)",
+            "description": "Fixed with the next authz change."
+          },
+          {
+            "label": "Fix now",
+            "description": "A lane does it now."
+          }
+        ],
+        "multiSelect": false
+      }
+    ]
+  },
+  {
+    "round": 31,
+    "group": "C",
+    "ids": [
+      "Q191",
+      "Q53",
+      "platform-health:95",
+      "Q68",
+      "invitations:123",
+      "github-branch-maintenance:90"
+    ],
+    "questions": [
+      {
+        "question": "authz's package-boundary test scans every module's sources, so its Nx cache misses on any module change (done in 14ac832cf7). Keep, or move that clause to an architecture policy and unbind it from the test? (Q191)",
+        "header": "Authz cache",
+        "options": [
+          {
+            "label": "Keep as done (Recommended)",
+            "description": "Correct, at a cache cost."
+          },
+          {
+            "label": "Move to a policy",
+            "description": "Faster cache; the check moves to lint:architecture."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "platform-health.feature:95 expects a blank metrics key to be refused at boot; the door answers 500 per request instead, and main had no such test. Proposed: tag the scenario @unimplemented with a gap note. (Q53)",
+        "header": "Blank key",
+        "options": [
+          {
+            "label": "Tag @unimplemented (Recommended)",
+            "description": "Recorded as a known gap."
+          },
+          {
+            "label": "Build boot refusal",
+            "description": "Refuse a blank key at boot, as written."
+          },
+          {
+            "label": "Reword to 500",
+            "description": "Scenario matches today's per-request answer."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "Organisation always composes its invitation and join doors, so OrganizationCapabilityUnavailableError's branches are unreachable (invitations.feature:123). Proposed: delete those branches and the scenario, following the ruling that a missing module refuses at boot. (Q68)",
+        "header": "Dead branch",
+        "options": [
+          {
+            "label": "Delete both (Recommended)",
+            "description": "Less dead code."
+          },
+          {
+            "label": "Add a seam",
+            "description": "A composition seam makes the branch reachable and testable."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "github-branch-maintenance.feature:90 says a worker without GitHub App credentials names the missing capability; nothing does, and main had no test. Proposed: tag it @unimplemented with a gap note. (github:90)",
+        "header": "GitHub creds",
+        "options": [
+          {
+            "label": "Tag @unimplemented (Recommended)",
+            "description": "Recorded as a known gap."
+          },
+          {
+            "label": "Build it",
+            "description": "The worker names the missing credentials."
+          }
+        ],
+        "multiSelect": false
+      }
+    ]
+  },
+  {
+    "round": 32,
+    "group": "C",
+    "ids": ["Q173", "Q199(1)", "Q199(2)", "Q199(3)"],
+    "questions": [
+      {
+        "question": "A memory-store stack has no product rate limiter (only Redis stacks do), so rate-limiting.feature:35's in-memory path holds only vacuously. Default: leave memory stacks without a limiter. (Q173)",
+        "header": "Memory limit",
+        "options": [
+          {
+            "label": "No limiter (Recommended)",
+            "description": "As built."
+          },
+          {
+            "label": "Memory limiter",
+            "description": "Add a counting memory limiter so dev stacks limit too."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "For review: the live test-suite tier now requires Redis; a live process without Redis refuses at boot instead of running the run fold uncached, as experiment already does. Accept? (Q199)",
+        "header": "Redis needed",
+        "options": [
+          {
+            "label": "Accept (Recommended)",
+            "description": "As built."
+          },
+          {
+            "label": "Allow no Redis",
+            "description": "Restore the uncached path."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "rum's deprecated telemetry fallback reads OTEL_EXPORTER_OTLP_HEADERS, which observability already declares as a secret. Chosen: one shared handle in @langwatch/secrets rather than a second owner; dropping the fallback would be a wire change. Keep? (Q199)",
+        "header": "OTEL headers",
+        "options": [
+          {
+            "label": "Shared handle (Recommended)",
+            "description": "As built; one owner per variable."
+          },
+          {
+            "label": "Drop the fallback",
+            "description": "A wire change for old telemetry clients."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "A slack repository integration test expects /foreign key/i, but Prisma answers 'required relation ...'. Proposed follow-up: assert on Prisma's error code, not the message prose. (Q199)",
+        "header": "FK assert",
+        "options": [
+          {
+            "label": "Assert the code (Recommended)",
+            "description": "Stable across Prisma versions."
+          },
+          {
+            "label": "Match new prose",
+            "description": "Update the regex only."
+          }
+        ],
+        "multiSelect": false
+      }
+    ]
+  },
+  {
+    "round": 33,
+    "group": "C",
+    "ids": ["Q210(1)", "Q210(2)", "Q210(5)", "Q214(1)"],
+    "questions": [
+      {
+        "question": "Ten channel-registry findings need .withChannels / defineChannels, which packages/process lacks; hand-calling registry.live.create is a deleted spelling. Proposed: build the framework piece first, with the names the record states, then convert. (Q210)",
+        "header": "Channels",
+        "options": [
+          {
+            "label": "Framework first (Recommended)",
+            "description": "One correct shape for all ten."
+          },
+          {
+            "label": "Plain registries now",
+            "description": "Unwired plain registries now, wired later."
+          },
+          {
+            "label": "Defer",
+            "description": "Leave the findings for now."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "Five abstract contract services cannot be deleted because other modules type against Pick<XService> instead of calling the owner's *Api. Proposed: convert those consumers to the *Api first, then delete the services. (Q210)",
+        "header": "Pick types",
+        "options": [
+          {
+            "label": "Convert, then delete (Recommended)",
+            "description": "Consumers use the public Api."
+          },
+          {
+            "label": "Leave them",
+            "description": "Findings stay."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "Eight modules (enterprise-gateway, governance, licensing, saas, instant-eval, log, metric, usage) still lack real memory twins. Proposed: build real twins, as the record requires. (Q210)",
+        "header": "Memory twins",
+        "options": [
+          {
+            "label": "Real twins (Recommended)",
+            "description": "Memory tier behaves like live."
+          },
+          {
+            "label": "Baseline them",
+            "description": "Accept the findings for now."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "Three trace ClickHouse facet repositories are used only in their own files, but dropping their export trips the module-classes lint rule. Proposed: module-classes ignores a file whose class is private. (Q214)",
+        "header": "Facet export",
+        "options": [
+          {
+            "label": "Rule ignores private (Recommended)",
+            "description": "The two rules stop disagreeing."
+          },
+          {
+            "label": "Move onto a class",
+            "description": "The facet definitions move onto a class the registry exports."
+          },
+          {
+            "label": "Baseline entry",
+            "description": "Keep the export; baseline the finding."
+          }
+        ],
+        "multiSelect": false
+      }
+    ]
+  },
+  {
+    "round": 34,
+    "group": "C",
+    "ids": ["Q214(2)", "Q220", "Q197", "Q146", "feature-package-boundaries:9"],
+    "questions": [
+      {
+        "question": "Trace still exports its 'has signal' SQL predicate, now unread because analytics keeps its own copy. Proposed: keep trace's export until the owner of trace's analytics tables is ruled (asked separately). (Q214)",
+        "header": "Signal copy",
+        "options": [
+          {
+            "label": "Wait for that ruling (Recommended)",
+            "description": "No churn before the owner is known."
+          },
+          {
+            "label": "Delete now",
+            "description": "Remove trace's unread export."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "Governance's BuiltInPullerRegistryService is an unused passthrough with no main counterpart, and governanceClickhouseRepositories is installed by nothing. Proposed: delete both in the next governance slice. (Q220)",
+        "header": "Puller svc",
+        "options": [
+          {
+            "label": "Delete both (Recommended)",
+            "description": "Less dead code."
+          },
+          {
+            "label": "Keep",
+            "description": "Leave them."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "Project's S3 settings are sealed by a narrow ProjectStorageSettingsRepository that holds the cipher (its memory twin stores plaintext); ProjectApi.updateSettings takes plaintext and no other module changes. Rejected: a cipher required everywhere, or an optional cipher. Keep? (Q197)",
+        "header": "S3 settings",
+        "options": [
+          {
+            "label": "Narrow repository (Recommended)",
+            "description": "As built; no new edge."
+          },
+          {
+            "label": "Cipher everywhere",
+            "description": "Every project repository requires the cipher."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "feature-package-boundaries.feature:9 'Concurrent architecture checks wait before loading the lint engine' duplicates haven's admission scenario; haven owns that gate. Proposed: retire it. (Q146)",
+        "header": "Slot gate",
+        "options": [
+          {
+            "label": "Retire (Recommended)",
+            "description": "Haven's scenario covers it."
+          },
+          {
+            "label": "Reword",
+            "description": "Keep it, worded to the enforcer's part."
+          }
+        ],
+        "multiSelect": false
+      }
+    ]
+  },
+  {
+    "round": 35,
+    "group": "C",
+    "ids": [
+      "Q146",
+      "strict-feature-layout:92",
+      "system-migrations-runner:151",
+      "fresh-clone-dev-setup:40",
+      "Q217(1)"
+    ],
+    "questions": [
+      {
+        "question": "strict-feature-layout.feature:92 'API handlers use the composed request context' describes a lint rule that no longer exists (API classes became transport handlers). Proposed: retire it. (Q146)",
+        "header": "Old rule",
+        "options": [
+          {
+            "label": "Retire (Recommended)",
+            "description": "The rule is gone."
+          },
+          {
+            "label": "Reword",
+            "description": "Describe today's transport handlers instead."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "system-migrations-runner.feature:151 bundles three claims about preflight work. Proposed: split it into queue admission, startup refusal and worker composition, and bind the startup-refusal half now (its tests exist); the other two stay unbound. (sm-runner:151)",
+        "header": "Preflight",
+        "options": [
+          {
+            "label": "Split, bind one (Recommended)",
+            "description": "Progress now; two rows remain."
+          },
+          {
+            "label": "Port main's preflight",
+            "description": "Port main's group-queue preflight (over 150 lines) and bind all."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "fresh-clone-dev-setup.feature:40 says a fresh clone with no gateway secrets boots clean, but .env.example's placeholder secrets are shorter than the 32-character minimum, so it does not. Main had no test. Proposed: fix the placeholders. (fresh-clone:40)",
+        "header": "Env example",
+        "options": [
+          {
+            "label": "Fix placeholders (Recommended)",
+            "description": "A fresh clone boots without edits."
+          },
+          {
+            "label": "Retire",
+            "description": "Drop the row."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "azure-blob-workload-identity.feature:344 now says the storage migration task builds its own Azure credentials and shares the services' transport guards, as main's task did. Proposed: bind it in that task's test. You ruled the task itself to be rethought. (Q217)",
+        "header": "Azure task",
+        "options": [
+          {
+            "label": "Bind as worded (Recommended)",
+            "description": "Proved over today's task."
+          },
+          {
+            "label": "Retire with the task",
+            "description": "Drop it; the migrations rethink replaces the task."
+          },
+          {
+            "label": "Hold",
+            "description": "Wait for the migrations rethink."
+          }
+        ],
+        "multiSelect": false
+      }
+    ]
+  },
+  {
+    "round": 36,
+    "group": "C",
+    "ids": ["Q217(2)", "Q217(5)", "ui-contract:314", "Q156", "Q167(1)"],
+    "questions": [
+      {
+        "question": "For review: with STORED_OBJECTS_BACKEND=azure and an incomplete Azure block, boot no longer refuses; projects without their own S3 account are refused by name on first use, as main did. Accept? (Q217)",
+        "header": "Lazy Azure",
+        "options": [
+          {
+            "label": "Lazy, as main (Recommended)",
+            "description": "As built."
+          },
+          {
+            "label": "Refuse at boot",
+            "description": "Stricter than main; misconfiguration caught before serving."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "PayloadStagingRepository, S3PayloadStagingRepository and the stored-object contract's PayloadStagingUnavailableError are now unused. Proposed: delete them. (Q217)",
+        "header": "Staging dead",
+        "options": [
+          {
+            "label": "Delete (Recommended)",
+            "description": "Less dead code."
+          },
+          {
+            "label": "Keep",
+            "description": "Leave them."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "ui-contract.feature:314 names a cross-module invariant test that does not exist; the hidden governance-project filter is tested per module. Proposed: reword to those tests and drop 'CI fails'. Note: three project finders do not filter, one feeding /api/v1/projects. (ui-contract:314)",
+        "header": "Leak test",
+        "options": [
+          {
+            "label": "Reword (Recommended)",
+            "description": "Scenario matches the per-module tests."
+          },
+          {
+            "label": "Reword and add filters",
+            "description": "Also add the filter to the three unfiltered finders."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "api-endpoint-authorization.feature 'Every route still admits the roles that could already reach it' was ruled retired, but it is bound and proved over every registered route, the live sweep you asked for. Proposed: keep it. (Q167)",
+        "header": "Route sweep",
+        "options": [
+          {
+            "label": "Keep it (Recommended)",
+            "description": "It is the live route sweep."
+          },
+          {
+            "label": "Retire as ruled",
+            "description": "Drop the row and its binding."
+          }
+        ],
+        "multiSelect": false
+      }
+    ]
+  },
+  {
+    "round": 37,
+    "group": "C",
+    "ids": ["Q167(2)", "Q54", "Q75", "Q165"],
+    "questions": [
+      {
+        "question": "typed-permission-declarations.feature:208 'An endpoint's middleware array cannot displace its declared check' is bound in packages/api tests. Proposed: rewrite it to what those tests prove instead of retiring it. (Q167)",
+        "header": "Middleware",
+        "options": [
+          {
+            "label": "Rewrite (Recommended)",
+            "description": "Keeps a proved row."
+          },
+          {
+            "label": "Retire",
+            "description": "Drop it."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "WorkflowApi.completeCode no longer takes a userId: nothing read it once the door checks the caller. Keep it dropped? (Q54)",
+        "header": "completeCode",
+        "options": [
+          {
+            "label": "Keep dropped (Recommended)",
+            "description": "As built."
+          },
+          {
+            "label": "Restore userId",
+            "description": "Carry it again for audit or later use."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "A managed gateway key's configuration lists the customer's own provider id and type in routing_excluded_providers (no credentials are exposed). Proposed: leave the id visible. (Q75)",
+        "header": "Excluded ids",
+        "options": [
+          {
+            "label": "Leave visible (Recommended)",
+            "description": "As built."
+          },
+          {
+            "label": "Hide the id",
+            "description": "Show only the provider type."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "When a Langy agent is busy or unreachable, Langy retries with a countdown: 3 attempts at 5, 10 and 20 s, then the 'Try again' card. The per-person throttle and the provider rate-limit card are unchanged. Keep these constants? (Q165)",
+        "header": "Langy retry",
+        "options": [
+          {
+            "label": "Keep 5/10/20 s (Recommended)",
+            "description": "As built; not yet checked whether services/langyagent also retries, which would stack."
+          },
+          {
+            "label": "Other numbers",
+            "description": "Tell me the attempts and delays."
+          }
+        ],
+        "multiSelect": false
+      }
+    ]
+  },
+  {
+    "round": 38,
+    "group": "C",
+    "ids": [
+      "Q188",
+      "Q168 (agent type-select)",
+      "Q169 (gateway tour)",
+      "guided-onboarding-offer:39",
+      "guided-onboarding-offer:109"
+    ],
+    "questions": [
+      {
+        "question": "The workflow create dialog submits twice per click (a submit button plus an onClick handler); main does the same, so it was left as main. Keep, or fix it as a deliberate departure? (Q188)",
+        "header": "2x submit",
+        "options": [
+          {
+            "label": "Leave as main (Recommended)",
+            "description": "As built."
+          },
+          {
+            "label": "Fix it",
+            "description": "One submit per click; the fix and test are already described."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "The agent scenario 'Selecting type navigates to appropriate editor' cannot be proved under the mocked drawer stack. Proposed: split it into page-level scenarios the harness can prove. (Q168)",
+        "header": "Agent row",
+        "options": [
+          {
+            "label": "Split it (Recommended)",
+            "description": "Each half provable."
+          },
+          {
+            "label": "Reword",
+            "description": "Narrow it to what one test proves."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "The ruled gateway tour restore extends the existing guidedTour lend in browser-host (precedent: guidedOnboardingOffer), adding no module edge. Confirm? (Q169)",
+        "header": "Gateway tour",
+        "options": [
+          {
+            "label": "Extend the lend (Recommended)",
+            "description": "No new edge."
+          },
+          {
+            "label": "New edge",
+            "description": "Gateway's browser imports the tour from onboarding directly."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "guided-onboarding-offer.feature :39 and :109 mention a governance home that does not exist. Proposed: bind both over the personal and gateway homes and drop 'governance' from the wording. (guided-onboarding-offer)",
+        "header": "Home pills",
+        "options": [
+          {
+            "label": "Bind, drop governance (Recommended)",
+            "description": "Scenarios match the homes that exist."
+          },
+          {
+            "label": "Build that home",
+            "description": "Add a governance home pill first."
+          }
+        ],
+        "multiSelect": false
+      }
+    ]
+  },
+  {
+    "round": 39,
+    "group": "C",
+    "ids": ["langy-trace-explorer-actions:220", "shared-scope-host:82", "Q121"],
+    "questions": [
+      {
+        "question": "langy-trace-explorer-actions.feature:220 (Langy applies the thumbs-down filter and answers the Explorer's count) was proved on main by a 240-line live-LLM scenario test. Proposed: port that test in an end-to-end lane. (langy:220)",
+        "header": "Thumbs-down",
+        "options": [
+          {
+            "label": "Port the e2e (Recommended)",
+            "description": "Proved as main proved it."
+          },
+          {
+            "label": "Tag @unimplemented",
+            "description": "Recorded as a gap."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "shared-scope-host.feature:82: annotation queue completion requires a successful read. The walker never claims completion while loading or after a failed read, but shows no loading or error state. Proposed: reword to the no-false-completion half. (shared-scope-host:82)",
+        "header": "Queue state",
+        "options": [
+          {
+            "label": "Reword (Recommended)",
+            "description": "Scenario matches the code."
+          },
+          {
+            "label": "Build the states",
+            "description": "Add loading, error and unavailable states."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "The SCIM copy-input field (copy-input.tsx:40) shows a raw error toast when clipboard access fails, which the no-raw-error-toasts rule forbids. Proposed: fix it and re-enable the tree-wide guard. (Q121)",
+        "header": "Copy toast",
+        "options": [
+          {
+            "label": "Fix and re-guard (Recommended)",
+            "description": "Small fix; the guard covers the whole tree again."
+          },
+          {
+            "label": "Exempt it",
+            "description": "Leave the toast; the guard skips this file."
+          }
+        ],
+        "multiSelect": false
+      }
+    ]
+  }
+]

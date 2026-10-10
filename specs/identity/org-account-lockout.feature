@@ -49,7 +49,7 @@ Feature: An organization can lock accounts after repeated failed sign-ins
       When "ana" opens the sign-in security card
       Then the attempt threshold is offered starting at five
       And the lock-out period is offered starting at thirty minutes
-      And both say plainly that nobody is locked out until she saves them
+      And nothing is applied until she saves them, and saving says it applies to new sign-ins
 
   Rule: failures are counted against the account, not against the door
 
@@ -233,3 +233,12 @@ Feature: An organization can lock accounts after repeated failed sign-ins
       record
       # A lock-out trail that accumulates the passwords people typed is a
       # worse breach than the one it was built to prevent.
+
+    # The counter is keyed on the address somebody TYPED, so anybody can make
+    # rows appear; an hourly sweep clears the finished ones. It releases nothing.
+    @unit
+    Scenario: Finished lock-out rows are cleared a day after they settle
+      Given lock-out rows untouched for more than a day, one held for review and one still locked
+      When the hourly sweep runs
+      Then only the settled row is removed
+      And the held, the still-locked and the recently touched rows remain

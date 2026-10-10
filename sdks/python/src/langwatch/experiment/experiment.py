@@ -24,6 +24,8 @@ from typing import (
     Literal,
     Optional,
     Sequence,
+    Set,
+    Tuple,
     TypeVar,
     TypedDict,
     Sized,
@@ -36,7 +38,7 @@ if TYPE_CHECKING:
 
     from langwatch.evaluation import EvaluationResultModel
 
-from tenacity import retry, stop_after_attempt, wait_exponential
+from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponential
 from tqdm.auto import tqdm
 
 import langwatch
@@ -53,8 +55,12 @@ from langwatch.experiment.platform_run import (
     _print_summary,
 )
 from langwatch.telemetry.tracing import LangWatchTrace
-from langwatch.utils.auth import build_auth_headers
+from langwatch.utils.auth import build_request_headers
 from langwatch.utils.exceptions import better_raise_for_status
+from langwatch.utils.log_results_batching import (
+    is_payload_too_large,
+    send_log_results_in_parts,
+)
 from langwatch.utils.transformation import SerializableWithStringFallback
 
 from coolname import generate_slug  # type: ignore
@@ -328,6 +334,10 @@ class Experiment:
         self.last_sent = 0
         self.debounce_interval = 1  # 1 second
         self.threads: List[threading.Thread] = []
+        # Every row and verdict sent so far, by the identity the platform stores
+        # it under. Their counts go with the finishing batch.
+        self._sent_rows: Set[Tuple[int, str]] = set()
+        self._sent_evaluations: Set[Tuple[Optional[int], str, str]] = set()
         self.initialized = False
 
         # Target registry - tracks registered targets and their metadata
@@ -367,8 +377,8 @@ class Experiment:
 
         with create_client(timeout=60) as client:
             response = client.post(
-                f"{langwatch.get_endpoint()}/api/experiment/init",
-                headers=build_auth_headers(langwatch.get_api_key() or ""),
+                f"{langwatch.get_endpoint()}/api/v1/experiment/init",
+                headers=build_request_headers(langwatch.get_api_key() or ""),
                 json={
                     "experiment_name": self.name,
                     "experiment_slug": self.experiment_slug,
@@ -434,7 +444,7 @@ class Experiment:
         for attempt in range(retries):
             try:
                 with create_client(timeout=30) as client:
-                    response = client.get(url, headers=build_auth_headers(api_key))
+                    response = client.get(url, headers=build_request_headers(api_key))
 
                 if response.status_code == 404:
                     if attempt < retries - 1:
@@ -1107,14 +1117,27 @@ class Experiment:
             if len(targets) > 0:
                 body["targets"] = targets
 
+            for entry in self.batch["dataset"]:
+                self._sent_rows.add((entry.index, entry.target_id or ""))
+            for eval in self.batch["evaluations"]:
+                self._sent_evaluations.add(
+                    (eval.index, eval.target_id or "", eval.evaluator)
+                )
+
             if finished:
                 if not isinstance(body["timestamps"], dict):
                     body["timestamps"] = {}
                 body["timestamps"]["finished_at"] = int(time.time() * 1000)
+                # What the run reported in total, so a reader can tell results
+                # that are still being stored from a run that is whole.
+                body["expected"] = {
+                    "dataset": len(self._sent_rows),
+                    "evaluations": len(self._sent_evaluations),
+                }
 
             # Start a new thread to send the batch
             thread = threading.Thread(
-                target=Experiment._log_results,
+                target=Experiment._log_results_in_parts,
                 args=(langwatch.get_api_key(), body),
             )
             thread.start()
@@ -1125,17 +1148,25 @@ class Experiment:
             self.last_sent = time.time()
 
     @classmethod
+    def _log_results_in_parts(cls, api_key: str, body: Dict[str, Any]):
+        """Send one batch, as several requests when it is too large for one."""
+        send_log_results_in_parts(
+            body, post=lambda part: cls._log_results(api_key, part)
+        )
+
+    @classmethod
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=2, max=10),
+        retry=retry_if_exception(lambda error: not is_payload_too_large(error)),
         reraise=True,
     )
     def _log_results(cls, api_key: str, body: Dict[str, Any]):
         with create_client(timeout=60) as client:
             response = client.post(
-                f"{langwatch.get_endpoint()}/api/evaluations/batch/log_results",
+                f"{langwatch.get_endpoint()}/api/v1/evaluations/batch/log_results",
                 headers={
-                    **build_auth_headers(api_key),
+                    **build_request_headers(api_key),
                     "Content-Type": "application/json",
                 },
                 content=json.dumps(body, cls=SerializableWithStringFallback),
@@ -1744,8 +1775,7 @@ class Experiment:
         duration: Optional[int] = None
 
         start_time = time.time()
-        result = langwatch.evaluations.evaluate(
-            span=langwatch.get_current_span(),
+        result = langwatch.evaluation.evaluate(
             slug=evaluator_id,
             name=name or evaluator_id,
             settings=settings,

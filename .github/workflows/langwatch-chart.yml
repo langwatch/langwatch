@@ -5,7 +5,9 @@ on:
     # ready_for_review is NOT a default activity type, and the two heaviest
     # jobs below skip on a draft. Without it, taking a PR out of draft fires
     # no event at all and they would never get their non-draft run.
-    types: [opened, synchronize, reopened, ready_for_review]
+    # `labeled` fires for every label; a run starts only for `ci:full`, which
+    # also lifts the draft gate. Any other label is skipped by the gates below.
+    types: [opened, synchronize, reopened, ready_for_review, labeled]
     paths:
       - "charts/langwatch/**"
       - "charts/clickhouse-serverless/**"
@@ -13,12 +15,18 @@ on:
       - "charts/langyagent/**"
       - "charts/lib/**"
       - ".github/workflows/langwatch-chart.yml"
-      # The shutdown budget is the one place where a code constant and a
-      # chart value must agree: the pod's terminationGracePeriodSeconds is
-      # sized from the same numbers budget.ts derives. Without this path a
-      # change to those constants never runs the workers-shutdown job, and
-      # the chart would keep asserting a margin the code no longer uses.
-      - "platform/app/src/server/shutdown/**"
+      # Where the processes declare what they read. The shutdown deadline must
+      # agree with the pod's grace period (workers-shutdown.sh), and every
+      # variable the chart sets must still be declared somewhere
+      # (env-contract.mjs); without these paths a code change breaks either
+      # while the chart CI never runs.
+      - "packages/process/src/**"
+      - "packages/process-stores/src/config-owner.ts"
+      - "packages/secrets/src/shared-secrets.ts"
+      - "packages/config/src/**"
+      - "modules/*/contract/src/*.config.ts"
+      - "enterprise/modules/*/contract/src/*.config.ts"
+      - "apps/tasks/src/config.ts"
       # This job is the only thing in CI that builds the app image and runs a
       # stack against it — publish-docker-app fires on `release: published`, so
       # on a pull request nothing else touches the Dockerfile at all. Without
@@ -42,12 +50,18 @@ on:
       - "charts/langyagent/**"
       - "charts/lib/**"
       - ".github/workflows/langwatch-chart.yml"
-      # The shutdown budget is the one place where a code constant and a
-      # chart value must agree: the pod's terminationGracePeriodSeconds is
-      # sized from the same numbers budget.ts derives. Without this path a
-      # change to those constants never runs the workers-shutdown job, and
-      # the chart would keep asserting a margin the code no longer uses.
-      - "platform/app/src/server/shutdown/**"
+      # Where the processes declare what they read. The shutdown deadline must
+      # agree with the pod's grace period (workers-shutdown.sh), and every
+      # variable the chart sets must still be declared somewhere
+      # (env-contract.mjs); without these paths a code change breaks either
+      # while the chart CI never runs.
+      - "packages/process/src/**"
+      - "packages/process-stores/src/config-owner.ts"
+      - "packages/secrets/src/shared-secrets.ts"
+      - "packages/config/src/**"
+      - "modules/*/contract/src/*.config.ts"
+      - "enterprise/modules/*/contract/src/*.config.ts"
+      - "apps/tasks/src/config.ts"
       # This job is the only thing in CI that builds the app image and runs a
       # stack against it — publish-docker-app fires on `release: published`, so
       # on a pull request nothing else touches the Dockerfile at all. Without
@@ -65,14 +79,16 @@ on:
 
   workflow_dispatch:
     # Allow running kind e2e legs on demand against draft branches.
-    # Skipped on draft PRs by the if: conditions at ~line 226 and ~270.
+    # Skipped on draft PRs unless labelled `ci:full` (the `if:` of behavioral and e2e).
 # The e2e jobs here are the most expensive in the repo — `e2e: infra` runs to
 # 697s and `e2e: overlays` to 348s — and without a group every push to a chart
 # PR left its predecessors running to completion alongside it. Same rule as
 # langwatch-app-ci: supersede on a PR branch, never on main, because every
 # commit that lands on main has to keep its own validation.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  # A label event for any label but `ci:full` gets its own group, so it neither
+  # cancels a running full run nor is cancelled by one.
+  group: ${{ github.workflow }}-${{ (github.event_name == 'pull_request' && github.event.action == 'labeled' && github.event.label.name != 'ci:full') && format('label-{0}', github.run_id) || github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
@@ -91,6 +107,8 @@ jobs:
   # next four.
   render:
     name: "render + assertions"
+    # Skipped for a label event other than `ci:full`, like every job here.
+    if: github.event_name != 'pull_request' || github.event.action != 'labeled' || github.event.label.name == 'ci:full'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -100,9 +118,17 @@ jobs:
       - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5
         with:
           version: v3.12.0
-      - run: helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
-      - run: helm repo add langwatch https://langwatch.github.io/langwatch
-      - run: helm dependency build .
+      - uses: ./.github/actions/setup-pnpm-node
+        with:
+          install: "@langwatch/workspace"
+      - uses: ./.github/actions/nx-cache
+        with:
+          suffix: chart
+      # Adds the repositories, builds the dependencies, then lints and renders
+      # the smoke preset for every chart; each is cached by chart content.
+      - name: "helm deps, lint and smoke render"
+        working-directory: .
+        run: pnpm exec nx run-many -t helm:deps helm:lint helm:template --projects "tag:helm" --outputStyle=static
 
       # `set +e` is deliberate and load-bearing. Actions runs `run:` steps with
       # `-e` already on, and `set -uo pipefail` does not clear it — so without
@@ -198,6 +224,10 @@ jobs:
         if: "!cancelled()"
         run: ./tests/workers-shutdown.sh
 
+      - name: "assert ClickHouse pool sizing follows fleet capacity"
+        if: "!cancelled()"
+        run: ./tests/clickhouse-pool-sizing.sh
+
       # In local-filesystem mode the app and the workers mount one ReadWriteOnce
       # PVC, and a helm upgrade rolls both Deployments at once. The pre-upgrade
       # hook that orders them is a template over several values, so which
@@ -221,6 +251,9 @@ jobs:
         if: "!cancelled()"
         run: ./tests/gateway-internal-url.sh
 
+      - name: "assert the app knows the control plane address its gateway dials"
+        if: "!cancelled()"
+        run: ./tests/gateway-control-plane-url.sh
       # A plain install renders no Ingress for the app or the gateway, an
       # enabled gateway Ingress uses the class the operator picked, and no
       # PodDisruptionBudget can block a node drain.
@@ -251,6 +284,27 @@ jobs:
         if: "!cancelled()"
         run: ./tests/sign-up-env.sh
 
+      # A CREDENTIALS_SECRET rotation needs the previous key on every process
+      # that holds the new one, and an install that names no previous key must
+      # carry no such variable. Both are only visible in the render.
+      - name: "assert the previous credentials key renders only when set, on every process"
+        if: "!cancelled()"
+        run: ./tests/credentials-secret-previous.sh
+
+      # Both scrape jobs discover every pod in the namespace. Which pods each
+      # one keeps, and whether the workers pods carry what their job keeps on,
+      # is relabeling against pod metadata: only the render shows it.
+      - name: "assert each Prometheus scrape job selects only its own pods"
+        if: "!cancelled()"
+        run: ./tests/prometheus-scrape-targets.sh
+
+      # apps/api and apps/worker parse one config at each owner (ADR-132), so a
+      # variable nothing declares is dead and a missing store URL refuses the
+      # boot. Both are only visible by setting the render beside the source.
+      - name: "assert every process env var is read, and the required ones are set"
+        if: "!cancelled()"
+        run: node tests/env-contract.mjs
+
       # A default install calls LangWatch only for the license sync and the
       # usage report. The offline defaults that switch off library calls to
       # third parties (Prisma checkpoint, the voice quick tunnel, RAGAS
@@ -278,29 +332,31 @@ jobs:
   # every behavioral guarantee while CI stays green.
   behavioral:
     name: "behavioral (rendered-output assertions)"
-    # Skipped on a draft, like the e2e legs below. This workflow has no
-    # `changes` gate to read `heavy` from, so the draft check is inline.
-    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    # Skipped on a draft, like the e2e legs below, unless the PR is labelled
+    # `ci:full`. No `changes` gate to read `heavy` from, so the check is inline.
+    if: >-
+      (github.event_name != 'pull_request' || github.event.pull_request.draft == false
+       || contains(github.event.pull_request.labels.*.name, 'ci:full'))
+      && (github.event_name != 'pull_request' || github.event.action != 'labeled' || github.event.label.name == 'ci:full')
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: platform/app
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5
         with:
           version: v3.12.0
-      - run: helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
-      - run: helm repo add langwatch https://langwatch.github.io/langwatch
       - uses: ./.github/actions/setup-pnpm-node
         with:
-          install: "@langwatch/web..."
+          install: "@langwatch/platform-api... @langwatch/langy-browser..."
+      - uses: ./.github/actions/nx-cache
+        with:
+          suffix: chart
+      - name: Build chart dependencies
+        run: pnpm exec nx run chart-langwatch:helm:deps --outputStyle=static
       - name: Generate required files
-        run: pnpm start:prepare:files
+        run: pnpm start:prepare:files && pnpm ensure:built
       # The integration config's globalSetup runs ClickHouse migrations via
       # goose before any test file executes, helm-backed or not.
       - name: Install Goose migration tool
-        working-directory: .
         run: bash .github/scripts/install-goose.sh
       - name: Run helm behavioral suites
         env:
@@ -308,8 +364,13 @@ jobs:
           # job exists precisely so these suites cannot quietly not run.
           REQUIRE_HELM_TESTS: "1"
         run: |
-          pnpm test:unit run src/server/stored-objects/__tests__/helm-and-docs-shape.unit.test.ts
-          pnpm test:integration run src/server/stored-objects/__tests__/helm-azure-identity.integration.test.ts
+          pnpm --filter @langwatch/stored-object-process exec vitest run \
+            src/__tests__/stored-object-helm-and-docs-shape.unit.test.ts \
+            src/__tests__/stored-object-helm-azure-identity.integration.test.ts
+          pnpm --filter @langwatch/evaluation-process exec vitest run \
+            src/__tests__/helm-langevals-memory.unit.test.ts
+          pnpm --filter @langwatch/auth-process exec vitest run \
+            src/transport/__tests__/helm-auth-base-url.unit.test.ts
 
   e2e:
     name: "e2e: ${{ matrix.name }}"
@@ -324,7 +385,10 @@ jobs:
     # draft via detect-changes' `heavy` output; this one has no gate job to
     # read it from, which left it the last heavy thing running on a version
     # bump.
-    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    if: >-
+      (github.event_name != 'pull_request' || github.event.pull_request.draft == false
+       || contains(github.event.pull_request.labels.*.name, 'ci:full'))
+      && (github.event_name != 'pull_request' || github.event.action != 'labeled' || github.event.label.name == 'ci:full')
     runs-on: ubuntu-latest
     needs: render
     strategy:

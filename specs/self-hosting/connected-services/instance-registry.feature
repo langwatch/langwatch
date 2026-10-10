@@ -80,7 +80,7 @@ Feature: The registry of self-hosted installs
     Then that install is among the results
     And part of a hostname, a release or an instance id finds it too
 
-  @unimplemented @unit
+  @unit
   Scenario: The drawer shows the ladder, the domains and the usage numbers
     When an operator opens an install
     Then the rungs it reached are shown with the day each was reached

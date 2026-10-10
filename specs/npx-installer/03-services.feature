@@ -65,6 +65,38 @@ Feature: Service orchestration after pre-deps are installed
     And "curl http://localhost:5560/api/health" returns 200 within 60 seconds
     And `runtime.startAll` returns one ServiceHandle per service
 
+  @unit
+  Scenario: The backend runs the api and the worker as one process
+    When the CLI starts "langwatch"
+    Then it spawns apps/backend once, the api and the worker in one Node process, and no "workers" process
+    And the api listens on the langwatch port and the worker's health door on its own port slot
+    And "langwatch" is reported healthy once "/api/health" answers on the langwatch port
+    And when "/api/health" never answers, the backend is stopped and `runtime.startAll` fails
+
+  @unit
+  Scenario: The backend leaves migrations to the worker's upgrade
+    When the CLI starts "langwatch"
+    Then the backend's environment sets neither SKIP_PRISMA_MIGRATE nor SKIP_CLICKHOUSE_MIGRATE
+
+  @unit
+  Scenario: nlpgo and the ai-gateway run as one Go process when the binary has combined mode
+    Given the installed monobinary offers `service combined`
+    When the CLI starts the Go services
+    Then it spawns one "go" process running "combined nlpgo aigateway"
+    And nlpgo and the ai-gateway each listen on their own port, both pointed back at the app
+    And the Go services are reported healthy once both "/healthz" doors answer
+
+  @unit
+  Scenario: An older monobinary still gets nlpgo and the ai-gateway as two processes
+    Given the installed monobinary predates combined mode
+    When the CLI starts the Go services
+    Then nlpgo and the ai-gateway start as two processes, as before
+
+  Scenario: The ai-gateway sees the same environment as the other app-tier services
+    Given the user's shell carries "OPENAI_API_KEY"
+    When the CLI calls `runtime.startAll(ctx)`
+    Then "ai-gateway" receives the same environment as "langwatch"
+
   Scenario: Migrations run automatically on first start
     Given postgres has no "langwatch_db" schema yet
     And clickhouse has no "langwatch" database yet

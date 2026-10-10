@@ -46,12 +46,12 @@ Open **Sessions** at [/me/sessions](https://app.langwatch.ai/me/sessions). One r
 
 Open a session and the **Usage** tab prices it. Read the **Cache health** block first: cache reads and cache writes decide a large share of a coding agent's bill.
 
-| Stat | Why it costs you |
-| --- | --- |
-| **Peak context** | The most tokens the session carried into one call. Every later call pays to keep that context alive. |
-| **Cache misses** | Calls that rebuilt the context instead of reading it. A cache write costs more per token than a read, so a miss pays twice for the same tokens. |
-| **Context reused** | Tokens served from cache, billed at a fraction of fresh input. |
-| **Context rebuilt** | Tokens spent writing the cache again. |
+| Stat                | Why it costs you                                                                                                                                |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Peak context**    | The most tokens the session carried into one call. Every later call pays to keep that context alive.                                            |
+| **Cache misses**    | Calls that rebuilt the context instead of reading it. A cache write costs more per token than a read, so a miss pays twice for the same tokens. |
+| **Context reused**  | Tokens served from cache, billed at a fraction of fresh input.                                                                                  |
+| **Context rebuilt** | Tokens spent writing the cache again.                                                                                                           |
 
 <Frame caption="Session detail with the Cache health section. This session compacted twice, missed its cache three times, and re-sent 393k tokens on its biggest rebuild.">
   ![Claude Code session cost detail](/images/coding-agents/session-detail.png)

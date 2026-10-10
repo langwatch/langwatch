@@ -5,9 +5,9 @@
 # reads, and the end node's inputs (labelled RESULTS in the Studio) are what it
 # produces.
 #
-# Bindings target platform/app/src/server/agents/__tests__/,
-# platform/app/src/experiments-v3/__tests__/ and
-# platform/app/src/server/experiments-v3/execution/__tests__/.
+# Bindings target [gone] src/server/agents/__tests__/,
+# [gone] src/experiments-v3/__tests__/ and
+# [gone] src/server/experiments-v3/execution/__tests__/.
 Feature: A workflow agent exposes its real fields as an evaluations target
   As an author evaluating a Studio workflow from the experiments workbench
   I want the workflow's own inputs and results to be what I map against

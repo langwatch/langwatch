@@ -1,0 +1,114 @@
+import type { Authorization } from "@langwatch/authorization";
+import type { SingleEvaluationResult } from "@langwatch/evaluator-contract";
+import { moduleApi } from "@langwatch/module";
+
+import type {
+  ExecuteEvaluationCommandData,
+  ReportEvaluationCommandData,
+} from "./evaluation-event.commands.ts";
+import type {
+  DatasetEvaluationRow,
+  EvaluationCostRecord,
+  EvaluationModelLookup,
+  EvaluationMonitorSummary,
+  EvaluationSlugLookup,
+  EvaluationSlugMatch,
+  GuardrailCheckInput,
+  GuardrailCheckOutcome,
+  RunEvaluatorInput,
+  SavedEvaluatorLookup,
+  SavedEvaluatorResolution,
+} from "./evaluation-rest.schemas.ts";
+import type {
+  CustomEvaluator,
+  EvaluationProjectScope,
+  RunTraceEvaluationInput,
+  WarmupEvaluatorsInput,
+} from "./evaluation-trpc.schemas.ts";
+import type {
+  ExecuteEvaluationCommand,
+  UpsertEvaluationRunCommand,
+} from "./evaluation.commands.ts";
+import type {
+  MonitorPerformanceForProjectInput,
+  MonitorPerformanceQuery,
+  OnlineEvaluationPerformance,
+} from "./evaluation.performance.ts";
+import type {
+  EvaluationInputsQuery,
+  EvaluationRunLookup,
+  EvaluationRunsByTraceQuery,
+} from "./evaluation.queries.ts";
+import type {
+  EvaluationRunOutcome,
+  EvaluationWarmup,
+  EvaluatorCatalogue,
+} from "./evaluation.responses.ts";
+import type { EvaluationExecutionResult, EvaluationRunData } from "./evaluation.ts";
+import type { TopicClusteringOutcome, TopicClusteringRequest } from "./langevals-clustering.ts";
+import type { PiiDetectionOutcome, PiiDetectionRequest } from "./langevals-pii-detection.ts";
+
+/** The complete callable Evaluation capability shared by process peers. */
+export interface EvaluationApi {
+  /** Every evaluator, with what this install and this project are missing for it. */
+  listEvaluators(input: EvaluationProjectScope): Promise<EvaluatorCatalogue>;
+  /** The project's own workflow-backed evaluators. */
+  listCustomEvaluators(input: EvaluationProjectScope): Promise<CustomEvaluator[]>;
+  /** Scores one stored trace now, and reports the verdict onto the pipeline. */
+  runTraceEvaluation(
+    input: RunTraceEvaluationInput,
+    by: Readonly<{ id: string }>,
+  ): Promise<EvaluationRunOutcome>;
+  /** Nudges the evaluator runtime ahead of a run. */
+  warmupEvaluators(input: WarmupEvaluatorsInput): Promise<EvaluationWarmup>;
+  executeForTrace(input: ExecuteEvaluationCommand): Promise<EvaluationExecutionResult>;
+  upsertRun(input: UpsertEvaluationRunCommand): Promise<void>;
+  upsertRuns(input: UpsertEvaluationRunCommand[]): Promise<void>;
+  getRunByEvaluationId(input: EvaluationRunLookup): Promise<EvaluationRunData>;
+  findRunByEvaluationId(input: EvaluationRunLookup): Promise<EvaluationRunData | null>;
+  findRunsByTraceId(input: EvaluationRunsByTraceQuery): Promise<EvaluationRunData[]>;
+  /** Read through the proof; null when none are stored or the viewer may not read content. */
+  findInputs(
+    input: EvaluationInputsQuery & { authorization: Authorization; userId: string | null },
+  ): Promise<Record<string, unknown> | null>;
+  getMonitorPerformance(input: MonitorPerformanceQuery): Promise<OnlineEvaluationPerformance[]>;
+  /** The seven-day trend of every monitor the project has; none when it has no monitors. */
+  findMonitorPerformance(
+    input: MonitorPerformanceForProjectInput,
+  ): Promise<OnlineEvaluationPerformance[]>;
+
+  // The public evaluation doors: the evaluate paths reach the same capability
+  // every other caller does.
+
+  /** Runs one evaluator over one input, and never rejects for a domain reason. */
+  runEvaluator(input: RunEvaluatorInput): Promise<SingleEvaluationResult>;
+  /** Runs one guardrail's evaluator until its deadline or the caller's abort; records its cost. */
+  checkGuardrail(input: GuardrailCheckInput): Promise<GuardrailCheckOutcome>;
+  /** One saved evaluator, ready to run; throws when no evaluator answers to it. */
+  resolveSavedEvaluator(input: SavedEvaluatorLookup): Promise<SavedEvaluatorResolution>;
+  /** One monitor by slug, or null. */
+  findMonitorBySlug(input: EvaluationSlugLookup): Promise<EvaluationMonitorSummary | null>;
+  /** One dataset by slug, or null. */
+  findDatasetBySlug(input: EvaluationSlugLookup): Promise<EvaluationSlugMatch | null>;
+  /** The model the project's cascade resolves for one feature key, or null. */
+  findModelForFeature(input: EvaluationModelLookup): Promise<string | null>;
+  /** Records what a run of an evaluator cost. */
+  recordEvaluationCost(input: EvaluationCostRecord): Promise<EvaluationSlugMatch>;
+  /** Records one row of a dataset evaluation. */
+  recordDatasetEvaluationRow(input: DatasetEvaluationRow): Promise<void>;
+  /** Reports one verdict onto the evaluation processing pipeline. */
+  reportEvaluation(data: ReportEvaluationCommandData): Promise<void>;
+  /** Queues a trace's online evaluation with the trigger's delay and dedup. */
+  queueTraceEvaluation(data: ExecuteEvaluationCommandData): Promise<void>;
+  /** The evaluation half of a trigger's legacy filters against a trace's runs. */
+  matchesEvaluationFilters(input: {
+    filters: Readonly<Record<string, unknown>>;
+    evaluations: EvaluationRunData[];
+  }): boolean;
+  /** One topic-clustering call to langevals, staging an oversized body; aborts with the signal. */
+  requestTopicClustering(input: TopicClusteringRequest): Promise<TopicClusteringOutcome>;
+  /** One Presidio batch through langevals: main's `/presidio/pii_detection/evaluate` call. */
+  detectPii(input: PiiDetectionRequest): Promise<PiiDetectionOutcome>;
+}
+
+export const EvaluationApi = moduleApi<EvaluationApi>()("evaluation");

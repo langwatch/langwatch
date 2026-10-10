@@ -40,8 +40,8 @@ app:
     skipEnvValidation: true
 
 workers:
-  # e2e.sh asserts the workers Deployment is absent when enabled=false
-  # (validates the gate added in c74fb13a3).
+  # The workers run the upgrade. enabled: false runs the worker as a sidecar
+  # in each app pod, so the app pod can finish the upgrade it waits on.
   enabled: false
 
 langwatch_nlp:

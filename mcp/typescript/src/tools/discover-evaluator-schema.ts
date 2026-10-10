@@ -1,12 +1,12 @@
-import { AVAILABLE_EVALUATORS } from "../../../../services/langevals/ts-integration/evaluators.generated.js";
-import type { EvaluatorDefinition, EvaluatorTypes } from "../../../../services/langevals/ts-integration/evaluators.generated.js";
+import {
+  AVAILABLE_EVALUATORS,
+  type EvaluatorDefinition,
+  type EvaluatorTypes,
+} from "@langwatch/evaluator-contract";
 
 /**
- * Formats evaluator schema information for the discover_schema tool.
- *
- * Two levels of detail:
- * - Overview (no evaluatorType): compact list of all evaluator types
- * - Detail (with evaluatorType): full schema for one evaluator type
+ * Formats evaluator schema for discover_schema: an overview (all types,
+ * compact) when no evaluatorType is given, else the full schema for one.
  */
 export function formatEvaluatorSchema(evaluatorType?: string): string {
   if (evaluatorType) {
@@ -50,9 +50,22 @@ function formatEvaluatorOverview(): string {
   return lines.join("\n");
 }
 
+function settingsSection(settingsEntries: [string, unknown][]): string[] {
+  if (settingsEntries.length === 0) return [];
+  const lines = ["\n## Settings\n"];
+  for (const [key, setting] of settingsEntries) {
+    const s = setting as { description?: string; default: unknown };
+    const defaultStr = JSON.stringify(s.default);
+    const desc = s.description ? ` - ${s.description}` : "";
+    lines.push(`- **${key}**${desc}`);
+    lines.push(`  Default: \`${defaultStr}\``);
+  }
+  return lines;
+}
+
 /**
- * Returns the full schema for a specific evaluator type.
- * Includes settings with descriptions and defaults, required/optional fields, env vars, and result fields.
+ * Returns the full schema for a specific evaluator type: settings, required/optional
+ * fields, env vars, and result fields.
  */
 function formatEvaluatorDetail(evaluatorType: string): string {
   const def = AVAILABLE_EVALUATORS[evaluatorType as EvaluatorTypes] as
@@ -85,18 +98,8 @@ function formatEvaluatorDetail(evaluatorType: string): string {
     lines.push(`**Optional**: ${def.optionalFields.join(", ")}`);
   }
 
-  // Settings
   const settingsEntries = Object.entries(def.settings);
-  if (settingsEntries.length > 0) {
-    lines.push("\n## Settings\n");
-    for (const [key, setting] of settingsEntries) {
-      const s = setting as { description?: string; default: unknown };
-      const defaultStr = JSON.stringify(s.default);
-      const desc = s.description ? ` - ${s.description}` : "";
-      lines.push(`- **${key}**${desc}`);
-      lines.push(`  Default: \`${defaultStr}\``);
-    }
-  }
+  lines.push(...settingsSection(settingsEntries));
 
   // Env vars
   if (def.envVars.length > 0) {
@@ -118,12 +121,18 @@ function formatEvaluatorDetail(evaluatorType: string): string {
 
   lines.push("\n## Usage Example\n");
   lines.push("```json");
-  lines.push(JSON.stringify({
-    evaluatorType: evaluatorType,
-    settings: Object.fromEntries(
-      settingsEntries.map(([key, setting]) => [key, (setting as { default: unknown }).default]),
+  lines.push(
+    JSON.stringify(
+      {
+        evaluatorType: evaluatorType,
+        settings: Object.fromEntries(
+          settingsEntries.map(([key, setting]) => [key, (setting as { default: unknown }).default]),
+        ),
+      },
+      null,
+      2,
     ),
-  }, null, 2));
+  );
   lines.push("```");
 
   return lines.join("\n");

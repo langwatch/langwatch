@@ -18,10 +18,10 @@ func main() {
 	ctx := context.Background()
 	logger := clog.New(ctx, clog.Config{Level: "info"})
 	if err := cmd.Root(ctx, logger, Version, os.Args[1:]); err != nil {
-		// cmd.Root's unknown-command path already prints its own message
-		// before returning; this is still the one place that reports every
-		// other failure instead of exiting silently.
+		// The one place every failure is reported; its exit code says what
+		// went wrong (64 usage, 65 not running, 66 timeout, 67 gate) or is a
+		// wrapped command's own (ADR-064, amendment 2026-10-10).
 		fmt.Fprintln(os.Stderr, "haven:", err)
-		os.Exit(1)
+		os.Exit(cmd.ExitCode(err))
 	}
 }

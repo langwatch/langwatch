@@ -1,50 +1,69 @@
 {
-    "compilerOptions": {
-        "target": "es2017",
-        "module": "NodeNext",
-        "declaration": true,
-        "declarationMap": true,
-        "outDir": "./dist",
-        "strict": true,
-        "esModuleInterop": true,
-        "resolveJsonModule": true,
-        "allowJs": true,
-        "checkJs": true,
-        "skipLibCheck": true,
-        "forceConsistentCasingInFileNames": true,
-        "moduleResolution": "nodenext",
-        "isolatedModules": true,
-        "jsx": "preserve",
-        "incremental": true,
-        "noUncheckedIndexedAccess": true,
-        "tsBuildInfoFile": "./tsconfig.tsbuildinfo",
-        "allowSyntheticDefaultImports": true,
-        // tsup's dts worker sets `baseUrl` itself, and TypeScript 6 makes that
-        // a hard error rather than a warning — this package cannot build
-        // without the transition flag until a d.ts bundler exists that speaks
-        // the TypeScript 7 API. See ADR-099.
-        "ignoreDeprecations": "6.0",
-        "paths": {
-            "@/*": ["./src/*"]
-        }
-    },
-    "include": [
-        "**/*.ts",
-        "vitest.config.mts",
-        "vitest.e2e.config.mts",
-        "eslint.config.mjs"
-    ],
-    "exclude": [
-        "node_modules",
-        "./dist/**/*",
-        "./examples/**/*",
-        "./coverage/**/*",
-        "./__tests__/**/*",
-        // Bun-only build script (uses the `Bun` global + import attributes).
-        // It is compiled BY bun, never by tsc — and `pnpm build` runs
-        // `tsc --noEmit` over everything, so leaving it in would break the
-        // Node/tsup build for every contributor. Typechecked via `bun build`
-        // at the point of use instead.
-        "./scripts/build-cli-binary.ts"
-    ]
+  "extends": "../../tsconfig.shared.json",
+  "compilerOptions": {
+    // This package emits: `noEmit` from the shared base is turned back off
+    // here so a `tsc -p` build still writes its declarations.
+    "noEmit": false,
+    // `module: NodeNext` with no `"type": "module"` in this package's own
+    // package.json (its dual CJS/ESM publish is tsup's job, not tsc's)
+    // compiles every file here as CommonJS, so verbatimModuleSyntax's ban on
+    // ECMAScript import/export syntax in a CommonJS file fires tree-wide.
+    // Genuine exception, not a restatement.
+    "verbatimModuleSyntax": false,
+    // An emitting project that imports `.ts` paths must rewrite them to `.js`.
+    "rewriteRelativeImportExtensions": true,
+    // `target` governs EMIT and stays conservative: this package is published
+    // and its output is downlevelled for whatever runtime a customer has.
+    // `lib` describes the runtime the code may ASSUME, and this package's own
+    // `engines.node` is ">=22", where the ES2023 array copy methods
+    // (toSorted, toReversed, toSpliced, with) have existed since Node 20.
+    // Without this, `unicorn/no-array-sort`'s fix does not type-check here.
+    "target": "es2017",
+    // `dom` and `dom.iterable` are not a browser assumption here: they are what
+    // the default lib for an es2017 target already included, and naming `lib`
+    // at all replaces that default outright. Dropping them took `RequestInfo`,
+    // `RequestInit` and `globalThis` with them.
+    "lib": ["es2023", "dom", "dom.iterable"],
+    "module": "NodeNext",
+    "declaration": true,
+    "declarationMap": true,
+    "outDir": "./dist",
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "allowJs": true,
+    "checkJs": true,
+    "moduleResolution": "nodenext",
+    "isolatedModules": true,
+    "jsx": "preserve",
+    "noUncheckedIndexedAccess": true,
+    "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
+    "allowSyntheticDefaultImports": true,
+    // tsup's dts worker sets `baseUrl` itself, and TypeScript 6 makes that
+    // a hard error rather than a warning — this package cannot build
+    // without the transition flag until a d.ts bundler exists that speaks
+    // the TypeScript 7 API. See ADR-099.
+    "ignoreDeprecations": "6.0",
+    "paths": {
+      "@/*": ["./src/*"]
+    }
+  },
+  "include": ["**/*.ts", "vitest.config.mts", "vitest.e2e.config.mts", "eslint.config.mjs"],
+  "exclude": [
+    "node_modules",
+    "./dist/**/*",
+    "./examples/**/*",
+    "./coverage/**/*",
+    "./__tests__/**/*",
+    // Bun-only build script (uses the `Bun` global + import attributes).
+    // It is compiled BY bun, never by tsc — and `pnpm build` runs
+    // `tsc --noEmit` over everything, so leaving it in would break the
+    // Node/tsup build for every contributor. Typechecked via `bun build`
+    // at the point of use instead.
+    "./scripts/build-cli-binary.ts"
+  ],
+  "references": [
+    {
+      "path": "../../packages/handled-error/tsconfig.build.json"
+    }
+  ]
 }

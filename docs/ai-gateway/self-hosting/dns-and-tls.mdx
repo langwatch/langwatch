@@ -113,7 +113,7 @@ The `/health` call returns `{"status":"ok","checks":{"gateway":"ok","control_pla
 | `/v1` | `Prefix` | `/v1/chat/completions`, `/v1/messages`, `/v1/responses`, `/v1/embeddings`, `/v1/audio/*`, `/v1/images/*`, `/v1/models`, the realtime and ElevenLabs routes |
 | `/health` | `Exact` | The public status endpoint for uptime monitors |
 
-`/healthz`, `/readyz`, `/startupz`, `/metrics`, `/debug/control-plane` and `/internal/*` stay in-cluster. The Gemini-native routes under `/v1beta` are outside the `/v1` prefix and are not published by the chart Ingress. To publish them, route `/v1beta` to the gateway Service with your own route, as described in [Routing and ingress controllers](/self-hosting/deployment/routing).
+`/healthz`, `/readyz`, `/startupz`, `/debug/control-plane` and `/internal/*` stay in-cluster. Metrics are on their own port (`9464`). The Gemini-native routes under `/v1beta` are outside the `/v1` prefix and are not published by the chart Ingress. To publish them, route `/v1beta` to the gateway Service with your own route, as described in [Routing and ingress controllers](/self-hosting/deployment/routing).
 
 ## Cloud load balancer in front of the Service
 
@@ -134,7 +134,15 @@ gateway:
       service.beta.kubernetes.io/aws-load-balancer-backend-protocol: tcp
 ```
 
-<Warning>Both examples terminate TLS in front of the gateway and reach port 5563 over plain HTTP, so the `Authorization` header that carries the virtual key crosses that last hop without encryption. The ingress terminates at the ingress controller and the network load balancer terminates at the load balancer, which puts the plaintext hop inside the cluster network in the first case and between the load balancer and the pods in the second. Both assume that network is trusted. Where it is not, run a service mesh with mutual TLS between the terminator and the gateway pods.</Warning>
+<Warning>
+  Both examples terminate TLS in front of the gateway and reach port 5563 over plain HTTP, so the
+  `Authorization` header that carries the virtual key crosses that last hop without encryption.
+
+  The ingress terminates at the ingress controller and the network load balancer terminates at the load
+  balancer, which puts the plaintext hop inside the cluster network in the first case and between
+  the load balancer and the pods in the second. Both assume that network is trusted. Where it is
+  not, run a service mesh with mutual TLS between the terminator and the gateway pods.
+</Warning>
 
 Request the certificate first and publish the validation CNAME records ACM prints:
 
@@ -151,7 +159,7 @@ kubectl -n langwatch get svc langwatch-gateway \
   -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'
 ```
 
-A Service of type `LoadBalancer` publishes every route, including `/metrics`, the probes and `/debug/control-plane`, which returns the resolved `LW_GATEWAY_BASE_URL` and takes no key. Put a load balancer listener rule or a security group in front of it when the address is public. Set `service.internal.enabled: true` to also render a ClusterIP Service named `langwatch-gateway-internal` for in-cluster callers, so they do not go out through the load balancer.
+A Service of type `LoadBalancer` publishes every route, including the probes and `/debug/control-plane`, which returns the resolved `LW_GATEWAY_BASE_URL` and takes no key. Put a load balancer listener rule or a security group in front of it when the address is public. Set `service.internal.enabled: true` to also render a ClusterIP Service named `langwatch-gateway-internal` for in-cluster callers, so they do not go out through the load balancer.
 
 ## Other ingress controllers
 
@@ -182,11 +190,11 @@ gateway:
 
 TLS in front of the gateway is one boundary. The other is the provider endpoints that customers configure on their own credentials. Three variables, set through `gateway.security.*` in the chart, control them:
 
-| Chart value | Env var | Effect |
-|---|---|---|
-| `security.requireHTTPSCustomEndpoints` | `REQUIRE_HTTPS_CUSTOM_ENDPOINTS` | Refuse a provider base URL with an `http://` scheme |
-| `security.blockLocalHTTPCalls` | `BLOCK_LOCAL_HTTP_CALLS` | Refuse a provider base URL that resolves to a private, loopback or other non-public address |
-| `security.allowedProxyHosts` | `ALLOWED_PROXY_HOSTS` | Hostnames that may resolve to a private address while the block is on |
+| Chart value                            | Env var                          | Effect                                                                                      |
+| -------------------------------------- | -------------------------------- | ------------------------------------------------------------------------------------------- |
+| `security.requireHTTPSCustomEndpoints` | `REQUIRE_HTTPS_CUSTOM_ENDPOINTS` | Refuse a provider base URL with an `http://` scheme                                         |
+| `security.blockLocalHTTPCalls`         | `BLOCK_LOCAL_HTTP_CALLS`         | Refuse a provider base URL that resolves to a private, loopback or other non-public address |
+| `security.allowedProxyHosts`           | `ALLOWED_PROXY_HOSTS`            | Hostnames that may resolve to a private address while the block is on                       |
 
 Both switches default to `false`, so a self-hosted install can route to a model server on the cluster network. Cloud metadata addresses, `0.0.0.0`, `::` and link-local ranges are refused with every setting. Setting `ENVIRONMENT` to anything other than `local` requires both switches to be `true`.
 

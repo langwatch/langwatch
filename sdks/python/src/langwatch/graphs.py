@@ -100,7 +100,7 @@ class GraphsFacade:
         if dashboard_id is not None:
             params["dashboardId"] = dashboard_id
 
-        response = self._http().get("/api/graphs", params=params)
+        response = self._http().get("/api/v1/graphs", params=params)
         _raise_for_status(response, operation="list")
         return response.json()
 
@@ -114,7 +114,7 @@ class GraphsFacade:
         Returns:
             Dictionary containing the graph data.
         """
-        response = self._http().get(f"/api/graphs/{_quote(graph_id)}")
+        response = self._http().get(f"/api/v1/graphs/{_quote(graph_id)}")
         _raise_for_status(response, operation="get")
         return response.json()
 
@@ -133,7 +133,7 @@ class GraphsFacade:
             Dictionary containing the created graph data.
         """
         body = params or {}
-        response = self._http().post("/api/graphs", json=body)
+        response = self._http().post("/api/v1/graphs", json=body)
         _raise_for_status(response, operation="create")
         return response.json()
 
@@ -155,7 +155,7 @@ class GraphsFacade:
         """
         body = params or {}
         response = self._http().patch(
-            f"/api/graphs/{_quote(graph_id)}", json=body
+            f"/api/v1/graphs/{_quote(graph_id)}", json=body
         )
         _raise_for_status(response, operation="update")
         return response.json()
@@ -170,6 +170,6 @@ class GraphsFacade:
         Returns:
             Dictionary with deletion result.
         """
-        response = self._http().delete(f"/api/graphs/{_quote(graph_id)}")
+        response = self._http().delete(f"/api/v1/graphs/{_quote(graph_id)}")
         _raise_for_status(response, operation="delete")
         return response.json()

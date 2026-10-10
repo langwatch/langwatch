@@ -94,7 +94,7 @@ autogen:
   # Custom secret names for each service (auto-generated if not specified)
   secretNames:
     # Single canonical Secret holding every chart-materialised value: the
-    # app keys (credentialsEncryptionKey, cronApiKey, nextAuthSecret,
+    # app keys (credentialsEncryptionKey, nextAuthSecret,
     # virtualKeyPepper) AND the AI gateway shared-auth keys
     # (LW_GATEWAY_INTERNAL_SECRET, LW_GATEWAY_JWT_SECRET) when
     # gateway.chartManaged=true. langwatch-app and the gateway pod both
@@ -121,9 +121,11 @@ secrets:
     # Key for credentials encryption (used by app)
     ## @param secrets.secretKeys.credentialsEncryptionKey [string] Key name for credentials encryption.
     credentialsEncryptionKey: "credentialsEncryptionKey"
-    # Key for cron API key (used by app and cronjobs)
-    ## @param secrets.secretKeys.cronApiKey [string] Key name for cron API key.
-    cronApiKey: "cronApiKey"
+    # Key holding the previous credentials encryption key during a rotation.
+    # Empty means the Secret carries none and CREDENTIALS_SECRET_PREVIOUS is
+    # not set.
+    ## @param secrets.secretKeys.credentialsEncryptionKeyPrevious [string] Key name for the previous credentials encryption key, set only during a rotation.
+    credentialsEncryptionKeyPrevious: ""
     # Key for NextAuth secret (used by app)
     ## @param secrets.secretKeys.nextAuthSecret [string] Key name for NextAuth secret.
     nextAuthSecret: "nextAuthSecret"
@@ -173,6 +175,19 @@ images:
 # Core settings for the main LangWatch application service
 ## @section LangWatch app
 app:
+  ## @param app.migrations.preRoll [default: true] With app.storedObjects.localFilesystem.serializeUpgrades
+  ## active only: apply this release's migrations in a pre-upgrade Job on the new image, before
+  ## any Deployment rolls (ADR-155). Otherwise the new worker pods run `pnpm task upgrade` themselves.
+  ## @param app.migrations.preRollTimeoutSeconds [default: 2100] activeDeadlineSeconds for that Job. Run `helm upgrade --timeout 45m` (no shorter than this plus a margin): Helm's own hook timeout is 5 minutes and fails the release while the Job still runs.
+  ## @param app.migrations.oldWritersGoneHook [default: false] After the app and workers finish rolling out, a post-upgrade Job records that writers from before the serving roster have stopped (pnpm task upgrade old-writers-gone). Needs a Role reading the two Deployments and its own ServiceAccount token, projected into its kubectl container only.
+  ## @param app.migrations.oldWritersGoneHookTimeoutSeconds [default: 1800] How long it waits for the rollouts; past it nothing is asserted and the grace applies.
+  ## @param app.migrations.oldWritersGoneHookImage [string, default: alpine/k8s:1.34.9] Image of its rollout wait. Needs sh and kubectl.
+  migrations:
+    preRoll: true
+    preRollTimeoutSeconds: 2100
+    oldWritersGoneHook: false
+    oldWritersGoneHookTimeoutSeconds: 1800
+    oldWritersGoneHookImage: alpine/k8s:1.34.9
   # Telemetry identity for the app pods. Becomes the OTel resource
   # `service.name` and the `service` field on stdout log lines, which log
   # shipping promotes to the Loki `service_name` label.
@@ -187,9 +202,12 @@ app:
   replicaCount: 1
 
   # Shutdown budget — same shape and the same rule as workers.* below. The app
-  # shares the workers' entrypoint watchdog and can host the worker stack
-  # itself (the `all` process role), so it is sized the same way. A web-only
-  # pod drains in well under this; the grace period is a ceiling, not a wait.
+  # runs its own process now (apps/api; the workers are apps/worker in their own
+  # Deployment) and is sized the same way, because the clock has the same shape:
+  # the queue drains for this value (SHUTDOWN_DRAIN_TIMEOUT_MS) and the process
+  # deadline (PROCESS_SHUTDOWN_DEADLINE_MS) is this value plus 20s.
+  # The API drains in well under this; the grace period is a ceiling, not a
+  # wait.
   ## @param app.shutdownDrainSeconds [default: 25] Seconds the queue may spend draining in-flight jobs on shutdown.
   shutdownDrainSeconds: 25
   ## @param app.terminationGracePeriodSeconds [default: 55] Seconds before SIGKILL. Must be at least shutdownDrainSeconds + 30.
@@ -233,15 +251,17 @@ app:
   credentialsEncryptionKey:
     value: ""
     secretKeyRef: { name: "", key: "" }
-
-  # API key for internal cron job authentication
-  # Used by scheduled tasks to authenticate with the application
-  ## @extra app.cronApiKey API key used by cron jobs for authentication.
-  ## @param app.cronApiKey.value [string] Cron API key value.
-  ## @param app.cronApiKey.secretKeyRef [object] Reference to a secret holding the cron API key.
-  cronApiKey:
-    value: ""
-    secretKeyRef: { name: "", key: "" }
+    # The key being rotated away from. Set it together with the new key above
+    # so the app, the workers and the migration Jobs can still decrypt data
+    # written under the old one (CREDENTIALS_SECRET_PREVIOUS). Same format as
+    # the key itself: 64 hex characters. Remove it once the rotation is done.
+    # autogen never generates it.
+    ## @extra app.credentialsEncryptionKey.previous Previous credentials encryption key, set only during a rotation.
+    ## @param app.credentialsEncryptionKey.previous.value [string] Previous encryption key value (not recommended in production).
+    ## @param app.credentialsEncryptionKey.previous.secretKeyRef [object] Reference to a secret holding the previous encryption key.
+    previous:
+      value: ""
+      secretKeyRef: { name: "", key: "" }
 
   # Pepper used when hashing AI Gateway virtual-key secrets (HMAC-SHA256).
   # Control-plane only — this value is NEVER shared with the gateway pod.
@@ -275,18 +295,19 @@ app:
   # commit-prefixed CDN base — e.g. "https://cdn.langwatch.ai/git-<short-sha>/" — so
   # a rolling deploy never strands a browser on a 404: every past build's assets
   # remain under their own immutable prefix. The deploy pipeline both uploads
-  # dist/client/assets to that prefix and sets this value for the same SHA. See
+  # apps/ui's dist/client/assets to that prefix and sets this value for the same
+  # SHA. See
   # ADR-086. Rendered into the LANGWATCH_ASSET_BASE env var when non-empty.
   ## @param app.assetBase [string, default: ""] CDN base URL for content-hashed assets; empty = serve same-origin from the pod.
   assetBase: ""
 
   # Feature flags to enable/disable specific functionality
   ## @extra app.features Feature flags for the app.
-  ## @param app.features.skipEnvValidation [default: false] Skip env var validation (dev only).
+  ## @param app.features.skipEnvValidation [default: false] Deprecated and inert: no process reads SKIP_ENV_VALIDATION any more.
   ## @param app.features.disableStrictPiiRedaction [default: false] Skip the strict PII redaction pass (Presidio analysis service). Native secrets and essential PII redaction still run.
   ## @param app.features.topicClustering [default: true] Enable automatic topic clustering.
   features:
-    # Skip environment variable validation (useful for development)
+    # Deprecated and inert. Kept so existing values files still render.
     skipEnvValidation: false
     # Skip the strict PII redaction pass (Presidio analysis service) to shed
     # analysis-service load. Native secrets and essential PII redaction still
@@ -306,26 +327,11 @@ app:
   upstreams:
     nlp: { scheme: http, port: 5561 }
     langevals: { scheme: http, port: 5562 }
-  # AI model evaluator configurations
-  # These enable integration with various AI providers for evaluation tasks
+  # Server-wide provider credentials. Model providers for evaluators are
+  # configured per project in Settings > Model Providers, not here.
   ## @extra app.evaluators Evaluator providers configuration.
   evaluators:
-    # Azure OpenAI integration for model evaluation
-    ## @extra app.evaluators.azureOpenAI Azure OpenAI evaluator configuration.
-    ## @param app.evaluators.azureOpenAI.enabled [default: false] Enable Azure OpenAI evaluator.
-    ## @param app.evaluators.azureOpenAI.endpoint.value [string] Azure OpenAI endpoint.
-    ## @param app.evaluators.azureOpenAI.apiKey.value [string] Azure OpenAI API key.
-    azureOpenAI:
-      enabled: false
-      endpoint:
-        value: ""
-        ## @param app.evaluators.azureOpenAI.endpoint.secretKeyRef [object] Secret ref for Azure OpenAI endpoint.
-        secretKeyRef: { name: "", key: "" }
-      apiKey:
-        value: ""
-        ## @param app.evaluators.azureOpenAI.apiKey.secretKeyRef [object] Secret ref for Azure OpenAI API key.
-        secretKeyRef: { name: "", key: "" }
-    # Google AI integration for model evaluation
+    # Google service account used for Google Cloud DLP PII redaction
     ## @extra app.evaluators.google Google evaluator configuration.
     ## @param app.evaluators.google.enabled [default: false] Enable Google evaluator.
     ## @param app.evaluators.google.credentials.value [string] Google credentials JSON (base64 or inline).
@@ -415,7 +421,7 @@ app:
           value: ""
           ## @param app.dataplane.providers.azureBlob.container.secretKeyRef [object] Secret ref for the Azure Blob container name.
           secretKeyRef: { name: "", key: "" }
-        ## @param app.dataplane.providers.azureBlob.spoolRetentionConfirmed [boolean] Confirms the container has a lifecycle rule deleting `trace-blobs/spool/` blobs after 3 days. The ADR-022 trace spool refuses to write to Azure until this is true, because a crash between the spool write and its delete is bounded only by that rule and the app cannot verify a management-plane policy with a data-plane key. Leave false unless you have created the policy.
+        ## @param app.dataplane.providers.azureBlob.spoolRetentionConfirmed [boolean] Earlier spelling of `app.dataplane.objectRetentionConfirmed`, still honoured: either one confirms. Retired at the LTS floor.
         spoolRetentionConfirmed: false
         # Optional. Override the blob endpoint for sovereign clouds
         # (*.usgovcloudapi.net, *.chinacloudapi.cn), private endpoints, or an
@@ -471,6 +477,29 @@ app:
     # that lands.
     ## @param app.dataplane.legacyAzureRead [default: false] Keep Azure settings for reads after moving writes back to S3.
     legacyAzureRead: false
+
+    # Object-storage lifecycle table (ADR-172). The app writes transient or
+    # oversized payloads under these prefixes and relies on a lifecycle rule on
+    # the bucket or container to expire whatever is left behind. Create one rule
+    # per row: expire after the stated days, and do not shorten it.
+    #
+    #   Prefix                           Written by                    Eager delete  Lifecycle rule
+    #   trace-blobs/spool/               trace spool (ADR-022)         yes           expire after 3 days
+    #   langevals-staging/               evaluation, langevals bodies  yes           expire after 3 days
+    #   studio-staging/                  workflow studio payloads      yes           expire after 3 days
+    #   group-queue/                     group-queue S3 tier           no            expire after 7 days
+    #   evaluation-inputs/r<days>/       evaluation inputs             no            one rule per class: r90 after 90
+    #                                                                                days, r180 after 180, r365 after
+    #                                                                                365, r730 after 730
+    #   evaluation-inputs/r-indefinite/  evaluation inputs             no            none (kept for ever)
+    #
+    # S3 and compatible stores accept oversized writes. Azure needs you to
+    # confirm the rules below exist (today the trace spool refuses until then;
+    # other kinds follow), because the app holds a data-plane key
+    # and cannot read a management-plane policy back. The local filesystem
+    # refuses them always. A refused payload stays bounded: a preview or inline.
+    ## @param app.dataplane.objectRetentionConfirmed [boolean, default: false] Confirms the Azure container has a lifecycle rule for every prefix in the table above. Emitted as `OBJECT_RETENTION_CONFIRMED`.
+    objectRetentionConfirmed: false
 
   # Stored Objects - externalized byte content (audio, image, PDF, document).
   # By default, uses a local-filesystem PVC so the chart works plug-and-play
@@ -619,18 +648,8 @@ app:
   ## @extra app.license Enterprise license configuration.
   ## @param app.license.key.value [string] Signed license key or activation code issued by LangWatch.
   ## @param app.license.key.secretKeyRef [object] Secret ref holding the signed license key or activation code.
-  ## @param app.license.publicKey.value [string] Verification key, only for a private signing chain.
-  ## @param app.license.publicKey.secretKeyRef [object] Secret ref holding the verification key.
   license:
     key:
-      value: ""
-      secretKeyRef: { name: "", key: "" }
-    # Overrides the built-in verification key. Almost no deployment sets this:
-    # it exists for installs that LangWatch issues licenses to from a separate
-    # signing chain. Replacing this key does not grant an Enterprise License,
-    # and a key that verifies only against a replaced value is not one; see
-    # platform/app/ee/LICENSE.md.
-    publicKey:
       value: ""
       secretKeyRef: { name: "", key: "" }
 
@@ -1000,18 +1019,17 @@ app:
 # =============================================================================
 # Configuration for running BullMQ background workers in a separate pod.
 # Workers are always deployed as their own Deployment; the main app
-# pod never starts in-process workers (START_WORKERS=false).
-# Uses the same container image as the app but runs `pnpm start:workers`.
+# pod never runs jobs, since apps/worker is its own application.
+# Uses the same container image as the app, started from the apps/worker working directory.
 ## @section Workers
 workers:
-
   # See app.otel — named separately so worker telemetry is distinguishable.
   ## @extra workers.otel OpenTelemetry identity for the workers.
   ## @param workers.otel.serviceName [string, default: langwatch-workers] Service name reported in traces and logs.
   otel:
     serviceName: langwatch-workers
 
-  ## @param workers.enabled [default: true] Deploy the workers Deployment + PDB.
+  ## @param workers.enabled [default: true] Deploy the workers Deployment + PDB. false runs the worker as a sidecar in each app pod.
   enabled: true
 
   # Number of worker replicas
@@ -1020,8 +1038,9 @@ workers:
   replicaCount: 1
 
   # Shutdown budget. shutdownDrainSeconds is how long the GroupQueue may wait
-  # for in-flight jobs to finish their ClickHouse writes; it must match the
-  # app's own SHUTDOWN_DRAIN_TIMEOUT_MS, which the chart sets from this value.
+  # for in-flight jobs to finish their ClickHouse writes. The chart passes it
+  # to the queue as SHUTDOWN_DRAIN_TIMEOUT_MS and sets the process deadline
+  # (PROCESS_SHUTDOWN_DEADLINE_MS) to this value plus 20s.
   #
   # terminationGracePeriodSeconds is the kubelet's SIGKILL clock and must cover
   # the drain plus 5s for App.close, 15s for process teardown and 10s of
@@ -1128,7 +1147,6 @@ workers:
   extraInitContainers: []
   ## @param workers.extraVolumeMounts [array] Additional volume mounts for workers container.
   extraVolumeMounts: []
-
 
 # =============================================================================
 # LangWatch NLP Service Configuration
@@ -1967,6 +1985,15 @@ clickhouse:
       secretKeyRef: { name: "", key: "" }
     ## @param clickhouse.external.cluster [string] Cluster name for ON CLUSTER DDL (omit for non-replicated).
     cluster: ""
+    ## @param clickhouse.external.serverNodes [default: 1] Nodes serving client queries.
+    serverNodes: 1
+    ## @param clickhouse.external.serverMaxConcurrentQueries [default: 300] Per-node max_concurrent_queries.
+    serverMaxConcurrentQueries: 300
+
+  ## @extra clickhouse.client Client pool sizing shared by app and worker processes.
+  client:
+    ## @param clickhouse.client.maxOpenConnections [string] Explicit per-client override. Empty derives from fleet capacity.
+    maxOpenConnections: ""
 
   # ---------------------------------------------------------------------------
   # Chart-managed subchart configuration (clickhouse-serverless)
@@ -2297,10 +2324,12 @@ gateway:
   ## @param gateway.security.blockLocalHTTPCalls [default: false] Reject tenant-supplied provider endpoints resolving to local/private networks. Keep false for local/self-hosted installs that intentionally use private services; set true for SaaS together with a restrictive gateway NetworkPolicy.
   ## @param gateway.security.requireHTTPSCustomEndpoints [default: false] Require HTTPS for customer-configured provider endpoints. Hosted-cloud hardening; disabled by default for self-hosted compatibility.
   ## @param gateway.security.allowedProxyHosts [array, default: []] Exact private endpoint hostnames allowed when blockLocalHTTPCalls is enabled. Cloud metadata remains blocked.
+  ## @param gateway.security.corsAllowedOrigins [array, default: []] Browser origins allowed to call the gateway /v1 routes directly (CORS). Exact origins such as https://app.example.com, or a single "*". Empty sends no CORS headers.
   security:
     blockLocalHTTPCalls: false
     requireHTTPSCustomEndpoints: false
     allowedProxyHosts: []
+    corsAllowedOrigins: []
 
   # Trace export is OFF by default to keep the chart safe to install
   # without out-of-band auth-token plumbing. Earlier defaults pointed

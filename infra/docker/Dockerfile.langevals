@@ -29,7 +29,7 @@ ENV RAGAS_DO_NOT_TRACK=true
 ENV LANGWATCH_MODEL_PRICING_DIR=/usr/src/app/model-pricing
 ENV TIKTOKEN_CACHE_DIR=/usr/src/app/tiktoken
 ENV CUSTOM_TIKTOKEN_CACHE_DIR=/usr/src/app/tiktoken
-COPY platform/app/src/server/modelProviders/llmModels.json platform/app/src/server/modelProviders/llmModels.overlay.json model-pricing/
+COPY modules/model-provider/contract/src/catalog/model-catalog.json modules/model-provider/contract/src/catalog/model-catalog.overlay.json model-pricing/
 RUN uv run --no-sync python -c "import tiktoken; [tiktoken.get_encoding(name) for name in tiktoken.list_encoding_names()]"
 
 # Copy application code

@@ -1,0 +1,34 @@
+{
+  "name": "@langwatch/model-provider-client",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The typed tRPC hooks generated from Model provider's own contract, and the tokens it lends other modules' screens (ARCHITECTURE.md §10.1).",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc -b"
+  },
+  "dependencies": {
+    "@langwatch/api": "workspace:*",
+    "@langwatch/model-provider-contract": "workspace:*",
+    "@langwatch/module": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/react": "catalog:",
+    "react": "catalog:",
+    "typescript": "catalog:"
+  },
+  "peerDependencies": {
+    "react": "^19.2.7"
+  }
+}

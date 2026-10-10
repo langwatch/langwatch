@@ -1,0 +1,181 @@
+import type { TraceEvaluationData as TraceEvaluation } from "@langwatch/evaluation-contract";
+import { Temporal } from "@langwatch/time";
+import type { Evaluation, Trace } from "@langwatch/trace-contract";
+
+/**
+ * The object a stored JSON column holds, or null when the column was empty.
+ * A column we wrote that no longer parses is corruption, not absence, so it
+ * throws rather than reading back as "this row had no inputs".
+ */
+function parseJsonSafely(json: string | null): Record<string, unknown> | null {
+  if (!json) {
+    return null;
+  }
+
+  return JSON.parse(json);
+}
+
+/**
+ * ClickHouse evaluation_runs row shape (PascalCase, matching the table schema).
+ */
+export interface ClickHouseEvaluationRunRow {
+  ProjectionId: string;
+  TenantId: string;
+  EvaluationId: string;
+  Version: string;
+  EvaluatorId: string;
+  EvaluatorType: string;
+  EvaluatorName: string | null;
+  TraceId: string | null;
+  IsGuardrail: number; // UInt8
+  Status: string;
+  Score: number | null;
+  Passed: number | null; // Nullable(UInt8)
+  Label: string | null;
+  Details: string | null;
+  Error: string | null;
+  Inputs: string | null;
+  ScheduledAt: string | null; // DateTime64(3) as string
+  StartedAt: string | null;
+  CompletedAt: string | null;
+  LastProcessedEventId: string;
+  UpdatedAt: string;
+}
+
+/**
+ * evaluation_runs columns backing {@link ClickHouseEvaluationRunRow}, minus the heavy `Inputs`
+ * payload — keep in sync with the interface above. Listing them avoids `SELECT *`, which on the
+ * deduped read path also pulls every stale version's columns before the IN-tuple discards them.
+ */
+const EVALUATION_RUN_COLUMNS_LIGHT = [
+  "ProjectionId",
+  "TenantId",
+  "EvaluationId",
+  "Version",
+  "EvaluatorId",
+  "EvaluatorType",
+  "EvaluatorName",
+  "TraceId",
+  "IsGuardrail",
+  "Status",
+  "Score",
+  "Passed",
+  "Label",
+  "Details",
+  "Error",
+  "ScheduledAt",
+  "StartedAt",
+  "CompletedAt",
+  "LastProcessedEventId",
+  "UpdatedAt",
+].join(", ");
+
+/** Light columns plus the heavy `Inputs` payload. */
+export const EVALUATION_RUN_COLUMNS_WITH_INPUTS = `${EVALUATION_RUN_COLUMNS_LIGHT}, Inputs`;
+
+/** Appends "Z" to a timestamp string only when it lacks a timezone indicator. */
+function appendUtcSuffix(ts: string): string {
+  return /[Zz]$|[+-]\d{2}:?\d{2}$/.test(ts) ? ts : ts + "Z";
+}
+
+function parseChTimestampMs(ts: string): number | null {
+  try {
+    return Temporal.Instant.from(appendUtcSuffix(ts)).epochMilliseconds;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Maps a ClickHouse evaluation_runs row to the canonical TraceEvaluation type.
+ * @param record - A row from the evaluation_runs table
+ * @returns TraceEvaluation in camelCase
+ */
+export function mapClickHouseEvaluationToTraceEvaluation(
+  record: ClickHouseEvaluationRunRow,
+): TraceEvaluation {
+  return {
+    evaluationId: record.EvaluationId,
+    evaluatorId: record.EvaluatorId,
+    evaluatorType: record.EvaluatorType,
+    evaluatorName: record.EvaluatorName,
+    traceId: record.TraceId,
+    isGuardrail: record.IsGuardrail === 1,
+    status: record.Status as TraceEvaluation["status"],
+    score: record.Score,
+    passed: record.Passed === null ? null : record.Passed === 1,
+    label: record.Label,
+    details: record.Details,
+    error: record.Error,
+    inputs: parseJsonSafely(record.Inputs),
+    timestamps: {
+      // CH DateTime64(3) returns UTC strings with no timezone suffix; append "Z" only if missing.
+      scheduledAt: record.ScheduledAt ? parseChTimestampMs(record.ScheduledAt) : null,
+      startedAt: record.StartedAt ? parseChTimestampMs(record.StartedAt) : null,
+      completedAt: record.CompletedAt ? parseChTimestampMs(record.CompletedAt) : null,
+    },
+  };
+}
+
+/** Reverse mapper: converts TraceEvaluation records back to legacy Evaluation format. */
+export function mapTraceEvaluationsToLegacyEvaluations(
+  result: Record<string, TraceEvaluation[]>,
+): Record<string, Evaluation[]> {
+  const output: Record<string, Evaluation[]> = {};
+
+  for (const [traceId, evaluations] of Object.entries(result)) {
+    output[traceId] = evaluations.map((te) => ({
+      evaluation_id: te.evaluationId,
+      evaluator_id: te.evaluatorId,
+      name: te.evaluatorName ?? "",
+      type: te.evaluatorType,
+      is_guardrail: te.isGuardrail,
+      status: te.status,
+      passed: te.passed,
+      score: te.score,
+      label: te.label,
+      details: te.details,
+      error: te.error ? { has_error: true as const, message: te.error, stacktrace: [] } : null,
+      inputs: te.inputs,
+      timestamps: {
+        inserted_at: te.timestamps.scheduledAt,
+        started_at: te.timestamps.startedAt,
+        finished_at: te.timestamps.completedAt,
+      },
+    }));
+  }
+
+  return output;
+}
+
+/**
+ * Merges evaluations from traceChecks into trace objects: TraceService
+ * returns them separately, so this attaches each to its trace's
+ * `evaluations` array for serialization.
+ */
+export function enrichTracesWithEvaluations({
+  traces,
+  traceChecks,
+}: {
+  traces: Trace[];
+  traceChecks: Record<string, Evaluation[]>;
+}): Trace[] {
+  return traces.map((trace) => {
+    const existingEvals = trace.evaluations ?? [];
+    const externalEvals = traceChecks[trace.trace_id] ?? [];
+
+    // Merge, deduplicating by evaluation_id
+    const seen: Record<string, true> = Object.create(null);
+    const merged: Evaluation[] = [];
+    for (const evaluation of [...existingEvals, ...externalEvals]) {
+      if (seen[evaluation.evaluation_id] === true) continue;
+      seen[evaluation.evaluation_id] = true;
+      merged.push(evaluation);
+    }
+
+    return {
+      ...trace,
+      evaluations: merged,
+    };
+  });
+}

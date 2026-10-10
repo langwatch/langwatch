@@ -1,15 +1,16 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
+
 import { DashboardWidgetsApiService } from "@/client-sdk/services/dashboard-widgets/dashboard-widgets-api.service";
+
 import { resolveCredentials } from "../../utils/apiKey";
-import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 
 /**
- * Returns the deleted widget's identity rather than printing it: the output
- * port renders it in whatever format the caller asked for (utils/output.ts).
- * The route answers `204` with no body, so the confirmation carries the id
- * the caller passed — there is no response body to read a name from.
+ * Returns the deleted widget's identity rather than printing it (output port
+ * renders per-format). The route answers `204` with no body, so the
+ * confirmation carries the id the caller passed.
  */
 export const deleteDashboardWidgetCommand = async (
   id: string,

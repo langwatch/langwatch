@@ -85,11 +85,11 @@ Lists available models for the authenticated virtual key.
 
 ### Health
 
-| Endpoint     | Purpose                                        |
-|--------------|------------------------------------------------|
-| `/healthz`   | Liveness probe (always 200)                   |
-| `/readyz`    | Readiness probe (503 until auth cache warms)  |
-| `/startupz`  | Startup probe                                 |
+| Endpoint    | Purpose                                      |
+| ----------- | -------------------------------------------- |
+| `/healthz`  | Liveness probe (always 200)                  |
+| `/readyz`   | Readiness probe (503 until auth cache warms) |
+| `/startupz` | Startup probe                                |
 
 ### Response headers
 
@@ -118,12 +118,12 @@ make service svc=aigateway       # run once
 make service-watch svc=aigateway # live reload via air
 ```
 
-This sources `platform/app/.env` in full — Go and the TS control-plane
+This sources `.env` in full — Go and the TS control-plane
 share the same file, so secrets like `LW_GATEWAY_INTERNAL_SECRET` live in
 exactly one place. Vars the Go service doesn't need are ignored by
 `config.Hydrate`. Required: `LW_GATEWAY_INTERNAL_SECRET`,
 `LW_GATEWAY_JWT_SECRET`, `LW_GATEWAY_BASE_URL` (see
-`platform/app/.env.example`).
+`.env.example`).
 
 Logs emit as pretty-printed JSON locally (`LOG_FORMAT=pretty` is set by the
 Makefile target).
@@ -133,22 +133,22 @@ Makefile target).
 All config is loaded from environment variables via `pkg/config.Hydrate` (nested
 struct tags chain with `_`). See `config.go` for the source of truth.
 
-| Variable                         | Required | Default               | Description                        |
-|----------------------------------|----------|-----------------------|------------------------------------|
-| `ENVIRONMENT`                    | yes      |                       | e.g. `local`, `production`         |
-| `SERVER_ADDR`                    | no       | `:5563`               | Listen address                     |
-| `SERVER_GRACEFUL_SECONDS`        | no       | `900`                 | Shutdown grace period (seconds)    |
-| `SERVER_DRAIN_DELAY_SECONDS`     | no       | `3`                   | Pause before the listener closes    |
-| `LOG_LEVEL`                      | no       | `info`                | Log level                          |
-| `LOG_FORMAT`                     | no       | `json`                | `json` or `pretty`                 |
-| `LW_GATEWAY_BASE_URL`           | yes      | `http://localhost:5560` | Control plane URL                 |
-| `LW_GATEWAY_INTERNAL_SECRET`    | yes      |                       | HMAC shared secret                 |
-| `LW_GATEWAY_JWT_SECRET`         | yes      |                       | JWT verification secret            |
-| `LW_GATEWAY_JWT_SECRET_PREVIOUS`| no       |                       | Previous JWT secret (rotation)     |
-| `OTEL_GATEWAY_ENDPOINT`         | no       |                       | OTel collector for gateway traces  |
-| `OTEL_GATEWAY_AUTH_TOKEN`       | no       |                       | Bearer token for OTel collector    |
-| `OTEL_DEFAULT_EXPORT_ENDPOINT`  | no       |                       | Default customer OTLP endpoint     |
-| `OTEL_DEFAULT_AUTH_TOKEN`       | no       |                       | Bearer token for default endpoint  |
+| Variable                         | Required | Default                 | Description                       |
+| -------------------------------- | -------- | ----------------------- | --------------------------------- |
+| `ENVIRONMENT`                    | yes      |                         | e.g. `local`, `production`        |
+| `SERVER_ADDR`                    | no       | `:5563`                 | Listen address                    |
+| `SERVER_GRACEFUL_SECONDS`        | no       | `900`                   | Shutdown grace period (seconds)   |
+| `SERVER_DRAIN_DELAY_SECONDS`     | no       | `3`                     | Pause before the listener closes  |
+| `LOG_LEVEL`                      | no       | `info`                  | Log level                         |
+| `LOG_FORMAT`                     | no       | `json`                  | `json` or `pretty`                |
+| `LW_GATEWAY_BASE_URL`            | yes      | `http://localhost:5560` | Control plane URL                 |
+| `LW_GATEWAY_INTERNAL_SECRET`     | yes      |                         | HMAC shared secret                |
+| `LW_GATEWAY_JWT_SECRET`          | yes      |                         | JWT verification secret           |
+| `LW_GATEWAY_JWT_SECRET_PREVIOUS` | no       |                         | Previous JWT secret (rotation)    |
+| `OTEL_GATEWAY_ENDPOINT`          | no       |                         | OTel collector for gateway traces |
+| `OTEL_GATEWAY_AUTH_TOKEN`        | no       |                         | Bearer token for OTel collector   |
+| `OTEL_DEFAULT_EXPORT_ENDPOINT`   | no       |                         | Default customer OTLP endpoint    |
+| `OTEL_DEFAULT_AUTH_TOKEN`        | no       |                         | Bearer token for default endpoint |
 
 ## Testing
 

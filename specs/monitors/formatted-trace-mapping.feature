@@ -7,14 +7,12 @@ Feature: Full Trace (AI-Readable) Mapping Source
   # 5 of 7 scenarios bound to tracesMapping.test.ts (Trace-level source via
   # getTraceAvailableSources, span hierarchy digest + inputs/outputs via
   # formatSpansDigest, errors in digest, thread-level joining via separator).
-  # Remaining 2 @unimplemented scenarios:
+  # Remaining @unimplemented scenario:
   # - "Thread-level formatted traces source is available": UPDATE per manifest
   #   (code label is "Full Thread (AI-Readable)" singular at tracesMapping.ts:955;
   #   scenario expects "Full Traces (AI-Readable)" plural — premise contradicts impl).
-  # - "Auto-inference does not select formatted trace": KEEP per manifest
-  #   (OnlineEvaluationDrawer.tsx:82 AUTO_INFER_MAPPINGS excludes formatted_trace
-  #   by design; no test asserts this exclusion exists yet).
-  # Aspirational pending UPDATE rewrite + KEEP test addition tracked in PR #3458.
+  # Auto-inference picks the formatted trace for an LLM judge's input only:
+  # specs/evaluators/judges-read-tool-evidence.feature.
 
   Background:
     Given I am configuring an online evaluation
@@ -54,11 +52,3 @@ Feature: Full Trace (AI-Readable) Mapping Source
     And a thread with two traces, each containing spans
     When the formatted traces mapping is evaluated
     Then the result contains formatted digests for both traces separated by a delimiter
-
-  @unimplemented
-  Scenario: Auto-inference does not select formatted trace
-    Given trace level is selected
-    And an evaluator with required fields "input", "output"
-    When auto-inference runs
-    Then "input" should not map to formatted_trace
-    And "output" should not map to formatted_trace

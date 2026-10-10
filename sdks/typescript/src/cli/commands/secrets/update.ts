@@ -1,42 +1,46 @@
-import { scopedApiKey } from "@/internal/credentialContext";
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
-import { resolveCredentials } from "../../utils/apiKey";
-import { failSpinnerFromResponse } from "../../utils/failFromResponse";
-import { failSpinner } from "../../utils/spinnerError";
-import { buildAuthHeaders } from "@/internal/api/auth";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
-import type { CommandResult } from "../../utils/output";
+import { buildRequestHeaders } from "@/internal/api/request-headers";
+import { scopedApiKey } from "@/internal/credentialContext";
 import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
+import { resolveCredentials } from "../../utils/apiKey.ts";
+import { failSpinnerFromResponse } from "../../utils/failFromResponse.ts";
+import type { CommandResult } from "../../utils/output.ts";
+import { createSpinner } from "../../utils/spinner.ts";
+import { failSpinner } from "../../utils/spinnerError.ts";
+
 /**
- * Returns the updated secret's metadata rather than printing it: the output
- * port renders it in whatever format the caller asked for (utils/output.ts).
- * The new VALUE the caller passed in `--value` is not echoed into the payload
- * — the server does not return it, and a machine payload must not reintroduce
- * key material the human output never showed.
+ * Returns the updated secret's metadata rather than printing it (output
+ * port renders per-format). The new `--value` is not echoed back -- the
+ * server doesn't return it, so a machine payload can't leak key material.
  */
 export const updateSecretCommand = async (
   id: string,
-  options: { value: string }
+  options: { value: string },
 ): Promise<CommandResult | void> => {
-  await resolveCredentials();
+  const credentials = await resolveCredentials();
+  if (!credentials.projectId) {
+    throw new Error("A project must be selected for secret operations");
+  }
 
   const apiKey = scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
-  const endpoint =
-    resolveControlPlaneUrl();
+  const endpoint = resolveControlPlaneUrl();
 
   const spinner = createSpinner(`Updating secret "${id}"...`).start();
 
   try {
-    const response = await langwatchFetch(`${endpoint}/api/secrets/${id}`, {
+    const response = await langwatchFetch(`${endpoint}/api/v1/secrets/${encodeURIComponent(id)}`, {
       method: "PUT",
       headers: {
         "Content-Type": "application/json",
-        ...buildAuthHeaders({ apiKey }),
+        ...buildRequestHeaders({ apiKey }),
       },
-      body: JSON.stringify({ value: options.value }),
+      body: JSON.stringify({
+        projectId: credentials.projectId,
+        value: options.value,
+      }),
     });
 
     if (!response.ok) {

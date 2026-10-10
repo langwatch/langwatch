@@ -6,10 +6,8 @@ from typing import TYPE_CHECKING, Any, TypeVar
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
-from ..types import UNSET, Unset
-
 if TYPE_CHECKING:
-    from ..models.pagination import Pagination
+    from ..models.search_response_pagination import SearchResponsePagination
     from ..models.trace import Trace
 
 
@@ -20,57 +18,47 @@ T = TypeVar("T", bound="SearchResponse")
 class SearchResponse:
     """
     Attributes:
-        traces (list[Trace] | Unset):
-        pagination (Pagination | Unset):
+        traces (list[Trace]):
+        pagination (SearchResponsePagination):
     """
 
-    traces: list[Trace] | Unset = UNSET
-    pagination: Pagination | Unset = UNSET
+    traces: list[Trace]
+    pagination: SearchResponsePagination
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        traces: list[dict[str, Any]] | Unset = UNSET
-        if not isinstance(self.traces, Unset):
-            traces = []
-            for traces_item_data in self.traces:
-                traces_item = traces_item_data.to_dict()
-                traces.append(traces_item)
+        traces = []
+        for traces_item_data in self.traces:
+            traces_item = traces_item_data.to_dict()
+            traces.append(traces_item)
 
-        pagination: dict[str, Any] | Unset = UNSET
-        if not isinstance(self.pagination, Unset):
-            pagination = self.pagination.to_dict()
+        pagination = self.pagination.to_dict()
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
-        field_dict.update({})
-        if traces is not UNSET:
-            field_dict["traces"] = traces
-        if pagination is not UNSET:
-            field_dict["pagination"] = pagination
+        field_dict.update(
+            {
+                "traces": traces,
+                "pagination": pagination,
+            }
+        )
 
         return field_dict
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
-        from ..models.pagination import Pagination
+        from ..models.search_response_pagination import SearchResponsePagination
         from ..models.trace import Trace
 
         d = dict(src_dict)
-        _traces = d.pop("traces", UNSET)
-        traces: list[Trace] | Unset = UNSET
-        if _traces is not UNSET:
-            traces = []
-            for traces_item_data in _traces:
-                traces_item = Trace.from_dict(traces_item_data)
+        traces = []
+        _traces = d.pop("traces")
+        for traces_item_data in _traces:
+            traces_item = Trace.from_dict(traces_item_data)
 
-                traces.append(traces_item)
+            traces.append(traces_item)
 
-        _pagination = d.pop("pagination", UNSET)
-        pagination: Pagination | Unset
-        if isinstance(_pagination, Unset):
-            pagination = UNSET
-        else:
-            pagination = Pagination.from_dict(_pagination)
+        pagination = SearchResponsePagination.from_dict(d.pop("pagination"))
 
         search_response = cls(
             traces=traces,

@@ -1,0 +1,33 @@
+{
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    "tsBuildInfoFile": "../dist/tsconfig.preview.tsbuildinfo",
+    "lib": ["es2023", "dom", "dom.iterable"],
+    "jsx": "react-jsx",
+    "noUncheckedIndexedAccess": true,
+    "types": ["node"],
+
+    "rootDir": "..",
+
+    "outDir": "../dist/typecheck"
+  },
+  "include": ["**/*.ts", "**/*.tsx"],
+
+  "references": [
+    {
+      "path": "../tsconfig.declarations.json"
+    },
+    {
+      "path": "../../design-system-internal/tsconfig.build.json"
+    },
+    {
+      "path": "../../egress/tsconfig.build.json"
+    },
+    {
+      "path": "../../observability/tsconfig.build.json"
+    },
+    {
+      "path": "../../time/tsconfig.build.json"
+    }
+  ]
+}

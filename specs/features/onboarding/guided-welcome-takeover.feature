@@ -8,16 +8,8 @@ Feature: Guided welcome flow and takeover screens
   # organization and the project exist before the takeover starts, and every
   # answer is written to the organization so a reload continues where it was.
   #
-  # Tests:
-  #   platform/app/src/features/onboarding/constants/onboarding-flow.unit.test.ts
-  #   platform/app/src/features/guided-onboarding/__tests__/paths.unit.test.ts
-  #   platform/app/src/features/onboarding/screens/__tests__/WelcomeScreen.guided.integration.test.tsx
-  #   platform/app/src/features/guided-onboarding/takeover/__tests__/GuidedTakeover.integration.test.tsx
-  #   platform/app/src/features/guided-onboarding/takeover/__tests__/HelloScreen.integration.test.tsx
-  #   platform/app/src/features/guided-onboarding/takeover/__tests__/ValueScreen.integration.test.tsx
-  #   platform/app/src/features/guided-onboarding/takeover/__tests__/ProviderScreen.integration.test.tsx
-  #   platform/app/src/features/guided-onboarding/takeover/__tests__/useGuidedProviderConnect.integration.test.tsx
-  #   platform/app/src/features/guided-onboarding/takeover/__tests__/takeover.analytics.integration.test.tsx
+  # Tests live beside their subject under
+  # modules/onboarding/browser/src/features/guided-onboarding/{model,ui/takeover}/__tests__/.
 
   Background:
     Given I signed up and the "experiment_onboarding_langy_guided" flag resolves enabled for me
@@ -192,6 +184,14 @@ Feature: Guided welcome flow and takeover screens
     And the default chat model pills show the recommended model first, marked "recommended"
     And Connect is disabled until a key is typed
 
+  @integration
+  Scenario: The picked chat model pill is the model the connection uses
+    When I select OpenAI
+    Then the default chat model pills show the recommended model first, marked "recommended"
+    When I pick another pill and connect with a key
+    Then the connection saves the model I picked and Langy runs on it
+    And the pills can no longer be changed once connected
+
   @unit
   Scenario: The recommended model is the newest main-tier model in the catalog
     Given the committed model catalog
@@ -205,7 +205,7 @@ Feature: Guided welcome flow and takeover screens
   Scenario: Azure, Bedrock and Custom take credentials and a typed model name
     When I select Azure
     Then the connect panel asks for the credentials and a chat model
-    And the hint reads "Type it exactly as deployed: Azure has no model list we can read for you."
+    And the hint reads "Type it exactly as deployed: Azure OpenAI has no model list we can read for you."
     When I select Bedrock
     Then the hint names Bedrock
     When I select Custom
@@ -372,7 +372,7 @@ Feature: Guided welcome flow and takeover screens
     And no event carries the API key
 
   # ============================================================================
-  # End to end, in a real browser (platform/app/e2e/guided-onboarding.e2e.test.ts)
+  # End to end, in a real browser (apps/ui/e2e/langy/guided-onboarding.e2e.test.ts)
   # ============================================================================
 
   @e2e

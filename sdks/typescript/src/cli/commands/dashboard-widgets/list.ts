@@ -1,14 +1,12 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
+
 import { DashboardWidgetsApiService } from "@/client-sdk/services/dashboard-widgets/dashboard-widgets-api.service";
+
 import { resolveCredentials } from "../../utils/apiKey";
-import {
-  formatTable,
-  formatRelativeTime,
-  sanitizeTerminalText,
-} from "../../utils/formatting";
-import { failSpinner } from "../../utils/spinnerError";
+import { formatTable, formatRelativeTime, sanitizeTerminalText } from "../../utils/formatting";
 import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 
 /**
  * Returns the listing rather than printing it: the output port renders it in
@@ -26,9 +24,7 @@ export const listDashboardWidgetsCommand = async (options?: {
     const result = await service.list();
     const widgets = result.data;
 
-    spinner.succeed(
-      `Found ${widgets.length} widget${widgets.length !== 1 ? "s" : ""}`,
-    );
+    spinner.succeed(`Found ${widgets.length} widget${widgets.length !== 1 ? "s" : ""}`);
 
     return {
       data: result,

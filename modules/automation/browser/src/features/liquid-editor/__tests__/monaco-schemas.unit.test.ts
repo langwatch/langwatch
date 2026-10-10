@@ -1,0 +1,44 @@
+import { describe, expect, it, vi } from "vitest";
+
+import { registerJsonSchema, type AutomationMonaco } from "../model/monaco-schemas.ts";
+
+describe("registerJsonSchema", () => {
+  it("keeps previously registered editor schemas when adding a model", () => {
+    const diagnostics = vi.fn();
+    const monaco: AutomationMonaco = {
+      languages: {
+        json: {
+          jsonDefaults: { setDiagnosticsOptions: diagnostics },
+        },
+      },
+    };
+
+    registerJsonSchema({
+      monaco,
+      modelUri: "file:///automation/conditions.json",
+      schema: { title: "conditions" },
+    });
+    registerJsonSchema({
+      monaco,
+      modelUri: "file:///automation/slack.json",
+      schema: { title: "slack" },
+    });
+
+    expect(diagnostics).toHaveBeenLastCalledWith({
+      validate: true,
+      allowComments: false,
+      schemas: [
+        {
+          uri: "inmemory://schemas/file%3A%2F%2F%2Fautomation%2Fconditions.json.schema.json",
+          fileMatch: ["file:///automation/conditions.json"],
+          schema: { title: "conditions" },
+        },
+        {
+          uri: "inmemory://schemas/file%3A%2F%2F%2Fautomation%2Fslack.json.schema.json",
+          fileMatch: ["file:///automation/slack.json"],
+          schema: { title: "slack" },
+        },
+      ],
+    });
+  });
+});

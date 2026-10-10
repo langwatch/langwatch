@@ -1,0 +1,75 @@
+# The format's own example: one of every step kind, against the datasets and
+# invites endpoints. Files starting with an underscore are skipped by the
+# default -scenarios glob; name this one to run it:
+#   apidiff scenarios -a URL -b URL -scenarios 'tools/apidiff/scenarios/_example.yaml'
+
+- id: example-dataset-create-is-readable
+  endpoint: POST /api/dataset
+  auth: project
+  request:
+    path: /api/dataset
+    body:
+      name: "vd-{uid}"
+      columnTypes: [{ name: input, type: string }]
+  capture: { datasetId: id }
+  expect:
+    status: 201
+    body: { name: "vd-{uid}", id: "<any>" }
+  verify:
+    - request: GET /api/dataset/{datasetId}
+      eventually: 10s
+      expect: { status: 200, contains: "vd-{uid}", body: { name: "vd-{uid}" } }
+
+- id: example-dataset-create-rejects-missing-name
+  endpoint: POST /api/dataset
+  request:
+    path: /api/dataset
+    body: { columnTypes: [] }
+  expect:
+    status: [400, 422]
+  verify:
+    - request: GET /api/dataset
+      expect: { status: 200, notContains: "{uid}" }
+
+- id: example-dataset-records-count-delta
+  endpoint: POST /api/dataset/{slugOrId}/records
+  setup:
+    - request: POST /api/dataset
+      body:
+        name: "vd-{uid}"
+        columnTypes: [{ name: input, type: string }]
+      capture: { datasetId: id }
+  request:
+    path: /api/dataset/{datasetId}/records
+    body: { entries: [{ input: one }, { input: two }] }
+  expect:
+    status: 201
+    path: data
+    length: 2
+  verify:
+    - countDelta: { request: "GET /api/dataset/{datasetId}", path: data, by: 2 }
+      eventually: 10s
+
+- id: example-dataset-list-refuses-no-key
+  endpoint: GET /api/dataset
+  auth: none
+  request:
+    path: /api/dataset
+  expect:
+    status: 401
+
+- id: example-invite-sends-mail
+  endpoint: POST /api/organization/invites
+  auth: org
+  request:
+    path: /api/organization/invites
+    body:
+      invites:
+        - email: "vd-{uid}@example.com"
+          role: MEMBER
+          teams: [{ teamId: "{teamId}", role: MEMBER }]
+  expect:
+    status: 201
+  verify:
+    - mail: { to: "vd-{uid}@example.com" }
+      eventually: 15s

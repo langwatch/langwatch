@@ -60,10 +60,7 @@ describe("setOpencodeOpenTelemetryFlag", () => {
   });
 
   it("returns unchanged + does not rewrite when the flag is already true", () => {
-    fs.writeFileSync(
-      configPath,
-      JSON.stringify({ experimental: { openTelemetry: true } }),
-    );
+    fs.writeFileSync(configPath, JSON.stringify({ experimental: { openTelemetry: true } }));
     const before = fs.readFileSync(configPath, "utf8");
     const result = setOpencodeOpenTelemetryFlag({ filePath: configPath });
     expect(result.action).toBe("unchanged");
@@ -71,10 +68,7 @@ describe("setOpencodeOpenTelemetryFlag", () => {
   });
 
   it("refuses to overwrite when the user explicitly disabled the flag", () => {
-    fs.writeFileSync(
-      configPath,
-      JSON.stringify({ experimental: { openTelemetry: false } }),
-    );
+    fs.writeFileSync(configPath, JSON.stringify({ experimental: { openTelemetry: false } }));
     const result = setOpencodeOpenTelemetryFlag({ filePath: configPath });
     expect(result.action).toBe("disabled-by-user");
     const parsed = JSON.parse(fs.readFileSync(configPath, "utf8"));

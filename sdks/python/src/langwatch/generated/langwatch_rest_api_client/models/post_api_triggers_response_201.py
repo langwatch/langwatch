@@ -4,16 +4,9 @@ from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from attrs import define as _attrs_define
-from attrs import field as _attrs_field
 
 from ..models.post_api_triggers_response_201_action import PostApiTriggersResponse201Action
-from ..models.post_api_triggers_response_201_alert_type_type_1 import PostApiTriggersResponse201AlertTypeType1
-from ..models.post_api_triggers_response_201_alert_type_type_2_type_1 import (
-    PostApiTriggersResponse201AlertTypeType2Type1,
-)
-from ..models.post_api_triggers_response_201_alert_type_type_3_type_1 import (
-    PostApiTriggersResponse201AlertTypeType3Type1,
-)
+from ..models.post_api_triggers_response_201_alert_type_type_0 import PostApiTriggersResponse201AlertTypeType0
 from ..models.post_api_triggers_response_201_kind import PostApiTriggersResponse201Kind
 
 if TYPE_CHECKING:
@@ -38,7 +31,7 @@ class PostApiTriggersResponse201:
             value replaced by the `[redacted]` placeholder. Which channel is configured, which destination is set and which
             header names are in play all survive; the values never leave; a Slack automation names its connection by
             `slackIntegrationId` and carries no secret. Sending the placeholder back on an update keeps the stored value.
-            The rule this automation fires by is not here — it is stated in `graphAlert` or `report`, and sending it in this
+            The rule this automation fires by is not here: it is stated in `graphAlert` or `report`, and sending it in this
             field is refused.
         graph_alert (None | PostApiTriggersResponse201GraphAlertType0): The rule an alert fires by. Null for anything
             that is not one.
@@ -54,8 +47,7 @@ class PostApiTriggersResponse201:
             from. Absent fields render the LangWatch default for the channel.
         active (bool):
         message (None | str):
-        alert_type (None | PostApiTriggersResponse201AlertTypeType1 | PostApiTriggersResponse201AlertTypeType2Type1 |
-            PostApiTriggersResponse201AlertTypeType3Type1):
+        alert_type (None | PostApiTriggersResponse201AlertTypeType0):
         created_at (str):
         updated_at (str):
         platform_url (str):
@@ -76,16 +68,10 @@ class PostApiTriggersResponse201:
     templates: PostApiTriggersResponse201Templates
     active: bool
     message: None | str
-    alert_type: (
-        None
-        | PostApiTriggersResponse201AlertTypeType1
-        | PostApiTriggersResponse201AlertTypeType2Type1
-        | PostApiTriggersResponse201AlertTypeType3Type1
-    )
+    alert_type: None | PostApiTriggersResponse201AlertTypeType0
     created_at: str
     updated_at: str
     platform_url: str
-    additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         from ..models.post_api_triggers_response_201_graph_alert_type_0 import PostApiTriggersResponse201GraphAlertType0
@@ -135,11 +121,7 @@ class PostApiTriggersResponse201:
         message = self.message
 
         alert_type: None | str
-        if isinstance(self.alert_type, PostApiTriggersResponse201AlertTypeType1):
-            alert_type = self.alert_type.value
-        elif isinstance(self.alert_type, PostApiTriggersResponse201AlertTypeType2Type1):
-            alert_type = self.alert_type.value
-        elif isinstance(self.alert_type, PostApiTriggersResponse201AlertTypeType3Type1):
+        if isinstance(self.alert_type, PostApiTriggersResponse201AlertTypeType0):
             alert_type = self.alert_type.value
         else:
             alert_type = self.alert_type
@@ -151,7 +133,7 @@ class PostApiTriggersResponse201:
         platform_url = self.platform_url
 
         field_dict: dict[str, Any] = {}
-        field_dict.update(self.additional_properties)
+
         field_dict.update(
             {
                 "id": id,
@@ -268,47 +250,18 @@ class PostApiTriggersResponse201:
 
         message = _parse_message(d.pop("message"))
 
-        def _parse_alert_type(
-            data: object,
-        ) -> (
-            None
-            | PostApiTriggersResponse201AlertTypeType1
-            | PostApiTriggersResponse201AlertTypeType2Type1
-            | PostApiTriggersResponse201AlertTypeType3Type1
-        ):
+        def _parse_alert_type(data: object) -> None | PostApiTriggersResponse201AlertTypeType0:
             if data is None:
                 return data
             try:
                 if not isinstance(data, str):
                     raise TypeError()
-                alert_type_type_1 = PostApiTriggersResponse201AlertTypeType1(data)
+                alert_type_type_0 = PostApiTriggersResponse201AlertTypeType0(data)
 
-                return alert_type_type_1
+                return alert_type_type_0
             except (TypeError, ValueError, AttributeError, KeyError):
                 pass
-            try:
-                if not isinstance(data, str):
-                    raise TypeError()
-                alert_type_type_2_type_1 = PostApiTriggersResponse201AlertTypeType2Type1(data)
-
-                return alert_type_type_2_type_1
-            except (TypeError, ValueError, AttributeError, KeyError):
-                pass
-            try:
-                if not isinstance(data, str):
-                    raise TypeError()
-                alert_type_type_3_type_1 = PostApiTriggersResponse201AlertTypeType3Type1(data)
-
-                return alert_type_type_3_type_1
-            except (TypeError, ValueError, AttributeError, KeyError):
-                pass
-            return cast(
-                None
-                | PostApiTriggersResponse201AlertTypeType1
-                | PostApiTriggersResponse201AlertTypeType2Type1
-                | PostApiTriggersResponse201AlertTypeType3Type1,
-                data,
-            )
+            return cast(None | PostApiTriggersResponse201AlertTypeType0, data)
 
         alert_type = _parse_alert_type(d.pop("alertType"))
 
@@ -340,21 +293,4 @@ class PostApiTriggersResponse201:
             platform_url=platform_url,
         )
 
-        post_api_triggers_response_201.additional_properties = d
         return post_api_triggers_response_201
-
-    @property
-    def additional_keys(self) -> list[str]:
-        return list(self.additional_properties.keys())
-
-    def __getitem__(self, key: str) -> Any:
-        return self.additional_properties[key]
-
-    def __setitem__(self, key: str, value: Any) -> None:
-        self.additional_properties[key] = value
-
-    def __delitem__(self, key: str) -> None:
-        del self.additional_properties[key]
-
-    def __contains__(self, key: str) -> bool:
-        return key in self.additional_properties

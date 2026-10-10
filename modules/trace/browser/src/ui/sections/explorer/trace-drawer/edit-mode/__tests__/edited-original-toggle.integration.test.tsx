@@ -1,0 +1,133 @@
+/**
+ * @vitest-environment jsdom
+ */
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { Temporal } from "@langwatch/time";
+import type { TraceEditOverlayDto, TraceEditOverlayPatch } from "@langwatch/trace-contract";
+import { cleanup, fireEvent, screen } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+const overlayData = vi.hoisted<{ current: TraceEditOverlayDto | null }>(() => ({ current: null }));
+
+vi.mock("../../../../../../behavior/explorer/use-trace-edit-overlay.ts", () => ({
+  useTraceEditOverlay: () => ({ data: overlayData.current }),
+  useAppliedTraceEditPatch: () => overlayData.current?.patch ?? null,
+}));
+
+vi.mock("../../../../../../features/trace-drawer/behavior/use-trace-header.ts", () => ({
+  useTraceHeaderCanonical: () => ({ data: undefined }),
+}));
+
+vi.mock("react-router", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  ...(await import("../../../../../../__tests__/window-location-router.ts")).windowLocationRouter,
+}));
+
+vi.mock("../../../../../../features/span/behavior/use-spans-full.ts", () => ({
+  useSpansFullCanonical: () => ({ data: undefined }),
+  applyOverlayToSpansFull: ({ spans }: { spans: unknown[] }) => spans,
+}));
+
+import { openTraceDrawerAt } from "../../../../../../__tests__/window-location-router.ts";
+import { useTraceEditStore } from "../../../../../../features/trace-drawer/behavior/trace-edit.store.ts";
+import { EditedOriginalToggle } from "../edited-original-toggle.tsx";
+
+const patch: TraceEditOverlayPatch = {
+  version: 1,
+  spans: [{ spanId: "span-1", name: "search the web" }],
+  deletedSpanIds: [],
+};
+
+function withCorrection(authorName: string | null = "Robin") {
+  overlayData.current = {
+    traceId: "trace-1",
+    patch,
+    createdBy: { id: "user-1", name: authorName, image: null },
+    updatedBy: { id: "user-1", name: authorName, image: null },
+    createdAt: Temporal.Instant.from("2026-08-01T10:00:00Z"),
+    updatedAt: Temporal.Instant.from("2026-08-02T10:00:00Z"),
+  };
+}
+
+function renderToggle() {
+  return renderWithDesignSystem(<EditedOriginalToggle />);
+}
+
+describe("EditedOriginalToggle", () => {
+  beforeEach(() => {
+    overlayData.current = null;
+    useTraceEditStore.getState().discard();
+    openTraceDrawerAt({});
+  });
+
+  afterEach(cleanup);
+
+  describe("given a trace with no correction", () => {
+    describe("when the header renders", () => {
+      /** @scenario "A trace with no correction offers no switch" */
+      it("offers nothing to switch between", () => {
+        renderToggle();
+
+        expect(screen.queryByText("Edited")).not.toBeInTheDocument();
+        expect(screen.queryByText("Original")).not.toBeInTheDocument();
+      });
+    });
+  });
+
+  describe("given a trace with a correction", () => {
+    beforeEach(() => withCorrection());
+
+    describe("when the header renders", () => {
+      /** @scenario "The corrected trace is what the reader sees by default" */
+      it("shows the corrected trace and offers the captured one", () => {
+        renderToggle();
+
+        expect(screen.getByText("Edited")).toBeInTheDocument();
+        expect(screen.getByText("Original")).toBeInTheDocument();
+        expect(useTraceEditStore.getState().overlayView).toBe("edited");
+      });
+
+      /** @scenario "The correction names who made it" */
+      it("names who corrected it", () => {
+        renderToggle();
+
+        expect(screen.getByText("Edited by Robin")).toBeInTheDocument();
+      });
+    });
+
+    describe("when the reader switches to the captured trace", () => {
+      /** @scenario "Switching to the captured trace shows the original values" */
+      it("reads the captured trace from then on", () => {
+        renderToggle();
+
+        fireEvent.click(screen.getByText("Original"));
+
+        expect(useTraceEditStore.getState().overlayView).toBe("original");
+      });
+    });
+
+    describe("when the reviewer is editing", () => {
+      it("steps out of the way", () => {
+        openTraceDrawerAt({ edit: "1" });
+
+        renderToggle();
+
+        expect(screen.queryByText("Original")).not.toBeInTheDocument();
+      });
+    });
+  });
+
+  describe("given a correction whose author has no name recorded", () => {
+    beforeEach(() => withCorrection(null));
+
+    describe("when the header renders", () => {
+      /** @scenario "The correction names who made it" */
+      it("names nobody rather than crediting a blank", () => {
+        renderToggle();
+
+        expect(screen.getByText("Edited")).toBeInTheDocument();
+        expect(screen.queryByText(/^Edited by/)).not.toBeInTheDocument();
+      });
+    });
+  });
+});

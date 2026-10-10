@@ -1,0 +1,300 @@
+/** Renders the selected annotation list view. */
+
+import type { AnnotationWithUser } from "@langwatch/annotation-contract";
+import { downloadCsv } from "@langwatch/csv/download";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
+import { PageLayout } from "@langwatch/design-system/page-layout";
+import { Box, Flex, HStack, Text } from "@langwatch/design-system/primitives";
+import { Tooltip } from "@langwatch/design-system/tooltip";
+import { readHandledError } from "@langwatch/handled-error/read-handled-error";
+import { toEpochMs } from "@langwatch/time";
+import { Inbox } from "lucide-react";
+import { useMemo } from "react";
+
+import { useAnnotationPeriod } from "../../behavior/use-annotation-period.ts";
+import {
+  useAllAnnotations,
+  useAnnotationsByTraceIds,
+  useAnnotationQueue,
+  useAnnotationSidebarCounts,
+  useAnnotationTraces,
+} from "../../behavior/use-annotation-reads.ts";
+import { useTraceIdsAcrossPages } from "../../behavior/use-trace-ids-across-pages.ts";
+import { allAnnotationsExport, csvFileName } from "../../model/annotation-export.ts";
+import { useAnnotationHost } from "../../model/annotation-host.ts";
+import type { AnnotationHostApi } from "../../model/annotation-host.ts";
+import {
+  closedQueueEditorAddress,
+  queueEditorAddress,
+  readQueueEditor,
+} from "../../model/annotation-overlay-address.ts";
+import {
+  groupedAnnotationsToRows,
+  type AnnotationRow,
+  type AnnotationTrace,
+} from "../../model/annotation-row.ts";
+import type { AnnotationView } from "../../model/annotation-view.ts";
+import { ReviewerAvatar } from "../elements/reviewer-avatar.tsx";
+import { AnnotationList, type PageQueue } from "./annotation-list.tsx";
+import { AnnotationQueueEditor } from "./annotation-queue-editor.tsx";
+import { AnnotationSidebar } from "./annotation-sidebar.tsx";
+
+export function AnnotationsScreen({ view }: { view: AnnotationView }) {
+  const host = useAnnotationHost();
+  const project = host.project();
+  const reviewer = host.currentUser();
+  const { params, query } = host.route();
+  const editor = readQueueEditor(query);
+
+  const sidebarCounts = useAnnotationSidebarCounts({ projectId: project?.id });
+
+  return (
+    <>
+      <AnnotationSidebar
+        view={view}
+        projectSlug={project?.slug}
+        reviewerName={reviewer?.name ?? null}
+        reviewerImage={reviewer?.image ?? null}
+        pendingCount={sidebarCounts.pendingCount}
+        assignedCount={sidebarCounts.assignedCount}
+        queues={sidebarCounts.queues}
+        activeQueueSlug={params.slug}
+        canManageQueues={!host.isLiteMember()}
+        onCreateQueue={() => host.setQuery(queueEditorAddress({ current: query }))}
+        onEditQueue={(queueId) => host.setQuery(queueEditorAddress({ current: query, queueId }))}
+      >
+        {/* `minWidth={0}` lets the column shrink inside the sidebar row, so wide
+            columns scroll inside the table instead of pushing the page sideways. */}
+        <Flex direction="column" flex={1} minWidth={0} height="full">
+          <AnnotationView view={view} host={host} />
+        </Flex>
+      </AnnotationSidebar>
+      {editor && (
+        <AnnotationQueueEditor
+          projectId={project?.id}
+          organizationId={host.organizationId()}
+          queueId={editor.queueId}
+          onClose={() => host.setQuery(closedQueueEditorAddress(query))}
+          onSaved={(queueName) =>
+            host.succeeded({
+              title: editor.queueId ? "Annotation Queue Updated" : "Annotation Queue Created",
+              description: `Successfully ${editor.queueId ? "updated" : "created"} ${queueName} annotation queue`,
+            })
+          }
+          onFailed={(error) =>
+            host.failed({
+              error,
+              fallbackTitle: editor.queueId
+                ? "Couldn't update annotation queue"
+                : "Couldn't create annotation queue",
+            })
+          }
+        />
+      )}
+    </>
+  );
+}
+
+/** The one list this address is, wired to what that view reads. */
+function AnnotationView({ view, host }: { view: AnnotationView; host: AnnotationHostApi }) {
+  if (view === "all") return <AllAnnotationsList host={host} />;
+
+  if (view === "queue") return <QueueList host={host} />;
+
+  if (view === "mine") return <MyQueueList host={host} />;
+
+  return <AnnotationList view="inbox" host={host} />;
+}
+
+/** The reviewer's own queue: their items, and their name on the send picker. */
+function MyQueueList({ host }: { host: AnnotationHostApi }) {
+  const reviewer = host.currentUser();
+
+  // This page is the reviewer's own queue, so moving a selection elsewhere
+  // starts from them being on it.
+  const pageQueue: PageQueue | undefined = reviewer
+    ? { annotatorId: `user-${reviewer.id}`, name: reviewer.name ?? "You" }
+    : void 0;
+
+  return <AnnotationList view="mine" host={host} {...(pageQueue ? { pageQueue } : {})} />;
+}
+
+/** One named queue, read from the `:slug` the router captured. */
+function QueueList({ host }: { host: AnnotationHostApi }) {
+  const project = host.project();
+  const slug = host.route().params.slug;
+
+  const queue = useAnnotationQueue({ projectId: project?.id, slug });
+
+  if (readHandledError(queue.error)?.code === "annotation_queue_not_found") {
+    return (
+      <NoDataInfoBlock
+        title="Annotation queue not found"
+        description="It may have been deleted or you may no longer have access to it."
+        icon={<Inbox />}
+      />
+    );
+  }
+
+  const members = queue.data?.members.map((member) => member.user);
+
+  const titleContent = queue.data ? (
+    <>
+      <PageLayout.Heading>{queue.data.name}</PageLayout.Heading>
+      <HStack>
+        <Text fontSize="sm">Members: </Text>
+        {members?.map((member) => (
+          <Tooltip key={member.id} content={member.name}>
+            <Box display="inline-flex">
+              <ReviewerAvatar size="xs" name={member.name ?? ""} image={member.image} />
+            </Box>
+          </Tooltip>
+        ))}
+      </HStack>
+    </>
+  ) : null;
+
+  // The page IS this queue, so moving a selection elsewhere starts from the
+  // queue the rows are already on.
+  const pageQueue: PageQueue | undefined = queue.data
+    ? { annotatorId: `queue-${queue.data.id}`, name: queue.data.name }
+    : void 0;
+
+  return (
+    <AnnotationList
+      view="queue"
+      host={host}
+      queueId={queue.data?.id ?? ""}
+      {...(titleContent ? { titleContent } : {})}
+      {...(pageQueue ? { pageQueue } : {})}
+    />
+  );
+}
+
+/** Main's page size for the walk; the free plan's list bound refuses anything larger. */
+const TRACE_WALK_PAGE_SIZE = 1000;
+
+/** Keeps main's 10 000-trace ceiling while every request stays at the page cap. */
+const TRACE_WALK_MAX_PAGES = 10;
+
+function AllAnnotationsList({ host }: { host: AnnotationHostApi }) {
+  const project = host.project();
+  const { query } = host.route();
+  const { period } = useAnnotationPeriod(query);
+  const traceFilters = host.traceFilters();
+  const filtered = traceFilters !== void 0;
+
+  const walk = useTraceIdsAcrossPages({
+    input: {
+      ...traceFilters,
+      projectId: project?.id ?? "",
+      startDate: traceFilters?.startDate ?? toEpochMs(period.startDate),
+      endDate: traceFilters?.endDate ?? toEpochMs(period.endDate),
+      groupBy: "none",
+      pageOffset: 0,
+      pageSize: TRACE_WALK_PAGE_SIZE,
+      ...(query.sortBy ? { sortBy: query.sortBy } : {}),
+      ...(query.orderBy ? { sortDirection: query.orderBy } : {}),
+    },
+    enabled: filtered && !!project,
+    maxPages: TRACE_WALK_MAX_PAGES,
+  });
+
+  const filteredAnnotations = useAnnotationsByTraceIds({
+    projectId: project?.id,
+    traceIds: walk.traceIds,
+    enabled: filtered,
+  });
+
+  const allAnnotations = useAllAnnotations({
+    projectId: project?.id,
+    startDate: period.startDate,
+    endDate: period.endDate,
+    enabled: !filtered,
+  });
+
+  const annotations: readonly AnnotationWithUser[] = useMemo(
+    () => (filtered ? filteredAnnotations.data : (allAnnotations.data ?? [])),
+    [filtered, filteredAnnotations.data, allAnnotations.data],
+  );
+  const annotationsLoading = filtered
+    ? walk.isLoading || filteredAnnotations.isLoading
+    : allAnnotations.isLoading;
+
+  const traceIds = useMemo(
+    () => Array.from(new Set(annotations.map((one) => one.traceId))),
+    [annotations],
+  );
+
+  const traces = useAnnotationTraces({ projectId: project?.id, traceIds });
+
+  const rows: AnnotationRow[] = useMemo(
+    () => groupedAnnotationsToRows(groupByTrace(annotations, traces.data ?? [])),
+    [annotations, traces.data],
+  );
+
+  return (
+    <AnnotationList
+      view="all"
+      host={host}
+      rows={rows}
+      rowsLoading={annotationsLoading || traces.isLoading}
+      exportLabel="Export all"
+      {...(filtered && walk.isError
+        ? {
+            emptyNotice: {
+              title: "Couldn't load the annotations for these filters",
+              description:
+                "Something went wrong while loading matching traces. Reload the page to try again.",
+            },
+          }
+        : {})}
+      onExport={() => {
+        const { fields, rows: exportRows } = allAnnotationsExport({
+          annotations,
+          traces: traces.data ?? [],
+        });
+
+        downloadCsv({ fields, rows: exportRows, fileName: csvFileName("Traces") });
+      }}
+    />
+  );
+}
+
+/**
+ * One row per trace, carrying everything said about it. The list is of
+ * annotations rather than of traces, so a comment on one span is one of the
+ * trace's annotations, not a row of its own — the page groups them, not the server.
+ */
+function groupByTrace(
+  annotations: readonly AnnotationWithUser[],
+  traces: readonly AnnotationTrace[],
+): { traceId: string; trace?: AnnotationTrace; annotations: AnnotationWithUser[] }[] {
+  const traceById = new Map(traces.map((trace) => [trace.trace_id, trace]));
+
+  const grouped = new Map<
+    string,
+    { traceId: string; trace?: AnnotationTrace; annotations: AnnotationWithUser[] }
+  >();
+
+  for (const annotation of annotations) {
+    const existing = grouped.get(annotation.traceId);
+
+    if (existing) {
+      existing.annotations.push(annotation);
+      continue;
+    }
+
+    const trace = traceById.get(annotation.traceId);
+
+    grouped.set(annotation.traceId, {
+      traceId: annotation.traceId,
+      ...(trace ? { trace } : {}),
+      annotations: [annotation],
+    });
+  }
+
+  return [...grouped.values()];
+}
+
+export default AnnotationsScreen;

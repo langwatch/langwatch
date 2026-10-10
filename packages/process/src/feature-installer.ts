@@ -1,0 +1,2300 @@
+import type { MiddlewareBinding } from "@langwatch/api";
+import {
+  bindRestCredential,
+  type DoorCredential,
+  type ErasedRestDoorDefinition,
+  type RestDoorCredential,
+  type MiddlewareContext,
+  type MiddlewareContextBinding,
+  type RestDoorDefinition,
+} from "@langwatch/api/rest";
+import type { ConfigOf, ConfigSlice } from "@langwatch/config";
+import { type FeatureEventing, type ProjectionLaneReplayer } from "@langwatch/eventing";
+import {
+  type DependencyIdentity,
+  type DependencyToken,
+  type FeatureApiIdentity,
+  ModuleApiToken,
+  type ModuleName,
+  publicNamespace,
+  type PublicNamespace,
+  publicNamespaceFromUnknown,
+  type ResolvedTokens,
+  type TokenIdentity,
+  type TokenMap,
+} from "@langwatch/module";
+import { ScopedSecrets, type SecretHandle } from "@langwatch/secrets";
+import type { z } from "zod";
+
+import { FeatureSecretsUnavailableError } from "./boot-errors.ts";
+import {
+  instantiateChannels,
+  type AnyChannelRegistry,
+  type ChannelRegistry,
+  type ChannelsFor,
+} from "./channel-registry.ts";
+/** One feature installer. A feature declares its config, the contract services */
+import { processProjectionReplayer } from "./migration/projection-replayer.ts";
+import { withAnotherPipeline } from "./module-eventing.ts";
+import { snapshotRepositories, type FeatureRepositories } from "./repository-ownership.ts";
+import {
+  instantiateRepositories,
+  type AnyRepositoryRegistry,
+  type RepositoriesFor,
+  type RepositoryRegistry,
+  type RepositorySelection,
+} from "./repository-registry.ts";
+import type { ResourceOwnership } from "./resource-scope.ts";
+import type { Tier } from "./tiers.ts";
+
+/** Which process is booting. A role hosts only the work that role owns. */
+export type ServerRole = "api" | "worker" | "tasks";
+
+/**
+ * How the application root narrows the process's one resolver to a single
+ * module: its own declared handles, and nothing else in the process.
+ */
+export type ModuleSecretsScope = (
+  owner: string,
+  declared: readonly SecretHandle<unknown>[],
+) => ScopedSecrets;
+
+/**
+ * Scopes the process's operator reads to one module's declared handles (§7).
+ * Typed opaquely here: the handle and its scope belong to the stores owner.
+ */
+export type ModuleOperatorReadsScope = (input: {
+  owner: string;
+  declared: readonly unknown[];
+}) => unknown;
+
+/** The complete context supplied to a server app's static factory. */
+export type FeatureSetup<
+  Dependencies extends TokenMap,
+  Config,
+  Repositories = never,
+  Channels = never,
+> = Readonly<{
+  readonly dependencies: ResolvedTokens<Dependencies>;
+  readonly config: Config;
+  readonly resources: ResourceOwnership;
+  /** This module's declared handles, resolved only through `into` (§6). */
+  readonly secrets: ScopedSecrets;
+  /** Which process this install is in; absent only where a test builds the App by hand. */
+  readonly role?: ServerRole;
+  /** Every installed module's built migration steps, read once all have installed (S6-FEED). */
+  readonly declaredMigrationSteps?: () => readonly unknown[];
+}> &
+  ([Repositories] extends [never]
+    ? object
+    : Readonly<{
+        readonly repositories: Repositories;
+        /** The tier the repositories came from, so channels follow it; absent if built by hand. */
+        readonly tier?: Tier;
+      }>) &
+  /** Built by the container from the registry named in `.withChannels(...)` (record §5). */
+  ([Channels] extends [never] ? object : Readonly<{ readonly channels: Channels }>);
+
+type AppContract<Dependencies extends TokenMap, App> =
+  | Readonly<{
+      contract: ModuleApiToken<App>;
+      dependencies: Dependencies & Readonly<Record<string, DependencyIdentity>>;
+    }>
+  | Readonly<{ contract: abstract new (...args: never[]) => App; dependencies: Dependencies }>;
+
+/** Static construction metadata owned by a server app implementation. */
+export type AppDefinition<
+  Dependencies extends TokenMap,
+  Config,
+  App,
+  Created extends App = App,
+  Channels = never,
+> = AppContract<Dependencies, App> &
+  Readonly<{
+    /** Present when the App declared its own slice instead (§6). */
+    readonly config?: ConfigSlice;
+    readonly repositories?: FeatureRepositories;
+    readonly create: (
+      setup: FeatureSetup<NoInfer<Dependencies>, NoInfer<Config>, never, Channels>,
+    ) => Created | Promise<Created>;
+  }>;
+
+/**
+ * An App that declares its own config slice (§6). The process parses every
+ * owner once, so `create` receives that slice already parsed — there is no
+ * second schema and no second parse.
+ */
+export type DeclaredConfigAppDefinition<
+  Dependencies extends TokenMap,
+  Slice extends ConfigSlice,
+  App,
+  Created extends App = App,
+  Channels = never,
+> = AppContract<Dependencies, App> &
+  Readonly<{
+    readonly config: Slice;
+    readonly repositories?: FeatureRepositories;
+    readonly create: (
+      setup: FeatureSetup<NoInfer<Dependencies>, ConfigOf<Slice>, never, Channels>,
+    ) => Created | Promise<Created>;
+  }>;
+
+/** Static construction metadata for an app with no semantic configuration. */
+export type AppDefinitionWithoutConfig<
+  Dependencies extends TokenMap,
+  App,
+  Created extends App = App,
+  Channels = never,
+> = AppContract<Dependencies, App> &
+  Readonly<{
+    readonly repositories?: FeatureRepositories;
+    readonly create: (
+      setup: FeatureSetup<NoInfer<Dependencies>, undefined, never, Channels>,
+    ) => Created | Promise<Created>;
+  }>;
+
+/** What a module's transport bindings and middleware context are built from. */
+export interface ModuleMiddlewareSetup<Dependencies extends TokenMap, App> {
+  /** This module's own App, already constructed by the same boot. */
+  readonly app: App;
+  /** The peer Apps this module declared as dependencies, resolved. */
+  readonly dependencies: ResolvedTokens<Dependencies>;
+}
+
+/** The doors a module's transports name, read off each REST family's declared type. */
+type NamedDoorsOf<Transports extends readonly FeatureTransportDescriptor[]> =
+  Transports[number] extends infer Transport
+    ? Transport extends {
+        readonly protocol: "rest";
+        readonly router: () => { readonly named?: infer Named };
+      }
+      ? // A family typed with every door (not built by the router) names none it can prove.
+        RestDoorCredential extends Named
+        ? never
+        : Extract<Named, RestDoorCredential>
+      : never
+    : never;
+
+/**
+ * A door for every module-bound credential the module's routes name, each needing an Api the
+ * module has, its own or a declared peer's (Alex 2026-10-10 TYPED-DOORS).
+ */
+export type ModuleDoors<Named, Reachable> = {
+  readonly [Credential in Extract<Named, DoorCredential>]: RestDoorDefinition<
+    Credential,
+    FeatureApiIdentity & { readonly name: Reachable }
+  >;
+};
+
+/** This module's name and its peers' Api names: what a door's `needs` may be. */
+type ReachableApi<Module, Dependencies extends TokenMap> =
+  | Module
+  | Extract<Dependencies[keyof Dependencies], FeatureApiIdentity>["name"];
+
+/** The middleware context a module's REST families ask for, read off each declared type. */
+type ContextNeedsOf<Transports extends readonly FeatureTransportDescriptor[]> =
+  Transports[number] extends infer Transport
+    ? Transport extends {
+        readonly protocol: "rest";
+        readonly router: () => { readonly needs?: infer Needs };
+      }
+      ? // A family typed with every context (not built by the router) names none it can prove.
+        MiddlewareContext extends Needs
+        ? never
+        : Extract<Needs, MiddlewareContext>
+      : never
+    : never;
+
+/** What a context's value is read from: the request, and the module that provides it. */
+export type MiddlewareContextSetup<Dependencies extends TokenMap, App> = ModuleMiddlewareSetup<
+  Dependencies,
+  App
+> &
+  Readonly<{
+    /** The validated input, for a context declared `source: "input"`; absent before the body. */
+    input?: unknown;
+  }>;
+
+/** One value per context the module's own routes ask for, keyed by its name (Alex 2026-10-10). */
+export type ModuleMiddlewareContext<
+  Needs extends MiddlewareContext,
+  Dependencies extends TokenMap,
+  App,
+> = {
+  readonly [Context in Needs as Context["name"]]: (
+    request: Request,
+    setup: MiddlewareContextSetup<Dependencies, App>,
+  ) => z.input<Context["schema"]> | Promise<z.input<Context["schema"]>>;
+};
+
+/** The binder itself, run once at install in a role that serves doors. */
+export type ModuleMiddlewareBindings<
+  Dependencies extends TokenMap,
+  App,
+  Bindings extends readonly MiddlewareBinding[] = readonly MiddlewareBinding[],
+> = (
+  setup: ModuleMiddlewareSetup<Dependencies, App> &
+    Readonly<{
+      /** The App behind a token: this module's own, or a declared peer's. */
+      api: (token: FeatureApiIdentity) => unknown;
+    }>,
+) => Bindings;
+
+/** The REST context names a hand-bound list answers; an erased name answers none. */
+type BoundContextNames<Bindings extends readonly MiddlewareBinding[]> = Extract<
+  Bindings[number],
+  MiddlewareContextBinding
+>["middlewareContext"] extends infer Name
+  ? Name extends string
+    ? string extends Name
+      ? never
+      : Name
+    : never
+  : never;
+
+/** The need's name when its hand-bound binding answers a value the schema does not accept. */
+type MistypedContextName<Binding, Need extends MiddlewareContext> = [Binding] extends [never]
+  ? never
+  : Binding extends MiddlewareContextBinding<string, infer Value>
+    ? [Value] extends [z.input<Need["schema"]>]
+      ? never
+      : Need["name"]
+    : never;
+
+/** The contexts a hand-bound list answers with a value its route's schema does not accept. */
+type MistypedContextNames<
+  Bindings extends readonly MiddlewareBinding[],
+  Needs extends MiddlewareContext,
+> = Needs extends MiddlewareContext
+  ? MistypedContextName<
+      Extract<Bindings[number], { readonly middlewareContext: Needs["name"] }>,
+      Needs
+    >
+  : never;
+
+/** What a task binder is handed: the middleware setup plus the module's own repositories. */
+export interface ModuleTaskSetup<
+  Dependencies extends TokenMap,
+  Repositories,
+  App,
+  Config = unknown,
+> extends ModuleMiddlewareSetup<Dependencies, App> {
+  readonly repositories: Repositories;
+  /** This module's slice of the one process parse (§6), as its App's `create` received it. */
+  readonly config: Config;
+  /** The secrets this module's App declared, scoped to it; resolve with `secrets.into`. */
+  readonly secrets: ScopedSecrets;
+}
+
+/** Builds a module's one-shot tasks over its booted App, once at install in the tasks role. */
+export type ModuleTaskBinder<Dependencies extends TokenMap, Repositories, App, Config = unknown> = (
+  setup: ModuleTaskSetup<Dependencies, Repositories, App, Config>,
+) => readonly unknown[] | Promise<readonly unknown[]>;
+
+/** What a migration binder is handed: the task setup plus the process's projection replayer. */
+export interface ModuleMigrationSetup<
+  Dependencies extends TokenMap,
+  Repositories,
+  App,
+  Config = unknown,
+> extends ModuleTaskSetup<Dependencies, Repositories, App, Config> {
+  /** Replays one named lane from its owner's log, for `defineProjectionReplayStep` (round 12). */
+  readonly replayer: ProjectionLaneReplayer;
+}
+
+/** Builds a module's migration steps over its booted App, at install in every role. */
+export type ModuleMigrationBinder<
+  Dependencies extends TokenMap,
+  Repositories,
+  App,
+  Config = unknown,
+> = (
+  setup: ModuleMigrationSetup<Dependencies, Repositories, App, Config>,
+) => readonly unknown[] | Promise<readonly unknown[]>;
+
+/** The parsed slice a declaration's phantom `configType` names; nothing where it declared none. */
+type DeclaredConfigOf<Declaration> = Declaration extends { readonly configType?: infer Config }
+  ? Exclude<Config, undefined>
+  : unknown;
+
+/** An inert API descriptor retained for the process root to mount later. */
+export type FeatureTransportDescriptor = Readonly<{
+  readonly protocol: "rest" | "trpc" | "websocket" | "rawsocket" | "rawhttp";
+  /** The family's path segment, or the tRPC namespace the record keys it by. */
+  readonly namespace?: string;
+  readonly router: (...args: never[]) => object;
+}>;
+
+/** What a setup is handed, once per process. */
+export interface FeatureSetupArguments<Config, Dependencies> {
+  readonly resources: ResourceOwnership;
+  /** Which process this install is in. */
+  readonly role: ServerRole;
+  readonly config: Config;
+  readonly dependencies: Dependencies;
+  /**
+   * Exactly the handles this module declared, and the only way to resolve one
+   * (§6): `into(handle, build)` hands the value to the closure and lets only
+   * the constructed collaborator escape. Resolving seals when boot finishes.
+   */
+  readonly secrets: ScopedSecrets;
+  readonly repositorySelection?: FeatureInstallArguments["repositorySelection"];
+  readonly declaredMigrationSteps?: FeatureInstallArguments["declaredMigrationSteps"];
+  /**
+   * What the module's registry answered on the selected backend, instantiated
+   * once per install so the app and its eventing declaration read the same
+   * objects rather than two graphs over the same rows.
+   */
+  readonly repositories?: unknown;
+  /** The channels the module's registry built on the same tier, once per install. */
+  readonly channels?: unknown;
+}
+
+/** What the one transport assembly is handed, in a role that serves doors. */
+export interface FeatureTransportSetupArguments<
+  Config,
+  Dependencies,
+  TransportDependencies,
+  Provided,
+> extends FeatureSetupArguments<Config, Dependencies> {
+  /** The tokens this feature needs only where it serves a transport. */
+  readonly transportDependencies: TransportDependencies;
+  /** Whatever the setup returned. */
+  readonly provided: Provided;
+}
+
+/** What a door's contribution is handed, after the transport assembly ran. */
+export interface FeatureTransportArguments<
+  Config,
+  Dependencies,
+  TransportDependencies,
+  Provided,
+  Transport,
+> extends FeatureTransportSetupArguments<Config, Dependencies, TransportDependencies, Provided> {
+  /** What the doors share: constructed once, by the transport assembly. */
+  readonly transport: Transport;
+}
+
+/** What a background contribution is handed, after the setup ran. */
+export interface FeatureWorkerArguments<
+  Config,
+  Dependencies,
+  Provided,
+> extends FeatureSetupArguments<Config, Dependencies> {
+  readonly provided: Provided;
+}
+
+/** One token this feature answers for, and the instance behind it. */
+export interface FeatureProvider<Provided> {
+  readonly token: TokenIdentity;
+  read(provided: Provided): unknown;
+}
+
+/** What one installed feature holds, with its own types erased. */
+export interface InstalledFeatureState {
+  readonly provided: unknown;
+  /** The instantiated repositories, for a module that declared a registry. */
+  readonly repositories?: unknown;
+  /**
+   * What this module bound for its own declarations (credentials, its API door and
+   * middleware context), built in a role that serves doors. The process mounts these
+   * with the family; anything left unbound is refused by the door at mount, by name.
+   */
+  readonly middlewareBindings?: readonly MiddlewareBinding[];
+  /** The tasks this module's binders built over its App, in the tasks role only. */
+  readonly tasks?: readonly unknown[];
+  /** The migration steps this module's binders built over its App, in every role. */
+  readonly migrationSteps?: readonly unknown[];
+  /** Bound contribution readers; absent where the feature declared none. */
+  readonly rest: (() => unknown) | undefined;
+  readonly trpc: (() => unknown) | undefined;
+  readonly worker: (() => unknown) | undefined;
+}
+
+/** What `install` is handed by the application root. */
+export interface FeatureInstallArguments {
+  readonly resources: ResourceOwnership;
+  readonly config: unknown;
+  /** Which repository tier this process chose, and the store clients that tier may read. */
+  readonly repositorySelection?: RepositorySelection;
+  readonly role: ServerRole;
+  /** Instantiated once by the repository-aware declaration that wraps this. */
+  readonly repositories?: unknown;
+  /** Instantiated once by the channel-aware declaration that wraps this. */
+  readonly channels?: unknown;
+  /**
+   * Scoped to this module's own declared handles by the application root. A
+   * process that composed no resolver supplies none, and a module that then
+   * resolves one refuses by name rather than reading an undeclared secret.
+   */
+  readonly secrets?: ScopedSecrets;
+  /** The process's projection replayer; absent where none was composed, which then refuses. */
+  readonly replayer?: ProjectionLaneReplayer;
+  /**
+   * Every installed module's built migration steps, collected when called: ops installs before
+   * the modules whose tenant steps it drives (S6-FEED). Absent where the root composed none.
+   */
+  readonly declaredMigrationSteps?: () => readonly unknown[];
+  /** The instance the graph resolved for one token. */
+  resolve: (token: TokenIdentity) => unknown;
+}
+
+/**
+ * Application root's view of a module. Retains name + config schema for
+ * compile-time checking.
+ */
+export interface InstallableServerFeature<Name extends string = string, Config = unknown> {
+  readonly name: Name;
+  /**
+   * Phantom: the slice type the one process parse (§6) produces for this
+   * feature. Type-only, never read, and the anchor `ModuleConfigGuard` infers
+   * a module's config from — without it the guard silently checks nothing.
+   */
+  readonly configType?: Config;
+  readonly config?: ConfigSlice;
+  readonly secrets?: Readonly<Record<string, SecretHandle<unknown>>>;
+  /** The cross-organization reads this module declared (§7), for the root to scope. */
+  readonly operatorReads?: Readonly<Record<string, unknown>>;
+  readonly publicConfig?: (config: unknown, api: unknown) => unknown;
+  /** Every door this feature declared, for the process root to mount at boot. */
+  readonly transports?: readonly FeatureTransportDescriptor[];
+  readonly repositories?: FeatureRepositories;
+  readonly repositoryRegistry?: AnyRepositoryRegistry;
+  /** The registry named in `.withChannels(...)`; boot claims the stores its tier requires. */
+  readonly channelRegistry?: AnyChannelRegistry;
+  readonly apiContract?: FeatureApiIdentity;
+  readonly dependencies: TokenMap;
+  readonly transportDependencies: TokenMap;
+  readonly providers: readonly FeatureProvider<never>[];
+  readonly contributesWorkerWork: boolean;
+  /** Background work the worker role starts, declared with `withWorkers`. */
+  readonly workers?: readonly unknown[];
+  /** One-shot work the tasks role exposes, declared with `withTasks`. */
+  readonly tasks?: readonly unknown[];
+  /** Event sourcing declared with withEventing. */
+  readonly eventing?: FeatureEventing;
+  /** Repository tier: live (default) or memory. */
+  readonly tier?: Tier;
+  readonly install: (args: FeatureInstallArguments) => Promise<InstalledFeatureState>;
+}
+
+/**
+ * A module's installer as its package publishes it (ruling PD-1): name, Api and config
+ * only, so its class, repositories and Prisma never reach the public `.d.ts`. `types` keeps the
+ * annotation checked against what the builder built. Record §3.2.
+ */
+export interface PublishedProcessModule<
+  Name extends string,
+  Api,
+  Config = undefined,
+> extends InstallableServerFeature<Name, Config> {
+  readonly transports?: readonly FeatureTransportDescriptor[];
+  readonly types: Readonly<{
+    config: Config;
+    provided: Api;
+    dependencies: ResolvedTokens<TokenMap>;
+  }>;
+  /** Type-only: a module whose routes ask for context it never provided does not publish. */
+  readonly unprovidedMiddlewareContext?: never;
+}
+
+/** One slice per module name, as a process states the config it hands them. */
+export type ModuleConfigRecord = Readonly<Record<string, unknown>>;
+
+/** The module name a config slice is keyed by, or nothing where it declared none. */
+type ConfiguredModuleName<Module> =
+  Module extends InstallableServerFeature<infer Name, infer Config>
+    ? [Config] extends [undefined]
+      ? never
+      : Name
+    : never;
+
+/** The slice one module's own schema parses. */
+type ConfiguredModuleConfig<Module> =
+  Module extends InstallableServerFeature<string, infer Config> ? Config : never;
+
+/** Config each module's schema requires for the process to install it. */
+export type ModuleConfigFor<Modules extends readonly unknown[]> = {
+  readonly [
+    Module in Modules[number] as ConfiguredModuleName<Module>
+  ]: ConfiguredModuleConfig<Module>;
+};
+
+/** A module name that is a literal, not a widened `string` or `number` index. */
+type IsNamedKey<Name> = string extends Name ? false : number extends Name ? false : true;
+
+/** The module's name when the supplied config lacks its slice or gives one of the wrong shape. */
+type UncoveredSlice<Name, Required, Supplied> = Name extends keyof Supplied
+  ? Name extends keyof Required
+    ? Supplied[Name] extends Required[Name]
+      ? never
+      : Name
+    : Name
+  : Name;
+
+/**
+ * Every module whose slice the supplied config does not cover. A guard that cannot
+ * know must not refuse: a module name widened to `string`, and a config typed as an
+ * open record, state nothing checkable, so each module's schema refuses it at boot.
+ */
+type ModulesMissingConfig<Required, Supplied> = string extends keyof Supplied
+  ? never
+  : {
+      [Name in keyof Required]: IsNamedKey<Name> extends true
+        ? UncoveredSlice<Name, Required, Supplied>
+        : never;
+    }[keyof Required];
+
+/** Guard type refusing processes that didn't state a module's config. */
+export interface ModuleConfigMissing<Modules extends string> {
+  readonly "config this process did not state, by module": Modules;
+}
+
+/**
+ * Nothing where the supplied config covers this list, and a refusal naming the
+ * modules where it does not. Intersected with the list itself at the parameter,
+ * so the list is still what the call infers.
+ */
+export type ModuleConfigGuard<Modules extends readonly unknown[], Supplied> = [
+  ModulesMissingConfig<ModuleConfigFor<Modules>, Supplied>,
+] extends [never]
+  ? unknown
+  : ModuleConfigMissing<ModulesMissingConfig<ModuleConfigFor<Modules>, Supplied> & string>;
+
+/** A built declaration, with the types its own call sites read back. */
+export interface ServerFeatureDeclaration<
+  Config,
+  Dependencies extends TokenMap,
+  TransportDependencies extends TokenMap,
+  Provided,
+  Transport,
+  Rest,
+  Trpc,
+  Worker,
+  Name extends string = string,
+> extends InstallableServerFeature<Name, Config> {
+  readonly dependencies: Dependencies;
+  readonly transportDependencies: TransportDependencies;
+  /** Present only so the declaration's types are reachable from a runtime read. */
+  readonly types: {
+    config: Config;
+    dependencies: ResolvedTokens<Dependencies>;
+    transportDependencies: ResolvedTokens<TransportDependencies>;
+    provided: Provided;
+    transport: Transport;
+    rest: Rest;
+    trpc: Trpc;
+    worker: Worker;
+  };
+}
+
+/** What the declaration stage accumulates before a setup exists. */
+interface FeatureShape<
+  Dependencies extends TokenMap,
+  TransportDependencies extends TokenMap,
+  Name extends string = string,
+> {
+  readonly name: Name;
+  readonly dependencies: Dependencies;
+  readonly transportDependencies: TransportDependencies;
+}
+
+/**
+ * The first stage: everything a feature states before it says how it is built.
+ * Nothing here depends on anything else here, which is why one class can carry
+ * all of it without an assertion when a type parameter changes.
+ */
+export class ServerFeatureBuilder<
+  Config,
+  Dependencies extends TokenMap,
+  TransportDependencies extends TokenMap,
+  Name extends string = string,
+> {
+  constructor(private readonly shape: FeatureShape<Dependencies, TransportDependencies, Name>) {}
+
+  /**
+   * States the slice type the one process parse (§6) produces for this
+   * feature. Type-only: there is no second schema and nothing runs here.
+   */
+  withConfigType<NextConfig>(): ServerFeatureBuilder<
+    NextConfig,
+    Dependencies,
+    TransportDependencies,
+    Name
+  > {
+    return new ServerFeatureBuilder(this.shape);
+  }
+
+  /** The contract services this feature needs in EVERY role it is installed in. */
+  withDependencies<NextDependencies extends TokenMap>(
+    dependencies: NextDependencies,
+  ): ServerFeatureBuilder<Config, NextDependencies, TransportDependencies, Name> {
+    return new ServerFeatureBuilder({ ...this.shape, dependencies });
+  }
+
+  /** The tokens this feature needs only where it serves a transport. They are */
+  withTransportDependencies<NextTransportDependencies extends TokenMap>(
+    transportDependencies: NextTransportDependencies,
+  ): ServerFeatureBuilder<Config, Dependencies, NextTransportDependencies, Name> {
+    return new ServerFeatureBuilder({ ...this.shape, transportDependencies });
+  }
+
+  /** Ordinary code, run once per process, that constructs what this feature owns. */
+  withSetup<Provided>(
+    setup: (
+      args: FeatureSetupArguments<Config, ResolvedTokens<Dependencies>>,
+    ) => Provided | Promise<Provided>,
+  ): ServerFeatureAssembly<
+    Config,
+    Dependencies,
+    TransportDependencies,
+    Provided,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    Name
+  > {
+    return new ServerFeatureAssembly({
+      ...this.shape,
+      setup,
+      providers: [],
+      transport: undefined,
+      rest: undefined,
+      trpc: undefined,
+      worker: undefined,
+      close: undefined,
+      middlewareBindings: undefined,
+    });
+  }
+}
+
+/** What the assembly stage accumulates once a setup exists. */
+interface FeatureAssemblyState<
+  Config,
+  Dependencies extends TokenMap,
+  TransportDependencies extends TokenMap,
+  Provided,
+  Transport,
+  Rest,
+  Trpc,
+  Worker,
+  Name extends string = string,
+> extends FeatureShape<Dependencies, TransportDependencies, Name> {
+  readonly setup: (
+    args: FeatureSetupArguments<Config, ResolvedTokens<Dependencies>>,
+  ) => Provided | Promise<Provided>;
+  readonly providers: readonly FeatureProvider<Provided>[];
+  readonly transport:
+    | ((
+        args: FeatureTransportSetupArguments<
+          Config,
+          ResolvedTokens<Dependencies>,
+          ResolvedTokens<TransportDependencies>,
+          Provided
+        >,
+      ) => Transport)
+    | undefined;
+  readonly rest: DoorContribution<
+    Config,
+    Dependencies,
+    TransportDependencies,
+    Provided,
+    Transport,
+    Rest
+  >;
+  readonly trpc: DoorContribution<
+    Config,
+    Dependencies,
+    TransportDependencies,
+    Provided,
+    Transport,
+    Trpc
+  >;
+  readonly worker:
+    | ((args: FeatureWorkerArguments<Config, ResolvedTokens<Dependencies>, Provided>) => Worker)
+    | undefined;
+  readonly close: ((provided: Provided) => void | Promise<void>) | undefined;
+  readonly middlewareBindings:
+    | ((
+        args: FeatureTransportArguments<
+          Config,
+          ResolvedTokens<Dependencies>,
+          ResolvedTokens<TransportDependencies>,
+          Provided,
+          Transport
+        >,
+      ) => readonly MiddlewareBinding[])
+    | undefined;
+}
+
+/** One door's contribution, or nothing where the feature declared no such door. */
+type DoorContribution<
+  Config,
+  Dependencies extends TokenMap,
+  TransportDependencies extends TokenMap,
+  Provided,
+  Transport,
+  Result,
+> =
+  | ((
+      args: FeatureTransportArguments<
+        Config,
+        ResolvedTokens<Dependencies>,
+        ResolvedTokens<TransportDependencies>,
+        Provided,
+        Transport
+      >,
+    ) => Result)
+  | undefined;
+
+/**
+ * The second stage: what the feature exposes and contributes. Each method
+ * replaces exactly one field, so the type parameter it changes is the only one
+ * the new state names differently.
+ */
+export class ServerFeatureAssembly<
+  Config,
+  Dependencies extends TokenMap,
+  TransportDependencies extends TokenMap,
+  Provided,
+  Transport,
+  Rest,
+  Trpc,
+  Worker,
+  Name extends string = string,
+> {
+  constructor(
+    private readonly state: FeatureAssemblyState<
+      Config,
+      Dependencies,
+      TransportDependencies,
+      Provided,
+      Transport,
+      Rest,
+      Trpc,
+      Worker,
+      Name
+    >,
+  ) {}
+
+  /** Publishes the setup result as the feature’s single public app contract. */
+  provides<Instance>(
+    token: DependencyToken<Instance> & ([Provided] extends [Instance] ? unknown : never),
+  ): ServerFeatureAssembly<
+    Config,
+    Dependencies,
+    TransportDependencies,
+    Provided,
+    Transport,
+    Rest,
+    Trpc,
+    Worker,
+    Name
+  > {
+    const alreadyProvidesApp = this.state.providers.length !== 0;
+    if (alreadyProvidesApp) {
+      throw new Error(
+        `Feature "${this.state.name}" already provides its app. Expose services as readonly app members.`,
+      );
+    }
+
+    return new ServerFeatureAssembly({
+      ...this.state,
+      providers: [{ token, read: (app: Provided) => app }],
+    });
+  }
+
+  /** What both doors share, constructed once in a role that serves doors. */
+  withTransport<NextTransport>(
+    create: (
+      args: FeatureTransportSetupArguments<
+        Config,
+        ResolvedTokens<Dependencies>,
+        ResolvedTokens<TransportDependencies>,
+        Provided
+      >,
+    ) => NextTransport,
+  ): ServerFeatureAssembly<
+    Config,
+    Dependencies,
+    TransportDependencies,
+    Provided,
+    NextTransport,
+    undefined,
+    undefined,
+    Worker,
+    Name
+  > {
+    return new ServerFeatureAssembly({
+      ...this.state,
+      transport: create,
+      rest: undefined,
+      trpc: undefined,
+      middlewareBindings: undefined,
+    });
+  }
+
+  /** What this feature contributes to the process's REST surface. */
+  withRest<NextRest>(
+    create: (
+      args: FeatureTransportArguments<
+        Config,
+        ResolvedTokens<Dependencies>,
+        ResolvedTokens<TransportDependencies>,
+        Provided,
+        Transport
+      >,
+    ) => NextRest,
+  ): ServerFeatureAssembly<
+    Config,
+    Dependencies,
+    TransportDependencies,
+    Provided,
+    Transport,
+    NextRest,
+    Trpc,
+    Worker,
+    Name
+  > {
+    return new ServerFeatureAssembly({ ...this.state, rest: create });
+  }
+
+  /** Credentials and middleware context its declarations name. Runs once at install. */
+  provideMiddlewareBindings(
+    bind: (
+      args: FeatureTransportArguments<
+        Config,
+        ResolvedTokens<Dependencies>,
+        ResolvedTokens<TransportDependencies>,
+        Provided,
+        Transport
+      >,
+    ) => readonly MiddlewareBinding[],
+  ): ServerFeatureAssembly<
+    Config,
+    Dependencies,
+    TransportDependencies,
+    Provided,
+    Transport,
+    Rest,
+    Trpc,
+    Worker,
+    Name
+  > {
+    return new ServerFeatureAssembly({ ...this.state, middlewareBindings: bind });
+  }
+
+  /** What this feature contributes to the process's tRPC surface. */
+  withTrpc<NextTrpc>(
+    create: (
+      args: FeatureTransportArguments<
+        Config,
+        ResolvedTokens<Dependencies>,
+        ResolvedTokens<TransportDependencies>,
+        Provided,
+        Transport
+      >,
+    ) => NextTrpc,
+  ): ServerFeatureAssembly<
+    Config,
+    Dependencies,
+    TransportDependencies,
+    Provided,
+    Transport,
+    Rest,
+    NextTrpc,
+    Worker,
+    Name
+  > {
+    return new ServerFeatureAssembly({ ...this.state, trpc: create });
+  }
+
+  /** The consumers and schedulers this feature contributes to a worker. */
+  withWorker<NextWorker>(
+    create: (
+      args: FeatureWorkerArguments<Config, ResolvedTokens<Dependencies>, Provided>,
+    ) => NextWorker,
+  ): ServerFeatureAssembly<
+    Config,
+    Dependencies,
+    TransportDependencies,
+    Provided,
+    Transport,
+    Rest,
+    Trpc,
+    NextWorker,
+    Name
+  > {
+    return new ServerFeatureAssembly({ ...this.state, worker: create });
+  }
+
+  /** Releases what the setup acquired. Runs in reverse construction order. */
+  withClose(
+    close: (provided: Provided) => void | Promise<void>,
+  ): ServerFeatureAssembly<
+    Config,
+    Dependencies,
+    TransportDependencies,
+    Provided,
+    Transport,
+    Rest,
+    Trpc,
+    Worker,
+    Name
+  > {
+    return new ServerFeatureAssembly({ ...this.state, close });
+  }
+
+  /** The immutable declaration. Building it constructs nothing. */
+  build(): ServerFeatureDeclaration<
+    Config,
+    Dependencies,
+    TransportDependencies,
+    Provided,
+    Transport,
+    Rest,
+    Trpc,
+    Worker
+  > {
+    const state = this.state;
+    const declaration = {
+      name: state.name,
+      dependencies: state.dependencies,
+      transportDependencies: state.transportDependencies,
+      providers: state.providers as readonly FeatureProvider<never>[],
+      contributesWorkerWork: state.worker !== undefined,
+      types: undefined as never,
+
+      install: async (args: FeatureInstallArguments): Promise<InstalledFeatureState> => {
+        const config = declaredConfig<Config>(args.config);
+        const dependencies = resolveTokens(
+          state.dependencies,
+          args.resolve,
+        ) as ResolvedTokens<Dependencies>;
+        const setupArguments = {
+          config,
+          secrets: args.secrets ?? undeclaredSecrets(state.name),
+          dependencies,
+          resources: args.resources,
+          role: args.role,
+          repositorySelection: args.repositorySelection,
+          repositories: args.repositories,
+          channels: args.channels,
+          declaredMigrationSteps: args.declaredMigrationSteps,
+        };
+        // A module resolving a secret does so in `create()`, so the whole
+        // install awaits: only the constructed collaborator comes back.
+        const provided = await state.setup(setupArguments);
+        const { worker, close } = state;
+        if (close) {
+          args.resources.own(state.name, () => close(provided));
+        }
+        const workerResult =
+          args.role === "worker" && worker ? worker({ ...setupArguments, provided }) : void 0;
+
+        const doors =
+          args.role === "api"
+            ? this.bindTransports(setupArguments, provided, args)
+            : { rest: void 0, trpc: void 0, middlewareBindings: void 0 };
+        return {
+          provided,
+          ...(doors.middlewareBindings ? { middlewareBindings: doors.middlewareBindings } : {}),
+          rest: doors.rest,
+          trpc: doors.trpc,
+          worker: args.role === "worker" && worker ? () => workerResult : undefined,
+        };
+      },
+    };
+    return Object.freeze(declaration);
+  }
+
+  private bindTransports(
+    setupArguments: FeatureSetupArguments<Config, ResolvedTokens<Dependencies>>,
+    provided: Provided,
+    args: FeatureInstallArguments,
+  ): {
+    rest: (() => unknown) | undefined;
+    trpc: (() => unknown) | undefined;
+    middlewareBindings: readonly MiddlewareBinding[] | undefined;
+  } {
+    const state = this.state;
+    const { rest, trpc } = state;
+    const transportDependencies = resolveTokens(
+      state.transportDependencies,
+      args.resolve,
+    ) as ResolvedTokens<TransportDependencies>;
+    const transportSetupArguments = {
+      ...setupArguments,
+      transportDependencies,
+      provided,
+    };
+    // Both transports share this single adapter assembly.
+    const transport = state.transport
+      ? state.transport(transportSetupArguments)
+      : (undefined as Transport);
+    const doorArguments = { ...transportSetupArguments, transport };
+    const restResult = rest ? rest(doorArguments) : undefined;
+    const trpcResult = trpc ? trpc(doorArguments) : undefined;
+    return {
+      rest: rest ? () => restResult : undefined,
+      trpc: trpc ? () => trpcResult : undefined,
+      middlewareBindings: state.middlewareBindings
+        ? state.middlewareBindings(doorArguments)
+        : undefined,
+    };
+  }
+}
+
+/** Names one feature installer. */
+export function serverFeature(
+  name: string,
+): ServerFeatureBuilder<undefined, Record<never, never>, Record<never, never>, string> {
+  const trimmed = name.trim();
+  if (!trimmed) throw new Error("A feature installer needs a name.");
+  return new ServerFeatureBuilder({
+    name: trimmed,
+    dependencies: {},
+    transportDependencies: {},
+  });
+}
+
+/** Names a module's server half: its App, repositories, channels and transports. */
+export function defineProcessModule<const Name extends ModuleName>(
+  name: Name,
+): DefinedFeatureBuilder<Name> {
+  publicNamespaceFromUnknown(name);
+  return new DefinedFeatureBuilder(name);
+}
+
+/** A repository provider as a registry holds it, with its own types erased. */
+type AnyProvider = Readonly<{
+  requires: readonly string[];
+  create: (...arguments_: never[]) => unknown;
+}>;
+
+/**
+ * The repositories a module's App is handed, whichever tier the process chose.
+ * Both tiers answer the same shape, which is what makes `"live" | "memory"` a
+ * process decision the module never sees.
+ */
+type ModuleRepositories<Live extends AnyProvider, Memory extends AnyProvider> = RepositoriesFor<
+  RepositoryRegistry<Live, Memory>,
+  Tier
+>;
+
+class DefinedFeatureBuilder<Name extends ModuleName, Channels = never, Registry = undefined> {
+  constructor(
+    private readonly name: Name,
+    private readonly channels?: AnyChannelRegistry,
+  ) {}
+
+  withRepositories<const Live extends AnyProvider, const Memory extends AnyProvider>(
+    repositories: RepositoryRegistry<Live, Memory>,
+  ): RepositoryDefinedFeatureBuilder<Name, Live, Memory, Channels, Registry> {
+    return new RepositoryDefinedFeatureBuilder(this.name, repositories, this.channels);
+  }
+
+  /** This module's channels, built by the container on the tier the stores state (record §5). */
+  withChannels<const Live extends AnyProvider, const Memory extends AnyProvider>(
+    channels: ChannelRegistry<Live, Memory>,
+  ): DefinedFeatureBuilder<
+    Name,
+    ChannelsFor<ChannelRegistry<Live, Memory>>,
+    ChannelRegistry<Live, Memory>
+  > {
+    return new DefinedFeatureBuilder(this.name, channels);
+  }
+  withApi<Dependencies extends TokenMap, Config, App, Created extends App>(
+    app: AppDefinition<Dependencies, Config, App, Created, Channels>,
+  ): ConfiguredAppBuilder<Name, Dependencies, Config, App, Created, Registry>;
+  withApi<Dependencies extends TokenMap, Slice extends ConfigSlice, App, Created extends App>(
+    app: DeclaredConfigAppDefinition<Dependencies, Slice, App, Created, Channels>,
+  ): ConfiguredAppBuilder<Name, Dependencies, ConfigOf<Slice>, App, Created, Registry>;
+  withApi<Dependencies extends TokenMap, App, Created extends App>(
+    app: AppDefinitionWithoutConfig<Dependencies, App, Created, Channels>,
+  ): UnconfiguredAppBuilder<Name, Dependencies, App, Created, Registry>;
+  withApi(
+    app:
+      | AppDefinition<TokenMap, unknown, unknown, unknown, Channels>
+      | AppDefinitionWithoutConfig<TokenMap, unknown, unknown, Channels>,
+  ): object {
+    // The overloads typed `setup.channels`; the builders forward it at runtime.
+    const erased = app as
+      | AppDefinition<TokenMap, unknown, unknown>
+      | AppDefinitionWithoutConfig<TokenMap, unknown>;
+    if ("config" in erased) {
+      return new ConfiguredAppBuilder(this.name, erased, this.channels);
+    }
+    return new UnconfiguredAppBuilder(this.name, erased, this.channels);
+  }
+}
+
+type RepositoryAppDefinition<
+  Dependencies extends TokenMap,
+  Config,
+  Repositories,
+  App,
+  Created extends App = App,
+  Channels = never,
+> = AppContract<Dependencies, App> &
+  Readonly<{
+    /** Present when the App declared its own slice instead (§6). */
+    readonly config?: ConfigSlice;
+    readonly create: (
+      setup: FeatureSetup<NoInfer<Dependencies>, NoInfer<Config>, Repositories, Channels>,
+    ) => Created | Promise<Created>;
+  }>;
+
+/**
+ * The repository path's twin of {@link DeclaredConfigAppDefinition}: an App
+ * over its own repositories declaring a config slice, not a second schema.
+ */
+type RepositoryDeclaredConfigAppDefinition<
+  Dependencies extends TokenMap,
+  Slice extends ConfigSlice,
+  Repositories,
+  App,
+  Created extends App = App,
+  Channels = never,
+> = AppContract<Dependencies, App> &
+  Readonly<{
+    readonly config: Slice;
+    readonly create: (
+      setup: FeatureSetup<NoInfer<Dependencies>, ConfigOf<Slice>, Repositories, Channels>,
+    ) => Created | Promise<Created>;
+  }>;
+
+type RepositoryAppDefinitionWithoutConfig<
+  Dependencies extends TokenMap,
+  Repositories,
+  App,
+  Created extends App = App,
+  Channels = never,
+> = AppContract<Dependencies, App> &
+  Readonly<{
+    readonly create: (
+      setup: FeatureSetup<NoInfer<Dependencies>, undefined, Repositories, Channels>,
+    ) => Created | Promise<Created>;
+  }>;
+
+/** The registry named in `.withChannels(...)`, typed, so the root reads what its tiers bind. */
+type ChannelsDeclared<Registry> = [Registry] extends [undefined]
+  ? unknown
+  : Readonly<{ readonly channelRegistry: Registry }>;
+
+/** The registries a module named on its installer, handed to the app builder together. */
+type ModuleRegistries<Live extends AnyProvider, Memory extends AnyProvider> = Readonly<{
+  repositories: RepositoryRegistry<Live, Memory>;
+  channels?: AnyChannelRegistry;
+}>;
+
+class RepositoryDefinedFeatureBuilder<
+  Name extends ModuleName,
+  Live extends AnyProvider,
+  Memory extends AnyProvider,
+  Channels = never,
+  Registry = undefined,
+> {
+  constructor(
+    private readonly name: Name,
+    private readonly repositories: RepositoryRegistry<Live, Memory>,
+    private readonly channels?: AnyChannelRegistry,
+  ) {}
+
+  /** This module's channels, built by the container on the repositories' tier (record §5). */
+  #registries(): ModuleRegistries<Live, Memory> {
+    return this.channels === undefined
+      ? { repositories: this.repositories }
+      : { repositories: this.repositories, channels: this.channels };
+  }
+
+  withChannels<const ChannelLive extends AnyProvider, const ChannelMemory extends AnyProvider>(
+    channels: ChannelRegistry<ChannelLive, ChannelMemory>,
+  ): RepositoryDefinedFeatureBuilder<
+    Name,
+    Live,
+    Memory,
+    ChannelsFor<ChannelRegistry<ChannelLive, ChannelMemory>>,
+    ChannelRegistry<ChannelLive, ChannelMemory>
+  > {
+    return new RepositoryDefinedFeatureBuilder(this.name, this.repositories, channels);
+  }
+  withApi<Dependencies extends TokenMap, Config, App, Created extends App>(
+    app: RepositoryAppDefinition<
+      Dependencies,
+      Config,
+      ModuleRepositories<Live, Memory>,
+      App,
+      Created,
+      Channels
+    >,
+  ): RepositoryAppBuilder<Name, Live, Memory, Dependencies, Config, App, Created, Registry>;
+  withApi<Dependencies extends TokenMap, App = unknown, Created extends App = App>(
+    app: RepositoryAppDefinitionWithoutConfig<
+      Dependencies,
+      ModuleRepositories<Live, Memory>,
+      App,
+      Created,
+      Channels
+    >,
+  ): RepositoryUnconfiguredAppBuilder<Name, Live, Memory, Dependencies, App, Created, Registry>;
+  withApi<Dependencies extends TokenMap, Slice extends ConfigSlice, App, Created extends App>(
+    app: RepositoryDeclaredConfigAppDefinition<
+      Dependencies,
+      Slice,
+      ModuleRepositories<Live, Memory>,
+      App,
+      Created,
+      Channels
+    >,
+  ): RepositoryAppBuilder<
+    Name,
+    Live,
+    Memory,
+    Dependencies,
+    ConfigOf<Slice>,
+    App,
+    Created,
+    Registry
+  >;
+  withApi(
+    app:
+      | RepositoryAppDefinition<
+          TokenMap,
+          unknown,
+          ModuleRepositories<Live, Memory>,
+          unknown,
+          unknown,
+          Channels
+        >
+      | RepositoryAppDefinitionWithoutConfig<
+          TokenMap,
+          ModuleRepositories<Live, Memory>,
+          unknown,
+          unknown,
+          Channels
+        >,
+  ): object {
+    // The overloads typed `setup.channels`; the builders forward it at runtime.
+    const erased = app as
+      | RepositoryAppDefinition<TokenMap, unknown, ModuleRepositories<Live, Memory>, unknown>
+      | RepositoryAppDefinitionWithoutConfig<TokenMap, ModuleRepositories<Live, Memory>, unknown>;
+    // Mirrors the non-repository path: a declared slice is config too, and the
+    // one process parse has already produced it (§6).
+    if ("config" in erased) {
+      return new RepositoryAppBuilder(this.name, this.#registries(), erased);
+    }
+    return new RepositoryUnconfiguredAppBuilder(this.name, this.#registries(), erased);
+  }
+}
+
+class RepositoryAppBuilder<
+  Name extends ModuleName,
+  Live extends AnyProvider,
+  Memory extends AnyProvider,
+  Dependencies extends TokenMap,
+  Config,
+  App,
+  Created extends App = App,
+  Registry = undefined,
+> {
+  private readonly repositories: RepositoryRegistry<Live, Memory>;
+  private readonly channels: AnyChannelRegistry | undefined;
+
+  constructor(
+    private readonly name: Name,
+    registries: ModuleRegistries<Live, Memory>,
+    private readonly app: RepositoryAppDefinition<
+      Dependencies,
+      Config,
+      ModuleRepositories<Live, Memory>,
+      App,
+      Created
+    >,
+  ) {
+    this.repositories = registries.repositories;
+    this.channels = registries.channels;
+  }
+
+  withTransports<const Transports extends readonly FeatureTransportDescriptor[]>(
+    ...transports: Transports
+  ): ModuleContributions<
+    ReturnType<
+      RepositoryAppBuilder<
+        Name,
+        Live,
+        Memory,
+        Dependencies,
+        Config,
+        App,
+        Created,
+        Registry
+      >["build"]
+    > & {
+      readonly transports: readonly FeatureTransportDescriptor[];
+      readonly namespace: PublicNamespace<Name>;
+    },
+    ModuleRepositories<Live, Memory>,
+    App,
+    Dependencies,
+    Created,
+    NamedDoorsOf<Transports>,
+    Name,
+    ContextNeedsOf<Transports>
+  > {
+    return withContributions<
+      ReturnType<
+        RepositoryAppBuilder<
+          Name,
+          Live,
+          Memory,
+          Dependencies,
+          Config,
+          App,
+          Created,
+          Registry
+        >["build"]
+      > & {
+        readonly transports: readonly FeatureTransportDescriptor[];
+        readonly namespace: PublicNamespace<Name>;
+      },
+      ModuleRepositories<Live, Memory>,
+      App,
+      Dependencies,
+      Created,
+      NamedDoorsOf<Transports>,
+      Name,
+      ContextNeedsOf<Transports>
+    >({
+      declaration: { ...this.build(), transports, namespace: publicNamespace(this.name) },
+      workers: [],
+      tasks: [],
+    });
+  }
+
+  /** Background work this module contributes to the worker role. */
+  withWorkers(...workers: readonly unknown[]) {
+    return withContributions<
+      ReturnType<
+        RepositoryAppBuilder<
+          Name,
+          Live,
+          Memory,
+          Dependencies,
+          Config,
+          App,
+          Created,
+          Registry
+        >["build"]
+      >,
+      ModuleRepositories<Live, Memory>,
+      App,
+      Dependencies,
+      Created
+    >({ declaration: this.build(), workers, tasks: [] });
+  }
+
+  /** One-shot work this module contributes to the tasks role. */
+  withTasks(...tasks: readonly unknown[]) {
+    return withContributions<
+      ReturnType<
+        RepositoryAppBuilder<
+          Name,
+          Live,
+          Memory,
+          Dependencies,
+          Config,
+          App,
+          Created,
+          Registry
+        >["build"]
+      >,
+      ModuleRepositories<Live, Memory>,
+      App,
+      Dependencies,
+      Created
+    >({ declaration: this.build(), workers: [], tasks });
+  }
+
+  /** Migration steps this module declares, built in every role; tasks and worker run them. */
+  withMigrations(...steps: readonly unknown[]) {
+    return withContributions<
+      ReturnType<
+        RepositoryAppBuilder<
+          Name,
+          Live,
+          Memory,
+          Dependencies,
+          Config,
+          App,
+          Created,
+          Registry
+        >["build"]
+      >,
+      ModuleRepositories<Live, Memory>,
+      App,
+      Dependencies,
+      Created
+    >({ declaration: bindingMigrations(this.build(), () => steps), workers: [], tasks: [] });
+  }
+
+  build(): ServerFeatureDeclaration<
+    Config,
+    Dependencies,
+    Record<never, never>,
+    App,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    Name
+  > & {
+    readonly repositoryRegistry: RepositoryRegistry<Live, Memory>;
+  } & ChannelsDeclared<Registry> {
+    const app = this.app;
+    const registry = this.repositories;
+    const name = this.name;
+    const setup = serverFeature(name)
+      .withConfigType<Config>()
+      .withDependencies(app.dependencies)
+      .withSetup(
+        ({
+          dependencies,
+          config,
+          secrets,
+          resources,
+          role,
+          repositories,
+          repositorySelection,
+          channels,
+          declaredMigrationSteps,
+        }): App | Promise<App> => {
+          return app.create({
+            dependencies,
+            config,
+            secrets,
+            resources,
+            role,
+            repositories: repositories as ModuleRepositories<Live, Memory>,
+            ...(repositorySelection ? { tier: repositorySelection.tier } : {}),
+            ...(channels === undefined ? {} : { channels }),
+            ...(declaredMigrationSteps === undefined ? {} : { declaredMigrationSteps }),
+          });
+        },
+      )
+      .provides(app.contract)
+      .build();
+    const declared = declaringChannels(
+      {
+        ...setup,
+        // The name is the literal the module was declared with, which is the key
+        // its config slice is stated under. The builder chain above widens it.
+        name,
+        // The registry is read ONCE per install, here, and the instances are
+        // handed to the app and to this module's eventing declaration alike. A
+        // second read would give the two halves separate objects over the same
+        // rows, and a memory tier two separate databases.
+        install: async (args: FeatureInstallArguments) => {
+          if (!args.repositorySelection) {
+            throw new Error(`Module "${name}" was installed without a repository tier.`);
+          }
+          const repositories = instantiateRepositories(registry, {
+            ...args.repositorySelection,
+            config: args.config,
+          });
+          return { ...(await setup.install({ ...args, repositories })), repositories };
+        },
+        ...declaredOwner(app),
+        repositoryRegistry: registry,
+        ...(app.contract instanceof ModuleApiToken ? { apiContract: app.contract } : {}),
+      },
+      this.channels,
+    );
+    return declared as typeof declared & ChannelsDeclared<Registry>;
+  }
+
+  /**
+   * One of this module's pipelines, declared with `defineEventingModule` and
+   * built over the repositories and app above. Call it once per pipeline the
+   * module hosts; they register in the order declared.
+   */
+  withEventing<Definition>(
+    eventing: FeatureEventing<ModuleRepositories<Live, Memory>, App, unknown, Definition>,
+  ): ModuleContributions<
+    ReturnType<
+      RepositoryAppBuilder<
+        Name,
+        Live,
+        Memory,
+        Dependencies,
+        Config,
+        App,
+        Created,
+        Registry
+      >["build"]
+    >,
+    ModuleRepositories<Live, Memory>,
+    App,
+    Dependencies,
+    Created
+  > {
+    return withContributions<
+      ReturnType<
+        RepositoryAppBuilder<
+          Name,
+          Live,
+          Memory,
+          Dependencies,
+          Config,
+          App,
+          Created,
+          Registry
+        >["build"]
+      >,
+      ModuleRepositories<Live, Memory>,
+      App,
+      Dependencies,
+      Created
+    >({ declaration: this.build(), workers: [], tasks: [], eventing: eventing as FeatureEventing });
+  }
+}
+
+class RepositoryUnconfiguredAppBuilder<
+  Name extends ModuleName,
+  Live extends AnyProvider,
+  Memory extends AnyProvider,
+  Dependencies extends TokenMap,
+  App,
+  Created extends App = App,
+  Registry = undefined,
+> extends RepositoryAppBuilder<
+  Name,
+  Live,
+  Memory,
+  Dependencies,
+  undefined,
+  App,
+  Created,
+  Registry
+> {
+  constructor(
+    name: Name,
+    registries: ModuleRegistries<Live, Memory>,
+    app: RepositoryAppDefinitionWithoutConfig<
+      Dependencies,
+      ModuleRepositories<Live, Memory>,
+      App,
+      Created
+    >,
+  ) {
+    // Named member by member: an app is usually a class, and spreading a class
+    // drops its static methods (`create` is not enumerable).
+    super(name, registries, {
+      contract: app.contract,
+      dependencies: app.dependencies,
+      ...("secrets" in app ? { secrets: app.secrets } : {}),
+      ...("operatorReads" in app ? { operatorReads: app.operatorReads } : {}),
+      create: (setup) => app.create(setup),
+    } as RepositoryAppDefinition<
+      Dependencies,
+      undefined,
+      ModuleRepositories<Live, Memory>,
+      App,
+      Created
+    >);
+  }
+}
+
+class ConfiguredAppBuilder<
+  Name extends ModuleName,
+  Dependencies extends TokenMap,
+  Config,
+  App,
+  Created extends App = App,
+  Registry = undefined,
+> {
+  constructor(
+    private readonly name: Name,
+    private readonly app: AppDefinition<Dependencies, Config, App>,
+    private readonly channels?: AnyChannelRegistry,
+  ) {}
+
+  /**
+   * The doors this module declares. Answers a declaration that is already
+   * installable, so there is no half-declared module and no build step to
+   * forget.
+   */
+  withTransports<const Transports extends readonly FeatureTransportDescriptor[]>(
+    ...transports: Transports
+  ): ModuleContributions<
+    ReturnType<
+      ConfiguredAppBuilder<Name, Dependencies, Config, App, Created, Registry>["build"]
+    > & {
+      readonly transports: readonly FeatureTransportDescriptor[];
+      readonly namespace: PublicNamespace<Name>;
+    },
+    unknown,
+    App,
+    Dependencies,
+    Created,
+    NamedDoorsOf<Transports>,
+    Name,
+    ContextNeedsOf<Transports>
+  > {
+    return withContributions<
+      ReturnType<
+        ConfiguredAppBuilder<Name, Dependencies, Config, App, Created, Registry>["build"]
+      > & {
+        readonly transports: readonly FeatureTransportDescriptor[];
+        readonly namespace: PublicNamespace<Name>;
+      },
+      unknown,
+      App,
+      Dependencies,
+      Created,
+      NamedDoorsOf<Transports>,
+      Name,
+      ContextNeedsOf<Transports>
+    >({
+      declaration: { ...this.build(), transports, namespace: publicNamespace(this.name) },
+      workers: [],
+      tasks: [],
+    });
+  }
+
+  /** Background work this module contributes to the worker role. */
+  withWorkers(...workers: readonly unknown[]) {
+    return withContributions({ declaration: this.build(), workers, tasks: [] });
+  }
+
+  /** One-shot work this module contributes to the tasks role. */
+  withTasks(...tasks: readonly unknown[]) {
+    return withContributions({ declaration: this.build(), workers: [], tasks });
+  }
+
+  /** Migration steps this module declares, built in every role; tasks and worker run them. */
+  withMigrations(...steps: readonly unknown[]) {
+    return withContributions({
+      declaration: bindingMigrations(this.build(), () => steps),
+      workers: [],
+      tasks: [],
+    });
+  }
+
+  /** This module's event sourcing, built over the app above. */
+  withEventing<Definition>(eventing: FeatureEventing<undefined, App, unknown, Definition>) {
+    return withContributions({
+      declaration: this.build(),
+      workers: [],
+      tasks: [],
+      eventing: eventing as FeatureEventing,
+    });
+  }
+
+  build(): ServerFeatureDeclaration<
+    Config,
+    Dependencies,
+    Record<never, never>,
+    App,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    Name
+  > &
+    ChannelsDeclared<Registry> {
+    const app = this.app;
+    const declaration = serverFeature(this.name)
+      .withConfigType<Config>()
+      .withDependencies(app.dependencies)
+      .withSetup(
+        ({ dependencies, config, secrets, resources, role, channels, declaredMigrationSteps }) =>
+          app.create({
+            dependencies,
+            config,
+            secrets,
+            resources,
+            role,
+            ...(channels === undefined ? {} : { channels }),
+            ...(declaredMigrationSteps === undefined ? {} : { declaredMigrationSteps }),
+          }),
+      )
+      .provides(app.contract)
+      .build();
+    const declared = declaringChannels(
+      {
+        ...declaration,
+        name: this.name,
+        repositories: snapshotRepositories(app.repositories),
+        ...declaredOwner(app),
+        ...(app.contract instanceof ModuleApiToken ? { apiContract: app.contract } : {}),
+      },
+      this.channels,
+    );
+    return declared as typeof declared & ChannelsDeclared<Registry>;
+  }
+}
+
+class UnconfiguredAppBuilder<
+  Name extends ModuleName,
+  Dependencies extends TokenMap,
+  App,
+  Created extends App = App,
+  Registry = undefined,
+> {
+  constructor(
+    private readonly name: Name,
+    private readonly app: AppDefinitionWithoutConfig<Dependencies, App>,
+    private readonly channels?: AnyChannelRegistry,
+  ) {}
+
+  /**
+   * The doors this module declares. Answers a declaration that is already
+   * installable, so there is no half-declared module and no build step to
+   * forget.
+   */
+  withTransports<const Transports extends readonly FeatureTransportDescriptor[]>(
+    ...transports: Transports
+  ): ModuleContributions<
+    ReturnType<UnconfiguredAppBuilder<Name, Dependencies, App, Created, Registry>["build"]> & {
+      readonly transports: readonly FeatureTransportDescriptor[];
+      readonly namespace: PublicNamespace<Name>;
+    },
+    unknown,
+    App,
+    Dependencies,
+    Created,
+    NamedDoorsOf<Transports>,
+    Name,
+    ContextNeedsOf<Transports>
+  > {
+    return withContributions<
+      ReturnType<UnconfiguredAppBuilder<Name, Dependencies, App, Created, Registry>["build"]> & {
+        readonly transports: readonly FeatureTransportDescriptor[];
+        readonly namespace: PublicNamespace<Name>;
+      },
+      unknown,
+      App,
+      Dependencies,
+      Created,
+      NamedDoorsOf<Transports>,
+      Name,
+      ContextNeedsOf<Transports>
+    >({
+      declaration: { ...this.build(), transports, namespace: publicNamespace(this.name) },
+      workers: [],
+      tasks: [],
+    });
+  }
+
+  /** Background work this module contributes to the worker role. */
+  withWorkers(...workers: readonly unknown[]) {
+    return withContributions({ declaration: this.build(), workers, tasks: [] });
+  }
+
+  /** One-shot work this module contributes to the tasks role. */
+  withTasks(...tasks: readonly unknown[]) {
+    return withContributions({ declaration: this.build(), workers: [], tasks });
+  }
+
+  /** Migration steps this module declares, built in every role; tasks and worker run them. */
+  withMigrations(...steps: readonly unknown[]) {
+    return withContributions({
+      declaration: bindingMigrations(this.build(), () => steps),
+      workers: [],
+      tasks: [],
+    });
+  }
+
+  /** This module's event sourcing, built over the app above. */
+  withEventing<Definition>(eventing: FeatureEventing<undefined, App, unknown, Definition>) {
+    return withContributions({
+      declaration: this.build(),
+      workers: [],
+      tasks: [],
+      eventing: eventing as FeatureEventing,
+    });
+  }
+
+  build(): ServerFeatureDeclaration<
+    undefined,
+    Dependencies,
+    Record<never, never>,
+    App,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    Name
+  > &
+    ChannelsDeclared<Registry> {
+    const app = this.app;
+    const declaration = serverFeature(this.name)
+      .withConfigType<undefined>()
+      .withDependencies(app.dependencies)
+      .withSetup(
+        ({ dependencies, config, secrets, resources, role, channels, declaredMigrationSteps }) =>
+          app.create({
+            dependencies,
+            config,
+            secrets,
+            resources,
+            role,
+            ...(channels === undefined ? {} : { channels }),
+            ...(declaredMigrationSteps === undefined ? {} : { declaredMigrationSteps }),
+          }),
+      )
+      .provides(app.contract)
+      .build();
+    const declared = declaringChannels(
+      {
+        ...declaration,
+        name: this.name,
+        repositories: snapshotRepositories(app.repositories),
+        ...declaredOwner(app),
+        ...(app.contract instanceof ModuleApiToken ? { apiContract: app.contract } : {}),
+      },
+      this.channels,
+    );
+    return declared as typeof declared & ChannelsDeclared<Registry>;
+  }
+}
+
+/**
+ * Installable declaration accepting further work contributions.
+ * Stays installable after any contribution.
+ */
+export type ModuleContributions<
+  Declaration,
+  Repositories = unknown,
+  App = unknown,
+  Dependencies extends TokenMap = TokenMap,
+  Created = App,
+  Named extends RestDoorCredential = never,
+  Module = never,
+  Needs extends MiddlewareContext = never,
+> = Declaration &
+  Readonly<{
+    /** Type-only: the names of the context its routes ask for that it has not provided yet. */
+    readonly unprovidedMiddlewareContext?: Needs["name"];
+    readonly workers: readonly unknown[];
+    readonly tasks: readonly unknown[];
+    readonly eventing: FeatureEventing | undefined;
+    withWorkers(
+      ...workers: readonly unknown[]
+    ): ModuleContributions<
+      Declaration,
+      Repositories,
+      App,
+      Dependencies,
+      Created,
+      Named,
+      Module,
+      Needs
+    >;
+    withTasks(
+      bind: ModuleTaskBinder<Dependencies, Repositories, Created, DeclaredConfigOf<Declaration>>,
+    ): ModuleContributions<
+      Declaration,
+      Repositories,
+      App,
+      Dependencies,
+      Created,
+      Named,
+      Module,
+      Needs
+    >;
+    withTasks(
+      ...tasks: readonly unknown[]
+    ): ModuleContributions<
+      Declaration,
+      Repositories,
+      App,
+      Dependencies,
+      Created,
+      Named,
+      Module,
+      Needs
+    >;
+    withMigrations(
+      bind: ModuleMigrationBinder<
+        Dependencies,
+        Repositories,
+        Created,
+        DeclaredConfigOf<Declaration>
+      >,
+    ): ModuleContributions<
+      Declaration,
+      Repositories,
+      App,
+      Dependencies,
+      Created,
+      Named,
+      Module,
+      Needs
+    >;
+    withMigrations(
+      ...steps: readonly unknown[]
+    ): ModuleContributions<
+      Declaration,
+      Repositories,
+      App,
+      Dependencies,
+      Created,
+      Named,
+      Module,
+      Needs
+    >;
+    /**
+     * Credentials, the API door and hand-bound middleware context its declarations name. A
+     * bound context counts as provided; one whose value its route's schema refuses is an error.
+     */
+    provideMiddlewareBindings<const Bindings extends readonly MiddlewareBinding[]>(
+      bind: ModuleMiddlewareBindings<Dependencies, Created, Bindings>,
+      ...mistyped: [MistypedContextNames<Bindings, Needs>] extends [never]
+        ? []
+        : [mistypedMiddlewareContext: MistypedContextNames<Bindings, Needs>]
+    ): ModuleContributions<
+      Declaration,
+      Repositories,
+      App,
+      Dependencies,
+      Created,
+      Named,
+      Module,
+      Exclude<Needs, { readonly name: BoundContextNames<Bindings> }>
+    >;
+    /** The doors for the module-bound credentials its own routes name: exactly those, typed. */
+    withDoors<const Doors extends ModuleDoors<Named, ReachableApi<Module, Dependencies>>>(
+      doors: Doors & {
+        readonly [
+          Extra in Exclude<
+            keyof Doors,
+            keyof ModuleDoors<Named, ReachableApi<Module, Dependencies>>
+          >
+        ]: never;
+      },
+    ): ModuleContributions<
+      Declaration,
+      Repositories,
+      App,
+      Dependencies,
+      Created,
+      Named,
+      Module,
+      Needs
+    >;
+    withEventing<Definition>(
+      eventing: FeatureEventing<Repositories, App, unknown, Definition>,
+    ): ModuleContributions<
+      Declaration,
+      Repositories,
+      App,
+      Dependencies,
+      Created,
+      Named,
+      Module,
+      Needs
+    >;
+    /** A value for every context its own routes ask for: exactly those names, each typed. */
+    provideMiddlewareContext<
+      const Provided extends ModuleMiddlewareContext<Needs, Dependencies, Created>,
+    >(
+      provided: Provided & {
+        readonly [Extra in Exclude<keyof Provided, Needs["name"]>]: never;
+      },
+    ): ModuleContributions<Declaration, Repositories, App, Dependencies, Created, Named, Module>;
+  }>;
+
+/** A built declaration, as the binding and task wrappers read the fields they need. */
+interface InstallableDeclaration {
+  readonly name: string;
+  readonly dependencies: TokenMap;
+  readonly install: (args: FeatureInstallArguments) => Promise<InstalledFeatureState>;
+}
+
+/** Bind middleware at install (API role only). */
+function bindingMiddleware<Declaration extends object>(
+  declaration: Declaration,
+  bind: ModuleMiddlewareBindings<TokenMap, never>,
+): Declaration {
+  const installable = declaration as Declaration & InstallableDeclaration;
+
+  return {
+    ...declaration,
+    install: async (args: FeatureInstallArguments): Promise<InstalledFeatureState> => {
+      const state = await installable.install(args);
+      if (args.role !== "api") return state;
+
+      return {
+        ...state,
+        middlewareBindings: [
+          ...(state.middlewareBindings ?? []),
+          ...bind({
+            app: state.provided as never,
+            dependencies: resolveTokens(
+              installable.dependencies,
+              args.resolve,
+            ) as ResolvedTokens<TokenMap>,
+            api: (token) =>
+              token.name === installable.name ? state.provided : args.resolve(token),
+          }),
+        ],
+      };
+    },
+  };
+}
+
+/** Build tasks at install (tasks role only), over the App and repositories just installed. */
+function bindingTasks<Declaration extends object>(
+  declaration: Declaration,
+  bind: ModuleTaskBinder<TokenMap, unknown, never>,
+): Declaration {
+  const installable = declaration as Declaration & InstallableDeclaration;
+
+  return {
+    ...declaration,
+    install: async (args: FeatureInstallArguments): Promise<InstalledFeatureState> => {
+      const state = await installable.install(args);
+      if (args.role !== "tasks") return state;
+
+      const built = await bind({
+        app: state.provided as never,
+        repositories: state.repositories,
+        dependencies: resolveTokens(
+          installable.dependencies,
+          args.resolve,
+        ) as ResolvedTokens<TokenMap>,
+        config: declaredConfig(args.config),
+        secrets: args.secrets ?? undeclaredSecrets(installable.name),
+      });
+      return { ...state, tasks: [...(state.tasks ?? []), ...built] };
+    },
+  };
+}
+
+/** Build migration steps at install in every role (the api's feed ops, S6-FEED), over the App. */
+function bindingMigrations<Declaration extends object>(
+  declaration: Declaration,
+  bind: ModuleMigrationBinder<TokenMap, unknown, never>,
+): Declaration {
+  const installable = declaration as Declaration & InstallableDeclaration;
+
+  return {
+    ...declaration,
+    install: async (args: FeatureInstallArguments): Promise<InstalledFeatureState> => {
+      const state = await installable.install(args);
+      const built = await bind({
+        app: state.provided as never,
+        repositories: state.repositories,
+        dependencies: resolveTokens(
+          installable.dependencies,
+          args.resolve,
+        ) as ResolvedTokens<TokenMap>,
+        config: declaredConfig(args.config),
+        secrets: args.secrets ?? undeclaredSecrets(installable.name),
+        replayer: args.replayer ?? processProjectionReplayer({ eventing: undefined }),
+      });
+      return { ...state, migrationSteps: [...(state.migrationSteps ?? []), ...built] };
+    },
+  };
+}
+
+/** Adds the worker, task, middleware and eventing halves to a built declaration. */
+function withContributions<
+  Declaration extends object,
+  Repositories = unknown,
+  App = unknown,
+  Dependencies extends TokenMap = TokenMap,
+  Created = App,
+  Named extends RestDoorCredential = never,
+  Module = never,
+  Needs extends MiddlewareContext = never,
+>({
+  declaration,
+  workers,
+  tasks,
+  eventing,
+}: {
+  declaration: Declaration;
+  workers: readonly unknown[];
+  tasks: readonly unknown[];
+  eventing?: FeatureEventing;
+}): ModuleContributions<
+  Declaration,
+  Repositories,
+  App,
+  Dependencies,
+  Created,
+  Named,
+  Module,
+  Needs
+> {
+  const contributions = {
+    ...declaration,
+    workers,
+    tasks,
+    eventing,
+    withWorkers: (...next: readonly unknown[]) =>
+      withContributions({ declaration, workers: [...workers, ...next], tasks, eventing }),
+    withTasks: (...next: readonly unknown[]) => {
+      const [bind] = next;
+      if (next.length === 1 && isTaskBinder(bind)) {
+        return withContributions({
+          declaration: bindingTasks(declaration, bind),
+          workers,
+          tasks,
+          eventing,
+        });
+      }
+      return withContributions({ declaration, workers, tasks: [...tasks, ...next], eventing });
+    },
+    withMigrations: (...next: readonly unknown[]) => {
+      const [bind] = next;
+      const binder = next.length === 1 && isTaskBinder(bind) ? bind : () => next;
+      return withContributions({
+        declaration: bindingMigrations(declaration, binder),
+        workers,
+        tasks,
+        eventing,
+      });
+    },
+    provideMiddlewareBindings: (bind: ModuleMiddlewareBindings<TokenMap, never>) =>
+      withContributions({
+        declaration: bindingMiddleware(declaration, bind),
+        workers,
+        tasks,
+        eventing,
+      }),
+    withDoors: (doors: Readonly<Record<string, ErasedRestDoorDefinition>>) =>
+      withContributions({
+        declaration: bindingMiddleware(declaration, ({ api }) =>
+          Object.values(doors).map((door) =>
+            bindRestCredential(door.credential, () => door.open(api(door.needs))),
+          ),
+        ),
+        workers,
+        tasks,
+        eventing,
+      }),
+    withEventing: (next: FeatureEventing) =>
+      withContributions({
+        declaration,
+        workers,
+        tasks,
+        eventing: withAnotherPipeline(eventing, next),
+      }),
+    provideMiddlewareContext: (provided: Readonly<Record<string, ContextResolver>>) =>
+      withContributions({
+        declaration: bindingMiddleware(declaration, (setup) =>
+          Object.entries(provided).map(([name, resolve]): MiddlewareContextBinding => ({
+            middlewareContext: name,
+            resolve: (request, input) => resolve(request, { ...setup, input }),
+          })),
+        ),
+        workers,
+        tasks,
+        eventing,
+      }),
+  } as ModuleContributions<
+    Declaration,
+    Repositories,
+    App,
+    Dependencies,
+    Created,
+    Named,
+    Module,
+    Needs
+  >;
+
+  return contributions;
+}
+
+/** A provided context's resolver, as the installer holds it once the builder checked its type. */
+type ContextResolver = (
+  request: Request,
+  setup: MiddlewareContextSetup<TokenMap, never>,
+) => unknown;
+
+function isTaskBinder(value: unknown): value is ModuleTaskBinder<TokenMap, unknown, never> {
+  return typeof value === "function";
+}
+
+/**
+ * What a module is handed where the process composed no chain. Declaring costs
+ * nothing, so this only ever fires on an actual resolve, naming both.
+ */
+function undeclaredSecrets(feature: string): ScopedSecrets {
+  return new ScopedSecrets((handle) => {
+    throw new FeatureSecretsUnavailableError(feature, handle.id);
+  });
+}
+
+/**
+ * The one process parse (§6) already produced this feature's slice, so the
+ * declaration only gives it a type. This is the single boundary where the
+ * parsed value stops being `unknown`; there is no second schema.
+ */
+type ChannelInstall = (args: FeatureInstallArguments) => Promise<InstalledFeatureState>;
+
+/**
+ * Builds the module's channels once per install, on the tier its stores state, and hands them
+ * to the module class as `setup.channels` (record §5). No registry, nothing changes.
+ */
+function declaringChannels<Declaration extends Readonly<{ name: string; install: unknown }>>(
+  declaration: Declaration,
+  registry: AnyChannelRegistry | undefined,
+): Declaration {
+  if (registry === undefined) return declaration;
+  const { name } = declaration;
+  const install = declaration.install as ChannelInstall;
+  const declaring: ChannelInstall = async (args) => {
+    const selection = args.repositorySelection;
+    if (!selection) throw new Error(`Module "${name}" was installed without a store tier.`);
+    const channels = await instantiateChannels(registry, {
+      tier: selection.tier,
+      members: selection.members,
+      config: args.config,
+      secrets: args.secrets ?? undeclaredSecrets(name),
+      resolve: args.resolve,
+    });
+    return install({ ...args, channels });
+  };
+  return { ...declaration, channelRegistry: registry, install: declaring };
+}
+
+function declaredConfig<Config>(value: unknown): Config {
+  return value as Config;
+}
+
+function resolveTokens(
+  tokens: TokenMap,
+  resolve: (token: TokenIdentity) => unknown,
+): Record<string, unknown> {
+  const resolved: Record<string, unknown> = {};
+  for (const [key, token] of Object.entries(tokens)) {
+    resolved[key] = resolve(token);
+  }
+  return resolved;
+}
+
+function declaredOwner(app: object): {
+  config?: ConfigSlice;
+  secrets?: Readonly<Record<string, SecretHandle<unknown>>>;
+  operatorReads?: Readonly<Record<string, unknown>>;
+  publicConfig?: (config: unknown, api: unknown) => unknown;
+} {
+  const owner = app as {
+    config?: ConfigSlice;
+    secrets?: Readonly<Record<string, SecretHandle<unknown>>>;
+    operatorReads?: Readonly<Record<string, unknown>>;
+    publicConfig?: (config: unknown, api: unknown) => unknown;
+  };
+  return {
+    config: owner.config,
+    secrets: owner.secrets,
+    ...(owner.operatorReads ? { operatorReads: owner.operatorReads } : {}),
+    publicConfig: owner.publicConfig,
+  };
+}

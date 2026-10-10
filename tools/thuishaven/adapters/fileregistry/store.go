@@ -1,6 +1,6 @@
 // Package fileregistry implements app.Store on the filesystem: the cross-worktree
 // registry + daemon record under the thuishaven home dir, plus the two
-// worktree-local files (the slug cache and the .env.portless overlay).
+// worktree-local files (the slug cache and the sticky selection).
 package fileregistry
 
 import (
@@ -22,6 +22,8 @@ import (
 // Store is the filesystem-backed implementation of app.Store.
 type Store struct {
 	home string
+	// daemonLock is the held haven.lock while this process is the daemon.
+	daemonLock *os.File
 }
 
 // New builds a Store rooted at the thuishaven home dir (~/.langwatch/portless).
@@ -30,9 +32,11 @@ func New(home string) *Store { return &Store{home: home} }
 func (s *Store) registryDir() string          { return filepath.Join(s.home, "registry") }
 func (s *Store) stackPath(slug string) string { return filepath.Join(s.registryDir(), slug+".json") }
 func (s *Store) daemonPath() string           { return filepath.Join(s.home, "haven.json") }
+func (s *Store) daemonLockPath() string       { return filepath.Join(s.home, "haven.lock") }
 
-// SaveStack persists one stack's registry entry. Mode 0o600: the entry carries
-// LocalAPIKey, so it must not be world-readable.
+// SaveStack persists one stack's registry entry, atomically so the reaper never
+// reads a torn file mid-heartbeat and drops a live stack. Mode 0o600: the entry
+// carries LocalAPIKey, so it must not be world-readable.
 func (s *Store) SaveStack(st domain.Stack) error {
 	if err := os.MkdirAll(s.registryDir(), 0o755); err != nil {
 		return err
@@ -41,7 +45,7 @@ func (s *Store) SaveStack(st domain.Stack) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(s.stackPath(st.Slug), append(b, '\n'), 0o600)
+	return writeFileAtomic(s.stackPath(st.Slug), append(b, '\n'), 0o600)
 }
 
 // RemoveStack drops a stack's registry entry.
@@ -97,6 +101,7 @@ func (s *Store) WriteSlugCache(worktreeDir, slug string) error {
 // selectionFile is the on-disk shape of the worktree-local sticky service
 // selection (ADR-064) — .haven.json next to .langwatch-slug.
 type selectionFile struct {
+	Mode     string           `json:"mode,omitempty"`
 	Services *selectionFields `json:"services"`
 }
 
@@ -106,25 +111,67 @@ type selectionFile struct {
 // turned ON — the natural thing to hand-write, and what a truncated or
 // hand-merged file looks like — would silently strip gateway and nlp off the
 // stack. Absent means "not stated", and what is not stated keeps its default.
+//
+// A `"workers"` key written before the worker became its own application is
+// simply not decoded any more, which is the point of dropping the field rather
+// than keeping it: every one of those files says `"workers": false`, and a
+// field would read that as "run no background processing at all".
 type selectionFields struct {
-	Workers *bool `json:"workers"`
 	Gateway *bool `json:"gateway"`
 	NLP     *bool `json:"nlp"`
 	Langy   *bool `json:"langy"`
 	IDP     *bool `json:"idp"`
+	Mail    *bool `json:"mail"`
+	// The two developer tools, both off by default and both stated here the
+	// same way as the rest, so a file written before they existed keeps
+	// leaving them off rather than reading as a deliberate choice.
+	DesignSystem *bool `json:"design-system"`
+	MailRoom     *bool `json:"mail-room"`
+	Langevals    *bool `json:"langevals"`
+	Storage      *bool `json:"storage"`
+	Voice        *bool `json:"voice"`
+	LLM          *bool `json:"llm"`
+	Analytics    *bool `json:"analytics"`
+	Outbound     *bool `json:"outbound"`
+	// Payment is stored as "paymentsim": every file written while the lane was
+	// opt-in says `"payment": false`, which would keep the new default off, so
+	// that key is no longer decoded (the "workers" precedent above).
+	Payment   *bool `json:"paymentsim"`
+	Telemetry *bool `json:"telemetry"`
+	Lambda    *bool `json:"lambda"`
+	// LegacyDesignSystem decodes the pre-rename key (`"storybook"`) a
+	// worktree's .haven.json may still carry. applyTo prefers the new key
+	// when both are present; WriteSelection never writes it, so the next
+	// `haven up` migrates the file to the new spelling. Mail-room's own
+	// legacy `"mail"` shim is gone: that key now states the mail sink lane.
+	LegacyDesignSystem *bool `json:"storybook,omitempty"`
 }
 
 // applyTo overlays the services this file actually states onto sel.
 func (f selectionFields) applyTo(sel *domain.Selection) {
-	for _, field := range []struct{ stated, target *bool }{
-		{f.Workers, &sel.Workers},
-		{f.Gateway, &sel.Gateway},
-		{f.NLP, &sel.NLP},
-		{f.Langy, &sel.Langy},
-		{f.IDP, &sel.IDP},
+	for _, field := range []struct{ stated, legacy, target *bool }{
+		{f.Gateway, nil, &sel.Gateway},
+		{f.NLP, nil, &sel.NLP},
+		{f.Langy, nil, &sel.Langy},
+		{f.IDP, nil, &sel.IDP},
+		{f.Mail, nil, &sel.Mail},
+		{f.DesignSystem, f.LegacyDesignSystem, &sel.DesignSystem},
+		{f.MailRoom, nil, &sel.MailRoom},
+		{f.Langevals, nil, &sel.Langevals},
+		{f.Storage, nil, &sel.Storage},
+		{f.Voice, nil, &sel.Voice},
+		{f.LLM, nil, &sel.LLM},
+		{f.Analytics, nil, &sel.Analytics},
+		{f.Outbound, nil, &sel.Outbound},
+		{f.Payment, nil, &sel.Payment},
+		{f.Telemetry, nil, &sel.Telemetry},
+		{f.Lambda, nil, &sel.Lambda},
 	} {
-		if field.stated != nil {
+		switch {
+		case field.stated != nil:
 			*field.target = *field.stated
+		case field.legacy != nil:
+			*field.target = *field.legacy
 		}
 	}
 }
@@ -149,6 +196,7 @@ func (s *Store) ReadSelection(worktreeDir string) (domain.Selection, bool) {
 	}
 	sel := domain.DefaultSelection()
 	f.Services.applyTo(&sel)
+	sel.Mode = f.Mode // the retired held, watch, watch-ui and bundled-ui keys are not decoded
 	return sel, true
 }
 
@@ -160,12 +208,23 @@ func (s *Store) ReadSelection(worktreeDir string) (domain.Selection, bool) {
 // on the default-keeping behaviour above — that is there for files it did not
 // write.
 func (s *Store) WriteSelection(worktreeDir string, sel domain.Selection) error {
-	b, err := json.MarshalIndent(selectionFile{Services: &selectionFields{
-		Workers: &sel.Workers,
-		Gateway: &sel.Gateway,
-		NLP:     &sel.NLP,
-		Langy:   &sel.Langy,
-		IDP:     &sel.IDP,
+	b, err := json.MarshalIndent(selectionFile{Mode: sel.Mode, Services: &selectionFields{
+		Gateway:      &sel.Gateway,
+		NLP:          &sel.NLP,
+		Langy:        &sel.Langy,
+		IDP:          &sel.IDP,
+		Mail:         &sel.Mail,
+		DesignSystem: &sel.DesignSystem,
+		MailRoom:     &sel.MailRoom,
+		Langevals:    &sel.Langevals,
+		Storage:      &sel.Storage,
+		Voice:        &sel.Voice,
+		LLM:          &sel.LLM,
+		Analytics:    &sel.Analytics,
+		Outbound:     &sel.Outbound,
+		Payment:      &sel.Payment,
+		Telemetry:    &sel.Telemetry,
+		Lambda:       &sel.Lambda,
 	}}, "", "  ")
 	if err != nil {
 		return err
@@ -179,37 +238,87 @@ func writeFileAtomic(path string, data []byte, perm os.FileMode) error {
 	return atomicfile.Write(path, data, perm)
 }
 
-// WriteOverlay writes platform/app/.env.portless. Mode 0o600: it carries
-// LANGWATCH_API_KEY, so it must not be world-readable.
-func (s *Store) WriteOverlay(lwDir string, st domain.Stack) error {
-	return os.WriteFile(filepath.Join(lwDir, ".env.portless"), []byte(st.OverlayFile()), 0o600)
+// prereqSkipsPath is the machine-wide record of which prerequisites `haven
+// install` was told never to ask about again. It lives beside the registry
+// rather than in a worktree: what is installed on the machine is the same
+// answer from every checkout, and so is the developer's decision about it.
+func (s *Store) prereqSkipsPath() string { return filepath.Join(s.home, "install-skips.json") }
+
+// prereqSkipsFile is the on-disk shape: what `haven self install` was told about
+// this machine. A list for the skips rather than a map, so the file reads as
+// the sentence it is ("never ask me about these") and a hand edit is obvious.
+type prereqSkipsFile struct {
+	Skipped []string `json:"skipped"`
+	// ContainerPosture is colima, docker or none — the one answer every
+	// container-shaped decision downstream is derived from. Empty means the
+	// developer has never chosen, which is what makes haven look instead.
+	ContainerPosture string `json:"containerPosture,omitempty"`
 }
 
-// hmrGatePath is the worktree-local marker the Vite HMR-gate plugin reads.
-func (s *Store) hmrGatePath(lwDir string) string {
-	return filepath.Join(lwDir, ".haven-hmr-gate")
-}
-
-// WriteHMRGate writes the gate expiry (unix-ms) so Vite defers HMR until then.
-func (s *Store) WriteHMRGate(lwDir string, expiryUnixMs int64) error {
-	return os.WriteFile(s.hmrGatePath(lwDir), []byte(strconv.FormatInt(expiryUnixMs, 10)+"\n"), 0o644)
-}
-
-// ReadHMRGate reads the gate expiry (unix-ms); ok is false when no gate is set.
-func (s *Store) ReadHMRGate(lwDir string) (int64, bool) {
-	b, err := os.ReadFile(s.hmrGatePath(lwDir))
+// readPrereqFile loads the whole record. Absent, unreadable or corrupt all
+// read as empty: a preference nobody has expressed yet is not a failure, and
+// a truncated file must not be able to block the install command entirely.
+func (s *Store) readPrereqFile() prereqSkipsFile {
+	var f prereqSkipsFile
+	b, err := os.ReadFile(s.prereqSkipsPath())
 	if err != nil {
-		return 0, false
+		return prereqSkipsFile{}
 	}
-	n, err := strconv.ParseInt(strings.TrimSpace(string(b)), 10, 64)
-	if err != nil {
-		return 0, false
+	if json.Unmarshal(b, &f) != nil {
+		return prereqSkipsFile{}
 	}
-	return n, true
+	return f
 }
 
-// ClearHMRGate removes the marker so HMR resumes immediately.
-func (s *Store) ClearHMRGate(lwDir string) { _ = os.Remove(s.hmrGatePath(lwDir)) }
+// writePrereqFile replaces the record, sorted so it does not churn between
+// runs that record the same thing in a different order.
+func (s *Store) writePrereqFile(f prereqSkipsFile) error {
+	if err := os.MkdirAll(s.home, 0o755); err != nil {
+		return err
+	}
+	if f.Skipped == nil {
+		f.Skipped = []string{}
+	}
+	sort.Strings(f.Skipped)
+	b, err := json.MarshalIndent(f, "", "  ")
+	if err != nil {
+		return err
+	}
+	return writeFileAtomic(s.prereqSkipsPath(), append(b, '\n'), 0o644)
+}
+
+// ReadContainerPosture is the machine's stated container posture, "" when
+// never chosen.
+func (s *Store) ReadContainerPosture() string { return s.readPrereqFile().ContainerPosture }
+
+// WriteContainerPosture records it, leaving the skips in the same file alone.
+func (s *Store) WriteContainerPosture(posture string) error {
+	f := s.readPrereqFile()
+	f.ContainerPosture = posture
+	return s.writePrereqFile(f)
+}
+
+// ReadPrereqSkips loads the never-ask-again set.
+func (s *Store) ReadPrereqSkips() map[string]bool {
+	skips := map[string]bool{}
+	for _, key := range s.readPrereqFile().Skipped {
+		skips[key] = true
+	}
+	return skips
+}
+
+// WritePrereqSkips replaces the set, leaving the posture in the same file
+// alone.
+func (s *Store) WritePrereqSkips(skips map[string]bool) error {
+	f := s.readPrereqFile()
+	f.Skipped = []string{}
+	for key, on := range skips {
+		if on {
+			f.Skipped = append(f.Skipped, key)
+		}
+	}
+	return s.writePrereqFile(f)
+}
 
 // dbActivityPath is the machine-wide last-seen clock for per-slug databases.
 func (s *Store) dbActivityPath() string { return filepath.Join(s.home, "db-activity.json") }
@@ -255,27 +364,31 @@ func (s *Store) writeDBActivity(m map[string]time.Time) error {
 
 // ClaimDaemon / Daemon / ClearDaemon manage the singleton daemon record.
 
-// ClaimDaemon writes the daemon record only if none exists yet. The O_EXCL
-// create is atomic across processes, so of two daemons racing to start exactly
-// one claims the slot; the loser gets (false, nil) and an untouched record. A
-// stale record left by a crashed daemon must be cleared (ClearDaemon) before the
-// claim can succeed — ClaimDaemon itself never overwrites.
+// ClaimDaemon takes haven.lock without waiting and keeps it for the life of
+// this process (D9); the loser gets (false, nil) and an untouched record. The
+// lock is its own file because the record is renamed over, as lockDurations.
+// The kernel drops the lock with its holder, so a crash leaves nothing to clear.
 func (s *Store) ClaimDaemon(info app.DaemonInfo) (bool, error) {
 	if err := os.MkdirAll(s.home, 0o755); err != nil {
 		return false, err
 	}
-	f, err := os.OpenFile(s.daemonPath(), os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o644)
+	f, err := os.OpenFile(s.daemonLockPath(), os.O_CREATE|os.O_RDWR, 0o600) //nolint:gosec // G703: a fixed name under haven's own home
 	if err != nil {
-		if os.IsExist(err) {
+		return false, err
+	}
+	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
+		_ = f.Close()
+		if errors.Is(err, syscall.EWOULDBLOCK) {
 			return false, nil
 		}
 		return false, err
 	}
-	defer func() { _ = f.Close() }()
 	b, _ := json.MarshalIndent(info, "", "  ")
-	if _, err := f.Write(append(b, '\n')); err != nil {
+	if err := writeFileAtomic(s.daemonPath(), append(b, '\n'), 0o644); err != nil {
+		_ = f.Close()
 		return false, err
 	}
+	s.daemonLock = f
 	return true, nil
 }
 
@@ -291,7 +404,15 @@ func (s *Store) Daemon() (app.DaemonInfo, bool) {
 	return d, true
 }
 
-func (s *Store) ClearDaemon() { _ = os.Remove(s.daemonPath()) }
+// ClearDaemon drops the record, then the lock if this process holds it: in that
+// order, so a successor never claims and then loses its fresh record.
+func (s *Store) ClearDaemon() {
+	_ = os.Remove(s.daemonPath())
+	if s.daemonLock != nil {
+		_ = s.daemonLock.Close()
+		s.daemonLock = nil
+	}
+}
 
 func (s *Store) heavyRunsDir() string  { return filepath.Join(s.home, "heavy-runs") }
 func (s *Store) durationsPath() string { return filepath.Join(s.home, "run-durations.json") }
@@ -335,6 +456,27 @@ func (s *Store) HeavyRuns() int {
 // cannot hold a slot for a working day.
 const HeavyRunClaimTTL = 6 * time.Hour
 
+// heavyRunClaim is one heavy-run marker's payload - enough to say what it is
+// and how long it has been running.
+type heavyRunClaim struct {
+	Command string    `json:"command"`
+	At      time.Time `json:"at"`
+}
+
+// readHeavyRunClaim reads and parses one marker. ok is false when the file
+// cannot be read or parsed - the caller decides what that means for liveness.
+func readHeavyRunClaim(path string) (heavyRunClaim, bool) {
+	b, err := os.ReadFile(path) // #nosec G304 -- path is built from haven's own home dir
+	if err != nil {
+		return heavyRunClaim{}, false
+	}
+	var rec heavyRunClaim
+	if json.Unmarshal(b, &rec) != nil || rec.At.IsZero() {
+		return heavyRunClaim{}, false
+	}
+	return rec, true
+}
+
 // heavyRunExpired reads the claim's own timestamp. A marker that cannot be read
 // or parsed has not expired: the pid check already said something is alive
 // there, and inventing an expiry from an unreadable file would free a slot that
@@ -345,18 +487,39 @@ const HeavyRunClaimTTL = 6 * time.Hour
 // or one corrupt record holding machine-wide capacity for as long as it likes.
 // The same rule as domain.LiveSpawns, for the same reason.
 func (s *Store) heavyRunExpired(path string) bool {
-	b, err := os.ReadFile(path) // #nosec G304 -- path is built from haven's own home dir
-	if err != nil {
-		return false
-	}
-	var rec struct {
-		At time.Time `json:"at"`
-	}
-	if json.Unmarshal(b, &rec) != nil || rec.At.IsZero() {
+	rec, ok := readHeavyRunClaim(path)
+	if !ok {
 		return false
 	}
 	age := time.Since(rec.At)
 	return age < 0 || age > HeavyRunClaimTTL
+}
+
+// HeavyRunSnapshots lists the heavy runs currently holding a slot, across
+// every worktree and terminal, with what a wait estimate needs: which command
+// and when it started. Same liveness and expiry rule as HeavyRuns; a marker
+// this cannot parse still counts there but is skipped here, since there is
+// nothing to report about it.
+func (s *Store) HeavyRunSnapshots() []app.HeavyRunSnapshot {
+	entries, err := os.ReadDir(s.heavyRunsDir())
+	if err != nil {
+		return nil
+	}
+	var out []app.HeavyRunSnapshot
+	for _, e := range entries {
+		pid, err := strconv.Atoi(strings.TrimSuffix(e.Name(), ".json"))
+		if err != nil {
+			continue
+		}
+		path := filepath.Join(s.heavyRunsDir(), e.Name())
+		if !processAlive(pid) || s.heavyRunExpired(path) {
+			continue
+		}
+		if rec, ok := readHeavyRunClaim(path); ok {
+			out = append(out, app.HeavyRunSnapshot{Command: rec.Command, StartedAt: rec.At})
+		}
+	}
+	return out
 }
 
 // ClaimHeavyRun records this process as holding a heavy slot.
@@ -373,6 +536,189 @@ func (s *Store) ClaimHeavyRun(pid int, command string) (func(), error) {
 		return func() {}, err
 	}
 	return func() { _ = os.Remove(path) }, nil
+}
+
+func (s *Store) waitersDir(name string) string { return filepath.Join(s.home, "waiters", name) }
+
+// WaiterClaimTTL is how long a queued-run marker is believed. Comfortably
+// above domain.LongFailsafe (the longest anything waits before running
+// anyway), so a live, still-waiting run is never mistaken for a stale one.
+const WaiterClaimTTL = 2 * time.Hour
+
+// WaiterClaim is one queued run's registration - what the priority scheduler
+// (specs/setup/check-slots.feature, "Priority with aging") needs to compare
+// it against every other current waiter.
+type WaiterClaim struct {
+	Command         string            `json:"command"`
+	Caller          domain.CallerKind `json:"caller"`
+	AgentID         string            `json:"agentId,omitempty"`
+	QueuedAt        time.Time         `json:"queuedAt"`
+	OverrideHonored bool              `json:"overrideHonored,omitempty"`
+}
+
+// WaiterSnapshot is one currently-queued run, as WaiterClaim plus the pid it
+// was registered under - what lets a caller exclude its own registration
+// when it compares itself against everyone else waiting.
+type WaiterSnapshot struct {
+	PID int
+	WaiterClaim
+}
+
+// ClaimWaiter registers this process as queued for name's slot. The release
+// removes the marker; unlike a heavy-run claim there is nothing here to
+// resume from a crash - a queued run that dies simply stops competing, which
+// a dropped pid file already expresses with no further bookkeeping.
+func (s *Store) ClaimWaiter(pid int, name string, claim WaiterClaim) (func(), error) {
+	dir := s.waitersDir(name)
+	if err := os.MkdirAll(dir, 0o750); err != nil {
+		return func() {}, err
+	}
+	path := filepath.Join(dir, strconv.Itoa(pid)+".json")
+	b, err := json.Marshal(claim)
+	if err != nil {
+		return func() {}, err
+	}
+	if err := writeFileAtomic(path, b, 0o644); err != nil {
+		return func() {}, err
+	}
+	return func() { _ = os.Remove(path) }, nil
+}
+
+// WaiterSnapshots lists every run currently queued for name's slot, across
+// every worktree and terminal. Same liveness rule as HeavyRunSnapshots: a
+// dead pid or an expired marker is swept as it is found rather than reported,
+// and a marker this cannot parse is dropped rather than reaching code that
+// assumes its fields.
+func (s *Store) WaiterSnapshots(name string) []WaiterSnapshot {
+	dir := s.waitersDir(name)
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil
+	}
+	var out []WaiterSnapshot
+	for _, e := range entries {
+		if snap, ok := waiterFromEntry(dir, e.Name()); ok {
+			out = append(out, snap)
+		}
+	}
+	return out
+}
+
+// waiterFromEntry reads one waiter marker file, sweeping it away and
+// reporting ok=false whenever it is not a live, current waiter: not a pid at
+// all, a dead process, unparseable, or a marker past WaiterClaimTTL.
+func waiterFromEntry(dir, name string) (WaiterSnapshot, bool) {
+	pid, err := strconv.Atoi(strings.TrimSuffix(name, ".json"))
+	if err != nil {
+		return WaiterSnapshot{}, false
+	}
+	path := filepath.Join(dir, name)
+	if !processAlive(pid) {
+		_ = os.Remove(path)
+		return WaiterSnapshot{}, false
+	}
+	claim, ok := readWaiterClaim(path)
+	if !ok {
+		return WaiterSnapshot{}, false
+	}
+	if age := time.Since(claim.QueuedAt); age < 0 || age > WaiterClaimTTL {
+		_ = os.Remove(path)
+		return WaiterSnapshot{}, false
+	}
+	return WaiterSnapshot{PID: pid, WaiterClaim: claim}, true
+}
+
+// readWaiterClaim reads and parses one waiter marker. ok is false when the
+// file cannot be read or parsed at all - the caller drops it rather than
+// reaching code that assumes its fields.
+func readWaiterClaim(path string) (WaiterClaim, bool) {
+	b, err := os.ReadFile(path) // #nosec G304 -- path is built from haven's own home dir
+	if err != nil {
+		return WaiterClaim{}, false
+	}
+	var claim WaiterClaim
+	if json.Unmarshal(b, &claim) != nil || claim.QueuedAt.IsZero() {
+		return WaiterClaim{}, false
+	}
+	return claim, true
+}
+
+func (s *Store) holdersDir(name string) string { return filepath.Join(s.home, "holders", name) }
+
+// HolderClaim is one `haven machine slot run` holding name's slot: the label a waiter
+// sees it under and when it took the slot.
+type HolderClaim struct {
+	Label     string    `json:"label"`
+	StartedAt time.Time `json:"startedAt"`
+}
+
+// HolderSnapshot is one live slot holder, with the pid it registered under.
+type HolderSnapshot struct {
+	PID int
+	HolderClaim
+}
+
+// ClaimHolder records this process as holding name's slot, so a queued run can
+// name what it is waiting behind. Like ClaimWaiter it is telemetry only: the
+// flock admits, and a holder that dies just leaves a dead pid file.
+func (s *Store) ClaimHolder(pid int, name string, claim HolderClaim) (func(), error) {
+	dir := s.holdersDir(name)
+	if err := os.MkdirAll(dir, 0o750); err != nil {
+		return func() {}, err
+	}
+	path := filepath.Join(dir, strconv.Itoa(pid)+".json")
+	b, err := json.Marshal(claim)
+	if err != nil {
+		return func() {}, err
+	}
+	if err := writeFileAtomic(path, b, 0o644); err != nil {
+		return func() {}, err
+	}
+	return func() { _ = os.Remove(path) }, nil
+}
+
+// HolderSnapshots lists the live holders of name's slot. A dead pid, a marker
+// past HeavyRunClaimTTL or one this cannot parse is dropped, as for waiters.
+func (s *Store) HolderSnapshots(name string) []HolderSnapshot {
+	dir := s.holdersDir(name)
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil
+	}
+	var out []HolderSnapshot
+	for _, e := range entries {
+		if snap, ok := holderFromEntry(dir, e.Name()); ok {
+			out = append(out, snap)
+		}
+	}
+	return out
+}
+
+// holderFromEntry reads one holder marker, sweeping it away when its process
+// is dead or its claim is past the TTL.
+func holderFromEntry(dir, name string) (HolderSnapshot, bool) {
+	pid, err := strconv.Atoi(strings.TrimSuffix(name, ".json"))
+	if err != nil {
+		return HolderSnapshot{}, false
+	}
+	path := filepath.Join(dir, name)
+	if !processAlive(pid) {
+		_ = os.Remove(path)
+		return HolderSnapshot{}, false
+	}
+	b, err := os.ReadFile(path) // #nosec G304 -- path is built from haven's own home dir
+	if err != nil {
+		return HolderSnapshot{}, false
+	}
+	var claim HolderClaim
+	if json.Unmarshal(b, &claim) != nil || claim.StartedAt.IsZero() {
+		return HolderSnapshot{}, false
+	}
+	if age := time.Since(claim.StartedAt); age < 0 || age > HeavyRunClaimTTL {
+		_ = os.Remove(path)
+		return HolderSnapshot{}, false
+	}
+	return HolderSnapshot{PID: pid, HolderClaim: claim}, true
 }
 
 // processAlive reports whether a pid is a live process. Signal 0 tests for
@@ -533,4 +879,84 @@ func (s *Store) ReapEvents() []domain.ReapEvent {
 		return nil
 	}
 	return events
+}
+
+// runHistoryPath is beside the semaphore's home, one JSON object per line so
+// a crash mid-append leaves only the last line to lose rather than the file.
+func (s *Store) runHistoryPath() string { return filepath.Join(s.home, "run-history.jsonl") }
+
+// AppendRunHistory records one completed heavy run, capped at
+// domain.RunHistoryCap (oldest dropped). Best-effort: the caller must not
+// fail a real run over a history write, so every error here is returned for
+// the caller to log rather than to act on.
+func (s *Store) AppendRunHistory(rec domain.RunRecord) error {
+	if err := os.MkdirAll(s.home, 0o750); err != nil {
+		return err
+	}
+	release, err := s.lockRunHistory()
+	if err != nil {
+		return err
+	}
+	defer release()
+
+	all := append(s.readRunHistory(), rec)
+	if len(all) > domain.RunHistoryCap {
+		all = all[len(all)-domain.RunHistoryCap:]
+	}
+	return s.writeRunHistory(all)
+}
+
+// RunHistory reads the recent history newest-last. Absent or unreadable is an
+// empty history - every caller already treats that as "cannot estimate"
+// rather than an error.
+func (s *Store) RunHistory() []domain.RunRecord { return s.readRunHistory() }
+
+func (s *Store) readRunHistory() []domain.RunRecord {
+	b, err := os.ReadFile(s.runHistoryPath())
+	if err != nil {
+		return nil
+	}
+	var out []domain.RunRecord
+	for _, line := range strings.Split(strings.TrimSpace(string(b)), "\n") {
+		if line == "" {
+			continue
+		}
+		var rec domain.RunRecord
+		if json.Unmarshal([]byte(line), &rec) == nil {
+			out = append(out, rec)
+		}
+	}
+	return out
+}
+
+func (s *Store) writeRunHistory(records []domain.RunRecord) error {
+	var b strings.Builder
+	for _, rec := range records {
+		line, err := json.Marshal(rec)
+		if err != nil {
+			continue
+		}
+		b.Write(line)
+		b.WriteByte('\n')
+	}
+	return writeFileAtomic(s.runHistoryPath(), []byte(b.String()), 0o644)
+}
+
+// lockRunHistory takes the exclusive lock guarding the history file, the same
+// pattern as lockDurations and for the same reason: the writer renames a
+// fresh file over the path, so the lock has to be its own file rather than
+// one on an inode a concurrent writer is about to replace.
+func (s *Store) lockRunHistory() (func(), error) {
+	f, err := os.OpenFile(s.runHistoryPath()+".lock", os.O_CREATE|os.O_RDWR, 0o600)
+	if err != nil {
+		return nil, err
+	}
+	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX); err != nil {
+		_ = f.Close()
+		return nil, err
+	}
+	return func() {
+		_ = syscall.Flock(int(f.Fd()), syscall.LOCK_UN)
+		_ = f.Close()
+	}, nil
 }

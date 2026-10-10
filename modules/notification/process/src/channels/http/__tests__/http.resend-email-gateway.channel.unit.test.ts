@@ -1,0 +1,201 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const { EnvHttpProxyAgent, fetch } = vi.hoisted(() => ({
+  EnvHttpProxyAgent: vi.fn(),
+  fetch: vi.fn(),
+}));
+
+vi.mock("undici", () => ({ EnvHttpProxyAgent, fetch }));
+
+import { ResendEmailGatewayChannel } from "../http.resend-email-gateway.channel.ts";
+
+/**
+ * Spec: modules/notification/specs/packaged-mail-delivery.feature
+ */
+beforeEach(() => {
+  vi.clearAllMocks();
+  fetch.mockResolvedValue({ ok: true, json: async () => ({ id: "message" }) });
+});
+
+describe("given a Resend deployment behind an outbound proxy", () => {
+  describe("when two messages are sent", () => {
+    /** @scenario "The gateway named by the deployment is the one that sends" */
+    /** @scenario "Blind recipients never reach the rendered headers" */
+    /** @scenario "A crafted header cannot inject another one" */
+    it("builds one dispatcher and carries the whole message surface", async () => {
+      const close = vi.fn().mockResolvedValue(undefined);
+      EnvHttpProxyAgent.mockImplementation(function (this: { close: () => Promise<void> }) {
+        this.close = close;
+      });
+      const gateway = ResendEmailGatewayChannel.create({
+        configuration: { apiKey: "re_test" },
+        outboundProxy: { httpsProxy: "http://proxy.acme.example:8080" },
+      });
+      await gateway.send({
+        content: {
+          to: "public@acme.example",
+          bcc: "hidden@acme.example",
+          subject: "Alert",
+          html: "<p>Alert</p>",
+          headers: { "X-Name": "value\r\nBcc: injected@acme.example" },
+        },
+        defaultFrom: "noreply@acme.example",
+      });
+      await gateway.send({
+        content: { to: "second@acme.example", subject: "Second", html: "<p>Second</p>" },
+        defaultFrom: "noreply@acme.example",
+      });
+
+      expect(EnvHttpProxyAgent).toHaveBeenCalledOnce();
+      expect(fetch.mock.calls[0]?.[1]).toMatchObject({
+        headers: { Authorization: "Bearer re_test" },
+      });
+      const payload = JSON.parse(fetch.mock.calls[0]?.[1]?.body as string) as {
+        to: string[];
+        bcc: string[];
+        headers: Record<string, string>;
+      };
+      // Blind addresses travel in the envelope, never the rendered headers.
+      expect(payload.to).toEqual(["public@acme.example"]);
+      expect(payload.bcc).toEqual(["hidden@acme.example"]);
+      // A crafted header cannot close its field and open another.
+      expect(payload.headers["X-Name"]).toBe("value Bcc: injected@acme.example");
+
+      await gateway.close();
+      expect(close).toHaveBeenCalledOnce();
+    });
+  });
+
+  describe("when the proxy excludes the vendor host", () => {
+    /** @scenario "The gateway named by the deployment is the one that sends" */
+    it("sends without a dispatcher", async () => {
+      const gateway = ResendEmailGatewayChannel.create({
+        configuration: { apiKey: "re_test" },
+        outboundProxy: {
+          httpsProxy: "http://proxy.acme.example:8080",
+          noProxy: ".resend.com",
+        },
+      });
+      await gateway.send({
+        content: { to: "public@acme.example", subject: "Alert", html: "<p>Alert</p>" },
+        defaultFrom: "noreply@acme.example",
+      });
+
+      expect(EnvHttpProxyAgent).not.toHaveBeenCalled();
+      expect(fetch.mock.calls[0]?.[1]).not.toHaveProperty("dispatcher");
+    });
+  });
+});
+
+describe("given a Resend deployment with no API key", () => {
+  describe("when a message is sent", () => {
+    /** @scenario "A named but unusable gateway refuses instead of falling back" */
+    it("refuses naming the setting rather than calling the vendor", async () => {
+      const gateway = ResendEmailGatewayChannel.create({
+        configuration: {},
+        outboundProxy: {},
+      });
+
+      await expect(
+        gateway.send({
+          content: { to: "public@acme.example", subject: "Alert", html: "<p>Alert</p>" },
+          defaultFrom: "noreply@acme.example",
+        }),
+      ).rejects.toThrow(/RESEND_API_KEY/);
+      expect(fetch).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe("given the vendor rejects a send", () => {
+  describe("when the response is not ok", () => {
+    it("raises the status without reading a body that echoes recipients", async () => {
+      const cancel = vi.fn().mockResolvedValue(undefined);
+      const json = vi.fn();
+      fetch.mockResolvedValue({
+        ok: false,
+        status: 422,
+        statusText: "Unprocessable Entity",
+        body: { cancel },
+        json,
+      });
+      const gateway = ResendEmailGatewayChannel.create({
+        configuration: { apiKey: "re_test" },
+        outboundProxy: {},
+      });
+
+      await expect(
+        gateway.send({
+          content: { to: "public@acme.example", subject: "Alert", html: "<p>Alert</p>" },
+          defaultFrom: "noreply@acme.example",
+        }),
+      ).rejects.toThrow(/Resend responded 422/);
+      expect(cancel).toHaveBeenCalledOnce();
+      expect(json).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe("given a Resend deployment and a message with the full surface", () => {
+  describe("when it is sent", () => {
+    /** @scenario "The full message surface survives every gateway" */
+    it("carries attachments, reply-to and headers, and the blind copy as bcc", async () => {
+      const gateway = ResendEmailGatewayChannel.create({
+        configuration: { apiKey: "re_test" },
+        outboundProxy: {},
+      });
+      await gateway.send({
+        content: {
+          to: "public@acme.example",
+          bcc: "hidden@acme.example",
+          replyTo: "help@acme.example",
+          subject: "Report",
+          html: "<p>Report</p>",
+          headers: { "X-Report": "weekly" },
+          attachments: [{ filename: "report.csv", content: "a,b", contentType: "text/csv" }],
+        },
+        defaultFrom: "noreply@acme.example",
+      });
+      const payload = JSON.parse(fetch.mock.calls[0]?.[1]?.body as string) as Record<
+        string,
+        unknown
+      >;
+
+      expect(payload).toMatchObject({
+        to: ["public@acme.example"],
+        bcc: ["hidden@acme.example"],
+        reply_to: "help@acme.example",
+        headers: { "X-Report": "weekly" },
+        attachments: [{ filename: "report.csv", content: Buffer.from("a,b").toString("base64") }],
+      });
+    });
+  });
+});
+
+describe("given a Resend delivery that is attempted again", () => {
+  describe("when the same delivery identity is sent twice, and another once", () => {
+    /** @scenario "Resend retries reuse the same provider idempotency key" */
+    it("sends the same opaque key and payload for the retry, another key for another delivery", async () => {
+      const gateway = ResendEmailGatewayChannel.create({
+        configuration: { apiKey: "re_test" },
+        outboundProxy: {},
+      });
+      const base = { to: "public@acme.example", subject: "Alert", html: "<p>Alert</p>" };
+      for (const idempotencyKey of ["org:join:a", "org:join:a", "org:join:b"]) {
+        await gateway.send({
+          content: { ...base, idempotencyKey },
+          defaultFrom: "noreply@acme.example",
+        });
+      }
+      const [first, retry, other] = fetch.mock.calls.map(
+        (call) => call[1] as { headers: Record<string, string>; body: string },
+      );
+
+      expect(first?.headers["Idempotency-Key"]).toMatch(/^[a-f0-9]{64}$/);
+      expect(retry?.headers["Idempotency-Key"]).toBe(first?.headers["Idempotency-Key"]);
+      expect(other?.headers["Idempotency-Key"]).not.toBe(first?.headers["Idempotency-Key"]);
+      expect(retry?.body).toBe(first?.body);
+      expect(first?.body).not.toContain("idempotencyKey");
+    });
+  });
+});

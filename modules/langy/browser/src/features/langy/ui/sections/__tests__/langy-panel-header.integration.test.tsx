@@ -1,0 +1,325 @@
+/**
+ * The panel header rail: one line, the actions cluster, Minimise always last, and history as a
+ * PLACE that swaps the panel body for the recents list and hands it back.
+ * @vitest-environment jsdom
+ * Spec: specs/langy/langy-panel-header.feature
+ */
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
+import { cleanup, render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import type { ReactNode } from "react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+const PROJECT_ID = "project-demo";
+
+if (typeof window !== "undefined" && !window.ResizeObserver) {
+  Object.defineProperty(window, "ResizeObserver", {
+    configurable: true,
+    writable: true,
+    value: class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    },
+  });
+}
+
+vi.mock("@ai-sdk/react", () => ({
+  useChat: () => ({
+    messages: [],
+    sendMessage: vi.fn(),
+    stop: vi.fn(),
+    status: "ready",
+    setMessages: vi.fn(),
+    error: undefined,
+    clearError: vi.fn(),
+    regenerate: vi.fn(),
+  }),
+}));
+
+const currentDrawerRef = { current: undefined as string | undefined };
+vi.mock("@langwatch/browser-host/drawer", () => ({
+  useDrawer: () => ({
+    currentDrawer: currentDrawerRef.current,
+    openDrawer: vi.fn(),
+    closeDrawer: vi.fn(),
+    goBack: vi.fn(),
+  }),
+}));
+
+vi.mock("../../elements/langy-model-pill.tsx", () => ({
+  LangyModelPill: () => <div data-testid="model-pill" />,
+}));
+
+const ONE_CONVERSATION = {
+  id: "conv-1",
+  title: "Debugging the trace pipeline",
+  isShared: false,
+  isOwn: true,
+  messageCount: 3,
+  lastActivityAtMs: Date.now(),
+};
+
+vi.mock("../../../../../behavior/langy-api.ts", async () => {
+  const { createTrpcUtils, idleQuery, withFallback } =
+    await import("../../../__tests__/support/langy-api-mock.ts");
+
+  const trpcUtils = createTrpcUtils();
+
+  const explicitApi: Record<string, unknown> = {
+    langy: withFallback({
+      list: {
+        useInfiniteQuery: () => ({
+          ...idleQuery(),
+          data: { pages: [{ items: [ONE_CONVERSATION], nextCursor: null }] },
+          fetchNextPage: () => Promise.resolve(),
+          hasNextPage: false,
+          isFetchingNextPage: false,
+        }),
+      },
+      modelsAllowed: {
+        useQuery: () => ({
+          data: { modelsAllowed: null },
+          isLoading: false,
+          isError: false,
+        }),
+      },
+      messages: {
+        useQuery: () => ({
+          data: undefined,
+          isLoading: false,
+          isFetching: false,
+          isError: false,
+        }),
+      },
+      stopTurn: { useMutation: () => ({ mutateAsync: () => Promise.resolve() }) },
+      onConversationUpdate: { useSubscription: () => undefined },
+    }),
+    useUtils: () => trpcUtils,
+    useContext: () => trpcUtils,
+    modelProvider: {
+      getResolvedDefault: {
+        useQuery: () => ({
+          data: { model: "openai/gpt-5-mini" },
+          isLoading: false,
+          isSuccess: true,
+          isError: false,
+          refetch: () => Promise.resolve(),
+        }),
+      },
+      listAllForProjectForFrontend: {
+        useQuery: () => ({ data: [], isLoading: false }),
+      },
+      setRoleAssignmentForScope: { useMutation: () => ({ mutateAsync: () => Promise.resolve() }) },
+      setFeatureOverrideForScope: { useMutation: () => ({ mutateAsync: () => Promise.resolve() }) },
+    },
+    virtualKeys: {
+      list: { useQuery: () => ({ data: undefined, isLoading: false }) },
+    },
+    github: {
+      getConnectionStatus: {
+        useQuery: () => ({ data: undefined, isLoading: false, isError: true }),
+      },
+      disconnect: { useMutation: () => ({ mutate: () => undefined, isPending: false }) },
+    },
+  };
+
+  return { api: withFallback(explicitApi) };
+});
+
+import { useLangyStore } from "../../../../../behavior/langy.store.ts";
+import {
+  LangyHostApi,
+  LangyHostProvider,
+  type LangyRouteReading,
+} from "../../../../../model/langy-host.ts";
+import { LangyProvider } from "../../../../tools/ui/sections/langy-page-context.tsx";
+import { LangySidecar } from "../langy-panel.tsx";
+
+vi.mock("@langwatch/feature-flag-client", () => ({
+  useFeatureFlag: () => ({ enabled: false, isLoading: false }),
+}));
+
+class FakeLangyHost extends LangyHostApi {
+  project() {
+    return { id: PROJECT_ID, slug: "demo", name: "demo" };
+  }
+  organization() {
+    return { id: "org-1" };
+  }
+  team() {
+    return { id: "team-1", isPersonal: false, members: [{ userId: "user-1" }] };
+  }
+  organizationRole() {
+    return "MEMBER";
+  }
+  currentUser() {
+    return { id: "user-1", email: "staff@langwatch.ai" };
+  }
+  hasOrganizationPermission() {
+    return false;
+  }
+  hasPermission() {
+    return true;
+  }
+  isLoading() {
+    return false;
+  }
+  isDemoProject() {
+    return false;
+  }
+  route(): LangyRouteReading {
+    return { params: {}, query: {}, pathname: "/demo/traces" };
+  }
+  setQuery() {}
+  navigate() {}
+  planManagementUrl() {
+    return undefined;
+  }
+  succeeded() {}
+  failed() {}
+}
+
+const Wrapper = ({ children }: { children: ReactNode }) => (
+  <DesignSystemProvider forcedTheme="light">
+    <LangyHostProvider value={new FakeLangyHost()}>
+      <LangyProvider>{children}</LangyProvider>
+    </LangyHostProvider>
+  </DesignSystemProvider>
+);
+
+function renderPanel() {
+  return render(<LangySidecar />, { wrapper: Wrapper });
+}
+
+/** The actions cluster: every header control is a direct child of it — see PanelHeader. */
+async function actionsCluster(): Promise<HTMLElement> {
+  const newChat = await screen.findByRole("button", { name: "New chat" });
+  return newChat.parentElement as HTMLElement;
+}
+
+beforeEach(() => {
+  currentDrawerRef.current = undefined;
+  useLangyStore.setState({ isOpen: true, panelMode: "floating" });
+});
+
+afterEach(() => {
+  cleanup();
+});
+
+describe("given the Langy panel is open", () => {
+  describe("when the header renders", () => {
+    /** @scenario "The header is a single line" */
+    it("shows one line, the title then the actions, with no subtitle underneath", async () => {
+      renderPanel();
+
+      // The actions cluster's own parent is the header row: exactly two
+      // children (title, then actions). A subtitle row would add a third.
+      const row = await actionsCluster();
+      const headerRow = row.parentElement;
+      expect(headerRow?.children.length).toBe(2);
+      expect(headerRow?.children[1]).toBe(row);
+    });
+
+    /** @scenario "Minimise is the rightmost control" */
+    it("puts the Minimise control last", async () => {
+      renderPanel();
+
+      const row = await actionsCluster();
+      const buttons = within(row).getAllByRole("button");
+      const last = buttons[buttons.length - 1];
+      expect(last).toHaveAccessibleName("Minimise Langy");
+    });
+
+    /** @scenario "New conversation is distinct from minimise" */
+    it("offers New chat apart from Minimise", async () => {
+      renderPanel();
+
+      const newChat = await screen.findByRole("button", { name: "New chat" });
+      const minimise = await screen.findByRole("button", { name: "Minimise Langy" });
+
+      expect(newChat).not.toBe(minimise);
+      expect(
+        newChat.compareDocumentPosition(minimise) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+    });
+  });
+});
+
+describe("given the Langy panel is open", () => {
+  /** @scenario "History replaces the panel body with the recents list" */
+  it("swaps the message column for the recents list and marks the control pressed", async () => {
+    const user = userEvent.setup();
+    renderPanel();
+
+    const history = await screen.findByRole("button", { name: "Recent chats" });
+    expect(history).toHaveAttribute("aria-pressed", "false");
+
+    await user.click(history);
+
+    expect(await screen.findByText("Recent chats")).toBeInTheDocument();
+    expect(history).toHaveAttribute("aria-pressed", "true");
+    // The composer is gone while browsing — this is a place, not a popover.
+    expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+  });
+
+  describe("given the recents list is showing", () => {
+    let user: ReturnType<typeof userEvent.setup>;
+
+    beforeEach(() => {
+      user = userEvent.setup();
+      renderPanel();
+    });
+
+    /** @scenario "Choosing a conversation hands the panel back" */
+    it("returns to the message column on the chosen conversation", async () => {
+      await user.click(await screen.findByRole("button", { name: "Recent chats" }));
+      const row = await screen.findByRole("button", {
+        name: /Debugging the trace pipeline/,
+      });
+      await user.click(row);
+
+      expect(screen.queryByText("Recent chats")).not.toBeInTheDocument();
+      expect(await screen.findByRole("button", { name: "Recent chats" })).toHaveAttribute(
+        "aria-pressed",
+        "false",
+      );
+    });
+
+    /** @scenario "Leaving the recents list without choosing" */
+    it("returns to the message column on Back, Escape, or New chat, without picking anything", async () => {
+      await user.click(await screen.findByRole("button", { name: "Recent chats" }));
+      await user.click(await screen.findByRole("button", { name: "Back to chat" }));
+
+      expect(screen.queryByText("Recent chats")).not.toBeInTheDocument();
+      expect(await screen.findByRole("button", { name: "Recent chats" })).toHaveAttribute(
+        "aria-pressed",
+        "false",
+      );
+    });
+  });
+});
+
+describe("given the Langy panel is open in floating mode", () => {
+  /** @scenario "The header rail carries a one-click layout toggle" */
+  it("offers Dock to side, becomes Float once docked, and keeps both layouts in the overflow menu", async () => {
+    const user = userEvent.setup();
+    renderPanel();
+
+    const dock = await screen.findByRole("button", { name: "Dock to the side" });
+    expect((await actionsCluster()).contains(dock)).toBe(true);
+    await user.hover(dock);
+    expect(await screen.findByText("Dock to side")).toBeInTheDocument();
+
+    await user.click(dock);
+
+    expect(useLangyStore.getState().panelMode).toBe("sidebar");
+    const float = await screen.findByRole("button", { name: "Float the panel" });
+    expect((await actionsCluster()).contains(float)).toBe(true);
+    expect(screen.queryByRole("button", { name: "Dock to the side" })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "More Langy options" }));
+    expect(await screen.findByRole("menuitem", { name: "Floating" })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "Sidebar" })).toBeInTheDocument();
+  });
+});

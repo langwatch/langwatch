@@ -1,0 +1,542 @@
+Feature: Workflow service boundary
+
+  @unit
+  Scenario: A failed peer copy removes only the newly copied workflow
+    Given a copied workflow has current and latest version pointers and version parentage
+    When the peer deletes its uncommitted workflow in the target project
+    Then version pointers and parentage are cleared before deleting versions
+    And the workflow is deleted last
+    And every write is constrained to the target project
+
+  @unit
+  Scenario: A workflow definition is versioned through one service
+    Given a valid workflow DSL
+    When the Workflow service creates the workflow
+    Then it persists the definition and its first version
+    And callers receive portable Workflow contract values
+
+  @unit
+  Scenario: Saving a Studio graph records the version as a fact agents react to
+    Given a Studio graph saved as a version of a workflow
+    When the save completes
+    Then one version_saved fact is recorded on the workflow's own pipeline, keyed by the version and the instant
+    And recording it never fails or delays the save
+
+  @unit
+  Scenario: A version recorded again carries its fields while it is current
+    Given a workflow whose current version is saved, restored, created or brought back from an archive
+    When workflow records the version_saved fact
+    Then the fact carries the input and output fields of that version
+    And a version that is no longer current, or a workflow that is archived, carries none
+
+  @unit
+  Scenario: Archiving a workflow records the archived fact agents react to
+    Given a live workflow
+    When it is archived on its own, with its linked rows, or by agent's archive cascade
+    Then one archived fact is recorded on the workflow's own pipeline, keyed by the workflow and the instant
+    And recording it never fails or delays the archive
+
+  @unit
+  Scenario: The deploy backfill records each live workflow's current version with its fields
+    Given live workflows across projects, some with a current version, and an archived workflow
+    When the background backfill runs after the old writers are gone
+    Then one version_saved fact with fields is recorded per live workflow with a current version
+    And the archived workflow records nothing, a dry run records nothing
+    And a resumed run skips every project its checkpoint already finished
+
+  @unit
+  Scenario: A workflow created as an autosave keeps one version across later autosaves
+    Given a workflow created with its first version marked autosaved
+    When a second autosave is written into it
+    Then the first version is updated in place and the workflow still has one version
+
+  @unit
+  Scenario: Published version selection is tenant scoped
+    Given a workflow with a published version in a project
+    When the service resolves its published version
+    Then it returns that version
+    And a workflow from another project is not visible
+
+  @unit @regression
+  Scenario: Running a named version of an unpublished workflow is refused as not published
+    Given a workflow with a saved version that was never published
+    When a caller runs that version by its id
+    Then the run is refused as not published before any version is read
+
+  @unit
+  Scenario: Version history preserves the Studio response
+    Given a workflow has current, latest, published and parent versions
+    When the service lists its version history
+    Then it returns the author and sparse version tags
+    And it includes DSL only in the requested history mode
+
+  @unit
+  Scenario: Restoring an old version migrates its graph
+    Given a persisted workflow version uses an older graph shape
+    When the service restores that version
+    Then it migrates the graph through the application port
+    And updates the current pointer and display metadata together
+
+  @unit
+  Scenario: Studio and execution share graph migration
+    Given a persisted workflow version uses an older graph shape
+    When Studio or execution materialises that version
+    Then it uses the Workflow contract migration
+    And both paths produce the same current DSL shape
+
+  @unit
+  Scenario: Studio execution events use one portable wire contract
+    Given Studio dispatches a component, flow, evaluation, or optimization event
+    When a browser or server consumes the event
+    Then it validates the same Zod 4 contract and optimizer parameter shape
+
+  @unit
+  Scenario: New Studio workflows use portable templates and entry defaults
+    Given a user creates a blank or custom-evaluator workflow
+    When an inline entry dataset is materialized
+    Then declared entry defaults fill only missing values
+    And the browser template does not pin a resolved project model
+
+  @unit
+  Scenario: Local configuration dispatch stays portable
+    Given a browser or API dispatches unsaved local Studio configuration
+    When it materializes execution DSL or a default LLM node
+    Then it uses the Workflow contract
+    And no backend imports the Workflow browser surface
+
+  @integration
+  Scenario: Canvas node renderers use explicit application host ports
+    Given Studio renders workflow nodes or palette entries
+    When a node needs application-only execution or dataset data
+    Then Workflow uses its injected browser host port
+
+  @integration
+  Scenario: The canvas resolves its renderers from the Workflow browser surface
+    Given the Workflow browser surface mounts the React Flow canvas
+    When it resolves node or default-edge renderers
+    Then node renderers come from the Workflow node registry
+    And the single default edge renderer is wrapped inline
+    And the application retains only page and host composition
+
+  @unit
+  Scenario: Node selection transitions use named drawer host ports
+    Given a prompt, evaluator, or agent node is dropped on the canvas
+    When the user selects, creates, or cancels the resource
+    Then Workflow updates the placeholder and selection through its store
+    And the injected drawer port performs only navigation and callback wiring
+
+  @unit
+  Scenario: Execution materializes a saved entry dataset through DatasetService
+    Given a Studio execution event references a saved entry dataset
+    When Workflow materializes the event with an injected DatasetService
+    Then execution receives inline records without accessing application globals
+
+  @unit
+  Scenario: A saved entry dataset larger than one run reads refuses the Studio run
+    Given a Studio evaluation event references a saved dataset
+    And the dataset's rows total more than the organization's whole-dataset limit
+    When Workflow materializes the event
+    Then the run is refused as "workflow_dataset_too_large_to_run"
+    And no partial dataset is sent to the engine
+
+  @unit
+  Scenario: Exporting a workflow whose dataset was read in part says so
+    Given a workflow whose entry dataset is larger than the page loads in one read
+    When the workflow is exported with its dataset
+    Then a warning says how many rows the file carries out of how many the dataset holds
+    And an export that carries every row shows no warning
+
+  @unit
+  Scenario: Every run sent to the engine carries the organization's file limit
+    Given a project whose organization answers its own file limit
+    When Workflow sends a run to the engine on the streaming or the synchronous route
+    Then the event names that limit as the largest attachment the engine may fetch
+    And the runs of one project ask for the limit once
+
+  @unit
+  Scenario: Events that run no graph are sent to the engine unchanged
+    Given a liveness probe or a stop event
+    When Workflow sends it to the engine
+    Then the event is sent as it was
+
+  @unit
+  Scenario: A failed file limit lookup does not stop the run
+    Given the organization's file limit cannot be resolved
+    When Workflow sends a run to the engine
+    Then the event is sent without a limit, and the engine holds its default
+
+  @unit
+  Scenario: Workflow prepares a Studio event through typed runtime ports
+    Given a Studio event needs project credentials, model parameters, and datasets
+    When a caller invokes prepareStudioEvent for its project
+    Then Workflow enriches the event before materializing referenced datasets
+    And application transports do not copy the preparation helper
+
+  @unit
+  Scenario: Copying referenced datasets uses the Dataset service
+    Given a workflow copy includes referenced datasets
+    When Workflow copies the definition into another project
+    Then it calls the canonical Dataset service
+    And it does not access the Dataset repository
+
+  @unit
+  Scenario: Execution dispatch is a Workflow server concern
+    Given Workflow resolves a version to run
+    When the server executor dispatches it through injected nlpgo infrastructure
+    Then it validates required entry inputs and model credentials
+    And application composition supplies nlpgo and model-provider adapters
+
+  @unit
+  Scenario: Copying from a project the caller cannot create workflows in is refused
+    Given the caller cannot create workflows in the source project
+    When they copy a workflow from it
+    Then permission_denied is reported with status 401 and nothing is copied
+
+  @unit
+  Scenario: Copying a workflow agent copies its graph first
+    Given a workflow agent points to a graph in the source project
+    When the caller copies the agent into the target project through workflow.copyAgent
+    Then Workflow copies the graph into the target project, authored by the caller
+    And AgentApi writes the new agent pointing at that copied graph
+    And the source graph and agent are unchanged
+
+  @unit
+  Scenario: Copying an agent with no graph asks Agent alone
+    Given a signature agent in the source project
+    When the caller copies it into the target project through workflow.copyAgent
+    Then no graph is copied and AgentApi writes the new agent with no graph
+
+  @unit
+  Scenario: Copying an agent from a project the caller cannot manage is refused
+    Given the caller cannot manage evaluations in the source project
+    When they copy an agent from it through workflow.copyAgent
+    Then agent_source_permission_denied is reported before the agent is read and nothing is copied
+
+  @unit
+  Scenario: A failed agent write removes the copied graph
+    Given Workflow copied a workflow agent's graph into the target project
+    When AgentApi refuses to write the new agent
+    Then Workflow deletes the uncommitted graph copy
+    And the original failure reaches the caller
+    And a failed removal is logged without replacing the original failure
+
+  @unit
+  Scenario: The agent copy door keeps the agents.copy input, output and permission
+    Given the copy door moved from agents.copy to workflow.copyAgent
+    When the browser copies an agent
+    Then the input, the output and the evaluations:manage permission are the ones agents.copy had
+
+  @unit
+  Scenario: A workflow that is not a copy has nothing to sync from
+    Given a workflow that was never copied from another
+    When the caller syncs it from its source
+    Then workflow_not_a_copy is reported with status 400
+
+  @unit
+  Scenario: A synced copy continues its own version history
+    Given a copy at version 4.2 whose source the caller may view
+    When the caller syncs it from its source
+    Then the source graph is written into the copy as version 5
+
+  @unit
+  Scenario: A push reaching no copy the caller may update is refused
+    Given every copy lives in a project the caller cannot update
+    When the caller pushes to the copies
+    Then permission_denied is reported with status 401 and no copy changes
+
+  @unit
+  Scenario: A push with nothing to push to is refused
+    Given a workflow nothing has been copied from
+    When the caller pushes to its copies
+    Then workflow_has_no_copies is reported with status 400
+
+  @unit
+  Scenario: Listing the copies of a missing workflow answers not found
+    Given no workflow with the requested id in the project
+    When the caller lists its copies
+    Then workflow_not_found is reported with status 404
+
+  @unit
+  Scenario: Restoring a version the project does not hold answers not found
+    Given no workflow version with the requested id in the project
+    When the caller restores it
+    Then workflow_version_not_found is reported with status 404
+
+  @unit
+  Scenario: A Studio graph saved without execution state is accepted as main accepted it
+    Given a Studio workflow DSL that carries no state field
+    When the Studio schema parses it
+    Then the graph parses with an empty state
+
+  @unit
+  Scenario: Evaluator workflows are listed with only their published version
+    Given a project holding evaluator workflows, one published and one never published, and a plain workflow
+    When the evaluator workflows are listed
+    Then each evaluator workflow comes back carrying only the version it published
+    And an evaluator workflow that never published comes back with no version
+    And no workflow of another project comes back
+
+  @unit
+  Scenario: Archiving a workflow takes its agents with it, and its evaluators and monitors after a lag
+    Given a workflow backs an evaluator that a monitor uses, and an agent runs it
+    When the workflow is archived with its dependants
+    Then the agent is archived, then the workflow, and the archived fact is recorded
+    And evaluator archives the evaluator and monitor deletes the monitor from their own sides
+    And the confirmation names the evaluators and monitors from the preview the reader confirmed
+
+  @unit
+  Scenario: The workflows list reads copy lineage on a process that supplies only stores and declared peers
+    Given the workflow module is installed on the process's stores and its declared peers alone
+    When the project's workflows are listed with their copy lineage
+    Then the list answers instead of failing on anything the process never supplied
+
+  @unit
+  Scenario: An evaluation run is judged against an API key's own bindings
+    Given an API key that no user owns but that is bound to the project
+    When it asks to evaluate a workflow
+    Then the authz peer is asked about the key at that project with no user
+
+  @unit
+  Scenario: An evaluation run started with a project-bound access token is judged as its person
+    Given a person's access token bound to the project, which has no key row
+    When it asks to evaluate a workflow
+    Then the authz peer is asked about that person's user principal at that project
+    And no key id is asked about
+
+  @unit
+  Scenario: The Studio event door hands the app the signed-in browser session
+    Given an editor with a browser session
+    When it posts a Studio event
+    Then the app receives that session's user rather than nobody
+
+  @unit
+  Scenario: The Studio event door asks workflows:manage at the project the event names
+    Given an editor with a browser session
+    When it posts a Studio event for a project it may not manage
+    Then it is refused 403 at the door and the app is not reached
+    And a malformed event is refused 400 and an event naming no project 422, before any permission is asked
+
+  @unit
+  Scenario: The Studio event door refuses an event posted to an aggregate project
+    Given an editor who may manage workflows on an aggregate project
+    When it posts a Studio event for that project
+    Then it is refused 403 aggregate_project_is_read_only and no run starts
+
+  @unit
+  Scenario: A run fills a saved HTTP agent's blank credentials from the agent
+    Given a graph has a node that runs a saved HTTP agent with its credentials blank
+    When Workflow enriches a Studio event for the project
+    Then the node carries the credentials the saved agent stores
+    And a credential the node already carries is kept
+
+  @unit
+  Scenario: A run whose saved HTTP agent no longer exists leaves the node as it is
+    Given a graph has a node that runs a saved HTTP agent which has since been deleted
+    When Workflow enriches a Studio event for the project
+    Then the event is enriched without a credential for that node
+
+  @unit
+  Scenario: Saving a graph leaves a saved HTTP agent's credentials with the agent
+    Given a graph has a node that runs a saved HTTP agent and carries a bearer token
+    When the graph is saved as a version
+    Then the stored version keeps the auth kind and the header names
+    And every credential value on that node is blank
+
+  @unit
+  Scenario: A workflow read never carries a saved HTTP agent's credentials
+    Given a stored version of a workflow embeds a saved HTTP agent's credentials
+    When the studio reads the workflow, its version history or a restored version
+    Then the answered graph has a blank value for every credential on that node
+    And a node that does not run a saved agent is answered as stored
+
+  @unit
+  Scenario: A published workflow read never carries a saved HTTP agent's credentials
+    Given the published version of a workflow embeds a saved HTTP agent's credentials
+    When the studio reads the published workflow
+    Then the answered graph has a blank value for every credential on that node
+    And the header names and the auth kind are kept
+
+  @unit
+  Scenario: A workflow run calls LangWatch with a key minted for that run, never the project key
+    Given a member who may run workflows in a project
+    When the member starts a workflow run that calls LangWatch's own endpoints
+    Then the run carries a key minted for that run, bound to the project and owned by the member
+    And the project's legacy key is not in the run
+    And the key lives 15 minutes and is retired by the api-key sweep once it has lapsed
+
+  @unit
+  Scenario: Every call a run makes back into LangWatch acts as the user who started it
+    Given a member who holds some, but not all, of the permissions of a project
+    When the member's workflow run calls LangWatch with its minted key
+    Then each call is judged as that member
+    And the key carries no permission the member does not hold
+
+  @unit
+  Scenario: A run's key carries only the permissions the run uses
+    Given a graph with no evaluator node and no node that runs another workflow
+    When the run's key is minted
+    Then it carries trace creation alone
+    And an evaluator node adds evaluations, and a node that runs another workflow adds workflows
+
+  @unit
+  Scenario: A run is refused before it starts when its starter may not run evaluations
+    Given a member who does not hold evaluations:manage on the project
+    When the member starts a run whose graph has an evaluator node
+    Then api_key_permission_denied names evaluations:manage
+    And no key is minted and nothing is dispatched
+
+  @unit
+  Scenario: A long run keeps calling LangWatch past 15 minutes
+    Given a run that outlives the key it started with
+    When the run asks for a key with less than 5 minutes of life left on the one it holds
+    Then a fresh key is minted for the same member, project and permissions
+    And a key with at least 5 minutes left is reused, and never lent to a narrower or different run
+
+  @unit
+  Scenario: The run's key stops working after the run ends
+    Given a workflow run carrying its own minted key
+    Then the key expires 15 minutes after it was minted
+    And an expired key cannot authenticate
+
+  @unit
+  Scenario: A run nobody started calls LangWatch with a project key holding only what it needs
+    Given a monitor, an online evaluation or a scenario run that no member started
+    When its workflow, evaluator or scenario target is prepared to run
+    Then the run carries a 15 minute key with no owner, bound to the project
+    And the key holds only the permissions the graph or target uses
+    And the project's legacy key is not in the run
+
+  @unit
+  Scenario: A run nobody started in a personal workspace acts as the system, not the owner
+    Given a monitor in a member's personal workspace
+    When its run's key is minted
+    Then the key has no owner and no creator
+    And none of its calls act as the workspace owner or borrow their grants
+
+  @unit
+  Scenario: A starter who loses a permission is refused even while a key minted for them lives
+    Given a key minted for a member's run holding evaluations:manage, with most of its life left
+    And the member then loses evaluations:manage
+    When the member starts another run that needs it
+    Then api_key_permission_denied names evaluations:manage before the run starts
+    And the held key is not handed out
+
+  @unit
+  Scenario: A run started with a personal access token holds no more than that token
+    Given a member who holds workflows:manage on the project
+    And a personal access token of theirs that does not hold it
+    When the token starts a run whose graph runs another workflow
+    Then api_key_permission_denied names workflows:manage before the run starts
+    And no key is minted
+
+  @unit
+  Scenario: A run started with a CLI access token is bounded by the person alone
+    Given a member signed in through the CLI or the hosted MCP with a project-bound access token
+    When the token starts a run
+    Then the run names no calling key, since no key row stands behind the token
+    And the run's key is minted holding what the member and the run both hold
+
+  @unit
+  Scenario: A run started with a service key acts as that key
+    Given a service key with no owner that may run workflows on the project
+    When the key starts a run
+    Then the run names the key as its principal and no member
+    And the run's key is minted bounded by that key, not as the system
+
+  @unit
+  Scenario: A run started with a service key holds no more than that key
+    Given a service key with no owner that does not hold evaluations:manage
+    When the key starts a run whose graph has an evaluator node
+    Then api_key_permission_denied names evaluations:manage before the run starts
+    And no key is minted
+
+  @unit
+  Scenario: A service key's run key is a child of the starting key
+    Given a service key with no owner that holds every permission the run uses
+    When its run's key is minted
+    Then the run's key has no owner, names the starting key as its parent and holds only what the run uses
+    And it is never lent to a run another key or a scheduler started
+
+  @unit
+  Scenario: Only a run key nobody started acts as the system
+    Given a run key with no owner and no parent key, and one whose parent is a service key
+    When each is resolved at the door
+    Then the first resolves as an unattended run
+    And the second resolves as an ordinary key with no owner
+
+  @unit
+  Scenario: A caller cannot ask for a run key that outlives an hour
+    Given a caller asking for a run key with more than an hour of life left
+    When the key is minted
+    Then the request is refused and no key is minted
+
+  @unit
+  Scenario: A dispatch never holds a key that lapses before the dispatch can end
+    Given a run dispatched to the Lambda fleet, whose invocation may last 900 seconds
+    When its run key is minted or reused
+    Then the key has at least 900 seconds plus a minute left when handed out
+    And a self-hosted dispatch's key has at least 15 minutes left
+
+  @unit
+  Scenario: A run fills a saved HTTP agent's credentials only at the agent's saved address
+    Given a graph has a node that runs a saved HTTP agent with its credentials blank
+    And the node calls another scheme, host or port than the agent's saved address
+    When Workflow enriches a Studio event for the project
+    Then the node carries none of the agent's stored credentials
+
+  @unit
+  Scenario: A graph copied into another project arrives with blank HTTP credentials
+    Given a graph whose HTTP nodes hold credentials or secret references
+    When it is copied, pushed or synced into another project
+    Then every HTTP credential in the copy is blank for the user to enter again
+
+  @unit
+  Scenario: A version saved while the backfill runs keeps that save
+    Given the credentials backfill has read a workflow version
+    When a user saves that version before the backfill writes it
+    Then the backfill skips the version and logs its id only
+
+  @unit
+  Scenario: A studio workflow run receives only listed, non-reserved secrets
+    Given a project holding its own secrets beside a product-reserved one
+    When Workflow prepares a Studio run for the project
+    Then the run receives every secret the project lists
+    And the reserved secret is never read, even when the graph names it
+
+  @unit
+  Scenario: An unreadable secret the studio workflow does not name leaves the run unaffected
+    Given a project secret whose stored value cannot be read
+    And a graph that does not name that secret
+    When Workflow prepares a Studio run for the project
+    Then the run receives the other secrets without it
+
+  @unit
+  Scenario: An unreadable secret the studio workflow names refuses the run
+    Given a project secret whose stored value cannot be read
+    And a graph that names that secret
+    When Workflow prepares a Studio run for the project
+    Then the run is refused with the handled code secret_unreadable
+
+  @unit
+  Scenario: A workflows-only key cannot start a run it could not read
+    Given a key that can trigger workflows but not read the workflow
+    When it starts a run
+    Then it is refused before the trigger is reached
+
+  @unit
+  Scenario: Agent's archived fact archives the graph it cascades to
+    Given Agent records an agent archived naming a live graph of the project
+    When Workflow's peer subscriber handles the fact
+    Then the graph is archived in that project and no other graph changes
+
+  @unit
+  Scenario: An agent archived fact naming no live graph archives nothing
+    Given Agent records an agent archived naming no graph, or a graph already archived or missing
+    When Workflow's peer subscriber handles the fact
+    Then no graph changes and the handler succeeds
+
+  @unit
+  Scenario: A redelivered agent archived fact is harmless
+    Given Workflow already archived the graph for an agent archived fact
+    When the same fact is delivered again
+    Then both deliveries share one deduplication id and the graph is not archived a second time

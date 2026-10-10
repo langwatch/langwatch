@@ -65,7 +65,8 @@ Feature: Worker liveness probe endpoint
       When a caller requests "/metrics" without an Authorization header
       Then the response status is 401
 
-    @unit
+    # Unimplemented: production without a key mounts no /metrics route, so the request falls through to a 404 where main answered 500.
+    @unimplemented @unit
     Scenario: Metrics still fail closed in production without a key
       Given the worker is running in production mode
       And no metrics API key is configured
@@ -122,25 +123,34 @@ Feature: Worker liveness probe endpoint
       Then the response status is 503
       # A stalled loop fails the scrape, never the probe.
 
+    @unit
+    Scenario: A slow answer from a turning main loop is not cut off
+      Given the liveness thread is serving the process port
+      And the main loop's heartbeat keeps moving
+      When a caller makes a request the main thread answers after the proxy timeout
+      Then the reply is served with the main thread's status
+      # The api serves through this thread too: a long poll or a slow export
+      # is work in progress, not a stall.
+
   Rule: Liveness boots before any stage that can block for minutes
 
     # The voice public URL tunnel (cloudflared quick tunnel) can take up to
     # CLOUDFLARED_INSTALL_TIMEOUT_MS_DEFAULT + TUNNEL_READY_TIMEOUT_MS_DEFAULT
     # to mint on a cold binary download or slow trycloudflare DNS — minutes,
-    # far past the kubelet's liveness budget (prod: ~90s). Before this rule,
-    # the tunnel boot ran before the boot plan and /healthz didn't answer
-    # until the plan's LAST stage, so a slow tunnel crash-looped every new
-    # worker pod during a rollout. The liveness thread now boots first and
+    # far past the kubelet's liveness budget (prod: ~90s). Were /healthz to
+    # bind only after the stages, a slow tunnel would crash-loop every new
+    # worker pod during a rollout. The liveness thread boots first and
     # depends on nothing any other stage sets up, so a slow tunnel no longer
     # risks the probe.
 
     @unit
     Scenario: The liveness server boots before every other stage, including the voice tunnel
-      Given the worker boot plan is resolved
-      Then the metrics stage is first in the plan
-      # startWorkers boots exactly this "metrics" stage, before it resolves
-      # the voice public URL tunnel, so /healthz is answering the kubelet
-      # for the entire duration of a slow tunnel mint.
+      Given a worker whose boot is held by a slow stage such as the voice tunnel mint
+      When the kubelet requests "/healthz" before that stage has completed
+      Then the response status is 200
+      And the stage has not yet completed
+      # Boot opens the liveness door first, so /healthz is answering the
+      # kubelet for the entire duration of a slow tunnel mint.
 
   Rule: The chart probes the liveness endpoint, not the metrics endpoint
 

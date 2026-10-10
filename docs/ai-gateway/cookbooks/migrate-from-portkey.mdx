@@ -6,18 +6,18 @@ sidebarTitle: Migrate from Portkey
 
 ## What maps to what
 
-| Portkey | LangWatch AI Gateway |
-|---|---|
-| Virtual key (a stored provider credential) | A row under **Settings > Model Providers**. See [Providers](/ai-gateway/providers/overview). |
-| API key sent as `x-portkey-api-key` | A [virtual key](/ai-gateway/virtual-keys), sent as `Authorization: Bearer vk-lw-...`. |
-| `x-portkey-virtual-key` or `x-portkey-provider` on the request | The `provider/` prefix on the model name, for example `openai/gpt-5-mini`. See [Model naming](/ai-gateway/model-naming). |
-| Config with `strategy.mode: "fallback"` and ordered `targets` | A [routing policy](/ai-gateway/governance/routing-policies): an ordered list of provider rows a key tries. |
-| `retry.attempts` in a config | `fallback.maxAttempts` in the key configuration, default 3. The gateway decides which failures move to the next provider; that list is not configurable. |
-| `cache.mode: "simple"` | Provider prompt caching passes through, and [cache rules](/ai-gateway/cache-control) force or disable it per model, key or tag. |
-| Guardrails | [Guardrails](/ai-gateway/guardrails): a LangWatch evaluator attached to the key, run on the request, the response or each stream chunk. |
-| `x-portkey-metadata` | `X-LangWatch-Metadata`, a JSON object copied onto the spend event, and `X-LangWatch-End-User-Id` for the end user. See [Billing and spend events](/ai-gateway/billing-events#attribution-what-the-request-carries). |
-| Budgets and rate limits on an API key | [Budgets](/ai-gateway/budgets) on the key, the project, the team, the organization, a person or an end user, and [rate limits](/ai-gateway/rate-limits) on the key. |
-| Logs | A trace per request in Trace Explorer and a [spend event](/ai-gateway/billing-events) per request. |
+| Portkey                                                        | LangWatch AI Gateway                                                                                                                                                                                                |
+| -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Virtual key (a stored provider credential)                     | A row under **Settings > Model Providers**. See [Providers](/ai-gateway/providers/overview).                                                                                                                        |
+| API key sent as `x-portkey-api-key`                            | A [virtual key](/ai-gateway/virtual-keys), sent as `Authorization: Bearer vk-lw-...`.                                                                                                                               |
+| `x-portkey-virtual-key` or `x-portkey-provider` on the request | The `provider/` prefix on the model name, for example `openai/gpt-5-mini`. See [Model naming](/ai-gateway/model-naming).                                                                                            |
+| Config with `strategy.mode: "fallback"` and ordered `targets`  | A [routing policy](/ai-gateway/governance/routing-policies): an ordered list of provider rows a key tries.                                                                                                          |
+| `retry.attempts` in a config                                   | `fallback.maxAttempts` in the key configuration, default 3. The gateway decides which failures move to the next provider; that list is not configurable.                                                            |
+| `cache.mode: "simple"`                                         | Provider prompt caching passes through, and [cache rules](/ai-gateway/cache-control) force or disable it per model, key or tag.                                                                                     |
+| Guardrails                                                     | [Guardrails](/ai-gateway/guardrails): a LangWatch evaluator attached to the key, run on the request, the response or each stream chunk.                                                                             |
+| `x-portkey-metadata`                                           | `X-LangWatch-Metadata`, a JSON object copied onto the spend event, and `X-LangWatch-End-User-Id` for the end user. See [Billing and spend events](/ai-gateway/billing-events#attribution-what-the-request-carries). |
+| Budgets and rate limits on an API key                          | [Budgets](/ai-gateway/budgets) on the key, the project, the team, the organization, a person or an end user, and [rate limits](/ai-gateway/rate-limits) on the key.                                                 |
+| Logs                                                           | A trace per request in Trace Explorer and a [spend event](/ai-gateway/billing-events) per request.                                                                                                                  |
 
 Two Portkey features have no equivalent: `strategy.mode: "loadbalance"` with weights across targets, and `cache.mode: "semantic"`. The gateway tries providers in order and caches only what the provider caches.
 
@@ -36,10 +36,7 @@ A Portkey config with fallback targets becomes a routing policy that lists the s
 ```json Portkey config
 {
   "strategy": { "mode": "fallback" },
-  "targets": [
-    { "virtual_key": "openai-prod" },
-    { "virtual_key": "azure-eu" }
-  ],
+  "targets": [{ "virtual_key": "openai-prod" }, { "virtual_key": "azure-eu" }],
   "retry": { "attempts": 3 }
 }
 ```

@@ -1,34 +1,15 @@
 /**
- * The permission question, answered in the terminal.
- *
- * A call that is not read-only stops on two screens at once: the card in the
- * LangWatch panel and this selector, drawn at the bottom of the transcript.
- * The first answer wins, and the CLI applies it here rather than waiting for
- * the platform to relay it back.
- *
- * The box is drawn by hand with chalk over a small keypress loop rather than
- * with the `prompts` package the request picker uses: `prompts` renders its
- * own list style and gives no way to put a framed command and a reason above
- * the choices, which is the whole point of this screen. No dependency is
- * added for it.
- *
- * @see specs/typescript-sdk/cli-langy-share-control.feature
- * @see dev/docs/adr/129-langy-local-control.md
+ * The permission question, answered in the terminal. A call that is not
+ * read-only stops on two screens at once; the first answer wins. Drawn by
+ * hand with chalk since `prompts` can't frame a command above the choices.
  */
 
 import * as readline from "node:readline";
+
 import chalk from "chalk";
-import type {
-  LocalCall,
-  TerminalPermissionDecision,
-} from "../../../agent/local-control-protocol";
-import {
-  patternPhrase,
-  shorten,
-  terminalWidth,
-  wrapWords,
-  type UiWriter,
-} from "./ui";
+
+import type { LocalCall, TerminalPermissionDecision } from "../../../agent/local-control-protocol";
+import { patternPhrase, shorten, terminalWidth, wrapWords, type UiWriter } from "./ui";
 
 /** One row of a box. */
 export interface BoxOption<T> {
@@ -46,7 +27,7 @@ export interface BoxCard<T> {
   description: string;
   /** The line above the options. */
   question: string;
-  options: Array<BoxOption<T>>;
+  options: BoxOption<T>[];
   /** The keys the footer names. */
   hint: string;
   /** The patterns a session grant would cover, named under the options. */
@@ -81,8 +62,7 @@ export const APPROVAL_HINT =
   "Enter or a number to answer · ↑↓ to choose · Esc to deny · or answer on the card in LangWatch";
 
 /** What the developer typed, after choosing to deny. */
-export const DENY_REASON_QUESTION =
-  "Tell Langy what to do instead, or press Enter to skip: ";
+export const DENY_REASON_QUESTION = "Tell Langy what to do instead, or press Enter to skip: ";
 
 /** The keys the selector reads. */
 export interface KeyEvent {
@@ -161,8 +141,7 @@ export function approvalCardFor({
   patterns: string[];
   timeoutSeconds?: number;
 }): ApprovalCard {
-  const limit =
-    timeoutSeconds === undefined ? "" : ` ${timeLimitSentence(timeoutSeconds)}`;
+  const limit = timeoutSeconds === undefined ? "" : ` ${timeLimitSentence(timeoutSeconds)}`;
   return {
     title: approvalTitle({ call, workspaceName }),
     subject: summary,
@@ -175,12 +154,9 @@ export function approvalCardFor({
 }
 
 /**
- * What the session grant covers, in one sentence under the options.
- *
- * The developer answered "allow for this session" without being told what
- * the grant lets through afterwards, and one of those grants covered every
- * python command on the machine. The sentence names the same patterns the
- * option names, so the two read as one answer.
+ * What the session grant covers, in one sentence under the options — so the
+ * developer isn't answering "allow for this session" blind to how wide it
+ * reaches (a bare pattern once covered every python command on the machine).
  */
 export function grantCoverageSentence(patterns: string[]): string | null {
   const covered = patterns
@@ -197,13 +173,10 @@ export function grantCoverageSentence(patterns: string[]): string | null {
 /** The widest the box is drawn, however wide the terminal is. */
 export const MAX_BOX_WIDTH = 100;
 
-
 /**
- * The box, as the lines it occupies.
- *
- * Every line is exactly as wide as the box, so the writer can count the rows
- * it drew and move the cursor back over exactly those rows when the selection
- * moves or the box is erased.
+ * The box, as the lines it occupies. Every line is exactly as wide as the
+ * box, so the writer can count the rows it drew and move the cursor back
+ * over exactly those rows on redraw or erase.
  */
 export function renderBox<T>({
   card,
@@ -218,7 +191,7 @@ export function renderBox<T>({
   const inner = box - 2;
   const textWidth = inner - 4;
 
-  const body: Array<{ text: string; painted?: string }> = [];
+  const body: { text: string; painted?: string }[] = [];
   const plain = (text: string, painted?: string): void => {
     body.push(painted === undefined ? { text } : { text, painted });
   };
@@ -233,16 +206,9 @@ export function renderBox<T>({
   plain("");
   plain(`   ${card.question}`);
   card.options.forEach((option, index) => {
-    const chosen = index === selected;
-    const marker = `${chosen ? " ❯ " : "   "}${index + 1}. `;
-    // A label of a chain names every pattern, so it is wrapped like any other
-    // line rather than pushed through the frame.
-    wrapWords(option.label, textWidth - marker.length + 3).forEach(
-      (line, part) => {
-        const row = `${part === 0 ? marker : " ".repeat(marker.length)}${line}`;
-        plain(row, chosen ? chalk.cyan(row) : row);
-      },
-    );
+    for (const row of optionRows({ label: option.label, index, selected, textWidth })) {
+      plain(row.text, row.painted);
+    }
   });
   const coverage = grantCoverageSentence(card.patterns ?? []);
   if (coverage !== null) {
@@ -271,20 +237,37 @@ export function renderBox<T>({
   ];
 }
 
+function optionRows({
+  label,
+  index,
+  selected,
+  textWidth,
+}: {
+  label: string;
+  index: number;
+  selected: number;
+  textWidth: number;
+}): { text: string; painted: string }[] {
+  const chosen = index === selected;
+  const marker = `${chosen ? " ❯ " : "   "}${index + 1}. `;
+  // A label of a chain names every pattern, so it is wrapped like any other
+  // line rather than pushed through the frame.
+  return wrapWords(label, textWidth - marker.length + 3).map((line, part) => {
+    const row = `${part === 0 ? marker : " ".repeat(marker.length)}${line}`;
+    return { text: row, painted: chosen ? chalk.cyan(row) : row };
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Reading the answer
 // ---------------------------------------------------------------------------
 
 /**
  * Keys from the real terminal, in raw mode for as long as one ask is open.
- *
  * Raw mode stops the terminal from turning Ctrl-C into a signal, so this
- * raises it instead. Without that, Ctrl-C did nothing at all while a question
- * was on the screen and the only way out was to kill the process.
+ * raises it instead.
  */
-export function createStdinKeySource(
-  stdin: NodeJS.ReadStream = process.stdin,
-): KeySource {
+export function createStdinKeySource(stdin: NodeJS.ReadStream = process.stdin): KeySource {
   return {
     listen: (onKey) => {
       readline.emitKeypressEvents(stdin);
@@ -293,8 +276,7 @@ export function createStdinKeySource(
       const handler = (_: string, key: KeyEvent | undefined): void => {
         if (!key) return;
         if (key.ctrl === true && key.name === "c") {
-          if (process.listenerCount("SIGINT") === 0) process.exit(130);
-          process.emit("SIGINT");
+          raiseInterrupt();
           return;
         }
         onKey(key);
@@ -308,6 +290,11 @@ export function createStdinKeySource(
       };
     },
   };
+}
+
+function raiseInterrupt(): void {
+  if (process.listenerCount("SIGINT") === 0) process.exit(130);
+  process.emit("SIGINT");
 }
 
 /** One line of text from the terminal, with the question in front of it. */
@@ -355,11 +342,9 @@ export interface OpenBox<T> {
 }
 
 /**
- * Draws one box and reads the answer. Every question the terminal asks goes
- * through this: the permission selector, and the request to share the folder.
- *
- * The box owns the bottom of the screen while it is open, so a command that
- * finishes under it neither erases it nor scrolls it away.
+ * Draws one box and reads the answer; every question the terminal asks goes
+ * through this. The box owns the bottom of the screen while open, so a
+ * command that finishes under it neither erases nor scrolls it away.
  */
 export function askBox<TValue, TAnswer = TValue>({
   card,
@@ -382,81 +367,118 @@ export function askBox<TValue, TAnswer = TValue>({
   /** What Escape answers with. Left out, Escape does nothing. */
   escape?: { answer: TAnswer };
 }): OpenBox<TAnswer> {
-  let selected = 0;
-  let settled = false;
-  let stopKeys: () => void = () => undefined;
   let deliver: (value: TAnswer | null) => void = () => undefined;
   const answer = new Promise<TAnswer | null>((resolve) => {
     deliver = resolve;
   });
+  const box = new BoxSession<TValue, TAnswer>({ card, writer, width, settle, escape, deliver });
+  box.stopKeys = keys.listen((key) => box.onKey(key));
 
-  const paint = (): void => {
-    writer.draw?.(renderBox({ card, selected, width: width() }), "box");
-  };
-
-  /** Takes the box off the screen, so what follows is typed on a clean line. */
-  const closeScreen = (): boolean => {
-    if (settled) return false;
-    settled = true;
-    stopKeys();
-    writer.erase?.("box");
-    return true;
-  };
-
-  const confirm = (): void => {
-    const option = card.options[selected];
-    if (!option || !closeScreen()) return;
-    if (!settle) {
-      deliver(option.value as unknown as TAnswer);
-      return;
-    }
-    void Promise.resolve(settle(option.value)).then(deliver);
-  };
-
-  const move = (step: number): void => {
-    selected = (selected + step + card.options.length) % card.options.length;
-    paint();
-  };
-
-  stopKeys = keys.listen((key) => {
-    if (settled) return;
-    if (key.ctrl === true && key.name === "c") return;
-    switch (key.name) {
-      case "up":
-      case "k":
-        move(-1);
-        return;
-      case "down":
-      case "j":
-        move(1);
-        return;
-      case "escape":
-        if (escape && closeScreen()) deliver(escape.answer);
-        return;
-      case "return":
-      case "enter":
-        confirm();
-        return;
-      default:
-        break;
-    }
-    // A number answers on its own, the way a coding agent's own permission
-    // dialog does: the option it names is the option that is taken.
-    const digit = Number(key.name ?? key.sequence ?? "");
-    if (Number.isInteger(digit) && digit >= 1 && digit <= card.options.length) {
-      selected = digit - 1;
-      paint();
-      confirm();
-    }
-  });
-
-  paint();
+  box.paint();
   return {
     answer,
     close: () => {
-      if (closeScreen()) deliver(null);
+      if (box.closeScreen()) deliver(null);
     },
   };
+}
+
+/** One open box: which option is selected, and whether it has been answered. */
+class BoxSession<TValue, TAnswer> {
+  private selected = 0;
+  private settled = false;
+  stopKeys: () => void = () => undefined;
+  private readonly card: BoxCard<TValue>;
+  private readonly writer: UiWriter;
+  private readonly width: () => number;
+  private readonly settle?: (value: TValue) => TAnswer | Promise<TAnswer>;
+  private readonly escape?: { answer: TAnswer };
+  private readonly deliver: (value: TAnswer | null) => void;
+
+  constructor(args: {
+    card: BoxCard<TValue>;
+    writer: UiWriter;
+    width: () => number;
+    settle?: (value: TValue) => TAnswer | Promise<TAnswer>;
+    escape?: { answer: TAnswer };
+    deliver: (value: TAnswer | null) => void;
+  }) {
+    this.card = args.card;
+    this.writer = args.writer;
+    this.width = args.width;
+    this.settle = args.settle;
+    this.escape = args.escape;
+    this.deliver = args.deliver;
+  }
+
+  paint(): void {
+    this.writer.draw?.(
+      renderBox({ card: this.card, selected: this.selected, width: this.width() }),
+      "box",
+    );
+  }
+
+  /** Takes the box off the screen, so what follows is typed on a clean line. */
+  closeScreen(): boolean {
+    if (this.settled) return false;
+    this.settled = true;
+    this.stopKeys();
+    this.writer.erase?.("box");
+    return true;
+  }
+
+  onKey(key: KeyEvent): void {
+    if (this.settled) return;
+    if (key.ctrl === true && key.name === "c") return;
+    if (this.onNamedKey(key.name)) return;
+    // A number answers on its own, the way a coding agent's own permission
+    // dialog does: the option it names is the option that is taken.
+    const digit = Number(key.name ?? key.sequence ?? "");
+    if (Number.isInteger(digit) && digit >= 1 && digit <= this.card.options.length) {
+      this.selected = digit - 1;
+      this.paint();
+      this.confirm();
+    }
+  }
+
+  /** Handles a movement, escape or confirm key; false for any other. */
+  private onNamedKey(name: KeyEvent["name"]): boolean {
+    switch (name) {
+      case "up":
+      case "k":
+        this.move(-1);
+        return true;
+      case "down":
+      case "j":
+        this.move(1);
+        return true;
+      case "escape":
+        if (this.escape && this.closeScreen()) this.deliver(this.escape.answer);
+        return true;
+      case "return":
+      case "enter":
+        this.confirm();
+        return true;
+      default:
+        return false;
+    }
+  }
+
+  private confirm(): void {
+    const option = this.card.options[this.selected];
+    if (!option || !this.closeScreen()) return;
+    if (!this.settle) {
+      this.deliver(option.value as unknown as TAnswer);
+      return;
+    }
+    void Promise.resolve(this.settle(option.value)).then(this.deliver);
+  }
+
+  private move(step: number): void {
+    const count = this.card.options.length;
+    this.selected = (this.selected + step + count) % count;
+    this.paint();
+  }
 }
 
 /** Draws one permission ask and reads the answer. Exported so a test can drive it. */

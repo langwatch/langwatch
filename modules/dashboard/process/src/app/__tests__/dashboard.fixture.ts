@@ -1,0 +1,96 @@
+import type {
+  AnalyticsApi,
+  LangWatchQLExecuteInput,
+  LangWatchQLProtections,
+  LangWatchQLQueryResult,
+  LangWatchQLValidationInput,
+} from "@langwatch/analytics-contract";
+import { EVERY_CATALOGUE_PERMISSION } from "@langwatch/analytics-process/testing";
+import type { AutomationApi, Trigger } from "@langwatch/automation-contract";
+import { ResourceScope } from "@langwatch/process";
+import type { ProjectApi } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { vi } from "vitest";
+
+import type { DashboardRepositories } from "../../repositories/dashboard.repositories.ts";
+import { MemoryDashboardRepositories } from "../../repositories/memory/memory.dashboard.repositories.ts";
+import { DashboardModule } from "../dashboard.app.ts";
+
+/** Everything visible: the caller the gates are measured against. */
+export const FULLY_PERMITTED: LangWatchQLProtections = {
+  catalogue: EVERY_CATALOGUE_PERMISSION,
+  canSeeCapturedInput: true,
+  canSeeCapturedOutput: true,
+  canSeeCosts: true,
+};
+
+export function createDashboardTestAnalytics(overrides: Partial<AnalyticsApi> = {}): AnalyticsApi {
+  return createApiFixture<AnalyticsApi>({
+    isLangWatchQLAvailable: () => true,
+    describeLangWatchQLSchema: async () => ({
+      database: "analytics",
+      functions: [],
+      views: [],
+      appFunctions: [],
+    }),
+    validateLangWatchQL: (_input: LangWatchQLValidationInput) => ({
+      parameters: [],
+      appFunctions: [],
+    }),
+    executeLangWatchQL: async (
+      _input: LangWatchQLExecuteInput,
+    ): Promise<LangWatchQLQueryResult> => ({
+      columns: [],
+      rows: [],
+      statistics: { elapsedMs: 0, rowsRead: 0, bytesRead: 0, rowsReturned: 0 },
+      diagnostics: [],
+      followsTimeWindow: false,
+      followsGranularity: false,
+    }),
+    isWorkbenchEnabled: async () => true,
+    assertCustomChartPlaygroundEnabled: async () => void 0,
+    resolveProtections: async () => FULLY_PERMITTED,
+    resolveRunCaller: async () => ({
+      project: { id: "project-1", lwqlKey: "restricted-project-key" },
+      protections: FULLY_PERMITTED,
+    }),
+    ...overrides,
+  });
+}
+
+export function createDashboardTestAutomation(triggers: Trigger[] = []): AutomationApi {
+  return createApiFixture<AutomationApi>({
+    getByCustomGraphIds: vi.fn(async () => triggers),
+    findByCustomGraphId: vi.fn(async () => triggers[0] ?? null),
+  });
+}
+
+export function createDashboardTestProjects(slug = "project-one"): ProjectApi {
+  return createApiFixture<ProjectApi>({
+    findSummaryById: async () => ({ name: "Project One", slug }),
+  });
+}
+
+export function createDashboardTestApp(
+  input: Readonly<{
+    repositories?: DashboardRepositories;
+    publicBaseUrl?: string;
+    dependencies?: Partial<{
+      analytics: AnalyticsApi;
+      automation: AutomationApi;
+      projects: ProjectApi;
+    }>;
+  }> = {},
+): DashboardModule {
+  return DashboardModule.create({
+    repositories: input.repositories ?? MemoryDashboardRepositories.create(),
+    dependencies: {
+      analytics: input.dependencies?.analytics ?? createDashboardTestAnalytics(),
+      automation: input.dependencies?.automation ?? createDashboardTestAutomation(),
+      projects: input.dependencies?.projects ?? createDashboardTestProjects(),
+    },
+    config: { publicBaseUrl: input.publicBaseUrl },
+    resources: new ResourceScope(),
+    secrets: {} as never,
+  });
+}

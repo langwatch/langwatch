@@ -56,6 +56,32 @@ Feature: Local IdP simulator (idpsim)
     When a client completes the authorization code flow
     Then the ID token's subject carries the samlp| prefix Auth0 uses for brokered SAML connections
 
+  # --- Social sign-in ---------------------------------------------------
+
+  @unit
+  Scenario: Signing in with GitHub at the simulator round-trips a GitHub-shaped profile
+    Given a client sent through the tenant's GitHub authorize endpoint as a seeded user
+    When the client exchanges the code without asking for JSON
+    Then the token endpoint answers a form-encoded bearer access token, as GitHub does
+    And the user and user emails endpoints return the person with a numeric id and a primary verified address
+    And the tenant's activity records the GitHub authorize, token and profile reads
+
+  @unit
+  Scenario: Signing in with Google or Microsoft at the simulator returns a signed ID token in the provider's shape
+    Given a client sent through the tenant's Google or Microsoft authorize endpoint as a seeded user
+    When the client exchanges the code
+    Then the ID token verifies against the tenant's published keys
+    And a Google token carries a 21-digit subject under the tenant's Google issuer
+    And a Microsoft token carries the tenant's directory id under its Entra v2.0 issuer
+
+  @unit
+  Scenario: The social account picker links back into the provider and can be cancelled
+    When a client is sent through a social provider's authorize endpoint with no login hint
+    Then the account picker names the provider and links each person back into that provider's endpoint
+    When the person presses Cancel
+    Then the client is sent back access_denied with its state and no code
+    And the tenant's activity records the refusal
+
   # --- Registering an application ---------------------------------------
 
   @unit
@@ -187,6 +213,45 @@ Feature: Local IdP simulator (idpsim)
     Then the connection is still there, because putting the seeded users back
       is not a reason to forget where they were going
 
+  # A real identity provider pushes a group by the ids the RECEIVING service
+  # minted for its people, not by its own. Sending its own ids writes a group
+  # of members nobody can resolve, which a target accepts and then shows
+  # empty — so a sync that reads as four groups written is four groups of
+  # nobody.
+
+  @unit
+  Scenario: Group sync references the receiving service's users and repeats without writes
+    Given a tenant connected to a SCIM service provider
+    When the tenant pushes its directory twice with groups turned on
+    Then the groups arrive naming the members by the ids the target minted
+    And the second push writes no group, because nothing changed
+    And a membership the tenant then changes is written once and no more
+    And somebody the tenant marks inactive stops being a member
+
+  @unit
+  Scenario: Group sync reports target failures instead of claiming success
+    Given a SCIM service provider that refuses every group write
+    When the tenant pushes its directory with groups turned on
+    Then the push reports a failure for each group it could not write
+    And each failure names what the target answered
+    And the people it did provision are still reported as created
+
+  @unit
+  Scenario: Directory readback follows every page of users and groups
+    Given a tenant of 250 people and 5 groups pushed at a service provider that pages
+    When the directory is read back
+    Then everybody and every group is reported exactly once
+    And the next push reports them all as unchanged
+
+  @unit
+  Scenario: An inactive person removed by the target is not provisioned again
+    Given somebody the tenant has marked inactive whose resource the target deleted
+    When the tenant pushes its directory again
+    Then nobody is created and nobody is updated
+    And the target still does not hold them
+    # A service provider that removes the resource on deactivation would
+    # otherwise be handed the person back on every pass, for ever.
+
   # --- Domain verification ---------------------------------------------
 
   @unit
@@ -262,7 +327,7 @@ Feature: Local IdP simulator (idpsim)
   @unit
   Scenario: The simulator runs alone without the app stack
     Given no LangWatch stack is running
-    When the developer runs `haven idp`
+    When the developer runs `haven simulator idp`
     Then only the simulator process starts — no app, API, workers or databases
     And it is routed at the machine-wide idp hostname while the proxy is available
 
@@ -272,35 +337,221 @@ Feature: Local IdP simulator (idpsim)
     When the stack is planned
     Then the idp service is planned with its own hostname under the worktree's slug
 
-  @unit @regression
-  Scenario: Group sync references the receiving service's users and repeats without writes
-    Given a tenant has provisioned users and groups into an application
-    When it syncs group membership
-    Then every active member is referenced by the application's SCIM user id
-    And existing groups keep their ids when membership changes
-    And inactive users are removed from group membership
-    And an unchanged repeat sends no user or group writes
+  # The landing page listed twelve identical cards and a paragraph of eleven
+  # control-API paths run together. Both are true; neither tells someone opening
+  # it for the first time what they are supposed to do with it.
 
-  @unit @regression
-  Scenario: Group sync reports target failures instead of claiming success
-    Given an application accepts users but refuses group writes
-    When the connected tenant syncs its directory with groups
-    Then successful users are counted
-    And every refused group is reported as a failure
-    And no refused group is counted as written
+  @unit
+  Scenario: The landing page says what to do before it lists the providers
+    Given someone opening the simulator for the first time
+    When they read the page top to bottom
+    Then it names the three steps in order before it lists the providers
+    And the machine's own base address is on the page and copyable
+    And the control API is folded away, each request saying what it does
 
-  @unit @regression
-  Scenario: Directory readback follows every page of users and groups
-    Given a target holds more users and groups than fit on one page
-    And the target caps pages below the simulator's requested size
-    When the connected tenant reads the target back
-    Then every user and group is included in the result
-    And a following unchanged sync sends no duplicate creates
+  @unit
+  Scenario: A provider that already has an application registered is marked as such
+    Given one tenant with a registered application and several without
+    When the landing page lists the providers
+    Then only that tenant is marked, because it is the one being come back to
 
-  @unit @regression
-  Scenario: An inactive person removed by the target is not provisioned again
-    Given a person is inactive in the identity provider
-    And the application removed their membership resource when deactivated
-    When the provider repeats its directory sync
-    Then it does not recreate that person in the application
-    And their group membership stays removed
+  # --- Faults: SAML tampers, clock skew, IdP-initiated, disabled users ---
+  # Driven through the control API and `haven sim idp`, never a page. Every
+  # fault is recorded in the tenant's activity.
+
+  @unit
+  Scenario: A SAML response can be broken once in each way a service provider must refuse
+    Given a tenant armed with one of the SAML tamper modes
+      | mode                      | what the next response carries                 |
+      | saml-bad-signature        | signatures that no longer verify               |
+      | saml-unsigned             | no signature on the response or the assertion  |
+      | saml-wrong-audience       | an audience that is not the service provider   |
+      | saml-wrong-recipient      | a recipient that is not the ACS URL            |
+      | saml-expired              | a validity window that has already closed      |
+      | saml-not-yet-valid        | a validity window that has not opened yet      |
+      | saml-wrong-in-response-to | an InResponseTo naming no request it was sent  |
+    When a service provider signs in through the tenant twice
+    Then the first response is refused by a service provider that checks it
+    And the second response verifies, because the break is one-shot
+    And the tenant's activity shows the mode being armed and the response it broke
+
+  @unit
+  Scenario: A replayed SAML assertion repeats the previous assertion's ID
+    Given a tenant that has already signed one assertion
+    When the tenant is armed with saml-replayed-assertion and signs another
+    Then the new assertion carries the previous assertion's ID
+    And refusing the replay is left to the service provider
+
+  @unit
+  Scenario: An unknown tamper mode is refused
+    When a tenant is armed with a mode it does not know
+    Then the request is refused as a bad request listing the modes it does know
+    And nothing is armed
+
+  @unit
+  Scenario: A tenant's clock can run ahead of or behind the service provider's
+    Given a tenant whose clock is skewed by a number of seconds
+    When a service provider signs in through the tenant
+    Then a skew of ten minutes ahead is refused as not yet valid
+    And a skew of ten minutes behind is refused as expired
+    And a skew of thirty seconds is accepted inside the usual tolerance
+    And the same skew moves the issued-at and expiry of the tenant's ID tokens
+    And the tenant's activity shows the skew being set
+
+  @unit
+  Scenario: An unsolicited SAML response carries the chosen RelayState and no InResponseTo
+    Given a tenant with an active user
+    When the control API is asked for an unsolicited response to an ACS URL with a RelayState
+    Then it returns the ACS URL, the signed response and the RelayState to post
+    And the response names no request it answers
+    And a service provider that accepts only solicited responses refuses it
+    And one that allows IdP-initiated sign-in accepts it for that user
+    And the tenant's activity records the RelayState it was sent with
+
+  @unit
+  Scenario: An unsolicited SAML response needs an ACS URL and an active user
+    When an unsolicited response is asked for without an ACS URL
+    Then the request is refused as a bad request
+    When one is asked for a user the tenant does not have
+    Then the request is refused as forbidden
+    And the tenant's activity records the refusal
+
+  @unit
+  Scenario: A user disabled at the IdP is refused at sign-in
+    Given a tenant whose user has been disabled through the control API
+    When that user signs in over SAML, over OIDC or through an unsolicited response
+    Then the tenant refuses each one itself, before anything reaches the service provider
+    And the tenant's activity shows the user being disabled
+    And a change naming no active flag is refused as a bad request
+    And a change naming an unknown user is refused as not found
+
+  @unit
+  Scenario: Resetting a tenant clears its clock skew
+    Given a tenant whose clock is skewed by ten minutes
+    When the tenant is reset
+    Then the tenant's clock runs true again
+    And the next replayed SAML assertion has no previous assertion to repeat
+
+  @unit
+  Scenario: A tenant's clock skew survives a simulator restart
+    Given a simulator that keeps its state on disk
+    And a tenant whose clock is skewed by ten minutes
+    When the simulator restarts
+    Then the tenant's clock is still skewed by ten minutes
+
+  @unit
+  Scenario: After a key rotation both keys are published and the new one signs
+    Given a tenant with one signing key
+    When the tenant's signing key is rotated through the control API
+    Then the tenant's JWKS publishes the new key and the previous one under different key ids
+    And the tenant's SAML metadata publishes a signing certificate for each key
+    And new ID tokens name the new key id and verify against the new key
+    And new SAML assertions verify against the new certificate
+    And the tenant's activity shows the rotation
+    And a rotated tenant keeps both keys across a simulator restart
+
+  @unit
+  Scenario: After the previous key is dropped only the new one is published
+    Given a tenant whose signing key has been rotated
+    When the previous key is dropped through the control API
+    Then the tenant's JWKS publishes only the new key
+    And the tenant's SAML metadata publishes only the new signing certificate
+    And dropping again when there is no previous key is refused as a conflict
+
+  @unit
+  Scenario: A token signed by a dropped key no longer verifies
+    Given an ID token signed before the tenant's key was rotated
+    When the key is rotated and the previous key is dropped
+    Then the old token finds no matching key in the tenant's JWKS
+    And a malformed rotation body is refused as a bad request
+
+  # --- Console: directory and provider controls ---------------------------
+
+  @integration
+  Scenario: The console adds a person to a tenant's directory
+    Given a tenant's Users tab is open in the console
+    When the operator adds a person by email with a name and groups
+    Then the console asks the simulator to add that person to the tenant
+    And the directory is read again so the person appears
+
+  @integration
+  Scenario: The console disables and re-enables a person at the IdP
+    Given a tenant's Users tab lists an active person
+    When the operator disables that person
+    Then the console asks the simulator to mark the person inactive
+    And a refusal from the simulator is shown in its own words
+
+  @integration
+  Scenario: The console sends one SCIM event on demand
+    Given a tenant's Provisioning tab is open in the console
+    When the operator picks an event kind, a person and a PATCH style and sends it
+    Then the console asks the simulator to send exactly that SCIM event
+    And the status LangWatch answered with is shown
+
+  @integration
+  Scenario: The console sends an Auth0 SCIM webhook
+    Given a tenant's Provisioning tab is open in the console
+    When the operator sends an Auth0 deactivate event for a person to a stack with a secret
+    Then the console asks the simulator to sign and send that webhook
+    And the status the stack answered with is shown
+
+  @integration
+  Scenario: The console makes a tenant pose as a legacy provider and shows its env lines
+    Given a tenant's Setup tab is open in the console
+    When the operator picks Okta as the tenant's legacy provider
+    Then the console asks the simulator to pose as Okta
+    And it shows the issuer and the env lines that point a stack at the tenant
+
+  @unit
+  Scenario: The tenant page reads the keys, skew and armed break it signs with
+    Given a tenant whose key was rotated, whose clock is skewed and which has a SAML break armed
+    When the console reads the tenant
+    Then it answers both published key ids, current first, the skew in seconds and the armed break
+
+  @integration
+  Scenario: The console rotates a tenant's key, skews its clock and arms a broken response
+    Given a tenant's Signing tab is open in the console
+    When the operator rotates the key, applies a clock skew and arms a SAML expired break
+    Then the console asks the simulator for each through its control API
+    And it shows which key signs and which is still published
+
+  @integration
+  Scenario: The console signs an IdP-initiated SAML response ready to post to the ACS
+    Given a tenant's Signing tab is open in the console
+    When the operator asks for an unsolicited response to an ACS address
+    Then the console offers a form that posts the signed response and RelayState to that address
+
+  # --- Console and CLI: proofs on any domain, advanced SCIM events -------
+
+  @integration
+  Scenario: The console publishes and removes a TXT record on any domain
+    Given a tenant's Domain tab is open in the console
+    When the operator publishes two TXT values at a domain no tenant owns, then removes them
+    Then the console asks the simulator to set exactly those values at that name
+    And then asks it to remove the record
+
+  @integration
+  Scenario: The console serves and stops the well-known verification file for a domain
+    Given a tenant's Domain tab is open in the console
+    When the operator serves a token for a domain, then stops serving it
+    Then the console asks the simulator to serve that token as the domain's verification file
+    And then asks it to stop
+
+  @unit
+  Scenario: haven sim idp verification sets and clears the well-known verification file
+    When an agent runs `haven sim idp verification set` with a domain and a token
+    Then the simulator is asked to serve that token for the domain
+    And `haven sim idp verification clear` with the domain asks it to stop
+
+  @integration
+  Scenario: The console sends a SCIM event with ids, attributes and the enterprise extension
+    Given a tenant's Provisioning tab is open on a connected tenant
+    When the operator fills in the receiving side's id, attributes to set, inactive, no externalId and a department
+    Then the console sends those fields in the SCIM event request
+    And a line that is not key=value is refused before anything is sent
+
+  @integration
+  Scenario: The signing inputs follow the tenant after a reset
+    Given a tenant's Signing tab shows a typed clock skew and a chosen break
+    When the tenant is reset and read again
+    Then the skew input and the break select show the tenant's own values

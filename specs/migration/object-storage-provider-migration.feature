@@ -165,3 +165,38 @@ Feature: Object storage provider parity and migration
     Given a provider migration has finalized successfully
     When the operator verifies the destination and resumes traffic
     Then the source bytes remain available for an explicit rollback
+
+  @unit
+  Scenario Outline: A phase run against the wrong active provider is refused before any object moves
+    Given the migration moves objects from S3 to Azure Blob
+    And the application's active provider is <active>
+    When the operator runs the <phase> phase
+    Then the phase is refused, naming the provider it expects and the one that is active
+    And the migration reads, copies, publishes and deletes nothing
+
+    Examples:
+      | phase    | active     |
+      | plan     | Azure Blob |
+      | copy     | Azure Blob |
+      | finalize | Azure Blob |
+      | verify   | S3         |
+
+  @unit
+  Scenario: A phase whose active storage is a different bucket than the migration names is refused
+    Given the migration moves objects from S3 to Azure Blob
+    And the application's active provider is S3 on a bucket other than the migration's source bucket
+    When the operator runs the copy phase
+    Then the phase is refused, naming the bucket the migration expects
+    And the migration reads, copies, publishes and deletes nothing
+
+  @unit
+  Scenario Outline: A phase run against the matching active provider proceeds
+    Given the migration moves objects from S3 to Azure Blob
+    And the application's active provider is <active> on the storage the migration names
+    When the operator runs the <phase> phase
+    Then the migration runs the phase
+
+    Examples:
+      | phase  | active     |
+      | copy   | S3         |
+      | verify | Azure Blob |

@@ -1,0 +1,36 @@
+import { Mastra } from "@mastra/core/mastra";
+import { Agent } from "@mastra/core/agent";
+import { LibSQLStore } from "@mastra/libsql";
+import { PinoLogger } from "@mastra/loggers";
+import { Observability } from "@mastra/observability";
+import { OtelExporter } from "@mastra/otel-exporter";
+
+export const mastra = new Mastra({
+  agents: {
+    assistant: new Agent({
+      name: "assistant",
+      instructions: "You are a helpful assistant.",
+      model: "openai/gpt-4o",
+    }),
+  },
+  // Storage is required for tracing in Mastra
+  storage: new LibSQLStore({ url: ":memory:" }), // +
+  logger: new PinoLogger({ name: "mastra", level: "info" }), // +
+  observability: new Observability({
+    configs: {
+      default: {
+        serviceName: "<project_name>",
+        exporters: [
+          new OtelExporter({
+            provider: {
+              custom: {
+                endpoint: "https://app.langwatch.ai/api/otel/v1/traces", // +
+                headers: { "Authorization": `Bearer ${process.env.LANGWATCH_API_KEY}` }, // +
+              },
+            },
+          }),
+        ],
+      },
+    },
+  },
+});

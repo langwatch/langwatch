@@ -2,6 +2,7 @@ package langyagent
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 )
@@ -205,6 +206,7 @@ func TestLoadConfig_UnsafeDevDisableIsolationAllowedInLocalEnvs(t *testing.T) {
 	}
 }
 
+// @scenario "The manager refuses the isolation bypass outside a local environment"
 func TestLoadConfig_UnsafeDevDisableIsolationRefusedInNonLocalEnvs(t *testing.T) {
 	// Allowlist fail-closed: production, staging, and any unknown/prod-like value
 	// must reject the bypass, so it can never be armed off a dev box.
@@ -215,8 +217,12 @@ func TestLoadConfig_UnsafeDevDisableIsolationRefusedInNonLocalEnvs(t *testing.T)
 			t.Setenv("ENVIRONMENT", env)
 			t.Setenv("LANGY_UNSAFE_DEV_DISABLE_ISOLATION", "true")
 
-			if _, err := LoadConfig(context.Background()); err == nil {
+			_, err := LoadConfig(context.Background())
+			if err == nil {
 				t.Fatalf("expected LoadConfig to refuse LANGY_UNSAFE_DEV_DISABLE_ISOLATION when ENVIRONMENT=%q", env)
+			}
+			if !strings.Contains(err.Error(), "LANGY_UNSAFE_DEV_DISABLE_ISOLATION") || !strings.Contains(err.Error(), env) {
+				t.Fatalf("refusal %q names neither the bypass nor the environment", err)
 			}
 		})
 	}

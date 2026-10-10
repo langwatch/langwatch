@@ -1,0 +1,417 @@
+/** Edits a queue through the annotation feature API. */
+
+import { Link } from "@langwatch/browser-host/link";
+import { Drawer } from "@langwatch/design-system/drawer";
+import { EmptyOptionsHint, OptionItem } from "@langwatch/design-system/option-list";
+import { Popover } from "@langwatch/design-system/popover";
+import {
+  Button,
+  type ButtonProps,
+  Field,
+  HStack,
+  Input,
+  Spacer,
+  Tag,
+  Text,
+  Textarea,
+  VStack,
+} from "@langwatch/design-system/primitives";
+import { readHandledError } from "@langwatch/handled-error/read-handled-error";
+import { Check, ChevronDown } from "lucide-react";
+import { useEffect, useId, useState } from "react";
+
+import { annotationApi } from "../../behavior/annotation-api.ts";
+import {
+  useActiveScoreTypes,
+  useAnnotationQueue,
+  useOrganizationMembers,
+} from "../../behavior/use-annotation-reads.ts";
+import { ReviewerAvatar } from "../elements/reviewer-avatar.tsx";
+
+/** What the server said about individual fields, if it named any. */
+function fieldProblems(error: unknown): Record<string, string> {
+  const handled = readHandledError(error);
+  const raw = handled?.meta.fieldErrors;
+  if (typeof raw !== "object" || raw === null) return {};
+
+  const problems: Record<string, string> = {};
+
+  for (const [field, messages] of Object.entries(raw as Record<string, unknown>)) {
+    const first = Array.isArray(messages) ? messages[0] : messages;
+    if (typeof first === "string") problems[field] = first;
+  }
+
+  return problems;
+}
+
+type Picked = { id: string; name: string | null };
+
+/** A member's name, or their email when the account has none (WEB-998). */
+function memberName(user: { name: string | null; email?: string | null } | undefined): string {
+  return user?.name ?? user?.email ?? "Unknown user";
+}
+
+function togglePicked(list: Picked[], entry: Picked): Picked[] {
+  return list.some((picked) => picked.id === entry.id)
+    ? list.filter((picked) => picked.id !== entry.id)
+    : [...list, entry];
+}
+
+function participantNames(
+  participants: Picked[],
+  members: { user: { id: string; name: string | null; email?: string | null } }[],
+): Picked[] {
+  return participants.map((participant) => ({
+    ...participant,
+    name:
+      participant.name ??
+      memberName(members.find((member) => member.user.id === participant.id)?.user),
+  }));
+}
+
+/** A pick list's trigger: the picked names as tags, or the placeholder when none. */
+function PickedTrigger({
+  picked,
+  placeholder,
+  ...triggerProps
+}: { picked: Picked[]; placeholder: string } & ButtonProps) {
+  return (
+    <Button
+      variant="outline"
+      width="full"
+      justifyContent="space-between"
+      fontWeight="normal"
+      color={picked.length === 0 ? "fg.subtle" : "fg"}
+      paddingX={3}
+      {...triggerProps}
+    >
+      {picked.length === 0 ? (
+        placeholder
+      ) : (
+        <HStack gap={1} flexWrap="wrap" flex={1}>
+          {picked.map((entry) => (
+            <Tag.Root key={entry.id} size="sm">
+              <Tag.Label>{entry.name}</Tag.Label>
+            </Tag.Root>
+          ))}
+        </HStack>
+      )}
+      <ChevronDown size={16} />
+    </Button>
+  );
+}
+
+export function AnnotationQueueEditor({
+  projectId,
+  organizationId,
+  queueId,
+  onClose,
+  onSaved,
+  onFailed,
+}: {
+  projectId: string | undefined;
+  organizationId: string | undefined;
+  /** The queue being edited, or undefined when one is being created. */
+  queueId: string | undefined;
+  onClose: () => void;
+  onSaved: (queueName: string) => void;
+  onFailed: (error: unknown) => void;
+}) {
+  const queue = useAnnotationQueue({ projectId, queueId });
+  const scores = useActiveScoreTypes({ projectId });
+  const organization = useOrganizationMembers({ organizationId });
+
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [participants, setParticipants] = useState<Picked[]>([]);
+  const [scoreTypes, setScoreTypes] = useState<Picked[]>([]);
+  const [problem, setProblem] = useState<string | null>(null);
+  const [problems, setProblems] = useState<Record<string, string>>({});
+  const [participantsOpen, setParticipantsOpen] = useState(false);
+  const [scoreTypesOpen, setScoreTypesOpen] = useState(false);
+
+  // Edit-mode hydration. Creating a queue never resolves a read, so nothing
+  // here fires and the form stays the empty one it started as.
+  const loaded = queue.data;
+
+  useEffect(() => {
+    if (!loaded) return;
+
+    setName(loaded.name);
+    setDescription(loaded.description ?? "");
+
+    setParticipants(
+      loaded.members.map((member) => ({ id: member.user.id, name: member.user.name })),
+    );
+
+    setScoreTypes(
+      loaded.AnnotationQueueScores.map((score) => ({
+        id: score.annotationScore.id,
+        name: score.annotationScore.name,
+      })),
+    );
+  }, [loaded]);
+
+  const utils = annotationApi.useUtils();
+
+  const save = annotationApi.annotation.createOrUpdateQueue.useMutation({
+    onSuccess: (saved) => {
+      // Everything that lists queues or counts their work: the listing, the
+      // queue page itself, the participants picker, the sidebar entries and
+      // its badges. A queue nobody can see yet is a queue nobody can use.
+      void utils.annotation.getOptimizedAnnotationQueues.invalidate();
+      void utils.annotation.getQueueBySlugOrId.invalidate();
+      void utils.annotation.getQueues.invalidate();
+      void utils.annotation.getQueueItemsCounts.invalidate();
+      void utils.annotation.getPendingItemsCount.invalidate();
+      void utils.annotation.getAssignedItemsCount.invalidate();
+      onSaved(saved.name);
+      onClose();
+    },
+    onError: (error) => {
+      const named = fieldProblems(error);
+      setProblems(named);
+      // A rejection the server pinned to a field is shown on that field; a
+      // rejection it did not is the host's to word, from the code.
+      if (Object.keys(named).length === 0) onFailed(error);
+    },
+  });
+
+  const members = organization.data?.members ?? [];
+  const scoreHintId = useId();
+  const participantHintId = useId();
+  const noScores = scores.data?.length === 0;
+  const noMembers = organization.data?.members.length === 0;
+
+  const submit = () => {
+    if (!projectId) return;
+
+    setProblem(null);
+    setProblems({});
+
+    if (participants.length === 0 || scoreTypes.length === 0) {
+      setProblem("Pick at least one participant and one score type.");
+
+      return;
+    }
+
+    save.mutate({
+      projectId,
+      name,
+      description,
+      userIds: participants.map((participant) => participant.id),
+      scoreTypeIds: scoreTypes.map((scoreType) => scoreType.id),
+      ...(queueId ? { queueId } : {}),
+    });
+  };
+
+  return (
+    <Drawer.Root
+      open
+      placement="end"
+      size="lg"
+      onOpenChange={({ open }) => {
+        if (!open) onClose();
+      }}
+    >
+      <Drawer.Content>
+        <Drawer.Header>
+          <HStack>
+            <Drawer.CloseTrigger onClick={onClose} />
+          </HStack>
+          <HStack>
+            <Drawer.Title>
+              {queueId ? "Edit Annotation Queue" : "Create Annotation Queue"}
+            </Drawer.Title>
+          </HStack>
+        </Drawer.Header>
+        <Drawer.Body>
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              submit();
+            }}
+          >
+            <VStack align="start" gap={4}>
+              {problem && (
+                <Text color="fg.error" fontSize="sm" role="alert">
+                  {problem}
+                </Text>
+              )}
+
+              <Field.Root>
+                <Field.Label>Participants</Field.Label>
+                <Popover.Root
+                  open={participantsOpen && !noMembers}
+                  onOpenChange={({ open }) => setParticipantsOpen(open)}
+                  positioning={{ placement: "bottom-start" }}
+                >
+                  <Popover.Trigger asChild>
+                    <PickedTrigger
+                      picked={participantNames(participants, members)}
+                      disabled={!organization.data || noMembers}
+                      aria-describedby={noMembers ? participantHintId : void 0}
+                      placeholder="Add Participants"
+                      data-testid="annotation-queue-editor-participants"
+                    />
+                  </Popover.Trigger>
+                  <Popover.Content width="300px">
+                    <Popover.Body padding={1}>
+                      <VStack align="start" gap={0} maxHeight="min(320px, 50vh)" overflowY="auto">
+                        {members.map((member) => {
+                          const isPicked = participants.some(
+                            (participant) => participant.id === member.user.id,
+                          );
+
+                          return (
+                            <OptionItem
+                              type="button"
+                              key={member.user.id}
+                              data-testid="annotation-queue-editor-participant-option"
+                              aria-pressed={isPicked}
+                              onClick={() =>
+                                setParticipants((current) =>
+                                  togglePicked(current, {
+                                    id: member.user.id,
+                                    name: memberName(member.user),
+                                  }),
+                                )
+                              }
+                            >
+                              <ReviewerAvatar size="2xs" name={memberName(member.user)} />
+                              <Text fontSize="sm">{memberName(member.user)}</Text>
+                              <Check
+                                size={16}
+                                aria-hidden
+                                style={{ marginInlineStart: "auto", opacity: isPicked ? 1 : 0 }}
+                              />
+                            </OptionItem>
+                          );
+                        })}
+                      </VStack>
+                    </Popover.Body>
+                  </Popover.Content>
+                </Popover.Root>
+                <ParticipantOptionsHint empty={noMembers} id={participantHintId} />
+              </Field.Root>
+
+              <Field.Root invalid={!!problems.name} width="full">
+                <Field.Label>Name Annotation Queue</Field.Label>
+                <Input
+                  value={name}
+                  required
+                  onChange={(event) => setName(event.target.value)}
+                  data-testid="annotation-queue-editor-name"
+                />
+                <Field.ErrorText>{problems.name}</Field.ErrorText>
+                <Field.HelperText>
+                  Give it a name to identify this annotation queue
+                </Field.HelperText>
+              </Field.Root>
+
+              <Field.Root invalid={!!problems.description} width="full">
+                <Field.Label>Description</Field.Label>
+                <Textarea
+                  value={description}
+                  required
+                  data-testid="annotation-queue-editor-description"
+                  onChange={(event) => setDescription(event.target.value)}
+                />
+                <Field.ErrorText>{problems.description}</Field.ErrorText>
+                <Field.HelperText>Provide a description of the annotation</Field.HelperText>
+              </Field.Root>
+
+              <Field.Root>
+                <Field.Label>Score Type</Field.Label>
+                <Popover.Root
+                  open={scoreTypesOpen && !noScores}
+                  onOpenChange={({ open }) => setScoreTypesOpen(open)}
+                  positioning={{ placement: "bottom-start" }}
+                >
+                  <Popover.Trigger asChild>
+                    <PickedTrigger
+                      picked={scoreTypes}
+                      disabled={!scores.data || noScores}
+                      aria-describedby={noScores ? scoreHintId : void 0}
+                      placeholder="Add Score Type"
+                      data-testid="annotation-queue-editor-score-types"
+                    />
+                  </Popover.Trigger>
+                  <Popover.Content width="300px">
+                    <Popover.Body padding={1}>
+                      <VStack align="start" gap={0} maxHeight="250px" overflowY="auto">
+                        {(scores.data ?? []).map((score) => {
+                          const isPicked = scoreTypes.some(
+                            (scoreType) => scoreType.id === score.id,
+                          );
+
+                          return (
+                            <OptionItem
+                              type="button"
+                              key={score.id}
+                              data-testid="annotation-queue-editor-score-option"
+                              aria-pressed={isPicked}
+                              onClick={() =>
+                                setScoreTypes((current) =>
+                                  togglePicked(current, { id: score.id, name: score.name }),
+                                )
+                              }
+                            >
+                              <Text fontSize="sm">{score.name}</Text>
+                              <Check
+                                size={16}
+                                aria-hidden
+                                style={{ marginInlineStart: "auto", opacity: isPicked ? 1 : 0 }}
+                              />
+                            </OptionItem>
+                          );
+                        })}
+                      </VStack>
+                    </Popover.Body>
+                  </Popover.Content>
+                </Popover.Root>
+                <ScoreOptionsHint empty={noScores} id={scoreHintId} />
+              </Field.Root>
+
+              <HStack width="full">
+                <Spacer />
+                <Button
+                  colorPalette="orange"
+                  type="submit"
+                  minWidth="fit-content"
+                  loading={save.isPending}
+                  data-testid="annotation-queue-editor-save"
+                >
+                  Save
+                </Button>
+              </HStack>
+            </VStack>
+          </form>
+        </Drawer.Body>
+      </Drawer.Content>
+    </Drawer.Root>
+  );
+}
+
+function ScoreOptionsHint({ empty, id }: { empty: boolean; id: string }) {
+  if (!empty)
+    return <Field.HelperText>Select the score type for this annotation queue</Field.HelperText>;
+  return (
+    <EmptyOptionsHint
+      id={id}
+      action={<Link href="/settings/annotation-scores">Create an annotation score</Link>}
+    >
+      No score types yet. Create one to use in this queue.
+    </EmptyOptionsHint>
+  );
+}
+
+function ParticipantOptionsHint({ empty, id }: { empty: boolean; id: string }) {
+  if (!empty)
+    return <Field.HelperText>Select the participants for this annotation queue</Field.HelperText>;
+  return (
+    <EmptyOptionsHint id={id} action={<Link href="/settings/directory">Invite participants</Link>}>
+      No participants yet. Invite someone to your organization first.
+    </EmptyOptionsHint>
+  );
+}

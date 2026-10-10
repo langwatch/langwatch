@@ -1,17 +1,11 @@
-import { bench, describe } from "vitest";
-import { redactSecretsInText } from "../secrets.js";
+import { test } from "vitest";
+
+import { redactSecretsInText } from "../secrets.ts";
 
 /**
- * Redaction runs on every stored string at ingestion, so its cost is paid per
- * span rather than per request. These payloads are the three shapes that decide
- * that cost, and they are here because a rule can be fast on one and quadratic
- * on another: the connection-URL rule was 0.1 ms on URL-dense text and 2.4 ms on
- * prose with no URL in it at all, because the scheme led the match and every
- * letter therefore started a scan.
- *
- * Run with `pnpm --filter @langwatch/redaction bench`. Compare against the same
- * command on the base branch; there is no absolute number to assert, because a
- * loaded CI box moves them all together while the ratio between shapes holds.
+ * These payloads are the three shapes that decide redaction's per-span cost
+ * (the connection-URL rule was 0.1ms on URL-dense text, 2.4ms on prose with
+ * none). Run with `pnpm --filter @langwatch/redaction bench`; compare ratios.
  */
 const SIZE = 200_000;
 
@@ -29,7 +23,7 @@ const PROSE = payloadOf(
 
 /** A coding-agent transcript: prose, code, JSON, paths, hashes, logs. */
 const MIXED = payloadOf(
-  "The agent read platform/app/src/server/traces/trace.service.ts:72 and " +
+  "The agent read modules/trace/process/src/services/trace-legacy-read.service.ts:72 and " +
     "found the redaction service constructed there.\n" +
     "const apiKey = process.env.OPENAI_API_KEY;\n" +
     '{"traceId":"4bf92f3577b34da6a3ce929d0e0e4736","model":"claude-opus-5"}\n' +
@@ -44,16 +38,19 @@ const URLS = payloadOf(
     "amqp://guest:guest@localhost:5672/%2f\n",
 );
 
-describe("redactSecretsInText, 200 KB", () => {
-  bench("prose with no URL", () => {
+test("redactSecretsInText, 200 KB", async ({ bench, expect }) => {
+  const prose = bench("prose with no URL", () => {
     redactSecretsInText({ text: PROSE });
   });
 
-  bench("a coding-agent transcript", () => {
+  const mixed = bench("a coding-agent transcript", () => {
     redactSecretsInText({ text: MIXED });
   });
 
-  bench("connection strings", () => {
+  const urls = bench("connection strings", () => {
     redactSecretsInText({ text: URLS });
   });
+
+  const results = await bench.compare(prose, mixed, urls);
+  expect(results.get("connection strings").name).toBe("connection strings");
 });

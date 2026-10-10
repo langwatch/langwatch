@@ -25,8 +25,9 @@ func seedServedKey(t *testing.T, svc *Service, rawKey, vkID string) [64]byte {
 	return h
 }
 
-func budgetUpdated(svc *Service) {
-	svc.applyChange("org-1", CacheChange{Kind: ChangeKindBudgetUpdated, ProjectID: "proj-1"})
+// budgetCreated is a change-feed eviction that keeps the last known entry.
+func budgetCreated(svc *Service) {
+	svc.applyChange("org-1", CacheChange{Kind: ChangeKindBudgetCreated, ProjectID: "proj-1"})
 }
 
 // @scenario "a key evicted by a budget change keeps serving when the refetch times out"
@@ -39,7 +40,7 @@ func TestResolve_EvictedByBudgetChange_ConfigTimeout_ServesLastKnown(t *testing.
 	rawKey := "vk-lw-busy"
 	h := seedServedKey(t, svc, rawKey, "vk_busy")
 
-	budgetUpdated(svc)
+	budgetCreated(svc)
 	_, inL1 := svc.l1.Peek(h)
 	require.False(t, inL1, "the budget change still evicts, so the next request sees fresh spend")
 
@@ -74,7 +75,7 @@ func TestResolve_LastKnown_RecoversOnNextRefresh(t *testing.T) {
 	})
 	rawKey := "vk-lw-recover"
 	h := seedServedKey(t, svc, rawKey, "vk_recover")
-	budgetUpdated(svc)
+	budgetCreated(svc)
 	_, err := svc.Resolve(context.Background(), domain.PresentedKey{Token: rawKey})
 	require.NoError(t, err)
 
@@ -103,7 +104,7 @@ func TestResolve_LastKnown_OlderThanMaxAge_FailsRetryable(t *testing.T) {
 	e.configConfirmedAt = time.Now().Add(-DefaultLastKnownConfigMaxAge - time.Minute)
 	e.mu.Unlock()
 
-	budgetUpdated(svc)
+	budgetCreated(svc)
 	_, err := svc.Resolve(context.Background(), domain.PresentedKey{Token: rawKey})
 	require.ErrorIs(t, err, domain.ErrAuthUpstream)
 }
@@ -125,7 +126,7 @@ func TestResolve_RevokingChange_LeavesNoFallback(t *testing.T) {
 				rawKey := "vk-lw-revoked-" + name
 				seedServedKey(t, svc, rawKey, "vk_revoked")
 				if afterBudget {
-					budgetUpdated(svc)
+					budgetCreated(svc)
 				}
 
 				svc.applyChange("org-1", CacheChange{Kind: kind, VirtualKeyID: "vk_revoked"})
@@ -155,7 +156,7 @@ func TestResolve_LastKnown_AuthRejectionWins(t *testing.T) {
 			svc, _ := newService(t, Options{Resolver: &fetcher.fakeResolver, ConfigFetcher: fetcher})
 			rawKey := "vk-lw-rejected"
 			seedServedKey(t, svc, rawKey, "vk_rejected")
-			budgetUpdated(svc)
+			budgetCreated(svc)
 			require.Equal(t, 1, svc.lastKnown.Len())
 
 			_, err := svc.Resolve(context.Background(), domain.PresentedKey{Token: rawKey})
@@ -177,7 +178,7 @@ func TestResolve_LastKnown_KeepsTheFreshTokensExpiry(t *testing.T) {
 	})
 	rawKey := "vk-lw-dated"
 	h := seedServedKey(t, svc, rawKey, "vk_dated")
-	budgetUpdated(svc)
+	budgetCreated(svc)
 
 	got, err := svc.Resolve(context.Background(), domain.PresentedKey{Token: rawKey})
 	require.NoError(t, err)
@@ -197,7 +198,7 @@ func TestResolve_LastKnown_FreshResolutionAlreadyExpired_Refuses(t *testing.T) {
 	svc, _ := newService(t, Options{Resolver: &fetcher.fakeResolver, ConfigFetcher: fetcher})
 	rawKey := "vk-lw-ended"
 	seedServedKey(t, svc, rawKey, "vk_ended")
-	budgetUpdated(svc)
+	budgetCreated(svc)
 
 	_, err := svc.Resolve(context.Background(), domain.PresentedKey{Token: rawKey})
 	require.ErrorIs(t, err, domain.ErrKeyExpired)
@@ -209,7 +210,7 @@ func TestServeLastKnown_EntryThatLapsedDuringTheFetch_IsNotServed(t *testing.T) 
 	svc, _ := newService(t, Options{Resolver: &fetcher.fakeResolver, ConfigFetcher: fetcher})
 	rawKey := "vk-lw-lapsed"
 	h := seedServedKey(t, svc, rawKey, "vk_lapsed")
-	budgetUpdated(svc)
+	budgetCreated(svc)
 	e := svc.lastKnownFor(h)
 	require.NotNil(t, e)
 
@@ -257,7 +258,7 @@ func TestResolve_LastKnown_WindowMeasuredFromLatest304(t *testing.T) {
 	e.mu.Unlock()
 	require.WithinDuration(t, time.Now(), confirmedAt, time.Second, "a 304 is a confirmation from the control plane")
 
-	budgetUpdated(svc)
+	budgetCreated(svc)
 	got, err := svc.Resolve(context.Background(), domain.PresentedKey{Token: rawKey})
 	require.NoError(t, err, "the fallback window is measured from the 304, not from the last full fetch")
 	assert.Equal(t, "cred-known-good", got.Credentials[0].ID)
@@ -290,7 +291,7 @@ func TestRefresh_ConfigFetchFindsKeyDeleted_EvictsAtOnce(t *testing.T) {
 		h := hashKey(domain.PresentedKey{Token: rawKey})
 		svc.storeL1(h, bundleWithCreds("vk_gone", time.Now().Add(2*time.Minute), "cred-old"), "")
 
-		svc.refreshBackground(domain.PresentedKey{Token: rawKey}, h)
+		refreshCurrent(svc, domain.PresentedKey{Token: rawKey}, h)
 
 		_, ok := svc.l1.Peek(h)
 		assert.False(t, ok, "a deleted key is evicted by the background refresh too")

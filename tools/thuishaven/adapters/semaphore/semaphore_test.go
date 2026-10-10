@@ -2,6 +2,8 @@ package semaphore
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 )
@@ -28,6 +30,25 @@ func TestAcquireBlocksWhenAllSlotsHeld(t *testing.T) {
 		t.Fatalf("acquire after release: slot=%d err=%v, want slot 1", slot2, err)
 	}
 	release2()
+}
+
+func TestTryAcquireReturnsSlotFileError(t *testing.T) {
+	home := t.TempDir()
+	dir := filepath.Join(home, "locks", "tc")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(filepath.Join(dir, "slot-0"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	_, _, ok, err := New(home).TryAcquire("tc", 1)
+	if err == nil {
+		t.Fatal("TryAcquire should return an error when a slot path cannot be opened")
+	}
+	if ok {
+		t.Fatal("TryAcquire should not report a slot as acquired after an open error")
+	}
 }
 
 func TestTwoSlotsAllowTwoConcurrent(t *testing.T) {

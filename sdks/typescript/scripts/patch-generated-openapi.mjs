@@ -9,10 +9,7 @@
 // generate:openapi-types; the generated file stays fully reproducible.
 import { readFileSync, writeFileSync } from "node:fs";
 
-const target = new URL(
-  "../src/internal/generated/openapi/api-client.ts",
-  import.meta.url,
-);
+const target = new URL("../src/internal/generated/openapi/api-client.ts", import.meta.url);
 let source = readFileSync(target, "utf8");
 
 const member =

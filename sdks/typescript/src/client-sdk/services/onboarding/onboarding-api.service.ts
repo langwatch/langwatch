@@ -1,18 +1,15 @@
-/**
- * The `/api/v1/onboarding` family: the guided onboarding state of the
- * organization the credential's project belongs to.
- *
- * CLI-only, deliberately not exported from the client SDK's public index: an
- * application instruments and reads data, it does not report on the
- * onboarding of the organization it runs inside. Langy calls it at the end
- * of a guided setup so the Home offer and the campaigns see the path finish.
- */
-import { scopedApiKey } from "@/internal/credentialContext";
-import { langwatchFetch } from "@/internal/http/langwatchFetch";
-import { resolveEndpoint } from "@/internal/endpoint";
-import { buildAuthHeaders } from "@/internal/api/auth";
 import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
+import { mergeHeaders } from "@/client-sdk/services/_shared/merge-headers";
 import { throwIfHandledError } from "@/client-sdk/services/_shared/throw-handled-error";
+/**
+ * The `/api/v1/onboarding` family. CLI-only, deliberately not exported from
+ * the client SDK's public index (an application reports traces, not its own
+ * onboarding).
+ */
+import { buildAuthHeaders } from "@/internal/api/auth";
+import { scopedApiKey } from "@/internal/credentialContext";
+import { resolveEndpoint } from "@/internal/endpoint";
+import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
 export type GuidedOnboardingPath = "llmops" | "coding" | "gateway" | "governance";
 
@@ -45,8 +42,7 @@ export class OnboardingApiService {
   private readonly endpoint: string;
 
   constructor(config?: { apiKey?: string; endpoint?: string }) {
-    this.apiKey =
-      config?.apiKey ?? scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
+    this.apiKey = config?.apiKey ?? scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
     this.endpoint = resolveEndpoint(config?.endpoint);
   }
 
@@ -62,18 +58,13 @@ export class OnboardingApiService {
     );
   }
 
-  private async request<T>(
-    operation: string,
-    path: string,
-    options?: RequestInit,
-  ): Promise<T> {
+  private async request<T>(operation: string, path: string, options?: RequestInit): Promise<T> {
     const response = await langwatchFetch(`${this.endpoint}${path}`, {
       ...options,
-      headers: {
-        ...buildAuthHeaders({ apiKey: this.apiKey }),
-        "Content-Type": "application/json",
-        ...options?.headers,
-      },
+      headers: mergeHeaders(
+        { ...buildAuthHeaders({ apiKey: this.apiKey }), "Content-Type": "application/json" },
+        options?.headers,
+      ),
     });
 
     if (!response.ok) {
@@ -82,18 +73,14 @@ export class OnboardingApiService {
       try {
         parsed = JSON.parse(errorText);
       } catch {
-        // leave as raw text
+        /* non-JSON body — pass through as-is */
+        void 0;
       }
       const message = formatApiErrorMessage({
         error: parsed,
         options: { status: response.status },
       });
-      throwIfHandledError({
-        operation,
-        error: parsed,
-        status: response.status,
-        message,
-      });
+      throwIfHandledError({ operation, error: parsed, status: response.status, message });
       throw new OnboardingApiError(message, operation, parsed);
     }
 

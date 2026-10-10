@@ -1,0 +1,398 @@
+# The `langwatch` CLI gateway families: virtual keys, budgets and spend events
+# (client-sdk/services/{virtual-keys,gateway-budgets,spend-events}). Virtual keys and budgets
+# send the key as a Bearer token plus `X-Project-Id`; spend events send the key alone (the routes
+# are organization-level). Paths are `/api/gateway/v1/...`; bodies are what the commands build:
+# `null` for the ids they default and no key for the flags they leave out. Assertions name the
+# fields the services type and the commands print. Every scenario that makes a key, budget or
+# endpoint removes it in a teardown step. Written unrun; spend reads need ClickHouse.
+
+# ── virtual keys ─────────────────────────────────────────────────────────────
+
+- id: "cli-virtual-keys-create-list-get-update-rotate-disable-enable-revoke"
+  endpoint: "POST /api/gateway/v1/virtual-keys"
+  auth: "org"
+  request:
+    path: "/api/gateway/v1/virtual-keys"
+    headers: {"X-Project-Id": "{projectId}"}
+    body: {"name": "vd-{uid}", "description": "vd key", "principal_user_id": null, "trace_project_id": null, "routing_policy_id": null}
+  capture: {"vkId": "virtual_key.id"}
+  expect:
+    status: 201
+    body:
+      virtual_key: {"id": "<any>", "name": "vd-{uid}", "description": "vd key", "status": "active", "purpose": "user", "display_prefix": "<any>", "scopes": "<any>", "revision": "<any>", "created_at": "<any>", "updated_at": "<any>", "revoked_at": null}
+      secret: "<any>"
+  verify:
+    - request: "GET /api/gateway/v1/virtual-keys/{vkId}"
+      auth: "org"
+      headers: {"X-Project-Id": "{projectId}"}
+      expect: {"status": 200, "body": {"virtual_key": {"id": "{vkId}", "name": "vd-{uid}", "status": "active"}}, "notContains": "\"secret\""}
+    - request: "GET /api/gateway/v1/virtual-keys?limit=100"
+      auth: "org"
+      headers: {"X-Project-Id": "{projectId}"}
+      expect: {"status": 200, "body": {"data": "<any>"}, "contains": ["{vkId}", "next_cursor"]}
+    - request: "PATCH /api/gateway/v1/virtual-keys/{vkId}"
+      auth: "org"
+      headers: {"X-Project-Id": "{projectId}"}
+      body: {"name": "vd2-{uid}", "description": null}
+      # main's update reads `description ?? existing`, so a null keeps the stored value.
+      expect: {"status": 200, "body": {"virtual_key": {"id": "{vkId}", "name": "vd2-{uid}", "description": "vd key"}}}
+    - request: "POST /api/gateway/v1/virtual-keys/{vkId}/disable"
+      auth: "org"
+      headers: {"X-Project-Id": "{projectId}"}
+      body: {"reason": "vd-{uid}"}
+      expect: {"status": 200, "body": {"virtual_key": {"id": "{vkId}", "status": "disabled"}}}
+    - request: "POST /api/gateway/v1/virtual-keys/{vkId}/enable"
+      auth: "org"
+      headers: {"X-Project-Id": "{projectId}"}
+      expect: {"status": 200, "body": {"virtual_key": {"id": "{vkId}", "status": "active"}}}
+    - request: "POST /api/gateway/v1/virtual-keys/{vkId}/rotate"
+      auth: "org"
+      headers: {"X-Project-Id": "{projectId}"}
+      expect: {"status": 200, "body": {"virtual_key": {"id": "{vkId}", "display_prefix": "<any>"}, "secret": "<any>"}}
+    - request: "POST /api/gateway/v1/virtual-keys/{vkId}/revoke"
+      auth: "org"
+      headers: {"X-Project-Id": "{projectId}"}
+      expect: {"status": 200, "body": {"virtual_key": {"id": "{vkId}", "status": "revoked", "revoked_at": "<any>"}}}
+  teardown:
+    - request: "POST /api/gateway/v1/virtual-keys/{vkId}/revoke"
+      auth: "org"
+      headers: {"X-Project-Id": "{projectId}"}
+
+- id: "cli-virtual-keys-create-with-scope-and-budget-reads-back"
+  endpoint: "POST /api/gateway/v1/virtual-keys"
+  auth: "org"
+  request:
+    path: "/api/gateway/v1/virtual-keys"
+    headers: {"X-Project-Id": "{projectId}"}
+    body: {"name": "vd-{uid}", "scopes": [{"scope_type": "project", "scope_id": "{projectId}"}], "budget": {"limit_usd": "10", "window": "month", "on_breach": "block"}, "principal_user_id": null, "trace_project_id": null, "routing_policy_id": null}
+  capture: {"vkId": "virtual_key.id"}
+  expect:
+    status: 201
+    body: {"virtual_key": {"id": "<any>", "name": "vd-{uid}", "scopes": [{"scope_type": "project", "scope_id": "{projectId}"}]}, "secret": "<any>"}
+  verify:
+    - request: "GET /api/gateway/v1/budgets?scope_type=virtual_key&limit=100"
+      auth: "org"
+      headers: {"X-Project-Id": "{projectId}"}
+      expect: {"status": 200, "contains": ["{vkId}"]}
+  teardown:
+    - request: "POST /api/gateway/v1/virtual-keys/{vkId}/revoke"
+      auth: "org"
+      headers: {"X-Project-Id": "{projectId}"}
+
+- id: "cli-virtual-keys-reveal-once-withholds-the-secret"
+  endpoint: "POST /api/gateway/v1/virtual-keys"
+  auth: "org"
+  request:
+    path: "/api/gateway/v1/virtual-keys"
+    headers: {"X-Project-Id": "{projectId}"}
+    body: {"name": "vd-{uid}", "principal_user_id": null, "trace_project_id": null, "routing_policy_id": null, "reveal_once": true}
+  capture: {"vkId": "virtual_key.id"}
+  expect:
+    status: 201
+    body: {"virtual_key": {"id": "<any>", "name": "vd-{uid}"}, "reveal_id": "<any>", "preview": "<any>"}
+    notContains: "\"secret\""
+  teardown:
+    - request: "POST /api/gateway/v1/virtual-keys/{vkId}/revoke"
+      auth: "org"
+      headers: {"X-Project-Id": "{projectId}"}
+
+- id: "cli-virtual-keys-spend-reads-the-summary-fields"
+  endpoint: "GET /api/gateway/v1/virtual-keys/{id}/spend"
+  auth: "org"
+  setup:
+    - request: "POST /api/gateway/v1/virtual-keys"
+      auth: "org"
+      headers: {"X-Project-Id": "{projectId}"}
+      body: {"name": "vd-{uid}"}
+      capture: {"vkId": "virtual_key.id"}
+      expect: {"status": 201}
+  request:
+    path: "/api/gateway/v1/virtual-keys/{vkId}/spend"
+    headers: {"X-Project-Id": "{projectId}"}
+  expect: {"status": 200, "body": {"virtual_key_id": "{vkId}", "spent_usd": "<any>", "requests": "<any>", "window": {"from": "<any>", "to": "<any>"}}}
+  teardown:
+    - request: "POST /api/gateway/v1/virtual-keys/{vkId}/revoke"
+      auth: "org"
+      headers: {"X-Project-Id": "{projectId}"}
+
+- id: "cli-virtual-keys-spend-inverted-window-is-refused"
+  endpoint: "GET /api/gateway/v1/virtual-keys/{id}/spend"
+  auth: "org"
+  setup:
+    - request: "POST /api/gateway/v1/virtual-keys"
+      auth: "org"
+      headers: {"X-Project-Id": "{projectId}"}
+      body: {"name": "vd-{uid}"}
+      capture: {"vkId": "virtual_key.id"}
+      expect: {"status": 201}
+  request:
+    path: "/api/gateway/v1/virtual-keys/{vkId}/spend"
+    headers: {"X-Project-Id": "{projectId}"}
+    query: {"from": "{nowMs}", "to": "{nowMs-1000}"}
+  expect: {"status": [400, 422]}
+  teardown:
+    - request: "POST /api/gateway/v1/virtual-keys/{vkId}/revoke"
+      auth: "org"
+      headers: {"X-Project-Id": "{projectId}"}
+
+- id: "cli-virtual-keys-get-unknown-is-404"
+  endpoint: "GET /api/gateway/v1/virtual-keys/{id}"
+  auth: "org"
+  request: {"path": "/api/gateway/v1/virtual-keys/vk-nope-{uid}", "headers": {"X-Project-Id": "{projectId}"}}
+  expect: {"status": 404}
+
+- id: "cli-virtual-keys-create-without-a-name-is-refused"
+  endpoint: "POST /api/gateway/v1/virtual-keys"
+  auth: "org"
+  request: {"path": "/api/gateway/v1/virtual-keys", "headers": {"X-Project-Id": "{projectId}"}, "body": {"principal_user_id": null}}
+  expect: {"status": [400, 422]}
+
+# ── budgets ──────────────────────────────────────────────────────────────────
+
+- id: "cli-gateway-budgets-create-list-update-reset-archive"
+  endpoint: "POST /api/gateway/v1/budgets"
+  auth: "org"
+  setup:
+    - request: "POST /api/gateway/v1/virtual-keys"
+      auth: "org"
+      headers: {"X-Project-Id": "{projectId}"}
+      body: {"name": "vd-{uid}"}
+      capture: {"vkId": "virtual_key.id"}
+      expect: {"status": 201}
+  request:
+    path: "/api/gateway/v1/budgets"
+    headers: {"X-Project-Id": "{projectId}"}
+    body: {"name": "vd-{uid}", "scope": {"kind": "project", "project_id": "{projectId}"}, "window": "month", "limit_usd": "10", "timezone": null, "provider_key": null}
+  capture: {"budgetId": "budget.id"}
+  expect:
+    status: 201
+    body:
+      budget: {"id": "<any>", "name": "vd-{uid}", "scope_type": "project", "scope_id": "{projectId}", "window": "month", "on_breach": "<any>", "limit_usd": "<any>", "resets_at": "<any>", "current_period_started_at": "<any>", "created_at": "<any>", "archived_at": null}
+  verify:
+    - request: "GET /api/gateway/v1/budgets?scope_type=project&limit=100"
+      auth: "org"
+      headers: {"X-Project-Id": "{projectId}"}
+      expect: {"status": 200, "body": {"data": "<any>", "spend_available": "<any>"}, "contains": ["{budgetId}", "next_cursor"]}
+    - request: "PATCH /api/gateway/v1/budgets/{budgetId}"
+      auth: "org"
+      headers: {"X-Project-Id": "{projectId}"}
+      body: {"name": "vd2-{uid}", "limit_usd": "20", "on_breach": "warn"}
+      expect: {"status": 200, "body": {"budget": {"id": "{budgetId}", "name": "vd2-{uid}", "on_breach": "warn"}}}
+    - request: "POST /api/gateway/v1/budgets/{budgetId}/reset"
+      auth: "org"
+      headers: {"X-Project-Id": "{projectId}"}
+      body: {}
+      expect: {"status": 200, "body": {"budget": {"id": "{budgetId}", "current_period_started_at": "<any>"}}, "contains": ["last_reset_at"]}
+    - request: "DELETE /api/gateway/v1/budgets/{budgetId}"
+      auth: "org"
+      headers: {"X-Project-Id": "{projectId}"}
+      expect: {"status": 200, "body": {"budget": {"id": "{budgetId}", "archived_at": "<any>"}}}
+    - request: "GET /api/gateway/v1/budgets?scope_type=project&limit=100"
+      auth: "org"
+      headers: {"X-Project-Id": "{projectId}"}
+      expect: {"status": 200, "notContains": "{budgetId}"}
+  teardown:
+    - request: "DELETE /api/gateway/v1/budgets/{budgetId}"
+      auth: "org"
+      headers: {"X-Project-Id": "{projectId}"}
+    - request: "POST /api/gateway/v1/virtual-keys/{vkId}/revoke"
+      auth: "org"
+      headers: {"X-Project-Id": "{projectId}"}
+
+- id: "cli-gateway-budgets-virtual-key-scope-with-cycle-anchor"
+  endpoint: "POST /api/gateway/v1/budgets"
+  auth: "org"
+  setup:
+    - request: "POST /api/gateway/v1/virtual-keys"
+      auth: "org"
+      headers: {"X-Project-Id": "{projectId}"}
+      body: {"name": "vd-{uid}"}
+      capture: {"vkId": "virtual_key.id"}
+      expect: {"status": 201}
+  request:
+    path: "/api/gateway/v1/budgets"
+    headers: {"X-Project-Id": "{projectId}"}
+    body: {"name": "vd-{uid}", "scope": {"kind": "virtual_key", "virtual_key_id": "{vkId}"}, "window": "month", "limit_usd": "5", "on_breach": "warn", "timezone": null, "provider_key": null, "cycle_anchor_at": "2026-01-17T09:00:00Z"}
+  capture: {"budgetId": "budget.id"}
+  expect:
+    status: 201
+    body: {"budget": {"id": "<any>", "scope_type": "virtual_key", "scope_id": "{vkId}", "window": "month", "on_breach": "warn", "cycle_anchor_at": "<any>"}}
+  teardown:
+    - request: "DELETE /api/gateway/v1/budgets/{budgetId}"
+      auth: "org"
+      headers: {"X-Project-Id": "{projectId}"}
+    - request: "POST /api/gateway/v1/virtual-keys/{vkId}/revoke"
+      auth: "org"
+      headers: {"X-Project-Id": "{projectId}"}
+
+- id: "cli-gateway-budgets-organization-scope-manual-window"
+  endpoint: "POST /api/gateway/v1/budgets"
+  auth: "org"
+  request:
+    path: "/api/gateway/v1/budgets"
+    headers: {"X-Project-Id": "{projectId}"}
+    body: {"name": "vd-{uid}", "scope": {"kind": "organization", "organization_id": "{orgId}"}, "window": "manual", "limit_usd": "100", "timezone": null, "provider_key": null}
+  capture: {"budgetId": "budget.id"}
+  expect:
+    status: 201
+    body: {"budget": {"id": "<any>", "scope_type": "organization", "scope_id": "{orgId}", "window": "manual"}}
+  teardown:
+    - request: "DELETE /api/gateway/v1/budgets/{budgetId}"
+      auth: "org"
+      headers: {"X-Project-Id": "{projectId}"}
+
+- id: "cli-gateway-budgets-create-with-an-unknown-window-is-refused"
+  endpoint: "POST /api/gateway/v1/budgets"
+  auth: "org"
+  request:
+    path: "/api/gateway/v1/budgets"
+    headers: {"X-Project-Id": "{projectId}"}
+    body: {"name": "vd-{uid}", "scope": {"kind": "organization", "organization_id": "{orgId}"}, "window": "fortnight", "limit_usd": "10"}
+  expect: {"status": [400, 422]}
+
+- id: "cli-gateway-budgets-list-with-an-unknown-scope-type-is-refused"
+  endpoint: "GET /api/gateway/v1/budgets"
+  auth: "org"
+  request: {"path": "/api/gateway/v1/budgets", "headers": {"X-Project-Id": "{projectId}"}, "query": {"scope_type": "nope"}}
+  expect: {"status": [400, 422]}
+
+- id: "cli-gateway-budgets-update-unknown-is-404"
+  endpoint: "PATCH /api/gateway/v1/budgets/{id}"
+  auth: "org"
+  request: {"path": "/api/gateway/v1/budgets/budget-nope-{uid}", "headers": {"X-Project-Id": "{projectId}"}, "body": {"name": "vd-{uid}"}}
+  expect: {"status": 404}
+
+- id: "cli-gateway-budgets-reset-unknown-is-404"
+  endpoint: "POST /api/gateway/v1/budgets/{id}/reset"
+  auth: "org"
+  request: {"path": "/api/gateway/v1/budgets/budget-nope-{uid}/reset", "headers": {"X-Project-Id": "{projectId}"}, "body": {}}
+  expect: {"status": 404}
+
+- id: "cli-gateway-budgets-archive-unknown-is-404"
+  endpoint: "DELETE /api/gateway/v1/budgets/{id}"
+  auth: "org"
+  request: {"path": "/api/gateway/v1/budgets/budget-nope-{uid}", "headers": {"X-Project-Id": "{projectId}"}}
+  expect: {"status": 404}
+
+# ── spend events ─────────────────────────────────────────────────────────────
+
+- id: "cli-spend-events-list-carries-data-and-cursor"
+  endpoint: "GET /api/gateway/v1/spend-events"
+  auth: "org"
+  request:
+    path: "/api/gateway/v1/spend-events"
+    query: {"from": "{nowMs-86400000}", "to": "{nowMs}", "limit": 5, "project_id": "{projectId}", "status": "success"}
+  expect: {"status": 200, "body": {"data": "<any>"}, "contains": ["next_cursor"]}
+
+- id: "cli-spend-events-list-filters-by-key-and-metadata"
+  endpoint: "GET /api/gateway/v1/spend-events"
+  auth: "org"
+  request:
+    path: "/api/gateway/v1/spend-events"
+    query: {"from": "{nowMs-86400000}", "to": "{nowMs}", "virtual_key_id": "vk-nope-{uid}", "metadata": "team:vd"}
+  expect: {"status": 200, "body": {"data": "<any>"}}
+
+- id: "cli-spend-events-list-without-a-range-is-refused"
+  endpoint: "GET /api/gateway/v1/spend-events"
+  auth: "org"
+  request: {"path": "/api/gateway/v1/spend-events"}
+  expect: {"status": [400, 422]}
+
+- id: "cli-spend-events-list-inverted-range-is-refused"
+  endpoint: "GET /api/gateway/v1/spend-events"
+  auth: "org"
+  request:
+    path: "/api/gateway/v1/spend-events"
+    query: {"from": "{nowMs}", "to": "{nowMs-86400000}"}
+  expect: {"status": [400, 422]}
+
+- id: "cli-spend-summaries-by-virtual-key-carry-the-row-fields"
+  endpoint: "GET /api/gateway/v1/spend-summaries"
+  auth: "org"
+  request:
+    path: "/api/gateway/v1/spend-summaries"
+    query: {"group_by": "virtual_key", "from": "{nowMs-86400000}", "to": "{nowMs}", "limit": 5}
+  expect: {"status": 200, "body": {"data": "<any>"}, "contains": ["next_cursor"]}
+
+- id: "cli-spend-summaries-bucketed-with-allow-unstable-and-timezone"
+  endpoint: "GET /api/gateway/v1/spend-summaries"
+  auth: "org"
+  request:
+    path: "/api/gateway/v1/spend-summaries"
+    query: {"group_by": "model", "bucket": "day", "timezone": "Europe/Amsterdam", "allow_unstable": "true", "from": "{nowMs-86400000}", "to": "{nowMs}"}
+  expect: {"status": 200, "body": {"data": "<any>"}}
+
+- id: "cli-spend-summaries-by-model-over-a-live-window-is-refused"
+  endpoint: "GET /api/gateway/v1/spend-summaries"
+  auth: "org"
+  request:
+    path: "/api/gateway/v1/spend-summaries"
+    query: {"group_by": "model", "from": "{nowMs-86400000}", "to": "{nowMs}"}
+  expect: {"status": [400, 409, 422]}
+
+- id: "cli-spend-summaries-unknown-group-is-refused"
+  endpoint: "GET /api/gateway/v1/spend-summaries"
+  auth: "org"
+  request:
+    path: "/api/gateway/v1/spend-summaries"
+    query: {"group_by": "nope", "from": "{nowMs-86400000}", "to": "{nowMs}"}
+  expect: {"status": [400, 422]}
+
+- id: "cli-spend-summaries-unknown-timezone-is-refused"
+  endpoint: "GET /api/gateway/v1/spend-summaries"
+  auth: "org"
+  request:
+    path: "/api/gateway/v1/spend-summaries"
+    query: {"group_by": "virtual_key", "timezone": "Mars/Olympus", "from": "{nowMs-86400000}", "to": "{nowMs}"}
+  expect: {"status": [400, 422]}
+
+- id: "cli-spend-by-end-user-carries-the-fields-the-cli-prints"
+  endpoint: "GET /api/gateway/v1/end-users/{id}/spend"
+  auth: "org"
+  request:
+    path: "/api/gateway/v1/end-users/eu-{uid}/spend"
+    query: {"window": "week"}
+  expect:
+    status: 200
+    body: {"data": {"end_user_id": "eu-{uid}", "window": "week", "from": "<any>", "to": "<any>", "cost": {"total_usd": "<any>"}, "request_count": "<any>", "usage": "<any>", "caps": "<any>"}}
+
+- id: "cli-spend-by-end-user-unknown-window-is-refused"
+  endpoint: "GET /api/gateway/v1/end-users/{id}/spend"
+  auth: "org"
+  request:
+    path: "/api/gateway/v1/end-users/eu-{uid}/spend"
+    query: {"window": "decade"}
+  expect: {"status": [400, 422]}
+
+- id: "cli-spend-replay-answers-the-replayed-count"
+  endpoint: "POST /api/gateway/v1/spend-events/replay"
+  auth: "org"
+  setup:
+    - request: "POST /api/webhooks/v1/endpoints"
+      auth: "org"
+      body: {"destination_kind": "http", "url": "https://example.com/vd-{uid}", "enabled_events": ["gateway.request.completed"]}
+      capture: {"endpointId": "data.id"}
+      expect: {"status": 201}
+  request:
+    path: "/api/gateway/v1/spend-events/replay"
+    body: {"from": "{nowMs-3600000}", "to": "{nowMs}", "endpoint_id": "{endpointId}"}
+  expect: {"status": 200, "body": {"data": {"endpoint_id": "{endpointId}", "replay_id": "<any>", "replayed": "<any>", "window": {"from": "<any>", "to": "<any>"}}}}
+  teardown:
+    - request: "DELETE /api/webhooks/v1/endpoints/{endpointId}"
+      auth: "org"
+
+- id: "cli-spend-replay-unknown-endpoint-is-refused"
+  endpoint: "POST /api/gateway/v1/spend-events/replay"
+  auth: "org"
+  request:
+    path: "/api/gateway/v1/spend-events/replay"
+    body: {"from": "{nowMs-3600000}", "to": "{nowMs}", "endpoint_id": "whe_nope{uid}"}
+  expect: {"status": [400, 404, 422]}
+
+- id: "cli-spend-replay-window-over-seven-days-is-refused"
+  endpoint: "POST /api/gateway/v1/spend-events/replay"
+  auth: "org"
+  request:
+    path: "/api/gateway/v1/spend-events/replay"
+    body: {"from": "{nowMs-1728000000}", "to": "{nowMs}", "endpoint_id": "whe_nope{uid}"}
+  expect: {"status": [400, 422]}

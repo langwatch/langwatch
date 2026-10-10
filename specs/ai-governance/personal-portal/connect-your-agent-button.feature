@@ -74,3 +74,8 @@ Feature: Connect your agent from the /me usage home
   Scenario: the traces empty state keeps Setup via Agent on every project
     Given the traces integrate pane renders for a personal or shared project
     Then the empty-state agent menu button reads "Setup via Agent"
+
+  @integration
+  Scenario: A screen outside the trace module can render Setup via Agent
+    When a screen outside the trace module renders the Setup via Agent button
+    Then it renders without the trace module's host around it

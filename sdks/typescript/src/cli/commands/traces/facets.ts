@@ -1,17 +1,13 @@
 /**
- * `langwatch trace facets [field]` — what the filter fields actually hold.
- *
- * The other half of `langwatch trace fields`. That one says a field exists;
- * this says what is in it, in this project, right now. The pair is what turns
- * "I think the origin is called `app`" into `origin:application` without a
- * round trip through a failed search.
- *
+ * `langwatch trace facets [field]`: what the filter fields hold in this project now; with `trace
+ * fields`, it turns a guessed value into a working filter without a failed search.
  * @see specs/traces/trace-filter-api.feature
  */
 
 import chalk from "chalk";
 
 import { TracesApiService } from "@/client-sdk/services/traces/traces-api.service";
+
 import { resolveCredentials } from "../../utils/apiKey";
 import { formatTable } from "../../utils/formatting";
 import type { CommandResult } from "../../utils/output";
@@ -110,8 +106,7 @@ function discoverResult(discover: DiscoverPayload): CommandResult {
           "Top values": summarise(facet),
         })),
         headers: ["Field", "Kind", "Top values"],
-        emptyMessage:
-          "No facets yet: this project has no traces in the window.",
+        emptyMessage: "No facets yet: this project has no traces in the window.",
       });
       if (discover.pending) {
         console.log();
@@ -137,9 +132,7 @@ function resolveLimit(raw: string | undefined): number | undefined {
   if (raw === undefined) return undefined;
   const limit = Number(raw);
   if (!Number.isInteger(limit) || limit < 1) {
-    console.error(
-      chalk.red("Error: --limit must be a whole number of at least 1"),
-    );
+    console.error(chalk.red("Error: --limit must be a whole number of at least 1"));
     process.exit(1);
   }
   return limit;
@@ -157,9 +150,7 @@ export const traceFacetsCommand = async (
   await resolveCredentials({ project: options.project });
   const service = new TracesApiService();
   const spinner = createSpinner(
-    field === undefined
-      ? "Reading the project's facets..."
-      : `Reading the values of ${field}...`,
+    field === undefined ? "Reading the project's facets..." : `Reading the values of ${field}...`,
   ).start();
 
   try {
@@ -167,9 +158,7 @@ export const traceFacetsCommand = async (
       ...(field === undefined ? {} : { field }),
       ...(options.prefix === undefined ? {} : { prefix: options.prefix }),
       ...(limit === undefined ? {} : { limit }),
-      ...(options.startDate === undefined
-        ? {}
-        : { startDate: options.startDate }),
+      ...(options.startDate === undefined ? {} : { startDate: options.startDate }),
       ...(options.endDate === undefined ? {} : { endDate: options.endDate }),
     });
 

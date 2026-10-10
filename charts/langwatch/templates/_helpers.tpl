@@ -43,7 +43,7 @@ app.kubernetes.io/instance: {{ .Release.Name }}
       pods land on the same Secret with zero operator config).
   Used by app/secrets.yaml, app/deployment.yaml, the gateway subchart
   bridge, the preflight Job, and NOTES.txt so every site agrees on the
-  one Secret that holds credentialsEncryptionKey + cronApiKey +
+  one Secret that holds credentialsEncryptionKey +
   nextAuthSecret + virtualKeyPepper + LW_GATEWAY_INTERNAL_SECRET +
   LW_GATEWAY_JWT_SECRET. this release collapsed the older split (separate
   langwatch-gateway-auth Secret) into this one because there was no
@@ -85,6 +85,22 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 - name: LW_GATEWAY_BASE_URL
   value: {{ $url | quote }}
 - name: LW_GATEWAY_INTERNAL_URL
+  value: {{ $url | quote }}
+{{- end }}
+{{- end -}}
+
+{{/*
+  GATEWAY_CONTROL_PLANE_URL env entry for the app: the address the chart's
+  gateway dials to reach this control plane, computed the way the gateway
+  subchart's ConfigMap computes it. The checkup compares it with the address
+  the gateway reports, so an in-cluster address passes and another install
+  fails. Renders nothing when the chart does not run the gateway.
+*/}}
+{{- define "langwatch.gatewayControlPlaneUrlEnv" -}}
+{{- $gw := .Values.gateway | default dict }}
+{{- if $gw.chartManaged }}
+{{- $url := (($gw.controlPlane) | default dict).baseUrl | default (printf "http://%s-app:5560" .Release.Name) }}
+- name: GATEWAY_CONTROL_PLANE_URL
   value: {{ $url | quote }}
 {{- end }}
 {{- end -}}
@@ -147,18 +163,6 @@ app.kubernetes.io/instance: {{ .Release.Name }}
   {{- end }}
 {{- end }}
 
-{{- if .Values.app.cronApiKey.secretKeyRef.name }}
-  {{- if empty .Values.app.cronApiKey.secretKeyRef.key }}
-    {{- $errors = append $errors "app.cronApiKey.secretKeyRef.name is set but key is empty" }}
-  {{- end }}
-{{- else if empty .Values.app.cronApiKey.value }}
-  {{- if not .Values.autogen.enabled }}
-    {{- if empty .Values.secrets.existingSecret }}
-      {{- $errors = append $errors "app.cronApiKey must have either value, secretKeyRef, or autogen must be enabled" }}
-    {{- end }}
-  {{- end }}
-{{- end }}
-
 {{/* Validate NextAuth secret */}}
 {{- if .Values.app.nextAuth.secret.secretKeyRef.name }}
   {{- if empty .Values.app.nextAuth.secret.secretKeyRef.key }}
@@ -185,25 +189,14 @@ app.kubernetes.io/instance: {{ .Release.Name }}
   {{- end }}
 {{- end }}
 
-{{/* Validate evaluators secrets */}}
-{{- if .Values.app.evaluators.azureOpenAI.enabled }}
-  {{- if .Values.app.evaluators.azureOpenAI.endpoint.secretKeyRef.name }}
-    {{- if empty .Values.app.evaluators.azureOpenAI.endpoint.secretKeyRef.key }}
-      {{- $errors = append $errors "app.evaluators.azureOpenAI.endpoint.secretKeyRef.name is set but key is empty" }}
-    {{- end }}
-  {{- else if empty .Values.app.evaluators.azureOpenAI.endpoint.value }}
-    {{- $errors = append $errors "app.evaluators.azureOpenAI.enabled is true but endpoint is not configured" }}
-  {{- end }}
-  
-  {{- if .Values.app.evaluators.azureOpenAI.apiKey.secretKeyRef.name }}
-    {{- if empty .Values.app.evaluators.azureOpenAI.apiKey.secretKeyRef.key }}
-      {{- $errors = append $errors "app.evaluators.azureOpenAI.apiKey.secretKeyRef.name is set but key is empty" }}
-    {{- end }}
-  {{- else if empty .Values.app.evaluators.azureOpenAI.apiKey.value }}
-    {{- $errors = append $errors "app.evaluators.azureOpenAI.enabled is true but apiKey is not configured" }}
-  {{- end }}
+{{/* The previous credentials key is optional. Only a half-written secret
+     reference is an error: it names a Secret but no key inside it. */}}
+{{- $credsPrevious := (.Values.app.credentialsEncryptionKey).previous | default dict }}
+{{- if and (($credsPrevious.secretKeyRef).name) (empty ($credsPrevious.secretKeyRef).key) }}
+  {{- $errors = append $errors "app.credentialsEncryptionKey.previous.secretKeyRef.name is set but key is empty" }}
 {{- end }}
 
+{{/* Validate evaluators secrets */}}
 {{- if .Values.app.evaluators.google.enabled }}
   {{- if .Values.app.evaluators.google.credentials.secretKeyRef.name }}
     {{- if empty .Values.app.evaluators.google.credentials.secretKeyRef.key }}
@@ -519,7 +512,7 @@ app.kubernetes.io/instance: {{ .Release.Name }}
      this release collapsed the separate langwatch-gateway-auth Secret into
      the umbrella's app Secret: both langwatch-app and the gateway pod
      mount LW_GATEWAY_INTERNAL_SECRET + LW_GATEWAY_JWT_SECRET from the
-     same Secret that holds credentialsEncryptionKey / cronApiKey /
+     same Secret that holds credentialsEncryptionKey /
      nextAuthSecret / virtualKeyPepper. So the existing
      `autogen is disabled but no existingSecret is provided` check
      above already covers the gateway case — when chartManaged is on,
@@ -595,7 +588,7 @@ app.kubernetes.io/instance: {{ .Release.Name }}
      the NLP credential. Refuse, for the same reason the Langy check does:
      these credentials have separate blast radii on purpose. */}}
 {{- $nlpKey := include "langwatch.nlpInternalSecretKey" . }}
-{{- $nlpReserved := list "credentialsEncryptionKey" "cronApiKey" "nextAuthSecret" "virtualKeyPepper" }}
+{{- $nlpReserved := list "credentialsEncryptionKey" "nextAuthSecret" "virtualKeyPepper" }}
 {{- if (.Values.gateway).chartManaged }}
   {{- $nlpReserved = concat $nlpReserved (list (include "langwatch.gatewayInternalSecretKey" .) (include "langwatch.gatewayJwtSecretKey" .)) }}
 {{- end }}
@@ -624,7 +617,7 @@ app.kubernetes.io/instance: {{ .Release.Name }}
        radii are meant to be separate. Only when both live in the same Secret;
        an operator-owned Secret elsewhere may name its key whatever it likes. */}}
   {{- if eq $langySecretName (include "langwatch.appSecretName" .) }}
-    {{- $reserved := list "credentialsEncryptionKey" "cronApiKey" "nextAuthSecret" "virtualKeyPepper" }}
+    {{- $reserved := list "credentialsEncryptionKey" "nextAuthSecret" "virtualKeyPepper" }}
     {{- if (.Values.gateway).chartManaged }}
       {{- $reserved = concat $reserved (list (include "langwatch.gatewayInternalSecretKey" .) (include "langwatch.gatewayJwtSecretKey" .)) }}
     {{- end }}
@@ -737,12 +730,10 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 
      710 is the ceiling — the engine's stream idle timeout default, 720
      (`NLPGO_ENGINE_STREAM_IDLE_TIMEOUT_SECONDS`, `httpapi.DefaultStreamIdleTimeout`
-     in services/nlpgo; `NLPGO_ENGINE_STREAM_IDLE_TIMEOUT_DEFAULT_SECONDS` in
-     platform/app/src/server/nlpgo/timeouts.ts), minus the same 10s margin
-     (`CODE_BLOCK_TIMEOUT_SAFETY_MARGIN_SECONDS`, also in timeouts.ts) that
-     `clampCodeBlockTimeoutSeconds`
-     (platform/app/src/optimization_studio/server/lambda/index.ts) subtracts
-     before it silently clamps a Lambda's env override. Anything above 710
+     in services/nlpgo), minus the 10s margin
+     (`CODE_BLOCK_TIMEOUT_SAFETY_MARGIN_SECONDS`) that the studio's Lambda
+     clamp subtracts before it silently clamps a Lambda's env override.
+     Anything above 710
      races the stream shutting down with no margin left for nlpgo to report
      its own timeout first — and, left at 720, would sail through here and
      be silently cut to 710 on the Lambda path, the exact two-numbers drift
@@ -767,7 +758,7 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- fail (printf "langwatch_nlp.codeBlockTimeoutSeconds must be a positive whole number of seconds, at most %d. Got %v. Helm reads a value it cannot parse as a whole number — text, a fraction, exponent notation, or a number past int64 — as 0, and passes a negative one through unchanged, so without this check either would reach every nlpgo caller as its ceiling." $maxSeconds $raw) -}}
 {{- end -}}
 {{- if gt $seconds $maxSeconds -}}
-{{- fail (printf "langwatch_nlp.codeBlockTimeoutSeconds must stay at or below %d — the engine's %ds stream idle timeout (NLPGO_ENGINE_STREAM_IDLE_TIMEOUT_DEFAULT_SECONDS) minus the %ds safety margin (CODE_BLOCK_TIMEOUT_SAFETY_MARGIN_SECONDS in platform/app/src/server/nlpgo/timeouts.ts) that lets nlpgo report its own timeout before the enclosing Lambda deadline fires. Got %d." $maxSeconds $streamIdleTimeoutSeconds $safetyMarginSeconds $seconds) -}}
+{{- fail (printf "langwatch_nlp.codeBlockTimeoutSeconds must stay at or below %d — the engine's %ds stream idle timeout (NLPGO_ENGINE_STREAM_IDLE_TIMEOUT_DEFAULT_SECONDS) minus the %ds safety margin (CODE_BLOCK_TIMEOUT_SAFETY_MARGIN_SECONDS) that lets nlpgo report its own timeout before the enclosing Lambda deadline fires. Got %d." $maxSeconds $streamIdleTimeoutSeconds $safetyMarginSeconds $seconds) -}}
 {{- end -}}
 {{- $seconds -}}
 {{- end -}}
@@ -809,8 +800,8 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 - name: NEXTAUTH_URL
   value: {{ .Values.app.http.publicUrl | default .Values.app.http.baseHost | default "http://localhost:5560" }}
 
-- name: SKIP_ENV_VALIDATION
-  value: {{ .Values.app.features.skipEnvValidation | default false | quote }}
+{{/* SKIP_ENV_VALIDATION is no longer emitted: no process reads it, since config
+     parses at each owner (ADR-132). app.features.skipEnvValidation is inert. */}}
 {{- if .Values.app.features.disableStrictPiiRedaction }}
 - name: OPS_PII_STRICT_PRESIDIO_REDACTION_DISABLED
   value: "1"
@@ -944,6 +935,29 @@ app.kubernetes.io/instance: {{ .Release.Name }}
   value: {{ .Values.clickhouse.external.cluster | quote }}
 {{- end }}
 {{- end }}
+{{- $workerReplicas := 0 }}
+{{- if .Values.workers.enabled }}
+  {{- $workerReplicas = int .Values.workers.replicaCount }}
+{{- else }}
+  {{- $workerReplicas = int .Values.app.replicaCount }}
+{{- end }}
+{{- $clientReplicas := add (int .Values.app.replicaCount) $workerReplicas }}
+{{- $serverNodes := int .Values.clickhouse.external.serverNodes }}
+{{- $serverMaxConcurrentQueries := int .Values.clickhouse.external.serverMaxConcurrentQueries }}
+{{- if .Values.clickhouse.chartManaged }}
+  {{- $serverNodes = int .Values.clickhouse.replicas }}
+  {{- $serverMaxConcurrentQueries = int (index (.Values.clickhouse.env | default dict) "MAX_CONCURRENT_QUERIES" | default 300) }}
+{{- end }}
+- name: CLICKHOUSE_CLIENT_REPLICAS
+  value: {{ $clientReplicas | quote }}
+- name: CLICKHOUSE_SERVER_NODES
+  value: {{ $serverNodes | quote }}
+- name: CLICKHOUSE_SERVER_MAX_CONCURRENT_QUERIES
+  value: {{ $serverMaxConcurrentQueries | quote }}
+{{- if .Values.clickhouse.client.maxOpenConnections }}
+- name: CLICKHOUSE_MAX_OPEN_CONNECTIONS
+  value: {{ .Values.clickhouse.client.maxOpenConnections | quote }}
+{{- end }}
 {{- $chCold := (.Values.clickhouse).cold }}
 {{- if $chCold.enabled }}
 - name: CLICKHOUSE_COLD_STORAGE_ENABLED
@@ -1017,10 +1031,31 @@ app.kubernetes.io/instance: {{ .Release.Name }}
       key: credentialsEncryptionKey
 {{- end }}
 
-# Evaluators - Azure OpenAI Integration
-{{- if .Values.app.evaluators.azureOpenAI.enabled }}
-{{- include "langwatch.secretOrValue" (dict "envName" "AZURE_OPENAI_ENDPOINT" "fieldValues" .Values.app.evaluators.azureOpenAI.endpoint) }}
-{{- include "langwatch.secretOrValue" (dict "envName" "AZURE_OPENAI_KEY" "fieldValues" .Values.app.evaluators.azureOpenAI.apiKey) }}
+{{/* Previous credentials key, set only during a rotation. Every process that
+     gets CREDENTIALS_SECRET gets this too, so data written under the old key
+     stays readable while it is re-encrypted. Never generated: an install that
+     names no previous key renders no variable.
+
+     Precedence: an explicit secretKeyRef, then an inline value, then the key
+     secrets.secretKeys.credentialsEncryptionKeyPrevious names inside
+     secrets.existingSecret. */}}
+{{- $credsPrevious := (.Values.app.credentialsEncryptionKey).previous | default dict }}
+{{- $credsPreviousKey := (.Values.secrets.secretKeys).credentialsEncryptionKeyPrevious | default "" }}
+{{- if ($credsPrevious.secretKeyRef).name }}
+- name: CREDENTIALS_SECRET_PREVIOUS
+  valueFrom:
+    secretKeyRef:
+      name: {{ $credsPrevious.secretKeyRef.name }}
+      key: {{ $credsPrevious.secretKeyRef.key }}
+{{- else if $credsPrevious.value }}
+- name: CREDENTIALS_SECRET_PREVIOUS
+  value: {{ $credsPrevious.value | quote }}
+{{- else if and .Values.secrets.existingSecret $credsPreviousKey }}
+- name: CREDENTIALS_SECRET_PREVIOUS
+  valueFrom:
+    secretKeyRef:
+      name: {{ .Values.secrets.existingSecret }}
+      key: {{ $credsPreviousKey }}
 {{- end }}
 
 # Evaluators - Google AI Integration
@@ -1031,8 +1066,13 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 # Telemetry - Usage analytics collection
 - name: DISABLE_USAGE_STATS
   value: {{ (not (ternary .Values.app.telemetry.usage.enabled true (hasKey .Values.app.telemetry.usage "enabled"))) | quote }}
-# Telemetry - Prometheus metrics collection
+# Telemetry - Prometheus metrics collection. The processes open their own
+# scrape listener only with a prometheus exporter and METRICS_API_KEY (ADR-175).
 {{- if .Values.app.telemetry.metrics.enabled }}
+- name: OTEL_METRICS_EXPORTER
+  value: "prometheus"
+- name: OTEL_EXPORTER_PROMETHEUS_PORT
+  value: {{ include "langwatch.metricsPort" . | quote }}
 {{- include "langwatch.secretOrValue" (dict "envName" "METRICS_API_KEY" "fieldValues" .Values.app.telemetry.metrics.apiKey) }}
 {{- end }}
 
@@ -1048,23 +1088,20 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 # why the connection settings below can outlive it (see legacyAzureRead).
 - name: STORED_OBJECTS_BACKEND
   value: "azure"
-{{- if .Values.app.dataplane.providers.azureBlob.spoolRetentionConfirmed }}
-# The ADR-022 trace spool stays off on Azure until the operator states that the
-# container has a lifecycle rule deleting `trace-blobs/spool/` blobs after 3
-# days. That policy is management-plane; the app holds a data-plane key and
-# cannot read it back, so this is an assertion, not a check. Left unset, an
-# oversized span keeps its payload inline instead of leaving an object behind
-# that nothing reaps. Emitted here, beside the write toggle rather than with
-# the connection settings below, because it gates only the spool WRITE path —
-# a legacyAzureRead migration reads existing spool objects without it.
-- name: AZURE_BLOB_SPOOL_RETENTION_CONFIRMED
+{{- if or .Values.app.dataplane.objectRetentionConfirmed .Values.app.dataplane.providers.azureBlob.spoolRetentionConfirmed }}
+# Azure refuses oversized writes (trace spool, staging, group-queue, evaluation
+# inputs) until the operator states that the container has a lifecycle rule for
+# every prefix in the values.yaml table. That policy is management-plane; the
+# app holds a data-plane key and cannot read it back, so this is an assertion,
+# not a check. The earlier spool-only value still sets it (expand; retired at
+# the LTS floor). It gates only the WRITE path, so a legacyAzureRead migration
+# reads existing objects without it.
+- name: OBJECT_RETENTION_CONFIRMED
   value: "true"
 {{- end }}
 {{- else }}
 - name: STORED_OBJECTS_BACKEND
   value: "s3"
-- name: USE_S3_STORAGE
-  value: "true"
 # Emit S3_BUCKET_NAME — the app/server reads this name across all
 # storage code paths (storage.ts, stored-objects.service.ts,
 # env-create.mjs). The legacy `S3_BUCKET` env was a no-op for every
@@ -1171,7 +1208,6 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 # the workers too, and a worker that reads a different entitlement than the
 # app would enforce different limits on the same organization.
 {{- include "langwatch.secretOrValue" (dict "envName" "LANGWATCH_LICENSE_KEY" "fieldValues" .Values.app.license.key) }}
-{{- include "langwatch.secretOrValue" (dict "envName" "LANGWATCH_LICENSE_PUBLIC_KEY" "fieldValues" .Values.app.license.publicKey) }}
 
 {{- /* The version this install reports in its license sync and its usage
        report, so we know which release each install runs. The app image tag is
@@ -1179,6 +1215,14 @@ app.kubernetes.io/instance: {{ .Release.Name }}
        decision. */}}
 - name: SERVICE_VERSION
   value: {{ .Values.images.app.tag | default .Chart.AppVersion | quote }}
+
+{{- /* How the install was deployed and which chart release rendered it. The
+       usage report and the checkup preview carry both, and the chart release
+       moves separately from the app image. */}}
+- name: INSTALL_METHOD
+  value: "helm"
+- name: LANGWATCH_CHART_VERSION
+  value: {{ .Chart.Version | quote }}
 
 {{- /* LangWatch-hosted services. There is no switch that turns them on: the
        license decides what an install may call, and a license naming no hosted
@@ -1277,6 +1321,9 @@ app.kubernetes.io/instance: {{ .Release.Name }}
      NOTE: Only .value is supported here because Prometheus bearer_token is a static
      config field in a ConfigMap, not a pod env var. secretKeyRef for the metrics API
      key is handled separately via sharedEnv for the app/worker containers. */}}
+{{/* The port the Node processes serve the Prometheus scrape on. */}}
+{{- define "langwatch.metricsPort" -}}9464{{- end -}}
+
 {{- define "langwatch.metricsApiKey" -}}
   {{- if .Values.app.telemetry.metrics.apiKey.value -}}
     {{- .Values.app.telemetry.metrics.apiKey.value -}}
@@ -1591,6 +1638,102 @@ containers:
 {{- printf "%s|%s|%s" .Chart.Version (.Chart.AppVersion | default "") (toJson .Values) | sha256sum -}}
 {{- end -}}
 
+{{/* The worker container: the workers Deployment, or a sidecar in each app pod when workers.enabled is false. */}}
+{{- define "langwatch.workersContainer" -}}
+- name: {{ .Release.Name }}-workers
+  securityContext:
+    {{- include "langwatch.containerSecurityContext" (dict "ctx" . "component" .Values.workers) | nindent 4 }}
+  image: "{{ .Values.images.app.repository }}:{{ .Values.images.app.tag }}"
+  imagePullPolicy: "{{ .Values.images.app.pullPolicy }}"
+  workingDir: /app/apps/worker
+  command: ['pnpm']
+  args: ['run', 'start']
+  env:
+    {{- include "langwatch.sharedEnv" . | nindent 4 }}
+    {{- include "langwatch.shutdownEnv" (dict "component" .Values.workers "name" "workers") | nindent 4 }}
+    # See the app deployment — named per role so worker telemetry is
+    # separable from the app's.
+    - name: OTEL_SERVICE_NAME
+      value: {{ .Values.workers.otel.serviceName | default "langwatch-workers" | quote }}
+    - name: LANGWATCH_ENDPOINT
+      value: {{ .Values.workers.upstreams.langwatch.scheme | default "http" }}://{{ .Values.workers.upstreams.langwatch.name | default (printf "%s-app" .Release.Name) }}:{{ .Values.workers.upstreams.langwatch.port | default 5560 }}
+    {{- /* Everything the app is given beyond its port and its own address:
+           the worker parses the same config over the same modules (Alex,
+           2026-09-30), including the Langy pair its turns are dispatched
+           with. app.extraEnvs reaches it too; workers.extraEnvs renders
+           after and so wins a duplicate. */}}
+    {{- include "langwatch.processEnv" . | nindent 4 }}
+    {{- if and (not .Values.workers.enabled) .Values.app.telemetry.metrics.enabled }}
+    # Sidecar: the api in this pod holds 9464, so the worker scrapes on 9465 (SIDECAR-METRICS-9465).
+    - name: OTEL_EXPORTER_PROMETHEUS_PORT
+      value: "9465"
+    {{- end }}
+    {{- with .Values.app.extraEnvs}}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+    {{- with .Values.workers.extraEnvs}}
+    {{- include "langwatch.assertNoReservedTimeoutEnvs" (dict "envs" . "path" "workers.extraEnvs") }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- $extraEnvFrom := concat (default (list) .Values.app.extraEnvFrom) (default (list) .Values.workers.extraEnvFrom) }}
+  {{- include "langwatch.envFromWithOfflineDefaults" (dict "root" $ "extraEnvFrom" $extraEnvFrom) | nindent 2 }}
+  # Probe the worker's HTTP listener (the metrics server port, 2999)
+  # rather than just PID 1 liveness — an answered request proves the
+  # event loop is turning, which `kill -0 1` cannot tell us.
+  #
+  # The probe targets /healthz, NOT /metrics. The scrape door is on its
+  # own port and opens only with METRICS_API_KEY (the default,
+  # app.telemetry.metrics.enabled is false, sets none), so a /metrics
+  # probe would fail and crash-loop the workers on a stock install. And an httpGet probe cannot read a
+  # Secret, so a key delivered via secretKeyRef could never be put in a
+  # rendered Authorization header anyway — that install would 401.
+  # /healthz is unauthenticated by design and carries no telemetry, so
+  # no bearer token is copied into this podspec.
+  # See specs/server/worker-liveness-probe.feature.
+  #
+  # 40 minutes (15s x 160), matching the app: the worker never
+  # migrates; its upgrade gate refuses to start until the ledger
+  # records this image's steps, and the pre-roll Job's upgrade can take
+  # up to ~27 minutes. See the app deployment for why a shorter budget
+  # hides the real error.
+  startupProbe:
+    httpGet:
+      path: /healthz
+      port: 2999
+    failureThreshold: 160
+    periodSeconds: 15
+    timeoutSeconds: 5
+  livenessProbe:
+    httpGet:
+      path: /healthz
+      port: 2999
+    periodSeconds: 30
+    timeoutSeconds: 5
+    failureThreshold: 3
+  resources:
+    {{- toYaml .Values.workers.resources | nindent 4 }}
+  volumeMounts:
+    {{- with .Values.workers.extraVolumeMounts}}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+    - name: tmp-dir
+      mountPath: /tmp
+    {{- if eq (include "langwatch.storedObjects.localFilesystemIsActive" .) "true" }}
+    # Stored-objects local-FS mount. The off-request normalize job runs
+    # HERE (on the worker), so it must read the app's staged upload and
+    # write dataset chunks to the SAME PVC the app mounts — not the
+    # worker's own ephemeral FS (where `LANGWATCH_LOCAL_STORAGE_PATH`
+    # from sharedEnv would otherwise point, and normalize would fail to
+    # find the staged file / lose its chunk writes). Renders only when
+    # local-FS is the active backend; app + workers share this one RWO
+    # PVC, which requires them co-located on a single node — the
+    # documented single-replica/hobby topology. Use app.dataplane (S3)
+    # for any multi-node deployment.
+    - name: stored-objects-data
+      mountPath: {{ .Values.app.storedObjects.localFilesystem.path }}
+    {{- end }}
+{{- end -}}
+
 {{/* Whether the stored-objects upgrade hooks render for this release. */}}
 {{- define "langwatch.storedObjects.serializeUpgradesActive" -}}
 {{- if and (eq (include "langwatch.storedObjects.localFilesystemIsActive" .) "true") .Values.workers.enabled .Values.app.storedObjects.localFilesystem.serializeUpgrades -}}
@@ -1808,43 +1951,42 @@ here, once, by name, so both consuming templates agree.
 {{- end -}}
 
 {{/* Renders terminationGracePeriodSeconds for a Node component, refusing the
-     render when it cannot cover that component's shutdown drain.
+     render when it cannot cover that component's shutdown budget.
 
-     The Node processes run four nested shutdown clocks — the GroupQueue
-     drain, App.close's backstop, the entrypoint watchdog, and this one. They
-     are derived from a single number in
-     platform/app/src/server/shutdown/budget.ts:
+     Three clocks are derived from one number, shutdownDrainSeconds (D):
 
-       processDeadlineMs = drain + 5s (App.close) + 15s (process teardown)
-       required grace    = processDeadlineMs + 10s of kubelet slack
+       SHUTDOWN_DRAIN_TIMEOUT_MS    = D         the queue stops waiting for
+                                                in-flight jobs here
+                                                (packages/process-stores/src/config-owner.ts)
+       PROCESS_SHUTDOWN_DEADLINE_MS = D + 20s   the process force-exits here
+                                                (packages/process/src/config.ts)
+       required grace               = D + 30s   the kubelet SIGKILLs here
 
-     So a drain of D seconds needs a grace period of at least D + 30. The
-     workers Deployment had no grace period at all and ran on the k8s default
-     of 30s, which a 20s drain plus teardown does not fit inside; the kubelet
-     answered with SIGKILL mid-drain, severing in-flight ClickHouse statements
-     and producing `Broken pipe ... ParallelFormattingOutputFormat` on the
-     server. See specs/event-sourcing/worker-graceful-shutdown.feature.
+     The 20s above the drain pays for App.close (5s) and process teardown
+     (15s). The 10s between the deadline and the grace period covers the signal-to-handler gap and lets the
+     overrun log line ship before the process dies. The workers Deployment
+     once ran on the k8s default of 30s, which a 25s drain plus teardown does
+     not fit inside; the kubelet answered with SIGKILL mid-drain, severing
+     in-flight ClickHouse statements and producing `Broken pipe ...
+     ParallelFormattingOutputFormat` on the server. See
+     specs/background/worker-graceful-shutdown.feature.
 
      Validated rather than derived, matching the gateway subchart: an operator
      draining behind a slow load balancer wants a wider margin than a formula
-     would pick, so the number stays theirs to set — the chart only refuses to
-     install a release the kubelet would kill mid-drain.
-
-     Set shutdownDrainSeconds and the app's SHUTDOWN_DRAIN_TIMEOUT_MS together;
-     this helper validates the pod against what the process will actually do. */}}
+     would pick, so the number stays theirs to set. The chart only refuses to
+     install a release the kubelet would kill mid-drain. */}}
 {{/* The process side of the same number the pod is sized for.
 
      Emitted per component rather than in sharedEnv because app and workers
-     each carry their own shutdownDrainSeconds, and a process told a budget its
-     pod was not sized for is exactly the drift this pair exists to prevent:
-     the kubelet SIGKILLs a drain the process still believes it has time for.
-     One value in values.yaml now drives both. */}}
+     each carry their own shutdownDrainSeconds, and a process told a deadline
+     its pod was not sized for is exactly the drift this pair exists to
+     prevent: the kubelet SIGKILLs a drain the process still believes it has
+     time for. One value in values.yaml drives both. */}}
 {{/* Reads a whole-second count, refusing anything that is not one.
 
      `int` is the trap this exists for: it silently yields 0 for a value Helm
      kept as a string, which `--set-string x=abc` and `--set x=25.9` both
-     produce. A zero drain then renders SHUTDOWN_DRAIN_TIMEOUT_MS="0" — which
-     the app rejects at boot, crashlooping every pod — while ALSO collapsing
+     produce. A zero drain then renders a deadline of bare slack while ALSO collapsing
      the required grace period to the bare margin, so the guard below happily
      passes and the release installs looking correct. A silent 0 is the worst
      of both: the render says fine and the fleet does not come up. */}}
@@ -1866,20 +2008,206 @@ here, once, by name, so both consuming templates agree.
 {{- $s -}}
 {{- end -}}
 
+{{/* The env the app and the workers share beyond sharedEnv: both processes parse
+     one config over the same module list, so the workers get everything the app
+     gets except API_PORT, LANGWATCH_ENDPOINT and the telemetry name (Alex,
+     2026-09-30). tests/env-contract.mjs asserts the parity. */}}
+{{- define "langwatch.processEnv" }}
+{{- with .Values.app.trustedProxyAddresses }}
+- name: TRUSTED_PROXY_ADDRESSES
+  value: {{ . | quote }}
+{{- end }}
+
+# Content-hashed asset base (ADR-086). Empty by default → assets are
+# served same-origin from the pod. Set to a commit-prefixed CDN base
+# so a rolling deploy never strands a browser on a stale-chunk 404.
+{{- if .Values.app.assetBase }}
+- name: LANGWATCH_ASSET_BASE
+  value: {{ .Values.app.assetBase | quote }}
+{{- end }}
+
+# AI Gateway virtual-key pepper (control-plane only).
+# The gateway pod must NEVER receive this value — it is used here
+# by @langwatch/gateway-process to hash incoming virtual-key
+# plaintext against the stored digest.
+{{- if .Values.app.virtualKeyPepper.secretKeyRef.name }}
+- name: LW_VIRTUAL_KEY_PEPPER
+  valueFrom:
+    secretKeyRef:
+      name: {{ .Values.app.virtualKeyPepper.secretKeyRef.name }}
+      key: {{ .Values.app.virtualKeyPepper.secretKeyRef.key }}
+{{- else if .Values.secrets.existingSecret }}
+- name: LW_VIRTUAL_KEY_PEPPER
+  valueFrom:
+    secretKeyRef:
+      name: {{ .Values.secrets.existingSecret }}
+      key: {{ .Values.secrets.secretKeys.virtualKeyPepper | default "virtualKeyPepper" }}
+{{- else if .Values.autogen.enabled }}
+- name: LW_VIRTUAL_KEY_PEPPER
+  valueFrom:
+    secretKeyRef:
+      name: {{ include "langwatch.appSecretName" . }}
+      key: virtualKeyPepper
+{{- end }}
+
+# AI Gateway shared auth — HMAC internal-call signing + per-request
+# JWT issuance. langwatch-app and the gateway pod mount these from
+# the SAME Secret (the app Secret — secrets.existingSecret when
+# operator-provided, autogen.secretNames.app when chart-rendered).
+# Rotating either value requires rolling both Deployments.
+{{- if .Values.gateway.chartManaged }}
+- name: LW_GATEWAY_INTERNAL_SECRET
+  valueFrom:
+    secretKeyRef:
+      name: {{ include "langwatch.appSecretName" . }}
+      key: {{ include "langwatch.gatewayInternalSecretKey" . }}
+- name: LW_GATEWAY_JWT_SECRET
+  valueFrom:
+    secretKeyRef:
+      name: {{ include "langwatch.appSecretName" . }}
+      key: {{ include "langwatch.gatewayJwtSecretKey" . }}
+{{- end }}
+
+{{- if (index .Values "langyagent").chartManaged }}
+# Langy agent pod. The app POSTs chats to LANGY_AGENT_URL with
+# LANGY_INTERNAL_SECRET as the Bearer token; the agent verifies it
+# against the same Secret. Subchart values key read via index (aliased subchart).
+- name: LANGY_AGENT_URL
+  value: {{ (index .Values "langyagent").controlPlane.agentUrl | default (printf "http://%s-langyagent:80" .Release.Name) | quote }}
+- name: LANGY_INTERNAL_SECRET
+  valueFrom:
+    secretKeyRef:
+      name: {{ (index .Values "langyagent").secrets.existingSecretName | default (include "langwatch.appSecretName" .) }}
+      key: {{ (index .Values "langyagent").secrets.internalSecretKey | default "LANGY_INTERNAL_SECRET" }}
+{{- include "langwatch.langyCallbackUrlEnv" . | nindent 0 }}
+{{- end }}
+{{- /* Langy's rollout flag is SYSTEM-scoped and defaults off, because
+       the hosted product opens it one cohort at a time. A self-hosted
+       install has a single cohort — the people who installed it — so
+       deploying the agent and then finding no assistant anywhere in
+       the product is a dead end whose only lever is an internal ops
+       screen. Deploying the pod IS the decision to enable it; the
+       operator keeps the staged path by setting
+       langyagent.enableForAllUsers=false, which hands authority back
+       to the flag store (/ops/feature-flags). Operator-forced flags
+       are joined with it, never clobbered by it. */}}
+{{- $forcedFlags := list }}
+{{- with .Values.app.featureFlagForceEnable }}
+{{- $forcedFlags = append $forcedFlags . }}
+{{- end }}
+{{- if and (index .Values "langyagent").chartManaged (index .Values "langyagent").enableForAllUsers }}
+{{- $forcedFlags = append $forcedFlags "release_langy_enabled" }}
+{{- end }}
+{{- if $forcedFlags }}
+- name: FEATURE_FLAG_FORCE_ENABLE
+  value: {{ join "," $forcedFlags | quote }}
+{{- end }}
+
+# LW_GATEWAY_PUBLIC_URL — the externally-reachable AI Gateway URL
+# the control plane hands to CLI users (langwatch claude/codex/
+# cursor) at login. Without it the CLI falls back to
+# http://localhost:5563, which a developer laptop can't reach
+# against a remote cluster. Prefer the explicit gateway.publicUrl
+# knob; otherwise derive it from ingress.gateway.host when the
+# app Ingress publishes the gateway.
+{{- $gwPublic := .Values.gateway.publicUrl | default "" }}
+{{- if not $gwPublic }}
+{{- $gwRoute := (.Values.ingress | default dict).gateway | default dict }}
+{{- $gwHost := $gwRoute.host | default "" }}
+{{- if and .Values.ingress.enabled $gwHost }}
+{{- $scheme := "http" }}
+{{- if ($gwRoute.tls | default dict).secretName }}{{- $scheme = "https" }}{{- end }}
+{{- $gwPublic = printf "%s://%s" $scheme $gwHost }}
+{{- end }}
+{{- end }}
+{{- if $gwPublic }}
+- name: LW_GATEWAY_PUBLIC_URL
+  value: {{ $gwPublic | quote }}
+{{- end }}
+
+{{- /* LW_GATEWAY_BASE_URL — where the CONTROL PLANE itself reaches the
+       gateway, over cluster DNS. Distinct from the public URL above,
+       which is what browsers and laptops use: an install with no
+       gateway ingress (the common self-hosted shape) has no public URL
+       at all, and the control plane still has to reach the gateway.
+       Langy needs it to mint the worker's virtual key, and without it
+       the assistant refuses every turn with a credential-resolution
+       error naming this variable. */}}
+{{- include "langwatch.gatewayBaseUrlEnv" . | nindent 0 }}
+{{- include "langwatch.gatewayControlPlaneUrlEnv" . | nindent 0 }}
+
+# Auth configuration (NEXTAUTH_SECRET lives in sharedEnv —
+# every app-image consumer needs it, see _helpers.tpl).
+# AUTH_PROVIDER is the app's supported name for this setting;
+# the values key keeps its NextAuth-era path for compatibility.
+# An operator who selects the provider in app.extraEnvs, under
+# either name, owns the setting: rendering AUTH_PROVIDER from the
+# values key would outrank a NEXTAUTH_PROVIDER there and silently
+# put an SSO install into email mode.
+{{- $providerFromExtraEnvs := false }}
+{{- range .Values.app.extraEnvs }}
+{{- if has (toString .name) (list "AUTH_PROVIDER" "NEXTAUTH_PROVIDER") }}
+{{- $providerFromExtraEnvs = true }}
+{{- end }}
+{{- end }}
+{{- if not $providerFromExtraEnvs }}
+- name: AUTH_PROVIDER
+  value: {{ .Values.app.nextAuth.provider | quote }}
+{{- end }}
+
+# Self sign-up restrictions. Rendered only when set away from the
+# default, so an upgrade that changes no value adds no variable.
+{{- with .Values.app.signUp }}
+{{- if and .mode (ne (toString .mode) "open") }}
+- name: SIGN_UP_MODE
+  value: {{ .mode | quote }}
+{{- end }}
+{{- if .allowedDomains }}
+- name: SIGN_UP_ALLOWED_DOMAINS
+  value: {{ join "," .allowedDomains | quote }}
+{{- end }}
+{{- end }}
+
+# NextAuth - SSO OAuth providers (auth0, azureAd, cognito, github,
+# gitlab, google, okta, onelogin, oidc).
+# These are this chart's values keys, which map to env prefixes; the
+# provider id the app selects on is app.nextAuth.provider.
+{{- $oauthProviders := list
+  (dict "key" "auth0"    "prefix" "AUTH0"    "fields" (list "clientId" "clientSecret" "issuer"))
+  (dict "key" "azureAd"  "prefix" "AZURE_AD" "fields" (list "clientId" "clientSecret" "tenantId"))
+  (dict "key" "cognito"  "prefix" "COGNITO"  "fields" (list "clientId" "clientSecret" "issuer"))
+  (dict "key" "github"   "prefix" "GITHUB"   "fields" (list "clientId" "clientSecret"))
+  (dict "key" "gitlab"   "prefix" "GITLAB"   "fields" (list "clientId" "clientSecret"))
+  (dict "key" "google"   "prefix" "GOOGLE"   "fields" (list "clientId" "clientSecret"))
+  (dict "key" "okta"     "prefix" "OKTA"     "fields" (list "clientId" "clientSecret" "issuer"))
+  (dict "key" "onelogin" "prefix" "ONELOGIN" "fields" (list "clientId" "clientSecret" "issuer"))
+  (dict "key" "oidc"     "prefix" "OIDC"     "fields" (list "clientId" "clientSecret" "issuer"))
+}}
+{{- range $provider := $oauthProviders }}
+{{- $providerValues := index $.Values.app.nextAuth.providers $provider.key }}
+{{- range $field := $provider.fields }}
+{{- $fieldValues := index $providerValues $field }}
+{{- $envName := printf "%s_%s" $provider.prefix (include "langwatch.envSuffix" $field) }}
+{{- include "langwatch.secretOrValue" (dict "envName" $envName "fieldValues" $fieldValues) | nindent 0 }}
+{{- end }}
+{{- end }}
+{{- end }}
+
 {{- define "langwatch.shutdownEnv" -}}
 {{- $drain := include "langwatch.positiveSeconds" (dict "name" (printf "%s.shutdownDrainSeconds" .name) "value" .component.shutdownDrainSeconds "fallback" 25) -}}
 {{/* extraEnvs renders after this block, and the kubelet takes the LAST
-     duplicate — so setting SHUTDOWN_DRAIN_TIMEOUT_MS there silently wins over
-     the value the pod was sized for, which is the exact drift the pair exists
-     to prevent, and invisible because the grace period still looks right. Set
-     shutdownDrainSeconds instead; it moves both. */}}
+     duplicate, so setting either variable there silently wins over the value
+     the pod was sized for. Set shutdownDrainSeconds instead; it moves all
+     three clocks. */}}
 {{- range (default (list) .component.extraEnvs) -}}
-{{- if eq .name "SHUTDOWN_DRAIN_TIMEOUT_MS" -}}
-{{- fail (printf "SHUTDOWN_DRAIN_TIMEOUT_MS must not be set through extraEnvs — it would override the drain budget the pod's terminationGracePeriodSeconds was sized for, and the kubelet would SIGKILL a drain the process still thinks it has time for. Set shutdownDrainSeconds instead, which moves both.") -}}
+{{- if has .name (list "SHUTDOWN_DRAIN_TIMEOUT_MS" "PROCESS_SHUTDOWN_DEADLINE_MS") -}}
+{{- fail (printf "%s must not be set through extraEnvs. It would override the shutdown budget the pod's terminationGracePeriodSeconds was sized for, and the kubelet would SIGKILL a drain the process still thinks it has time for. Set shutdownDrainSeconds instead, which moves the drain, the process deadline and the grace period together." .name) -}}
 {{- end -}}
 {{- end -}}
 - name: SHUTDOWN_DRAIN_TIMEOUT_MS
   value: {{ mul (int $drain) 1000 | quote }}
+- name: PROCESS_SHUTDOWN_DEADLINE_MS
+  value: {{ mul (add (int $drain) 20) 1000 | quote }}
 {{- end -}}
 
 {{- define "langwatch.terminationGracePeriod" -}}

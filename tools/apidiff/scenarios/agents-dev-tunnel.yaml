@@ -1,0 +1,68 @@
+# The marker `langwatch agent tunnel` writes onto an HTTP agent while a session runs
+# (specs/agents/agent-dev-tunnel.feature): main's schema keeps previousUrl, connectedAt and
+# heartbeatAt and the platform reads it to badge the agent and name a dead tunnel.
+
+- id: agents-dev-tunnel-marker-reads-back
+  endpoint: PATCH /api/agents/{id}
+  auth: project
+  setup:
+    - request: POST /api/agents
+      body:
+        name: "vd-{uid}"
+        type: http
+        config: { url: "http://127.0.0.1:1/echo", method: POST }
+      capture: { agentId: id }
+      expect: { status: 201 }
+  request:
+    method: PATCH
+    path: /api/agents/{agentId}
+    body:
+      config:
+        url: "https://vd-{uid}.tunnel.example.com/echo"
+        method: POST
+        devTunnel:
+          previousUrl: "http://127.0.0.1:1/echo"
+          connectedAt: "2026-09-30T10:00:00.000Z"
+          heartbeatAt: "2026-09-30T10:00:30.000Z"
+  expect:
+    status: 200
+  verify:
+    - request: GET /api/agents/{agentId}
+      expect:
+        status: 200
+        body:
+          config.url: "https://vd-{uid}.tunnel.example.com/echo"
+          config.devTunnel.previousUrl: "http://127.0.0.1:1/echo"
+          config.devTunnel.connectedAt: "2026-09-30T10:00:00.000Z"
+          config.devTunnel.heartbeatAt: "2026-09-30T10:00:30.000Z"
+
+- id: agents-dev-tunnel-marker-clears-on-restore
+  endpoint: PATCH /api/agents/{id}
+  auth: project
+  setup:
+    - request: POST /api/agents
+      body:
+        name: "vd-{uid}"
+        type: http
+        config:
+          url: "https://vd-{uid}.tunnel.example.com/echo"
+          method: POST
+          devTunnel:
+            previousUrl: "http://127.0.0.1:1/echo"
+            connectedAt: "2026-09-30T10:00:00.000Z"
+      capture: { agentId: id }
+      expect: { status: 201 }
+  request:
+    method: PATCH
+    path: /api/agents/{agentId}
+    body:
+      config: { url: "http://127.0.0.1:1/echo", method: POST }
+  expect:
+    status: 200
+  verify:
+    - request: GET /api/agents/{agentId}
+      expect:
+        status: 200
+        body:
+          config.url: "http://127.0.0.1:1/echo"
+        notContains: devTunnel

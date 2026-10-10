@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING, Any, Literal, TypeVar, cast
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
-from ..models.post_api_analytics_timeseries_body_group_by import PostApiAnalyticsTimeseriesBodyGroupBy
 from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
@@ -30,9 +29,10 @@ class PostApiAnalyticsTimeseriesBody:
         trace_ids (list[str] | Unset):
         negate_filters (bool | Unset):
         exclude_origins (list[str] | Unset):
-        group_by (PostApiAnalyticsTimeseriesBodyGroupBy | Unset):
+        group_by (str | Unset):
         group_by_key (str | Unset):
         time_scale (int | Literal['full'] | Unset):
+        should_skip_previous_period (bool | Unset):
     """
 
     start_date: float | str
@@ -44,9 +44,10 @@ class PostApiAnalyticsTimeseriesBody:
     trace_ids: list[str] | Unset = UNSET
     negate_filters: bool | Unset = UNSET
     exclude_origins: list[str] | Unset = UNSET
-    group_by: PostApiAnalyticsTimeseriesBodyGroupBy | Unset = UNSET
+    group_by: str | Unset = UNSET
     group_by_key: str | Unset = UNSET
     time_scale: int | Literal["full"] | Unset = UNSET
+    should_skip_previous_period: bool | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -79,9 +80,7 @@ class PostApiAnalyticsTimeseriesBody:
         if not isinstance(self.exclude_origins, Unset):
             exclude_origins = self.exclude_origins
 
-        group_by: str | Unset = UNSET
-        if not isinstance(self.group_by, Unset):
-            group_by = self.group_by.value
+        group_by = self.group_by
 
         group_by_key = self.group_by_key
 
@@ -90,6 +89,8 @@ class PostApiAnalyticsTimeseriesBody:
             time_scale = UNSET
         else:
             time_scale = self.time_scale
+
+        should_skip_previous_period = self.should_skip_previous_period
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
@@ -117,6 +118,8 @@ class PostApiAnalyticsTimeseriesBody:
             field_dict["groupByKey"] = group_by_key
         if time_scale is not UNSET:
             field_dict["timeScale"] = time_scale
+        if should_skip_previous_period is not UNSET:
+            field_dict["shouldSkipPreviousPeriod"] = should_skip_previous_period
 
         return field_dict
 
@@ -161,12 +164,7 @@ class PostApiAnalyticsTimeseriesBody:
 
         exclude_origins = cast(list[str], d.pop("excludeOrigins", UNSET))
 
-        _group_by = d.pop("groupBy", UNSET)
-        group_by: PostApiAnalyticsTimeseriesBodyGroupBy | Unset
-        if isinstance(_group_by, Unset):
-            group_by = UNSET
-        else:
-            group_by = PostApiAnalyticsTimeseriesBodyGroupBy(_group_by)
+        group_by = d.pop("groupBy", UNSET)
 
         group_by_key = d.pop("groupByKey", UNSET)
 
@@ -181,6 +179,8 @@ class PostApiAnalyticsTimeseriesBody:
 
         time_scale = _parse_time_scale(d.pop("timeScale", UNSET))
 
+        should_skip_previous_period = d.pop("shouldSkipPreviousPeriod", UNSET)
+
         post_api_analytics_timeseries_body = cls(
             start_date=start_date,
             end_date=end_date,
@@ -194,6 +194,7 @@ class PostApiAnalyticsTimeseriesBody:
             group_by=group_by,
             group_by_key=group_by_key,
             time_scale=time_scale,
+            should_skip_previous_period=should_skip_previous_period,
         )
 
         post_api_analytics_timeseries_body.additional_properties = d

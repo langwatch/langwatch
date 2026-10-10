@@ -1,0 +1,88 @@
+import {
+  credentialPrincipalOfToken,
+  projectCredentialOfRequest,
+  projectRequestContextOf,
+} from "@langwatch/api/rest";
+import type {
+  ExperimentApi,
+  ExperimentServerConfig,
+  WorkbenchCredential,
+} from "@langwatch/experiment-contract";
+import { defineProcessModule, type PublishedProcessModule } from "@langwatch/process";
+
+import { ExperimentModule } from "#app/experiment.app";
+
+import { experimentLifecycleEventing } from "./eventing/experiment-lifecycle.pipeline.ts";
+import { experimentRunProcessingEventing } from "./eventing/experiment-run-processing.pipeline.ts";
+import { experimentRepositories } from "./repositories/experiment-repositories.registry.ts";
+import { batchRecordTrpcTransport } from "./transport/batch-record.trpc.ts";
+import { experimentBatchLogRest } from "./transport/experiment-batch-log.rest.ts";
+import { experimentDatasetEvaluationRest } from "./transport/experiment-dataset-evaluation.rest.ts";
+import { experimentDspyStepsRest } from "./transport/experiment-dspy-steps.rest.ts";
+import { experimentInitRest } from "./transport/experiment-init.rest.ts";
+import {
+  experimentV3LegacyRest,
+  experimentWorkbenchRunLegacyRest,
+} from "./transport/experiment-v3-legacy.rest.ts";
+import { experimentV3Rest } from "./transport/experiment-v3.rest.ts";
+import { experimentWorkbenchRunRest } from "./transport/experiment-workbench-run.rest.ts";
+import { experimentWorkflowEvaluationRest } from "./transport/experiment-workflow-evaluation.rest.ts";
+import { experimentRest } from "./transport/experiment.rest.ts";
+import { experimentTrpcTransport } from "./transport/experiment.trpc.ts";
+
+export const experimentProcessModule: PublishedProcessModule<
+  "experiment",
+  ExperimentApi,
+  ExperimentServerConfig
+> = defineProcessModule("experiment")
+  .withRepositories(experimentRepositories)
+  .withApi(ExperimentModule)
+  .withTransports(
+    // The workbench's project-keyed family and the two doors a browser opens.
+    // It mounts before `experimentRest`, whose `/:slug` would otherwise answer
+    // `GET /api/experiments/runs`. Both App tokens are this module's own App.
+    experimentV3Rest,
+    experimentRest,
+    experimentInitRest,
+    experimentDspyStepsRest,
+    experimentWorkbenchRunRest,
+    // `/api/evaluations/v3/*`, the SDKs' older name for the same doors.
+    experimentV3LegacyRest,
+    experimentWorkbenchRunLegacyRest,
+    // `/api/evaluations/batch/log_results`, the SDK's batch result log.
+    experimentBatchLogRest,
+    // `/api/dataset/evaluate`, the SDK's dataset evaluation, in dataset's namespace.
+    experimentDatasetEvaluationRest,
+    // `/api/workflows/:id/evaluate`, the workflow evaluate door, in workflow's namespace.
+    experimentWorkflowEvaluationRest,
+    experimentTrpcTransport,
+    batchRecordTrpcTransport,
+  )
+  // This family answers behind the project door, so re-resolving the key here
+  // would ask a second question that could answer differently from the door
+  // that admitted the request.
+  .provideMiddlewareContext({
+    projectRequestContext: projectRequestContextOf,
+    experimentRestCredential: (request) =>
+      credentialPrincipalOfToken(projectCredentialOfRequest(request)),
+    // The workbench family reads the key's PERSON, not the whole principal: a
+    // legacy project key stands for nobody, and an api key stands for the
+    // person it was issued to.
+    experimentWorkbenchCredential: (request): WorkbenchCredential => {
+      const credential = projectCredentialOfRequest(request);
+      if (credential.type === "legacyProjectKey") return { kind: "legacyProjectKey" };
+      if (credential.type === "cliAccessToken") {
+        return { kind: "cliAccessToken", userId: credential.userId };
+      }
+
+      return {
+        kind: "apiKey",
+        userId: credential.userId,
+        ...(credential.isLangySessionKey === void 0
+          ? {}
+          : { isLangySessionKey: credential.isLangySessionKey }),
+      };
+    },
+  })
+  .withEventing(experimentRunProcessingEventing)
+  .withEventing(experimentLifecycleEventing);

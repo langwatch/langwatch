@@ -146,7 +146,7 @@ type Config struct {
 
 	// PiWorkerBinaryPath is the langy-worker executable a worker spawns
 	// (resolved via PATH when bare). Env-overridable so a host-tier dev manager
-	// can point at a locally built binary (services/langyworker/out) without
+	// can point at a locally built binary (<repo root>/.bin/langy-worker) without
 	// installing it on PATH.
 	PiWorkerBinaryPath string `env:"LANGY_PI_WORKER_BINARY_PATH"`
 }

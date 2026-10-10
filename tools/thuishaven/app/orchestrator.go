@@ -4,9 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -31,16 +33,41 @@ type Orchestrator struct {
 	obs   Observability
 	hyg   Hygiene
 	sem   Semaphore
+	// uiBuild replaces the one-shot UI build in tests; nil runs UIBuildShell.
+	uiBuild func(ctx context.Context, dir string, out io.Writer) error
+	// daemon is the up's line to the daemon, which starts every keeper.
+	daemon DaemonClient
+	// keeperRespawns is when the daemon last respawned each slug's keeper, for
+	// the backoff and the crash-loop give-up (D3). Daemon tick only.
+	keeperRespawns map[string][]time.Time
+	// waitDownSince is when each service's port was first seen down, so a short
+	// restart never moves its route to the wait page. Daemon tick only.
+	waitDownSince map[string]time.Time
 	// container is the colima VM the langyagent worker runs on in its container
 	// tiers (see domain.LangyTier). May be nil in tests that never launch it.
 	container ContainerRuntime
 	// janitor sweeps leaked testcontainers off that same VM. Nil in tests that
 	// never reap.
 	janitor ContainerJanitor
-	// claude edits Claude Code's own settings, which only `haven setup` does.
+	// jobs is the agent job scratch under ~/.claude/jobs. Nil when no jobs root
+	// is configured, and in tests that never reclaim one.
+	jobs JobScratch
+	// claudeState reads the rest of what Claude Code keeps under its home —
+	// transcripts, session files, caches — for the report that attributes them to
+	// a worktree. Nil when no Claude home is configured; it never deletes.
+	claudeState ClaudeState
+	// claude edits Claude Code's own settings, which only `haven self setup` does.
 	// Nil everywhere else, including in tests that never install a feature.
-	claude ClaudeSettings
-	log    *zap.Logger
+	claude AgentHookSettings
+	codex  AgentHookSettings
+	// prereqs looks at (and installs onto) the machine itself, which only
+	// `haven self install` does. Nil elsewhere; see prereqTools for what a graph
+	// without one reports.
+	prereqs PrereqTools
+	// goos is the platform prerequisites are planned and installed for. Empty
+	// means the running one; tests pin it to exercise the macOS install path.
+	goos string
+	log  *zap.Logger
 
 	// isGoverning guards the slow half of a pressure tick, which runs off the
 	// tick so publishing stays bounded. governance is what a caller waits on to
@@ -70,10 +97,15 @@ type Deps struct {
 	Obs       Observability
 	Hyg       Hygiene
 	Sem       Semaphore
+	Daemon    DaemonClient
 	Container ContainerRuntime
 	Janitor   ContainerJanitor
+	Jobs      JobScratch
+	State     ClaudeState
 	ProcTel   ProcTelemetry
-	Claude    ClaudeSettings
+	Claude    AgentHookSettings
+	Codex     AgentHookSettings
+	Prereqs   PrereqTools
 	Log       *zap.Logger
 }
 
@@ -88,15 +120,15 @@ func New(d Deps) *Orchestrator {
 	}
 	return &Orchestrator{
 		cfg: d.Cfg, proxy: d.Proxy, store: d.Store, sup: d.Sup, sys: d.Sys,
-		ch: d.CH, pg: d.PG, rds: d.RDS, obs: d.Obs, hyg: d.Hyg, sem: d.Sem,
-		container: d.Container, janitor: d.Janitor, procTel: d.ProcTel, claude: d.Claude, log: d.Log,
+		ch: d.CH, pg: d.PG, rds: d.RDS, obs: d.Obs, hyg: d.Hyg, sem: d.Sem, daemon: d.Daemon,
+		container: d.Container, janitor: d.Janitor, jobs: d.Jobs, claudeState: d.State, procTel: d.ProcTel, claude: d.Claude, codex: d.Codex,
+		prereqs: d.Prereqs, log: d.Log,
 	}
 }
 
 // UpParams identify the worktree `up` runs in (resolved by the composition root).
 type UpParams struct {
 	WorktreeDir      string
-	LwDir            string
 	Branch           string
 	ExplicitSlug     string // from LANGWATCH_SLUG; wins over the derived/cached slug
 	IsBaseline       bool   // this stack is the shared default others fall back to
@@ -106,6 +138,8 @@ type UpParams struct {
 	// which would otherwise run fork-authored code with the developer's
 	// environment before a single service starts.
 	UntrustedCheckout bool
+	// StartedAt is when this up began; its progress lines count from it.
+	StartedAt time.Time
 }
 
 // resolveSlug applies the precedence: explicit > cache > derived (then cached).
@@ -141,7 +175,7 @@ func (o *Orchestrator) resolveSlug(p UpParams) (string, error) {
 }
 
 // provision resolves the slug, allocates ports, registers the hostnames, writes
-// the overlay + registry entry, and starts the heartbeat. It returns the stack
+// the overlay + registry entry; the caller starts the heartbeat. It returns the stack
 // and a cleanup that deregisters the routes and drops the registry entry. When
 // shouldManageDBs is set it also ensures the shared ClickHouse + Postgres servers
 // and this stack's databases on them before the overlay is written, so
@@ -152,7 +186,7 @@ func (o *Orchestrator) provision(ctx context.Context, p UpParams, opts PlanOptio
 		return domain.Stack{}, nil, err
 	}
 	nSvc := len(domain.PerWorktreeServices)
-	ports, err := o.sys.FreePorts(nSvc + 3)
+	ports, err := o.sys.FreePorts(nSvc + 5)
 	if err != nil {
 		return domain.Stack{}, nil, err
 	}
@@ -162,9 +196,10 @@ func (o *Orchestrator) provision(ctx context.Context, p UpParams, opts PlanOptio
 	proxyScheme, proxyPort := o.proxy.Endpoint()
 	// ports[0..nSvc-1] back the routed services (app/gateway/nlp/langyagent, in
 	// PerWorktreeServices order); ports[nSvc] is the API backend behind app's /api,
-	// ports[nSvc+1] the worker metrics endpoint, and ports[nSvc+2] the IdP
-	// simulator's verification nameserver — the one listener that is reached by
-	// address rather than by hostname, so it cannot go through the proxy.
+	// ports[nSvc+1] the worker metrics endpoint, ports[nSvc+2] the IdP
+	// simulator's verification nameserver, and ports[nSvc+3] the mail sink's SMTP
+	// listener — both reached by address rather than by hostname, so neither can
+	// go through the proxy. ports[nSvc+4] is the worker's voice socket.
 	redisDB, exclusive := o.allocateRedisDB(slug)
 	if !exclusive {
 		fmt.Printf(
@@ -177,18 +212,27 @@ func (o *Orchestrator) provision(ctx context.Context, p UpParams, opts PlanOptio
 
 	st := domain.Stack{
 		Slug: slug, WorktreeDir: p.WorktreeDir, Branch: p.Branch,
-		LauncherPID: o.sys.Getpid(), RedisDB: redisDB,
-		APIPort: ports[nSvc], WorkerMetricsPort: ports[nSvc+1], LocalAPIKey: o.cfg.LocalAPIKey, IsBaseline: p.IsBaseline,
-		PublicURL: o.cfg.PublicURL,
-		// Mirror planChildren: a separate `workers` lane exists only when workers
-		// are requested AND not hosted in-process. Persist it so restart targets
-		// the workers' own group rather than the API's when they share a process.
-		HasStandaloneWorkers: opts.Selection.Workers,
+		// Detected once, here, and read by everything downstream: the plan, the
+		// one-shot jobs, the lanes status reports and the names restart accepts.
+		Layout:      detectLayout(p.WorktreeDir),
+		LauncherPID: o.sys.Getpid(), LauncherStart: o.sys.ProcessStart(o.sys.Getpid()), RedisDB: redisDB,
+		APIPort: ports[nSvc], WorkerMetricsPort: ports[nSvc+1], VoiceSocketPort: ports[nSvc+4], LocalAPIKey: o.cfg.LocalAPIKey, IsBaseline: p.IsBaseline,
+		PublicURL:            o.cfg.PublicURL,
 		LangyTier:            opts.LangyTier,
+		Mode:                 opts.DeploymentMode.Name,
+		ModeEnv:              opts.DeploymentMode.Env,
+		ModeOverriddenBy:     opts.ModeOverriddenBy,
+		EffectiveMode:        domain.EffectiveMode(opts.DeploymentMode.Name, opts.ModeOverriddenBy),
+		Refresh:              opts.Selection.Refresh,
 		LangyImage:           opts.langyImageTag,
 		DisableGoogleDLP:     o.cfg.ShouldDisableGoogleDLP,
+		MockInstantEvalJudge: o.cfg.ShouldMockInstantEvalJudge,
 		PortlessDisabled:     o.cfg.PortlessDisabled,
 	}
+	if p.UntrustedCheckout {
+		st.NxPrivateDir = o.nxPrivateDir(slug)
+	}
+	var routes []func()
 	for i, r := range domain.PerWorktreeServices {
 		svc := domain.Service{
 			Name: r.Name, Role: r.Role, Port: ports[i],
@@ -203,14 +247,26 @@ func (o *Orchestrator) provision(ctx context.Context, p UpParams, opts PlanOptio
 		if r.Name == domain.IdPService {
 			svc.DNSPort = ports[nSvc+2]
 		}
+		// A built UI (still or watch): no Vite, the api serves the bundle, so the app hostname is the API port.
+		if r.Name == "app" && opts.Selection.IsBuiltUI() && !st.Layout.IsMonolith() {
+			svc.Port = st.APIPort
+		}
+		if r.Name == domain.LLMService && runsLocally(r.Name, opts) {
+			if port := o.stableLLMPort(slug); port != 0 {
+				svc.Port = port
+			}
+		}
+		if r.Name == domain.MailService {
+			svc.SMTPPort = ports[nSvc+3]
+		}
 		if !runsLocally(r.Name, opts) {
 			if base, ok := o.baselineService(r.Name); ok {
-				// The nameserver comes with it: a fallback idp answers domain
-				// proofs on the baseline's listener, not on the port this
-				// stack allocated for a simulator it is not running.
-				svc.Port, svc.DNSPort, svc.IsFallback = base.Port, base.DNSPort, true
+				// The nameserver/SMTP listener comes with it: a fallback idp or
+				// mail sink answers on the baseline's own listener, not on the
+				// port this stack allocated for a service it is not running.
+				svc.Port, svc.DNSPort, svc.SMTPPort, svc.IsFallback = base.Port, base.DNSPort, base.SMTPPort, true
 			} else {
-				svc.Port, svc.DNSPort = 0, 0
+				svc.Port, svc.DNSPort, svc.SMTPPort = 0, 0, 0
 			}
 		}
 		// Portless enabled: the proxy routes every service through one shared
@@ -222,31 +278,64 @@ func (o *Orchestrator) provision(ctx context.Context, p UpParams, opts PlanOptio
 			scheme, port := o.serviceEndpoint(proxyScheme, proxyPort, svc.Port)
 			svc.URL = o.cfg.Naming.URL(r.Name, slug, scheme, port)
 		}
+		// The extra ways in (see domain.ServiceHostAliases): every alias points at
+		// the same listener, so nobody has to remember whether the design system
+		// answers to `ds`. Recorded on the service, so teardown removes exactly
+		// what was registered.
+		for _, alias := range domain.ServiceHostAliases[r.Name] {
+			svc.Aliases = append(svc.Aliases, o.cfg.Naming.Hostname(alias, slug))
+		}
 		st.Services = append(st.Services, svc)
 		if svc.Port != 0 && !o.cfg.PortlessDisabled {
-			if err := o.proxy.Register(svc.Name, slug, svc.Port); err != nil {
-				o.log.Warn("alias registration failed", zap.String("host", svc.Hostname), zap.Error(err))
+			routes = append(routes, o.registerRoute(svc.Name, slug, svc.Port))
+			for _, alias := range domain.ServiceHostAliases[r.Name] {
+				routes = append(routes, o.registerRoute(alias, slug, svc.Port))
 			}
 		}
 	}
+	// The Hono API additionally gets its own routed hostname
+	// (api.<slug>.langwatch.localhost, domain.APIService), alongside the
+	// same-origin app.<slug>.../api path Vite still proxies - additive, not a
+	// replacement, so nothing that already reaches the API through app's own
+	// origin changes. Unlike gateway/nlp/langyagent, the API never opts out:
+	// it runs wherever app does, so its port is always live once APIPort is.
+	if st.APIPort != 0 {
+		apiSvc := domain.Service{
+			Name:     domain.APIService,
+			Role:     "Hono API - its own hostname, alongside app.<slug>.../api",
+			Port:     st.APIPort,
+			Hostname: o.cfg.Naming.Hostname(domain.APIService, slug),
+		}
+		scheme, port := o.serviceEndpoint(proxyScheme, proxyPort, apiSvc.Port)
+		apiSvc.URL = o.cfg.Naming.URL(domain.APIService, slug, scheme, port)
+		st.Services = append(st.Services, apiSvc)
+		if !o.cfg.PortlessDisabled {
+			routes = append(routes, o.registerRoute(domain.APIService, slug, apiSvc.Port))
+		}
+	}
+	inParallel(routes)
 	if shouldManageDBs {
 		o.ensureClickHouse(ctx, &st)
 		o.ensurePostgres(ctx, &st)
 		o.ensureRedis(ctx, &st)
 	}
 	o.linkObservability(ctx, &st)
+	o.registerStackHomeWithDaemon(slug)
 	st.UpdatedAt = o.sys.Now()
-	if err := o.store.WriteOverlay(p.LwDir, st); err != nil {
-		return domain.Stack{}, nil, err
-	}
+	o.retireOverlayFiles(p.WorktreeDir)
 	if err := o.store.SaveStack(st); err != nil {
 		return domain.Stack{}, nil, err
 	}
 	cleanup := func() {
 		if !o.cfg.PortlessDisabled {
+			var removals []func()
 			for _, s := range st.Services {
-				o.proxy.Remove(s.Name, slug)
+				removals = append(removals, func() { o.proxy.Remove(s.Name, slug) })
+				for _, alias := range domain.ServiceHostAliases[s.Name] {
+					removals = append(removals, func() { o.proxy.Remove(alias, slug) })
+				}
 			}
+			inParallel(removals)
 		}
 		o.store.RemoveStack(slug)
 	}
@@ -259,7 +348,6 @@ func (o *Orchestrator) provision(ctx context.Context, p UpParams, opts PlanOptio
 		return domain.Stack{}, nil, fmt.Errorf("recording database activity for %q: %w", st.Slug, err)
 	}
 	o.printStack(st)
-	go o.heartbeat(ctx, st)
 	return st, cleanup, nil
 }
 
@@ -277,6 +365,11 @@ func (o *Orchestrator) heartbeat(ctx context.Context, st domain.Stack) {
 		case <-ctx.Done():
 			return
 		case <-t.C:
+			// A record removed (down, a failed hand-over) or taken by another
+			// launcher is never written back: that resurrected a stack with no routes.
+			if cur, ok := o.stackBySlug(st.Slug); !ok || cur.LauncherPID != st.LauncherPID {
+				return
+			}
 			st.UpdatedAt = o.sys.Now()
 			_ = o.store.SaveStack(st)
 		}
@@ -294,17 +387,40 @@ func (o *Orchestrator) ensurePortlessProxy() error {
 	if o.cfg.PortlessDisabled {
 		return nil
 	}
-	if !o.proxy.Installed() {
-		fmt.Println("portless is not installed — installing it (one time)…")
-		if err := o.proxy.Install(); err != nil {
-			return fmt.Errorf("could not install portless automatically (%w) — install it by hand (npm install -g portless) and re-run `haven up`", err)
-		}
+	if err := o.ensurePortlessInstalled(); err != nil {
+		return err
 	}
 	if err := preflightPortlessCA(); err != nil {
 		return err
 	}
 	if err := o.proxy.EnsureReady(); err != nil {
 		return fmt.Errorf("could not start the portless proxy: %w", err)
+	}
+	return nil
+}
+
+// ensurePortlessInstalled brings the machine to the one pinned portless
+// version, saying in a single line what it did. Nothing to do is silent, so an
+// ordinary `up` stays quiet; an install or an upgrade that fails refuses the up
+// with the hand command that would fix it. Idempotent: the pinned version
+// already being present is the common path and runs npm not at all.
+func (o *Orchestrator) ensurePortlessInstalled() error {
+	switch domain.PlanPortless(o.proxy.Installed(), o.proxy.Version()) {
+	case domain.PortlessInstall:
+		fmt.Printf("portless is not installed — installing %s (one time)…\n", domain.PortlessPackage())
+	case domain.PortlessUpgrade:
+		fmt.Printf("portless %s is installed and haven pins %s — upgrading…\n",
+			o.proxy.Version(), domain.PortlessPackage())
+	case domain.PortlessUnknownVersion:
+		fmt.Printf("portless is installed but would not report its version — haven pins %s; leaving it alone\n",
+			domain.PortlessPackage())
+		return nil
+	case domain.PortlessReady:
+		return nil
+	}
+	if err := o.proxy.Install(); err != nil {
+		return fmt.Errorf("could not install %s automatically (%w) — install it by hand (npm install -g %s) and re-run `haven up`",
+			domain.PortlessPackage(), err, domain.PortlessPackage())
 	}
 	return nil
 }
@@ -389,6 +505,10 @@ func (o *Orchestrator) serviceEndpoint(proxyScheme string, proxyPort, ownPort in
 
 // Up is the launcher hook `make haven up` runs, in either routing mode.
 func (o *Orchestrator) Up(ctx context.Context, p UpParams, opts PlanOptions) error {
+	p.StartedAt = time.Now()
+	if err := domain.RefuseLiveStripe(resolvedDevEnv(p.WorktreeDir)); err != nil {
+		return err
+	}
 	if err := o.ensurePortlessProxy(); err != nil {
 		return err
 	}
@@ -396,6 +516,11 @@ func (o *Orchestrator) Up(ctx context.Context, p UpParams, opts PlanOptions) err
 	if err != nil {
 		return err
 	}
+	// The isolation tier is resolved before anything reads it: it is persisted on
+	// the stack, threaded into the overlay, the plan and restart, and compared by
+	// the reconcile guard, so a tier settled later would be a different tier in
+	// each of them.
+	o.resolveLangyTier(ctx, &opts)
 	// Resolve the langy image tag before anything else: it is pure file hashing,
 	// and the reconcile guard needs it to notice a source edit under an
 	// unchanged selection (same services, new bytes — still a restart).
@@ -430,16 +555,65 @@ func (o *Orchestrator) Up(ctx context.Context, p UpParams, opts PlanOptions) err
 	if err != nil {
 		return err
 	}
-	defer cleanup()
+	stopBeat := o.startHeartbeat(ctx, st)
+	isHandedOver := false
+	defer func() {
+		stopBeat()
+		if !isHandedOver {
+			cleanup()
+			removeKeeperPlan(st.WorktreeDir, st.Slug)
+		}
+	}()
 	endRegistration()
-	fmt.Printf("  %s\n\n", opts.Selection.Describe())
+	fmt.Printf("  %s\n", opts.Selection.DescribeForLayout(st.Layout))
+	fmt.Printf("  %s\n\n", domain.StripeNotice(resolvedDevEnv(p.WorktreeDir), opts.Selection.Payment))
 
-	if err := o.prepareWorktree(ctx, p, st); err != nil {
+	seed, err := o.prepareWorktree(ctx, p, st)
+	if err != nil {
 		return err
 	}
-	langyDockerHost := o.langyContainerHost(ctx, st, &opts)
-	o.sup.Supervise(ctx, o.planChildren(st, opts, p.LwDir, langyDockerHost))
+	o.EnsureGateHookForUp(p.WorktreeDir)
+	opts.langyDockerHost = o.langyContainerHost(ctx, st, &opts)
+	o.ensureLangyWorkerBinary(ctx, st, &opts)
+	isLangyDropped := !opts.Selection.Langy && dropLocalLangyAgent(&st)
+	children := o.planChildren(st, opts, p.WorktreeDir)
+	retireStaleSimsCapture(children)
+	stopBeat()
+	if isLangyDropped {
+		_ = o.store.SaveStack(st)
+	}
+	plan := o.keeperPlan(children, opts.IsForegroundClient)
+	plan.Seed = seed
+	sayPhase(p.StartedAt, "services starting")
+	if err := o.handOver(ctx, st, plan); err != nil {
+		return err
+	}
+	isHandedOver = true
 	return nil
+}
+
+// resolveLangyTier settles the langyagent isolation posture from the developer's
+// flags and this machine, and says so when the machine decided it.
+//
+// A development stack with no container runtime resolves to the host tier
+// instead of the sandboxed default it cannot run: haven is a local-dev
+// orchestrator, and the alternative was langy silently deselected at launch. It
+// is printed as well as logged, because a quieter isolation posture than the one
+// the developer believes they have has to be visible in the terminal they are
+// looking at. A non-development stack, or an explicit LANGY_UNSAFE_HOST_ACCESS=0,
+// keeps the fail-closed behaviour.
+func (o *Orchestrator) resolveLangyTier(ctx context.Context, opts *PlanOptions) {
+	req := opts.LangyTierRequest
+	req.ContainerRuntimeAvailable = o.container != nil && o.container.Available(ctx)
+	tier, notice := domain.ResolveLangyTier(req)
+	opts.LangyTier = tier
+	// Said only when this stack actually runs langy: a worktree that opted out
+	// has no isolation posture to be surprised by.
+	if notice == "" || !opts.Selection.Langy {
+		return
+	}
+	fmt.Printf("  langyagent: %s\n", notice)
+	o.log.Warn("langyagent tier resolved to the host runner", zap.String("reason", notice), zap.String("tier", tier.String()))
 }
 
 // resolveLangyImageTag derives the content-addressed langy image tag for a
@@ -457,103 +631,155 @@ func (o *Orchestrator) resolveLangyImageTag(opts *PlanOptions) {
 	}
 }
 
-// prepareWorktree runs the pre-boot lanes: dependency install, codegen,
-// migrations and the seed. Only a migration failure stops the up.
-func (o *Orchestrator) prepareWorktree(ctx context.Context, p UpParams, st domain.Stack) error {
+// prepareWorktree runs the pre-boot lanes: dependency install, codegen and the
+// workspace build. A modular checkout's worker runs the upgrade when it boots
+// (ARCHITECTURE.md, "Migrations are not the api's job"), so its seed comes back
+// for the keeper to run once the api reports ready. A monolith still migrates
+// and seeds here, before its services boot; a migration failure stops the up.
+func (o *Orchestrator) prepareWorktree(ctx context.Context, p UpParams, st domain.Stack) (*KeeperSeed, error) {
 	// Stale dependencies install themselves before anything needs them. Lifecycle
 	// scripts (the repo's postinstall) run for the developer's own worktree and
 	// are suppressed for an untrusted one — `haven pr` sanitises the fork install
 	// it runs itself, and reaches this path immediately afterwards, so the two
 	// have to agree or the guard is void.
-	if err := o.ensureDeps(ctx, p.WorktreeDir, !p.UntrustedCheckout); err != nil {
-		return err
-	}
 	// DOTENV_CONFIG_QUIET drops dotenv v17's promo line for any one-shot script
 	// that loads it via `import "dotenv/config"`; `pnpm -s` drops the lifecycle
 	// banner. Keeps the codegen/prepare/seed lanes as quiet as the services.
-	env := append(st.OverlayEnv(), "DOTENV_CONFIG_QUIET=true")
-	// Codegen (prisma/zod/sdk-versions/mcp) then migrations — both finish before
-	// the services boot. Owned here so `pnpm dev` is simply `haven up`.
-	if err := o.sup.RunOnce(ctx, "codegen", p.LwDir, "pnpm -s run start:prepare:files", env); err != nil {
-		o.log.Warn("codegen (start:prepare:files) failed (continuing)", zap.Error(err))
+	env := append(append(st.OverlayEnv(), o.credentialEnv(st.Slug, p.WorktreeDir)...), simulatorsEnv(domain.SelectionFromStack(st), st, p.WorktreeDir)...)
+	env = append(env, "DOTENV_CONFIG_QUIET=true", o.compileCacheEnv(st.Slug))
+	sayPhase(p.StartedAt, "dependencies")
+	if err := o.ensureDeps(ctx, p.WorktreeDir, depsInstall{WithLifecycleScripts: !p.UntrustedCheckout, Env: nxEnv(st)}); err != nil {
+		return nil, err
 	}
-	if err := o.ensureAPIBundle(ctx, p.LwDir, env); err != nil {
-		return err
+	run := prepRun{UpParams: p, Stack: st, Env: env}
+	jobs := prepShellsFor(st.Layout)
+	if err := o.runBuildJobs(ctx, run, jobs); err != nil {
+		return nil, err
 	}
-	// Migrations failing on an existing database is the one prep step that must
-	// STOP the up: continuing would boot the app onto a half-migrated schema,
-	// and silently dropping the data to get past it is never haven's call.
-	if err := o.sup.RunOnce(ctx, "prepare", p.LwDir, "pnpm -s run start:prepare:db", env); err != nil {
-		return fmt.Errorf("migrations failed — nothing was dropped; fix the migration, or run `haven db reset` for a fresh database: %w", err)
+	if jobs.Prepare != "" {
+		return nil, o.migrateThenSeed(ctx, run, jobs)
 	}
-	o.runSeed(ctx, p, env)
-	return nil
+	job, ok := o.seedJob(p, seedRun{Slug: st.Slug, Env: env, Shell: jobs.Seed})
+	if !ok {
+		return nil, nil
+	}
+	return &KeeperSeed{Job: job, ReadyURL: st.ReadinessURL(), Since: p.StartedAt}, nil
 }
 
-// apiBundleRelPath is what `start:app` executes: the PRODUCTION server bundle.
-// Kept as one constant because the check below and the error it prints must
-// name the same file the lane will look for.
-var apiBundleRelPath = filepath.Join("dist", "server", "server.cjs")
-
-// ensureAPIBundle builds the app bundle when it is missing.
-//
-// The api lane runs `start:app` -> `node dist/server/server.cjs`, but nothing
-// else in the up produces that file: codegen writes generated SOURCE, the
-// migration step only touches the database, and dist/ is gitignored — so a
-// freshly-created worktree has no bundle at all. Without this the lane
-// crash-loops on MODULE_NOT_FOUND while the app (vite) lane sits behind its
-// /api/health ready-probe and never serves the hostname. The stack reports
-// itself up and then answers nothing, which is a much worse failure than a
-// slow first boot.
-//
-// Only the missing case builds. An existing bundle is left alone: rebuilding
-// on every `up` would add a minute to a bring-up for a file that only
-// server-side edits invalidate, and those already require a manual rebuild.
-//
-// The contract is the whole point: when this returns nil, node has a file to
-// execute. So both ends are checked against that, not against a weaker proxy.
-// A REGULAR file, because `node <a directory>` is the same crash by another
-// name; and re-checked AFTER the build, because a build can exit 0 without
-// emitting the server bundle (a changed build script, a partial run) and
-// trusting the exit code would hand the lane the exact MODULE_NOT_FOUND
-// crash-loop this function exists to prevent — only now with no explanation.
-func (o *Orchestrator) ensureAPIBundle(ctx context.Context, lwDir string, env []string) error {
-	bundle := filepath.Join(lwDir, apiBundleRelPath)
-	if info, err := os.Stat(bundle); err == nil && info.Mode().IsRegular() {
-		return nil
-	}
-	fmt.Println("building the app bundle (missing — first `up` in this worktree)…")
-	if err := o.sup.RunOnce(ctx, "build", lwDir, "pnpm -s run build", env); err != nil {
-		return fmt.Errorf("the app bundle failed to build — the api lane runs %s and cannot start without it: %w", apiBundleRelPath, err)
-	}
-	if info, err := os.Stat(bundle); err != nil || !info.Mode().IsRegular() {
-		return fmt.Errorf("the app build reported success but left no %s behind — the api lane runs that file and cannot start without it", apiBundleRelPath)
-	}
-	return nil
+// prepRun is one up's preparation: what was asked, the stack, the jobs' env.
+type prepRun struct {
+	UpParams
+	Stack domain.Stack
+	Env   []string
 }
 
-// runSeed always seeds. The seed is idempotent (a no-op once the stable local
-// project + API key exist), so every `up` guarantees the same migrations AND
-// the same seeded credential are in place — a freshly-provisioned DB is
-// immediately usable with the well-known LANGWATCH_API_KEY, no manual sign-up.
-//
-// When haven manages Postgres the overlay carries a per-slug loopback
-// DATABASE_URL (provably local) and the seed uses it. When it does not — DB
-// management disabled, or Postgres failed to come up — the seed would inherit
-// whatever DATABASE_URL is in .env, so guard that inherited URL exactly as
-// `haven seed` does and skip (never seed a non-local database) rather than
-// abort the up.
-func (o *Orchestrator) runSeed(ctx context.Context, p UpParams, env []string) {
-	if !hasEnvKey(env, "DATABASE_URL") {
-		if err := o.guardInheritedSeedEnv(p.LwDir); err != nil {
-			o.log.Warn("skipping seed — inherited database URL is not local", zap.Error(err))
-			fmt.Printf("haven: %v — skipping seed\n", err)
-			return
+// runBuildJobs runs codegen, which may fail without stopping the up, then the
+// workspace build, which stops it: a lane cannot import a package never built.
+func (o *Orchestrator) runBuildJobs(ctx context.Context, run prepRun, jobs prepShells) error {
+	st := run.Stack
+	if jobs.Codegen == "" {
+		fmt.Println("  codegen: left to the app lane, which runs it on its way up")
+	} else {
+		sayPhase(run.StartedAt, "codegen")
+		if err := o.runOnceJob(ctx, onceJob{Slug: st.Slug, WorktreeDir: st.WorktreeDir, Name: "codegen", Dir: run.WorktreeDir, Shell: jobs.Codegen, Env: append(o.nxParallelEnv(), run.Env...)}); err != nil {
+			o.log.Warn("codegen (start:prepare:files) failed (continuing)", zap.Error(err))
 		}
 	}
-	if err := o.sup.RunOnce(ctx, "seed", p.LwDir, seedShell("pnpm -s run prisma:seed", env), env); err != nil {
-		o.log.Warn("seed failed (continuing)", zap.Error(err))
+	if jobs.Build == "" {
+		return nil
 	}
+	sayPhase(run.StartedAt, "build")
+	if err := o.runOnceJob(ctx, onceJob{Slug: st.Slug, WorktreeDir: st.WorktreeDir, Name: "build", Dir: run.WorktreeDir, Shell: jobs.Build, Env: run.Env}); err != nil {
+		return fmt.Errorf("building the workspace packages the services import failed: %w", err)
+	}
+	return nil
+}
+
+// migrateThenSeed is a monolith's blocking migration, then its seed. Migrations
+// failing on an existing database STOP the up: continuing would boot the app onto
+// a half-migrated schema, and silently dropping the data is never haven's call.
+func (o *Orchestrator) migrateThenSeed(ctx context.Context, run prepRun, jobs prepShells) error {
+	st := run.Stack
+	sayPhase(run.StartedAt, "migrations")
+	if err := o.runOnceJob(ctx, onceJob{Slug: st.Slug, WorktreeDir: st.WorktreeDir, Name: "prepare", Dir: run.WorktreeDir, Shell: jobs.Prepare, Env: run.Env}); err != nil {
+		return fmt.Errorf("migrations failed — nothing was dropped; fix the migration, or run `haven db reset` for a fresh database: %w", err)
+	}
+	if job, ok := o.seedJob(run.UpParams, seedRun{Slug: st.Slug, Env: run.Env, Shell: jobs.Seed}); ok {
+		sayPhase(run.StartedAt, "seed")
+		o.runSeedJob(ctx, job)
+	}
+	return nil
+}
+
+// sayPhase prints one line of an up's progress: the time since it began, then
+// the phase now starting. A long up is never minutes of silence.
+func sayPhase(since time.Time, phase string) {
+	fmt.Printf("  [%6s] %s\n", time.Since(since).Round(time.Second), phase)
+}
+
+// compileCacheEnv points Node at the stack's compile cache. The one-shot jobs
+// share it with the lanes: Node 24 caches the TypeScript transform as well as
+// V8 code, which is most of every cold `--experimental-transform-types` start.
+func (o *Orchestrator) compileCacheEnv(slug string) string {
+	return "NODE_COMPILE_CACHE=" + filepath.Join(o.cfg.Home, "node-compile-cache", slug)
+}
+
+// prepShells is which one-shot job an up runs for a layout, by script. Prepare
+// is the blocking migration; Build the workspace packages the lanes import.
+type prepShells struct{ Codegen, Build, Prepare, Seed string }
+
+// prepShellsFor resolves the one-shot jobs from the checkout's layout. A
+// modular checkout migrates nothing before boot (its worker runs the upgrade)
+// but builds the dist packages its lanes import. A monolith migrates through
+// its own package's script, since no worker of its own runs it, and leaves
+// codegen to its dev:app script, which runs the same codegen itself.
+func prepShellsFor(layout domain.Layout) prepShells {
+	if layout.IsMonolith() {
+		return prepShells{Prepare: monolithScript("start:prepare:db"), Seed: seedScript}
+	}
+	return prepShells{
+		Codegen: "pnpm --silent run start:prepare:files",
+		Build:   "pnpm --silent run ensure:built",
+		Seed:    seedScript,
+	}
+}
+
+// seedScript is the seed both layouts define at their workspace root.
+const seedScript = "pnpm --silent run prisma:seed"
+
+// seedRun is which stack is being seeded, with what environment, and which of
+// the checkout's own seed scripts runs it.
+type seedRun struct {
+	Slug  string
+	Env   []string
+	Shell string
+}
+
+// prepareDBShell migrates both datastores in one process: `haven db reset` and
+// the play sandbox run it, since neither has a booting worker to do it for them.
+const prepareDBShell = "pnpm --silent run start:prepare:db"
+
+// seedJob is the up's idempotent seed, or false when it must not run. With no
+// haven-managed DATABASE_URL the seed would inherit .env's, so that URL is
+// guarded exactly as `haven db seed` guards it: never seed a non-local database.
+func (o *Orchestrator) seedJob(p UpParams, seed seedRun) (onceJob, bool) {
+	if !hasEnvKey(seed.Env, "DATABASE_URL") {
+		if err := o.guardInheritedSeedEnv(p.WorktreeDir); err != nil {
+			o.log.Warn("skipping seed — inherited database URL is not local", zap.Error(err))
+			fmt.Printf("haven: %v — skipping seed\n", err)
+			return onceJob{}, false
+		}
+	}
+	return onceJob{Slug: seed.Slug, WorktreeDir: p.WorktreeDir, Name: "seed", Dir: p.WorktreeDir, Shell: seedShell(seed.Shell, seed.Env), Env: seed.Env}, true
+}
+
+// runSeedJob runs the seed; a failed seed is said, never fatal.
+func (o *Orchestrator) runSeedJob(ctx context.Context, job onceJob) bool {
+	if err := o.runOnceJob(ctx, job); err != nil {
+		o.log.Warn("seed failed (continuing)", zap.Error(err))
+		return false
+	}
+	return true
 }
 
 // langyContainerHost prepares the colima-backed langy runtime for the
@@ -565,7 +791,7 @@ func (o *Orchestrator) langyContainerHost(ctx context.Context, st domain.Stack, 
 	if !opts.Selection.Langy || !st.LangyTier.RunsInContainer() {
 		return ""
 	}
-	dh, err := o.prepareLangyContainer(ctx, opts.RepoRoot, st.LangyImage, opts.ShouldRebuildImages)
+	dh, err := o.prepareLangyContainer(ctx, st, langyImageOptions{RepoRoot: opts.RepoRoot, ForceRebuild: opts.ShouldRebuildImages})
 	if err != nil {
 		o.log.Warn("langyagent container unavailable — skipping it (set LANGY_UNSAFE_HOST_ACCESS=1 to run the worker on the host instead)",
 			zap.String("tier", st.LangyTier.String()), zap.Error(err))
@@ -575,12 +801,20 @@ func (o *Orchestrator) langyContainerHost(ctx context.Context, st domain.Stack, 
 	return dh
 }
 
+// langyImageOptions is where the langy image build runs from, and whether it
+// is rebuilt even when the content hash already has an image.
+type langyImageOptions struct {
+	RepoRoot     string
+	ForceRebuild bool
+}
+
 // prepareLangyContainer brings colima up and ensures the stack's
 // content-addressed langy image exists on it, returning the docker socket the
 // worker container should run against. Unchanged inputs → the tag already
 // exists and this is a sub-second check; a configured registry may satisfy a
 // new tag with a pull; otherwise it builds once, until the inputs change again.
-func (o *Orchestrator) prepareLangyContainer(ctx context.Context, repoRoot, image string, forceRebuild bool) (string, error) {
+func (o *Orchestrator) prepareLangyContainer(ctx context.Context, st domain.Stack, opts langyImageOptions) (string, error) {
+	repoRoot, image, forceRebuild := opts.RepoRoot, st.LangyImage, opts.ForceRebuild
 	if o.container == nil {
 		return "", fmt.Errorf("no container runtime configured")
 	}
@@ -593,7 +827,8 @@ func (o *Orchestrator) prepareLangyContainer(ctx context.Context, repoRoot, imag
 	}
 	shell := langyImageEnsureShell(image, forceRebuild, langyImagePullRef(image))
 	fmt.Printf("  langyagent: ensuring container image %s (a first build can take a few minutes)…\n", image)
-	if err := o.sup.RunOnce(ctx, "langy-image", repoRoot, shell, []string{"DOCKER_HOST=" + dockerHost}); err != nil {
+	job := onceJob{Slug: st.Slug, WorktreeDir: st.WorktreeDir, Name: "langy-image", Dir: repoRoot, Shell: shell, Env: []string{"DOCKER_HOST=" + dockerHost}}
+	if err := o.runOnceJob(ctx, job); err != nil {
 		return "", fmt.Errorf("build %s: %w", image, err)
 	}
 	return dockerHost, nil
@@ -612,6 +847,7 @@ func (o *Orchestrator) UpStub(ctx context.Context, p UpParams, echo func(ports [
 		return err
 	}
 	defer cleanup()
+	go o.heartbeat(ctx, st)
 	var ports []int
 	for _, s := range st.Services {
 		ports = append(ports, s.Port)
@@ -636,7 +872,7 @@ func (o *Orchestrator) reconcileRunningStack(p UpParams, opts PlanOptions) (proc
 	if !ok || st.LauncherPID == o.sys.Getpid() {
 		return true, nil
 	}
-	if !o.sys.ProcessAlive(st.LauncherPID) {
+	if !o.launcherIsOurs(st) {
 		// A dead launcher's registry entry must never block up. Clean it up
 		// and take its hostnames down with it. A route that outlives its stack
 		// is worse than no route: the kernel hands that loopback port to the
@@ -647,12 +883,18 @@ func (o *Orchestrator) reconcileRunningStack(p UpParams, opts PlanOptions) (proc
 			o.removeStackRoutes(slug, st.Services)
 		}
 		o.store.RemoveStack(slug)
+		removeKeeperPlan(st.WorktreeDir, slug) // a dead keeper's plan must not be respawned from
 		return true, nil
 	}
 	// Everything that makes the running stack differ from what was asked for.
 	// A term missing here becomes a silent no-op: `up` reports "nothing to do"
 	// while the stack keeps running under the old settings.
-	selectionMatches := domain.SelectionFromStack(st) == opts.Selection
+	// The mode rides on Selection but a stack record derives none from its
+	// services, so it is compared on its own below.
+	requested := opts.Selection
+	requested.Mode = ""
+	selectionMatches := domain.SelectionFromStack(st) == requested
+	modeMatches := st.Mode == opts.DeploymentMode.Name && slices.Equal(st.ModeEnv, opts.DeploymentMode.Env)
 	imageMatches := st.LangyImage == opts.langyImageTag
 	// The langy isolation posture is a security property, not a preference:
 	// re-running `up` after unsetting LANGY_UNSAFE_CONTAINER must actually put
@@ -664,9 +906,9 @@ func (o *Orchestrator) reconcileRunningStack(p UpParams, opts PlanOptions) (proc
 	// a proxy the operator just asked to bypass, defeating the whole escape
 	// hatch — see #7117).
 	portlessMatches := st.PortlessDisabled == o.cfg.PortlessDisabled
-	if !opts.ShouldForce && !opts.ShouldRebuildImages && selectionMatches && imageMatches && tierMatches && portlessMatches {
+	if !opts.ShouldForce && !opts.ShouldRebuildImages && selectionMatches && modeMatches && imageMatches && tierMatches && portlessMatches {
 		fmt.Printf("stack %q is already running (launcher pid %d) and matches the selection — nothing to do\n", slug, st.LauncherPID)
-		fmt.Printf("  bounce a service: haven restart [service] · restart everything: haven up -f · stop: haven down\n")
+		fmt.Printf("  bounce a service: haven restart [service] · restart everything: haven up --force · stop: haven down\n")
 		return false, nil
 	}
 	switch {
@@ -676,15 +918,20 @@ func (o *Orchestrator) reconcileRunningStack(p UpParams, opts PlanOptions) (proc
 		fmt.Printf("stack %q is running — replacing it to rebuild its images (--rebuild)\n", slug)
 	case !portlessMatches:
 		fmt.Printf("stack %q is running with a different PORTLESS setting — restarting it to match\n", slug)
+	case !modeMatches:
+		fmt.Printf("stack %q is running a different deployment mode — restarting it with the requested one\n", slug)
 	case !tierMatches:
 		fmt.Printf("stack %q is running under a different langy isolation tier — restarting it with the requested one\n", slug)
 	case !imageMatches:
 		fmt.Printf("stack %q is running an older langy image (its build inputs changed) — restarting it\n", slug)
+	case st.Refresh != opts.Selection.Refresh:
+		fmt.Printf("stack %q is running %s — restarting it %s\n", slug, st.Refresh.Name(), opts.Selection.Refresh.Name())
 	default:
 		fmt.Printf("stack %q is running with a different selection — restarting it here with the new one\n", slug)
 	}
 	o.sys.Terminate(st.LauncherPID)
 	o.waitForProcessesDead([]int{st.LauncherPID})
+	removeKeeperPlan(st.WorktreeDir, slug)
 	return true, nil
 }
 
@@ -696,21 +943,50 @@ func (o *Orchestrator) reconcileRunningStack(p UpParams, opts PlanOptions) (proc
 // kernel has since reissued.
 func (o *Orchestrator) removeStackRoutes(slug string, services []domain.Service) {
 	seen := make(map[string]bool)
+	var removals []func()
 	remove := func(name string) {
 		if name == "" || seen[name] {
 			return
 		}
 		seen[name] = true
-		o.proxy.Remove(name, slug)
+		removals = append(removals, func() { o.proxy.Remove(name, slug) })
+	}
+	removeWithAliases := func(name string) {
+		remove(name)
+		for _, alias := range domain.ServiceHostAliases[name] {
+			remove(alias)
+		}
 	}
 	for _, r := range domain.PerWorktreeServices {
-		remove(r.Name)
+		removeWithAliases(r.Name)
 	}
 	for _, s := range services {
-		remove(s.Name)
+		removeWithAliases(s.Name)
 	}
 	remove(domain.ClickHouseService)
 	remove(domain.PostgresService)
+	inParallel(removals)
+}
+
+// registerRoute is one route registration, deferred so provision can run them
+// all at once. A failure only warns: the service still runs on its own port.
+func (o *Orchestrator) registerRoute(name, slug string, port int) func() {
+	return func() {
+		if err := o.proxy.Register(name, slug, port); err != nil {
+			o.log.Warn("alias registration failed", zap.String("host", o.cfg.Naming.Hostname(name, slug)), zap.Error(err))
+		}
+	}
+}
+
+// inParallel runs every call at once and waits for all of them. Each portless
+// call is a Node CLI start (0.3s idle, seconds under load) and portless locks
+// its route store, so a stack's dozen routes need not queue behind each other.
+func inParallel(calls []func()) {
+	var wg sync.WaitGroup
+	for _, call := range calls {
+		wg.Go(call)
+	}
+	wg.Wait()
 }
 
 // Down tears the current worktree's stack down from anywhere: it stops a live
@@ -718,14 +994,14 @@ func (o *Orchestrator) removeStackRoutes(slug string, services []domain.Service)
 // routes, and drops the registry entry. Databases are KEPT, always — no flag
 // on down can discard data; fresh data is `haven db reset`, and long-unused
 // databases are pruned in the background by the daemon (DBIdleTTL) or via
-// `haven clean`.
+// `haven machine clean`.
 func (o *Orchestrator) Down(ctx context.Context, p UpParams, force bool) error {
 	slug, err := o.resolveSlug(p)
 	if err != nil {
 		return err
 	}
 	st, ok := o.stackBySlug(slug)
-	if ok && st.LauncherPID != o.sys.Getpid() && o.sys.ProcessAlive(st.LauncherPID) {
+	if ok && st.LauncherPID != o.sys.Getpid() && o.launcherIsOurs(st) {
 		if force {
 			// -f: no grace — SIGKILL the launcher's whole process group at once,
 			// for the stack that is wedged or just needs to be gone NOW.
@@ -750,8 +1026,14 @@ func (o *Orchestrator) Down(ctx context.Context, p UpParams, force bool) error {
 	if !portlessDisabled {
 		o.removeStackRoutes(slug, st.Services)
 	}
+	o.stopNxDaemon(ctx, p.WorktreeDir)
 	o.store.RemoveStack(slug)
+	if ok {
+		removeKeeperPlan(st.WorktreeDir, slug)
+	}
+	removeKeeperPlan(p.WorktreeDir, slug)
 	fmt.Printf("stack %q torn down (databases kept — `haven db reset` for fresh ones)\n", slug)
+	o.stopColimaIfIdle(ctx)
 	return nil
 }
 
@@ -776,6 +1058,7 @@ func (o *Orchestrator) ensureClickHouse(ctx context.Context, st *domain.Stack) {
 	}
 	st.ClickHouseHTTPPort = port
 	st.ClickHouseDatabase = db
+	st.ClickHousePostgresHost = o.cfg.ClickHousePostgresHost
 	proxyScheme, proxyPort := o.proxy.Endpoint()
 	scheme, epPort := o.serviceEndpoint(proxyScheme, proxyPort, port)
 	st.Services = append(st.Services, domain.Service{
@@ -860,17 +1143,23 @@ func (o *Orchestrator) ensureRedis(ctx context.Context, st *domain.Stack) {
 // out) and chained with `|| echo` so a missing psql or a transient hiccup never
 // fails the seed — enabling the dev feature set is a convenience, not a boot
 // requirement. `key` is the FeatureFlag primary key, so the write is idempotent.
+//
+// It then grants the seeded admin the platform-operator role through ops's
+// recovery task (ARCHITECTURE.md, "Operator bootstrap"): ADMIN_EMAILS only feeds
+// a one-time seed that never runs when IS_SAAS is on. Idempotent, best-effort.
 func seedShell(base string, env []string) string {
 	if !hasEnvKey(env, "DATABASE_URL") {
 		return base
 	}
-	sql := domain.FeatureFlagSeedSQL()
-	if sql == "" {
-		return base
+	shell := base
+	if sql := domain.FeatureFlagSeedSQL(); sql != "" {
+		shell += ` && if [ "$HAVEN_SEED_FEATURE_FLAGS" != "0" ]; then ` +
+			`psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -qtA -c ` + shellSingleQuoted(sql) +
+			` || echo "haven: feature-flag seed skipped (continuing)"; fi`
 	}
-	return base + ` && if [ "$HAVEN_SEED_FEATURE_FLAGS" != "0" ]; then ` +
-		`psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -qtA -c ` + shellSingleQuoted(sql) +
-		` || echo "haven: feature-flag seed skipped (continuing)"; fi`
+	return shell + ` && { pnpm --silent --filter @langwatch/tasks task grant-platform-operator ` +
+		`"${LANGWATCH_ADMIN_EMAIL:-` + domain.DefaultAdminEmail + `}"` +
+		` || echo "haven: platform-operator grant skipped (continuing)"; }`
 }
 
 // shellSingleQuoted wraps s in single quotes for safe embedding in a bash -lc
@@ -883,7 +1172,7 @@ func shellSingleQuoted(s string) string {
 // overlay would inherit, resolved at the child's real precedence (process env
 // over the merged dotenv layers).
 func (o *Orchestrator) guardInheritedSeedEnv(lwDir string) error {
-	return domain.GuardSeedTargets(domain.LoadDotenv(lwDir), os.Getenv)
+	return domain.GuardSeedTargets(nil, domain.LoadDotenv(lwDir), os.Getenv)
 }
 
 // hasEnvKey reports whether a KEY=VALUE slice already sets key.
@@ -897,9 +1186,11 @@ func hasEnvKey(env []string, key string) bool {
 	return false
 }
 
-// runIngestScript runs one live-stack seed script (seed:sample-traces,
-// seed:realistic-platform, seed:mass) through the running stack's collector —
-// the real pipeline, not a ClickHouse side door — so the stack must be up. It
+// runIngestScript runs one live-stack seed script through the running stack's
+// collector — the real pipeline, not a ClickHouse side door — so the stack must
+// be up. No shipped preset names a script today (db.go's seedPreset says why);
+// this is the seam they come back through, and it stays tested against a
+// preset the tests own. It
 // talks to the app's loopback port over plain HTTP (portless terminates TLS in
 // front of it; Node does not trust the proxy's CA). The scripts deliberately
 // use the collector + event-sourcing commands rather than inserting read
@@ -910,12 +1201,12 @@ func (o *Orchestrator) runIngestScript(ctx context.Context, p UpParams, retryCmd
 	if err != nil {
 		return err
 	}
-	return o.sup.RunOnce(ctx, script, p.LwDir, "pnpm run "+script, env)
+	return o.sup.RunOnce(ctx, script, p.WorktreeDir, "pnpm run "+script, env)
 }
 
 // liveSeedEnv returns the running stack's complete environment overlay plus a
 // loopback collector endpoint. The complete overlay matters for seeders that
-// write both Postgres and ClickHouse; inheriting platform/app/.env would silently
+// write both Postgres and ClickHouse; inheriting .env would silently
 // target the primary checkout instead of this worktree's isolated databases.
 func (o *Orchestrator) liveSeedEnv(p UpParams, retryCmd string) ([]string, error) {
 	slug, err := o.resolveSlug(p)
@@ -955,6 +1246,30 @@ func runsLocally(name string, opts PlanOptions) bool {
 		return opts.Selection.Langy
 	case "idp":
 		return opts.Selection.IDP
+	case domain.MailService:
+		return opts.Selection.Mail
+	case domain.DesignSystemService:
+		return opts.Selection.DesignSystem
+	case domain.MailRoomService:
+		return opts.Selection.MailRoom
+	case domain.LangevalsService:
+		return opts.Selection.Langevals
+	case domain.StorageService:
+		return opts.Selection.Storage
+	case domain.VoiceService:
+		return opts.Selection.Voice
+	case domain.LLMService:
+		return opts.Selection.LLM
+	case domain.AnalyticsService:
+		return opts.Selection.Analytics
+	case domain.OutboundService:
+		return opts.Selection.Outbound
+	case domain.PaymentService:
+		return opts.Selection.Payment
+	case domain.TelemetryService:
+		return opts.Selection.Telemetry
+	case domain.LambdaService:
+		return opts.Selection.Lambda
 	default:
 		return true
 	}
@@ -984,14 +1299,41 @@ func (o *Orchestrator) printStack(st domain.Stack) {
 			target = fmt.Sprintf("baseline :%d", s.Port)
 		}
 		fmt.Printf("    %-10s %s  ->  %s\n", s.Name, s.URL, target)
-		// The API shares app's origin — surface it right under app so the single
-		// URL is obvious (no separate api.<slug> hostname to reach for).
+		// The same-origin path stays worth its own line too, even though api
+		// also gets its own row further down (domain.APIService, appended to
+		// st.Services after this loop): app.<slug>.../api is what the browser
+		// and existing tooling reach the API through day to day.
 		if s.Name == "app" && st.APIPort != 0 {
 			fmt.Printf("    %-10s %s/api  ->  127.0.0.1:%d\n", "└ api", s.URL, st.APIPort)
 		}
 	}
 	scheme, port := o.proxy.Endpoint()
 	fmt.Printf("    %-10s %s\n\n", "hub", o.cfg.Naming.URL(domain.HubService, "", scheme, port))
+}
+
+// stableLLMPort is the port llmsim keeps for a slug across restarts and
+// reconciles: its registered one while the stack is registered, else the slug's
+// own, probed past every port another stack holds and any live listener.
+func (o *Orchestrator) stableLLMPort(slug string) int {
+	taken := map[int]bool{}
+	stacks := o.store.Stacks()
+	for i := range stacks {
+		port := llmPortOf(stacks[i])
+		if stacks[i].Slug == slug && port != 0 {
+			return port
+		}
+		taken[port] = true
+	}
+	return domain.AllocateLLMPort(slug, func(port int) bool { return taken[port] || o.sys.PortInUse(port) })
+}
+
+func llmPortOf(st domain.Stack) int {
+	for _, svc := range st.Services {
+		if svc.Name == domain.LLMService {
+			return svc.Port
+		}
+	}
+	return 0
 }
 
 // allocateRedisDB picks this stack's Redis database, keeping the one it already
@@ -1036,6 +1378,9 @@ func (o *Orchestrator) allocateRedisDB(slug string) (int, bool) {
 			zap.Int("pinned", pinned),
 		)
 	}
+	// Db 0 is what every process outside haven's registry (the primary checkout,
+	// a plain `pnpm dev`) uses by default, so a managed stack never takes it.
+	taken[0] = true
 	if registered >= 0 && !taken[registered] {
 		return registered, true
 	}

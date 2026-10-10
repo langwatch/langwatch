@@ -48,6 +48,12 @@ Feature: One ClickHouse client, reached one way, bounded where it can be seen
     And the refusal is counted so the operator can see the platform shedding
 
   @unit
+  Scenario: the wait queue is sized from the bound, never below its floor
+    Given a bound of a few slots, and a bound of many
+    When the platform sizes the wait queue for each
+    Then each queue holds eight statements per slot, and never fewer than 64
+
+  @unit
   Scenario: a caller that gives up stops waiting
     Given a statement is waiting for a slot
     When the caller abandons the request
@@ -161,6 +167,82 @@ Feature: One ClickHouse client, reached one way, bounded where it can be seen
       Then one process alone never claims more than the server's safe budget
       And it reports that the fleet may still exceed the budget, so the operator learns to supply the fleet size
       But a deployment that says nothing keeps the historical fallback unchanged
+
+  # The client is where tenant scoping can be made unavoidable. In this schema
+  # no identifier other than the tenant is unique across customers, so a read
+  # that forgets its WHERE clause does not return too much - it returns somebody
+  # else's rows, with the right shape and no error. The guard sits outermost on
+  # the client every repository already calls, so it costs nothing when it
+  # refuses and cannot be reached around. A statement that genuinely spans
+  # tenants - a system table, an operator sweep, a billing meter - says so at the
+  # call site in a written reason, which a reviewer sees as an added string
+  # rather than as a silent omission.
+  Rule: Every statement names its tenant, or says in writing why it does not
+
+    @unit
+    Scenario: A statement that names its tenant runs
+      Given a read whose WHERE clause binds the tenant as a parameter
+      When the repository issues it
+      Then it reaches the server unchanged
+
+    @unit
+    Scenario: A statement that names no tenant is refused, and the refusal names the table
+      Given a read with no tenant predicate at all
+      When the repository issues it
+      Then the client refuses it before it reaches the server
+      And the refusal names the table and the beginning of the statement
+      And it is recorded as an error for the engineer who wrote the query
+
+    @unit
+    Scenario: A statement that declares why it spans tenants runs
+      Given a read that genuinely spans tenants and carries a written reason
+      When the repository issues it
+      Then the client lets it through
+      And the reason does not travel to the server as part of the request
+
+    @unit
+    Scenario: An OR that can disjoin a tenant predicate away is refused
+      Given a read with an OR beside a tenant predicate, or around the bracket that holds one
+      When the guard checks it
+      Then it is refused as a weakening disjunction
+
+    @unit
+    Scenario: An OR bracketed beneath a tenant predicate does not refuse a scoped statement
+      Given a read whose every OR sits in a bracket beneath a predicate binding the claimed tenant
+      And no OR shares a bracket with a tenant predicate or encloses one
+      When the guard checks it
+      Then it is accepted
+
+  # A replay reads a batch's whole history in one statement; main streamed it so a batch's memory
+  # stays bounded by its accumulators, not its event count (Alex, 2026-09-28). A streamed read is
+  # guarded and routed like any other, but holds no slot and is never retried: its reader sets how
+  # long it runs, and a retried stream would hand the reader rows it already applied.
+  Rule: A large read streams batch by batch through the same routing and guard
+
+    @unit
+    Scenario: A streamed read yields the tenant's rows batch by batch from its own server
+      Given a tenant whose organization has a private endpoint
+      When a repository streams a read for that tenant
+      Then it receives each batch as the server sends it, decoded
+      And only the private endpoint is asked
+
+    @unit
+    Scenario: A streamed read spanning every tenant reads the shared server
+      Given a read that names no tenant and carries a written reason
+      When a repository streams it
+      Then it is read from the shared server
+
+    @unit
+    Scenario: A streamed read that names no tenant is refused before it reaches a server
+      Given a streamed read with no tenant predicate and no written reason
+      When a repository streams it
+      Then the client refuses it before any server is asked
+
+    @unit
+    Scenario: A driver that cannot stream answers the whole read as one batch
+      Given a driver with no streaming read
+      When a repository streams a read
+      Then the whole result arrives as one batch
 
   @unit
   Scenario: ClickHouse is reached through a repository, from the application object

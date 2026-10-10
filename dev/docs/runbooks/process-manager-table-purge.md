@@ -51,10 +51,10 @@ overlaps with a sweep that is working through the same rows more slowly.
 
 ## What gets deleted, and why it is safe
 
-| Table | Predicate | Why safe |
-|---|---|---|
-| `ProcessManagerOutbox` | `status='dispatched' AND "dispatchedAt" < now() - 7 days` | A dispatched row is completed work. Its only remaining value is forensic, and seven days is well past any window in which anyone reads it. Pending and dead rows are never touched: pending rows are work still owed, dead rows are the operator's failure record. |
-| `ProcessManagerInbox` | `"consumedAt" < now() - 7 days` | An inbox row is an idempotency marker. It only has to outlive the window in which the same source event could be redelivered. That horizon is about 25 hours: origin guards reject events older than 1 hour and traces older than 24 hours, and the longest debounce bucket is 600 seconds. Seven days is a wide margin on top, and `TriggerSent` claims are a second layer against a double side effect even if a marker were dropped too early. |
+| Table                  | Predicate                                                 | Why safe                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| ---------------------- | --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ProcessManagerOutbox` | `status='dispatched' AND "dispatchedAt" < now() - 7 days` | A dispatched row is completed work. Its only remaining value is forensic, and seven days is well past any window in which anyone reads it. Pending and dead rows are never touched: pending rows are work still owed, dead rows are the operator's failure record.                                                                                                                                                                                |
+| `ProcessManagerInbox`  | `"consumedAt" < now() - 7 days`                           | An inbox row is an idempotency marker. It only has to outlive the window in which the same source event could be redelivered. That horizon is about 25 hours: origin guards reject events older than 1 hour and traces older than 24 hours, and the longest debounce bucket is 600 seconds. Seven days is a wide margin on top, and `TriggerSent` claims are a second layer against a double side effect even if a marker were dropped too early. |
 
 `ProcessManagerInstance` is deliberately **not** purged. It is bounded by entity
 population rather than by traffic (16 MB against 2.1 GB of inbox), and deleting
@@ -63,9 +63,12 @@ rather than a cleanup.
 
 ## Access path
 
-No psql bastion is needed. `platform/app/scripts/ops/purge-process-manager-tables.mjs`
-runs inside an app pod, which already has the Prisma client and the database
-credentials. Nothing here needs a new credential or a new network route.
+No psql bastion is needed. The purge runs inside an app pod, which already has
+the Prisma client and the database credentials, so nothing here needs a new
+credential or a new network route. The monolith's
+`scripts/ops/purge-process-manager-tables.mjs` did not survive the platform
+split — run the statements below directly against the pod's Prisma client until
+an equivalent task lands on `apps/api` or `apps/worker`.
 
 ## Procedure
 

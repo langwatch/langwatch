@@ -109,3 +109,9 @@ Feature: Datasets list page
     When I choose "Replicate to another project" from a dataset's row menu
     Then I can pick a target project
     And the dataset is copied there
+
+  @integration
+  Scenario: Replicating a dataset offers only the projects I may create datasets in
+    Given I may create datasets in one of my projects and not in another
+    When I open the dataset replicate dialog
+    Then only the project I may create datasets in is offered

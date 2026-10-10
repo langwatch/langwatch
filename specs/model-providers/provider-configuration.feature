@@ -3,26 +3,35 @@ Feature: Model Provider Configuration
   I want to set up API keys, models, and provider-specific settings
   So that I can use the provider for LangWatch operations
 
-  # Most remaining @unimplemented scenarios describe the provider drawer UI
-  # (toggles, Custom Models section, extra-headers). Need a JSDOM render of
-  # `ModelProviderForm` + the Custom Models / Extra Headers subforms. The
-  # masking/preservation pieces are bound to `modelProvider.service.unit.test.ts`
-  # (mergeCustomKeys / maskApiKeys). Aspirational pending the form harness.
+  # The JSDOM render harness this file kept asking for now exists:
+  # `modules/model-provider/browser/src/ui/sections/__tests__/
+  # edit-model-provider-drawer.integration.test.tsx`, written when the drawer was
+  # recovered from `platform/app` (deleted in `cc91631cd8`, which is why a
+  # customer could not add or edit a credential at all). It covers the headline
+  # path — the drawer opens on the provider the address names, the typed key is
+  # probed, and it reaches `modelProvider.update` as typed. What is still
+  # @unimplemented below is the rest of the drawer's surface: the Azure gateway
+  # toggle, the Custom Models section and the extra-headers subform. The
+  # masking/preservation pieces stay bound to `modelProvider.service.unit.test.ts`
+  # (mergeCustomKeys / maskApiKeys).
 
   Background:
     Given I am logged in
     And I have access to a project
     And I have "project:manage" permission
 
-  @visual
+  @integration
   Scenario: OpenAI provider form fields
     When I open the model provider configuration drawer for "openai"
     Then I see the following fields:
-      | field           | type       |
-      | OPENAI_API_KEY  | text input |
-      | OPENAI_BASE_URL | text input |
-    And I see a "Custom Models" section
+      | field           | type           |
+      | OPENAI_API_KEY  | concealed text |
+      | OPENAI_BASE_URL | text input     |
+    And each field says where its value comes from
     And I see a "Save" button
+    # The field keeps the environment variable's own name rather than prose:
+    # it is what the provider's dashboard and the deployment's configuration
+    # both call it, so the hint underneath is what carries the explanation.
 
   @visual
   Scenario: Azure provider form fields
@@ -49,7 +58,7 @@ Feature: Model Provider Configuration
     When I open the model provider configuration drawer for "openai"
     Then I do not see an "Extra Headers" section
 
-  @integration @unimplemented
+  @integration
   Scenario: Configure API keys with manual input
     Given I open the model provider configuration drawer for "openai"
     When I enter "sk-test123" in the "OPENAI_API_KEY" field
@@ -73,6 +82,14 @@ Feature: Model Provider Configuration
     Then the API key is masked in the response
     And the plaintext API key does not appear anywhere in the response
     And non-secret values like the base URL remain visible
+
+  @integration
+  Scenario: Saving a provider answers with its credentials masked
+    Given I save an "azure" provider with an API key, an endpoint and an extra header
+    When the save answers with the stored provider
+    Then the API key and the header value are masked in the answer
+    And the plaintext API key does not appear anywhere in the answer
+    And the endpoint remains visible
 
   @unit
   Scenario: Preserve original extra header values when saving with masked placeholders
@@ -169,14 +186,14 @@ Feature: Model Provider Configuration
     Then the endpoint is updated
     And the stored API key is preserved
 
-  # Everything else is on screen, so a save states it in full. That is how the
-  # API gateway option switches over, and it must not take the key with it.
+  # Everything else is on screen, so a save states it in full. Switching to the
+  # API gateway changes where the key goes, so the key is asked for again.
   @integration
-  Scenario: Switching Azure to its API gateway keeps the key and drops the direct endpoint
+  Scenario: Switching Azure to its API gateway asks for the key again and drops the direct endpoint
     Given I have "azure" provider configured with an API key and an endpoint
-    When I switch the provider to its API gateway and save
+    When I switch the provider to its API gateway and save without retyping the key
     Then the direct endpoint gives way to the gateway address
-    And the stored API key is preserved
+    And the stored API key is not kept
 
   @integration @unimplemented
   Scenario: Configure API keys from environment variables

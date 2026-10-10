@@ -1,0 +1,133 @@
+import {
+  Box,
+  chakra,
+  HStack,
+  Spacer,
+  Text,
+  VisuallyHidden,
+  VStack,
+} from "@langwatch/design-system/primitives";
+import { Tooltip } from "@langwatch/design-system/tooltip";
+import { Check, ChevronDown, HelpCircle } from "lucide-react";
+import type { ReactNode } from "react";
+
+/** Single-open accordion wiring, passed down from the main list. When present,
+ *  the facet collapses to its header + a one-line summary and the header
+ *  toggles it. Absent (the standalone / test path) renders an always-open
+ *  panel. */
+export interface FacetAccordionProps {
+  open: boolean;
+  onToggle: () => void;
+}
+
+/**
+ * Facet panel: title, optional help and control, fields. Accordion mode with completion indicator.
+ * One neutral border whatever the completion: the header's check is the only completion signal.
+ */
+export function FacetSection({
+  title,
+  help,
+  headerRight,
+  children,
+  accordion,
+  summary,
+  complete = false,
+}: {
+  title: string;
+  /** Long-form explanation, shown behind a `(?)` icon next to the title. */
+  help?: string;
+  /** Optional control pinned to the right of the header (e.g. a Code switch). */
+  headerRight?: ReactNode;
+  children: ReactNode;
+  /** Turns the panel into a collapsible accordion item. */
+  accordion?: FacetAccordionProps;
+  /** One-line preview shown when collapsed. */
+  summary?: string;
+  /** Drives the completion check. */
+  complete?: boolean;
+}) {
+  const titleRow = (
+    <HStack gap={2}>
+      <Text fontWeight="semibold">{title}</Text>
+      {help ? (
+        <Tooltip content={help}>
+          <Box color="fg.muted" display="inline-flex" cursor="help">
+            <HelpCircle size={13} />
+          </Box>
+        </Tooltip>
+      ) : null}
+      {complete ? (
+        <Box as="span" color="green.solid" display="inline-flex">
+          <Check size={14} aria-hidden="true" />
+          <VisuallyHidden>Answered</VisuallyHidden>
+        </Box>
+      ) : null}
+    </HStack>
+  );
+
+  // Always-open panel (standalone / test path).
+  if (!accordion) {
+    return (
+      <Box padding={3} borderRadius="md" border="1px solid" borderColor="border">
+        <HStack mb={3} gap={2}>
+          {titleRow}
+          <Spacer />
+          {headerRight}
+        </HStack>
+        {children}
+      </Box>
+    );
+  }
+
+  const { open, onToggle } = accordion;
+
+  return (
+    <Box
+      borderRadius="md"
+      border="1px solid"
+      borderColor="border"
+      bg="bg"
+      _hover={{ borderColor: "border.emphasized" }}
+    >
+      <HStack gap={2} align="center" padding={3} borderRadius="md">
+        <chakra.button
+          type="button"
+          aria-expanded={open}
+          display="flex"
+          alignItems="center"
+          gap={2}
+          flex="1"
+          minWidth="0"
+          textAlign="left"
+          cursor="pointer"
+          onClick={onToggle}
+        >
+          <VStack align="start" gap={0} flex="1" minWidth="0">
+            {titleRow}
+            {!open && summary ? (
+              <Text textStyle="sm" color="fg.muted" lineClamp={1}>
+                {summary}
+              </Text>
+            ) : null}
+          </VStack>
+          <Box
+            color="fg.muted"
+            flexShrink={0}
+            display="inline-flex"
+            transform={open ? "rotate(180deg)" : "rotate(0deg)"}
+            transition="transform 0.15s ease"
+          >
+            <ChevronDown size={16} />
+          </Box>
+        </chakra.button>
+        {/* Beside the toggle, not inside it: a control here must not collapse the panel. */}
+        {open && headerRight ? <Box>{headerRight}</Box> : null}
+      </HStack>
+      {open ? (
+        <Box paddingX={3} paddingBottom={3}>
+          {children}
+        </Box>
+      ) : null}
+    </Box>
+  );
+}

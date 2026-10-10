@@ -5,7 +5,8 @@
 # Ingress (what can talk TO the gateway):
 #   - Anything on the LB / ingress-nginx namespace hitting :5563
 #     (the public customer surface).
-#   - Prometheus scraper hitting :5563 /metrics.
+#   - Prometheus scraper hitting the metrics port (metrics.port, default
+#     9464) when metrics.enabled is true.
 #
 # Egress (what the gateway can talk to):
 #   - DNS (kube-system:53 TCP+UDP).
@@ -39,6 +40,14 @@ spec:
       ports:
         - protocol: TCP
           port: 5563
+    {{- if .Values.metrics.enabled }}
+    # Prometheus scrapes the metrics listener, with the bearer key.
+    - from:
+        {{- toYaml .Values.networkPolicy.metricsFrom | nindent 8 }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.metrics.port }}
+    {{- end }}
   egress:
     # DNS — must be allowed before anything else resolves.
     - to:

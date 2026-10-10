@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
+	"strings"
 	"time"
 
 	"go.uber.org/zap"
@@ -99,8 +101,8 @@ func executeSyncHandler(application *app.App) http.HandlerFunc {
 // shapes the Studio client emits:
 //
 //  1. Discriminated event (preferred — matches the Python
-//     StudioClientEvent union sent by platform/app/src/server/workflows/
-//     runWorkflow.ts):
+//     StudioClientEvent union declared by
+//     modules/workflow/contract/src/studio-events.ts):
 //     {"type":"execute_flow"|"execute_component"|"execute_evaluation",
 //     "payload":{trace_id, workflow, inputs?, origin?, ...}}
 //
@@ -163,7 +165,7 @@ func decodeStudioClientEvent(r *http.Request, body []byte) (*app.WorkflowRequest
 		UntilNodeID string `json:"until_node_id,omitempty"`
 		ProjectID   string `json:"project_id,omitempty"`
 		// RunID is present only on execute_evaluation envelopes
-		// (platform/app/src/optimization_studio/hooks/useEvaluationExecution.ts).
+		// (modules/workflow/browser/src/ui/sections/optimization_studio/use-evaluation-execution.ts).
 		// Plumbed through to the engine so evaluation_state_change events
 		// carry the run_id Studio's reducer keys evaluations on.
 		RunID string `json:"run_id,omitempty"`
@@ -179,6 +181,11 @@ func decodeStudioClientEvent(r *http.Request, body []byte) (*app.WorkflowRequest
 		// parent workflow already owns the trace. Mirrors
 		// langwatch_nlp/studio/types/events.py:57 + execute_flow.py:53.
 		DoNotTrace bool `json:"do_not_trace,omitempty"`
+		// MaxAttachmentBytes is the per-file attachment limit the
+		// application resolved for the organization that owns the run.
+		// Absent or zero falls back to the
+		// X-LangWatch-Max-Attachment-Bytes header, then to the default.
+		MaxAttachmentBytes int64 `json:"max_attachment_bytes,omitempty"`
 	}
 	if err := json.Unmarshal(innerBytes, &inner); err != nil {
 		e := herr.New(r.Context(), domain.ErrBadRequest, herr.M{
@@ -201,6 +208,10 @@ func decodeStudioClientEvent(r *http.Request, body []byte) (*app.WorkflowRequest
 	if threadID == "" {
 		threadID = r.Header.Get("X-LangWatch-Thread-Id")
 	}
+	maxAttachmentBytes := inner.MaxAttachmentBytes
+	if maxAttachmentBytes <= 0 {
+		maxAttachmentBytes = headerMaxAttachmentBytes(r)
+	}
 	// Combine envelope-level do_not_trace with the workflow's
 	// enable_tracing setting (default true). Either being false
 	// suppresses the studio span. Mirrors execute_flow.py:53 logic
@@ -211,23 +222,40 @@ func decodeStudioClientEvent(r *http.Request, body []byte) (*app.WorkflowRequest
 	}
 
 	return &app.WorkflowRequest{
-		WorkflowJSON:      inner.Workflow,
-		Inputs:            normalizeInputs(inner.Inputs),
-		Origin:            origin,
-		TraceID:           inner.TraceID,
-		ProjectID:         inner.ProjectID,
-		ThreadID:          threadID,
-		NodeID:            inner.NodeID,
-		UntilNodeID:       inner.UntilNodeID,
-		APIKey:            peekWorkflowAPIKey(inner.Workflow),
-		WorkflowName:      peekWorkflowName(inner.Workflow),
-		Type:              peek.Type,
-		RunID:             inner.RunID,
-		WorkflowVersionID: inner.WorkflowVersionID,
-		EvaluateOn:        inner.EvaluateOn,
-		DatasetEntry:      inner.DatasetEntry,
-		DoNotTrace:        doNotTrace,
+		WorkflowJSON:       inner.Workflow,
+		Inputs:             normalizeInputs(inner.Inputs),
+		Origin:             origin,
+		TraceID:            inner.TraceID,
+		ProjectID:          inner.ProjectID,
+		ThreadID:           threadID,
+		NodeID:             inner.NodeID,
+		UntilNodeID:        inner.UntilNodeID,
+		APIKey:             peekWorkflowAPIKey(inner.Workflow),
+		WorkflowName:       peekWorkflowName(inner.Workflow),
+		Type:               peek.Type,
+		RunID:              inner.RunID,
+		WorkflowVersionID:  inner.WorkflowVersionID,
+		EvaluateOn:         inner.EvaluateOn,
+		DatasetEntry:       inner.DatasetEntry,
+		DoNotTrace:         doNotTrace,
+		MaxAttachmentBytes: maxAttachmentBytes,
 	}, nil
+}
+
+// headerMaxAttachmentBytes reads the per-file attachment limit off the
+// X-LangWatch-Max-Attachment-Bytes header, a decimal integer of bytes. A
+// missing, malformed or non-positive value is zero, which the engine reads as
+// "no limit named" and serves at the default.
+func headerMaxAttachmentBytes(r *http.Request) int64 {
+	v := strings.TrimSpace(r.Header.Get(app.MaxAttachmentBytesHeader))
+	if v == "" {
+		return 0
+	}
+	n, err := strconv.ParseInt(v, 10, 64)
+	if err != nil || n <= 0 {
+		return 0
+	}
+	return n
 }
 
 // peekWorkflowName extracts the user-visible workflow name from raw
@@ -561,8 +589,9 @@ func executeStreamHandler(application *app.App, configuredHeartbeat, configuredI
 //	data: {"type":"<type>","payload":{...}}\n\n
 //
 // matching the Python /studio/execute SSE contract that Studio's TS
-// parser expects (platform/app/src/app/api/workflows/post_event/post-event.ts
-// reads only `data:` lines and JSON.parses the rest). An optional
+// parser expects (modules/workflow/process/src/adapters/
+// workflow-studio-stream.adapter.ts reads only `data:` lines and JSON.parses
+// the rest). An optional
 // `event:` line is intentionally omitted — the TS parser ignores it
 // today and emitting it confused early SSE rounds-tripping. The
 // `payload` key is omitted entirely when the event has no payload

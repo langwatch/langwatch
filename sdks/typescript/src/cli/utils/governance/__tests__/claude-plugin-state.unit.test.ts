@@ -1,28 +1,21 @@
 /**
- * What the LangWatch Claude Code plugin seam reads off disk, and what it makes
- * of a `claude` binary that may or may not understand plugins at all.
- *
- * `node:child_process` is the only thing mocked. Every file the module reads is
- * a real file under a temp HOME, so the state parsing is exercised against the
- * shapes Claude Code actually writes.
- *
- * Feature: specs/ai-governance/cli-wrappers/claude-plugin-install.feature
+ * What the LangWatch Claude Code plugin seam reads off disk, and what it
+ * makes of a `claude` that may not understand plugins. Only child_process is
+ * mocked; every other file read is real, under a temp HOME.
  */
 
+import type * as ChildProcessModule from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
 
 import { describe, expect, it, vi } from "vitest";
-
-import type * as ChildProcessModule from "node:child_process";
 
 import { installClaudePluginHarness } from "./claude-plugin-test-helpers";
 
 const { spawnSyncMock } = vi.hoisted(() => ({ spawnSyncMock: vi.fn() }));
 
 vi.mock("node:child_process", async () => {
-  const actual =
-    await vi.importActual<typeof ChildProcessModule>("node:child_process");
+  const actual = await vi.importActual<typeof ChildProcessModule>("node:child_process");
   return { ...actual, spawnSync: spawnSyncMock };
 });
 
@@ -92,14 +85,8 @@ describe("readClaudePluginState", () => {
   describe("given plugin state files holding malformed JSON", () => {
     it("reports nothing installed rather than throwing", async () => {
       fs.mkdirSync(pluginsDir(), { recursive: true });
-      fs.writeFileSync(
-        path.join(pluginsDir(), "installed_plugins.json"),
-        "{ not json",
-      );
-      fs.writeFileSync(
-        path.join(pluginsDir(), "known_marketplaces.json"),
-        "[[[",
-      );
+      fs.writeFileSync(path.join(pluginsDir(), "installed_plugins.json"), "{ not json");
+      fs.writeFileSync(path.join(pluginsDir(), "known_marketplaces.json"), "[[[");
       const { readClaudePluginState } = await loadModule();
       expect(readClaudePluginState().pluginInstalled).toBe(false);
       expect(readClaudePluginState().marketplaceKnown).toBe(false);
@@ -224,10 +211,7 @@ describe("readClaudePluginState", () => {
           value: { langwatch: { source: { source: "git", url } } },
         });
         const { readClaudePluginState } = await loadModule();
-        expect(
-          readClaudePluginState().marketplaceOwnedByLangwatch,
-          `${url} is ours`,
-        ).toBe(true);
+        expect(readClaudePluginState().marketplaceOwnedByLangwatch, `${url} is ours`).toBe(true);
       }
     });
 

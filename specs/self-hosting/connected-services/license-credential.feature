@@ -29,9 +29,9 @@ Feature: The license is the credential for hosted services
   @unit
   Scenario: The managed key is created on first use and reused after
     Given "ACME" has never called a hosted service
-    When its license token is resolved twice
-    Then one managed key for that license exists on "ACME"
-    And both resolutions return that key
+    When its license token is resolved, gateway's provisioned key attaches, and it is resolved twice more
+    Then the first resolution answers connect_credential_pending and records the credential issued once
+    And both later resolutions return the attached key
 
   @unit
   Scenario: Each license gets its own managed key
@@ -116,10 +116,10 @@ Feature: The license is the credential for hosted services
 
   @unit
   Scenario: A license that stops being active mid-call issues no credential
-    Given the license has no managed key yet
-    When it is revoked or its term ends after the call read its status and before its managed key is attached
-    Then the call is refused with the code for the state the license is now in
-    And no managed key is left active on the customer
+    Given the license has no managed key yet and its credential was recorded issued
+    When it is revoked or its term ends before gateway's provisioned key is attached
+    Then the provisioned key is ended and the license still has no managed key
+    And the next call is refused with the code for the state the license is now in
 
   @integration
   Scenario: The managed key is recorded only while the license still admits the call
@@ -130,10 +130,10 @@ Feature: The license is the credential for hosted services
 
   @unit
   Scenario: A managed key that fails to attach is ended
-    Given the license has no managed key yet
-    When recording the managed key on the license fails
-    Then the error reaches the caller
-    And the key that was created for it is ended
+    Given the license already holds a managed key
+    When gateway's provisioned fact names a different key
+    Then only the newly provisioned key is ended
+    And the key the license holds is untouched
 
   @integration
   Scenario: Refusals do not reveal license metadata
@@ -169,3 +169,16 @@ Feature: The license is the credential for hosted services
     When a call presents the same license token with instance id "instance-b"
     Then the cached credential is not used
     And the call is checked against the registry
+
+  @unit
+  Scenario: A licence whose managed key is still being set up is asked again on every call
+    Given a license token whose managed key the control plane answers as pending
+    When the install calls the gateway three times with it
+    Then the gateway asks the control plane each time and answers connect_credential_pending
+
+  @unit
+  Scenario: Gateway provisions one managed key per licence from licensing's issued fact
+    Given a linked licence whose call found no managed key
+    When licensing records the connect credential issued, once and then again
+    Then gateway mints one key for that licence and finds the same key on the repeat
+    And it writes the key's services and licence before it records the key provisioned

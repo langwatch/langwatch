@@ -526,3 +526,32 @@ func TestHubTickRefresh(t *testing.T) {
 		})
 	})
 }
+
+// @scenario "The hub opens a selected stack's project viewer"
+func TestHubProjectViewerAndStableSelection(t *testing.T) {
+	rows := []Row{{Slug: "alpha", Dir: "/alpha"}, {Slug: "beta", Dir: "/beta"}}
+	m := newModel(context.Background(), Actions{Refresh: func() View { return View{Stacks: rows} }, HasViewer: true})
+	m.cursor = 1
+	rows = []Row{{Slug: "new", Dir: "/new"}, {Slug: "alpha", Dir: "/alpha"}, {Slug: "beta", Dir: "/beta"}}
+	m.refresh()
+	if it, ok := m.selected(); !ok || it.name() != "beta" {
+		t.Fatal("selection changed during refresh")
+	}
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'l'}})
+	if updated.(model).outcome.OpenStack != "beta" || cmd == nil {
+		t.Fatal("did not request the selected project's viewer")
+	}
+}
+
+// @scenario "The hub opens a selected stack's project viewer"
+func TestEnterInspectsAndGitRemainsExplicit(t *testing.T) {
+	m := newModel(context.Background(), Actions{Refresh: func() View { return View{Stacks: []Row{{Slug: "alpha", Dir: "/alpha"}}} }, HasViewer: true})
+	inspected := press(t, m, "enter")
+	if inspected.outcome.OpenStack != "alpha" || inspected.outcome.OpenGitDir != "" {
+		t.Fatal(inspected.outcome)
+	}
+	git := press(t, m, "g")
+	if git.outcome.OpenGitDir != "/alpha" || git.outcome.OpenStack != "" {
+		t.Fatal(git.outcome)
+	}
+}

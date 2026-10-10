@@ -169,6 +169,22 @@ Feature: Langy runs on the model the project chose
     When the user starts a new conversation or switches to another
     Then the pick does not follow to the other conversation
 
+  # Resolution itself (apidiff parity with main's getVercelAIModel for langy.chat):
+  # the model the Langy feature key resolves to, on a provider that is present
+  # and enabled. Anything else refuses, and the turn answers model-not-configured.
+
+  @unit
+  Scenario: A turn resolves the model the project configured for Langy
+    Given the project's Langy model resolves to a model on an enabled provider
+    When a turn resolves its model
+    Then the turn runs on that model's full id
+
+  @unit
+  Scenario: A Langy model on a disabled provider is refused
+    Given the project's Langy model resolves to a model on a disabled provider
+    When a turn resolves its model
+    Then the resolution is refused
+
   # Riding beside a drawer (trace details, the online evaluation editor) the
   # panel is raised above the drawer, which put it above its own model list.
   @integration

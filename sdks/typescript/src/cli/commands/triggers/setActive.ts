@@ -1,10 +1,10 @@
-import { resolveCredentials } from "../../utils/apiKey";
-import { failSpinnerFromResponse } from "../../utils/failFromResponse";
-import type { CommandResult } from "../../utils/output";
-import { createSpinner } from "../../utils/spinner";
-import { failSpinner } from "../../utils/spinnerError";
-import type { TriggerRecord } from "./summary";
-import { triggerRequest } from "./triggerRequest";
+import { resolveCredentials } from "../../utils/apiKey.ts";
+import { failSpinnerFromResponse } from "../../utils/failFromResponse.ts";
+import type { CommandResult } from "../../utils/output.ts";
+import { createSpinner } from "../../utils/spinner.ts";
+import { failSpinner } from "../../utils/spinnerError.ts";
+import type { TriggerRecord } from "./summary.ts";
+import { triggerRequest } from "./triggerRequest.ts";
 
 /**
  * Resume or pause an automation. A report's schedule follows: pausing retires
@@ -20,9 +20,7 @@ export const setTriggerActiveCommand = async ({
   await resolveCredentials();
   const verb = active ? "enable" : "disable";
 
-  const spinner = createSpinner(
-    `${active ? "Resuming" : "Pausing"} trigger "${id}"...`,
-  ).start();
+  const spinner = createSpinner(`${active ? "Resuming" : "Pausing"} trigger "${id}"...`).start();
 
   try {
     const response = await triggerRequest({
@@ -35,11 +33,8 @@ export const setTriggerActiveCommand = async ({
       process.exit(1);
     }
 
-    const trigger: Pick<TriggerRecord, "id" | "name" | "active"> =
-      await response.json();
-    spinner.succeed(
-      `Trigger "${trigger.name}" is now ${trigger.active ? "running" : "paused"}`,
-    );
+    const trigger: Pick<TriggerRecord, "id" | "name" | "active"> = await response.json();
+    spinner.succeed(`Trigger "${trigger.name}" is now ${trigger.active ? "running" : "paused"}`);
 
     return {
       // The state answer carries only id, name and active, so machine output

@@ -1,0 +1,132 @@
+// @vitest-environment jsdom
+/** Governance draws peers' lent surfaces by token: specs/governance-lent-by-token.feature. */
+import {
+  UiHostServicesContextProvider,
+  type UiHostServices,
+} from "@langwatch/browser-host/capabilities";
+import { uiDeclarations, type UiDeclarations } from "@langwatch/browser-host/declarations";
+import { createUiHostServicesFromHost } from "@langwatch/browser-host/testing";
+import { ModelSelectorToken } from "@langwatch/model-provider-client";
+import { GuidedOnboardingOfferToken } from "@langwatch/onboarding-client";
+import { HeroAskFieldToken } from "@langwatch/project-client";
+import { cleanup, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+import { GuidedOnboardingOffer } from "../lent-guided-onboarding-offer.tsx";
+import { HeroAskField } from "../lent-hero-ask-field.tsx";
+import { ModelSelector } from "../lent-model-provider.tsx";
+
+const peersLend = uiDeclarations([
+  {
+    name: "onboarding",
+    installation: {
+      capabilities: {},
+      lends: [
+        {
+          token: GuidedOnboardingOfferToken,
+          load: async () => ({
+            default: ({ space }: { space: string }) => <button>Start guided {space}</button>,
+          }),
+        },
+      ],
+    },
+  },
+  {
+    name: "model-provider",
+    installation: {
+      capabilities: {},
+      lends: [
+        {
+          token: ModelSelectorToken,
+          load: async () => ({
+            default: ({ options }: { options: string[] }) => <p>Models {options.join(",")}</p>,
+          }),
+        },
+      ],
+    },
+  },
+  {
+    name: "project",
+    installation: {
+      capabilities: {},
+      lends: [
+        {
+          token: HeroAskFieldToken,
+          load: async () => ({
+            default: ({ placeholder }: { placeholder: string }) => (
+              <input placeholder={placeholder} />
+            ),
+          }),
+        },
+      ],
+    },
+  },
+]);
+
+function renderPeers({ declarations }: { declarations: UiDeclarations }) {
+  const capabilities: UiHostServices = {
+    ...createUiHostServicesFromHost({
+      route: () => ({ params: {}, query: {} }),
+      navigate: () => void 0,
+    }),
+    declarations,
+  };
+  return render(
+    <UiHostServicesContextProvider value={capabilities}>
+      <div data-testid="screen">
+        <GuidedOnboardingOffer space="governance" spaceInUse={false} />
+        <ModelSelector model="gpt-5" options={["gpt-5", "gpt-5-mini"]} onChange={vi.fn()} />
+        <HeroAskField placeholder="Ask about governance" />
+      </div>
+    </UiHostServicesContextProvider>,
+  );
+}
+
+afterEach(cleanup);
+
+describe("given governance's screens", () => {
+  describe("when onboarding lends its pill", () => {
+    /** @scenario The overview draws onboarding's lent guided onboarding pill */
+    it("draws the pill with the space", async () => {
+      renderPeers({ declarations: peersLend });
+
+      expect(await screen.findByText("Start guided governance")).toBeDefined();
+    });
+  });
+
+  describe("when model-provider lends its picker", () => {
+    /** @scenario The insights setup drawer draws model-provider's lent model picker */
+    it("draws the picker with the models", async () => {
+      renderPeers({ declarations: peersLend });
+
+      expect(await screen.findByText("Models gpt-5,gpt-5-mini")).toBeDefined();
+    });
+  });
+
+  describe("when model-provider lends its picker from its client", () => {
+    /** @scenario Governance renders model-provider's model picker through its client token */
+    it("draws the picker by the client token", async () => {
+      renderPeers({ declarations: peersLend });
+
+      expect(await screen.findByText("Models gpt-5,gpt-5-mini")).toBeDefined();
+    });
+  });
+
+  describe("when project lends its ask field", () => {
+    /** @scenario The overview hero draws project's lent ask field */
+    it("draws the field with the placeholder", async () => {
+      renderPeers({ declarations: peersLend });
+
+      expect(await screen.findByPlaceholderText("Ask about governance")).toBeDefined();
+    });
+  });
+
+  describe("when no module lends any of them", () => {
+    /** @scenario No module lends a token governance reads */
+    it("draws nothing in their place", () => {
+      renderPeers({ declarations: uiDeclarations([]) });
+
+      expect(screen.getByTestId("screen").textContent).toBe("");
+    });
+  });
+});

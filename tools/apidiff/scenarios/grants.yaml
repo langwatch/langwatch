@@ -1,0 +1,747 @@
+# Grants and roles: /api/grants (who holds which role where, succeeding /api/role-bindings) and
+# /api/roles with the built-in ids admin, member and viewer. specs/rbac/grants-rest-api.feature.
+# Branch-only: main serves no /api/grants (it answers 404), no ?builtIn filter, no built-in role ids
+# and no deprecation headers on /api/role-bindings, so in a two-sided run these are FAIL-main by
+# design; judge them on the branch alone (one-stack mode). Each scenario makes its own group, role
+# or key under {uid} and its teardown revokes the grant, then removes what it made.
+# Not scripted: the 10,000-grant limit (grant_limit_reached; unit-tested), an expired grant (a past
+# expiresAt is refused, so status=expired needs the clock) and a personal-workspace scope.
+
+# ---- grants: round trips ----
+
+- id: grants-create-built-in-role-for-group-on-team
+  endpoint: POST /api/grants
+  auth: org
+  setup:
+    - request: POST /api/groups
+      body: { name: "vd-{uid}" }
+      capture: { groupId: id }
+  request:
+    path: /api/grants
+    body:
+      principal: { type: group, id: "{groupId}" }
+      roleId: member
+      scope: { type: team, id: "{teamId}" }
+  capture: { grantId: id }
+  expect:
+    status: 201
+    body:
+      id: "<any>"
+      principal: { type: group, id: "{groupId}", name: "vd-{uid}" }
+      role: { id: member, builtIn: true }
+      scope: { type: team, id: "{teamId}" }
+      status: active
+      expiresAt: null
+      createdAt: "<any>"
+  verify:
+    - request: GET /api/grants/{grantId}
+      expect:
+        status: 200
+        body: { id: "{grantId}", role: { id: member, builtIn: true }, scope: { type: team, id: "{teamId}" } }
+  teardown:
+    - request: DELETE /api/grants/{grantId}
+      auth: org
+    - request: DELETE /api/groups/{groupId}
+      auth: org
+
+- id: grants-create-custom-role-for-group-on-project
+  endpoint: POST /api/grants
+  auth: org
+  setup:
+    - request: POST /api/roles
+      body: { name: "vd-{uid}", permissions: ["project:view"] }
+      capture: { roleId: id }
+    - request: POST /api/groups
+      body: { name: "vd-{uid}" }
+      capture: { groupId: id }
+  request:
+    path: /api/grants
+    body:
+      principal: { type: group, id: "{groupId}" }
+      roleId: "{roleId}"
+      scope: { type: project, id: "{projectId}" }
+  capture: { grantId: id }
+  expect:
+    status: 201
+    body: { role: { id: "{roleId}", name: "vd-{uid}", builtIn: false }, scope: { type: project, id: "{projectId}" } }
+  verify:
+    - request: GET /api/grants/{grantId}
+      expect:
+        status: 200
+        body: { role: { id: "{roleId}", name: "vd-{uid}", builtIn: false } }
+  teardown:
+    - request: DELETE /api/grants/{grantId}
+      auth: org
+    - request: DELETE /api/groups/{groupId}
+      auth: org
+    - request: DELETE /api/roles/{roleId}
+      auth: org
+
+- id: grants-create-for-api-key-on-project
+  endpoint: POST /api/grants
+  auth: org
+  setup:
+    - request: POST /api/api-keys
+      body: { keyType: service, name: "vd-{uid}", projectIds: ["{projectId}"] }
+      capture: { keyId: apiKey.id }
+      expect: { status: 201 }
+  request:
+    path: /api/grants
+    body:
+      principal: { type: apiKey, id: "{keyId}" }
+      roleId: viewer
+      scope: { type: project, id: "{projectId}" }
+  capture: { grantId: id }
+  expect:
+    status: 201
+    body: { principal: { type: apiKey, id: "{keyId}" }, role: { id: viewer, builtIn: true } }
+  teardown:
+    - request: DELETE /api/grants/{grantId}
+      auth: org
+    - request: DELETE /api/api-keys/{keyId}
+      auth: org
+
+- id: grants-list-by-principal-pages-by-cursor
+  endpoint: GET /api/grants
+  auth: org
+  setup:
+    - request: POST /api/groups
+      body: { name: "vd-{uid}" }
+      capture: { groupId: id }
+    - request: POST /api/grants
+      body: { principal: { type: group, id: "{groupId}" }, roleId: viewer, scope: { type: project, id: "{projectId}" } }
+      capture: { firstGrantId: id }
+    - request: POST /api/grants
+      body: { principal: { type: group, id: "{groupId}" }, roleId: member, scope: { type: team, id: "{teamId}" } }
+      capture: { secondGrantId: id }
+  request:
+    path: /api/grants
+    query: { principalType: group, principalId: "{groupId}", limit: 1 }
+  capture: { cursor: nextCursor }
+  expect:
+    status: 200
+    body: { grants: [{ id: "{firstGrantId}" }], nextCursor: "<any>" }
+    path: grants
+    length: 1
+  verify:
+    - request: GET /api/grants
+      query: { principalType: group, principalId: "{groupId}", limit: 1, cursor: "{cursor}" }
+      expect:
+        status: 200
+        body: { grants: [{ id: "{secondGrantId}" }], nextCursor: null }
+        path: grants
+        length: 1
+    - request: GET /api/grants
+      query: { principalType: group, principalId: "{groupId}", roleId: viewer }
+      expect: { status: 200, body: { grants: [{ id: "{firstGrantId}" }] }, path: grants, length: 1 }
+    - request: GET /api/grants
+      query: { principalType: group, principalId: "{groupId}", scopeType: team, scopeId: "{teamId}" }
+      expect: { status: 200, body: { grants: [{ id: "{secondGrantId}" }] }, path: grants, length: 1 }
+    - request: GET /api/grants
+      query: { principalType: group, principalId: "{groupId}", status: expired }
+      expect: { status: 200, path: grants, length: 0 }
+  teardown:
+    - request: DELETE /api/grants/{firstGrantId}
+      auth: org
+    - request: DELETE /api/grants/{secondGrantId}
+      auth: org
+    - request: DELETE /api/groups/{groupId}
+      auth: org
+
+- id: grants-list-refuses-tampered-cursor
+  endpoint: GET /api/grants
+  auth: org
+  request:
+    path: /api/grants
+    query: { cursor: "not-a-cursor-{uid}" }
+  expect: { status: 422 }
+
+- id: grants-get-unknown-id-is-not-found
+  endpoint: GET /api/grants/{grantId}
+  auth: org
+  request: { path: "/api/grants/rb_vd{uid}" }
+  expect: { status: 404, body: { code: grant_not_found } }
+  verify:
+    - request: PATCH /api/grants/rb_vd{uid}
+      body: { roleId: viewer }
+      expect: { status: 404, body: { code: grant_not_found } }
+    - request: DELETE /api/grants/rb_vd{uid}
+      expect: { status: 404, body: { code: grant_not_found } }
+
+- id: grants-change-role-keeps-principal-and-scope
+  endpoint: PATCH /api/grants/{grantId}
+  auth: org
+  setup:
+    - request: POST /api/groups
+      body: { name: "vd-{uid}" }
+      capture: { groupId: id }
+    - request: POST /api/grants
+      body: { principal: { type: group, id: "{groupId}" }, roleId: viewer, scope: { type: project, id: "{projectId}" } }
+      capture: { grantId: id }
+  request:
+    path: /api/grants/{grantId}
+    body: { roleId: member }
+  expect:
+    status: 200
+    body:
+      id: "{grantId}"
+      principal: { type: group, id: "{groupId}" }
+      role: { id: member, builtIn: true }
+      scope: { type: project, id: "{projectId}" }
+  verify:
+    - request: GET /api/grants/{grantId}
+      expect: { status: 200, body: { role: { id: member } } }
+  teardown:
+    - request: DELETE /api/grants/{grantId}
+      auth: org
+    - request: DELETE /api/groups/{groupId}
+      auth: org
+
+- id: grants-change-refuses-new-scope
+  endpoint: PATCH /api/grants/{grantId}
+  auth: org
+  setup:
+    - request: POST /api/groups
+      body: { name: "vd-{uid}" }
+      capture: { groupId: id }
+    - request: POST /api/grants
+      body: { principal: { type: group, id: "{groupId}" }, roleId: viewer, scope: { type: project, id: "{projectId}" } }
+      capture: { grantId: id }
+  request:
+    path: /api/grants/{grantId}
+    body: { roleId: viewer, scope: { type: team, id: "{teamId}" } }
+  expect: { status: 422 }
+  verify:
+    - request: GET /api/grants/{grantId}
+      expect: { status: 200, body: { role: { id: viewer }, scope: { type: project, id: "{projectId}" } } }
+  teardown:
+    - request: DELETE /api/grants/{grantId}
+      auth: org
+    - request: DELETE /api/groups/{groupId}
+      auth: org
+
+- id: grants-revoke-then-not-found
+  endpoint: DELETE /api/grants/{grantId}
+  auth: org
+  setup:
+    - request: POST /api/groups
+      body: { name: "vd-{uid}" }
+      capture: { groupId: id }
+    - request: POST /api/grants
+      body: { principal: { type: group, id: "{groupId}" }, roleId: member, scope: { type: team, id: "{teamId}" } }
+      capture: { grantId: id }
+  request: { path: "/api/grants/{grantId}" }
+  expect: { status: 200, body: { id: "{grantId}", revoked: true } }
+  verify:
+    - request: GET /api/grants/{grantId}
+      expect: { status: 404, body: { code: grant_not_found } }
+  teardown:
+    - request: DELETE /api/groups/{groupId}
+      auth: org
+
+- id: grants-same-grant-twice-is-two-grants
+  endpoint: POST /api/grants
+  auth: org
+  setup:
+    - request: POST /api/groups
+      body: { name: "vd-{uid}" }
+      capture: { groupId: id }
+    - request: POST /api/grants
+      body: { principal: { type: group, id: "{groupId}" }, roleId: member, scope: { type: team, id: "{teamId}" } }
+      capture: { firstGrantId: id }
+  request:
+    path: /api/grants
+    body: { principal: { type: group, id: "{groupId}" }, roleId: member, scope: { type: team, id: "{teamId}" } }
+  capture: { secondGrantId: id }
+  expect: { status: 201, notContains: "{firstGrantId}" }
+  verify:
+    - request: GET /api/grants
+      query: { principalType: group, principalId: "{groupId}" }
+      expect: { status: 200, path: grants, length: 2 }
+  teardown:
+    - request: DELETE /api/grants/{firstGrantId}
+      auth: org
+    - request: DELETE /api/grants/{secondGrantId}
+      auth: org
+    - request: DELETE /api/groups/{groupId}
+      auth: org
+
+# ---- grants: Idempotency-Key ----
+
+- id: grants-create-replays-under-idempotency-key
+  endpoint: POST /api/grants
+  auth: org
+  setup:
+    - request: POST /api/groups
+      body: { name: "vd-{uid}" }
+      capture: { groupId: id }
+    - request: POST /api/grants
+      headers: { Idempotency-Key: "vd-grant-{uid}" }
+      body: { principal: { type: group, id: "{groupId}" }, roleId: viewer, scope: { type: project, id: "{projectId}" } }
+      capture: { grantId: id }
+      expect: { status: 201 }
+  request:
+    path: /api/grants
+    headers: { Idempotency-Key: "vd-grant-{uid}" }
+    body: { principal: { type: group, id: "{groupId}" }, roleId: viewer, scope: { type: project, id: "{projectId}" } }
+  expect:
+    status: 201
+    body: { id: "{grantId}" }
+    headers: { X-Idempotent-Replay: "true" }
+  verify:
+    - request: GET /api/grants
+      query: { principalType: group, principalId: "{groupId}" }
+      expect: { status: 200, path: grants, length: 1 }
+  teardown:
+    - request: DELETE /api/grants/{grantId}
+      auth: org
+    - request: DELETE /api/groups/{groupId}
+      auth: org
+
+- id: grants-create-refuses-reused-idempotency-key
+  endpoint: POST /api/grants
+  auth: org
+  setup:
+    - request: POST /api/groups
+      body: { name: "vd-{uid}" }
+      capture: { groupId: id }
+    - request: POST /api/grants
+      headers: { Idempotency-Key: "vd-grant-{uid}" }
+      body: { principal: { type: group, id: "{groupId}" }, roleId: viewer, scope: { type: project, id: "{projectId}" } }
+      capture: { grantId: id }
+      expect: { status: 201 }
+  request:
+    path: /api/grants
+    headers: { Idempotency-Key: "vd-grant-{uid}" }
+    body: { principal: { type: group, id: "{groupId}" }, roleId: member, scope: { type: project, id: "{projectId}" } }
+  expect: { status: 409, body: { code: idempotency_error } }
+  verify:
+    - request: GET /api/grants
+      query: { principalType: group, principalId: "{groupId}" }
+      expect: { status: 200, path: grants, length: 1 }
+  teardown:
+    - request: DELETE /api/grants/{grantId}
+      auth: org
+    - request: DELETE /api/groups/{groupId}
+      auth: org
+
+# ---- grants: refusals ----
+
+- id: grants-create-refuses-unknown-principal
+  endpoint: POST /api/grants
+  auth: org
+  request:
+    path: /api/grants
+    body: { principal: { type: user, id: "vd-nobody-{uid}" }, roleId: viewer, scope: { type: project, id: "{projectId}" } }
+  expect: { status: 422, body: { code: grant_principal_not_found } }
+
+- id: grants-create-refuses-unknown-custom-role
+  endpoint: POST /api/grants
+  auth: org
+  setup:
+    - request: POST /api/groups
+      body: { name: "vd-{uid}" }
+      capture: { groupId: id }
+  request:
+    path: /api/grants
+    body: { principal: { type: group, id: "{groupId}" }, roleId: "vd-norole-{uid}", scope: { type: project, id: "{projectId}" } }
+  expect: { status: 422, body: { code: grant_role_not_found } }
+  teardown:
+    - request: DELETE /api/groups/{groupId}
+      auth: org
+
+- id: grants-create-refuses-other-org-project
+  endpoint: POST /api/grants
+  auth: org
+  setup:
+    - request: POST /api/groups
+      body: { name: "vd-{uid}" }
+      capture: { groupId: id }
+  request:
+    path: /api/grants
+    body: { principal: { type: group, id: "{groupId}" }, roleId: viewer, scope: { type: project, id: "{projectIdC}" } }
+  expect: { status: 422, body: { code: grant_scope_not_found } }
+  verify:
+    - request: GET /api/grants
+      query: { principalType: group, principalId: "{groupId}" }
+      expect: { status: 200, path: grants, length: 0 }
+  teardown:
+    - request: DELETE /api/groups/{groupId}
+      auth: org
+
+- id: grants-create-refuses-expiry-in-past
+  endpoint: POST /api/grants
+  auth: org
+  setup:
+    - request: POST /api/groups
+      body: { name: "vd-{uid}" }
+      capture: { groupId: id }
+  request:
+    path: /api/grants
+    body:
+      principal: { type: group, id: "{groupId}" }
+      roleId: viewer
+      scope: { type: project, id: "{projectId}" }
+      expiresAt: "2000-01-01T00:00:00.000Z"
+  expect: { status: 422, body: { code: grant_expiry_in_past } }
+  teardown:
+    - request: DELETE /api/groups/{groupId}
+      auth: org
+
+- id: grants-create-refuses-unknown-principal-type
+  endpoint: POST /api/grants
+  auth: org
+  request:
+    path: /api/grants
+    body: { principal: { type: robot, id: "r-{uid}" }, roleId: viewer, scope: { type: project, id: "{projectId}" } }
+  expect: { status: 422 }
+
+- id: grants-create-refuses-oversized-id
+  endpoint: POST /api/grants
+  auth: org
+  request:
+    path: /api/grants
+    body:
+      principal: { type: user, id: "uuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu" }
+      roleId: viewer
+      scope: { type: project, id: "{projectId}" }
+  expect: { status: 422 }
+
+- id: grants-list-refuses-no-key
+  endpoint: GET /api/grants
+  auth: none
+  request: { path: /api/grants }
+  expect: { status: 401 }
+
+- id: grants-list-refuses-project-key
+  endpoint: GET /api/grants
+  auth: project
+  request: { path: /api/grants }
+  expect: { status: [401, 403] }
+
+- id: grants-create-refuses-project-key
+  endpoint: POST /api/grants
+  auth: project
+  request:
+    path: /api/grants
+    body: { principal: { type: user, id: "{userId}" }, roleId: admin, scope: { type: project, id: "{projectId}" } }
+  expect: { status: [401, 403] }
+  verify:
+    - request: GET /api/grants
+      auth: org
+      query: { principalType: user, principalId: "{userId}", scopeType: project, scopeId: "{projectId}", roleId: admin }
+      expect: { status: 200, path: grants, length: 0 }
+
+- id: grants-list-refuses-read-only-key
+  endpoint: GET /api/grants
+  auth: restricted
+  request: { path: /api/grants }
+  expect: { status: 403 }
+
+- id: grants-foreign-org-key-cannot-reach-owner-grant
+  endpoint: GET /api/grants/{grantId}
+  auth: org-c-org
+  setup:
+    - request: POST /api/groups
+      auth: org
+      body: { name: "vd-{uid}" }
+      capture: { groupId: id }
+    - request: POST /api/grants
+      auth: org
+      body: { principal: { type: group, id: "{groupId}" }, roleId: viewer, scope: { type: project, id: "{projectId}" } }
+      capture: { grantId: id }
+  request: { path: "/api/grants/{grantId}" }
+  expect: { status: 404, body: { code: grant_not_found }, notContains: "vd-{uid}" }
+  verify:
+    - request: PATCH /api/grants/{grantId}
+      body: { roleId: admin }
+      expect: { status: 404, body: { code: grant_not_found } }
+    - request: DELETE /api/grants/{grantId}
+      expect: { status: 404, body: { code: grant_not_found } }
+    - request: GET /api/grants/{grantId}
+      auth: org
+      expect: { status: 200, body: { role: { id: viewer } } }
+  teardown:
+    - request: DELETE /api/grants/{grantId}
+      auth: org
+    - request: DELETE /api/groups/{groupId}
+      auth: org
+
+# ---- nobody grants more than they hold: a key holding only organization:manage ----
+
+- id: grants-key-cannot-grant-itself-admin
+  endpoint: POST /api/grants
+  auth: none
+  setup:
+    - request: POST /api/api-keys
+      auth: org
+      body:
+        keyType: service
+        name: "vd-{uid}"
+        permissionMode: restricted
+        permissions: ["organization:manage"]
+        bindings: [{ role: CUSTOM, scopeType: ORGANIZATION, scopeId: "{orgId}" }]
+      capture: { keyId: apiKey.id, keyToken: token }
+      expect: { status: 201 }
+  request:
+    path: /api/grants
+    headers: { Authorization: "Bearer {keyToken}" }
+    body: { principal: { type: apiKey, id: "{keyId}" }, roleId: admin, scope: { type: organization, id: "{orgId}" } }
+  expect:
+    status: 403
+    body: { code: grant_exceeds_caller_permissions, meta: { missingPermissions: ["<any>"] } }
+  verify:
+    - request: GET /api/grants
+      auth: org
+      query: { principalType: apiKey, principalId: "{keyId}", roleId: admin }
+      expect: { status: 200, path: grants, length: 0 }
+  teardown:
+    - request: DELETE /api/api-keys/{keyId}
+      auth: org
+
+- id: grants-key-cannot-raise-a-grant-above-itself
+  endpoint: PATCH /api/grants/{grantId}
+  auth: none
+  setup:
+    - request: POST /api/api-keys
+      auth: org
+      body:
+        keyType: service
+        name: "vd-{uid}"
+        permissionMode: restricted
+        permissions: ["organization:manage"]
+        bindings: [{ role: CUSTOM, scopeType: ORGANIZATION, scopeId: "{orgId}" }]
+      capture: { keyId: apiKey.id, keyToken: token }
+      expect: { status: 201 }
+    - request: POST /api/groups
+      auth: org
+      body: { name: "vd-{uid}" }
+      capture: { groupId: id }
+    - request: POST /api/grants
+      auth: org
+      body: { principal: { type: group, id: "{groupId}" }, roleId: viewer, scope: { type: organization, id: "{orgId}" } }
+      capture: { grantId: id }
+  request:
+    path: /api/grants/{grantId}
+    headers: { Authorization: "Bearer {keyToken}" }
+    body: { roleId: admin }
+  expect:
+    status: 403
+    body: { code: grant_exceeds_caller_permissions, meta: { missingPermissions: ["<any>"] } }
+  verify:
+    - request: GET /api/grants/{grantId}
+      auth: org
+      expect: { status: 200, body: { role: { id: viewer } } }
+  teardown:
+    - request: DELETE /api/grants/{grantId}
+      auth: org
+    - request: DELETE /api/groups/{groupId}
+      auth: org
+    - request: DELETE /api/api-keys/{keyId}
+      auth: org
+
+- id: roles-key-cannot-create-role-beyond-itself
+  endpoint: POST /api/roles
+  auth: none
+  setup:
+    - request: POST /api/api-keys
+      auth: org
+      body:
+        keyType: service
+        name: "vd-{uid}"
+        permissionMode: restricted
+        permissions: ["organization:manage"]
+        bindings: [{ role: CUSTOM, scopeType: ORGANIZATION, scopeId: "{orgId}" }]
+      capture: { keyId: apiKey.id, keyToken: token }
+      expect: { status: 201 }
+  request:
+    path: /api/roles
+    headers: { Authorization: "Bearer {keyToken}" }
+    body: { name: "vd-{uid}", permissions: ["project:delete"] }
+  expect: { status: 403, body: { code: role_exceeds_caller_permissions } }
+  verify:
+    - request: GET /api/roles
+      auth: org
+      expect: { status: 200, notContains: "vd-{uid}" }
+  teardown:
+    - request: DELETE /api/api-keys/{keyId}
+      auth: org
+
+# ---- the last administrator: its own org shard, serial, and only when one admin grant exists ----
+# The setup refuses to go on unless exactly one user and no group hold admin on the organization,
+# so a failing guard can never take the seeded admin's access away.
+
+- id: grants-last-admin-cannot-be-revoked
+  endpoint: DELETE /api/grants/{grantId}
+  auth: org
+  shard: org
+  serial: true
+  setup:
+    - request: GET /api/grants
+      query: { roleId: admin, scopeType: organization, principalType: group }
+      expect: { status: 200, path: grants, length: 0 }
+    - request: GET /api/grants
+      query: { roleId: admin, scopeType: organization, principalType: user }
+      capture: { adminGrantId: grants.0.id }
+      expect: { status: 200, path: grants, length: 1 }
+  request: { path: "/api/grants/{adminGrantId}" }
+  expect: { status: 400, body: { code: cannot_remove_last_admin } }
+  verify:
+    - request: GET /api/grants/{adminGrantId}
+      expect: { status: 200, body: { role: { id: admin } } }
+
+- id: grants-last-admin-cannot-be-lowered
+  endpoint: PATCH /api/grants/{grantId}
+  auth: org
+  shard: org
+  serial: true
+  setup:
+    - request: GET /api/grants
+      query: { roleId: admin, scopeType: organization, principalType: group }
+      expect: { status: 200, path: grants, length: 0 }
+    - request: GET /api/grants
+      query: { roleId: admin, scopeType: organization, principalType: user }
+      capture: { adminGrantId: grants.0.id }
+      expect: { status: 200, path: grants, length: 1 }
+  request:
+    path: /api/grants/{adminGrantId}
+    body: { roleId: member }
+  expect: { status: 400, body: { code: cannot_demote_last_admin } }
+  verify:
+    - request: GET /api/grants/{adminGrantId}
+      expect: { status: 200, body: { role: { id: admin } } }
+
+# ---- roles: built-in ids and the builtIn filter ----
+
+- id: roles-list-built-ins-first
+  endpoint: GET /api/roles
+  auth: org
+  setup:
+    - request: POST /api/roles
+      body: { name: "vd-{uid}", permissions: ["project:view"] }
+      capture: { roleId: id }
+  request: { path: /api/roles }
+  expect:
+    status: 200
+    body:
+      roles:
+        - { id: admin, builtIn: true, createdAt: null }
+        - { id: member, builtIn: true }
+        - { id: viewer, builtIn: true }
+        - { builtIn: false }
+    contains: "vd-{uid}"
+  teardown:
+    - request: DELETE /api/roles/{roleId}
+      auth: org
+
+- id: roles-list-built-in-only
+  endpoint: GET /api/roles
+  auth: org
+  setup:
+    - request: POST /api/roles
+      body: { name: "vd-{uid}", permissions: ["project:view"] }
+      capture: { roleId: id }
+  request:
+    path: /api/roles
+    query: { builtIn: "true" }
+  expect:
+    status: 200
+    body: { roles: [{ id: admin }, { id: member }, { id: viewer }] }
+    notContains: "vd-{uid}"
+    path: roles
+    length: 3
+  teardown:
+    - request: DELETE /api/roles/{roleId}
+      auth: org
+
+- id: roles-list-custom-only
+  endpoint: GET /api/roles
+  auth: org
+  setup:
+    - request: POST /api/roles
+      body: { name: "vd-{uid}", permissions: ["project:view"] }
+      capture: { roleId: id }
+  request:
+    path: /api/roles
+    query: { builtIn: "false" }
+  expect:
+    status: 200
+    body: { roles: [{ builtIn: false }] }
+    contains: "vd-{uid}"
+    notContains: '"builtIn":true'
+  teardown:
+    - request: DELETE /api/roles/{roleId}
+      auth: org
+
+- id: roles-list-refuses-invalid-built-in-filter
+  endpoint: GET /api/roles
+  auth: org
+  request:
+    path: /api/roles
+    query: { builtIn: "yes" }
+  expect: { status: 422, body: { code: validation_error } }
+
+- id: roles-get-built-in-by-id
+  endpoint: GET /api/roles/{id}
+  auth: org
+  request: { path: /api/roles/admin }
+  expect:
+    status: 200
+    body: { id: admin, builtIn: true, permissions: ["<any>"], createdAt: null, updatedAt: null }
+
+- id: roles-built-in-cannot-be-changed
+  endpoint: PATCH /api/roles/{id}
+  auth: org
+  request:
+    path: /api/roles/viewer
+    body: { name: "vd-{uid}" }
+  expect: { status: 409, body: { code: role_is_built_in } }
+  verify:
+    - request: GET /api/roles/viewer
+      expect: { status: 200, body: { id: viewer, builtIn: true }, notContains: "vd-{uid}" }
+
+- id: roles-built-in-cannot-be-deleted
+  endpoint: DELETE /api/roles/{id}
+  auth: org
+  request: { path: /api/roles/viewer }
+  expect: { status: 409, body: { code: role_is_built_in } }
+  verify:
+    - request: GET /api/roles/viewer
+      expect: { status: 200, body: { id: viewer } }
+
+# ---- /api/role-bindings: deprecated, still answering, pointing at /api/grants ----
+
+- id: role-bindings-deprecated-list-carries-headers
+  endpoint: GET /api/role-bindings
+  auth: org
+  request: { path: /api/role-bindings }
+  expect:
+    status: 200
+    body: { bindings: "<any>" }
+    headers: { Deprecation: "true", Link: '</api/grants>; rel="successor-version"' }
+
+- id: role-bindings-deprecated-writes-carry-headers
+  endpoint: POST /api/role-bindings
+  auth: org
+  setup:
+    - request: POST /api/groups
+      body: { name: "vd-{uid}" }
+      capture: { groupId: id }
+  request:
+    path: /api/role-bindings
+    body: { groupId: "{groupId}", role: VIEWER, scopeType: PROJECT, scopeId: "{projectId}" }
+  capture: { bindingId: id }
+  expect:
+    status: 201
+    headers: { Deprecation: "true", Link: "/api/grants" }
+  verify:
+    - request: PATCH /api/role-bindings/{bindingId}
+      body: { role: MEMBER }
+      expect: { status: 200, headers: { Deprecation: "true", Link: "/api/grants" } }
+    - request: GET /api/grants/{bindingId}
+      expect: { status: 200, body: { role: { id: member } } }
+    - request: DELETE /api/role-bindings/{bindingId}
+      expect: { status: 200, headers: { Deprecation: "true", Link: "/api/grants" } }
+  teardown:
+    - request: DELETE /api/groups/{groupId}
+      auth: org

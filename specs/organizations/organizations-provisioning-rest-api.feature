@@ -58,6 +58,15 @@ Feature: Organization provisioning REST API for self-hosted deployments
     And no organization or team with that slug remains
     And provisioning the same slug afterwards succeeds
 
+  # Membership rows do not cascade from the organization: a purge that skipped
+  # them would fail on the foreign key and leave the whole tenant behind.
+  @integration
+  Scenario: Rolling back a provisioned organization removes its memberships
+    Given a provisioned organization with a member of the organization and of its team
+    When the provisioned organization is purged
+    Then no organization membership or team membership of it remains
+    And the organization and its team are gone
+
   # ============================================================================
   # Read
   # ============================================================================
@@ -81,6 +90,12 @@ Feature: Organization provisioning REST API for self-hosted deployments
   Scenario: Fetching an unknown organization id is not found
     When I fetch an organization id that does not exist with the credential
     Then the request is refused with status 404
+
+  @integration
+  Scenario: The roster reads the same at every path the family answers on
+    Given I created an organization with the instance administrator credential
+    When I list the organizations at each path the family answers on
+    Then every path answers the same status and the same roster
 
   # ============================================================================
   # Availability

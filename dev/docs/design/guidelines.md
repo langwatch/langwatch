@@ -29,44 +29,33 @@ All UI elements should have a rounded, approachable feel.
 </Box>
 ```
 
-## 2. Translucent Overlays
+## 2. Overlays, dialogs and notices
 
-All overlays (drawers, popovers, dialogs) should have translucent backgrounds with blur effects.
+Drawers and popovers keep their translucent, blurred panel (`Drawer`, `Popover` from
+`@langwatch/design-system`). A dialog does not: its panel is opaque (`bg.panel`, set by the
+recipe) and the blur belongs to the backdrop behind it. Never set `bg`, `background` or a
+blur on `Dialog.Content`; never build a dialog from a fixed-position `Box`.
 
-### Visual Effect
+### One dialog
 
-- Semi-transparent white background
-- Backdrop blur for depth
-- Rounded floating corners with margin from edges
+| Part   | Standard                                                                                                                                                                                                                                  |
+| ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Shell  | `Dialog` from `@langwatch/design-system/dialog`; width by `size` or one `maxWidth`, nothing else on `Content`.                                                                                                                            |
+| Header | `Dialog.Title` in sentence case, recipe style (no `fontSize`/`fontWeight`); optional `Dialog.Description` in `fg.muted`.                                                                                                                  |
+| Close  | `<Dialog.CloseTrigger />` on every dismissible dialog. Only a takeover, a command palette or a must-acknowledge reveal (`role="alertdialog"`) goes without.                                                                               |
+| Body   | Field labels in sentence case (`Field.Label`, never an uppercase `SmallLabel` in a form).                                                                                                                                                 |
+| Footer | Right-aligned in `Dialog.Footer`: `variant="outline"` Cancel, then one solid primary: `colorPalette="orange"` (the product primary, as `PageLayout.HeaderButton primary`), `red` when it destroys. Never a full-width button in the body. |
 
-### Implementation Details
+A plain confirmation is `ConfirmDialog`; a type-to-confirm delete is `DeleteConfirmationDialog`.
 
-The overlay components in `components/ui/` already implement these styles:
+### One notice
 
-| Property | Value |
-|----------|-------|
-| `background` | `white/75` |
-| `backdropFilter` | `blur(8px)` |
-| `borderRadius` | `lg` |
-| `margin` | `2` (for drawers) |
-
-### Code Pattern
-
-```tsx
-// These components already have the translucent effect built-in:
-import { Drawer } from "../../components/ui/drawer";
-import { Dialog } from "../../components/ui/dialog";
-import { Popover } from "../../components/ui/popover";
-
-// If creating custom overlays, apply:
-<Box
-  background="white/75"
-  backdropFilter="blur(8px)"
-  borderRadius="lg"
->
-  ...
-</Box>
-```
+`Banner` from `@langwatch/design-system/banner` is the one notice: `status` info, warning,
+error or success; icon, `title`, optional sentence as children, optional one `BannerAction`.
+`placement="top"` sits flush at the top of the content panel, `inline` is a card inside it. A
+message says a thing once: a page that carries its own note hides the shell's top banner for
+the same fact. No hand-built tinted `Box` callouts; `Alert.Root` call sites are migrating to
+`Banner` (see [alerts-toasts-and-field-errors.md](../best_practices/alerts-toasts-and-field-errors.md)).
 
 ## 3. Prefer Drawers Over Modals
 
@@ -111,7 +100,9 @@ LangWatch uses a drawer navigation system that allows drawers to navigate to oth
 **Implementation:**
 
 ```tsx
-import { useDrawer } from "~/hooks/useDrawer";
+import { useDrawer } from "@langwatch/browser-host/drawer";
+// The drawer's token, declared once by its owner (ARCHITECTURE.md §10.1)
+import { ChildDrawerToken } from "../../model/child-drawer.ts";
 
 function ParentDrawer() {
   const { openDrawer, canGoBack, goBack, closeDrawer } = useDrawer();
@@ -125,13 +116,11 @@ function ParentDrawer() {
               <ArrowLeft />
             </Button>
           )}
-          <Heading>Select Type</Heading>
+          <Drawer.Title>Select Type</Drawer.Title>
         </HStack>
       </Drawer.Header>
       <Drawer.Body>
-        <Button onClick={() => openDrawer("childDrawer", { id: "123" })}>
-          Open Child
-        </Button>
+        <Button onClick={() => openDrawer(ChildDrawerToken, { id: "123" })}>Open Child</Button>
       </Drawer.Body>
     </Drawer.Root>
   );
@@ -142,73 +131,66 @@ See [components.md](./components.md) for detailed `useDrawer` hook documentation
 
 ## 4. Page Layout Standards
 
-All pages should follow a consistent layout structure.
+One standard per concern, ruled 2026-09-29 (Alex) after the UI consistency audit. Each has
+one component and one exemplar; a screen that disagrees is the defect.
 
-### Structure
+### Page title and header actions
 
-1. **Header** - Fixed height (48px), contains title and actions
-2. **Title** - Small, left-aligned heading
-3. **Action Buttons** - Top right, using `PageLayout.HeaderButton`
-4. **Content** - Full width, below the header divider
-
-### Code Pattern
-
-```tsx
-import { PageLayout } from "../../components/ui/layouts/PageLayout";
-
-<PageLayout.Container>
-  <PageLayout.Header>
-    <PageLayout.Heading>Page Title</PageLayout.Heading>
-    <Spacer />
-    <HStack gap={2}>
-      <PageLayout.HeaderButton onClick={handleAction}>
-        <Plus /> Add Item
-      </PageLayout.HeaderButton>
-    </HStack>
-  </PageLayout.Header>
-
-  {/* Page content below header */}
-  <VStack gap={4} padding={6}>
-    ...
-  </VStack>
-</PageLayout.Container>
-```
-
-### Key Points
-
-- Page takes full available width
-- Title should be concise
-- Action buttons grouped on the right
-- Consistent padding and spacing
-
-## 5. Collapsed Menu for Busy Pages
-
-For content-heavy pages, use the compact sidebar that expands on hover.
-
-### When to Use Compact Menu
-
-- Pages with dense content (prompt editor, settings)
-- Pages where users need maximum horizontal space
-- "Focused mode" pages where navigation is secondary
-
-### Implementation
+Every page inside the app chrome, workspace, settings, governance and `/me` alike, opens with
+`PageLayout.Header` (the 48px bar) holding `PageLayout.Heading`. Actions sit after a `<Spacer />`
+and are `PageLayout.HeaderButton` only, no raw `Button`. At most one is `primary` (solid,
+the page's main action); the rest are outline, and a page with no main action has none
+(ruled 2026-10-02, Alex). Full-screen tools
+(studio, traces explorer, workbench) and card screens (auth, onboarding, authorize) carry no bar.
+Exemplar: `modules/workflow/browser/src/ui/sections/workflows/workflows-screen.tsx:46`.
+Pages never size their title. Account pages (every `/me` page, Settings > Profile and
+Security) get a large one from the route table's `heading: "account"` (ruled 2026-10-02, Alex).
 
 ```tsx
-import { DashboardLayout } from "~/components/DashboardLayout";
+import { PageLayout } from "@langwatch/design-system/page-layout";
 
-<DashboardLayout compactMenu>
-  {/* Page content */}
-</DashboardLayout>
+<PageLayout.Header>
+  <PageLayout.Heading>Page Title</PageLayout.Heading>
+  <Spacer />
+  <PageLayout.HeaderButton primary onClick={handleAction}>
+    <Plus /> Add Item
+  </PageLayout.HeaderButton>
+</PageLayout.Header>;
 ```
 
-### Behavior
+### Container: the shell owns padding and width
 
-- Sidebar collapses to icons only
-- Expands on hover to show labels
-- Maintains navigation accessibility
-- Reduces visual noise
+A page root adds no padding, `maxWidth` or centring: the shell card, the area layout and
+settings' `PageMeasure` own it. Workspace list pages put `PageLayout.Container` after the
+`PageLayout.Header`, never around it. A page root is transparent over the shell card
+(`bg.surface`); cards use `bg.panel`; tints use semantic tokens, never a numbered palette.
+Exemplar: `workflows-screen.tsx:56`.
 
-## 6. Form Validation: Submit-then-Surface, Don't Pre-Disable
+### Empty and loading states
+
+"Nothing here yet" is `NoDataInfoBlock` from `@langwatch/design-system/no-data-info-block`, never
+a module-local copy or a raw `EmptyState`. Inside the chrome, loading is `Skeleton` in the content
+region; `LoadingScreen` is for screens outside the chrome only. Exemplar: `workflows-screen.tsx:58`.
+
+### Drawers
+
+Use `Drawer.*` from `@langwatch/design-system/drawer` with `Drawer.Title` inside `Drawer.Header`
+(Chakra wires `aria-labelledby` to it; a bare `Heading` leaves the drawer unnamed).
+Exemplar: `modules/organization/browser/src/ui/sections/invite-member-drawer.tsx:61`.
+
+### Front door
+
+Every `/auth/*` screen and `/invite/accept` renders inside `FrontDoorShell` with its content on an
+`AuthCard`, matching main's `AuthShell`. Wait states are a card too ("Taking you back to sign in"),
+never a bare line of text. Exemplar: `modules/auth/browser/src/ui/sections/signin-screen.tsx`.
+
+### Chrome placement
+
+Inside the chrome: `/authorize`, `/mcp/authorize`. Chromeless: `/:project/chat/:workflow` and the
+top-level card screens. `/share/:id` draws main's public frame (wordmark, sign-in entry, body in a
+card). The route table, `apps/ui/src/shell/ui-route-table.ts`, is the record of placement.
+
+## 5. Form Validation: Submit-then-Surface, Don't Pre-Disable
 
 Forms always allow Save to be clicked. Validation runs on submit and surfaces errors inline (field-level) and/or via toast (cross-field or backend). The Save button is disabled **only** while a request is in flight.
 
@@ -225,7 +207,7 @@ See [ADR 018](../adr/018-form-validation-and-save.md) for the full decision cont
 ```tsx
 <Button
   type="submit"
-  disabled={mutation.isPending}  // ✅ in-flight only
+  disabled={mutation.isPending} // ✅ in-flight only
   // disabled={!form.formState.isValid}  // ❌ don't pre-disable
 >
   Save
@@ -240,11 +222,9 @@ For validation:
 - **A server rejection that names fields:** Put it back on those fields with `applyHandledErrorToForm`, paired with `<FormServerError form={form} />` for complaints about the submission as a whole.
 
 ```tsx
-import {
-  applyHandledErrorToForm,
-  FormServerError,
-  showErrorToast,
-} from "~/features/errors";
+// Each module's browser package owns its own copy of these helpers (e.g.
+// `behavior/errors.tsx`) rather than importing from a shared barrel.
+import { applyHandledErrorToForm, FormServerError, showErrorToast } from "../../behavior/errors";
 
 const mutation = api.team.update.useMutation({
   onError: (error) => {
@@ -292,10 +272,10 @@ Save appears to do nothing.
 When implementing new features, verify:
 
 - [ ] Border radius uses `lg` for containers and interactive elements
-- [ ] Overlays use translucent backgrounds with blur
+- [ ] Drawers and popovers are translucent; dialogs are opaque, with the standard header, close X and footer (§2)
+- [ ] Notices use `Banner`, said once per screen
 - [ ] Resource management uses drawers, not modals
 - [ ] Page follows standard layout (header, title, actions)
-- [ ] Content-heavy pages use compact menu
-- [ ] Components imported from `components/ui/` where available
+- [ ] Components imported from `@langwatch/design-system` where available
 - [ ] Save buttons disable only on `isPending`, never on `!isValid`
 - [ ] Validation errors surface inline or via toast; Save never silently no-ops

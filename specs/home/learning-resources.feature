@@ -1,4 +1,3 @@
-@unit
 Feature: Learning Resources
   As a user
   I want pointers to documentation and tutorials from the home page
@@ -12,23 +11,28 @@ Feature: Learning Resources
   Background:
     Given I am on the home page
 
-  Scenario: Displays documentation link
+  @integration
+  Scenario: Every footer link points at its destination
     When I view the resources footer
-    Then I should see a "View documentation" link
-    And its href should contain "docs.langwatch.ai"
+    Then I see these links, in this order, with these addresses
+      | label          | href                                                  |
+      | Python SDK     | https://docs.langwatch.ai/integration/python/guide     |
+      | TypeScript SDK | https://docs.langwatch.ai/integration/typescript/guide |
+      | Go SDK         | https://docs.langwatch.ai/integration/go/guide         |
+      | Scenario       | https://scenario.langwatch.ai                          |
+      | REST API       | https://docs.langwatch.ai/integration/rest-api         |
+      | GitHub         | https://github.com/langwatch/langwatch                 |
+      | Status         | https://status.langwatch.ai                            |
+      | Terms          | https://langwatch.ai/legal/terms-conditions            |
+      | Privacy Policy | https://langwatch.ai/legal/privacy-policy              |
 
-  Scenario: Displays video link
-    When I view the resources footer
-    Then I should see a "Watch videos" link
-    And its href should contain "youtube.com/@LangWatch"
+  @integration
+  Scenario: Footer links open outside the product
+    When I follow any link in the resources footer
+    Then it opens in a new tab
+    And the page it opens cannot reach back into the product
 
-  Scenario: Displays the demo ask
+  @integration
+  Scenario: The footer carries no development controls
     When I view the resources footer
-    Then I should see a "Request a demo" link
-    And its href should contain "langwatch.ai/get-a-demo"
-
-  @visual
-  Scenario: The footer stays quiet
-    When I view the resources footer
-    Then it renders as a single row of text links under a hairline rule
-    And it contains no cards and no animated backgrounds
+    Then it holds only the copyright line and its links

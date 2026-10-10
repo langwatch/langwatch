@@ -59,7 +59,7 @@ of it is well-trodden and none of it is our product.
 **better-auth's single sign-on plugin.** We already run better-auth, on our own
 storage adapter (ADR-116), with genericOAuth, two-factor and passkey plugins
 mounted. At 1.7.1 — the release the app is already pinned to and tested
-against — `@better-auth/sso` terminates OpenID Connect *and* SAML, the latter
+against — `@better-auth/sso` terminates OpenID Connect _and_ SAML, the latter
 through samlify, with per-provider ACS, SP metadata and single-logout
 endpoints, a provider table keyed per registration, and algorithm allow-lists
 and clock-skew validation already written. It is one dependency in a stack we

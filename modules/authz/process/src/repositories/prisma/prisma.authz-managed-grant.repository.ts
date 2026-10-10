@@ -1,0 +1,465 @@
+import { organizationRoleSchema, type OrganizationRole } from "@langwatch/authorization";
+import {
+  PRINCIPAL_KIND_FROM_STORED,
+  storedPrincipalKindSchema,
+  grantScopeTierSchema,
+  teamUserRoleSchema,
+  type GrantScopeTier,
+} from "@langwatch/authz-contract";
+import { z } from "zod";
+
+import {
+  AuthzManagedGrantRepository,
+  type AuthzBindingScopeRow,
+  type AuthzGrantPrincipalRow,
+  type AuthzManagedBindingRow,
+  type AuthzUserGroupRow,
+} from "../authz-managed-grant.repository.ts";
+
+type Delegate = {
+  count(args: unknown): Promise<number>;
+  findFirst(args: unknown): Promise<unknown>;
+  findMany(args: unknown): Promise<unknown[]>;
+};
+
+const scopeOrganizationRowSchema = z.object({ id: z.string(), name: z.string() }).strict();
+const scopeTeamRowSchema = scopeOrganizationRowSchema
+  .safeExtend({ isPersonal: z.boolean() })
+  .strict();
+const scopeProjectRowSchema = scopeTeamRowSchema
+  .safeExtend({ team: z.object({ isPersonal: z.boolean(), name: z.string() }).strict() })
+  .strict();
+const groupMemberRowSchema = z.object({ groupId: z.string(), userId: z.string() }).strict();
+const teamMemberRowsSchema = z.array(z.object({ teamId: z.string(), userId: z.string() }).strict());
+const rolePrincipalRowsSchema = z.array(
+  z
+    .object({ principalType: storedPrincipalKindSchema, principalId: z.string().nullable() })
+    .strict(),
+);
+const userGroupRowSchema = z
+  .object({
+    groupId: z.string(),
+    group: z
+      .object({
+        id: z.string(),
+        name: z.string(),
+        slug: z.string(),
+        scimSource: z.string().nullable(),
+      })
+      .strict(),
+  })
+  .strict();
+const organizationUserIdRowsSchema = z.array(z.object({ userId: z.string() }).strict());
+const grantPrincipalRowsSchema = z.array(
+  z
+    .object({
+      id: z.string(),
+      principalType: storedPrincipalKindSchema,
+      principalId: z.string().nullable(),
+    })
+    .strict(),
+);
+const organizationRoleRowSchema = z.object({ role: organizationRoleSchema }).strict();
+const managedBindingRowSchema = z
+  .object({
+    id: z.string(),
+    organizationId: z.string(),
+    userId: z.string().nullable(),
+    groupId: z.string().nullable(),
+    apiKeyId: z.string().nullable(),
+    role: teamUserRoleSchema,
+    customRoleId: z.string().nullable(),
+    scopeType: grantScopeTierSchema,
+    scopeId: z.string(),
+  })
+  .strict();
+const assignableRoleRowSchema = z.object({ id: z.string(), permissions: z.unknown() }).strict();
+const scopeOrganizationRowsSchema = z.array(scopeOrganizationRowSchema);
+const scopeTeamRowsSchema = z.array(scopeTeamRowSchema);
+const scopeProjectRowsSchema = z.array(scopeProjectRowSchema);
+const groupMemberRowsSchema = z.array(groupMemberRowSchema);
+const userGroupRowsSchema = z.array(userGroupRowSchema);
+const nullableOrganizationRoleRowSchema = organizationRoleRowSchema.nullable();
+const nullableManagedBindingRowSchema = managedBindingRowSchema.nullable();
+const managedBindingRowsSchema = z.array(managedBindingRowSchema);
+const assignableRoleRowsSchema = z.array(assignableRoleRowSchema);
+
+export type AuthzManagedGrantDatabase = {
+  apiKey: Delegate;
+  customRole: Delegate;
+  grant: Delegate;
+  group: Delegate;
+  groupMembership: Delegate;
+  organization: Delegate;
+  organizationUser: Delegate;
+  project: Delegate;
+  roleBinding: Delegate;
+  team: Delegate;
+  teamUser: Pick<Delegate, "count"> & {
+    findMany(args: {
+      where: {
+        teamId: { in: string[] };
+        team: { organizationId: string };
+        user: { orgMemberships: { some: { organizationId: string } } };
+      };
+      select: { teamId: true; userId: true };
+    }): Promise<unknown[]>;
+  };
+  $queryRaw(query: TemplateStringsArray, ...values: unknown[]): Promise<unknown>;
+};
+
+export class PrismaAuthzManagedGrantRepository extends AuthzManagedGrantRepository {
+  static create(options: {
+    database: AuthzManagedGrantDatabase;
+  }): PrismaAuthzManagedGrantRepository {
+    return new PrismaAuthzManagedGrantRepository(options.database);
+  }
+
+  private constructor(private readonly database: AuthzManagedGrantDatabase) {
+    super();
+  }
+
+  async hasBindingsForUser({
+    organizationId,
+    userId,
+  }: {
+    organizationId: string;
+    userId: string;
+  }): Promise<boolean> {
+    const count = await this.database.roleBinding.count({
+      where: { organizationId, userId },
+    });
+    return count > 0;
+  }
+
+  async hasLegacySharedTeamMembership({
+    organizationId,
+    userId,
+  }: {
+    organizationId: string;
+    userId: string;
+  }): Promise<boolean> {
+    const count = await this.database.teamUser.count({
+      where: { userId, team: { organizationId, isPersonal: false } },
+    });
+    return count > 0;
+  }
+
+  async findScopeRows({
+    organizationId,
+    scopes,
+  }: {
+    organizationId: string;
+    scopes: readonly {
+      scopeType: GrantScopeTier;
+      scopeId: string;
+    }[];
+  }): Promise<AuthzBindingScopeRow[]> {
+    const idsOfType = (scopeType: GrantScopeTier) => [
+      ...new Set(
+        scopes.filter((scope) => scope.scopeType === scopeType).map((scope) => scope.scopeId),
+      ),
+    ];
+    const organizationIds = idsOfType("ORGANIZATION").filter((id) => id === organizationId);
+    const teamIds = idsOfType("TEAM");
+    const projectIds = idsOfType("PROJECT");
+
+    const [organizations, teams, projects] = await Promise.all([
+      organizationIds.length > 0
+        ? this.database.organization.findMany({
+            where: { id: { in: organizationIds } },
+            select: { id: true, name: true },
+          })
+        : [],
+      teamIds.length > 0
+        ? this.database.team.findMany({
+            where: { id: { in: teamIds }, organizationId },
+            select: { id: true, name: true, isPersonal: true },
+          })
+        : [],
+      projectIds.length > 0
+        ? this.database.project.findMany({
+            where: { id: { in: projectIds }, team: { organizationId } },
+            select: {
+              id: true,
+              name: true,
+              isPersonal: true,
+              team: { select: { isPersonal: true, name: true } },
+            },
+          })
+        : [],
+    ]);
+
+    const organizationRows = scopeOrganizationRowsSchema.parse(organizations);
+    const teamRows = scopeTeamRowsSchema.parse(teams);
+    const projectRows = scopeProjectRowsSchema.parse(projects);
+
+    return [
+      ...organizationRows.map((row): AuthzBindingScopeRow => ({
+        type: "ORGANIZATION",
+        id: row.id,
+        name: row.name,
+        personalWorkspaceName: null,
+      })),
+      ...teamRows.map((row): AuthzBindingScopeRow => ({
+        type: "TEAM",
+        id: row.id,
+        name: row.name,
+        personalWorkspaceName: row.isPersonal ? row.name : null,
+      })),
+      ...projectRows.map((row): AuthzBindingScopeRow => ({
+        type: "PROJECT",
+        id: row.id,
+        name: row.name,
+        personalWorkspaceName: row.isPersonal || row.team.isPersonal ? row.team.name : null,
+      })),
+    ];
+  }
+
+  async findGroupMembers({
+    organizationId,
+    groupIds,
+  }: {
+    organizationId: string;
+    groupIds: readonly string[];
+  }): Promise<{ groupId: string; userId: string }[]> {
+    if (groupIds.length === 0) {
+      return [];
+    }
+
+    const rows = await this.database.groupMembership.findMany({
+      where: {
+        groupId: { in: [...groupIds] },
+        group: { organizationId },
+        user: { orgMemberships: { some: { organizationId } } },
+      },
+      select: { groupId: true, userId: true },
+    });
+
+    return groupMemberRowsSchema.parse(rows);
+  }
+
+  async findUserGroups({
+    organizationId,
+    userId,
+  }: {
+    organizationId: string;
+    userId: string;
+  }): Promise<AuthzUserGroupRow[]> {
+    const rows = await this.database.groupMembership.findMany({
+      where: { userId, group: { organizationId } },
+      select: {
+        groupId: true,
+        group: {
+          select: { id: true, name: true, slug: true, scimSource: true },
+        },
+      },
+    });
+
+    return userGroupRowsSchema.parse(rows);
+  }
+
+  async findTeamMembers({
+    organizationId,
+    teamIds,
+  }: {
+    organizationId: string;
+    teamIds: readonly string[];
+  }): Promise<{ teamId: string; userId: string }[]> {
+    if (teamIds.length === 0) return [];
+    const rows = await this.database.teamUser.findMany({
+      where: {
+        teamId: { in: [...teamIds] },
+        team: { organizationId },
+        user: { orgMemberships: { some: { organizationId } } },
+      },
+      select: { teamId: true, userId: true },
+    });
+    return teamMemberRowsSchema.parse(rows);
+  }
+
+  async findRoleHolderPrincipals({
+    organizationId,
+    roleId,
+    limit,
+  }: {
+    organizationId: string;
+    roleId: string;
+    limit: number;
+  }): Promise<AuthzGrantPrincipalRow["principal"][]> {
+    // DISTINCT and LIMIT in SQL: Prisma's `distinct` dedupes in memory after reading every row.
+    const rows = await this.database.$queryRaw`
+      SELECT DISTINCT "principalType"::text AS "principalType", "principalId"
+      FROM "Grant"
+      WHERE "organizationId" = ${organizationId}
+        AND "roleKey" = ${`custom:${roleId}`}
+        AND "revokedAt" IS NULL
+      LIMIT ${limit}
+    `;
+    return rolePrincipalRowsSchema.parse(rows).map((row) => ({
+      type: PRINCIPAL_KIND_FROM_STORED[row.principalType],
+      id: row.principalId,
+    }));
+  }
+
+  async findOrganizationUserIds({ organizationId }: { organizationId: string }): Promise<string[]> {
+    const rows = await this.database.organizationUser.findMany({
+      where: { organizationId },
+      select: { userId: true },
+    });
+    return organizationUserIdRowsSchema.parse(rows).map((row) => row.userId);
+  }
+
+  async findGrantPrincipals({
+    organizationId,
+    grantIds,
+  }: {
+    organizationId: string;
+    grantIds: readonly string[];
+  }): Promise<AuthzGrantPrincipalRow[]> {
+    if (grantIds.length === 0) return [];
+    const rows = await this.database.grant.findMany({
+      where: { organizationId, id: { in: [...grantIds] } },
+      select: { id: true, principalType: true, principalId: true },
+    });
+    return grantPrincipalRowsSchema.parse(rows).map((row) => ({
+      grantId: row.id,
+      principal: { type: PRINCIPAL_KIND_FROM_STORED[row.principalType], id: row.principalId },
+    }));
+  }
+
+  async findOrganizationRole({
+    organizationId,
+    userId,
+  }: {
+    organizationId: string;
+    userId: string;
+  }): Promise<OrganizationRole | null> {
+    const storedMembership = await this.database.organizationUser.findFirst({
+      where: { organizationId, userId },
+      select: { role: true },
+    });
+    const membership = nullableOrganizationRoleRowSchema.parse(storedMembership);
+
+    return membership?.role ?? null;
+  }
+
+  async isGroupInOrganization({
+    organizationId,
+    groupId,
+  }: {
+    organizationId: string;
+    groupId: string;
+  }): Promise<boolean> {
+    const group = await this.database.group.findFirst({
+      where: { id: groupId, organizationId },
+      select: { id: true },
+    });
+    return group !== null;
+  }
+
+  async isApiKeyInOrganization({
+    organizationId,
+    apiKeyId,
+  }: {
+    organizationId: string;
+    apiKeyId: string;
+  }): Promise<boolean> {
+    const apiKey = await this.database.apiKey.findFirst({
+      where: { id: apiKeyId, organizationId },
+      select: { id: true },
+    });
+    return apiKey !== null;
+  }
+
+  async findBinding({
+    organizationId,
+    bindingId,
+  }: {
+    organizationId: string;
+    bindingId: string;
+  }): Promise<AuthzManagedBindingRow | null> {
+    // The live Grant is the truth: a revoke marks it at once, while the compat
+    // RoleBinding row only goes when the queued revoke projects.
+    const live = await this.database.grant.findFirst({
+      where: { id: bindingId, organizationId, revokedAt: null },
+      select: { id: true },
+    });
+    if (live === null) return null;
+    const row = await this.database.roleBinding.findFirst({
+      where: { id: bindingId, organizationId },
+      select: {
+        id: true,
+        organizationId: true,
+        userId: true,
+        groupId: true,
+        apiKeyId: true,
+        role: true,
+        customRoleId: true,
+        scopeType: true,
+        scopeId: true,
+      },
+    });
+
+    return nullableManagedBindingRowSchema.parse(row);
+  }
+
+  async findDirectUserBindings({
+    organizationId,
+    userId,
+    bindingIds,
+  }: {
+    organizationId: string;
+    userId: string;
+    bindingIds: readonly string[];
+  }): Promise<AuthzManagedBindingRow[]> {
+    if (bindingIds.length === 0) {
+      return [];
+    }
+
+    const rows = await this.database.roleBinding.findMany({
+      where: {
+        id: { in: [...bindingIds] },
+        organizationId,
+        userId,
+        groupId: null,
+      },
+      select: {
+        id: true,
+        organizationId: true,
+        userId: true,
+        groupId: true,
+        apiKeyId: true,
+        role: true,
+        customRoleId: true,
+        scopeType: true,
+        scopeId: true,
+      },
+    });
+
+    return managedBindingRowsSchema.parse(rows);
+  }
+
+  async findAssignableRoles({
+    organizationId,
+    roleIds,
+  }: {
+    organizationId: string;
+    roleIds: readonly string[];
+  }): Promise<{ id: string; permissions: unknown }[]> {
+    if (roleIds.length === 0) {
+      return [];
+    }
+
+    const rows = await this.database.customRole.findMany({
+      where: {
+        id: { in: [...roleIds] },
+        organizationId,
+        kind: "custom",
+      },
+      select: { id: true, permissions: true },
+    });
+
+    return assignableRoleRowsSchema.parse(rows);
+  }
+}

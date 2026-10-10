@@ -1,0 +1,495 @@
+import type { DatasetApi } from "@langwatch/dataset-contract";
+import { nowInstant, toDate } from "@langwatch/time";
+import {
+  archiveWorkflowCommandSchema,
+  copyWorkflowCommandSchema,
+  createWorkflowCommandSchema,
+  dslWithoutHttpAgentSecrets,
+  publishWorkflowCommandSchema,
+  runWorkflowCommandSchema,
+  saveWorkflowVersionCommandSchema,
+  updateWorkflowCommandSchema,
+  WorkflowDslValidationError,
+  WorkflowNotFoundError,
+  WorkflowNotPublishedError,
+  WorkflowVersionNotFoundError,
+  WorkflowVersionRequiredError,
+  type Workflow,
+  type WorkflowEvaluatorFields,
+  type RunWorkflowCommand,
+  type WorkflowVersion,
+  type WorkflowVersionHistoryEntry,
+  type WorkflowVersionHistoryMode,
+  type WorkflowRunAnswer,
+  type WorkflowWithVersion,
+  type StudioClientEvent,
+  type WorkflowMappingFields,
+  type WorkflowReference,
+} from "@langwatch/workflow-contract";
+import type * as workflowContractModule from "@langwatch/workflow-contract";
+
+import type { WorkflowDslMigration, WorkflowExecution, WorkflowId } from "../app/workflow.app.ts";
+import type {
+  PersistWorkflowVersionInput,
+  WorkflowRepository,
+} from "../repositories/workflow.repository.ts";
+import {
+  dslForTargetProject,
+  freshCopyDsl,
+  narrowToPublishedVersion,
+  selectCopiesToPush,
+} from "../rules/workflow-copy-selection.rules.ts";
+import type {
+  StudioEventPreparationInput,
+  StudioEventPreparer,
+} from "./studio-event-preparer.service.ts";
+import { WorkflowDatasetCopyService } from "./workflow-dataset-copy.service.ts";
+import { WorkflowDslService } from "./workflow-dsl.service.ts";
+import { WorkflowVersionHistoryService } from "./workflow-version-history.service.ts";
+
+/** KSUID resources for a workflow and a version row; the prefix is already on the database. */
+const WORKFLOW_KSUID_RESOURCE = "workflow";
+const WORKFLOW_VERSION_KSUID_RESOURCE = "workflowversion";
+
+type WorkflowServiceOptions = {
+  repository: WorkflowRepository;
+  datasets: DatasetApi;
+  execution: WorkflowExecution;
+  studioEvents: StudioEventPreparer;
+  dslMigration: WorkflowDslMigration;
+  ids: WorkflowId;
+};
+
+/** Canonical Workflow lifecycle. Persistence and cross-feature capabilities are injected. */
+export class WorkflowService {
+  listSummaries(input: {
+    projectId: string;
+    workflowIds: string[];
+  }): Promise<{ id: string; name: string }[]> {
+    return this.options.repository.findSummaries(input);
+  }
+
+  archiveLinked(input: WorkflowReference): Promise<{ id: string }> {
+    return this.options.repository.archiveLinked(input);
+  }
+
+  deleteUncommitted(input: WorkflowReference): Promise<void> {
+    return this.options.repository.deleteUncommitted(input);
+  }
+
+  /**
+   * A live workflow's current version as a version_saved fact carries it, with its fields;
+   * none when the workflow is archived or missing, or its current version is not `versionId`.
+   */
+  async findCurrentVersionFacts(
+    input: WorkflowReference & { versionId?: string },
+  ): Promise<{ versionId: string; authorId: string; fields: WorkflowMappingFields }[]> {
+    const workflow = await this.options.repository.findById({
+      id: input.workflowId,
+      projectId: input.projectId,
+      includeVersion: true,
+    });
+    const current = workflow?.currentVersion;
+    if (!current || (input.versionId !== undefined && current.id !== input.versionId)) return [];
+
+    return [
+      {
+        versionId: current.id,
+        authorId: current.authorId ?? "",
+        fields: this.dsl.mappingFields(current.dsl),
+      },
+    ];
+  }
+
+  /** Archives a live graph; an archived or missing one is left alone, so redelivery is harmless. */
+  async archiveIfLive(input: WorkflowReference): Promise<void> {
+    const live = await this.options.repository.findById({
+      id: input.workflowId,
+      projectId: input.projectId,
+    });
+    if (live) await this.options.repository.archiveLinked(input);
+  }
+
+  static create(options: WorkflowServiceOptions): WorkflowService {
+    return new WorkflowService(options);
+  }
+
+  private constructor(private readonly options: WorkflowServiceOptions) {
+    this.datasetCopies = WorkflowDatasetCopyService.create(options.datasets);
+    this.versionHistory = WorkflowVersionHistoryService.create(options);
+  }
+
+  private readonly dsl = WorkflowDslService.create();
+  private readonly datasetCopies: WorkflowDatasetCopyService;
+  private readonly versionHistory: WorkflowVersionHistoryService;
+
+  enrichStudioEvent(input: StudioEventPreparationInput): Promise<StudioClientEvent> {
+    return this.options.studioEvents.enrich(input);
+  }
+
+  prepareStudioEvent(input: StudioEventPreparationInput): Promise<StudioClientEvent> {
+    return this.options.studioEvents.prepare(input);
+  }
+
+  async getById(input: {
+    id: string;
+    projectId: string;
+    includeVersion?: boolean;
+  }): Promise<WorkflowWithVersion> {
+    const workflow = await this.options.repository.findById(input);
+    if (!workflow) {
+      throw new WorkflowNotFoundError(input.id, input.projectId);
+    }
+
+    return workflow;
+  }
+
+  async assertInProject(input: { workflowId: string; projectId: string }): Promise<void> {
+    await this.getById({
+      id: input.workflowId,
+      projectId: input.projectId,
+      includeVersion: false,
+    });
+  }
+
+  async getFields(input: {
+    workflowId: string;
+    projectId: string;
+  }): Promise<WorkflowEvaluatorFields> {
+    const workflow = await this.getById({
+      id: input.workflowId,
+      projectId: input.projectId,
+      includeVersion: true,
+    });
+    const fields = this.dsl.evaluatorFields(workflow.currentVersion?.dsl);
+
+    return {
+      workflowId: workflow.id,
+      workflowName: workflow.name,
+      ...(workflow.icon ? { workflowIcon: workflow.icon } : {}),
+      ...fields,
+    };
+  }
+
+  list(input: { projectId: string }): Promise<Workflow[]> {
+    return this.options.repository.findAll(input);
+  }
+
+  /** Main's `getCustomEvaluators`: each evaluator workflow narrowed to its published version. */
+  async findEvaluatorWorkflows(input: {
+    projectId: string;
+  }): Promise<(Workflow & { versions: WorkflowVersion[] })[]> {
+    return narrowToPublishedVersion(await this.options.repository.findEvaluators(input));
+  }
+
+  getVersions(input: {
+    workflowId: string;
+    projectId: string;
+    includeDsl?: boolean;
+  }): Promise<WorkflowVersion[]> {
+    return this.options.repository.findVersions(input);
+  }
+
+  async getVersionHistory(input: {
+    workflowId: string;
+    projectId: string;
+    mode: WorkflowVersionHistoryMode;
+  }): Promise<WorkflowVersionHistoryEntry[]> {
+    const workflow = await this.getById({
+      id: input.workflowId,
+      projectId: input.projectId,
+    });
+    return this.versionHistory.getVersionHistory({ ...input, workflow });
+  }
+
+  restoreVersion(input: { versionId: string; projectId: string }): Promise<WorkflowVersion> {
+    return this.versionHistory.restoreVersion(input);
+  }
+
+  async getPublishedVersion(input: {
+    workflowId: string;
+    projectId: string;
+    versionId?: string;
+  }): Promise<WorkflowVersion> {
+    const workflow = await this.getById({
+      id: input.workflowId,
+      projectId: input.projectId,
+      includeVersion: false,
+    });
+    if (!workflow.publishedId) {
+      throw new WorkflowNotPublishedError(input.workflowId);
+    }
+
+    const version = await this.options.repository.findPublishedVersion(input);
+    if (!version) {
+      throw new WorkflowVersionNotFoundError(input.versionId ?? workflow.publishedId);
+    }
+
+    return version;
+  }
+
+  async create(
+    input: workflowContractModule.CreateWorkflowCommand,
+  ): Promise<{ workflow: WorkflowWithVersion; version: WorkflowVersion }> {
+    const command = this.parse(createWorkflowCommandSchema, input);
+    const id = command.id ?? this.id(WORKFLOW_KSUID_RESOURCE);
+    await this.options.repository.createWorkflow({
+      id,
+      projectId: command.projectId,
+      name: command.dsl.name,
+      icon: command.dsl.icon ?? null,
+      description: command.dsl.description ?? null,
+    });
+    const version = await this.saveVersion({
+      projectId: command.projectId,
+      workflowId: id,
+      dsl: { ...command.dsl, workflow_id: id },
+      commitMessage: command.commitMessage,
+      autoSaved: command.autoSaved ?? false,
+      authorId: command.authorId,
+    });
+    const published = command.publish
+      ? await this.publish({
+          id,
+          projectId: command.projectId,
+          versionId: version.id,
+          actorId: command.authorId,
+        })
+      : await this.getById({ id, projectId: command.projectId, includeVersion: true });
+
+    return { workflow: published, version };
+  }
+
+  async update(input: workflowContractModule.UpdateWorkflowCommand): Promise<Workflow> {
+    const command = this.parse(updateWorkflowCommandSchema, input);
+    const existing = await this.getById(command);
+    const data = this.dsl.metadata({
+      name: command.name ?? existing.name,
+      icon: command.icon !== undefined ? command.icon : existing.icon,
+      description: command.description !== undefined ? command.description : existing.description,
+    });
+
+    return this.options.repository.updateWorkflow({
+      id: command.id,
+      projectId: command.projectId,
+      data,
+    });
+  }
+
+  async saveVersion(
+    input: workflowContractModule.SaveWorkflowVersionCommand,
+  ): Promise<WorkflowVersion> {
+    const command = this.parse(saveWorkflowVersionCommandSchema, input);
+    const workflow = await this.getById({
+      id: command.workflowId,
+      projectId: command.projectId,
+      includeVersion: true,
+    });
+    const versions = await this.options.repository.findVersions({
+      workflowId: command.workflowId,
+      projectId: command.projectId,
+    });
+    const latest = versions[0];
+    const major = Number.parseInt((latest?.version ?? "0.0").split(".")[0] ?? "0", 10);
+    const dsl = dslWithoutHttpAgentSecrets({
+      ...command.dsl,
+      workflow_id: command.workflowId,
+      state: {},
+    });
+    const persist: PersistWorkflowVersionInput = {
+      id: this.id(WORKFLOW_VERSION_KSUID_RESOURCE),
+      workflowId: command.workflowId,
+      projectId: command.projectId,
+      parentId: workflow.currentVersionId,
+      version: command.autoSaved ? String(major + 1) : String(command.dsl.version),
+      autoSaved: command.autoSaved,
+      commitMessage: command.commitMessage,
+      authorId: command.authorId,
+      dsl,
+    };
+    const autoSaved = versions.find((version) => version.autoSaved);
+    const version = autoSaved
+      ? await this.options.repository.updateAutoSavedVersion({
+          ...persist,
+          id: autoSaved.id,
+        })
+      : await this.options.repository.createVersion(persist);
+    await this.options.repository.updateWorkflow({
+      id: command.workflowId,
+      projectId: command.projectId,
+      data: {
+        ...this.dsl.metadata(dsl),
+        currentVersionId: version.id,
+        ...(command.setAsLatestVersion === false ? {} : { latestVersionId: version.id }),
+      },
+    });
+
+    return version;
+  }
+
+  async publish(input: workflowContractModule.PublishWorkflowCommand): Promise<Workflow> {
+    const command = this.parse(publishWorkflowCommandSchema, input);
+    const version = await this.options.repository.findVersion({
+      id: command.versionId,
+      workflowId: command.id,
+      projectId: command.projectId,
+    });
+    if (!version) {
+      throw new WorkflowVersionNotFoundError(command.versionId);
+    }
+
+    return this.options.repository.publish(command);
+  }
+
+  async unpublish(input: { id: string; projectId: string }): Promise<Workflow> {
+    await this.getById(input);
+
+    return this.options.repository.updateWorkflow({
+      id: input.id,
+      projectId: input.projectId,
+      data: { publishedId: null, publishedById: null },
+    });
+  }
+
+  async archive(input: workflowContractModule.ArchiveWorkflowCommand): Promise<Workflow> {
+    const command = this.parse(archiveWorkflowCommandSchema, input);
+    await this.getById(command);
+
+    return this.options.repository.updateWorkflow({
+      id: command.id,
+      projectId: command.projectId,
+      data: { archivedAt: command.unarchive ? null : toDate(nowInstant()) },
+    });
+  }
+
+  async copy(
+    input: workflowContractModule.CopyWorkflowCommand,
+  ): Promise<{ workflow: WorkflowWithVersion; version: WorkflowVersion }> {
+    const command = this.parse(copyWorkflowCommandSchema, input);
+    const source = await this.getById({
+      id: command.sourceWorkflowId,
+      projectId: command.sourceProjectId,
+      includeVersion: true,
+    });
+    const sourceVersion =
+      source.latestVersion ??
+      (await this.latestVersion(command.sourceWorkflowId, command.sourceProjectId));
+    const sourceDsl = dslForTargetProject({
+      dsl: this.dsl.copy(sourceVersion.dsl),
+      sourceProjectId: command.sourceProjectId,
+      targetProjectId: command.targetProjectId,
+    });
+    const dsl = command.copyDatasets
+      ? await this.datasetCopies.copy({
+          dsl: sourceDsl,
+          sourceProjectId: command.sourceProjectId,
+          targetProjectId: command.targetProjectId,
+        })
+      : sourceDsl;
+    const workflowId = command.id ?? this.id(WORKFLOW_KSUID_RESOURCE);
+    const workflow = await this.options.repository.createWorkflow({
+      id: workflowId,
+      projectId: command.targetProjectId,
+      name: source.name,
+      icon: source.icon,
+      description: source.description,
+      isEvaluator: source.isEvaluator,
+      isComponent: source.isComponent,
+      copiedFromWorkflowId: command.copiedFromWorkflowId ?? source.id,
+    });
+    const version = await this.saveVersion({
+      workflowId,
+      projectId: command.targetProjectId,
+      dsl: freshCopyDsl({ dsl, workflowId }),
+      commitMessage: `Copied from ${source.name}`,
+      autoSaved: false,
+      authorId: command.authorId,
+    });
+
+    return {
+      workflow: await this.getById({
+        id: workflow.id,
+        projectId: command.targetProjectId,
+        includeVersion: true,
+      }),
+      version,
+    };
+  }
+
+  getCopies(input: { workflowId: string; projectId: string }): Promise<Workflow[]> {
+    return this.options.repository.findCopies(input);
+  }
+
+  async pushToCopies(input: {
+    workflowId: string;
+    projectId: string;
+    copyIds?: string[];
+    allowedProjectIds?: string[];
+  }): Promise<{ pushedTo: number; selectedCopies: number }> {
+    const source = await this.getById({
+      id: input.workflowId,
+      projectId: input.projectId,
+      includeVersion: true,
+    });
+    const sourceVersion =
+      source.latestVersion ?? (await this.latestVersion(source.id, input.projectId));
+    const copies = await this.options.repository.findCopies(input);
+    const selected = selectCopiesToPush({ copies, ...input });
+    for (const copy of selected) {
+      const dsl = dslForTargetProject({
+        dsl: this.dsl.copy(sourceVersion.dsl),
+        sourceProjectId: input.projectId,
+        targetProjectId: copy.projectId,
+      });
+      await this.saveVersion({
+        workflowId: copy.id,
+        projectId: copy.projectId,
+        dsl: { ...dsl, workflow_id: copy.id },
+        commitMessage: "Updated from source workflow",
+        autoSaved: false,
+      });
+    }
+
+    return { pushedTo: selected.length, selectedCopies: selected.length };
+  }
+
+  async run(input: RunWorkflowCommand): Promise<WorkflowRunAnswer> {
+    const command = this.parse(runWorkflowCommandSchema, input);
+    const version = await this.getPublishedVersion({
+      workflowId: command.workflowId,
+      projectId: command.projectId,
+      versionId: command.versionId,
+    });
+
+    return this.options.execution.execute({ ...command, version });
+  }
+
+  private async latestVersion(workflowId: string, projectId: string): Promise<WorkflowVersion> {
+    const version = (await this.options.repository.findVersions({ workflowId, projectId }))[0];
+    if (!version) {
+      throw new WorkflowVersionRequiredError();
+    }
+
+    return version;
+  }
+
+  private id(kind: string): string {
+    return this.options.ids.next(kind);
+  }
+
+  private parse<T>(
+    schema: {
+      safeParse(
+        value: unknown,
+      ): { success: true; data: T } | { success: false; error: { issues: readonly unknown[] } };
+    },
+    value: unknown,
+  ): T {
+    const result = schema.safeParse(value);
+    if (!result.success) {
+      throw new WorkflowDslValidationError(result.error.issues);
+    }
+
+    return result.data;
+  }
+}

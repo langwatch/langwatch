@@ -48,11 +48,11 @@ def test_crud_routes_and_bodies():
     trigger = {"id": "t_1", "name": "Errors", "active": True}
     handler, calls = recorder(
         {
-            ("GET", "/api/triggers"): [trigger],
-            ("POST", "/api/triggers"): trigger,
-            ("GET", "/api/triggers/t_1"): trigger,
-            ("PATCH", "/api/triggers/t_1"): trigger,
-            ("DELETE", "/api/triggers/t_1"): {"id": "t_1", "deleted": True},
+            ("GET", "/api/v1/triggers"): [trigger],
+            ("POST", "/api/v1/triggers"): trigger,
+            ("GET", "/api/v1/triggers/t_1"): trigger,
+            ("PATCH", "/api/v1/triggers/t_1"): trigger,
+            ("DELETE", "/api/v1/triggers/t_1"): {"id": "t_1", "deleted": True},
         }
     )
     triggers = facade(handler)
@@ -88,13 +88,13 @@ def test_crud_routes_and_bodies():
 
 def test_fires_passes_cursor_and_limit_only_when_given():
     page = {"fires": [{"id": "f_1"}], "nextCursor": "c_2"}
-    handler, calls = recorder({("GET", "/api/triggers/t_1/fires"): page})
+    handler, calls = recorder({("GET", "/api/v1/triggers/t_1/fires"): page})
     triggers = facade(handler)
 
     assert triggers.fires("t_1") == page
     assert triggers.fires("t_1", cursor="c_2", limit=10) == page
 
-    assert calls[0][1] == "http://langwatch.test/api/triggers/t_1/fires"
+    assert calls[0][1] == "http://langwatch.test/api/v1/triggers/t_1/fires"
     params = httpx.URL(calls[1][1]).params
     assert params.get("cursor") == "c_2"
     assert params.get("limit") == "10"
@@ -111,9 +111,9 @@ def test_enable_disable_and_test_fire():
     }
     handler, calls = recorder(
         {
-            ("POST", "/api/triggers/t_1/enable"): trigger,
-            ("POST", "/api/triggers/t_1/disable"): {**trigger, "active": False},
-            ("POST", "/api/triggers/t_1/test-fire"): result,
+            ("POST", "/api/v1/triggers/t_1/enable"): trigger,
+            ("POST", "/api/v1/triggers/t_1/disable"): {**trigger, "active": False},
+            ("POST", "/api/v1/triggers/t_1/test-fire"): result,
         }
     )
     triggers = facade(handler)
@@ -132,7 +132,7 @@ def test_trigger_id_is_quoted_into_the_path():
         return httpx.Response(200, json={})
 
     facade(handler).enable("a/b")
-    assert seen == [b"/api/triggers/a%2Fb/enable"]
+    assert seen == [b"/api/v1/triggers/a%2Fb/enable"]
 
 
 @pytest.mark.parametrize(
@@ -149,7 +149,7 @@ def test_errors_map_to_exceptions(status: int, error: type):
 
 def test_list_slack_connections_route():
     connection = {"id": "si_1", "name": "Alerts bot", "kind": "bot"}
-    handler, calls = recorder({("GET", "/api/slack-connections"): [connection]})
+    handler, calls = recorder({("GET", "/api/v1/slack-connections"): [connection]})
 
     assert facade(handler).list_slack_connections() == [connection]
-    assert calls == [("GET", "http://langwatch.test/api/slack-connections", None)]
+    assert calls == [("GET", "http://langwatch.test/api/v1/slack-connections", None)]

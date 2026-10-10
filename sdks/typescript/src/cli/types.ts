@@ -19,10 +19,9 @@ export type PromptsConfig = {
 };
 
 /**
- * A JSON value: what runtime parameters actually persist and what the API
- * schema declares (the spec's recursive JsonValue component). Structurally
- * identical to the generated client's RecursiveJsonValue, so values flow
- * between hand-written and generated types without casts.
+ * A JSON value: what runtime parameters persist and the API schema declares.
+ * Structurally identical to the generated client's RecursiveJsonValue, so
+ * values flow between hand-written and generated types without casts.
  */
 export type JsonValue =
   | string
@@ -40,25 +39,25 @@ export type MaterializedPrompt = {
   version: number;
   versionId: string;
   model: string;
-  messages: Array<{
+  messages: {
     role: "system" | "user" | "assistant";
     content: string;
-  }>;
+  }[];
   prompt: string;
   temperature?: number;
   maxTokens?: number;
-  inputs?: any;
-  outputs?: any;
+  inputs?: unknown;
+  outputs?: unknown;
   parameters: RuntimeParameters;
   updatedAt: string;
 };
 
 export type SyncResult = {
-  fetched: Array<{ name: string; version: number; versionSpec: string }>;
-  pushed: Array<{ name: string; version: number }>;
+  fetched: { name: string; version: number; versionSpec: string }[];
+  pushed: { name: string; version: number }[];
   unchanged: string[];
   cleaned: string[];
-  errors: Array<{ name: string; error: string }>;
+  errors: { name: string; error: string }[];
 };
 
 export type PromptsLockEntry = {
@@ -73,9 +72,7 @@ export type PromptsLock = {
 };
 
 // Parse npm-style version specifications like "foo@latest" or "bar@5"
-export const parsePromptSpec = (
-  spec: string,
-): { name: string; version: string } => {
+export const parsePromptSpec = (spec: string): { name: string; version: string } => {
   const atIndex = spec.lastIndexOf("@");
   if (atIndex === -1) {
     return { name: spec, version: "latest" };

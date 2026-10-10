@@ -60,6 +60,16 @@ derive_directory() {
 
 # --- Orchestration (side-effecting) ---
 
+# The ref a new branch starts from: whatever `origin/HEAD` points at, which
+# `git remote set-head origin <branch>` moves and `git remote set-head origin
+# --auto` restores. Falls back to origin/main when the remote head was never
+# recorded, which is how a fresh clone with --no-tags can arrive.
+default_base_ref() {
+  local head
+  head=$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null || true)
+  printf '%s' "${head:-origin/main}"
+}
+
 main() {
   if [ $# -lt 1 ] || [ -z "${1:-}" ]; then
     echo "Usage: dev/scripts/worktree.sh <issue-number|feature-name>" >&2
@@ -117,14 +127,16 @@ main() {
     # Track existing remote branch
     git worktree add "$dir" "$branch"
   else
-    # Create new branch from origin/main
-    git worktree add -b "$branch" "$dir" origin/main
+    # Create new branch from the remote's default branch. `git remote set-head`
+    # is what moves it, so a checkout parked on a long-lived integration branch
+    # gets its worktrees off that branch without editing this script.
+    git worktree add -b "$branch" "$dir" "$(default_base_ref)"
   fi
 
-  # Copy .env files from subdirectories that need them.
+  # Copy the repository-root contributor env and service-local env files.
   # Warns when a required .env is missing so the developer knows to create one.
   local env_warnings=0
-  for src_dir in "platform/app" "services/langevals" "sdks/python" "sdks/typescript" "mcp/typescript"; do
+  for src_dir in "." "services/langevals" "sdks/python" "sdks/typescript" "mcp/typescript"; do
     local dest="${dir}/${src_dir}"
 
     # Skip directories that don't exist in the worktree
@@ -189,6 +201,14 @@ main() {
   echo ""
   echo "Installing dependencies..."
   (cd "$dir" && pnpm install)
+
+  # Build the packages nothing else stands up: `langwatch`, `@langwatch/mcp-server`,
+  # `@langwatch/ksuid` and `@langwatch/mail` are dist-first by design (published to
+  # npm), so an internal import of any of them by name resolves through a `dist`
+  # a fresh worktree has never built, and `pnpm typecheck` alone never triggers it.
+  echo ""
+  echo "Building dist-first published packages..."
+  (cd "$dir" && pnpm run ensure:built)
 
   # Print summary
   echo ""

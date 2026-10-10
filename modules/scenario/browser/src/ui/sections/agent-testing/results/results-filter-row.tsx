@@ -1,0 +1,119 @@
+import { Box, Button, HStack } from "@langwatch/design-system/primitives";
+import type { Instant } from "@langwatch/time";
+import { ChartColumn } from "lucide-react";
+
+import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
+/**
+ * The filter row of the Results tab: how the list is grouped, what is cut from it, and
+ * the window it all sits in.
+ * @see specs/features/agent-testing/results-tabs.feature
+ */
+import type { Period, PeriodMode, RelativePresetKey } from "../../../../model/analytics/period.ts";
+import { AgentTestingPeriodPicker } from "../../../elements/agent-testing/shared/period-picker.tsx";
+import { ToggleButton } from "../../../elements/agent-testing/shared/toggle-button.tsx";
+import { GroupByTabs } from "./group-by-tabs.tsx";
+import {
+  EMPTY_RESULT_FILTERS,
+  isNarrowed,
+  type ResultFilters,
+  type ResultGrouping,
+} from "./result-atoms.ts";
+import {
+  ResultsFilterMenu,
+  type ResultsFilterOption,
+  ResultsStatusMenu,
+} from "./results-filter-menu.tsx";
+
+export type ResultsFilterRowProps = {
+  grouping: ResultGrouping;
+  onGroupingChange: (grouping: ResultGrouping) => void;
+  filters: ResultFilters;
+  onFiltersChange: (filters: ResultFilters) => void;
+  /** Built from everything in the window, not from what the filters left. */
+  scenarioOptions: ResultsFilterOption[];
+  labelOptions: ResultsFilterOption[];
+  targetOptions: ResultsFilterOption[];
+  isChartsShown: boolean;
+  onChartsToggle: () => void;
+  period: Period;
+  periodMode: PeriodMode;
+  setPeriod: (startDate: Instant, endDate: Instant) => void;
+  setRelativePeriod: (key: RelativePresetKey) => void;
+};
+
+export function ResultsFilterRow({
+  grouping,
+  onGroupingChange,
+  filters,
+  onFiltersChange,
+  scenarioOptions,
+  labelOptions,
+  targetOptions,
+  isChartsShown,
+  onChartsToggle,
+  period,
+  periodMode,
+  setPeriod,
+  setRelativePeriod,
+}: ResultsFilterRowProps) {
+  return (
+    <HStack gap={1.5} flexWrap="wrap" data-testid="agent-testing-results-filter-row">
+      <GroupByTabs grouping={grouping} onGroupingChange={onGroupingChange} />
+      <AgentTestingPeriodPicker
+        period={period}
+        periodMode={periodMode}
+        setPeriod={setPeriod}
+        setRelativePeriod={setRelativePeriod}
+      />
+
+      <Box width="1px" height="20px" background="border" marginX={1} />
+
+      <ResultsFilterMenu
+        label="Scenario"
+        options={scenarioOptions}
+        selected={filters.scenarioIds}
+        onChange={(scenarioIds) => onFiltersChange({ ...filters, scenarioIds })}
+      />
+      <ResultsFilterMenu
+        label="Label"
+        options={labelOptions}
+        selected={filters.labels}
+        onChange={(labels) => onFiltersChange({ ...filters, labels })}
+      />
+      <ResultsFilterMenu
+        label="Target"
+        options={targetOptions}
+        selected={filters.targetKeys}
+        onChange={(targetKeys) => onFiltersChange({ ...filters, targetKeys })}
+      />
+
+      <ResultsStatusMenu
+        status={filters.status}
+        onChange={(status) => onFiltersChange({ ...filters, status })}
+      />
+
+      {isNarrowed(filters) ? (
+        <Button
+          size="xs"
+          variant="ghost"
+          height="32px"
+          fontSize="12.5px"
+          fontWeight="medium"
+          color={FG_MUTED}
+          onClick={() => onFiltersChange(EMPTY_RESULT_FILTERS)}
+        >
+          Reset filters
+        </Button>
+      ) : null}
+
+      <ToggleButton
+        isOn={isChartsShown}
+        onClick={onChartsToggle}
+        data-testid="results-charts-toggle"
+      >
+        <ChartColumn size={13} />
+        Charts
+      </ToggleButton>
+    </HStack>
+  );
+}

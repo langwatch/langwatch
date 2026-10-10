@@ -19,7 +19,7 @@ import (
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
 
-// haven play: run a GitHub PR in a throwaway sandbox. Everything here is
+// haven pr --throwaway: run a GitHub PR in a throwaway sandbox. Everything here is
 // deliberately disjoint from the shared local-dev estate: the sandbox gets its
 // own checkout, its own Postgres/ClickHouse/Redis containers and volumes
 // (play-prefixed names, freshly allocated loopback ports), and its own play-<n>
@@ -38,9 +38,9 @@ func ResolvePlayPR(ctx context.Context, repoRoot, ref string) (PlayPR, error) {
 	ref = strings.TrimSpace(ref)
 	if !ValidPlayRef(ref) {
 		return PlayPR{}, fmt.Errorf(
-			"usage: haven play [number|github-pr-url] [--allow-untrusted]\n" +
-				"  e.g. haven play 4913  |  haven play https://github.com/langwatch/langwatch/pull/4913\n" +
-				"  with no argument (in a terminal) haven play offers the open PRs to pick from")
+			"usage: haven pr --throwaway [number|github-pr-url] [--allow-untrusted]\n" +
+				"  e.g. haven pr --throwaway 4913  |  haven pr --throwaway https://github.com/langwatch/langwatch/pull/4913\n" +
+				"  with no argument (in a terminal) haven pr --throwaway offers the open PRs to pick from")
 	}
 	view, err := resolvePR(ctx, repoRoot, ref)
 	if err != nil {
@@ -274,7 +274,7 @@ func DecidePlayTrust(untrustedCount int, isAgent, allowUntrusted bool) PlayTrust
 func PlayTrustError(untrusted []string) error {
 	return fmt.Errorf(
 		"PR authors without write access to this repo: %s\n"+
-			"haven play runs their code on this machine as you, from this shell's environment,\n"+
+			"haven pr --throwaway runs their code on this machine as you, from this shell's environment,\n"+
 			"so it will not proceed unprompted.\n"+
 			"Re-run with --allow-untrusted to accept that explicitly.",
 		strings.Join(untrusted, ", "))
@@ -567,7 +567,7 @@ func playRedisShell(number, hostPort int) string {
 
 // --- the sandbox record ---
 // Written BEFORE any resource is created, so a play that dies hard is always
-// discoverable: `haven clean` reads these records and finishes the teardown
+// discoverable: `haven machine clean` reads these records and finishes the teardown
 // for any whose owner process is gone.
 
 // PlayRecord is one sandbox's on-disk record (<home>/play/pr-<n>.json).
@@ -669,7 +669,7 @@ type playStep struct {
 // the databases), then routes (the hostname must not point at a corpse), then
 // containers before their volumes (docker refuses to remove a volume in use),
 // then the checkout, then the record last - so a half-finished teardown is
-// still discoverable and re-runnable by `haven clean`.
+// still discoverable and re-runnable by `haven machine clean`.
 func playTeardownPlan(h PlayTeardownHooks) []playStep {
 	return []playStep{
 		{name: "stop processes", run: h.StopProcesses},
@@ -693,7 +693,7 @@ func runPlayTeardown(steps []playStep, report func(step string, err error)) erro
 		}
 		if s.onlyIfClean && len(errs) > 0 {
 			if report != nil {
-				report(s.name+" (kept: teardown was incomplete, so `haven clean` can finish it)", nil)
+				report(s.name+" (kept: teardown was incomplete, so `haven machine clean` can finish it)", nil)
 			}
 			continue
 		}
@@ -710,7 +710,7 @@ func runPlayTeardown(steps []playStep, report func(step string, err error)) erro
 
 // PlayTeardown destroys one sandbox completely: processes, hostnames,
 // containers, volumes, checkout, record. Idempotent - every step tolerates
-// the resource already being gone, so `haven clean` can finish a teardown a
+// the resource already being gone, so `haven machine clean` can finish a teardown a
 // crash interrupted.
 func (o *Orchestrator) PlayTeardown(ctx context.Context, rec PlayRecord) error {
 	hooks := PlayTeardownHooks{
@@ -825,7 +825,7 @@ func runQuiet(ctx context.Context, dir, name string, args ...string) error {
 }
 
 // ReapOrphanPlays finishes the teardown of every sandbox whose owner process
-// is gone - the `haven clean` tail for plays that died hard. Returns how many
+// is gone - the `haven machine clean` tail for plays that died hard. Returns how many
 // were reaped.
 func (o *Orchestrator) ReapOrphanPlays(ctx context.Context) (int, error) {
 	orphans := PlaysToReap(ReadPlayRecords(o.cfg.Home), o.sys.ProcessAlive)
@@ -840,7 +840,7 @@ func (o *Orchestrator) ReapOrphanPlays(ctx context.Context) (int, error) {
 }
 
 // OrphanPlays lists the sandboxes whose owner process is gone, without
-// touching them - the read-only view `haven clean` shows agents.
+// touching them - the read-only view `haven machine clean` shows agents.
 func (o *Orchestrator) OrphanPlays() []PlayRecord {
 	return PlaysToReap(ReadPlayRecords(o.cfg.Home), o.sys.ProcessAlive)
 }
@@ -868,8 +868,9 @@ func EnsurePlayCheckout(ctx context.Context, repoRoot string, number int, checko
 }
 
 // playEnvDirs mirrors the directories .githooks/post-checkout copies .env files
-// into, plus the repo root.
-var playEnvDirs = []string{".", "platform/app", "services/langevals", "sdks/python", "sdks/typescript", "mcp/typescript"}
+// into. The workspace root is the first of them: it is where the applications
+// in apps/ resolve .env from.
+var playEnvDirs = []string{".", "services/langevals", "sdks/python", "sdks/typescript", "mcp/typescript"}
 
 // StripInheritedEnvFiles removes every untracked .env* file from a play checkout.
 //
@@ -908,11 +909,11 @@ func gitTracksFile(checkout, rel string) bool {
 	return cmd.Run() == nil
 }
 
-// PlayDisclosure is the upfront data-loss disclosure `haven play` prints
+// PlayDisclosure is the upfront data-loss disclosure `haven pr --throwaway` prints
 // before creating anything - the sandbox's contract in one banner.
 func PlayDisclosure(number int) string {
 	return fmt.Sprintf(
-		"haven play pr-%d: an EPHEMERAL sandbox.\n"+
+		"haven pr %d --throwaway: an EPHEMERAL sandbox.\n"+
 			"  Everything it creates is destroyed when you quit the view (q) or the process exits:\n"+
 			"  databases and their volumes, containers, the checkout, and the hostname.\n"+
 			"  It gets its own databases and hostnames, and none of your .env files.\n"+
@@ -923,7 +924,7 @@ func PlayDisclosure(number int) string {
 // PlayLaunch provisions and supervises one sandbox in the current process:
 // dedicated containers, play hostnames, overlay, dependency install,
 // migrations, seed, then the supervised service set until ctx is cancelled.
-// It never cleans up - the owning `haven play` process (or `haven clean`)
+// It never cleans up - the owning `haven pr --throwaway` process (or `haven machine clean`)
 // owns the teardown, so a hard death here can never skip it.
 //
 // preset ("" = the plain identity seed) picks a variant from the same registry
@@ -946,7 +947,7 @@ func (o *Orchestrator) PlayLaunch(ctx context.Context, pl PlaySandbox) error {
 	if pl.dockerHost, err = o.ensurePlayRuntime(ctx); err != nil {
 		return err
 	}
-	free, err := o.sys.FreePorts(len(domain.PerWorktreeServices) + 5)
+	free, err := o.sys.FreePorts(len(domain.PerWorktreeServices) + 6)
 	if err != nil {
 		return err
 	}
@@ -975,7 +976,7 @@ func (o *Orchestrator) PlayLaunch(ctx context.Context, pl PlaySandbox) error {
 		}()
 	}
 	opts := PlanOptions{Selection: playSelection(), RepoRoot: pl.Checkout}
-	o.sup.Supervise(ctx, o.planChildren(st, opts, pl.LwDir, ""))
+	o.sup.Supervise(ctx, o.planChildren(st, opts, pl.Checkout))
 	// Both stop on the same canceled context, but the seeder writes to the
 	// databases teardown is about to delete — so hand back only once it has
 	// actually stopped, rather than racing a `docker volume rm` against it.
@@ -990,7 +991,6 @@ func (o *Orchestrator) PlayLaunch(ctx context.Context, pl PlaySandbox) error {
 type PlaySandbox struct {
 	Number   int
 	Checkout string // the PR's own tree, under the haven home's play area
-	LwDir    string // the app directory inside that tree
 	// Preset names a variant from the seed registry `haven db seed` reads; empty
 	// is the plain identity seed.
 	Preset string
@@ -1012,6 +1012,7 @@ type playPorts struct {
 	services      []int // one per domain.PerWorktreeServices, in order
 	api           int
 	workerMetrics int
+	voiceSocket   int
 	postgres      int
 	clickHouse    int
 	redis         int
@@ -1021,7 +1022,7 @@ func newPlayPorts(free []int) playPorts {
 	n := len(domain.PerWorktreeServices)
 	return playPorts{
 		services: free[:n], api: free[n], workerMetrics: free[n+1],
-		postgres: free[n+2], clickHouse: free[n+3], redis: free[n+4],
+		postgres: free[n+2], clickHouse: free[n+3], redis: free[n+4], voiceSocket: free[n+5],
 	}
 }
 
@@ -1029,17 +1030,14 @@ func newPlayPorts(free []int) playPorts {
 // proxy that serves its hostnames and the container runtime that holds its
 // dedicated databases. It returns the DOCKER_HOST addressing that runtime.
 func (o *Orchestrator) ensurePlayRuntime(ctx context.Context) (string, error) {
-	if !o.proxy.Installed() {
-		fmt.Println("portless is not installed: installing it (one time)…")
-		if err := o.proxy.Install(); err != nil {
-			return "", fmt.Errorf("could not install portless automatically (%w)", err)
-		}
+	if err := o.ensurePortlessInstalled(); err != nil {
+		return "", err
 	}
 	if err := o.proxy.EnsureReady(); err != nil {
 		return "", fmt.Errorf("could not start the portless proxy: %w", err)
 	}
 	if o.container == nil {
-		return "", fmt.Errorf("haven play needs the container runtime (colima) for its dedicated databases")
+		return "", fmt.Errorf("haven pr --throwaway needs the container runtime (colima) for its dedicated databases")
 	}
 	dockerHost, err := o.container.Ensure(ctx)
 	if err != nil {
@@ -1077,11 +1075,13 @@ func (o *Orchestrator) registerPlayStack(pl PlaySandbox, ports playPorts) (domai
 	scheme, pport := o.proxy.Endpoint()
 	st := domain.Stack{
 		Slug: pl.slug, WorktreeDir: pl.Checkout, Branch: PlayBranch(pl.Number),
-		LauncherPID: o.sys.Getpid(),
+		LauncherPID:   o.sys.Getpid(),
+		LauncherStart: o.sys.ProcessStart(o.sys.Getpid()),
 		// The sandbox's Redis is dedicated, so index 0 is always free.
 		RedisDB:            0,
 		APIPort:            ports.api,
 		WorkerMetricsPort:  ports.workerMetrics,
+		VoiceSocketPort:    ports.voiceSocket,
 		LocalAPIKey:        o.cfg.LocalAPIKey,
 		ClickHouseHTTPPort: ports.clickHouse, ClickHouseDatabase: pl.database,
 		PostgresPort: ports.postgres, PostgresDatabase: pl.database,
@@ -1089,6 +1089,7 @@ func (o *Orchestrator) registerPlayStack(pl PlaySandbox, ports playPorts) (domai
 		// Sandboxes run unreviewed branches, so this is the last place that
 		// should be shipping trace text to Google on someone's real credentials.
 		DisableGoogleDLP: o.cfg.ShouldDisableGoogleDLP,
+		NxPrivateDir:     o.nxPrivateDir(pl.slug),
 	}
 	for i, r := range domain.PerWorktreeServices {
 		svc := domain.Service{
@@ -1113,9 +1114,7 @@ func (o *Orchestrator) registerPlayStack(pl PlaySandbox, ports playPorts) (domai
 		o.log.Warn("play clickhouse alias registration failed")
 	}
 	st.UpdatedAt = o.sys.Now()
-	if err := o.store.WriteOverlay(pl.LwDir, st); err != nil {
-		return st, err
-	}
+	o.retireOverlayFiles(pl.Checkout)
 	if err := o.store.SaveStack(st); err != nil {
 		return st, err
 	}
@@ -1134,29 +1133,20 @@ func (o *Orchestrator) preparePlaySandbox(ctx context.Context, pl PlaySandbox, s
 	// than re-deriving fork status inside this detached child. Nothing is lost:
 	// the repo's postinstall is codegen, and the very next step runs it
 	// explicitly through start:prepare:files.
-	if err := o.ensureDeps(ctx, pl.Checkout, false); err != nil {
+	if err := o.ensureDeps(ctx, pl.Checkout, depsInstall{Env: nxEnv(st)}); err != nil {
 		return err
 	}
 	env := append(st.OverlayEnv(), "DOTENV_CONFIG_QUIET=true")
-	if err := o.sup.RunOnce(ctx, "codegen", pl.LwDir, "pnpm -s run start:prepare:files", env); err != nil {
+	if err := o.sup.RunOnce(ctx, "codegen", pl.Checkout, "pnpm --silent run start:prepare:files", append(o.nxParallelEnv(), env...)); err != nil {
 		o.log.Warn("play codegen failed (continuing)", zap.Error(err))
 	}
-	// A sandbox supervises the SAME child plan as `up` (planChildren below), so
-	// its api lane runs the production bundle too and the checkout it was cut
-	// from has no dist/. Fatal for the same reason it is fatal there: without
-	// the bundle the api never starts and the app lane never leaves its ready
-	// probe, so the sandbox serves nothing at all — and a sandbox that serves
-	// nothing is not "worth looking at" the way stale codegen is.
-	if err := o.ensureAPIBundle(ctx, pl.LwDir, env); err != nil {
-		return err
-	}
-	if err := o.sup.RunOnce(ctx, "prepare", pl.LwDir, "pnpm -s run start:prepare:db", env); err != nil {
+	if err := o.sup.RunOnce(ctx, "prepare", pl.Checkout, prepareDBShell, env); err != nil {
 		return fmt.Errorf("play migrations failed: %w", err)
 	}
 	// The preset's switches belong to the seed alone — codegen and migrations
 	// are the same run whatever data was asked for.
 	seedEnv := append(append([]string{}, env...), pl.pre.env...)
-	if err := o.sup.RunOnce(ctx, "seed", pl.LwDir, seedShell("pnpm -s run prisma:seed", seedEnv), seedEnv); err != nil {
+	if err := o.sup.RunOnce(ctx, "seed", pl.Checkout, seedShell("pnpm --silent run prisma:seed", seedEnv), seedEnv); err != nil {
 		o.log.Warn("play seed failed (continuing)", zap.Error(err))
 	}
 	return nil
@@ -1186,7 +1176,7 @@ func (o *Orchestrator) ingestPlaySeed(ctx context.Context, st domain.Stack, pl P
 	)
 	env = devNodeEnv(env)
 	for _, script := range pl.pre.ingest {
-		if err := o.sup.RunOnce(ctx, script, pl.LwDir, "pnpm run "+script, env); err != nil {
+		if err := o.sup.RunOnce(ctx, script, pl.Checkout, "pnpm run "+script, env); err != nil {
 			if ctx.Err() != nil {
 				return
 			}

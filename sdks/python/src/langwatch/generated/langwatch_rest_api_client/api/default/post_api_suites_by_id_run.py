@@ -7,29 +7,26 @@ from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.post_api_suites_by_id_run_body import PostApiSuitesByIdRunBody
 from ...models.post_api_suites_by_id_run_response_200 import PostApiSuitesByIdRunResponse200
-from ...models.post_api_suites_by_id_run_response_400 import PostApiSuitesByIdRunResponse400
-from ...models.post_api_suites_by_id_run_response_401 import PostApiSuitesByIdRunResponse401
 from ...models.post_api_suites_by_id_run_response_404 import PostApiSuitesByIdRunResponse404
-from ...models.post_api_suites_by_id_run_response_422 import PostApiSuitesByIdRunResponse422
-from ...models.post_api_suites_by_id_run_response_500 import PostApiSuitesByIdRunResponse500
-from ...types import Response, safe_http_status
+from ...types import UNSET, Response, Unset, safe_http_status
 
 
 def _get_kwargs(
     id: str,
     *,
-    body: PostApiSuitesByIdRunBody,
+    body: PostApiSuitesByIdRunBody | Unset = UNSET,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
 
     _kwargs: dict[str, Any] = {
         "method": "post",
-        "url": "/api/suites/{id}/run".format(
+        "url": "/api/v1/suites/{id}/run".format(
             id=quote(str(id), safe=""),
         ),
     }
 
-    _kwargs["json"] = body.to_dict()
+    if not isinstance(body, Unset):
+        _kwargs["json"] = body.to_dict()
 
     headers["Content-Type"] = "application/json"
 
@@ -39,44 +36,16 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> (
-    PostApiSuitesByIdRunResponse200
-    | PostApiSuitesByIdRunResponse400
-    | PostApiSuitesByIdRunResponse401
-    | PostApiSuitesByIdRunResponse404
-    | PostApiSuitesByIdRunResponse422
-    | PostApiSuitesByIdRunResponse500
-    | None
-):
+) -> PostApiSuitesByIdRunResponse200 | PostApiSuitesByIdRunResponse404 | None:
     if response.status_code == 200:
         response_200 = PostApiSuitesByIdRunResponse200.from_dict(response.json())
 
         return response_200
 
-    if response.status_code == 400:
-        response_400 = PostApiSuitesByIdRunResponse400.from_dict(response.json())
-
-        return response_400
-
-    if response.status_code == 401:
-        response_401 = PostApiSuitesByIdRunResponse401.from_dict(response.json())
-
-        return response_401
-
     if response.status_code == 404:
         response_404 = PostApiSuitesByIdRunResponse404.from_dict(response.json())
 
         return response_404
-
-    if response.status_code == 422:
-        response_422 = PostApiSuitesByIdRunResponse422.from_dict(response.json())
-
-        return response_422
-
-    if response.status_code == 500:
-        response_500 = PostApiSuitesByIdRunResponse500.from_dict(response.json())
-
-        return response_500
 
     if client.raise_on_unexpected_status:
         raise errors.UnexpectedStatus(response.status_code, response.content)
@@ -86,14 +55,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[
-    PostApiSuitesByIdRunResponse200
-    | PostApiSuitesByIdRunResponse400
-    | PostApiSuitesByIdRunResponse401
-    | PostApiSuitesByIdRunResponse404
-    | PostApiSuitesByIdRunResponse422
-    | PostApiSuitesByIdRunResponse500
-]:
+) -> Response[PostApiSuitesByIdRunResponse200 | PostApiSuitesByIdRunResponse404]:
     # LangWatch override: use safe_http_status to tolerate non-IANA status codes
     # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
     # Tracked upstream: https://github.com/openapi-generators/openapi-python-client/pull/1407
@@ -109,29 +71,22 @@ def sync_detailed(
     id: str,
     *,
     client: AuthenticatedClient,
-    body: PostApiSuitesByIdRunBody,
-) -> Response[
-    PostApiSuitesByIdRunResponse200
-    | PostApiSuitesByIdRunResponse400
-    | PostApiSuitesByIdRunResponse401
-    | PostApiSuitesByIdRunResponse404
-    | PostApiSuitesByIdRunResponse422
-    | PostApiSuitesByIdRunResponse500
-]:
-    """Deprecated: use /api/v1/run-plans and /api/v1/test-suites. Trigger a suite run. Schedules scenario
-    executions for all active scenarios x targets x repeatCount. When the id names a test suite, the
-    targets, the repeat count and the models are read from the body.
+    body: PostApiSuitesByIdRunBody | Unset = UNSET,
+) -> Response[PostApiSuitesByIdRunResponse200 | PostApiSuitesByIdRunResponse404]:
+    """Trigger a suite run. Schedules scenario executions for all active scenarios x targets x repeatCount.
+    When the id names a test suite, the targets, the repeat count and the models are read from the body.
+    Deprecated: use /api/v1/run-plans and /api/v1/test-suites.
 
     Args:
         id (str):
-        body (PostApiSuitesByIdRunBody):
+        body (PostApiSuitesByIdRunBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[PostApiSuitesByIdRunResponse200 | PostApiSuitesByIdRunResponse400 | PostApiSuitesByIdRunResponse401 | PostApiSuitesByIdRunResponse404 | PostApiSuitesByIdRunResponse422 | PostApiSuitesByIdRunResponse500]
+        Response[PostApiSuitesByIdRunResponse200 | PostApiSuitesByIdRunResponse404]
     """
 
     kwargs = _get_kwargs(
@@ -150,30 +105,22 @@ def sync(
     id: str,
     *,
     client: AuthenticatedClient,
-    body: PostApiSuitesByIdRunBody,
-) -> (
-    PostApiSuitesByIdRunResponse200
-    | PostApiSuitesByIdRunResponse400
-    | PostApiSuitesByIdRunResponse401
-    | PostApiSuitesByIdRunResponse404
-    | PostApiSuitesByIdRunResponse422
-    | PostApiSuitesByIdRunResponse500
-    | None
-):
-    """Deprecated: use /api/v1/run-plans and /api/v1/test-suites. Trigger a suite run. Schedules scenario
-    executions for all active scenarios x targets x repeatCount. When the id names a test suite, the
-    targets, the repeat count and the models are read from the body.
+    body: PostApiSuitesByIdRunBody | Unset = UNSET,
+) -> PostApiSuitesByIdRunResponse200 | PostApiSuitesByIdRunResponse404 | None:
+    """Trigger a suite run. Schedules scenario executions for all active scenarios x targets x repeatCount.
+    When the id names a test suite, the targets, the repeat count and the models are read from the body.
+    Deprecated: use /api/v1/run-plans and /api/v1/test-suites.
 
     Args:
         id (str):
-        body (PostApiSuitesByIdRunBody):
+        body (PostApiSuitesByIdRunBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        PostApiSuitesByIdRunResponse200 | PostApiSuitesByIdRunResponse400 | PostApiSuitesByIdRunResponse401 | PostApiSuitesByIdRunResponse404 | PostApiSuitesByIdRunResponse422 | PostApiSuitesByIdRunResponse500
+        PostApiSuitesByIdRunResponse200 | PostApiSuitesByIdRunResponse404
     """
 
     return sync_detailed(
@@ -187,29 +134,22 @@ async def asyncio_detailed(
     id: str,
     *,
     client: AuthenticatedClient,
-    body: PostApiSuitesByIdRunBody,
-) -> Response[
-    PostApiSuitesByIdRunResponse200
-    | PostApiSuitesByIdRunResponse400
-    | PostApiSuitesByIdRunResponse401
-    | PostApiSuitesByIdRunResponse404
-    | PostApiSuitesByIdRunResponse422
-    | PostApiSuitesByIdRunResponse500
-]:
-    """Deprecated: use /api/v1/run-plans and /api/v1/test-suites. Trigger a suite run. Schedules scenario
-    executions for all active scenarios x targets x repeatCount. When the id names a test suite, the
-    targets, the repeat count and the models are read from the body.
+    body: PostApiSuitesByIdRunBody | Unset = UNSET,
+) -> Response[PostApiSuitesByIdRunResponse200 | PostApiSuitesByIdRunResponse404]:
+    """Trigger a suite run. Schedules scenario executions for all active scenarios x targets x repeatCount.
+    When the id names a test suite, the targets, the repeat count and the models are read from the body.
+    Deprecated: use /api/v1/run-plans and /api/v1/test-suites.
 
     Args:
         id (str):
-        body (PostApiSuitesByIdRunBody):
+        body (PostApiSuitesByIdRunBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[PostApiSuitesByIdRunResponse200 | PostApiSuitesByIdRunResponse400 | PostApiSuitesByIdRunResponse401 | PostApiSuitesByIdRunResponse404 | PostApiSuitesByIdRunResponse422 | PostApiSuitesByIdRunResponse500]
+        Response[PostApiSuitesByIdRunResponse200 | PostApiSuitesByIdRunResponse404]
     """
 
     kwargs = _get_kwargs(
@@ -226,30 +166,22 @@ async def asyncio(
     id: str,
     *,
     client: AuthenticatedClient,
-    body: PostApiSuitesByIdRunBody,
-) -> (
-    PostApiSuitesByIdRunResponse200
-    | PostApiSuitesByIdRunResponse400
-    | PostApiSuitesByIdRunResponse401
-    | PostApiSuitesByIdRunResponse404
-    | PostApiSuitesByIdRunResponse422
-    | PostApiSuitesByIdRunResponse500
-    | None
-):
-    """Deprecated: use /api/v1/run-plans and /api/v1/test-suites. Trigger a suite run. Schedules scenario
-    executions for all active scenarios x targets x repeatCount. When the id names a test suite, the
-    targets, the repeat count and the models are read from the body.
+    body: PostApiSuitesByIdRunBody | Unset = UNSET,
+) -> PostApiSuitesByIdRunResponse200 | PostApiSuitesByIdRunResponse404 | None:
+    """Trigger a suite run. Schedules scenario executions for all active scenarios x targets x repeatCount.
+    When the id names a test suite, the targets, the repeat count and the models are read from the body.
+    Deprecated: use /api/v1/run-plans and /api/v1/test-suites.
 
     Args:
         id (str):
-        body (PostApiSuitesByIdRunBody):
+        body (PostApiSuitesByIdRunBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        PostApiSuitesByIdRunResponse200 | PostApiSuitesByIdRunResponse400 | PostApiSuitesByIdRunResponse401 | PostApiSuitesByIdRunResponse404 | PostApiSuitesByIdRunResponse422 | PostApiSuitesByIdRunResponse500
+        PostApiSuitesByIdRunResponse200 | PostApiSuitesByIdRunResponse404
     """
 
     return (

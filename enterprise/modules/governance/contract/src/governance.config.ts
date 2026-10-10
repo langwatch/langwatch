@@ -1,0 +1,62 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+
+/**
+ * What this feature is configured with, and the secret handles it resolves.
+ * The process parses the schema once and hands the result down; a secret is
+ * resolved only through its handle, never read from `process.env`.
+ */
+import {
+  Config,
+  gatewayAddressOf,
+  gatewayInternalUrl,
+  gatewayLegacyUrl,
+  gatewayPublicUrl,
+  isSaas,
+  publicBaseUrl,
+  type ConfigOf,
+} from "@langwatch/config";
+import { Secret } from "@langwatch/secrets/secret";
+import { gatewayInternalSecret, virtualKeyPepper } from "@langwatch/secrets/shared-secrets";
+import { z } from "zod";
+
+/** Every stored erasure digest is a function of this value: set it once, never change it. */
+export const governanceSecrets = {
+  erasurePseudonymSecret: Secret.load("GOVERNANCE_ERASURE_PSEUDONYM_SECRET", { optional: true }),
+  /** Prefixed into an ingestion secret's hash, so a database-only leak is inert. */
+  ingestionSecretPepper: virtualKeyPepper,
+  /** Signs OTTL validate and transform calls to the gateway's internal surface. */
+  ottlSigningSecret: gatewayInternalSecret,
+} as const;
+
+/** Where issued personal keys send traffic, where OTTL calls reach the gateway, the ingest throttle and this deployment's origin. */
+export const governanceConfig = Config.define((c) => ({
+  gatewayPublicUrl,
+  gatewayInternalUrl,
+  gatewayLegacyUrl,
+  /** The hosted product, whose default gateway is the SaaS one rather than the local one. */
+  isSaas,
+  /** This deployment's public origin (`BASE_HOST`), absent where it named none; the CLI's links lead back to it. */
+  publicBaseUrl,
+  /** Main's `LW_INGEST_RATE_LIMIT_DISABLED=1`: tests and dev switch the push receivers' throttle off. */
+  ingestRateLimitDisabled: c.env(
+    "LW_INGEST_RATE_LIMIT_DISABLED",
+    z
+      .string()
+      .optional()
+      .transform((value) => value === "1"),
+  ),
+}));
+export type GovernanceConfig = ConfigOf<typeof governanceConfig>;
+
+/** Main's precedence: the public URL, the legacy base URL, then the SaaS or local default. */
+export function governanceGatewayBaseUrl({
+  config,
+}: {
+  config: GovernanceConfig | undefined;
+}): string {
+  return gatewayAddressOf({
+    publicUrl: config?.gatewayPublicUrl,
+    legacyUrl: config?.gatewayLegacyUrl,
+    isSaas: config?.isSaas ?? false,
+  });
+}

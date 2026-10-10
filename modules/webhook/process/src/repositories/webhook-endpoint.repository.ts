@@ -1,0 +1,145 @@
+import type { Instant } from "@langwatch/time";
+import type {
+  CreateWebhookEndpointCommand,
+  UpdateWebhookEndpointCommand,
+  WebhookDeliveryOutcome,
+  WebhookEndpointView,
+  WebhookRequestFailureResponse,
+} from "@langwatch/webhook-contract";
+
+import type { WebhookId, WebhookSecret } from "../app/webhook.app.ts";
+import type { WebhookDeliveryDisposition } from "../rules/webhook-delivery-contract.rules.ts";
+import type { WebhookDestinationConfig } from "../rules/webhook-destination.rules.ts";
+import type { WebhookEndpointConfiguration } from "../rules/webhook-endpoint-policy.rules.ts";
+
+export type WebhookEndpointServiceOptions = {
+  ids: WebhookId;
+  secrets: WebhookSecret;
+  configuration?: WebhookEndpointConfiguration;
+  pruneDeliveries?: (now: Instant) => Promise<number>;
+  notifyAutoDisabled?: (input: {
+    organizationId: string;
+    endpointId: string;
+    destination: string;
+    failingSince: Instant;
+  }) => Promise<void>;
+};
+
+export type WebhookEndpointStatusSnapshot = {
+  status: "ACTIVE" | "DISABLED";
+  disabledReason: string | null;
+  failingSince: Instant | null;
+  lastSuccessAt: Instant | null;
+  lastFailureAt: Instant | null;
+};
+
+export interface WebhookEndpointRepository {
+  create(
+    input: CreateWebhookEndpointCommand,
+  ): Promise<{ endpoint: WebhookEndpointView; secret: string }>;
+  findAll(input: { organizationId: string }): Promise<WebhookEndpointView[]>;
+  getById(input: { organizationId: string; endpointId: string }): Promise<WebhookEndpointView>;
+  update(input: UpdateWebhookEndpointCommand): Promise<WebhookEndpointView>;
+  rollSecret(input: {
+    organizationId: string;
+    endpointId: string;
+    now?: Instant;
+  }): Promise<{ endpoint: WebhookEndpointView; secret: string }>;
+  enable(input: { organizationId: string; endpointId: string }): Promise<WebhookEndpointView>;
+  disable(input: { organizationId: string; endpointId: string }): Promise<WebhookEndpointView>;
+  archive(input: { organizationId: string; endpointId: string }): Promise<void>;
+  findDeliverable(input: {
+    organizationId: string;
+    endpointId: string;
+  }): Promise<WebhookEndpointView | null>;
+  /** Whether a frozen batch may ship, and when it may not, whether the endpoint is gone or
+   *  paused. */
+  getDeliveryDisposition(input: {
+    organizationId: string;
+    endpointId: string;
+  }): Promise<WebhookDeliveryDisposition>;
+  getDestinationConfig(input: {
+    organizationId: string;
+    endpointId: string;
+  }): Promise<WebhookDestinationConfig>;
+  getSigningSecret(input: { organizationId: string; endpointId: string }): Promise<string>;
+  findSigningSecrets(input: {
+    organizationId: string;
+    endpointId: string;
+    now?: Instant;
+  }): Promise<string[]>;
+  findStatusSnapshot(input: {
+    organizationId: string;
+    endpointId: string;
+  }): Promise<WebhookEndpointStatusSnapshot | null>;
+  getDeliveryStats(input: {
+    organizationId: string;
+    endpointId: string;
+    since: Instant;
+    sampleLimit: number;
+  }): Promise<{ attempted: number; delivered: number; latencies: number[] }>;
+  findActiveByOrganization(input: { organizationId: string }): Promise<WebhookEndpointView[]>;
+  organizationIdsWithActiveEndpoints(): Promise<string[]>;
+  recordDeliveryAttempt(input: {
+    organizationId: string;
+    endpointId: string;
+    dispatchId: string;
+    attempt: number;
+    eventCount: number;
+    outcome: WebhookDeliveryOutcome;
+    responseStatus?: number;
+    latencyMs?: number;
+    error?: string;
+    response?: unknown;
+    now?: Instant;
+  }): Promise<void>;
+  getDeliveries(input: {
+    organizationId: string;
+    endpointId: string;
+    limit?: number;
+    cursor?: { firedAt: Instant; id: string };
+  }): Promise<{
+    deliveries: {
+      id: string;
+      dispatchId: string;
+      attempt: number;
+      eventCount: number;
+      outcome: WebhookDeliveryOutcome;
+      responseStatus: number | null;
+      latencyMs: number | null;
+      error: string | null;
+      firedAt: Instant;
+    }[];
+    nextCursor: { firedAt: Instant; id: string } | null;
+  }>;
+  health(input: {
+    organizationId: string;
+    endpointId: string;
+  }): Promise<WebhookEndpointStatusSnapshot>;
+  pruneDeliveries(now?: Instant): Promise<number>;
+  /** One `sendRequest` attempt, filed under the project and trigger it came from. */
+  recordRequestAttempt(input: WebhookRequestAttempt): Promise<void>;
+  findRequestAttempts(input: {
+    projectId: string;
+    triggerId: string;
+    limit: number;
+  }): Promise<WebhookRequestAttemptRow[]>;
+}
+
+export type WebhookRequestAttempt = {
+  projectId: string;
+  triggerId: string;
+  dispatchId: string;
+  outcome: "success" | "retryable" | "terminal";
+  responseStatus: number | null;
+  latencyMs: number;
+  error: string | null;
+  response: WebhookRequestFailureResponse | null;
+};
+
+export type WebhookRequestAttemptRow = Omit<WebhookRequestAttempt, "outcome" | "latencyMs"> & {
+  id: string;
+  outcome: "success" | "retryable" | "terminal" | "pending";
+  latencyMs: number | null;
+  firedAt: Instant;
+};

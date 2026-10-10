@@ -1,13 +1,12 @@
 /**
  * `$HOME/.langy-worker.json`, written by the manager's Provision step before
- * spawn. Secrets stay in the environment; the config references env var NAMES
- * (`baseUrlEnv`, `apiKeyEnv`). Unknown model keys pass through verbatim into
- * the generated pi model entry so new compat findings drop in without a
- * wrapper change.
+ * spawn. Secrets stay in the environment; config references env var NAMES.
+ * Unknown model keys pass through verbatim for compat without wrapper changes.
  */
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+
 import { z } from "zod";
 
 export const THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh", "max"] as const;
@@ -21,7 +20,7 @@ const modelConfigSchema = z
     reasoning: z.boolean().optional(),
     contextWindow: z.number().int().positive().optional(),
     maxTokens: z.number().int().positive().optional(),
-    compat: z.record(z.unknown()).optional(),
+    compat: z.record(z.string(), z.unknown()).optional(),
   })
   .passthrough();
 
@@ -53,7 +52,9 @@ export function parseConfig(raw: string): LangyWorkerConfig {
   }
   const parsed = configSchema.safeParse(json);
   if (!parsed.success) {
-    throw new Error(`invalid ${CONFIG_FILE_NAME}: ${parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ")}`);
+    throw new Error(
+      `invalid ${CONFIG_FILE_NAME}: ${parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ")}`,
+    );
   }
   return parsed.data;
 }
@@ -64,7 +65,9 @@ export function loadConfig(home: string): LangyWorkerConfig {
   try {
     raw = readFileSync(path, "utf8");
   } catch (error) {
-    throw new Error(`cannot read ${path}: ${error instanceof Error ? error.message : String(error)}`);
+    throw new Error(
+      `cannot read ${path}: ${error instanceof Error ? error.message : String(error)}`,
+    );
   }
   return parseConfig(raw);
 }

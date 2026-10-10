@@ -46,9 +46,22 @@ Feature: Post-login first-trace watch on the CLI authorize page
     And the page does not navigate away
 
   @bdd @cli-onboarding @first-trace @unit
-  Scenario: First-trace polling only runs while the page is visible and stops at the timeout
+  Scenario: First-trace reads stop at the timeout, once traces are known and during the redirect
     Given the watch confirmed the project has never synced a trace
-    Then the poll interval is active only while the tab is visible
-    And no polling happens after the timeout elapses
-    And no polling happens once the project is known to already have traces
-    And no polling happens while the redirect is underway
+    Then the watch reads while it is live
+    And no read happens after the timeout elapses
+    And no read happens once the project is known to already have traces
+    And no read happens while the redirect is underway
+
+  @bdd @cli-onboarding @first-trace @integration
+  Scenario: The first-trace watch sets no timer
+    Given the watch confirmed the project has never synced a trace
+    Then the watch's read has no refetch interval
+    And it does not refetch when the window regains focus
+
+  @bdd @cli-onboarding @first-trace @integration @unimplemented
+  Scenario: The watch updates when the project's first trace is received
+    Given the watch confirmed the project has never synced a trace
+    When the project's first trace is received
+    Then the page learns of it from a server event, with no timer
+    And the redirect starts

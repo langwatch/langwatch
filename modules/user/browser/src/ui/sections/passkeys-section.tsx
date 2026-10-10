@@ -1,0 +1,449 @@
+/**
+ * Passkeys section: create, view, and manage passkeys in account settings.
+ */
+
+import { Dialog } from "@langwatch/design-system/dialog";
+import { Menu } from "@langwatch/design-system/menu";
+import {
+  Alert,
+  Box,
+  Button,
+  Field,
+  HStack,
+  Input,
+  Spacer,
+  Spinner,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
+import {
+  SettingsEmptyState,
+  SettingsSection,
+  SettingsSectionRow,
+} from "@langwatch/design-system/settings-section";
+import { readableDate } from "@langwatch/time";
+import { Fingerprint, MoreVertical, Usb } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+
+import { api } from "../../behavior/personal-workspace-api.ts";
+import { useLastWayInWarning } from "../../behavior/use-last-way-in-warning.ts";
+import { SSO_HANDLES_SIGN_IN } from "../../model/last-way-in.ts";
+import {
+  usePersonalWorkspaceHost,
+  type HeldPasskey,
+  type PasskeyOutcome,
+} from "../../model/personal-workspace-host.ts";
+import { isSecurityKey, passkeyLabel } from "../../model/sign-in-methods.ts";
+
+function RenamePasskeyDialog({
+  passkey,
+  onClose,
+  onRename,
+}: {
+  passkey: HeldPasskey | null;
+  onClose: () => void;
+  onRename: (input: { id: string; name: string }) => Promise<void>;
+}) {
+  const [name, setName] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Seeded from the passkey being renamed rather than held in sync with it: the
+  // dialog opens once per passkey, and re-seeding on every render would fight
+  // whatever is being typed.
+  useEffect(() => {
+    if (passkey) setName(passkey.name ?? "");
+  }, [passkey]);
+
+  const save = async () => {
+    if (!passkey) return;
+    setIsSaving(true);
+    try {
+      await onRename({ id: passkey.id, name: name.trim() });
+      onClose();
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <Dialog.Root
+      open={!!passkey}
+      onOpenChange={(details) => {
+        if (!details.open) onClose();
+      }}
+      placement="center"
+    >
+      <Dialog.Content bg="bg">
+        <Dialog.CloseTrigger />
+        <Dialog.Header>
+          <Dialog.Title fontSize="md" fontWeight="500">
+            Rename passkey
+          </Dialog.Title>
+        </Dialog.Header>
+        <Dialog.Body>
+          <Field.Root>
+            <Field.Label>Name</Field.Label>
+            <Input
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              placeholder="Work laptop"
+              data-testid="passkey-name"
+            />
+          </Field.Root>
+        </Dialog.Body>
+        <Dialog.Footer>
+          <HStack gap={3} justify="end" width="full">
+            <Button variant="outline" onClick={onClose} disabled={isSaving}>
+              Cancel
+            </Button>
+            <Button
+              colorPalette="orange"
+              loading={isSaving}
+              disabled={!name.trim()}
+              onClick={() => void save()}
+              data-testid="save-passkey-name"
+            >
+              Save
+            </Button>
+          </HStack>
+        </Dialog.Footer>
+      </Dialog.Content>
+    </Dialog.Root>
+  );
+}
+
+/**
+ * Confirming a removal, because a passkey is a way in and this is the click
+ * that ends it. Named, so nobody removes the wrong one from a list of three.
+ */
+function RemovePasskeyDialog({
+  passkey,
+  onClose,
+  onRemove,
+}: {
+  passkey: HeldPasskey | null;
+  onClose: () => void;
+  onRemove: (id: string) => Promise<void>;
+}) {
+  const [isRemoving, setIsRemoving] = useState(false);
+
+  const remove = async () => {
+    if (!passkey) return;
+    setIsRemoving(true);
+    try {
+      await onRemove(passkey.id);
+      onClose();
+    } finally {
+      setIsRemoving(false);
+    }
+  };
+
+  return (
+    <Dialog.Root
+      open={!!passkey}
+      onOpenChange={(details) => {
+        if (!details.open) onClose();
+      }}
+      placement="center"
+    >
+      <Dialog.Content bg="bg">
+        <Dialog.CloseTrigger />
+        <Dialog.Header>
+          <Dialog.Title fontSize="md" fontWeight="500">
+            Remove {passkey ? passkeyLabel(passkey) : "passkey"}?
+          </Dialog.Title>
+        </Dialog.Header>
+        <Dialog.Body>
+          <Text fontSize="sm" color="fg.muted">
+            You will not be able to sign in with it again. The passkey stays on your device until
+            you delete it there too.
+          </Text>
+        </Dialog.Body>
+        <Dialog.Footer>
+          <HStack gap={3} justify="end" width="full">
+            <Button variant="outline" onClick={onClose} disabled={isRemoving}>
+              Cancel
+            </Button>
+            <Button
+              colorPalette="red"
+              loading={isRemoving}
+              onClick={() => void remove()}
+              data-testid="confirm-remove-passkey"
+            >
+              Remove
+            </Button>
+          </HStack>
+        </Dialog.Footer>
+      </Dialog.Content>
+    </Dialog.Root>
+  );
+}
+
+/**
+ * One group of cards under a heading it earns. Renders nothing when empty:
+ * "Passkeys on security keys (0)" is a heading about an absence, and the page
+ * is not a report.
+ */
+function PasskeyGroup({
+  heading,
+  passkeys,
+  onRename,
+  onRemove,
+}: {
+  heading: string;
+  passkeys: readonly HeldPasskey[];
+  onRename: (passkey: HeldPasskey) => void;
+  onRemove: (passkey: HeldPasskey) => void;
+}) {
+  if (passkeys.length === 0) return null;
+
+  return (
+    <VStack width="full" align="stretch" gap={2}>
+      {/* Named for where the thing IS, not for what the specification calls it:
+          nobody has ever wanted a "device-bound credential". */}
+      <Text fontSize="xs" color="fg.muted" fontWeight={600}>
+        {heading}
+      </Text>
+      {passkeys.map((passkey) => (
+        <SettingsSectionRow key={passkey.id} data-testid="passkey-card">
+          <Box color="fg.muted" display="flex">
+            {isSecurityKey(passkey) ? <Usb size={16} /> : <Fingerprint size={16} />}
+          </Box>
+          <VStack align="start" gap={0}>
+            <Text fontSize="sm" fontWeight={500}>
+              {passkeyLabel(passkey)}
+            </Text>
+            <Text fontSize="xs" color="fg.muted">
+              Added {readableDate(passkey.createdAt).toLocaleDateString()}
+            </Text>
+          </VStack>
+          <Spacer />
+          {/* One trigger per row, per row-actions-overflow-menu.md: two icon
+                  buttons in a row is the pattern that doc exists to stop, and it
+                  puts a destructive action one stray click from a credential. */}
+          <Menu.Root>
+            <Menu.Trigger asChild>
+              <Button size="xs" variant="ghost" aria-label={`Actions for ${passkeyLabel(passkey)}`}>
+                <MoreVertical size={14} />
+              </Button>
+            </Menu.Trigger>
+            <Menu.Content>
+              <Menu.Item value="rename" onClick={() => onRename(passkey)}>
+                Rename
+              </Menu.Item>
+              <Menu.Item value="remove" color="red.fg" onClick={() => onRemove(passkey)}>
+                Remove
+              </Menu.Item>
+            </Menu.Content>
+          </Menu.Root>
+        </SettingsSectionRow>
+      ))}
+    </VStack>
+  );
+}
+
+function LastWayInNotice({ passkeys }: { passkeys: number | undefined }) {
+  const warning = useLastWayInWarning({ passkeys });
+  if (!warning) return null;
+
+  return (
+    <Alert.Root status="warning" variant="surface" data-testid="last-way-in-notice">
+      <Alert.Indicator />
+      <Alert.Content>
+        <Alert.Description>{warning.message}</Alert.Description>
+      </Alert.Content>
+    </Alert.Root>
+  );
+}
+
+function SsoGovernedLine() {
+  return (
+    <Text fontSize="sm" color="fg.muted" data-testid="passkeys-sso-governed">
+      {SSO_HANDLES_SIGN_IN}
+    </Text>
+  );
+}
+
+export function PasskeysSection() {
+  const host = usePersonalWorkspaceHost();
+  const passkeysEnabled = host.deployment().passkeysEnabled;
+
+  const [held, setHeld] = useState<readonly HeldPasskey[]>([]);
+  const [isPending, setIsPending] = useState(true);
+  const [isCreating, setIsCreating] = useState(false);
+  // Which passkey a dialog is open for, or null. Held as the row rather than an
+  // id so the dialogs can name it — "Remove?" over a list of three
+  // identical-looking cards is not a question anybody can answer.
+  const [renaming, setRenaming] = useState<HeldPasskey | null>(null);
+  const [removing, setRemoving] = useState<HeldPasskey | null>(null);
+
+  const reload = useCallback(async () => {
+    setIsPending(true);
+    try {
+      setHeld(await host.listPasskeys());
+    } finally {
+      setIsPending(false);
+    }
+  }, [host]);
+
+  // The account-security nudge creates passkeys too, outside this card; its
+  // offer is re-read after each one, so a fresh offer means a fresh list.
+  const nudgeReadAt = api.user.secureAccountNudge.useQuery({}).dataUpdatedAt;
+  // Where an organization's single sign-on governs sign-in, a passkey is refused there anyway.
+  const ssoGoverned =
+    api.identity.mySignInGovernance.useQuery({}, { enabled: passkeysEnabled }).data
+      ?.governedBySso === true;
+  useEffect(() => {
+    if (!passkeysEnabled) return;
+    void reload();
+  }, [passkeysEnabled, reload, nudgeReadAt]);
+
+  /**
+   * Says what happened, and says nothing at all about a decision. A
+   * cancelled prompt is somebody opening the OS dialog and closing it —
+   * reporting that as a failure is why `cancelled` exists on the outcome.
+   */
+  const report = async (
+    outcome: PasskeyOutcome,
+    { done, failed, description }: { done: string; failed: string; description: string },
+  ) => {
+    if (outcome.ok) {
+      host.succeeded({ title: done });
+      await reload();
+      return;
+    }
+    if (outcome.cancelled) return;
+    host.failed({ error: new Error(failed), fallbackTitle: failed, description });
+  };
+
+  // A deployment that never mounted the plugin has no endpoint behind any of
+  // this. Rendering the hero there would be an offer we cannot honour.
+  if (!passkeysEnabled) return null;
+
+  const create = async () => {
+    setIsCreating(true);
+    try {
+      await report(await host.registerPasskey(), {
+        done: "Passkey created",
+        failed: "That passkey wasn't created",
+        description: "The attempt didn't finish. Try again, or use another way to sign in.",
+      });
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
+  const remove = async (id: string) => {
+    await report(await host.removePasskey({ id }), {
+      done: "Passkey removed",
+      failed: "That passkey wasn't removed",
+      description: "Try again in a moment.",
+    });
+  };
+
+  const rename = async ({ id, name }: { id: string; name: string }) => {
+    await report(await host.renamePasskey({ id, name }), {
+      done: "Passkey renamed",
+      failed: "That passkey wasn't renamed",
+      description: "Try again in a moment.",
+    });
+  };
+
+  return (
+    <SettingsSection
+      anchorId="passkeys"
+      icon={<Fingerprint size={18} />}
+      title="Passkeys"
+      hint="Sign in with the fingerprint, face or screen lock you already use. There is nothing to remember and nothing to phish."
+      data-testid="passkeys-settings-section"
+    >
+      <VStack width="full" align="start" gap={4} data-testid="passkeys-section">
+        <LastWayInNotice passkeys={isPending ? undefined : held.length} />
+
+        {isPending ? <Spinner size="sm" /> : null}
+
+        {!isPending && held.length === 0 ? (
+          <SettingsEmptyState
+            icon={<Fingerprint size={20} />}
+            title="No passkeys yet"
+            description="A passkey is an encrypted key you create with your fingerprint, face or screen lock. It is kept by your passkey provider, so it works on your other devices too."
+            data-testid="passkeys-empty"
+            action={
+              ssoGoverned ? (
+                <SsoGovernedLine />
+              ) : (
+                <Button
+                  variant="outline"
+                  loading={isCreating}
+                  onClick={() => void create()}
+                  data-testid="create-passkey"
+                >
+                  Create a passkey
+                </Button>
+              )
+            }
+          />
+        ) : null}
+
+        {held.length > 0 ? (
+          <VStack width="full" align="stretch" gap={5}>
+            <PasskeyGroup
+              heading="Passkeys on your devices"
+              passkeys={held.filter((passkey) => !isSecurityKey(passkey))}
+              onRename={setRenaming}
+              onRemove={setRemoving}
+            />
+            <PasskeyGroup
+              heading="Passkeys on security keys"
+              passkeys={held.filter(isSecurityKey)}
+              onRename={setRenaming}
+              onRemove={setRemoving}
+            />
+            <Box>
+              {ssoGoverned ? (
+                <SsoGovernedLine />
+              ) : (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  loading={isCreating}
+                  onClick={() => void create()}
+                  data-testid="create-passkey"
+                >
+                  Create a passkey
+                </Button>
+              )}
+            </Box>
+          </VStack>
+        ) : null}
+
+        {/* The waiting state sits over the list the ceremony was started from. */}
+        <Dialog.Root open={isCreating} placement="center">
+          <Dialog.Content bg="bg" data-testid="passkey-ceremony-dialog">
+            <Dialog.Header>
+              <Dialog.Title fontSize="md" fontWeight="500">
+                Create your passkey
+              </Dialog.Title>
+            </Dialog.Header>
+            <Dialog.Body paddingBottom={6}>
+              <Text fontSize="sm" color="fg.muted">
+                Follow your device&apos;s prompt to finish. Closing it keeps things as they were.
+              </Text>
+            </Dialog.Body>
+          </Dialog.Content>
+        </Dialog.Root>
+
+        <RenamePasskeyDialog
+          passkey={renaming}
+          onClose={() => setRenaming(null)}
+          onRename={rename}
+        />
+        <RemovePasskeyDialog
+          passkey={removing}
+          onClose={() => setRemoving(null)}
+          onRemove={remove}
+        />
+      </VStack>
+    </SettingsSection>
+  );
+}

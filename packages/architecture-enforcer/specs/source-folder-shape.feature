@@ -1,0 +1,54 @@
+Feature: A folder is one concept and a file is one readable part
+  As a maintainer
+  I want a source tree that reads as concepts, not as a filing cabinet
+  So that a reader, human or agent, finds the file that owns a noun without a search
+
+  Background:
+    Given architecture lint scans every source folder under apps and packages
+    And the messages it emits are written as the instruction the author should have followed
+
+  @unit @architecture
+  Scenario: A crowded folder is refused with the instruction to fold or split
+    Given a source folder holds more files than the folder budget
+    When architecture lint checks the workspace
+    Then it reports the folder with its file count
+    And the message tells the author to put the code in the file that already owns its noun
+    And the remedy says to split the folder, not the file, when no file owns it
+
+  @unit @architecture
+  Scenario: A fragment of a neighbouring file is refused with the instruction to fold it in
+    Given a source file below the fragment floor is imported only by files in its own folder
+    When architecture lint checks the workspace
+    Then it reports the file as a paragraph of the file that reads it
+    And the remedy says to move the code into that file and delete the fragment
+
+  @unit @architecture
+  Scenario: A mount file the feature grammar requires is never a fragment
+    Given a feature installer or a process mount file is shorter than the fragment floor
+    And only its own folder reads it
+    When architecture lint checks the workspace
+    Then it reports nothing, because the grammar asked for those files and the runtime set their size
+
+  @unit @architecture
+  Scenario: An application's config.ts is never a fragment of its main.ts
+    Given an application's src/config.ts is shorter than the fragment floor
+    And only its main.ts reads it
+    When architecture lint checks the workspace
+    Then it reports nothing, because the record says an application is a main.ts and a config.ts
+    And any other small file beside main.ts is still reported
+
+  @unit @architecture
+  Scenario: A module contract's config file is never a fragment
+    Given a module contract's src/<id>.config.ts is shorter than the fragment floor
+    And only its own folder reads it
+    When architecture lint checks the workspace
+    Then it reports nothing, because the record puts a module's config slice in that file
+    And any other small file in the contract is still reported
+
+  @unit @architecture
+  Scenario: A file its package publishes as a subpath is never a fragment
+    Given a source file shorter than the fragment floor is the target of an exports entry in its own package.json
+    And only its own folder reads it
+    When architecture lint checks the workspace
+    Then it reports nothing, because an export target is a deliberate public entry point (ruling SF-2)
+    And an unexported small file beside it is still reported

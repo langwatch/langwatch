@@ -1,0 +1,29 @@
+{
+  "name": "@langwatch/dev-runtime",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Contributor-only: api and worker in one local process, reloaded in place (ADR-168).",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/backend.process.ts",
+      "default": "./src/backend.process.ts"
+    }
+  },
+  "scripts": {
+    "dev": "while true; do node --experimental-transform-types $(test -f ../../.env && echo --env-file=../../.env) src/app.entrypoint.ts; code=$?; test $code -eq 75 || exit $code; done",
+    "typecheck": "tsc -b",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@langwatch/observability": "workspace:*",
+    "@langwatch/platform-api": "workspace:*",
+    "@langwatch/process": "workspace:*",
+    "@langwatch/time": "workspace:*",
+    "@langwatch/worker": "workspace:*",
+    "vite": "catalog:"
+  },
+  "devDependencies": {
+    "@langwatch/vitest-config": "workspace:*"
+  }
+}

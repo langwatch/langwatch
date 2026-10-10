@@ -1,0 +1,93 @@
+/**
+ * Project's lent switcher (ARCHITECTURE §10), ported from main's
+ * `ProjectSelector`: the current project as a ghost button, and a menu of
+ * every project grouped by organization and team, as the graph arrives.
+ */
+
+import { useUiHostServices, useUiScope } from "@langwatch/browser-host/capabilities";
+import { Link } from "@langwatch/browser-host/link";
+import { Menu } from "@langwatch/design-system/menu";
+import { Button, HStack, Text } from "@langwatch/design-system/primitives";
+import { ChevronDown } from "lucide-react";
+import { useMemo, useState, type MouseEvent } from "react";
+
+import { projectApi } from "../../behavior/project-api.ts";
+import { projectSwitchGroups, projectSwitchHref } from "../../model/project-switch.ts";
+import { ProjectAvatar } from "../elements/project-avatar.tsx";
+
+export default function ProjectSwitcher() {
+  const { navigation, route } = useUiHostServices();
+  const { projectId } = useUiScope().activeScope();
+  const [isOpen, setIsOpen] = useState(false);
+  const organizations = projectApi.organization.getScopeGraph.useQuery({});
+
+  const groups = useMemo(() => projectSwitchGroups(organizations.data ?? []), [organizations.data]);
+  const current = groups
+    .flatMap((group) => group.projects)
+    .find((project) => project.id === projectId);
+
+  if (!current) return null;
+
+  const pathname = route.reading().pathname ?? "";
+  const follow = (href: string) => (event: MouseEvent<HTMLAnchorElement>) => {
+    const isModifiedClick = event.metaKey || event.ctrlKey || event.shiftKey || event.altKey;
+    if (isModifiedClick || event.button !== 0) return;
+    event.preventDefault();
+    setIsOpen(false);
+    navigation.navigate(href);
+  };
+
+  return (
+    <Menu.Root open={isOpen} onOpenChange={({ open }) => setIsOpen(open)}>
+      <Menu.Trigger asChild>
+        <Button
+          variant="ghost"
+          fontSize="13px"
+          paddingX={2}
+          paddingY={1}
+          height="auto"
+          fontWeight="normal"
+          minWidth={0}
+          maxWidth="260px"
+          color="fg"
+          _hover={{ backgroundColor: "bg.muted" }}
+        >
+          <HStack gap={2} minWidth={0}>
+            <ProjectAvatar name={current.name} />
+            <Text truncate title={current.name}>
+              {current.name}
+            </Text>
+            <ChevronDown size={14} />
+          </HStack>
+        </Button>
+      </Menu.Trigger>
+      {isOpen && (
+        <Menu.Content maxWidth="320px">
+          {groups.map((group) => (
+            <Menu.ItemGroup key={group.key} title={group.title}>
+              {group.projects.map((project) => {
+                const href = projectSwitchHref({
+                  pathname,
+                  currentProjectSlug: current.slug,
+                  targetSlug: project.slug,
+                });
+                return (
+                  <Menu.Item key={project.id} value={project.id} fontSize="14px" asChild>
+                    <Link href={href} onClick={follow(href)} _hover={{ textDecoration: "none" }}>
+                      <HStack gap={2} minWidth={0}>
+                        <ProjectAvatar name={project.name} />
+                        <Text truncate title={project.name}>
+                          {project.name}
+                        </Text>
+                      </HStack>
+                    </Link>
+                  </Menu.Item>
+                );
+              })}
+            </Menu.ItemGroup>
+          ))}
+        </Menu.Content>
+      )}
+    </Menu.Root>
+  );
+}

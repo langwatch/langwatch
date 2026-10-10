@@ -1,0 +1,388 @@
+import { createTrpcRuntime } from "@langwatch/api/trpc";
+/**
+ * @vitest-environment node
+ * The `project.*` namespace against the composition-built app — same defect
+ * as `project.trpc.unit.test.ts`, whose seven `vi.fn` mounts stay green while
+ * every procedure throws. Spec: specs/projects/projects-browser-door.feature
+ */
+import type { AuditLogApi } from "@langwatch/audit-log-contract";
+import type { AuthzApi } from "@langwatch/authz-contract";
+import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
+import { ResourceScope } from "@langwatch/process";
+import type { Project, ProjectWithTeam } from "@langwatch/project-contract";
+import { ScopedSecrets } from "@langwatch/secrets";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { trpcTestMembers } from "@langwatch/test-harness/trpc-members";
+import { initTRPC } from "@trpc/server";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+import { ProjectModule } from "../../app/project.app.ts";
+import { MemoryProjectStorageSettingsRepository } from "../../repositories/memory/memory.project-storage-settings.repository.ts";
+import { MemoryProjectDatabase } from "../../repositories/memory/memory.project.database.ts";
+import { MemoryProjectRepository } from "../../repositories/memory/memory.project.repository.ts";
+import type { ProjectBrowserApi } from "../project.trpc.ts";
+import { projectTrpcTransport } from "../project.trpc.ts";
+import type { ProjectTrpcTestContext } from "./project.trpc.harness.ts";
+
+const reported = vi.hoisted(() => ({
+  entries: [] as { payload: Readonly<Record<string, unknown>>; message: string }[],
+}));
+
+const logger = {
+  error: (payload: Readonly<Record<string, unknown>>, message: string) => {
+    reported.entries.push({ payload, message });
+  },
+};
+
+beforeEach(() => {
+  reported.entries.length = 0;
+});
+
+const ACTOR_ID = "user-1";
+const ORGANIZATION_ID = "organization-1";
+const OTHER_PROJECT_ID = "project_other";
+const NOW = new Date("2026-09-01T00:00:00.000Z");
+
+function team(overrides: Partial<ProjectWithTeam["team"]> = {}): ProjectWithTeam["team"] {
+  return {
+    id: "team-1",
+    name: "Team",
+    slug: "team",
+    organizationId: ORGANIZATION_ID,
+    createdAt: NOW,
+    updatedAt: NOW,
+    archivedAt: null,
+    isPersonal: false,
+    ownerUserId: null,
+    departmentId: null,
+    ...overrides,
+  };
+}
+
+function project(overrides: Partial<Project> = {}): Project {
+  return {
+    id: "project_1",
+    name: "First Project",
+    slug: "first-project",
+    apiKey: "sk-lw-base-key-of-the-project",
+    lwqlKey: "lwql-key",
+    teamId: "team-1",
+    language: "python",
+    framework: "langchain",
+    kind: "application",
+    firstMessage: false,
+    integrated: false,
+    createdAt: NOW,
+    updatedAt: NOW,
+    userLinkTemplate: null,
+    traceSharingEnabled: false,
+    presenceEnabled: false,
+    s3Endpoint: null,
+    s3AccessKeyId: null,
+    s3SecretAccessKey: null,
+    s3Bucket: null,
+    archivedAt: null,
+    isPersonal: false,
+    ownerUserId: null,
+    personalFeatures: null,
+    departmentId: null,
+    langyEgressAllowlist: null,
+    lastCodingAgentSessionAt: null,
+    lastCodingAgentPullRequestAt: null,
+    ...overrides,
+  };
+}
+
+/** One permission question, as this application asked AuthZ. */
+type PermissionQuestion = {
+  userId: string;
+  permission: string;
+  projectId?: string | undefined;
+  teamId?: string | undefined;
+  organizationId?: string | undefined;
+};
+
+/**
+ * The application exactly as `ProjectModule.create` builds it at boot: its own
+ * repository over an in-memory backing, the peers it declares, and the two
+ * process members it reads.
+ */
+function application(
+  options: {
+    permits?: (question: PermissionQuestion) => boolean;
+    record?: AuditLogApi["record"];
+    revoked?: (payload: unknown) => Promise<void>;
+  } = {},
+) {
+  const database = MemoryProjectDatabase.create();
+  database.putTeam(team());
+  database.putProject(project());
+  database.putProject(
+    project({
+      id: OTHER_PROJECT_ID,
+      name: "Another Project",
+      slug: "another-project",
+      apiKey: "sk-lw-base-key-of-the-other-project",
+    }),
+  );
+
+  const asked: PermissionQuestion[] = [];
+  const permits = options.permits ?? (() => true);
+  const authorization = createApiFixture<AuthzApi>({
+    hasPermission: async (question: PermissionQuestion) => {
+      asked.push(question);
+      return permits(question);
+    },
+  });
+
+  const app = ProjectModule.create({
+    logger,
+    dependencies: {
+      authorization,
+      organizations: createApiFixture<OrganizationApi>({}, "organizations"),
+      auditLog: createApiFixture<AuditLogApi>(
+        { record: options.record ?? (async () => ({ id: "audit", occurredAt: 0 })) },
+        "auditLog",
+      ),
+      dataPrivacy: createApiFixture<DataPrivacyApi>({}, "dataPrivacy"),
+    },
+    repositories: {
+      projects: MemoryProjectRepository.create({ memory: database }),
+      storageSettings: MemoryProjectStorageSettingsRepository.create({ memory: database }),
+    },
+    config: undefined,
+    resources: new ResourceScope(),
+    secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
+  });
+
+  app.connectLifecycle({
+    recordProjectCreated: { send: async () => undefined },
+    recordProjectLegacyKeyRevoked: { send: options.revoked ?? (async () => undefined) },
+    recordPresenceSettingChanged: { send: async () => undefined },
+    recordProjectMoved: { send: async () => undefined },
+    recordProjectArchived: { send: async () => undefined },
+    recordProjectDepartmentAssigned: { send: async () => undefined },
+    recordProjectTraceSharingDisabled: { send: async () => undefined },
+    recordProjectAggregateRuleChanged: { send: async () => undefined },
+    recordProjectRevived: { send: async () => undefined },
+  });
+
+  return { app, database, asked, logged: reported.entries };
+}
+
+/**
+ * The `project.*` namespace on a real tRPC root, over the real application.
+ * The two members no installed peer answers are supplied here, explicitly,
+ * because the mount refuses a partial witness — everything else is the app's own answer.
+ */
+function mount(options: Parameters<typeof application>[0] = {}) {
+  const built = application(options);
+  const { app } = built;
+
+  const browser: ProjectBrowserApi = {
+    projects: () => app.projects(),
+    probePermission: (input) => app.probePermission(input),
+    archiveOtherProject: (input) => app.archiveOtherProject(input),
+    revokeProjectApiKey: (input) => app.revokeProjectApiKey(input),
+    getLegacyKeyStatus: (input) => app.getLegacyKeyStatus(input),
+    updateAggregateRule: (input) => app.updateAggregateRule(input),
+    aggregateMemberCandidates: (input) => app.aggregateMemberCandidates(input),
+  };
+
+  const trpc = initTRPC.context<ProjectTrpcTestContext>().create();
+  const router = createTrpcRuntime<ProjectTrpcTestContext>({
+    root: trpc,
+    procedure: trpc.procedure,
+    members: trpcTestMembers<ProjectTrpcTestContext>(),
+  }).mount(projectTrpcTransport, () => browser);
+
+  return { ...built, caller: router.createCaller({ actor: { id: ACTOR_ID } }) };
+}
+
+describe("the project tRPC namespace over the application the composition builds", () => {
+  describe("when the settings form carries stored-object credentials", () => {
+    it("writes each one through the storage settings repository, which memory holds as given", async () => {
+      const { caller, database } = mount();
+
+      await caller.update({
+        projectId: "project_1",
+        name: "First Project",
+        traceSharingEnabled: false,
+        presenceEnabled: false,
+        s3Endpoint: "https://s3.example",
+        s3AccessKeyId: "access-key",
+        s3SecretAccessKey: "secret-key",
+        s3Bucket: "bucket",
+      });
+
+      expect(database.findProject("project_1")).toMatchObject({
+        s3Endpoint: "https://s3.example",
+        s3AccessKeyId: "access-key",
+        s3SecretAccessKey: "secret-key",
+        s3Bucket: "bucket",
+      });
+    });
+  });
+
+  describe("when trace sharing is flipped", () => {
+    /** @scenario "flipping trace sharing asks the caller's own standing" */
+    it("asks AuthZ about the caller at the project, and refuses when it says no", async () => {
+      const { caller, asked, database } = mount({
+        permits: (question) => question.permission !== "project:manage",
+      });
+
+      await expect(
+        caller.update({ projectId: "project_1", name: "First Project", traceSharingEnabled: true }),
+      ).rejects.toMatchObject({ cause: { code: "permission_denied", httpStatus: 403 } });
+
+      expect(asked).toContainEqual({
+        userId: ACTOR_ID,
+        permission: "project:manage",
+        projectId: "project_1",
+      });
+      expect(database.findProject("project_1")?.traceSharingEnabled).toBe(false);
+    });
+  });
+
+  describe("when the legacy project key is revoked", () => {
+    const LEGACY_KEY = "sk-lw-base-key-of-the-project";
+
+    /** @scenario A project manager revokes the legacy project key and is shown no key */
+    it("moves the status from present to absent, audits it and answers with no key", async () => {
+      const record = vi.fn<AuditLogApi["record"]>(async () => ({ id: "audit", occurredAt: 0 }));
+      const revoked = vi.fn(async (_payload: unknown) => undefined);
+      const { app, caller, database } = mount({ record, revoked });
+
+      await expect(caller.getLegacyKeyStatus({ projectId: "project_1" })).resolves.toEqual({
+        present: true,
+      });
+      const answer = await caller.revokeProjectApiKey({ projectId: "project_1" });
+
+      expect(answer).toEqual({ revoked: true });
+      expect(JSON.stringify(answer)).not.toContain(LEGACY_KEY);
+      await expect(caller.getLegacyKeyStatus({ projectId: "project_1" })).resolves.toEqual({
+        present: false,
+      });
+      expect(database.findProject("project_1")?.apiKey).not.toBe(LEGACY_KEY);
+      expect(await app.findIdByLegacyApiKey({ token: LEGACY_KEY })).toBeNull();
+      const stored = database.findProject("project_1")?.apiKey ?? "";
+      expect(await app.findIdByLegacyApiKey({ token: stored })).toBeNull();
+      expect(revoked).toHaveBeenCalledWith(
+        expect.objectContaining({
+          projectId: "project_1",
+          organizationId: expect.any(String),
+          revokedByUserId: ACTOR_ID,
+        }),
+      );
+      expect(record).toHaveBeenCalledWith({
+        action: "project.apiKey.revoked",
+        userId: ACTOR_ID,
+        projectId: "project_1",
+      });
+    });
+
+    /** @scenario Revoking the legacy project key again succeeds and changes nothing a caller can use */
+    it("answers a second revocation as revoked, and the status stays absent", async () => {
+      const { caller } = mount();
+
+      await caller.revokeProjectApiKey({ projectId: "project_1" });
+
+      await expect(caller.revokeProjectApiKey({ projectId: "project_1" })).resolves.toEqual({
+        revoked: true,
+      });
+      await expect(caller.getLegacyKeyStatus({ projectId: "project_1" })).resolves.toEqual({
+        present: false,
+      });
+    });
+
+    it("still answers revoked when the audit trail fails, and reports it", async () => {
+      const { caller, logged } = mount({
+        record: async () => {
+          throw new Error("audit down");
+        },
+      });
+
+      await expect(caller.revokeProjectApiKey({ projectId: "project_1" })).resolves.toEqual({
+        revoked: true,
+      });
+      expect(logged).toHaveLength(1);
+    });
+
+    it("refuses a project that does not exist and audits nothing", async () => {
+      const record = vi.fn<AuditLogApi["record"]>(async () => ({ id: "audit", occurredAt: 0 }));
+      const { caller } = mount({ record });
+
+      await expect(caller.revokeProjectApiKey({ projectId: "missing" })).rejects.toBeDefined();
+      expect(record).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when another project is archived", () => {
+    /** @scenario "archiving another project is probed on that project" */
+    it("asks AuthZ about the caller at the OTHER project before archiving it", async () => {
+      const { caller, asked, database } = mount();
+
+      await expect(
+        caller.archiveById({ projectId: "project_1", projectToArchiveId: OTHER_PROJECT_ID }),
+      ).resolves.toEqual({ success: true, alreadyArchived: false });
+
+      expect(asked).toContainEqual({
+        userId: ACTOR_ID,
+        permission: "project:delete",
+        projectId: OTHER_PROJECT_ID,
+      });
+      expect(database.findProject(OTHER_PROJECT_ID)?.archivedAt).not.toBeNull();
+    });
+
+    it("refuses, and archives nothing, when AuthZ denies the other project", async () => {
+      const { caller, database } = mount({
+        permits: (question) => question.projectId !== OTHER_PROJECT_ID,
+      });
+
+      await expect(
+        caller.archiveById({ projectId: "project_1", projectToArchiveId: OTHER_PROJECT_ID }),
+      ).rejects.toMatchObject({ cause: { code: "project_permission_denied", httpStatus: 403 } });
+
+      expect(database.findProject(OTHER_PROJECT_ID)?.archivedAt).toBeNull();
+    });
+  });
+
+  describe("given the hidden governance project", () => {
+    const GOVERNANCE_ID = "project_governance";
+    const governance = (database: ReturnType<typeof application>["database"]) =>
+      database.putProject(
+        project({
+          id: GOVERNANCE_ID,
+          name: "Governance (internal)",
+          slug: "governance-organization-1",
+          apiKey: "sk-lw-base-key-of-the-governance",
+          kind: "internal_governance",
+        }),
+      );
+
+    /** @scenario The governance area cannot be archived through the projects API */
+    it("refuses an archive from the browser door and leaves it live", async () => {
+      const { caller, database } = mount();
+      governance(database);
+
+      await expect(
+        caller.archiveById({ projectId: "project_1", projectToArchiveId: GOVERNANCE_ID }),
+      ).rejects.toMatchObject({ cause: { code: "forbidden", httpStatus: 403 } });
+
+      expect(database.findProject(GOVERNANCE_ID)?.archivedAt).toBeNull();
+    });
+
+    /** @scenario The governance area cannot be renamed or moved through the projects API */
+    it("refuses a settings update from the browser door and writes nothing", async () => {
+      const { caller, database } = mount();
+      governance(database);
+
+      await expect(
+        caller.update({ projectId: GOVERNANCE_ID, name: "Renamed", traceSharingEnabled: false }),
+      ).rejects.toMatchObject({ cause: { code: "forbidden", httpStatus: 403 } });
+
+      expect(database.findProject(GOVERNANCE_ID)?.name).toBe("Governance (internal)");
+    });
+  });
+});

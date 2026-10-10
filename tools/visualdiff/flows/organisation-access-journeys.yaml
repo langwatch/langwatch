@@ -1,0 +1,343 @@
+# Access journeys beyond organisation-access.yaml (lane green-org-ui): the pending invite list,
+# editing a custom role, personal and service API keys (secret shown once, rename, revoke), the
+# project key row and the project-level settings form. Labels and handles come from origin/main:
+# the Invite actions menu, "Edit this role", "Edit API key <name>", "Revoke API key <name>", the
+# "Token Created" dialog and its "Copy this token now" warning. Every name ends in {uid}.
+flows:
+  # main emails each invite with the subject "You were added to <organization> on LangWatch" and
+  # the accept link; the mail step reads both from the side's mailsim (org-mail-parity).
+  - id: members-invite-email-arrives
+    title: Invite a person and the invitation email arrives with its accept link
+    isolated: true
+    steps:
+      - action: go
+        with:
+          path: /settings/directory
+      - action: click
+        with:
+          text: Invite people
+      - action: fill
+        with:
+          field: "alice@example.com, bob@example.com"
+          value: "vd-invmail-{uid}@mail.langwatch.localhost"
+      - action: click
+        with:
+          text: /^\s*(Send|Create) invites\s*$/
+      - action: mail
+        with:
+          to: vd-invmail-{uid}@mail.langwatch.localhost
+          subject: You were added to
+          as: inviteLink
+      - action: go
+        with:
+          path: "{inviteLink}"
+          anonymous: "true"
+  - id: members-pending-invite-list-and-revoke
+    title: Invite a person, see them on the Invited list, revoke the invite and see it revoked
+    isolated: true
+    steps:
+      - action: go
+        with:
+          path: /settings/directory
+      - action: click
+        with:
+          text: Invite people
+      - action: fill
+        with:
+          field: "alice@example.com, bob@example.com"
+          value: "vd-inv-{uid}@mail.langwatch.localhost"
+      - action: click
+        with:
+          text: /^\s*(Send|Create) invites\s*$/
+      - action: go
+        with:
+          path: /settings/directory?people=invited
+      - action: expect
+        with:
+          testId: invite-row
+          hasText: vd-inv-{uid}@mail.langwatch.localhost
+      - action: expect
+        with:
+          testId: invite-row
+          hasText: /vd-inv-{uid}@mail\.langwatch\.localhost[\s\S]*Invited/
+      - action: click
+        with:
+          selector: '[data-testid="invite-row"]:has-text("vd-inv-{uid}@mail.langwatch.localhost") button[aria-label="Invite actions"]'
+      - action: click
+        with:
+          selector: '[role="menuitem"]'
+          hasText: /^\s*Revoke\s*$/
+      - action: go
+        with:
+          path: /settings/directory?people=invited
+      - action: expect
+        with:
+          testId: invite-row
+          hasText: /vd-inv-{uid}@mail\.langwatch\.localhost[\s\S]*Revoked/
+
+  - id: role-edit-reads-back-then-delete
+    title: Create a custom role, rename it from its card, see the new name after a reload, delete it
+    isolated: true
+    steps:
+      - action: go
+        with:
+          path: /settings/roles
+      - action: click
+        with:
+          text: New role
+      - action: fill
+        with:
+          selector: 'input[name="name"]'
+          value: "vd-role-{uid}"
+      - action: fill
+        with:
+          label: Search permissions
+          value: Traces
+      - action: click
+        with:
+          selector: '[data-testid="access-level-traces"] label'
+          hasText: /^\s*Read\s*$/
+      - action: click
+        with:
+          text: /^\s*Create role\s*$/i
+      - action: go
+        with:
+          path: /settings/roles
+      - action: expect
+        with:
+          text: vd-role-{uid}
+      - action: click
+        with:
+          selector: '[data-testid^="custom-role-"]:has-text("vd-role-{uid}") button[aria-label="Edit this role"]'
+      - action: expect
+        with:
+          text: Edit role
+      - action: fill
+        with:
+          selector: 'input[name="name"]'
+          value: "vd-role-renamed-{uid}"
+      - action: click
+        with:
+          text: /^\s*Save role\s*$/
+      - action: go
+        with:
+          path: /settings/roles
+      - action: expect
+        with:
+          text: vd-role-renamed-{uid}
+      - action: expect
+        with:
+          text: vd-role-{uid}
+          equals: "0"
+      - action: expect
+        with:
+          api: /api/roles
+          auth: "{orgKey}"
+          contains: vd-role-renamed-{uid}
+      - action: click
+        with:
+          selector: '[data-testid^="custom-role-"]:has-text("vd-role-renamed-{uid}") button[aria-label="Delete this role"]'
+      - action: click
+        with:
+          text: /^\s*Delete\s*$/
+      - action: go
+        with:
+          path: /settings/roles
+      - action: expect
+        with:
+          text: vd-role-renamed-{uid}
+          equals: "0"
+
+  - id: api-key-personal-secret-once-rename-revoke
+    title: Create a personal key, see its secret dialog once, rename it, then revoke it
+    isolated: true
+    steps:
+      - action: go
+        with:
+          path: /settings/api-keys
+      - action: click
+        with:
+          text: Create new secret key
+      - action: fill
+        with:
+          field: e.g., CI Pipeline
+          value: vd-pkey-{uid}
+      - action: click
+        with:
+          text: Create secret key
+      - action: expect
+        with:
+          text: Token Created
+      - action: expect
+        with:
+          text: Copy this token now
+      - action: click
+        with:
+          label: Close
+      - action: go
+        with:
+          path: /settings/api-keys
+      - action: expect
+        with:
+          text: Copy this token now
+          equals: "0"
+      - action: expect
+        with:
+          count: 'tr:has-text("vd-pkey-{uid}")'
+          min: "1"
+      - action: expect
+        with:
+          count: 'tr:has-text("vd-pkey-{uid}"):has-text("Service")'
+          equals: "0"
+      - action: expect
+        with:
+          api: /api/api-keys
+          auth: "{orgKey}"
+          contains: vd-pkey-{uid}
+      - action: click
+        with:
+          label: Edit API key vd-pkey-{uid}
+      - action: expect
+        with:
+          text: Edit API key
+      - action: fill
+        with:
+          selector: '[role="dialog"] input'
+          value: vd-pkey-renamed-{uid}
+      - action: click
+        with:
+          selector: '[role="dialog"] button'
+          hasText: /^\s*Save\s*$/
+      - action: go
+        with:
+          path: /settings/api-keys
+      - action: expect
+        with:
+          text: vd-pkey-renamed-{uid}
+      - action: expect
+        with:
+          text: vd-pkey-{uid}
+          equals: "0"
+      - action: expect
+        with:
+          api: /api/api-keys
+          auth: "{orgKey}"
+          contains: vd-pkey-renamed-{uid}
+      - action: click
+        with:
+          label: Revoke API key vd-pkey-renamed-{uid}
+      - action: expect
+        with:
+          text: Revoke API Key
+      - action: click
+        with:
+          text: /^\s*Revoke\s*$/
+      - action: go
+        with:
+          path: /settings/api-keys
+      - action: expect
+        with:
+          text: vd-pkey-renamed-{uid}
+          equals: "0"
+
+  - id: api-key-service-create-and-revoke
+    title: Create a service key, see it typed Service after a reload, then revoke it
+    isolated: true
+    steps:
+      - action: go
+        with:
+          path: /settings/api-keys
+      - action: click
+        with:
+          text: Create new secret key
+      - action: click
+        with:
+          selector: '[role="dialog"] label'
+          hasText: /^\s*Service\s*$/
+      - action: expect
+        with:
+          text: Not tied to any user
+      - action: fill
+        with:
+          field: e.g., CI Pipeline
+          value: vd-skey-{uid}
+      - action: click
+        with:
+          text: Create secret key
+      - action: expect
+        with:
+          text: Token Created
+      - action: click
+        with:
+          label: Close
+      - action: go
+        with:
+          path: /settings/api-keys
+      - action: expect
+        with:
+          count: 'tr:has-text("vd-skey-{uid}"):has-text("Service")'
+          min: "1"
+      - action: expect
+        with:
+          api: /api/api-keys
+          auth: "{orgKey}"
+          contains: vd-skey-{uid}
+      - action: click
+        with:
+          label: Revoke API key vd-skey-{uid}
+      - action: click
+        with:
+          text: /^\s*Revoke\s*$/
+      - action: go
+        with:
+          path: /settings/api-keys
+      - action: expect
+        with:
+          text: vd-skey-{uid}
+          equals: "0"
+
+  # Rotating is left out: it replaces the project key every other flow in the run signs with.
+  - id: api-key-project-key-row
+    title: The project key row shows its Service type, a copy control and the rotate control
+    steps:
+      - action: go
+        with:
+          path: /settings/api-keys
+      - action: expect
+        with:
+          text: Project API Key
+      - action: expect
+        with:
+          label: Copy secret key
+      - action: expect
+        with:
+          label: Rotate Project API Key
+
+  - id: project-settings-rename-reads-back
+    title: Rename the project from its settings form, save and read the new name back after a reload
+    serial: true
+    steps:
+      - action: go
+        with:
+          path: /settings
+      - action: expect
+        with:
+          text: Project-level Settings
+      - action: fill
+        with:
+          selector: 'xpath=(//input[@name="name"])[2]'
+          value: vd-projset-{uid}
+      - action: click
+        with:
+          selector: 'xpath=(//button[normalize-space()="Save Changes"])[2]'
+      - action: expect
+        with:
+          text: Project updated
+      - action: go
+        with:
+          path: /settings
+      - action: capture
+        with:
+          selector: 'xpath=(//input[@name="name"])[2]'
+          as: projectName
+          match: "^vd-projset-{uid}$"

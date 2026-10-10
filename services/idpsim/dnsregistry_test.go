@@ -1,22 +1,18 @@
 package idpsim
 
 import (
+	"encoding/json"
 	"net/http"
-	"net/url"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-// publish posts the registry form the way the tenant page's button does.
-func publish(s *Server, domain, value string) *http.Response {
-	form := url.Values{"domain": {domain}, "value": {value}}
-	r, _ := http.NewRequest(http.MethodPost, testBase+"/t/1/dns",
-		strings.NewReader(form.Encode()))
-	r.Header.Set("content-type", "application/x-www-form-urlencoded")
-	return do(s, r).Result()
+// publish sends the registry's two fields the way the tenant page's button does.
+func publish(s *Server, name, value string) *http.Response {
+	body, _ := json.Marshal(map[string]string{"name": name, "value": value})
+	return apiRequest(s, http.MethodPost, "/api/t/1/dns", string(body)).Result()
 }
 
 // @scenario "A domain proof can be published from the simulator's own page"
@@ -25,8 +21,7 @@ func TestDNSRegistryPublishesBothChannels(t *testing.T) {
 
 	t.Run("given a value LangWatch minted for a domain with no real DNS", func(t *testing.T) {
 		res := publish(s, "acme1.test", "lw-verify-abc123")
-		require.Equal(t, http.StatusSeeOther, res.StatusCode,
-			"the form redirects back to the tenant page")
+		require.Equal(t, http.StatusOK, res.StatusCode)
 
 		// The verifier asks for the label, not the bare domain, so publishing
 		// at the domain alone would answer a question nobody asks.
@@ -47,11 +42,8 @@ func TestDNSRegistryPublishesBothChannels(t *testing.T) {
 
 	// @scenario "A published record can be taken back out again"
 	t.Run("given the record is taken back out", func(t *testing.T) {
-		form := url.Values{"name": {"_langwatch-verification.acme1.test"}}
-		r, _ := http.NewRequest(http.MethodPost, testBase+"/t/1/dns/delete",
-			strings.NewReader(form.Encode()))
-		r.Header.Set("content-type", "application/x-www-form-urlencoded")
-		require.Equal(t, http.StatusSeeOther, do(s, r).Result().StatusCode)
+		rec := apiRequest(s, http.MethodDelete, "/api/t/1/dns/_langwatch-verification.acme1.test", "")
+		require.Equal(t, http.StatusNoContent, rec.Code)
 
 		t.Run("stops answering the TXT lookup", func(t *testing.T) {
 			_, ok := s.verification.TXT("_langwatch-verification.acme1.test")
@@ -74,10 +66,13 @@ func TestDNSRegistryRefusesAnIncompleteRecord(t *testing.T) {
 	t.Run("given a domain with no value", func(t *testing.T) {
 		res := publish(s, "acme1.test", "")
 
-		// Not a redirect: a form that silently bounced back would look like
-		// it had published something.
+		// A refusal, not a quiet success that would look like it had
+		// published something.
 		t.Run("refuses it and says what is missing", func(t *testing.T) {
 			assert.Equal(t, http.StatusBadRequest, res.StatusCode)
+			var notice refusalNotice
+			require.NoError(t, json.NewDecoder(res.Body).Decode(&notice))
+			assert.Equal(t, "A record needs a name and a value", notice.Title)
 		})
 
 		t.Run("publishes nothing", func(t *testing.T) {
@@ -95,7 +90,7 @@ func TestDNSRegistryTakesTheNameLangWatchShows(t *testing.T) {
 	// that row. Refusing it would make the form reject its own instructions.
 	t.Run("given the full record name is pasted", func(t *testing.T) {
 		res := publish(s, "_langwatch-verification.acme1.test", "lw-verify-xyz")
-		require.Equal(t, http.StatusSeeOther, res.StatusCode)
+		require.Equal(t, http.StatusOK, res.StatusCode)
 
 		t.Run("does not label an already-labeled name twice", func(t *testing.T) {
 			_, doubled := s.verification.TXT(
@@ -133,7 +128,7 @@ func TestDNSRegistryNormalizesTheDomain(t *testing.T) {
 	// A domain typed with different case or a trailing dot is the same domain,
 	// and the lookup will ask for the normalized one.
 	t.Run("given a domain typed with capitals and a trailing dot", func(t *testing.T) {
-		require.Equal(t, http.StatusSeeOther, publish(s, "ACME1.Test.", "v1").StatusCode)
+		require.Equal(t, http.StatusOK, publish(s, "ACME1.Test.", "v1").StatusCode)
 
 		t.Run("publishes under the name the lookup will ask for", func(t *testing.T) {
 			values, ok := s.verification.TXT("_langwatch-verification.acme1.test")

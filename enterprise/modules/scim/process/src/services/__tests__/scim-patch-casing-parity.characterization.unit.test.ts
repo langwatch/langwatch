@@ -1,0 +1,200 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+
+import { scimPatchRequestSchema } from "@langwatch/enterprise-scim-contract";
+import type { EntitlementApi } from "@langwatch/entitlement-contract";
+import { Temporal } from "@langwatch/time";
+import { describe, expect, it, vi } from "vitest";
+
+import { GrantsFake } from "../../__tests__/support/grants-fake.ts";
+import { HeldConnectionsFake } from "../../__tests__/support/held-connections-fake.ts";
+import {
+  MembersFake,
+  OrganizationAdministrationFake,
+} from "../../__tests__/support/organization-administration-fake.ts";
+import { scimRepositoryFixture } from "../../__tests__/support/scim-repository-fixture.ts";
+import type { ScimCostCenterFacts } from "../scim-cost-center.service.ts";
+import { ScimDirectoryService } from "../scim-directory.service.ts";
+import type { ScimDirectoryRepository } from "../scim-directory.service.ts";
+import { ScimGrantsService } from "../scim-grants.service.ts";
+import type { ScimUserProvisioning } from "../scim-provisioning.service.ts";
+import { ScimService } from "../scim.service.ts";
+import { QuietScimSyncLifecycle } from "./support/quiet-scim-sync-lifecycle.ts";
+
+/** Every seat free, so these tests admit full members (seat-limit-at-provisioning.feature). */
+const openSeats = {
+  countMemberSeats: async () => ({ fullMembers: 0, liteMembers: 0, developers: 0 }),
+};
+
+const patchSchema = "urn:ietf:params:scim:api:messages:2.0:PatchOp";
+const parse = (operations: unknown[]) =>
+  scimPatchRequestSchema.parse({ schemas: [patchSchema], Operations: operations });
+
+class EnterpriseEntitlements implements Pick<EntitlementApi, "getActivePlan"> {
+  async getActivePlan() {
+    return {
+      planSource: "free" as const,
+      type: "ENTERPRISE",
+      name: "Enterprise",
+      free: false,
+      maxMembers: 1,
+      maxMembersLite: 1,
+      maxMessagesPerMonth: 1,
+      canPublish: true,
+      prices: { USD: 0, EUR: 0 },
+    };
+  }
+}
+
+function groupRepository(): ScimDirectoryRepository {
+  return {
+    findGroupByExternalId: vi.fn(async () => null),
+    findGroup: vi.fn(async () => ({
+      id: "group-1",
+      organizationId: "org-1",
+      name: "Engineering",
+      slug: "engineering",
+      scimSource: "scim",
+      externalId: "group-1",
+      connectionId: null,
+      createdAt: Temporal.Instant.from("2024-01-01T00:00:00Z"),
+      updatedAt: Temporal.Instant.from("2024-01-02T00:00:00Z"),
+    })),
+    findGroupMemberIds: vi.fn(async () => ["user-1"]),
+    findGroupMembers: vi.fn(async () => []),
+    addGroupMember: vi.fn(async () => undefined),
+    removeGroupMembers: vi.fn(async () => undefined),
+    listGroups: vi.fn(async () => ({ rows: [], total: 0 })),
+    createGroup: vi.fn(),
+    renameGroup: vi.fn(async () => undefined),
+    deleteGroup: vi.fn(async () => undefined),
+    groupSlugExists: vi.fn(async () => false),
+  };
+}
+
+const notReached = async (): Promise<never> => {
+  throw new Error("not reached by the patch-casing parity tests");
+};
+
+function userService(): ScimUserProvisioning {
+  const current = {
+    id: "user-1",
+    name: "Alice Smith",
+    email: "alice@acme.com",
+    emailVerified: false,
+    image: null,
+    pendingSsoSetup: false,
+    createdAt: new Date("2024-01-01T00:00:00Z"),
+    updatedAt: new Date("2024-01-02T00:00:00Z"),
+    lastLoginAt: null,
+    deactivatedAt: null,
+  };
+  // The one this file exercises answers; the other two throw, because a patch
+  // that reached user creation or an address lookup would mean the casing
+  // parity under test had routed somewhere it should not.
+  return {
+    findById: vi.fn(async () => ({ ...current, deactivatedAt: new Date() })),
+    findByEmail: vi.fn(notReached),
+    create: vi.fn(notReached),
+  } satisfies ScimUserProvisioning;
+}
+
+function costCenterFacts(): ScimCostCenterFacts {
+  return {
+    recordCostCenterChanged: vi.fn(async () => undefined),
+  };
+}
+
+describe("SCIM PATCH operation casing parity", () => {
+  it("normalizes capitalized operations at the protocol boundary", () => {
+    const parsed = parse([
+      { op: "Replace", path: "active", value: false },
+      { op: "Add", path: "members", value: [{ value: "user-1" }] },
+      { op: "Remove", path: 'members[value eq "user-1"]' },
+    ]);
+    expect(parsed.Operations.map((operation) => operation.op)).toEqual([
+      "replace",
+      "add",
+      "remove",
+    ]);
+  });
+
+  it("applies a capitalized Replace to user deactivation", async () => {
+    const repo = scimRepositoryFixture({
+      ...groupRepository(),
+      findMembership: vi.fn(async () => ({
+        userId: "user-1",
+        organizationId: "org-1",
+        user: {
+          id: "user-1",
+          name: "Alice Smith",
+          email: "alice@acme.com",
+          emailVerified: false,
+          image: null,
+          pendingSsoSetup: false,
+          createdAt: new Date("2024-01-01T00:00:00Z"),
+          updatedAt: new Date("2024-01-02T00:00:00Z"),
+          lastLoginAt: null,
+          deactivatedAt: null,
+        },
+      })),
+    });
+    const members = new MembersFake();
+    const service = ScimService.create({
+      members,
+      connections: HeldConnectionsFake.of(),
+      prisma: repo,
+      writer: new GrantsFake(),
+      users: userService(),
+      costCenterFacts: costCenterFacts(),
+      organization: new OrganizationAdministrationFake(),
+      entitlements: new EnterpriseEntitlements(),
+      lifecycle: new QuietScimSyncLifecycle(),
+      provenOffboarding: false,
+      tokenPepper: "scim-test-pepper",
+      seats: openSeats,
+    });
+    await service.updateUser({
+      id: "user-1",
+      organizationId: "org-1",
+      patchRequest: parse([{ op: "Replace", path: "active", value: false }]),
+    });
+    expect(repo.saveUserResource).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: "user-1", active: false }),
+    );
+    // A leaver's membership goes with their access (scim-connection-sync.feature).
+    expect(members.deleteMember).toHaveBeenCalledWith(
+      { organizationId: "org-1", userId: "user-1" },
+      null,
+    );
+  });
+
+  it("applies a capitalized Replace to group renaming", async () => {
+    const repo = groupRepository();
+    const grants = new GrantsFake();
+    const service = ScimDirectoryService.create({
+      provenOffboarding: false,
+      prisma: repo,
+      grants: ScimGrantsService.create({ grants }),
+      identities: { assertWritable: vi.fn(async () => undefined) },
+    });
+    await service.updateGroup({
+      externalScimId: "group-1",
+      organizationId: "org-1",
+      patchRequest: parse([{ op: "Replace", path: "displayName", value: "Platform" }]),
+    });
+    expect(repo.renameGroup).toHaveBeenCalledWith({ id: "group-1", name: "Platform" });
+  });
+
+  it("continues to accept the RFC lowercase spelling", () => {
+    expect(parse([{ op: "replace", value: { active: false } }]).Operations[0]?.op).toBe("replace");
+  });
+
+  it("rejects a value that is not a SCIM operation", () => {
+    expect(
+      scimPatchRequestSchema.validate({
+        schemas: [patchSchema],
+        Operations: [{ op: "Delete", value: {} }],
+      }),
+    ).toBe(false);
+  });
+});

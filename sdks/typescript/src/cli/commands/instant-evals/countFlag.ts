@@ -1,16 +1,9 @@
 /**
- * Reading a count flag, the same way for every command that takes one.
- *
- * `Number(raw)` alone sends `--limit abc` on as `NaN`, which serialises to
- * `null` and comes back as a schema refusal naming a field the caller never
- * wrote. The ceilings are the server's own, so a value over one is named here
- * rather than travelling to be rejected.
+ * Reads a count flag the same way for every command: `Number("abc")` would travel as `null` and
+ * come back as a confusing schema refusal. The server's ceilings are enforced here, by name.
  */
 
-import {
-  commandValidationError,
-  reportCommandError,
-} from "../../utils/errorOutput";
+import { commandValidationError, reportCommandError } from "../../utils/errorOutput";
 
 /** Judgements one page may hold, matching the server's ceiling. */
 export const INSTANT_EVAL_RESULTS_CEILING = 1_000;
@@ -27,10 +20,9 @@ function refuse(message: string): never {
 }
 
 /**
- * The count a flag asked for, or a refusal naming the flag and the ceiling.
- *
- * Answers undefined when the flag was not written, so a caller leaves the
- * field off the request and the server applies its own default.
+ * The count a flag asked for, or a refusal naming the flag and the ceiling. Answers undefined when
+ * the flag was not written, so a caller leaves the field off the request and the server applies its
+ * own default.
  */
 export function readCountFlag({
   raw,

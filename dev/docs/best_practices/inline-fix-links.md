@@ -10,11 +10,7 @@ Any link rendered outside the settings area that points into settings so the
 user can act on what they are looking at opens in a new tab:
 
 ```tsx
-<NextLink
-  href="/settings/data-privacy"
-  target="_blank"
-  rel="noopener noreferrer"
->
+<NextLink href="/settings/data-privacy" target="_blank" rel="noopener noreferrer">
   Open privacy settings
 </NextLink>
 ```

@@ -11,7 +11,7 @@
 #   - uses: ./.github/actions/setup-pnpm-node
 #     with:
 #       # optional: what to install. Omit to skip installing entirely.
-#       install: "@langwatch/web..."
+#       install: "@langwatch/platform-api..."
 #       # optional: npm registry for a publish job. Writes the .npmrc that
 #       # `pnpm publish` authenticates through. Omit everywhere else.
 #       registry-url: "https://registry.npmjs.org"
@@ -36,8 +36,8 @@ inputs:
       What to install. Omit to skip the install step. `all` installs every
       workspace project. Anything else is split on whitespace and each word
       becomes one `pnpm --filter`, so a trailing `...` selects a project
-      together with its workspace dependencies (e.g. `@langwatch/web...`,
-      or `@langwatch/web... @langwatch/langyworker...` for two roots).
+      together with its workspace dependencies (e.g. `@langwatch/platform-api...`,
+      or `@langwatch/platform-api... @langwatch/langyworker...` for two roots).
     required: false
     default: ""
   registry-url:
@@ -56,13 +56,13 @@ runs:
       if: inputs.install-dir != ''
       shell: bash
       run: |
-        echo "::error::setup-pnpm-node no longer takes 'install-dir'. The repo is a single pnpm workspace (ADR-076), so installs run from the root and are narrowed with a filter. Replace 'install-dir: <dir>' with 'install: \"<package-name>...\"' — e.g. install-dir: langwatch becomes install: \"@langwatch/web...\"."
+        echo "::error::setup-pnpm-node no longer takes 'install-dir'. The repo is a single pnpm workspace (ADR-076), so installs run from the root and are narrowed with a filter. Replace 'install-dir: <dir>' with 'install: \"<package-name>...\"' — e.g. install-dir: langwatch becomes install: \"langwatch...\"."
         exit 1
 
     - name: Setup pnpm
       uses: pnpm/action-setup@0e279bb959325dab635dd2c09392533439d90093 # v6.0.8
       with:
-        version: 10.24.0
+        version: 12.6.0
 
     - name: Setup Node
       uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6
@@ -71,6 +71,15 @@ runs:
         cache: "pnpm"
         cache-dependency-path: ${{ inputs.cache-dependency-path }}
         registry-url: ${{ inputs.registry-url }}
+
+    # The dev scripts (generate:modules, sync:references, ensure:built, and the
+    # apps' predev/pretest hooks) are Go: dev/scripts/devscripts.sh runs them.
+    - name: Setup Go
+      if: inputs.install != ''
+      uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      with:
+        go-version-file: go.work
+        cache-dependency-path: "*/go.sum"
 
     # node-gyp is no longer bundled on PATH under Node-24 + npm-11, so any
     # native-module install lifecycle script (e.g. node-pty's prebuild fallback

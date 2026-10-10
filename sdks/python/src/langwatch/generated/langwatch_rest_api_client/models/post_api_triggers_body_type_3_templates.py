@@ -6,14 +6,8 @@ from typing import Any, TypeVar, cast
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
-from ..models.post_api_triggers_body_type_3_templates_slack_template_type_type_1 import (
-    PostApiTriggersBodyType3TemplatesSlackTemplateTypeType1,
-)
-from ..models.post_api_triggers_body_type_3_templates_slack_template_type_type_2_type_1 import (
-    PostApiTriggersBodyType3TemplatesSlackTemplateTypeType2Type1,
-)
-from ..models.post_api_triggers_body_type_3_templates_slack_template_type_type_3_type_1 import (
-    PostApiTriggersBodyType3TemplatesSlackTemplateTypeType3Type1,
+from ..models.post_api_triggers_body_type_3_templates_slack_template_type_type_0 import (
+    PostApiTriggersBodyType3TemplatesSlackTemplateTypeType0,
 )
 from ..types import UNSET, Unset
 
@@ -26,21 +20,13 @@ class PostApiTriggersBodyType3Templates:
     channel.
 
         Attributes:
-            slack_template_type (None | PostApiTriggersBodyType3TemplatesSlackTemplateTypeType1 |
-                PostApiTriggersBodyType3TemplatesSlackTemplateTypeType2Type1 |
-                PostApiTriggersBodyType3TemplatesSlackTemplateTypeType3Type1 | Unset):
+            slack_template_type (None | PostApiTriggersBodyType3TemplatesSlackTemplateTypeType0 | Unset):
             slack_template (None | str | Unset):
             email_subject_template (None | str | Unset):
             email_body_template (None | str | Unset):
     """
 
-    slack_template_type: (
-        None
-        | PostApiTriggersBodyType3TemplatesSlackTemplateTypeType1
-        | PostApiTriggersBodyType3TemplatesSlackTemplateTypeType2Type1
-        | PostApiTriggersBodyType3TemplatesSlackTemplateTypeType3Type1
-        | Unset
-    ) = UNSET
+    slack_template_type: None | PostApiTriggersBodyType3TemplatesSlackTemplateTypeType0 | Unset = UNSET
     slack_template: None | str | Unset = UNSET
     email_subject_template: None | str | Unset = UNSET
     email_body_template: None | str | Unset = UNSET
@@ -50,11 +36,7 @@ class PostApiTriggersBodyType3Templates:
         slack_template_type: None | str | Unset
         if isinstance(self.slack_template_type, Unset):
             slack_template_type = UNSET
-        elif isinstance(self.slack_template_type, PostApiTriggersBodyType3TemplatesSlackTemplateTypeType1):
-            slack_template_type = self.slack_template_type.value
-        elif isinstance(self.slack_template_type, PostApiTriggersBodyType3TemplatesSlackTemplateTypeType2Type1):
-            slack_template_type = self.slack_template_type.value
-        elif isinstance(self.slack_template_type, PostApiTriggersBodyType3TemplatesSlackTemplateTypeType3Type1):
+        elif isinstance(self.slack_template_type, PostApiTriggersBodyType3TemplatesSlackTemplateTypeType0):
             slack_template_type = self.slack_template_type.value
         else:
             slack_template_type = self.slack_template_type
@@ -97,13 +79,7 @@ class PostApiTriggersBodyType3Templates:
 
         def _parse_slack_template_type(
             data: object,
-        ) -> (
-            None
-            | PostApiTriggersBodyType3TemplatesSlackTemplateTypeType1
-            | PostApiTriggersBodyType3TemplatesSlackTemplateTypeType2Type1
-            | PostApiTriggersBodyType3TemplatesSlackTemplateTypeType3Type1
-            | Unset
-        ):
+        ) -> None | PostApiTriggersBodyType3TemplatesSlackTemplateTypeType0 | Unset:
             if data is None:
                 return data
             if isinstance(data, Unset):
@@ -111,35 +87,12 @@ class PostApiTriggersBodyType3Templates:
             try:
                 if not isinstance(data, str):
                     raise TypeError()
-                slack_template_type_type_1 = PostApiTriggersBodyType3TemplatesSlackTemplateTypeType1(data)
+                slack_template_type_type_0 = PostApiTriggersBodyType3TemplatesSlackTemplateTypeType0(data)
 
-                return slack_template_type_type_1
+                return slack_template_type_type_0
             except (TypeError, ValueError, AttributeError, KeyError):
                 pass
-            try:
-                if not isinstance(data, str):
-                    raise TypeError()
-                slack_template_type_type_2_type_1 = PostApiTriggersBodyType3TemplatesSlackTemplateTypeType2Type1(data)
-
-                return slack_template_type_type_2_type_1
-            except (TypeError, ValueError, AttributeError, KeyError):
-                pass
-            try:
-                if not isinstance(data, str):
-                    raise TypeError()
-                slack_template_type_type_3_type_1 = PostApiTriggersBodyType3TemplatesSlackTemplateTypeType3Type1(data)
-
-                return slack_template_type_type_3_type_1
-            except (TypeError, ValueError, AttributeError, KeyError):
-                pass
-            return cast(
-                None
-                | PostApiTriggersBodyType3TemplatesSlackTemplateTypeType1
-                | PostApiTriggersBodyType3TemplatesSlackTemplateTypeType2Type1
-                | PostApiTriggersBodyType3TemplatesSlackTemplateTypeType3Type1
-                | Unset,
-                data,
-            )
+            return cast(None | PostApiTriggersBodyType3TemplatesSlackTemplateTypeType0 | Unset, data)
 
         slack_template_type = _parse_slack_template_type(d.pop("slackTemplateType", UNSET))
 

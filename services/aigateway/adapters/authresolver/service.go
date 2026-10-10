@@ -112,6 +112,10 @@ const DefaultLastKnownConfigMaxAge = time.Hour
 // seconds rather than the client's full timeout.
 const lastKnownFetchTimeout = 5 * time.Second
 
+// budgetRefreshRetry paces the background refresh a budget change asks for, so
+// a control plane that keeps failing it is asked at most once a second per key.
+const budgetRefreshRetry = time.Second
+
 // tierL1 is the cache tier name reported on the auth-cache metrics. The
 // gateway caches virtual keys in this node's own memory and nowhere else, so
 // the label carries one value; it stays a label because the metric names are
@@ -174,6 +178,9 @@ type entry struct {
 	// in-flight guard so at most one background config fetch runs per entry.
 	configFetchedAt  time.Time
 	configRefreshing bool
+	// authRefreshing is the same guard for the near-expiry auth refresh:
+	// at most one background ResolveKey per entry.
+	authRefreshing bool
 	// configConfirmedAt is the last time the control plane actually answered
 	// for this config (a fetch or a 304). Failures never stamp it; it is what
 	// bounds the last-known fallback.
@@ -198,6 +205,38 @@ type entry struct {
 	// would ack a boundary the entry has not reached yet and suppress the roll
 	// when it does.
 	budgetRollAckedFor time.Time
+	// budgetChanges counts the BUDGET_UPDATED events this entry's spend has not
+	// caught up with. Non-zero makes the next request start a background
+	// refresh; budgetRetryAt paces it when that refresh fails.
+	budgetChanges uint64
+	budgetRetryAt time.Time
+}
+
+// markBudgetChanged records that the spend this entry carries is behind.
+func (e *entry) markBudgetChanged() {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.budgetChanges++
+}
+
+// budgetChangeCount reports how many budget changes this entry has seen.
+func (e *entry) budgetChangeCount() uint64 {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return e.budgetChanges
+}
+
+// tryBeginBudgetRefresh claims the auth-refresh slot when a budget change is
+// pending and the previous attempt is at least budgetRefreshRetry old.
+func (e *entry) tryBeginBudgetRefresh(now time.Time) bool {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if e.budgetChanges == 0 || e.authRefreshing || now.Before(e.budgetRetryAt) {
+		return false
+	}
+	e.authRefreshing = true
+	e.budgetRetryAt = now.Add(budgetRefreshRetry)
+	return true
 }
 
 // currentConfigETag reports the ETag of the config this entry is carrying.
@@ -300,6 +339,24 @@ func (e *entry) tryBeginConfigRefresh() bool {
 	}
 	e.configRefreshing = true
 	return true
+}
+
+// tryBeginAuthRefresh claims the per-entry auth-refresh slot.
+func (e *entry) tryBeginAuthRefresh() bool {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if e.authRefreshing {
+		return false
+	}
+	e.authRefreshing = true
+	return true
+}
+
+// endAuthRefresh releases the auth-refresh slot.
+func (e *entry) endAuthRefresh() {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.authRefreshing = false
 }
 
 // endConfigRefresh releases the slot and stamps configFetchedAt so a
@@ -604,7 +661,12 @@ func (s *Service) resolveCached(ctx context.Context, lk lookup, e *entry) (*doma
 		// Serve, maybe trigger background refresh on near-expiry.
 		s.recordHit()
 		if e.nearSoftExpiry(s.refreshThreshold) {
-			go s.refreshBackground(lk.key, lk.hash) //nolint:gosec // G118: intentional fire-and-forget refresh detached from request
+			if e.tryBeginAuthRefresh() {
+				go s.refreshBackground(lk.key, lk.hash, e) //nolint:gosec // G118: intentional fire-and-forget refresh detached from request
+			}
+		} else if e.tryBeginBudgetRefresh(time.Now()) {
+			// Spend moved: the cached bundle keeps serving while the new figures load.
+			go s.refreshBackground(lk.key, lk.hash, e) //nolint:gosec // G118: intentional fire-and-forget refresh detached from request
 		} else if e.configStale(s.configTTL) && e.tryBeginConfigRefresh() {
 			go s.refreshConfigBackground(lk.hash, e) //nolint:gosec // G118: intentional fire-and-forget refresh detached from request
 		}
@@ -968,11 +1030,11 @@ func (s *Service) Stop() {
 // records its org for the change feed. An empty configETag is the honest state
 // after a response that carried none: the next staleness refresh asks for the
 // config outright rather than revalidating against a token we do not have.
-func (s *Service) storeL1(h [64]byte, bundle *domain.Bundle, configETag string) {
+func (s *Service) storeL1(h [64]byte, bundle *domain.Bundle, configETag string) *entry {
 	softExpiresAt, hardExpiresAt := entryDeadlines(bundle, s.hardGrace)
 	now := time.Now()
 	s.lastKnown.Remove(h)
-	s.l1.Add(h, &entry{
+	stored := &entry{
 		bundle:             bundle,
 		softExpiresAt:      softExpiresAt,
 		hardExpiresAt:      hardExpiresAt,
@@ -980,7 +1042,8 @@ func (s *Service) storeL1(h [64]byte, bundle *domain.Bundle, configETag string) 
 		configConfirmedAt:  now,
 		configETag:         configETag,
 		budgetRollAckedFor: ackedBoundaryAtBuild(bundle, now),
-	})
+	}
+	s.l1.Add(h, stored)
 	// Record the bundle's org so the change-feed loop knows which orgs
 	// to subscribe to. LoadOrStore is the first-write-wins shape: if
 	// the org's already known, the existing cursor is preserved so we
@@ -988,6 +1051,16 @@ func (s *Service) storeL1(h [64]byte, bundle *domain.Bundle, configETag string) 
 	// bundle for an existing org.
 	if bundle.OrganizationID != "" {
 		s.activeOrgs.LoadOrStore(bundle.OrganizationID, &orgCursor{since: "0"})
+	}
+	return stored
+}
+
+// carryBudgetChanges marks a replacement entry when budget changes reached the
+// entry it replaces after its refresh had already started, since the figures
+// that refresh read may predate them.
+func carryBudgetChanges(from, to *entry, seenAtStart uint64) {
+	if from.budgetChangeCount() != seenAtStart {
+		to.markBudgetChanged()
 	}
 }
 
@@ -1023,60 +1096,93 @@ func entryDeadlines(bundle *domain.Bundle, hardGrace time.Duration) (soft, hard 
 // embeds its own short pause server-side so a transient control-plane
 // blip just produces a few quick retry passes here, not a tight spin.
 func (s *Service) changeFeedLoop(ctx context.Context) {
+	// One long-poll loop per active org, so a revoke reaches the cache in one
+	// poll's time however many orgs this node serves.
+	started := map[string]bool{}
+	tick := time.NewTicker(time.Second)
+	defer tick.Stop()
 	for {
+		s.activeOrgs.Range(func(key, value any) bool {
+			orgID, _ := key.(string)
+			cursor, _ := value.(*orgCursor)
+			if !started[orgID] {
+				started[orgID] = true
+				go s.orgChangeFeedLoop(ctx, orgID, cursor)
+			}
+			return true
+		})
 		select {
 		case <-ctx.Done():
 			return
 		case <-s.stopCh:
 			return
-		default:
+		case <-tick.C:
 		}
-		s.activeOrgs.Range(func(key, value any) bool {
-			orgID, _ := key.(string)
-			cursor, _ := value.(*orgCursor)
-			changes, nextRev, err := s.changePoller.PollChanges(ctx, orgID, cursor.since)
-			if err != nil {
-				s.logger.Warn("change_feed_poll_failed",
-					zap.String("organization_id", orgID),
-					zap.Error(err),
-				)
-				// Tiny pause so a tight error loop doesn't burn CPU
-				// when the control plane is down. Server long-poll is
-				// the primary brake for the success path.
-				time.Sleep(2 * time.Second)
-				return true
-			}
-			for _, ch := range changes {
-				s.applyChange(orgID, ch)
-			}
-			if nextRev != "" {
-				cursor.since = nextRev
-			}
-			return true
-		})
-		// If no orgs are active yet (first request hasn't landed), back
-		// off briefly so we don't spin on Range() over an empty map.
-		empty := true
-		s.activeOrgs.Range(func(_, _ any) bool {
-			empty = false
-			return false
-		})
-		if empty {
-			select {
-			case <-ctx.Done():
-				return
-			case <-s.stopCh:
-				return
-			case <-time.After(5 * time.Second):
-			}
+	}
+}
+
+// orgChangeFeedLoop long-polls one org's change feed until the service stops.
+// The cursor is touched only by this goroutine.
+func (s *Service) orgChangeFeedLoop(ctx context.Context, orgID string, cursor *orgCursor) {
+	for !s.isStopping(ctx) {
+		err := s.pollOrgChanges(ctx, orgID, cursor)
+		if err == nil {
+			continue
 		}
+		s.logger.Warn("change_feed_poll_failed",
+			zap.String("organization_id", orgID),
+			zap.Error(err),
+		)
+		// Pause so a down control plane is not polled in a tight loop.
+		if !s.waitUnlessStopping(ctx, 2*time.Second) {
+			return
+		}
+	}
+}
+
+// pollOrgChanges runs one long poll for an org and applies what it returns.
+func (s *Service) pollOrgChanges(ctx context.Context, orgID string, cursor *orgCursor) error {
+	changes, nextRev, err := s.changePoller.PollChanges(ctx, orgID, cursor.since)
+	if err != nil {
+		return err
+	}
+	for _, ch := range changes {
+		s.applyChange(orgID, ch)
+	}
+	if nextRev != "" {
+		cursor.since = nextRev
+	}
+	return nil
+}
+
+// isStopping reports, without blocking, whether the service is shutting down.
+func (s *Service) isStopping(ctx context.Context) bool {
+	select {
+	case <-ctx.Done():
+		return true
+	case <-s.stopCh:
+		return true
+	default:
+		return false
+	}
+}
+
+// waitUnlessStopping waits for d and reports false if the service stops first.
+func (s *Service) waitUnlessStopping(ctx context.Context, d time.Duration) bool {
+	select {
+	case <-ctx.Done():
+		return false
+	case <-s.stopCh:
+		return false
+	case <-time.After(d):
+		return true
 	}
 }
 
 // applyChange is the cache-invalidation switchboard. Each kind walks L1
 // once with a kind-specific predicate and removes matching entries; the
 // next request for those VKs takes a cold miss and re-resolves with the
-// fresh control-plane state.
+// fresh control-plane state. BUDGET_UPDATED marks instead of removing.
 //
 // The evict reason is the lowercased change kind, so an operator reading
 // auth_cache_change_evict sees which mutation caused it. Hardcoding one
@@ -1111,19 +1217,15 @@ func (s *Service) applyChange(organizationID string, ch CacheChange) {
 			}
 			return false
 		}, evictScope{reason: evictReason(ch.Kind), target: ch.ModelProviderID, keepLastKnown: keepLastKnown})
-	case ChangeKindBudgetCreated, ChangeKindBudgetUpdated, ChangeKindBudgetDeleted:
-		// Only PROJECT-scoped creates carry project_id. Updates, deletes, and
-		// every other scope omit it, so invalidate the polled organization in
-		// those cases rather than leaving a stale budget enforced until TTL.
-		if ch.ProjectID != "" {
-			s.evictWhere(func(b *domain.Bundle) bool {
-				return b.ProjectID == ch.ProjectID
-			}, evictScope{reason: evictReason(ch.Kind), target: ch.ProjectID, keepLastKnown: keepLastKnown})
-			return
-		}
-		s.evictWhere(func(b *domain.Bundle) bool {
-			return b.OrganizationID == organizationID
-		}, evictScope{reason: evictReason(ch.Kind), target: organizationID, keepLastKnown: keepLastKnown})
+	case ChangeKindBudgetUpdated:
+		// Every debit emits this, so evicting would put a control-plane round
+		// trip in front of the project's next request. The cached bundle keeps
+		// serving and the next request refreshes it in the background.
+		match, target := budgetChangeMatch(organizationID, ch)
+		s.markBudgetChangedWhere(match, evictReason(ch.Kind), target)
+	case ChangeKindBudgetCreated, ChangeKindBudgetDeleted:
+		match, target := budgetChangeMatch(organizationID, ch)
+		s.evictWhere(match, evictScope{reason: evictReason(ch.Kind), target: target, keepLastKnown: keepLastKnown})
 	case ChangeKindVirtualKeyConfigUpdate, ChangeKindVirtualKeyRotated, ChangeKindVirtualKeyRevoked,
 		ChangeKindVirtualKeyDisabled, ChangeKindVirtualKeyEnabled:
 		if ch.VirtualKeyID == "" {
@@ -1164,6 +1266,39 @@ func (s *Service) applyChange(organizationID string, ch CacheChange) {
 			zap.String("organization_id", organizationID),
 		)
 	}
+}
+
+// budgetChangeMatch selects the bundles a budget change reaches. Only
+// project-scoped creates and debits carry project_id; every other budget
+// change reaches the polled organization rather than leaving a stale budget
+// enforced until TTL.
+func budgetChangeMatch(organizationID string, ch CacheChange) (func(*domain.Bundle) bool, string) {
+	if ch.ProjectID != "" {
+		return func(b *domain.Bundle) bool { return b.ProjectID == ch.ProjectID }, ch.ProjectID
+	}
+	return func(b *domain.Bundle) bool { return b.OrganizationID == organizationID }, organizationID
+}
+
+// markBudgetChangedWhere marks every L1 entry whose bundle matches as behind
+// on spend, without removing any. Peek for the same reason as evictWhere.
+func (s *Service) markBudgetChangedWhere(match func(*domain.Bundle) bool, reason, target string) {
+	marked := 0
+	for _, h := range s.l1.Keys() {
+		e, ok := s.l1.Peek(h)
+		if !ok || !match(e.bundle) {
+			continue
+		}
+		e.markBudgetChanged()
+		marked++
+	}
+	if marked == 0 {
+		return
+	}
+	s.logger.Debug("auth_cache_change_refresh_pending",
+		zap.String("reason", reason),
+		zap.String("target", target),
+		zap.Int("marked", marked),
+	)
 }
 
 // revokesKey reports whether a change kind makes the key itself unusable, in
@@ -1248,7 +1383,9 @@ func (s *Service) dropLastKnownWhere(match func(*domain.Bundle) bool) {
 // fire-and-forget when the entry has less than RefreshThreshold left
 // before softExpiresAt. Same classification as foreground:
 // AuthRejection evicts; TransportFailure bumps the existing entry.
-func (s *Service) refreshBackground(key domain.PresentedKey, h [64]byte) {
+func (s *Service) refreshBackground(key domain.PresentedKey, h [64]byte, started *entry) {
+	defer started.endAuthRefresh()
+	budgetChangesAtStart := started.budgetChangeCount()
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 	bundle, err := s.resolver.ResolveKey(ctx, key)
@@ -1269,7 +1406,13 @@ func (s *Service) refreshBackground(key domain.PresentedKey, h [64]byte) {
 			s.bumpEntryAfterTransportFailure(h, cfgErr)
 			return
 		}
-		s.storeL1(h, bundle, etag)
+		// Same guard as refreshConfigBackground: an entry evicted or replaced
+		// while the refresh was in flight stays gone.
+		if cur, ok := s.l1.Peek(h); !ok || cur != started {
+			s.logger.Debug("auth_cache_refresh_dropped_stale", zap.String("vk_id", bundle.VirtualKeyID))
+			return
+		}
+		carryBudgetChanges(started, s.storeL1(h, bundle, etag), budgetChangesAtStart)
 		s.logger.Debug("auth_cache_refresh_success", zap.String("vk_id", bundle.VirtualKeyID))
 
 	case classAuthRejection:
@@ -1344,6 +1487,7 @@ func (s *Service) refreshConfigBackground(h [64]byte, e *entry) {
 	defer cancel()
 
 	stale, _, _ := e.snapshot()
+	budgetChangesAtStart := e.budgetChangeCount()
 	res, err := s.configFetcher.FetchConfig(ctx, stale.VirtualKeyID, e.refreshConfigETag())
 	if err != nil {
 		s.logger.Warn("config_ttl_refresh_failed",
@@ -1389,7 +1533,7 @@ func (s *Service) refreshConfigBackground(h [64]byte, e *entry) {
 		)
 		return
 	}
-	s.storeL1(h, &fresh, res.ETag)
+	carryBudgetChanges(e, s.storeL1(h, &fresh, res.ETag), budgetChangesAtStart)
 	s.logger.Debug("config_ttl_refresh_success", zap.String("vk_id", stale.VirtualKeyID))
 }
 

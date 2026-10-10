@@ -18,14 +18,19 @@ type Proxy interface {
 	Running() bool
 	// Installed reports whether a real portless binary is resolvable (a global
 	// install, a project-local one, or PORTLESS_BIN) rather than the on-demand
-	// `npx` fallback — so `haven setup` can tell the user to install it once.
+	// `npx` fallback — so `haven self setup` can tell the user to install it once.
 	Installed() bool
 	// EnsureReady boots the proxy if it is not already running and trusts its CA
 	// on first run, so `haven up` self-bootstraps with no setup command at all.
 	// Idempotent; the CA trust is guarded so it does not re-prompt on every launch.
 	EnsureReady() error
-	// Install installs portless itself — `up`'s bootstrap when Installed() is
-	// false, so a fresh machine needs nothing but `haven up`.
+	// Version reports what the resolved binary says it is ("" when nothing is
+	// resolvable, or it will not answer), so `up` can tell the pinned version
+	// from another one without running an install to find out.
+	Version() string
+	// Install installs the pinned portless (domain.PortlessVersion) — `up`'s
+	// bootstrap when nothing is installed and its upgrade when the machine has a
+	// different version, so a fresh machine needs nothing but `haven up`.
 	Install() error
 	// Endpoint reports how the proxy is reachable (scheme, port) so URLs are
 	// correct on the default 443 or an unprivileged port.
@@ -39,8 +44,8 @@ type Proxy interface {
 	CACertPath() string
 }
 
-// Store persists everything under the thuishaven home dir plus the two
-// worktree-local files (the slug cache and the .env.portless overlay).
+// Store persists everything under the thuishaven home dir plus the worktree-local
+// files (the slug cache and the sticky selection).
 type Store interface {
 	SaveStack(domain.Stack) error
 	RemoveStack(slug string)
@@ -52,20 +57,30 @@ type Store interface {
 	// runs here, surviving terminals and reboots. ok=false means never written.
 	ReadSelection(worktreeDir string) (domain.Selection, bool)
 	WriteSelection(worktreeDir string, sel domain.Selection) error
-	WriteOverlay(lwDir string, st domain.Stack) error
-	// HMR gate marker (worktree-local): expiry in unix-ms; 0/absent means no gate.
-	WriteHMRGate(lwDir string, expiryUnixMs int64) error
-	ReadHMRGate(lwDir string) (int64, bool)
-	ClearHMRGate(lwDir string)
+	// The machine-wide "never ask me about this prerequisite again" set that
+	// `haven self install` records. Machine-wide, not worktree-local, because the
+	// prerequisites are properties of the machine: a developer who declined
+	// the ClickHouse client once should not be asked by the next checkout.
+	// An absent or unreadable file is an empty set, never an error — a
+	// preference nobody has expressed yet is not a failure.
+	ReadPrereqSkips() map[string]bool
+	WritePrereqSkips(map[string]bool) error
+	// The machine's container posture, as the developer chose it. Same file
+	// and the same reasoning as the skips: it is a property of the machine,
+	// so every checkout on it gets the same answer. Empty means never chosen,
+	// which is what makes haven fall back to looking.
+	ReadContainerPosture() string
+	WriteContainerPosture(string) error
 	// TouchDBActivity records "slug's databases were in use now" — the clock the
 	// daemon's idle-database pruning reads. Touched on every `up` and refreshed
 	// by the daemon while a stack stays registered.
 	TouchDBActivity(slug string) error
 	DBActivity() map[string]time.Time
 	RemoveDBActivity(slug string)
-	// ClaimDaemon atomically records this process as the singleton daemon, but
-	// only if no record exists yet (O_EXCL). It returns false without overwriting
-	// when one already does, so two daemons racing to start can never both win.
+	// ClaimDaemon takes the daemon flock without waiting and, when it wins,
+	// writes the record; the lock is held until ClearDaemon or process death,
+	// so the kernel frees it on a crash and no stale record can block (D9).
+	// False means another daemon holds it.
 	ClaimDaemon(DaemonInfo) (bool, error)
 	Daemon() (DaemonInfo, bool)
 	ClearDaemon()
@@ -92,6 +107,18 @@ type Store interface {
 	// ObserveDuration records how long a run actually took, so the next one can
 	// be decided on evidence rather than a default.
 	ObserveDuration(command string, took time.Duration)
+	// HeavyRunSnapshots lists the heavy runs currently holding a slot, with
+	// what a wait estimate needs: each one's own command and when it started.
+	// Same liveness and expiry as HeavyRuns - every run this lists is one
+	// HeavyRuns counts.
+	HeavyRunSnapshots() []HeavyRunSnapshot
+	// AppendRunHistory records one completed heavy run - kind, when it
+	// started, how long it took, how it exited - for the wait estimate.
+	// Best-effort: an unwritable history must never fail the run it documents.
+	AppendRunHistory(domain.RunRecord) error
+	// RunHistory reads the recent history the estimate is built from, capped
+	// at domain.RunHistoryCap by AppendRunHistory itself.
+	RunHistory() []domain.RunRecord
 	// AppendReapEvent records one daemon reclamation (bounded ring, oldest
 	// dropped) and ReapEvents reads the record newest-last — the hub's "what
 	// has the reaper been doing" feed. Append failures are the daemon's to
@@ -100,16 +127,21 @@ type Store interface {
 	ReapEvents() []domain.ReapEvent
 }
 
-// ClaudeSettings writes another tool's configuration, which is why it is not on
+// AgentHookSettings writes another tool's configuration, which is why it is not on
 // Store: everything Store persists is haven's OWN state — stacks, slugs,
 // selections, the daemon record, heavy-run slots. This edits a file in the
-// developer's repo that belongs to Claude Code, and only `haven setup` uses it.
-type ClaudeSettings interface {
+// developer's repo that belongs to an agent client, and only `haven self setup` uses it.
+type AgentHookSettings interface {
 	// EnsureHook registers command as a PreToolUse hook in repoRoot's
-	// .claude/settings.local.json — untracked and per worktree. It merges: an
+	// local agent configuration — untracked and per worktree. It merges: an
 	// existing hooks block survives and an entry already present is left alone,
-	// so it reports whether anything actually changed.
+	// so it reports whether anything actually changed. A worktree opted out with
+	// Off leaves this a no-op.
 	EnsureHook(repoRoot, command string) (installed bool, err error)
+	// Off opts repoRoot out of the hook: it removes any existing registration
+	// and records the opt-out, so a later EnsureHook here - including the one
+	// `haven up` makes automatically - leaves it alone.
+	Off(repoRoot string) (turnedOff bool, err error)
 }
 
 // Supervisor runs child processes: one-shot prepare/seed steps and the
@@ -150,6 +182,9 @@ type Child struct {
 	// size-capped with one rotated generation — whether the stack runs attached
 	// or detached. It is what `haven logs` reads (ADR-064: logs are a tap).
 	LogPath string
+	// SplitLog captures a Node host lane per application (ui, api, worker) beside
+	// LogPath instead of into it, so logs list what a developer thinks about.
+	SplitLog bool
 }
 
 // ProcessSample is one live process as the tsgo governor's sampler sees it.
@@ -186,10 +221,16 @@ type System interface {
 	FreePorts(n int) ([]int, error)
 	PortInUse(port int) bool
 	ProcessAlive(pid int) bool
+	// ProcessStart is pid's start time, "" when unknown; pid plus start is a
+	// process's identity, so a reused pid is never mistaken for ours (D6).
+	ProcessStart(pid int) string
 	Terminate(pid int)
 	// TerminateGroup SIGTERMs pid's whole process group — how `haven restart`
 	// bounces one supervised child (its supervisor restarts it on exit).
 	TerminateGroup(pid int)
+	// Reload sends pid SIGUSR2, the Node host's "reload on demand" signal
+	// (tools/dev-runtime); the process keeps running.
+	Reload(pid int)
 	// KillGroup SIGKILLs pid's whole process group — `down -f`'s hard stop for
 	// a stack that must die now (or won't die gracefully).
 	KillGroup(pid int)
@@ -244,7 +285,7 @@ type ClickHouse interface {
 	HTTPPort() int
 	// Running reports whether the managed server answers right now (no start).
 	Running() bool
-	// Health pings the server and returns a one-line status for `haven doctor`.
+	// Health pings the server and returns a one-line status for `haven self doctor`.
 	Health(ctx context.Context) (ok bool, detail string)
 	// Databases lists the lw_* databases currently on the server.
 	Databases(ctx context.Context) ([]string, error)
@@ -269,7 +310,7 @@ type Postgres interface {
 	Port() int
 	// Running reports whether the server answers right now (no start).
 	Running() bool
-	// Health pings the server and returns a one-line status for `haven doctor`.
+	// Health pings the server and returns a one-line status for `haven self doctor`.
 	Health(ctx context.Context) (ok bool, detail string)
 	// Databases lists the lw_* databases currently on the server.
 	Databases(ctx context.Context) ([]string, error)
@@ -289,8 +330,10 @@ type Redis interface {
 	Port() int
 	// Running reports whether the server answers right now (no start).
 	Running() bool
-	// Health pings the server and returns a one-line status for `haven doctor`.
+	// Health pings the server and returns a one-line status for `haven self doctor`.
 	Health(ctx context.Context) (ok bool, detail string)
+	// FlushDB empties one logical database (FLUSHDB, never FLUSHALL).
+	FlushDB(ctx context.Context, db int) error
 	// Stop is a no-op in the real adapter — a brew-managed Redis is a
 	// machine-wide resource other local work may already depend on.
 	Stop()
@@ -309,7 +352,7 @@ type Observability interface {
 	Stop(ctx context.Context) error
 	// IsRunning reports whether the stack is answering right now, without starting it.
 	IsRunning(ctx context.Context) bool
-	// Health returns a one-line status for `haven doctor`.
+	// Health returns a one-line status for `haven self doctor`.
 	Health(ctx context.Context) (ok bool, detail string)
 	// Endpoints reports the stack's ports without touching the runtime.
 	Endpoints() domain.ObservabilityEndpoints
@@ -321,12 +364,21 @@ type Dashboard interface {
 	Serve(ctx context.Context, port int) error
 }
 
+// DaemonClient is how an up asks the running daemon to act (ruling D-S4c-1).
+type DaemonClient interface {
+	// StartKeeper asks the daemon on port to start slug's keeper and returns
+	// once the keeper holds the stack's record.
+	StartKeeper(ctx context.Context, port int, slug string) error
+}
+
 // Semaphore is a machine-wide counting semaphore so parallel, memory-hungry work
 // across worktrees (tsgo typechecks) can be bounded to a slot count.
 type Semaphore interface {
 	// Acquire blocks until one of `slots` slots for `name` is free; returns a
 	// release func and the 1-based slot taken. ctx cancellation aborts the wait.
 	Acquire(ctx context.Context, name string, slots int) (release func(), slot int, err error)
+	// TryAcquire takes a free slot now or reports ok=false, never waiting.
+	TryAcquire(name string, slots int) (release func(), slot int, ok bool, err error)
 }
 
 // Hygiene is the disk-reclamation surface: enumerating a repo's worktrees,
@@ -353,12 +405,60 @@ type Hygiene interface {
 	// "how long has this sat idle" signal interactive prune ranks and default-selects
 	// by; the bool is false only when neither can be established.
 	LastActivity(worktreeDir string) (t time.Time, ok bool)
+	// LastTouched is when the worktree DIRECTORY itself was last written — its own
+	// mtime, not its HEAD's committer date. LastActivity answers "how long has this
+	// branch sat", which for a diff drive checked out at an old ref reads as months
+	// idle the moment it is created; this answers "when did anything happen here",
+	// which is the only safe clock for deleting a tool's scratch out from under it.
+	LastTouched(worktreeDir string) (t time.Time, ok bool)
+	// MergedIntoMain reports whether the worktree's branch is already contained in
+	// origin/main (`git merge-base --is-ancestor`) — every commit on it is on main,
+	// so the directory is a copy of history rather than history. False for a
+	// detached HEAD, for a branch with commits main has not taken, and whenever git
+	// cannot tell, so an unanswerable question never reads as "safe to delete".
+	MergedIntoMain(worktreeDir, branch string) bool
 	// UpstreamGone reports whether the branch tracks an upstream whose remote-tracking
 	// ref no longer exists — the "merged, and the remote branch was deleted" signal
 	// that marks a worktree as a prime cleanup candidate. It reflects the local
 	// remote-tracking state, so it needs a prior `git fetch --prune` to be current;
 	// false for a branch with no upstream, a detached HEAD, or when git cannot tell.
 	UpstreamGone(worktreeDir, branch string) bool
+}
+
+// JobScratch is the agent job directories under ~/.claude/jobs. Each holds a
+// record of what the job was (state.json) and what it did (timeline.jsonl)
+// beside the scratch it produced getting there — a tmp/ tree, worktree copies,
+// logs — which is what runs a laptop out of disk. The port is deliberately
+// narrow: enumerate, size, and reclaim the scratch while keeping the record.
+type JobScratch interface {
+	// Jobs reads every job directory under root, parsing each state.json and
+	// walking the tree for its newest modification and access times. A directory
+	// whose state.json is missing or unreadable is still returned, with an empty
+	// State, so the age rule can still reclaim it. It never sets InUse: which jobs
+	// a live process is working in is read from the process table, which the app
+	// layer samples once per plan through System.
+	Jobs(root string) ([]domain.JobRecord, error)
+	// Size reports how much disk the job directory occupies.
+	Size(ctx context.Context, dir string) (bytes int64, ok bool)
+	// Reclaim deletes everything in dir except the named files, and reports how
+	// many bytes went. It never removes the directory itself.
+	Reclaim(dir string, keep []string) (freed int64, err error)
+}
+
+// ClaudeState is the rest of what Claude Code keeps under its home — the
+// transcripts, the session files, the caches — minus the two locations a
+// cleanup already owns (job scratch, agent worktrees). The port only reads:
+// these directories are the record of work rather than scratch, so haven names
+// them, attributes them and warns about them, and never offers to delete one.
+type ClaudeState interface {
+	// Read returns one cataloged location's records: a record per child for the
+	// per-entry locations, one for the rest. A location that does not exist is
+	// not an error — Claude creates each directory the first time it needs one.
+	Read(ctx context.Context, scan domain.ClaudeScan) ([]domain.ClaudeStateRecord, error)
+	// Stat measures one directory: its size, the share of it whose files were
+	// last written before coldBefore, and its newest write. False when the path
+	// is not a directory.
+	Stat(ctx context.Context, dir string, coldBefore time.Time) (domain.ClaudeStateRecord, bool)
 }
 
 // Worktree is one entry from `git worktree list`.
@@ -378,6 +478,13 @@ type ContainerRuntime interface {
 	Ensure(ctx context.Context) (dockerHost string, err error)
 	// Profile is the colima profile name, for logs and error messages.
 	Profile() string
+	// Available reports whether the runtime can be reached on this machine at
+	// all, without starting anything. It answers the question the langy tier is
+	// resolved from before the stack is built — "can a container tier run here?"
+	// — which Ensure can only answer by doing the work.
+	Available(ctx context.Context) bool
+	// IsRunning reports whether the VM is up, without starting it.
+	IsRunning(ctx context.Context) bool
 }
 
 // ContainerJanitor sweeps containers a testcontainers run left behind in the
@@ -392,7 +499,16 @@ type ContainerJanitor interface {
 
 // DaemonInfo is the little record `up` reads to find (or spawn) the daemon.
 type DaemonInfo struct {
-	PID  int    `json:"pid"`
-	Port int    `json:"port"`
-	URL  string `json:"url"`
+	PID   int    `json:"pid"`
+	Start string `json:"start,omitempty"`
+	Port  int    `json:"port"`
+	URL   string `json:"url"`
+}
+
+// HeavyRunSnapshot is one heavy run currently holding a slot: its own
+// command and when it started - the raw material a wait estimate classifies
+// into a domain.HeldRun.
+type HeavyRunSnapshot struct {
+	Command   string
+	StartedAt time.Time
 }

@@ -1,14 +1,11 @@
 /**
  * The file tools, in Node, so the shared folder needs no host tool at all.
- *
  * Every path goes through the folder boundary here as well as in `policy.ts`.
- * The second check is not a repeat: a write resolves the real path again right
- * before it opens the file, which is what closes the window between the
- * decision and the write where a symlink can be swapped.
  */
 
 import * as fs from "node:fs";
 import * as path from "node:path";
+
 import {
   isAppendEdit,
   type LocalEditParams,
@@ -37,13 +34,7 @@ const DEFAULT_READ_LINES = 2_000;
  * The absolute path of a target inside the folder. Refuses anything that
  * resolves outside, naming the folder that is allowed.
  */
-export function insideRoot({
-  target,
-  root,
-}: {
-  target: string;
-  root: string;
-}): string {
+export function insideRoot({ target, root }: { target: string; root: string }): string {
   const check = resolvePathInsideRoot({ target, root });
   if (!check.inside) {
     throw new LocalCallFailure({
@@ -61,13 +52,7 @@ const notFound = ({ target }: { target: string }): LocalCallFailure =>
   });
 
 /** The file as numbered lines, the way the model reads a file everywhere else. */
-export function readFile({
-  params,
-  root,
-}: {
-  params: LocalReadParams;
-  root: string;
-}): string {
+export function readFile({ params, root }: { params: LocalReadParams; root: string }): string {
   const target = insideRoot({ target: params.path, root });
   let content: string;
   try {
@@ -79,9 +64,7 @@ export function readFile({
   const from = Math.max(1, params.offset ?? 1);
   const count = params.limit ?? DEFAULT_READ_LINES;
   const slice = lines.slice(from - 1, from - 1 + count);
-  const numbered = slice
-    .map((line, index) => `${from + index}\t${line}`)
-    .join("\n");
+  const numbered = slice.map((line, index) => `${from + index}\t${line}`).join("\n");
   const rest = lines.length - (from - 1 + slice.length);
   return rest > 0
     ? `${numbered}\n[${rest} more line${rest === 1 ? "" : "s"}. Read again with offset ${from + slice.length}.]`
@@ -92,13 +75,7 @@ export function readFile({
  * Writes the file, creating the directories it needs. The boundary is checked
  * again on the resolved path right before the write.
  */
-export function writeFile({
-  params,
-  root,
-}: {
-  params: LocalWriteParams;
-  root: string;
-}): string {
+export function writeFile({ params, root }: { params: LocalWriteParams; root: string }): string {
   const target = insideRoot({ target: params.path, root });
   fs.mkdirSync(path.dirname(target), { recursive: true });
   insideRoot({ target, root });
@@ -108,18 +85,11 @@ export function writeFile({
 }
 
 /**
- * Applies the edits in order. Each `oldText` must appear exactly once, so an
- * edit is never applied to the wrong place; anything else is an error the
- * model can act on. An append goes at the end of the file, on its own line,
- * and creates the file when there is none.
+ * Applies the edits in order. Each `oldText` must appear exactly once, so an edit is never applied
+ * to the wrong place; anything else is an error the model can act on. An append goes at the end of
+ * the file, on its own line, and creates the file when there is none.
  */
-export function editFile({
-  params,
-  root,
-}: {
-  params: LocalEditParams;
-  root: string;
-}): string {
+export function editFile({ params, root }: { params: LocalEditParams; root: string }): string {
   const target = insideRoot({ target: params.path, root });
   let content: string;
   try {
@@ -157,15 +127,8 @@ export function editFile({
 }
 
 /** The content with `text` added as its last line(s), never mid-line. */
-function appendText({
-  content,
-  text,
-}: {
-  content: string;
-  text: string;
-}): string {
-  const joined =
-    content === "" || content.endsWith("\n") ? content : `${content}\n`;
+function appendText({ content, text }: { content: string; text: string }): string {
+  const joined = content === "" || content.endsWith("\n") ? content : `${content}\n`;
   return text.endsWith("\n") ? `${joined}${text}` : `${joined}${text}\n`;
 }
 
@@ -173,10 +136,9 @@ function appendText({
 const LANGWATCH_ENV_VARIABLES = ["LANGWATCH_API_KEY", "LANGWATCH_ENDPOINT"] as const;
 
 /**
- * Sets LANGWATCH_API_KEY and LANGWATCH_ENDPOINT in the env file, replacing the
- * lines that already set them and appending the others, so every other line
- * stays as it was. Creates the file when there is none. Answers with the
- * variable names only: the key is written, never reported.
+ * Sets LANGWATCH_API_KEY and LANGWATCH_ENDPOINT in the env file, replacing the lines that already
+ * set them and appending the others, so every other line stays as it was. Creates the file when
+ * there is none. Answers with the variable names only: the key is written, never reported.
  */
 export function writeLangwatchEnv({
   params,
@@ -223,13 +185,7 @@ export function writeLangwatchEnv({
 }
 
 /** The names in one directory, directories first, marked with a trailing slash. */
-export function listDirectory({
-  params,
-  root,
-}: {
-  params: LocalLsParams;
-  root: string;
-}): string {
+export function listDirectory({ params, root }: { params: LocalLsParams; root: string }): string {
   const target = insideRoot({ target: params.path ?? ".", root });
   let entries: fs.Dirent[];
   try {
@@ -240,18 +196,14 @@ export function listDirectory({
   const limit = params.limit ?? DEFAULT_LS_LIMIT;
   const named = entries
     .map((entry) => (entry.isDirectory() ? `${entry.name}/` : entry.name))
-    .sort((left, right) => {
+    .toSorted((left, right) => {
       const byKind = Number(right.endsWith("/")) - Number(left.endsWith("/"));
       return byKind === 0 ? left.localeCompare(right) : byKind;
     });
   const shown = named.slice(0, limit);
   const rest = named.length - shown.length;
   const header = path.relative(root, target) || ".";
-  return [
-    `${header}:`,
-    ...shown,
-    ...(rest > 0 ? [`[${rest} more entries]`] : []),
-  ].join("\n");
+  return [`${header}:`, ...shown, ...(rest > 0 ? [`[${rest} more entries]`] : [])].join("\n");
 }
 
 // ---------------------------------------------------------------------------
@@ -265,30 +217,35 @@ interface IgnoreRule {
   directoryOnly: boolean;
 }
 
+const globFragmentAt = (pattern: string, index: number): { source: string; nextIndex: number } => {
+  const char = pattern[index]!;
+  if (char === "*") {
+    if (pattern[index + 1] === "*") {
+      const crossesDirectories = pattern[index + 2] === "/";
+      return {
+        source: crossesDirectories ? "(?:.*/)?" : ".*",
+        nextIndex: index + (crossesDirectories ? 3 : 2),
+      };
+    }
+    return { source: "[^/]*", nextIndex: index + 1 };
+  }
+  if (char === "?") {
+    return { source: "[^/]", nextIndex: index + 1 };
+  }
+  return {
+    source: char.replace(/[.+^${}()|[\]\\]/g, "\\$&"),
+    nextIndex: index + 1,
+  };
+};
+
 /** A glob as a regular expression: `*`, `**` and `?` and nothing else. */
 export function globToRegExp(pattern: string): RegExp {
   let source = "";
   let index = 0;
   while (index < pattern.length) {
-    const char = pattern[index]!;
-    if (char === "*") {
-      if (pattern[index + 1] === "*") {
-        // `**/` crosses directories and also matches nothing at all.
-        source += pattern[index + 2] === "/" ? "(?:.*/)?" : ".*";
-        index += pattern[index + 2] === "/" ? 3 : 2;
-        continue;
-      }
-      source += "[^/]*";
-      index += 1;
-      continue;
-    }
-    if (char === "?") {
-      source += "[^/]";
-      index += 1;
-      continue;
-    }
-    source += char.replace(/[.+^${}()|[\]\\]/g, "\\$&");
-    index += 1;
+    const fragment = globFragmentAt(pattern, index);
+    source += fragment.source;
+    index = fragment.nextIndex;
   }
   return new RegExp(`^${source}$`);
 }
@@ -303,9 +260,7 @@ const ruleFrom = (line: string): IgnoreRule | null => {
   const anchored = pattern.startsWith("/");
   if (anchored) pattern = pattern.slice(1);
   const body = globToRegExp(pattern).source.replace(/^\^|\$$/g, "");
-  const test = anchored
-    ? new RegExp(`^${body}(?:/|$)`)
-    : new RegExp(`(?:^|/)${body}(?:/|$)`);
+  const test = anchored ? new RegExp(`^${body}(?:/|$)`) : new RegExp(`(?:^|/)${body}(?:/|$)`);
   return { test, negated, directoryOnly };
 };
 
@@ -343,25 +298,17 @@ const isIgnored = ({
   return ignored;
 };
 
-/**
- * Every file under `from`, relative to the folder. `.git` and `node_modules`
- * are always skipped; the folder's `.gitignore` is honored on top of that.
- */
-export function* walkFiles({
+function* walkEntries({
+  entries,
   from,
   root,
   rules,
 }: {
+  entries: fs.Dirent[];
   from: string;
   root: string;
   rules: IgnoreRule[];
 }): Generator<string> {
-  let entries: fs.Dirent[];
-  try {
-    entries = fs.readdirSync(from, { withFileTypes: true });
-  } catch {
-    return;
-  }
   for (const entry of entries) {
     if (ALWAYS_SKIPPED.has(entry.name)) continue;
     const absolute = path.join(from, entry.name);
@@ -381,17 +328,73 @@ export function* walkFiles({
   }
 }
 
-const escapeLiteral = (value: string): string =>
-  value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+/**
+ * Every file under `from`, relative to the folder. `.git` and `node_modules`
+ * are always skipped; the folder's `.gitignore` is honored on top of that.
+ */
+export function* walkFiles({
+  from,
+  root,
+  rules,
+}: {
+  from: string;
+  root: string;
+  rules: IgnoreRule[];
+}): Generator<string> {
+  let entries: fs.Dirent[];
+  try {
+    entries = fs.readdirSync(from, { withFileTypes: true });
+  } catch {
+    return;
+  }
+  yield* walkEntries({ entries, from, root, rules });
+}
+
+const escapeLiteral = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/** The file's lines, or none when it is too large, unreadable or binary. */
+const searchableLines = (absolute: string): string[] => {
+  let content: string;
+  try {
+    if (fs.statSync(absolute).size > MAX_SEARCHED_FILE_BYTES) return [];
+    content = fs.readFileSync(absolute, "utf8");
+  } catch {
+    return [];
+  }
+  // A null byte means a binary file: searching it produces noise.
+  if (content.includes("\u0000")) return [];
+  return content.split("\n");
+};
+
+const appendMatchingLines = ({
+  relative,
+  lines,
+  matcher,
+  context,
+  limit,
+  found,
+}: {
+  relative: string;
+  lines: string[];
+  matcher: RegExp;
+  context: number;
+  limit: number;
+  found: string[];
+}): void => {
+  for (const [index, line] of lines.entries()) {
+    if (found.length >= limit) break;
+    if (!matcher.test(line)) continue;
+    const first = Math.max(0, index - context);
+    const last = Math.min(lines.length - 1, index + context);
+    for (let cursor = first; cursor <= last; cursor += 1) {
+      const marker = cursor === index ? ":" : "-";
+      found.push(`${relative}${marker}${cursor + 1}${marker}${lines[cursor]}`);
+    }
+  }
+};
 
 /** Text search over the folder, with the matching lines and their numbers. */
-export function grep({
-  params,
-  root,
-}: {
-  params: LocalGrepParams;
-  root: string;
-}): string {
+export function grep({ params, root }: { params: LocalGrepParams; root: string }): string {
   const from = insideRoot({ target: params.path ?? ".", root });
   const source = params.literal ? escapeLiteral(params.pattern) : params.pattern;
   let matcher: RegExp;
@@ -414,27 +417,8 @@ export function grep({
   for (const relative of walkFiles({ from, root, rules })) {
     if (found.length >= limit) break;
     if (glob && !glob.test(relative)) continue;
-    const absolute = path.join(root, relative);
-    let content: string;
-    try {
-      if (fs.statSync(absolute).size > MAX_SEARCHED_FILE_BYTES) continue;
-      content = fs.readFileSync(absolute, "utf8");
-    } catch {
-      continue;
-    }
-    // A null byte means a binary file: searching it produces noise.
-    if (content.includes("\u0000")) continue;
-    const lines = content.split("\n");
-    for (const [index, line] of lines.entries()) {
-      if (found.length >= limit) break;
-      if (!matcher.test(line)) continue;
-      const first = Math.max(0, index - context);
-      const last = Math.min(lines.length - 1, index + context);
-      for (let cursor = first; cursor <= last; cursor += 1) {
-        const marker = cursor === index ? ":" : "-";
-        found.push(`${relative}${marker}${cursor + 1}${marker}${lines[cursor]}`);
-      }
-    }
+    const lines = searchableLines(path.join(root, relative));
+    appendMatchingLines({ relative, lines, matcher, context, limit, found });
   }
   if (found.length === 0) return `No line matches ${params.pattern}.`;
   return found.length >= limit
@@ -443,13 +427,7 @@ export function grep({
 }
 
 /** File names under the folder that match a glob. */
-export function findFiles({
-  params,
-  root,
-}: {
-  params: LocalFindParams;
-  root: string;
-}): string {
+export function findFiles({ params, root }: { params: LocalFindParams; root: string }): string {
   const from = insideRoot({ target: params.path ?? ".", root });
   const matcher = globToRegExp(params.pattern);
   const limit = params.limit ?? DEFAULT_FIND_LIMIT;
@@ -457,8 +435,13 @@ export function findFiles({
   const found: string[] = [];
   for (const relative of walkFiles({ from, root, rules })) {
     if (found.length >= limit) break;
-    if (matcher.test(relative) || matcher.test(path.basename(relative))) {
+    if (matcher.test(relative)) {
       found.push(relative);
+    } else {
+      const base = path.basename(relative);
+      if (matcher.test(base)) {
+        found.push(relative);
+      }
     }
   }
   if (found.length === 0) return `No file matches ${params.pattern}.`;

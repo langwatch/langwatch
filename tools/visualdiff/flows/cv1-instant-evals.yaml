@@ -1,0 +1,187 @@
+# CV1 coverage sweep, instant evals: the other question kinds and a run over more than one
+# question. instant-evals.yaml proves the boolean path; these read a rating, a choice and a
+# two-question run back through the same REST surface, judged by the stand-in classifier.
+flows:
+  - id: cv1-instant-eval-score-question-finishes
+    title: A run with a rating question finishes and files its judgement under that question
+    setup:
+      - post: /api/v1/instant-evals
+        body:
+          name: vd-cv1-instant-score
+          target: traces
+          filter: traceId:{errorTrace}
+          start: "2020-01-01T00:00:00Z"
+          limit: 20
+          questions:
+            - id: severity
+              kind: score
+              instructions: How severe is the failure, from one to five
+              range:
+                min: 1
+                max: 5
+        as:
+          runId: id
+    steps:
+      - action: go
+        with:
+          path: /{slug}/traces
+      - action: expect
+        with:
+          api: /api/v1/instant-evals/{runId}
+          field: questions.0.kind
+          equals: score
+      - action: expect
+        with:
+          api: /api/v1/instant-evals/{runId}
+          field: status
+          equals: finished
+          timeout: "60000"
+      - action: expect
+        with:
+          api: /api/v1/instant-evals/{runId}/results
+          field: judgments.0.questionId
+          equals: severity
+      - action: expect
+        with:
+          api: /api/v1/instant-evals/{runId}/results
+          field: judgments.0.status
+          equals: judged
+
+  - id: cv1-instant-eval-category-question-finishes
+    title: A run with a choice question finishes and files its judgement under that question
+    setup:
+      - post: /api/v1/instant-evals
+        body:
+          name: vd-cv1-instant-category
+          target: traces
+          filter: traceId:{errorTrace}
+          start: "2020-01-01T00:00:00Z"
+          limit: 20
+          questions:
+            - id: cause
+              kind: category
+              instructions: What kind of failure is this
+              options:
+                - name: model
+                  description: The model call failed
+                - name: tool
+                  description: A tool call failed
+        as:
+          runId: id
+    steps:
+      - action: go
+        with:
+          path: /{slug}/traces
+      - action: expect
+        with:
+          api: /api/v1/instant-evals/{runId}
+          field: questions.0.kind
+          equals: category
+      - action: expect
+        with:
+          api: /api/v1/instant-evals/{runId}
+          field: status
+          equals: finished
+          timeout: "60000"
+      - action: expect
+        with:
+          api: /api/v1/instant-evals/{runId}/results
+          field: judgments.0.questionId
+          equals: cause
+      - action: expect
+        with:
+          api: /api/v1/instant-evals/{runId}/results
+          field: judgments.0.status
+          equals: judged
+
+  - id: cv1-instant-eval-two-questions-judge-one-trace-twice
+    title: A run with two questions over one trace lists a judgement for each question
+    setup:
+      - post: /api/v1/instant-evals
+        body:
+          name: vd-cv1-instant-two
+          target: traces
+          filter: traceId:{errorTrace}
+          start: "2020-01-01T00:00:00Z"
+          limit: 20
+          questions:
+            - id: failed
+              kind: boolean
+              instructions: The trace has an error
+            - id: polite
+              kind: boolean
+              instructions: The reply is polite
+        as:
+          runId: id
+    steps:
+      - action: go
+        with:
+          path: /{slug}/traces
+      - action: expect
+        with:
+          api: /api/v1/instant-evals/{runId}
+          field: status
+          equals: finished
+          timeout: "60000"
+      - action: expect
+        with:
+          api: /api/v1/instant-evals/{runId}
+          field: total
+          equals: "1"
+      - action: expect
+        with:
+          api: /api/v1/instant-evals/{runId}/results
+          field: judgments
+          min: "2"
+      - action: expect
+        with:
+          api: /api/v1/instant-evals/{runId}/results
+          field: judgments
+          contains: '"questionId":"failed"'
+      - action: expect
+        with:
+          api: /api/v1/instant-evals/{runId}/results
+          field: judgments
+          contains: '"questionId":"polite"'
+      - action: expect
+        with:
+          api: /api/v1/instant-evals/{runId}/results
+          field: judgments.2
+          equals: "undefined"
+
+  - id: cv1-instant-eval-no-matching-trace-finishes-empty
+    title: A run whose filter matches no trace finishes with nothing judged
+    setup:
+      - post: /api/v1/instant-evals
+        body:
+          name: vd-cv1-instant-empty
+          target: traces
+          filter: traceId:vd-cv1-no-such-trace
+          start: "2020-01-01T00:00:00Z"
+          limit: 20
+          questions:
+            - id: q1
+              kind: boolean
+              instructions: The trace has an error
+        as:
+          runId: id
+    steps:
+      - action: go
+        with:
+          path: /{slug}/traces
+      - action: expect
+        with:
+          api: /api/v1/instant-evals/{runId}
+          field: status
+          equals: finished
+          timeout: "60000"
+      - action: expect
+        with:
+          api: /api/v1/instant-evals/{runId}
+          field: total
+          equals: "0"
+      - action: expect
+        with:
+          api: /api/v1/instant-evals/{runId}/results
+          field: judgments
+          equals: "[]"

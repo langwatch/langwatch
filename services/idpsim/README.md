@@ -8,7 +8,7 @@ independent tenants** (`/t/1` … `/t/N`), each of which is:
 - a **SAML identity provider** — metadata and an SSO endpoint that signs
   assertions for any service provider's request (permissive by design)
 - a **SCIM 2.0 directory** — Users/Groups CRUD + PATCH behind a deterministic
-  bearer token, plus a connection to a real SCIM service provider it *pushes*
+  bearer token, plus a connection to a real SCIM service provider it _pushes_
   its directory at and reads back (the Okta/Entra role, aimed at the app's SCIM
   endpoints)
 - a fake **domain owner** — `acme<n>.test` pre-seeded with a DNS TXT record
@@ -16,14 +16,18 @@ independent tenants** (`/t/1` … `/t/N`), each of which is:
   domain-verification testing. The app-side verification feature is greenfield;
   both proofs are ready for it.
 
-Everything is in-memory and reset at boot. Nothing here is production code.
+Haven persists each stack's simulator under `~/.langwatch/portless/idp/<slug>/`.
+Registered applications, users, groups, provisioning credentials, domain proofs,
+and signing keys survive `haven up --force`, service restarts, and stop/start cycles.
+Direct runs persist when `IDPSIM_DATA_DIR` is set; otherwise they start in memory.
+Nothing here is production code.
 
 ## Running
 
 ```bash
-haven idp                        # ONLY the simulator — no app, API or databases —
+haven simulator idp              # ONLY the simulator — no app, API or databases —
                                  #   routed at idp.langwatch.localhost
-haven idp --tenants 20           # same, with a wider range
+haven simulator idp --tenants 20 # same, with a wider range
 make service svc=idpsim          # run once (SERVER_ADDR :5565, DNS :15353)
 make service-watch svc=idpsim    # live reload via air
 IDPSIM_TENANTS=20 make service svc=idpsim   # a wider range
@@ -31,29 +35,60 @@ IDPSIM_TENANTS=20 make service svc=idpsim   # a wider range
 
 Under haven the lane is **on by default** in every stack (`haven up -idp`
 turns it off for a worktree), routed at `idp.<slug>.langwatch.localhost`.
+Both `haven up` and `haven simulator idp` use the simulator bundled into Haven, so the
+checkout does not need this package or a Go toolchain to launch the simulator.
+The stack's `idp` link on the Haven web dashboard opens its browser page.
+Standalone `haven simulator idp` keeps its separate state under
+`~/.langwatch/portless/idp-standalone/`. Both paths follow `LANGWATCH_PORTLESS_HOME` when set.
+Changes are saved atomically before the simulator acknowledges them. Invalid
+state files stop startup instead of silently resetting the directory. Explicit
+directory resets and deletions are saved too; login codes and access tokens
+remain temporary and are discarded on restart.
 
 Open `/` for the tenant list, and `/t/<n>/` for a tenant's own page: register
 an application, copy the values the setup wizard asks for, see its users, and
 watch a live feed of everything it serves or refuses. `GET /control/state` is
-the same as JSON.
+the same as JSON. The provider list can be searched by number or domain.
+Tenant pages have tabs for set-up, provisioning, domain, users and activity
+(the tab is in the address, so `/t/1/#activity` links straight to it). Filter
+activity by outcome or text, and pause/resume updates while inspecting a
+request. Connection errors are visible and retried.
+
+### The console
+
+The pages are `apps/idpsim-web`, a React app built by Vite into `web/dist` and
+embedded in this binary (ADR-160); the simulator renders no HTML of its own.
+Build it with `pnpm --filter @langwatch/idpsim-web build` before building the
+Go binary; a binary built without it answers every page with one line naming
+that command. The app reads `/api` (JSON, refusals as `{title, detail, hint}`
+with a 4xx status) and the activity feed at `/control/t/<n>/activity`. The
+authorize endpoint and a refused redirect serve the same bundle, so their
+status line is unchanged. `pnpm --filter @langwatch/idpsim-web dev` proxies to
+a simulator on `IDPSIM_URL` (default `http://127.0.0.1:5565`) for work on the
+console itself.
+
+The project terminal viewer has an `idp` tab with searchable tenant summaries;
+Enter opens the chosen tenant in the browser. `haven sim idp list --json` reads those
+summaries for the current stack, and `--stack <slug>` selects another stack.
+This read-only mode does not start a standalone simulator.
 
 ## Registering an application
 
 LangWatch's single sign-on setup shows you a redirect address ending in
-`{connection}` — the real id only exists *after* you register the connection,
+`{connection}` — the real id only exists _after_ you register the connection,
 which you cannot do until the identity provider is set up. Paste the address
 into the tenant page exactly as shown: a `{placeholder}` segment here matches
 whichever id turns up, so the circle breaks and you never have to come back.
 
-Registering hands back the three values the wizard's *Then tell us about it*
+Registering hands back the three values the wizard's _Then tell us about it_
 step asks for, under the same names:
 
-| Wizard field   | Where it comes from                     |
-| -------------- | --------------------------------------- |
-| Name           | whatever you called the application      |
-| Issuer address | the tenant's base address, `…/t/<n>`     |
-| Client id      | minted at registration                   |
-| Client secret  | minted at registration                   |
+| Wizard field   | Where it comes from                  |
+| -------------- | ------------------------------------ |
+| Name           | whatever you called the application  |
+| Issuer address | the tenant's base address, `…/t/<n>` |
+| Client id      | minted at registration               |
+| Client secret  | minted at registration               |
 
 For the SAML half the tenant page carries the sign-in address, entity id and a
 copyable signing certificate, plus a link to the metadata document if you would
@@ -81,14 +116,16 @@ outcome and a plain-language reason — which is usually the fastest way to find
 out whether a login even reached the identity provider, and what it objected to
 if it did.
 
-| Variable          | Default                  | Meaning                                    |
-| ----------------- | ------------------------ | ------------------------------------------ |
-| `SERVER_ADDR`     | `:5565`                  | HTTP listen address                        |
-| `IDPSIM_BASE_URL` | `http://localhost:5565`  | External base for issuer/metadata URLs     |
-| `IDPSIM_TENANTS`  | `3`                      | Tenant range size (1–100)                  |
-| `IDPSIM_DNS_ADDR` | `:15353`                 | Verification DNS UDP listener; `off` disables |
+| Variable          | Default                 | Meaning                                        |
+| ----------------- | ----------------------- | ---------------------------------------------- |
+| `SERVER_ADDR`     | `:5565`                 | HTTP listen address                            |
+| `IDPSIM_BASE_URL` | `http://localhost:5565` | External base for issuer/metadata URLs         |
+| `IDPSIM_TENANTS`  | `3`                     | Tenant range size (1–100)                      |
+| `IDPSIM_DNS_ADDR` | `:15353`                | Verification DNS UDP listener; `off` disables  |
+| `IDPSIM_DATA_DIR` | empty                   | Persistent state directory; empty is in memory |
 
-Under haven the lane gets `SERVER_ADDR` and `IDPSIM_BASE_URL` injected, and
+Under haven the lane gets its listener addresses, `IDPSIM_BASE_URL`, and
+`IDPSIM_DATA_DIR` injected, and
 worktrees running (or falling back to) the lane see `LANGWATCH_IDPSIM_URL` in
 their overlay.
 
@@ -104,8 +141,9 @@ OIDC_CLIENT_ID=anything                   # idpsim accepts any client
 OIDC_CLIENT_SECRET=anything
 ```
 
-The authorize endpoint serves an account picker; add `login_hint=<email>` for
-a zero-click login in automated tests. Seeded users per tenant:
+The authorize endpoint serves an account picker, each account a link back into
+the same request with the hint filled in; add `login_hint=<email>` for a
+zero-click login in automated tests. Seeded users per tenant:
 `admin@acme<n>.test` and `member@acme<n>.test`.
 
 To exercise the app's Auth0-brokered-SAML handling (`samlp|` subjects,
@@ -114,6 +152,43 @@ ADR-096) over plain OIDC:
 ```bash
 curl -X POST localhost:5565/control/t/1/config -d '{"samlpSubjects":true}'
 ```
+
+### Azure AD (Entra) as a legacy provider
+
+`legacy provider <t> azure` makes the tenant an Entra v2.0 directory: issuer
+`<host>/<tenant-guid>/v2.0`, ID tokens with `oid`, `tid`, `ver: "2.0"`, an
+opaque `sub`, and no `email_verified`, `groups` or `picture` (the way a work
+account's token arrives). The authority paths (`/<guid>/oauth2/v2.0/authorize`,
+`/token`, `/discovery/v2.0/keys`, `/v2.0/.well-known/openid-configuration`) are
+served from the host root. The product's `AUTH_PROVIDER=azure-ad` hard-wires
+`https://login.microsoftonline.com`, so resolve that host to idpsim over https;
+`legacy env <t>` prints `AZURE_AD_TENANT_ID` (the GUID) instead of an issuer.
+
+### Social sign-in (Google, GitHub, GitLab, Microsoft)
+
+Every tenant also plays the four social providers the sign-in page offers,
+under `/t/<n>/social/<provider>`, in each provider's own path layout and
+response shapes, signing in as the tenant's users. Any client id and secret
+are accepted, as for an unregistered OIDC client.
+
+| Provider  | Base (`<b>` = `…/t/<n>/social/<provider>`) | Endpoints under it                                                                                                    |
+| --------- | ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------- |
+| Google    | `<b>` is the issuer                        | `/.well-known/openid-configuration`, `/o/oauth2/v2/auth`, `/token`, `/oauth2/v3/userinfo`, `/oauth2/v3/certs`         |
+| GitHub    | `<b>`                                      | `/login/oauth/authorize`, `/login/oauth/access_token` (a form unless `Accept` asks for JSON), `/user`, `/user/emails` |
+| GitLab    | `<b>` is Better Auth's `issuer`            | `/oauth/authorize`, `/oauth/token`, `/api/v4/user`                                                                    |
+| Microsoft | `<b>` is Better Auth's `authority`         | `/<directory>/oauth2/v2.0/authorize`, `/<directory>/oauth2/v2.0/token`, `/<directory>/discovery/v2.0/keys`            |
+
+Google and Microsoft return a signed ID token (a 21-digit Google `sub`; Entra
+v2.0 `oid`, `tid`, `ver` under the issuer `<b>/<tenant GUID>/v2.0`). GitHub and
+GitLab return numeric account ids, and GitHub's emails call answers one primary
+verified address. Better Auth's built-in Google and GitHub providers hard-wire
+their hosts, so the app side needs its own switch to reach these.
+
+Without a login hint the authorize endpoint serves the account picker, which
+names the provider it plays and has a **Cancel** button: that sends the client
+`error=access_denied` with its state (scripts: `cancel=1` on the authorize
+request). Every step lands in the tenant's activity feed as
+`social.<provider>.authorize|token|userinfo` (and `social.github.emails`).
 
 ## Provisioning into LangWatch
 
@@ -128,7 +203,7 @@ Open a tenant page, fill in LangWatch's SCIM address and token under
 **Provision into LangWatch**, and you get two presses:
 
 - **Sync the difference** — reads what LangWatch holds and sends only what
-  changed. This is the one to use; see *Large directories* below.
+  changed. This is the one to use; see _Large directories_ below.
 - **Push everything** — every user then every group as a SCIM create, carrying
   that token, with seeded member ids mapped onto the ids LangWatch minted.
   Right exactly once, and all conflicts afterwards.
@@ -153,7 +228,7 @@ for a caller that would rather not connect first, and `DELETE
 putting the seeded users back is not a reason to forget where they were going.
 
 Two SCIM tokens live on the tenant page and they point opposite ways. The one
-under *Directory and domain* is the way **in** — it guards the tenant's own
+under _Directory and domain_ is the way **in** — it guards the tenant's own
 SCIM server at `/t/<n>/scim/v2`, for testing the client side of provisioning —
 and the one you paste is the way **out**. Pasting the first where the second
 belongs is refused rather than left to fail as an unauthorized push.
@@ -166,25 +241,25 @@ receiving side pages its lists, whether a deactivation reaches the membership
 table, what a thousand joiners does to the screen an administrator is reading.
 Those only appear at scale.
 
-**Directory at scale** on the tenant page has two forms and three verbs:
+**Directory at scale** on the tenant page's provisioning tab has two forms and three verbs:
 
 - **Generate** — how many people, across how many groups. The admin and member
   you sign in as are kept, and growing keeps everybody already there, so a
   second generate at a larger size adds joiners rather than replacing the
   organization. Same numbers, same people, every time: the generator is seeded.
 - **Churn** — one round of what happens to a real directory between syncs.
-  *Join*, *Leave*, *Deactivate*, *Reactivate*, *Rename* and *Regroup*, in
+  _Join_, _Leave_, _Deactivate_, _Reactivate_, _Rename_ and _Regroup_, in
   counts rather than percentages.
 - **Sync the difference** — reads what LangWatch holds and sends only what
   changed.
 
 ### Why sync rather than push
 
-*Push everything* sends each user as a SCIM create, which is right exactly once
+_Push everything_ sends each user as a SCIM create, which is right exactly once
 and all conflicts afterwards — so "what does the directory do when two hundred
 people are deactivated" could not be asked at all.
 
-*Sync* reconciles. It reads the receiving side's own account of what it holds,
+_Sync_ reconciles. It reads the receiving side's own account of what it holds,
 matches it against the tenant's directory the way a real provider does, and
 sends the difference: creates for arrivals, `PUT`s for changes, a `PATCH` on
 `active` for departures. Running it twice with nothing changed sends nothing,
@@ -229,12 +304,12 @@ curl -X POST $SIM/control/t/1/scim-sync
 `scim-sync` takes its options in the query string, because the body is already
 spoken for by the optional inline target:
 
-| Option | Default | What it does |
-| --- | --- | --- |
-| `mode` | `deactivate` | `delete` removes a departed record outright instead of suspending it. |
-| `concurrency` | `8` | Requests in flight at once, capped at 64. |
-| `groups` | off | Send group membership too — the slower half. |
-| `dryRun` | off | Work out the difference and send nothing. |
+| Option        | Default      | What it does                                                          |
+| ------------- | ------------ | --------------------------------------------------------------------- |
+| `mode`        | `deactivate` | `delete` removes a departed record outright instead of suspending it. |
+| `concurrency` | `8`          | Requests in flight at once, capped at 64.                             |
+| `groups`      | off          | Send group membership too — the slower half.                          |
+| `dryRun`      | off          | Work out the difference and send nothing.                             |
 
 Every run reports `elapsed`, `elapsedMs` and `requestsPerSec`, so "how long
 does 5,000 take" has an answer rather than an impression. Failures are counted
@@ -243,6 +318,37 @@ not produce a response longer than the directory.
 
 `population` caps at 50,000 users and 500 groups. Resetting a tenant puts the
 seeded two back.
+
+## From the command line
+
+Every console action has a `haven sim idp <verb>` twin that talks to the running
+simulator's control API. Tenants are numbers (`1`, `2`, ...). Reads take `--json`
+(agent mode implies it); `--stack <slug>` aims at another worktree's stack. A
+stopped simulator says `start it with haven up +idp`. The hidden `haven simulator idp`
+runs the standalone simulator.
+
+| Verb                                                                                                   | Does                                                                                                                                                                                                                                                                                                                 |
+| ------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `get <t>`                                                                                              | domain, issuer, SCIM token, users and applications                                                                                                                                                                                                                                                                   |
+| `apps add <t> --name <n> [--redirect a,b] [--entity-id --acs-url]` / `apps remove <t> <client-id>`     | register or drop an OIDC or SAML application                                                                                                                                                                                                                                                                         |
+| `populate <t> --users <n> [--groups <n>] [--domain] [--seed]` / `churn <t> --join <n> --leave <n> ...` | directory size and change; each user gets `department`, `costCenter` and `manager` from the seed, pushed under the SCIM enterprise extension (the first user has no manager)                                                                                                                                         |
+| `user add <t> --email <e> [--given-name] [--family-name] [--groups a,b]`                               | one user                                                                                                                                                                                                                                                                                                             |
+| `scim target set <t> --url <base> --token-env <VAR>` / `scim target clear <t>`                         | where the tenant provisions                                                                                                                                                                                                                                                                                          |
+| `scim push\|pull\|sync <t>`                                                                            | sync takes `--mode`, `--with-groups`, `--dry-run`, `--concurrency`; all three take `--target <url> --token-env <VAR>` instead of the connection                                                                                                                                                                      |
+| `scim-event <t> <kind> [--style okta\|entra] [--user] [--group] [--set k=v]...`                        | one SCIM event on demand; kinds: `user.lookup\|create\|replace\|patch\|deactivate\|reactivate\|delete`, `group.lookup\|create\|add-member\|remove-member\|rename\|delete`                                                                                                                                            |
+| `dns add <domain> <txt>...` / `dns remove <domain>`                                                    | TXT records (global, not per tenant)                                                                                                                                                                                                                                                                                 |
+| `activity <t>` / `signin <t> [--user <email>] [--client <id> --redirect <uri>]`                        | the feed; the IdP-initiated sign-in URL                                                                                                                                                                                                                                                                              |
+| `clear <t>` / `samlp <t> on\|off`                                                                      | seeded state; Auth0-broker `samlp\|` subjects                                                                                                                                                                                                                                                                        |
+| `legacy provider <t> <generic\|auth0\|okta\|cognito\|onelogin\|azure\|show>` / `legacy env <t>`        | the legacy provider and the env lines that point a stack at it                                                                                                                                                                                                                                                       |
+| `fault <t> <mode>` (`fault <t> off` removes it)                                                        | break the next ID token (`bad-signature`, `wrong-audience`, `expired`, `replayed-nonce`) or SAML response (`saml-bad-signature`, `saml-unsigned`, `saml-wrong-audience`, `saml-wrong-recipient`, `saml-expired`, `saml-not-yet-valid`, `saml-replayed-assertion`, `saml-wrong-in-response-to`), once; `none` disarms |
+| `skew <t> <seconds>`                                                                                   | run the tenant's clock ahead (positive) or behind (negative) for every token and assertion                                                                                                                                                                                                                           |
+| `rotate-key <t> [--drop-previous]`                                                                     | make a fresh signing key current while JWKS and SAML metadata still publish the previous one; `--drop-previous` then stops publishing it                                                                                                                                                                             |
+| `user disable <t> <email>` / `user enable <t> <email>`                                                 | refuse (or allow again) that user's sign-in at the IdP, over OIDC and SAML                                                                                                                                                                                                                                           |
+| `saml unsolicited <t> --acs-url <url> --email <e> [--entity-id <id>] [--relay-state <s>]`              | an IdP-initiated response (no InResponseTo): prints the URL, SAMLResponse and RelayState to post                                                                                                                                                                                                                     |
+| `auth0-webhook <t> --event create\|deactivate --user <u> --target <stack-url> --secret-env <VAR>`      | send one signed Auth0 SCIM event                                                                                                                                                                                                                                                                                     |
+
+Secrets are never flag values. `--token-env` and `--secret-env` name a variable in
+your shell; the value is sent to the simulator and not printed or recorded.
 
 ## Domain verification
 

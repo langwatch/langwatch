@@ -38,12 +38,52 @@ Feature: Hono API endpoint authorization and tenant isolation
       When a developer tries to register a verb route without calling access(policy) first
       Then the verb method does not exist on the bare app and the code fails to compile
 
+    @unit
+    Scenario: A versioned endpoint without an access policy fails the build
+      Given a versioned route family built through the same REST service
+      When an endpoint is registered without declaring a permission policy
+      Then building the family raises rather than mounting an unclassified route
+
     @integration
     Scenario: The composed router has no route without a registered policy
       Given the fully composed API router from createApiRouter
       When every mounted concrete-method endpoint is enumerated
       Then each one is registered through SecuredApp with a declared policy
       And any route that bypassed the builder fails this assertion
+
+    @integration
+    Scenario: Every installed route declares a permission or a named exception
+      Given the route registry of the booted API process
+      When every installed route's policy is read
+      Then each names at least one permission or carries a written reason for answering without one
+      And the sweep names the method and path of every route that does neither
+
+    @unit
+    Scenario: A mounted route with no declared policy stops the boot
+      Given the composed REST router of the API process
+      When a route is mounted that the route registry does not carry
+      Then the process refuses to finish booting
+      And the refusal names the method and path of every such route
+      # The CI cross-check only sees the composition the description task can
+      # build. This is the same check on the router the process actually
+      # serves, so a path CI never composed cannot answer unguarded.
+
+    @unit
+    Scenario: The REST host refuses to serve a route nothing declared
+      Given a REST host with its declared families mounted
+      When a route is added to its application outside any declaration
+      Then the host refuses to start serving
+      And the refusal names the method and path of that route
+      # The check reads only the REST host's application: tRPC, websocket
+      # and raw HTTP mount on their own, so it never refuses their routes.
+
+    @unit
+    Scenario: A tRPC procedure with no access declaration fails the sweep
+      Given every procedure the process mounts
+      When one carries no access declaration at all
+      Then the declaration sweep fails and names that procedure
+      # The sweep used to skip an undeclared procedure, so the one shape it
+      # could say nothing about was the one it reported as fine.
 
     @integration
     Scenario: A public or internal route declares a documented reason
@@ -144,19 +184,29 @@ Feature: Hono API endpoint authorization and tenant isolation
 
     @integration
     Scenario: A project API key lacking the required permission is forbidden
-      Given a project API key whose role grants only "traces:view"
+      Given an API key whose grants hold only a view permission
       When I call a route that requires a different permission
       Then the response status is 403
 
     @integration
     Scenario: A read-only key cannot perform a write action
-      Given a project API key restricted to read-only permissions
+      Given an API key restricted to read-only permissions
       When I call a mutating endpoint that requires a write permission
+      And the application is never asked to write
       Then the response status is 403
+
+    @unit
+    Scenario: A narrow API key cannot write model defaults with its owner's grants
+      Given a read-only project API key whose owner administers the organization
+      When it creates, updates or deletes a model-defaults config
+      Then the request is refused with the API-key permission-denied code
+      And the write never reaches the service
+      # The service gates each named scope against the key's OWNING USER, so
+      # without a ceiling on the route the key's scope capped nothing.
 
     @integration
     Scenario: An authorized key passes the permission gate
-      Given a project API key whose role grants the required permission
+      Given an API key whose grants hold the required permission
       When I call the route
       Then the request is not rejected with 401 or 403
 
@@ -207,6 +257,41 @@ Feature: Hono API endpoint authorization and tenant isolation
   # ============================================================================
   Rule: A credential for one tenant cannot reach another tenant's data
 
+    @unit
+    Scenario: A scoped key cannot be re-pointed at a project its grants do not reach
+      Given a project API key bound to project A only
+      When it names a sibling project B of the same organization in X-Project-Id
+      Then the credential resolves to nothing and the request is unauthenticated
+      # The organization was the only fence, and a project-scoped key that
+      # named a sibling passed it. The key's own bindings are the fence now.
+
+    @unit
+    Scenario: A key reading stored bytes is pinned to the project it authenticated as
+      Given a project API key authenticated on the stored-object byte route
+      When it reads an object owned by another project
+      Then it is refused and no bytes are read
+      # Main's rule (Alex, 2026-09-30): the pin is the whole gate; no permission ceiling is asked.
+
+    @unit
+    Scenario: An organization or team key still selects a project it covers
+      Given a project API key bound to an organization, or to a project's team
+      When it names a project inside that scope in X-Project-Id
+      Then the credential resolves to that project
+
+    @integration
+    Scenario: A key that reaches several projects and names none is told to name one
+      Given an organization API key that reaches more than one project
+      When it calls a project endpoint with no X-Project-Id
+      Then the response status is 400 with code "project_required"
+      And the message names the X-Project-Id header and the CLI's --project flag
+      # A 401 invalid_credentials here sent the holder of a working key to rotate it.
+
+    @unit
+    Scenario: A token that stands for no key is still an invalid credential when it names no project
+      Given a token no API key matches
+      When it calls a project endpoint with no X-Project-Id
+      Then the response status is 401 with code "invalid_credentials"
+
     @integration
     Scenario: A key for one organization cannot resolve another organization's project
       Given a project API key issued for organization B
@@ -234,11 +319,11 @@ Feature: Hono API endpoint authorization and tenant isolation
       When a credential-less request hits an internal route
       Then the request is denied
 
-    @integration
-    Scenario: A destructive cron route rejects callers without the secret
-      Given the internal shared secret is configured
-      When the old-lambdas-cleanup cron route is called with no Authorization header
-      Then the response status is 401
+    @unit
+    Scenario: A destructive scheduled job answers no caller
+      Given the deployment declares no cron route
+      Then the old-lambdas cleanup runs as a scheduled process manager, not as an HTTP route
+      And there is no request a caller without the secret could make to it
 
   # ============================================================================
   Rule: A budget cannot be scoped to another organization's resource
@@ -319,7 +404,7 @@ Feature: Hono API endpoint authorization and tenant isolation
     Langy surfaces an admin configures. The organization's GitHub connection is
     not one of them any more: it belongs to the organization rather than to
     Langy, so organization management gates it
-    (specs/integrations/github-connection.feature).
+    (modules/integration/specs/github-connection.feature).
 
     Granted from MEMBER upward and to org admins; below that, nothing. The
     permission grain is not what keeps Langy scarce — the rollout flag is — so

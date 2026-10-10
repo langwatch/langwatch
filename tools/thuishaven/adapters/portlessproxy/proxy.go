@@ -4,6 +4,8 @@
 package portlessproxy
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -17,13 +19,14 @@ import (
 
 // Proxy is the portless-backed implementation of app.Proxy.
 type Proxy struct {
-	naming domain.Naming
-	lwDir  string
+	naming  domain.Naming
+	repoDir string
 }
 
-// New builds a Proxy. lwDir is used to find a project-local portless install.
-func New(naming domain.Naming, lwDir string) *Proxy {
-	return &Proxy{naming: naming, lwDir: lwDir}
+// New builds a Proxy. repoDir is the workspace root, where a project-local
+// portless install would be hoisted (ADR-076: one node_modules at the root).
+func New(naming domain.Naming, repoDir string) *Proxy {
+	return &Proxy{naming: naming, repoDir: repoDir}
 }
 
 // resolveBinary returns a real, runnable portless binary and true, or "" and
@@ -36,7 +39,7 @@ func (p *Proxy) resolveBinary() (string, bool) {
 	if bin := os.Getenv("PORTLESS_BIN"); bin != "" && isExecutableFile(bin) {
 		return bin, true
 	}
-	local := filepath.Join(p.lwDir, "node_modules", ".bin", "portless")
+	local := filepath.Join(p.repoDir, "node_modules", ".bin", "portless")
 	if isExecutableFile(local) {
 		return local, true
 	}
@@ -55,7 +58,7 @@ func (p *Proxy) argv() []string {
 
 // Installed reports whether a real portless binary is resolvable (PORTLESS_BIN,
 // project-local, or on PATH) as opposed to the `npx --yes portless` fallback,
-// which would re-download on every call. This is the signal `haven setup` uses
+// which would re-download on every call. This is the signal `haven self setup` uses
 // to decide whether to ask the user to install portless first.
 func (p *Proxy) Installed() bool {
 	_, ok := p.resolveBinary()
@@ -98,7 +101,7 @@ func (p *Proxy) EnsureReady() error {
 		// User-level `proxy start` needs no sudo and is enough to route this dev
 		// session (it prints "already running" and exits 0 if a proxy — e.g. the
 		// root launchd service — already holds the port). The persistent root
-		// service stays opt-in via `haven setup`, which needs sudo and so
+		// service stays opt-in via `haven self setup`, which needs sudo and so
 		// must not be triggered from a possibly-non-interactive `pnpm dev`.
 		if err := p.runVerbose("proxy", "start"); err != nil {
 			return fmt.Errorf("could not start the portless proxy: %w", err)
@@ -149,17 +152,35 @@ func fileExists(path string) bool {
 	return err == nil
 }
 
-// Install installs portless globally via npm — the bootstrap `haven up` runs
-// on a machine that has never had it. Output is inherited so the (possibly
-// slow) install is visible rather than a silent hang.
+// Version reports what the resolved portless binary says it is, or "" when
+// nothing is resolvable or it will not answer. Never runs the `npx` fallback:
+// that would download a package just to ask its version.
+func (p *Proxy) Version() string {
+	bin, ok := p.resolveBinary()
+	if !ok {
+		return ""
+	}
+	out, err := exec.CommandContext(context.Background(), bin, "--version").Output()
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(out))
+}
+
+// Install installs the pinned portless globally via npm — the bootstrap `haven
+// up` runs on a machine that has never had it, and the upgrade it runs when the
+// machine has a different one. The version comes from domain.PortlessVersion,
+// the single place it is recorded. Output is inherited so the (possibly slow)
+// install is visible rather than a silent hang.
 func (p *Proxy) Install() error {
 	if _, err := exec.LookPath("npm"); err != nil {
 		return fmt.Errorf("npm is not on PATH — install Node first (brew install node)")
 	}
-	cmd := exec.Command("npm", "install", "-g", "portless")
+	pkg := domain.PortlessPackage()
+	cmd := exec.CommandContext(context.Background(), "npm", "install", "-g", pkg)
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("npm install -g portless: %w", err)
+		return fmt.Errorf("npm install -g %s: %w", pkg, err)
 	}
 	return nil
 }
@@ -248,4 +269,24 @@ func (p *Proxy) Endpoint() (string, int) {
 		return "https", port
 	}
 	return "http", port
+}
+
+// Routes is portless's live route table, hostname -> port; empty when unreadable.
+func (p *Proxy) Routes() map[string]int {
+	routes := map[string]int{}
+	b, err := os.ReadFile(filepath.Join(p.stateDir(), "routes.json"))
+	if err != nil {
+		return routes
+	}
+	var entries []struct {
+		Hostname string `json:"hostname"`
+		Port     int    `json:"port"`
+	}
+	if json.Unmarshal(b, &entries) != nil {
+		return routes
+	}
+	for _, e := range entries {
+		routes[e.Hostname] = e.Port
+	}
+	return routes
 }

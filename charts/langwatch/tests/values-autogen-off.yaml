@@ -23,7 +23,6 @@ secrets:
   existingSecret: acme-app
   secretKeys:
     credentialsEncryptionKey: credentials-encryption-key
-    cronApiKey: cron-api-key
     nextAuthSecret: nextauth-secret
     virtualKeyPepper: virtual-key-pepper
     lwqlClickhousePassword: lwql-clickhouse-password

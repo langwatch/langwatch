@@ -35,6 +35,9 @@ CACHED_CLI=$(find ~/.npm/_npx -path "*/node_modules/@playwright/mcp/cli.js" 2>/d
 if [ -n "$CACHED_CLI" ] && [ -f "$CACHED_CLI" ]; then
   exec node "$CACHED_CLI" $HEADLESS_FLAG "${EXTRA_ARGS[@]}" "$@"
 else
-  exec npx --offline @playwright/mcp $HEADLESS_FLAG "${EXTRA_ARGS[@]}" "$@" 2>/dev/null \
-    || exec npx @playwright/mcp@latest $HEADLESS_FLAG "${EXTRA_ARGS[@]}" "$@"
+  # No `exec` on the probe: an exec'd npx that fails takes the fallback with it.
+  if npx --offline @playwright/mcp --version >/dev/null 2>&1; then
+    exec npx --offline @playwright/mcp $HEADLESS_FLAG "${EXTRA_ARGS[@]}" "$@"
+  fi
+  exec npx -y @playwright/mcp@latest $HEADLESS_FLAG "${EXTRA_ARGS[@]}" "$@"
 fi

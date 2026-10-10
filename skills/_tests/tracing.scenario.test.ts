@@ -1,17 +1,19 @@
-import scenario, { assertSkillWasRead } from "@langwatch/scenario";
 import fs from "fs";
-import { describe, it, expect } from "vitest";
-import dotenv from "dotenv";
 import os from "os";
 import path from "path";
 import { fileURLToPath } from "url";
+
 import { openai } from "@ai-sdk/openai";
+import scenario, { assertSkillWasRead } from "@langwatch/scenario";
+import dotenv from "dotenv";
+import { describe, it, expect } from "vitest";
+
 import {
   copyFixtureToWorkDir,
   createClaudeCodeAgent,
   installSkillToWorkDir,
   SKILL_TESTS_SET_ID,
-} from "./helpers/claude-code-adapter";
+} from "./helpers/claude-code-adapter.ts";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -30,9 +32,7 @@ describe("Tracing Skill", () => {
   it.skipIf(isCI)(
     "instruments a Python OpenAI bot with LangWatch",
     async () => {
-      const tempFolder = fs.mkdtempSync(
-        path.join(os.tmpdir(), "langwatch-skill-instrument-py-")
-      );
+      const tempFolder = fs.mkdtempSync(path.join(os.tmpdir(), "langwatch-skill-instrument-py-"));
 
       copyFixtureToWorkDir({
         fixtureSubpath: "python-openai",
@@ -43,8 +43,7 @@ describe("Tracing Skill", () => {
       const result = await scenario.run({
         setId: SKILL_TESTS_SET_ID,
         name: "Python OpenAI instrumentation",
-        description:
-          "Implementing LangWatch instrumentation in a Python OpenAI bot project.",
+        description: "Implementing LangWatch instrumentation in a Python OpenAI bot project.",
         agents: [
           createClaudeCodeAgent({ workingDirectory: tempFolder }),
           scenario.userSimulatorAgent({ model: judgeModel }),
@@ -57,16 +56,11 @@ describe("Tracing Skill", () => {
           }),
         ],
         script: [
-          scenario.user(
-            "instrument my code with langwatch"
-          ),
+          scenario.user("instrument my code with langwatch"),
           scenario.agent(),
           (state) => {
             assertSkillWasRead(state, "tracing");
-            const resultFile = fs.readFileSync(
-              `${tempFolder}/main.py`,
-              "utf8"
-            );
+            const resultFile = fs.readFileSync(`${tempFolder}/main.py`, "utf8");
             expect(resultFile).toContain("langwatch");
             expect(resultFile).toContain("trace");
           },
@@ -76,15 +70,13 @@ describe("Tracing Skill", () => {
 
       expect(result.success).toBe(true);
     },
-    900_000
+    900_000,
   );
 
   it.skipIf(isCI)(
     "instruments a TypeScript Vercel AI bot with LangWatch",
     async () => {
-      const tempFolder = fs.mkdtempSync(
-        path.join(os.tmpdir(), "langwatch-skill-instrument-ts-")
-      );
+      const tempFolder = fs.mkdtempSync(path.join(os.tmpdir(), "langwatch-skill-instrument-ts-"));
 
       copyFixtureToWorkDir({
         fixtureSubpath: "typescript-vercel",
@@ -109,16 +101,11 @@ describe("Tracing Skill", () => {
           }),
         ],
         script: [
-          scenario.user(
-            "instrument my code with langwatch"
-          ),
+          scenario.user("instrument my code with langwatch"),
           scenario.agent(),
           (state) => {
             assertSkillWasRead(state, "tracing");
-            const resultFile = fs.readFileSync(
-              `${tempFolder}/index.ts`,
-              "utf8"
-            );
+            const resultFile = fs.readFileSync(`${tempFolder}/index.ts`, "utf8");
             expect(resultFile).toContain("langwatch");
           },
           scenario.judge(),
@@ -127,14 +114,14 @@ describe("Tracing Skill", () => {
 
       expect(result.success).toBe(true);
     },
-    900_000
+    900_000,
   );
 
   it.skipIf(isCI)(
     "instruments a Python LangGraph agent with LangWatch",
     async () => {
       const tempFolder = fs.mkdtempSync(
-        path.join(os.tmpdir(), "langwatch-skill-tracing-langgraph-")
+        path.join(os.tmpdir(), "langwatch-skill-tracing-langgraph-"),
       );
 
       copyFixtureToWorkDir({
@@ -146,8 +133,7 @@ describe("Tracing Skill", () => {
       const result = await scenario.run({
         setId: SKILL_TESTS_SET_ID,
         name: "Python LangGraph instrumentation",
-        description:
-          "Implementing LangWatch instrumentation in a Python LangGraph agent project.",
+        description: "Implementing LangWatch instrumentation in a Python LangGraph agent project.",
         agents: [
           createClaudeCodeAgent({ workingDirectory: tempFolder }),
           scenario.userSimulatorAgent({ model: judgeModel }),
@@ -160,16 +146,11 @@ describe("Tracing Skill", () => {
           }),
         ],
         script: [
-          scenario.user(
-            "instrument my code with langwatch"
-          ),
+          scenario.user("instrument my code with langwatch"),
           scenario.agent(),
           (state) => {
             assertSkillWasRead(state, "tracing");
-            const resultFile = fs.readFileSync(
-              `${tempFolder}/main.py`,
-              "utf8"
-            );
+            const resultFile = fs.readFileSync(`${tempFolder}/main.py`, "utf8");
             expect(resultFile).toContain("langwatch");
           },
           scenario.judge(),
@@ -178,15 +159,13 @@ describe("Tracing Skill", () => {
 
       expect(result.success).toBe(true);
     },
-    900_000
+    900_000,
   );
 
   it.skipIf(isCI)(
     "instruments a TypeScript Mastra agent with LangWatch",
     async () => {
-      const tempFolder = fs.mkdtempSync(
-        path.join(os.tmpdir(), "langwatch-skill-tracing-mastra-")
-      );
+      const tempFolder = fs.mkdtempSync(path.join(os.tmpdir(), "langwatch-skill-tracing-mastra-"));
 
       copyFixtureToWorkDir({
         fixtureSubpath: "typescript-mastra",
@@ -197,8 +176,7 @@ describe("Tracing Skill", () => {
       const result = await scenario.run({
         setId: SKILL_TESTS_SET_ID,
         name: "TypeScript Mastra instrumentation",
-        description:
-          "Implementing LangWatch instrumentation in a TypeScript Mastra agent project.",
+        description: "Implementing LangWatch instrumentation in a TypeScript Mastra agent project.",
         agents: [
           createClaudeCodeAgent({ workingDirectory: tempFolder }),
           scenario.userSimulatorAgent({ model: judgeModel }),
@@ -211,16 +189,11 @@ describe("Tracing Skill", () => {
           }),
         ],
         script: [
-          scenario.user(
-            "instrument my code with langwatch"
-          ),
+          scenario.user("instrument my code with langwatch"),
           scenario.agent(),
           (state) => {
             assertSkillWasRead(state, "tracing");
-            const resultFile = fs.readFileSync(
-              `${tempFolder}/index.ts`,
-              "utf8"
-            );
+            const resultFile = fs.readFileSync(`${tempFolder}/index.ts`, "utf8");
             expect(resultFile).toContain("langwatch");
           },
           scenario.judge(),
@@ -229,14 +202,14 @@ describe("Tracing Skill", () => {
 
       expect(result.success).toBe(true);
     },
-    900_000
+    900_000,
   );
 
   it.skipIf(isCI)(
     "instruments a Python Google ADK agent with LangWatch",
     async () => {
       const tempFolder = fs.mkdtempSync(
-        path.join(os.tmpdir(), "langwatch-skill-tracing-google-adk-")
+        path.join(os.tmpdir(), "langwatch-skill-tracing-google-adk-"),
       );
 
       copyFixtureToWorkDir({
@@ -248,8 +221,7 @@ describe("Tracing Skill", () => {
       const result = await scenario.run({
         setId: SKILL_TESTS_SET_ID,
         name: "Python Google ADK instrumentation",
-        description:
-          "Implementing LangWatch instrumentation in a Python Google ADK agent project.",
+        description: "Implementing LangWatch instrumentation in a Python Google ADK agent project.",
         agents: [
           createClaudeCodeAgent({ workingDirectory: tempFolder }),
           scenario.userSimulatorAgent({ model: judgeModel }),
@@ -262,16 +234,11 @@ describe("Tracing Skill", () => {
           }),
         ],
         script: [
-          scenario.user(
-            "instrument my code with langwatch"
-          ),
+          scenario.user("instrument my code with langwatch"),
           scenario.agent(),
           (state) => {
             assertSkillWasRead(state, "tracing");
-            const resultFile = fs.readFileSync(
-              `${tempFolder}/main.py`,
-              "utf8"
-            );
+            const resultFile = fs.readFileSync(`${tempFolder}/main.py`, "utf8");
             expect(resultFile).toContain("langwatch");
           },
           scenario.judge(),
@@ -280,14 +247,14 @@ describe("Tracing Skill", () => {
 
       expect(result.success).toBe(true);
     },
-    900_000
+    900_000,
   );
 
   it.skipIf(isCI)(
     "instruments code without env API key — discovers from .env file",
     async () => {
       const tempFolder = fs.mkdtempSync(
-        path.join(os.tmpdir(), "langwatch-skill-tracing-coldstart-")
+        path.join(os.tmpdir(), "langwatch-skill-tracing-coldstart-"),
       );
 
       copyFixtureToWorkDir({
@@ -299,7 +266,7 @@ describe("Tracing Skill", () => {
       // Write .env with API key — agent must discover this
       fs.writeFileSync(
         path.join(tempFolder, ".env"),
-        `LANGWATCH_API_KEY=${process.env.LANGWATCH_API_KEY}\nOPENAI_API_KEY=${process.env.OPENAI_API_KEY}\n`
+        `LANGWATCH_API_KEY=${process.env.LANGWATCH_API_KEY}\nOPENAI_API_KEY=${process.env.OPENAI_API_KEY}\n`,
       );
 
       const result = await scenario.run({
@@ -323,15 +290,12 @@ describe("Tracing Skill", () => {
         ],
         script: [
           scenario.user(
-            "instrument my code with langwatch. My API key should be in the .env file."
+            "instrument my code with langwatch. My API key should be in the .env file.",
           ),
           scenario.agent(),
           (state) => {
             assertSkillWasRead(state, "tracing");
-            const mainPy = fs.readFileSync(
-              `${tempFolder}/main.py`,
-              "utf8"
-            );
+            const mainPy = fs.readFileSync(`${tempFolder}/main.py`, "utf8");
             expect(mainPy).toContain("langwatch");
             expect(mainPy).toContain("trace");
           },
@@ -341,15 +305,13 @@ describe("Tracing Skill", () => {
 
       expect(result.success).toBe(true);
     },
-    900_000
+    900_000,
   );
 
   it.skipIf(isCI)(
     "instruments code via llms.txt fallback when told the CLI is not available",
     async () => {
-      const tempFolder = fs.mkdtempSync(
-        path.join(os.tmpdir(), "langwatch-skill-tracing-nocli-")
-      );
+      const tempFolder = fs.mkdtempSync(path.join(os.tmpdir(), "langwatch-skill-tracing-nocli-"));
       copyFixtureToWorkDir({
         fixtureSubpath: "python-openai",
         workingDirectory: tempFolder,
@@ -359,7 +321,7 @@ describe("Tracing Skill", () => {
       // Write .env with API key
       fs.writeFileSync(
         path.join(tempFolder, ".env"),
-        `LANGWATCH_API_KEY=${process.env.LANGWATCH_API_KEY}\n`
+        `LANGWATCH_API_KEY=${process.env.LANGWATCH_API_KEY}\n`,
       );
 
       const result = await scenario.run({
@@ -380,7 +342,7 @@ describe("Tracing Skill", () => {
         ],
         script: [
           scenario.user(
-            "instrument my code with langwatch. Pretend the langwatch CLI is not available in this environment, so do not run any `langwatch ...` shell commands; instead fetch docs directly from https://langwatch.ai/docs/llms.txt and follow the markdown links from there. My API key is in the .env file."
+            "instrument my code with langwatch. Pretend the langwatch CLI is not available in this environment, so do not run any `langwatch ...` shell commands; instead fetch docs directly from https://langwatch.ai/docs/llms.txt and follow the markdown links from there. My API key is in the .env file.",
           ),
           scenario.agent(),
           (state) => {
@@ -394,15 +356,13 @@ describe("Tracing Skill", () => {
       });
       expect(result.success).toBe(true);
     },
-    900_000
+    900_000,
   );
 
   it.skipIf(isCI)(
     "asks user for API key when not found in environment or .env",
     async () => {
-      const tempFolder = fs.mkdtempSync(
-        path.join(os.tmpdir(), "langwatch-skill-tracing-nokey-")
-      );
+      const tempFolder = fs.mkdtempSync(path.join(os.tmpdir(), "langwatch-skill-tracing-nokey-"));
       copyFixtureToWorkDir({
         fixtureSubpath: "python-openai",
         workingDirectory: tempFolder,
@@ -414,8 +374,7 @@ describe("Tracing Skill", () => {
       const result = await scenario.run({
         setId: SKILL_TESTS_SET_ID,
         name: "Tracing — agent asks for API key",
-        description:
-          "Agent instruments code but has no API key available. Must ask the user.",
+        description: "Agent instruments code but has no API key available. Must ask the user.",
         agents: [
           createClaudeCodeAgent({
             workingDirectory: tempFolder,
@@ -431,13 +390,11 @@ describe("Tracing Skill", () => {
           }),
         ],
         script: [
-          scenario.user(
-            "instrument my code with langwatch"
-          ),
+          scenario.user("instrument my code with langwatch"),
           scenario.agent(),
           // Agent should ask for API key — we provide it
           scenario.user(
-            `Here is my LangWatch API key: ${process.env.LANGWATCH_API_KEY}. Please save it to .env and continue with the instrumentation.`
+            `Here is my LangWatch API key: ${process.env.LANGWATCH_API_KEY}. Please save it to .env and continue with the instrumentation.`,
           ),
           scenario.agent(),
           (state) => {
@@ -447,16 +404,14 @@ describe("Tracing Skill", () => {
 
             // Verify .env was created with the key
             const envFile = path.join(tempFolder, ".env");
-            if (fs.existsSync(envFile)) {
-              const envContent = fs.readFileSync(envFile, "utf8");
-              expect(envContent).toContain("LANGWATCH_API_KEY");
-            }
+            expect(fs.existsSync(envFile)).toBe(true);
+            expect(fs.readFileSync(envFile, "utf8")).toContain("LANGWATCH_API_KEY");
           },
           scenario.judge(),
         ],
       });
       expect(result.success).toBe(true);
     },
-    900_000 // longer timeout for multi-turn
+    900_000, // longer timeout for multi-turn
   );
 });

@@ -1,7 +1,8 @@
-import { describe, it, expect, vi, afterEach } from "vitest";
-import { setupObservability } from "../../setup";
 import { trace } from "@opentelemetry/api";
-import { resetObservabilitySdkConfig } from '../../../../config.js';
+import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
+
+import { resetObservabilitySdkConfig } from "../../../../config.js";
+import { setupObservability } from "../../setup";
 
 // Integration tests for tracer functionality in setupObservability
 function createMockLogger() {
@@ -15,10 +16,15 @@ afterEach(() => {
 });
 
 describe("setupObservability Integration - Tracer Functionality", () => {
-  it("creates spans with correct attributes", async () => {
+  let tracer: ReturnType<typeof trace.getTracer>;
+
+  beforeEach(() => {
     const logger = createMockLogger();
     setupObservability({ langwatch: { apiKey: "test-key" }, debug: { logger } });
-    const tracer = trace.getTracer("default");
+    tracer = trace.getTracer("default");
+  });
+
+  it("creates spans with correct attributes", async () => {
     const span = tracer.startSpan("test-operation");
     span.setAttribute("http.method", "GET");
     span.setAttribute("http.url", "https://api.example.com");
@@ -29,9 +35,6 @@ describe("setupObservability Integration - Tracer Functionality", () => {
   });
 
   it("handles active spans correctly if available", async () => {
-    const logger = createMockLogger();
-    setupObservability({ langwatch: { apiKey: "test-key" }, debug: { logger } });
-    const tracer = trace.getTracer("default");
     const result = tracer.startActiveSpan("test-operation", (span) => {
       span.setAttribute("test.attribute", "test-value");
       span.end();

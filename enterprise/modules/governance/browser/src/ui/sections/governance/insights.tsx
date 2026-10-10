@@ -1,0 +1,144 @@
+import { LangyMark } from "@langwatch/design-system/langy-mark";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
+import { PageLayout } from "@langwatch/design-system/page-layout";
+import { Badge, Box, Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
+import { Inbox } from "lucide-react";
+import { useState } from "react";
+
+import { useLangyStore } from "../../../behavior/langy/langy.store.ts";
+import {
+  EMPTY_FOLDER_LINE,
+  EMPTY_INSIGHTS_COUNTS,
+  type InsightsFolder,
+  InsightsRail,
+} from "../../../features/insights/insights-rail.tsx";
+import {
+  DEFAULT_INSIGHTS_SETTINGS,
+  InsightsSetupDrawer,
+} from "../../../features/insights/insights-setup-drawer.tsx";
+import { SERIF } from "../../../model/langy/asaplangy-tokens.ts";
+import {
+  GOVERNANCE_BILLED_COST_FLAG,
+  withGovernanceSection,
+} from "../../../ui/sections/governance-section-gate.tsx";
+import GovernanceLayout from "../governance-layout.tsx";
+import { LangyPanelSurface } from "../langy/langy-panel-surface.tsx";
+
+/**
+ * Insights placeholder before content. Setup drawer state local (no store yet).
+ * Preview badge, no inert controls.
+ */
+function InsightsPage() {
+  const [setupOpen, setSetupOpen] = useState(false);
+  const [settings, setSettings] = useState(DEFAULT_INSIGHTS_SETTINGS);
+  const [folder, setFolder] = useState<InsightsFolder>("inbox");
+  const openLangy = useLangyStore((state) => state.openPanel);
+
+  return (
+    <GovernanceLayout pageTitle="Insights · AI Governance · LangWatch">
+      <PageLayout.Header>
+        <PageLayout.Heading>Insights</PageLayout.Heading>
+        <Badge colorPalette="purple" size="sm" variant="surface">
+          Preview
+        </Badge>
+      </PageLayout.Header>
+
+      <PageLayout.Container>
+        <VStack align="stretch" gap={6} width="full">
+          <Text color="fg.muted">
+            A preview of the inbox where Langy will file the few things worth acting on. Nothing is
+            filed yet.
+          </Text>
+
+          <HStack align="start" gap={8} width="full">
+            <InsightsRail selected={folder} counts={EMPTY_INSIGHTS_COUNTS} onSelect={setFolder} />
+            <Box flex={1} minWidth={0}>
+              {folder === "inbox" ? (
+                <InboxEmptyBrief onSetup={() => setSetupOpen(true)} onOpenLangy={openLangy} />
+              ) : (
+                <NoDataInfoBlock
+                  icon={<Inbox />}
+                  title={EMPTY_FOLDER_LINE[folder]}
+                  description="Insights will appear here once this preview is connected to your activity."
+                />
+              )}
+            </Box>
+          </HStack>
+        </VStack>
+      </PageLayout.Container>
+
+      <InsightsSetupDrawer
+        open={setupOpen}
+        settings={settings}
+        onCancel={() => setSetupOpen(false)}
+        onSave={(next) => {
+          setSettings(next);
+          setSetupOpen(false);
+        }}
+      />
+    </GovernanceLayout>
+  );
+}
+
+function InboxEmptyBrief({
+  onSetup,
+  onOpenLangy,
+}: {
+  onSetup: () => void;
+  onOpenLangy: () => void;
+}) {
+  return (
+    <>
+      {/* Langy's own empty state on Langy's own material — the surface the
+            home briefing wears (`langy-root`, hairline, no shadow, dark
+            panel palette), with the panel's own empty-state grid: mark,
+            serif display line, one sentence, then the keys. No gradient
+            defs: outside the Langy panel, currentColor has no paint server. */}
+      {/* The surface wraps its card in a full-width scope box, so the
+            card centres as a block (auto margins), not as a flex item. */}
+      <LangyPanelSurface data-testid="insights-empty-brief" maxWidth="900px" marginX="auto">
+        <VStack gap={0} paddingY={16} paddingX={8}>
+          <LangyMark size={44} />
+          <Text
+            as="h2"
+            fontFamily={SERIF}
+            // 44px mark ÷ φ, the same pairing the panel's greeting uses.
+            fontSize="27px"
+            fontWeight="500"
+            letterSpacing="-0.02em"
+            lineHeight="1.2"
+            color="fg"
+            textAlign="center"
+            marginTop={4}
+          >
+            Langy will write your brief here
+          </Text>
+          <Text
+            textStyle="sm"
+            color="fg.muted"
+            lineHeight="1.5"
+            textAlign="center"
+            textWrap="balance"
+            maxWidth="380px"
+            marginTop={2}
+          >
+            A couple of things worth acting on each day, never a feed of fifteen. Nothing has been
+            filed here yet.
+          </Text>
+          {/* Two ways out: Set up data (house button, local state, no mutation yet); Open
+              Langy (ghost, changes screen only). */}
+          <HStack gap={2} marginTop={6}>
+            <PageLayout.HeaderButton primary onClick={onSetup}>
+              Set up data
+            </PageLayout.HeaderButton>
+            <Button size="sm" variant="ghost" onClick={onOpenLangy}>
+              Open Langy
+            </Button>
+          </HStack>
+        </VStack>
+      </LangyPanelSurface>
+    </>
+  );
+}
+
+export default withGovernanceSection(InsightsPage, { releaseFlag: GOVERNANCE_BILLED_COST_FLAG });

@@ -121,3 +121,9 @@ Feature: Scenario Editor
   # Target Configuration
   # ============================================================================
 
+
+  @integration
+  Scenario: An edited scenario's typed fields are the ones the form reads
+    Given the scenario form opened on an existing scenario
+    When its name is edited
+    Then the form reads the typed name, not the one it opened with

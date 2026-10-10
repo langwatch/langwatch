@@ -1,0 +1,129 @@
+import { AgentNotFoundError, AgentOwnerOnlyError } from "@langwatch/agent-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import type { UserApi } from "@langwatch/user-contract";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+import { ConnectedAgentService } from "../../services/connected-agent.service.ts";
+import { createAgentAppFixture } from "./agent.fixture.ts";
+
+const register = {
+  id: "agent_one",
+  projectId: "project_one",
+  name: "Personal agent",
+  config: { sdk: { name: "langwatch", version: "1", language: "typescript" }, parameters: [] },
+  identity: {
+    environment: "development",
+    identityKey: "personal@development/user:owner",
+    ownerUserId: "owner",
+    hostLabel: null,
+  },
+};
+const input = {
+  id: register.id,
+  projectId: register.projectId,
+  messages: [{ role: "user" as const, content: "Hello" }],
+};
+
+afterEach(() => vi.restoreAllMocks());
+
+describe("AgentModule.call", () => {
+  it.each([null, "another_user"])(
+    "refuses a personal agent for viewer %s before dispatch",
+    async (viewerUserId) => {
+      const dispatch = vi.spyOn(ConnectedAgentService.prototype, "dispatch");
+      const { app } = createAgentAppFixture({
+        users: createApiFixture<UserApi>({ getProfiles: async () => [] }),
+      });
+      await app.registerConnected(register);
+
+      await expect(app.call(input, { viewerUserId, traceparent: null })).rejects.toBeInstanceOf(
+        AgentOwnerOnlyError,
+      );
+      expect(dispatch).not.toHaveBeenCalled();
+    },
+  );
+
+  describe("given a personal agent whose process is not connected", () => {
+    /** @scenario "The owner-only refusal comes before the offline one" */
+    it("refuses another person as agent_owner_only, never as agent_offline", async () => {
+      const dispatch = vi.spyOn(ConnectedAgentService.prototype, "dispatch");
+      const { app } = createAgentAppFixture({
+        users: createApiFixture<UserApi>({ getProfiles: async () => [] }),
+      });
+      await app.registerConnected(register);
+
+      const failure = await app
+        .call(input, { viewerUserId: "another_user", traceparent: null })
+        .catch((error: unknown) => error);
+
+      expect(failure).toMatchObject({ code: "agent_owner_only" });
+      expect(dispatch).not.toHaveBeenCalled();
+    });
+  });
+
+  it("does not read an agent from another project", async () => {
+    const dispatch = vi.spyOn(ConnectedAgentService.prototype, "dispatch");
+    const { app } = createAgentAppFixture();
+    await app.registerConnected(register);
+
+    await expect(
+      app.call(
+        { ...input, projectId: "project_other" },
+        { viewerUserId: "owner", traceparent: null },
+      ),
+    ).rejects.toBeInstanceOf(AgentNotFoundError);
+    expect(dispatch).not.toHaveBeenCalled();
+  });
+
+  it("passes the owner's turn defaults to dispatch and returns only the public response", async () => {
+    const dispatch = vi.spyOn(ConnectedAgentService.prototype, "dispatch").mockResolvedValue({
+      output: "Hi",
+      session: { cursor: "next" },
+      durationMs: 12,
+      instance: { instanceId: "private_instance", hostname: "laptop", label: null },
+    });
+    const { app, resources } = createAgentAppFixture({
+      config: {
+        replicaCount: 1,
+        relayMaxPayloadMb: void 0,
+        publicBaseUrl: "https://langwatch.test",
+      },
+    });
+    await app.registerConnected(register);
+    const signal = new AbortController().signal;
+
+    const response = await app.call(input, {
+      viewerUserId: "owner",
+      traceparent: "parent",
+      signal,
+    });
+
+    expect(dispatch).toHaveBeenCalledWith({
+      projectId: register.projectId,
+      agent: {
+        id: register.id,
+        name: register.name,
+        environment: "development",
+        timeoutMs: 120_000,
+        isSticky: false,
+      },
+      call: {
+        threadId: expect.any(String),
+        messages: input.messages,
+        newMessages: input.messages,
+        params: {},
+        session: void 0,
+        traceparent: "parent",
+        run: {},
+      },
+      signal,
+    });
+    expect(response).toEqual({
+      output: "Hi",
+      session: { cursor: "next" },
+      durationMs: 12,
+      instance: { hostname: "laptop", label: null },
+    });
+    await resources.close();
+  });
+});

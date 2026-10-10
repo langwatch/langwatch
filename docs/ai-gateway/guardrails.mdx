@@ -10,10 +10,10 @@ A guardrail is a project-scoped evaluator that the LangWatch AI Gateway runs inl
 
 A guardrail has three parts:
 
-| Part | Values |
-|---|---|
-| Evaluator | Any evaluator of the project that has an enabled monitor set to run as a guardrail. |
-| Direction | **Pre (request)**, **Post (response)** or **Stream chunk**. |
+| Part         | Values                                                                                  |
+| ------------ | --------------------------------------------------------------------------------------- |
+| Evaluator    | Any evaluator of the project that has an enabled monitor set to run as a guardrail.     |
+| Direction    | **Pre (request)**, **Post (response)** or **Stream chunk**.                             |
 | Failure mode | Fail closed (default) or fail open. Decides what happens when the evaluator cannot run. |
 
 A virtual key attaches guardrails per direction. The gateway evaluates them on every request through that key.
@@ -71,10 +71,12 @@ A realtime session mint (`POST /v1/realtime/client_secrets`, `GET /v1/convai/con
     Open **AI Gateway, Guardrails** in the sidebar (`/gateway/guardrails`). Click **New guardrail**, pick the evaluator, the direction and the failure mode.
 
     <Frame caption="The New guardrail drawer. The evaluator list holds only the evaluators marked as guardrails in the previous step.">
+
   <img src="/images/ai-gateway/guardrail-drawer.png" alt="The New guardrail drawer with the name, evaluator, direction and failure mode fields" />
 </Frame>
 
     <Frame caption="The Guardrails list: one guardrail on the request, one on the response.">
+
   <img src="/images/ai-gateway/guardrails-list.png" alt="The Guardrails list with the Name, Direction, Evaluator and Failure mode columns" />
 </Frame>
   </Step>
@@ -82,6 +84,7 @@ A realtime session mint (`POST /v1/realtime/client_secrets`, `GET /v1/convai/con
     Open the key's detail page under **AI Gateway, Virtual Keys** (`/gateway/virtual-keys/<id>`). In the **Guardrails** section, tick the guardrail under **Pre-request**, **Post-response** or **Stream chunk**, and click **Save guardrails**. The edit drawer has no guardrail field. Guardrails are project-scoped: the key must be scoped to that single project to attach them.
 
     <Frame caption="The Guardrails section of a key's detail page, with the request guardrail ticked.">
+
   <img src="/images/ai-gateway/vk-guardrails-attach.png" alt="The Guardrails section of a virtual key detail page with Pre-request and Post-response groups and the Save guardrails button" />
 </Frame>
   </Step>
@@ -89,6 +92,7 @@ A realtime session mint (`POST /v1/realtime/client_secrets`, `GET /v1/convai/con
     Send a request the evaluator rejects and check the response for `403` and `"code": "guardrail_blocked"`. Open the trace in Trace Explorer: the span records `error.type` as `guardrail_blocked`.
 
     A stream chunk guardrail has no error response to read. Send a streaming request whose output the evaluator rejects: the stream ends early at the rejected chunk, with the usual `data: [DONE]` frame and no error frame.
+
   </Step>
 </Steps>
 

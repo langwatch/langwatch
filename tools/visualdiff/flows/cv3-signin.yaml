@@ -1,0 +1,19 @@
+# CV3: sign-in routes the other auth flows leave out. Anonymous, so no seeded account is touched.
+flows:
+  - id: cv3-auth-error-without-a-code-returns-to-sign-in
+    title: The sign-in error page opened with no error code waits, then takes the visitor to the sign-in page instead of spinning
+    steps:
+      - action: go
+        with:
+          path: /auth/error
+          anonymous: "true"
+      - action: expect
+        with:
+          url: /auth/signin
+          timeout: "20000"
+          anonymous: "true"
+      - action: expect
+        with:
+          testId: sign-in-error-trace
+          equals: "0"
+          anonymous: "true"

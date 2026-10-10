@@ -1,4 +1,4 @@
-import { listAgents as apiListAgents, type AgentSummary } from "../langwatch-api-agents.js";
+import { listAgents as apiListAgents, type AgentSummary } from "../langwatch-api-agents.ts";
 
 /** Who a personal or host-scoped agent belongs to, empty for a shared one. */
 export const agentOwnerLabel = (agent: AgentSummary): string =>

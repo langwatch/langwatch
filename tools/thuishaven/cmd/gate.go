@@ -10,7 +10,7 @@ import (
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
 
-// runHeavy is `haven run` — take a machine-wide slot, run the command, release.
+// runHeavy is `haven machine run` — take a machine-wide slot, run the command, release.
 //
 // The command arrives as ONE argument on --sh rather than as trailing argv,
 // because the gate hands over a shell string and splicing it bare would let
@@ -18,17 +18,17 @@ import (
 func runHeavy(ctx context.Context, d deps, inv invocation) error {
 	shell := inv.value("--sh")
 	if shell == "" {
-		return fmt.Errorf("haven run needs a command: haven run --sh 'pnpm test:unit'")
+		return fmt.Errorf("haven machine run needs a command: haven machine run --sh 'pnpm test:unit'")
 	}
 	// One pool exists, so any other name is a request haven cannot honour.
 	// Accepting it silently would run the command against the heavy pool while
 	// the caller believes it took a different one.
 	if class := inv.value("--class"); class != "" && class != domain.HeavySlotClass {
-		return fmt.Errorf("haven run has one slot class today, %q — not %q", domain.HeavySlotClass, class)
+		return fmt.Errorf("haven machine run has one slot class today, %q — not %q", domain.HeavySlotClass, class)
 	}
 	return d.orch.RunHeavy(ctx, app.HeavyRun{
 		Shell:   shell,
-		Dir:     d.lwDir,
+		Dir:     d.worktree,
 		AgentID: inv.value("--agent-id"),
 		// The gate decided the width; this only applies it. A count that will not
 		// parse is treated as absent rather than fatal, because refusing to run
@@ -51,18 +51,23 @@ func positiveInt(s string) int {
 	return n
 }
 
-// runGate is `haven gate` — answer one Claude Code PreToolUse hook.
+// runGate answers one PreToolUse hook in the selected client protocol.
 //
-// There is no install flag: `haven setup gate-hook` registers this in the
-// worktree's own .claude/settings.local.json, and it is opt-in — `haven up`
-// installs nothing that changes how another tool behaves. A command whose job
-// is answering hooks should not also be the thing that installs them.
+// `haven self setup gate-hook` registers the hook by hand, and `haven up` now
+// registers it automatically for the worktree it starts - a per-worktree hook
+// only guards the checkout it was installed in, and remembering to run setup in
+// every one of them is exactly what stopped happening. `haven self setup gate-hook
+// --off` opts a worktree back out of both.
 //
 // It always exits 0. Exit code 2 BLOCKS the tool call, and an unrecovered Go
 // panic exits with exactly 2, so returning an error from here would risk
 // converting a haven bug into a machine-wide tool-call blocker. Every failure
-// inside Gate already resolves to "defer".
-func runGate(_ context.Context, d deps, _ invocation) error {
+// inside Gate already resolves to a neutral answer with no permission decision.
+func runGate(_ context.Context, d deps, inv invocation) error {
+	if inv.value("--client") == "codex" {
+		d.orch.GateCodex(os.Stdin, os.Stdout)
+		return nil
+	}
 	d.orch.Gate(os.Stdin, os.Stdout)
 	return nil
 }

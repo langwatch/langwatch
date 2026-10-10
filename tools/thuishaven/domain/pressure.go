@@ -51,7 +51,6 @@ type MemStat struct {
 // they are a heuristic, and ADR-090 says so rather than implying it measured
 // a limit the system actually applies.
 const (
-	amberSwapFraction = 0.40
 	redSwapFraction   = 0.75
 	amberCompFraction = 0.10
 	redCompFraction   = 0.20
@@ -60,9 +59,9 @@ const (
 // ClassifyPressure reads a level off the machine. An undetectable machine is
 // green: a governor that cannot see must not throttle.
 //
-// Either signal alone can raise the level. A machine with swap disabled has a
-// permanently zero swap term and still thrashes its compressor, so requiring
-// both would never fire there.
+// The compressor alone can raise the level; swap only escalates a busy
+// compressor to red. macOS keeps swap in use for hours after pressure ends, so
+// swap alone throttled every unfocused stack 20x on a machine 86% free.
 func ClassifyPressure(m MemStat) Pressure {
 	if m.TotalBytes == 0 {
 		return Green
@@ -73,9 +72,9 @@ func ClassifyPressure(m MemStat) Pressure {
 		swapFraction = float64(m.SwapUsedBytes) / float64(m.SwapTotalBytes)
 	}
 	switch {
-	case swapFraction > redSwapFraction || compFraction > redCompFraction:
+	case compFraction > redCompFraction || (swapFraction > redSwapFraction && compFraction > amberCompFraction):
 		return Red
-	case swapFraction > amberSwapFraction || compFraction > amberCompFraction:
+	case compFraction > amberCompFraction:
 		return Amber
 	default:
 		return Green

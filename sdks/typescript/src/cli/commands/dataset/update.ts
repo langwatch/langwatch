@@ -1,11 +1,13 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
+
 import type { DatasetColumnType } from "@/client-sdk/services/datasets/types";
+
 import { resolveCredentials } from "../../utils/apiKey";
 import type { CommandResult } from "../../utils/output";
-import { createDatasetService } from "./service-factory";
+import { createSpinner } from "../../utils/spinner";
 import { parseColumns } from "./create";
 import { handleDatasetCommandError } from "./error-handler";
+import { createDatasetService } from "./service-factory";
 
 /**
  * Updates an existing dataset's name and/or column types.
@@ -17,9 +19,7 @@ export const updateCommand = async (
   await resolveCredentials();
 
   if (!options.name && !options.columns) {
-    console.error(
-      chalk.red("Error: At least one of --name or --columns must be provided."),
-    );
+    console.error(chalk.red("Error: At least one of --name or --columns must be provided."));
     process.exit(1);
   }
 
@@ -28,9 +28,7 @@ export const updateCommand = async (
     try {
       columnTypes = parseColumns(options.columns);
     } catch (error) {
-      console.error(
-        chalk.red(error instanceof Error ? error.message : "Invalid columns format"),
-      );
+      console.error(chalk.red(error instanceof Error ? error.message : "Invalid columns format"));
       process.exit(1);
     }
   }
@@ -53,9 +51,7 @@ export const updateCommand = async (
         console.log(`  ${chalk.bold("Slug:")}  ${dataset.slug}`);
         console.log(`  ${chalk.bold("Name:")}  ${dataset.name}`);
         if (dataset.columnTypes.length > 0) {
-          const colStr = dataset.columnTypes
-            .map((c) => `${c.name}:${c.type}`)
-            .join(", ");
+          const colStr = dataset.columnTypes.map((c) => `${c.name}:${c.type}`).join(", ");
           console.log(`  ${chalk.bold("Columns:")} ${colStr}`);
         }
         if (dataset.platformUrl) {

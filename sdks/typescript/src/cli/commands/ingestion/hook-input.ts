@@ -1,13 +1,5 @@
 /**
- * The payload a coding agent hands `langwatch ingest hook <tool>`: how it
- * arrives, and what it is allowed to say.
- *
- * All three seams write the same JSON object to the hook's stdin, so reading it
- * is one concern with two halves: draining the pipe without ever waiting
- * forever on it, and reading a few optional strings out of whatever turned up.
- * Every malformed shape reads as an empty payload, which is what lets the
- * command stay silent instead of explaining itself to a session.
- *
+ * Hook payload: drain stdin bounded by deadline and byte cap.
  * Spec: specs/ai-governance/cli-wrappers/session-context-hook.feature
  */
 
@@ -71,17 +63,7 @@ const hookInputSchema = z
 /** The facts a seam reports, each absent until proven otherwise. */
 export type HookInput = z.infer<typeof hookInputSchema>;
 
-/**
- * Drain stdin. A terminal is not a hook payload, so it reads as empty.
- *
- * Bounded in both directions, by the deadline and by the byte cap, because a
- * seam that spawns the hook with a pipe it never closes would otherwise leave
- * it draining for the rest of the session, and the opencode plugin spawns it
- * without waiting, so nothing upstream would notice. Whatever arrived by the
- * deadline is what gets parsed, and half a payload is not JSON, so it takes the
- * same silent path as none. A payload past the cap takes that path too: the
- * read stops there rather than buffering the rest of whatever is being written.
- */
+/** Drain stdin bounded by deadline and byte cap; terminal reads as empty. */
 export async function readStdin({
   stream = process.stdin,
   timeoutMs = STDIN_TIMEOUT_MS,

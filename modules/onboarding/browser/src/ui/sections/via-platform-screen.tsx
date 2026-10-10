@@ -1,0 +1,180 @@
+import { Link } from "@langwatch/browser-host/link";
+import { Box, Grid, GridItem, HStack, Text, VStack } from "@langwatch/design-system/primitives";
+import {
+  Activity,
+  ArrowUpRight,
+  BookOpen,
+  FlaskConical,
+  type LucideIcon,
+  MessageSquareText,
+  Settings,
+  Shield,
+} from "lucide-react";
+import type React from "react";
+
+import { accentChipBg } from "../../model/shared/accent-surface.ts";
+import { useActiveProject } from "./active-project-context.tsx";
+
+interface CapabilityProps {
+  icon: LucideIcon;
+  title: string;
+  description: string;
+  /** URL path. If starts with "/" it's appended to project slug, otherwise used as-is. */
+  path: string;
+  /** If true, path is absolute and not prefixed with project slug. */
+  absolute?: boolean;
+}
+
+function capabilityHref({
+  capability,
+  projectSlug,
+}: {
+  capability: CapabilityProps;
+  projectSlug: string | undefined;
+}) {
+  if (capability.absolute) return capability.path;
+  if (projectSlug) return `/${projectSlug}${capability.path}`;
+  return "#";
+}
+
+const capabilities: CapabilityProps[] = [
+  {
+    icon: Activity,
+    title: "Traces & Analytics",
+    description: "Monitor LLM calls, latency, costs, and user interactions",
+    path: "/traces",
+  },
+  {
+    icon: Shield,
+    title: "Online Evaluations",
+    description: "Run automated quality checks on live LLM outputs",
+    path: "/online-evaluations",
+  },
+  {
+    icon: MessageSquareText,
+    title: "Prompts",
+    description: "Version, test, and manage your prompts from the dashboard",
+    path: "/prompts",
+  },
+  {
+    icon: FlaskConical,
+    title: "Scenarios",
+    description: "Create test scenarios to validate agent behavior",
+    path: "/simulations",
+  },
+  {
+    icon: BookOpen,
+    title: "Datasets",
+    description: "Build and curate datasets for evaluation and fine-tuning",
+    path: "/datasets",
+  },
+  {
+    icon: Settings,
+    title: "Model Providers",
+    description: "Configure API keys for the models you use",
+    path: "/settings/model-providers",
+    absolute: true,
+  },
+];
+
+function CapabilityCard({
+  icon: Icon,
+  title,
+  description,
+  href,
+}: CapabilityProps & { href: string }): React.ReactElement {
+  return (
+    <VStack
+      asChild
+      align="start"
+      gap={3}
+      p={5}
+      flex={1}
+      borderRadius="xl"
+      border="1px solid"
+      borderColor={{ base: "orange.emphasized", _dark: "orange.emphasized" }}
+      bg="bg.panel/70"
+      backdropFilter="blur(20px) saturate(1.3)"
+      boxShadow="0 1px 3px color-mix(in srgb, var(--chakra-colors-bg-scrim) 4%, transparent)"
+      transition="all 0.2s ease"
+      cursor="pointer"
+      _hover={{
+        borderColor: "orange.emphasized",
+        boxShadow:
+          "0 6px 28px color-mix(in srgb, var(--chakra-colors-accent-solid) 6%, transparent)",
+        transform: "translateY(-2px)",
+        textDecoration: "none",
+      }}
+    >
+      <Link href={href} textDecoration="none" color="inherit">
+        <Box
+          flexShrink={0}
+          p={2.5}
+          borderRadius="xl"
+          bg={accentChipBg}
+          color="orange.fg"
+          display="flex"
+          alignItems="center"
+          justifyContent="center"
+        >
+          <Icon size={20} strokeWidth={1.5} />
+        </Box>
+        <VStack align="stretch" gap={1}>
+          <Text fontSize="sm" fontWeight="semibold" color="fg" letterSpacing="-0.01em">
+            {title}
+          </Text>
+          <Text fontSize="xs" color="fg.muted" lineHeight="tall">
+            {description}
+          </Text>
+        </VStack>
+      </Link>
+    </VStack>
+  );
+}
+
+export function ViaPlatformScreen(): React.ReactElement {
+  const { project } = useActiveProject();
+
+  return (
+    <>
+      <VStack align="stretch" gap={6} mb={20} w="full">
+        <Grid
+          templateColumns={{
+            base: "1fr",
+            md: "repeat(2, 1fr)",
+            lg: "repeat(3, 1fr)",
+          }}
+          gap={3}
+        >
+          {capabilities.map((cap) => (
+            <GridItem key={cap.title} display="flex">
+              <CapabilityCard
+                {...cap}
+                href={capabilityHref({ capability: cap, projectSlug: project?.slug })}
+              />
+            </GridItem>
+          ))}
+        </Grid>
+
+        <HStack justify="center" pt={2}>
+          <a
+            href="https://docs.langwatch.ai"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "4px",
+              fontSize: "13px",
+              color: "var(--chakra-colors-fg-muted)",
+              textDecoration: "none",
+            }}
+          >
+            Read the docs
+            <ArrowUpRight size={14} />
+          </a>
+        </HStack>
+      </VStack>
+    </>
+  );
+}

@@ -1,0 +1,964 @@
+import { parseOnboardingVariant } from "@langwatch/onboarding-contract";
+import type { PersonalFeatures } from "@langwatch/organization-contract";
+import { PrismaRepository } from "@langwatch/prisma-client";
+import { Prisma, type Project as PrismaProject } from "@langwatch/prisma-client/generated";
+import {
+  NEVER_LANDED_ON_PROJECT_KINDS,
+  NON_DESTINATION_PROJECT_KINDS,
+  PROJECT_KIND,
+  ProjectNotFoundError,
+  aggregateRuleSchema,
+  type AggregateMemberCandidate,
+  type AggregateRule,
+  type LiveAggregate,
+  type StoredAggregateProject,
+  internalProjectSchema,
+  projectSchema,
+  type ActiveProjectsByScopesInput,
+  type CreateProjectInput,
+  type InternalProject,
+  type InternalProjectKind,
+  type PaginatedProjects,
+  type ArchivedProject,
+  type Project,
+  type ProjectIdentity,
+  type ProjectPath,
+  type ProjectWithTeam,
+  type SearchProjectsResult,
+  type TraceSharingConfig,
+  type TraceDestinationProject,
+  type UpdateProjectInput,
+  type UpdateProjectMetadataInput,
+  type ProjectIdPage,
+  type ProjectIdPageInput,
+  type ProjectLwqlKeyPage,
+  type ProjectOrganizationPage,
+  type ProjectPrivateS3Page,
+  type ProjectUsageCount,
+  type ProjectKind,
+} from "@langwatch/project-contract";
+import { fromDate, toDate, type Instant } from "@langwatch/time";
+
+import type {
+  ProjectRepository,
+  ProjectWithOrgAdmin,
+  TouchCodingAgentActivityInput,
+} from "../project.repository.ts";
+import { mapProjectIdentityRow, PROJECT_IDENTITY_SELECT } from "./prisma.project.mapper.ts";
+
+export class PrismaProjectRepository
+  extends PrismaRepository.for("Project")
+  implements ProjectRepository
+{
+  async findProjectsWithDepartments({
+    organizationId,
+    hiddenKinds,
+  }: {
+    organizationId: string;
+    hiddenKinds: readonly string[];
+  }): Promise<{ id: string; name: string; departmentId: string | null }[]> {
+    return this.prisma.project.findMany({
+      where: {
+        team: { organizationId },
+        kind: { notIn: [PROJECT_KIND.INTERNAL_GOVERNANCE, ...hiddenKinds] },
+      },
+      select: { id: true, name: true, departmentId: true },
+      orderBy: { name: "asc" },
+    });
+  }
+
+  async assignProjectDepartment(input: {
+    organizationId: string;
+    projectId: string;
+    departmentId: string | null;
+  }): Promise<boolean> {
+    const result = await this.prisma.project.updateMany({
+      where: { id: input.projectId, team: { organizationId: input.organizationId } },
+      data: { departmentId: input.departmentId },
+    });
+    return result.count > 0;
+  }
+
+  async findPaths(input: { projectIds: string[] }): Promise<ProjectPath[]> {
+    const projects = await this.prisma.project.findMany({
+      where: { id: { in: input.projectIds } },
+      select: {
+        id: true,
+        name: true,
+        team: { select: { name: true, organization: { select: { name: true } } } },
+      },
+    });
+
+    return projects.map((project) => ({
+      projectId: project.id,
+      fullPath: `${project.team.organization.name} / ${project.team.name} / ${project.name}`,
+    }));
+  }
+
+  static readonly create = this.factory((prisma) => new PrismaProjectRepository(prisma));
+
+  async countUsage({
+    organizationIds,
+    since,
+  }: {
+    organizationIds: readonly string[];
+    since?: number;
+  }): Promise<ProjectUsageCount> {
+    const inOrganizations = { team: { organizationId: { in: [...organizationIds] } } };
+    const after = since === undefined ? {} : { gte: new Date(since) };
+    const [projects, updatedProjects, first] = await Promise.all([
+      this.prisma.project.count({
+        where: since === undefined ? inOrganizations : { ...inOrganizations, createdAt: after },
+      }),
+      this.prisma.project.count({
+        where: since === undefined ? inOrganizations : { ...inOrganizations, updatedAt: after },
+      }),
+      this.prisma.project.findFirst({
+        where: inOrganizations,
+        orderBy: { createdAt: "asc" },
+        select: { createdAt: true },
+      }),
+    ]);
+    return {
+      projects,
+      updatedProjects,
+      ...(first ? { firstProjectAt: first.createdAt.getTime() } : {}),
+    };
+  }
+
+  async listAllIds({ after, limit }: ProjectIdPageInput = {}): Promise<ProjectIdPage> {
+    const rows = await this.prisma.project.findMany({
+      select: { id: true },
+      orderBy: { id: "asc" },
+      ...(after === undefined ? {} : { where: { id: { gt: after } } }),
+      ...(limit === undefined ? {} : { take: limit + 1 }),
+    });
+    const ids = rows.map((row) => row.id);
+    if (limit === undefined || ids.length <= limit) return { ids, next: null };
+    const page = ids.slice(0, limit);
+    return { ids: page, next: page[page.length - 1] ?? null };
+  }
+
+  async listAllWithOrganization({
+    after,
+    limit,
+  }: ProjectIdPageInput = {}): Promise<ProjectOrganizationPage> {
+    const rows = await this.prisma.project.findMany({
+      select: { id: true, team: { select: { organizationId: true } } },
+      orderBy: { id: "asc" },
+      ...(after === undefined ? {} : { where: { id: { gt: after } } }),
+      ...(limit === undefined ? {} : { take: limit + 1 }),
+    });
+    const projects = rows.map((row) => ({ id: row.id, organizationId: row.team.organizationId }));
+    if (limit === undefined || projects.length <= limit) return { projects, next: null };
+    const page = projects.slice(0, limit);
+    return { projects: page, next: page[page.length - 1]?.id ?? null };
+  }
+
+  async listAllWithPrivateS3({
+    after,
+    limit,
+  }: ProjectIdPageInput = {}): Promise<ProjectPrivateS3Page> {
+    const rows = await this.prisma.project.findMany({
+      select: { id: true, s3Bucket: true },
+      orderBy: { id: "asc" },
+      ...(after === undefined ? {} : { where: { id: { gt: after } } }),
+      ...(limit === undefined ? {} : { take: limit + 1 }),
+    });
+    const projects = rows.map((row) => ({ id: row.id, privateS3: !!row.s3Bucket }));
+    if (limit === undefined || projects.length <= limit) return { projects, next: null };
+    const page = projects.slice(0, limit);
+    return { projects: page, next: page[page.length - 1]?.id ?? null };
+  }
+
+  async listLwqlKeys({ after, limit }: ProjectIdPageInput = {}): Promise<ProjectLwqlKeyPage> {
+    const projects = await this.prisma.project.findMany({
+      select: { id: true, lwqlKey: true },
+      orderBy: { id: "asc" },
+      ...(after === undefined ? {} : { where: { id: { gt: after } } }),
+      ...(limit === undefined ? {} : { take: limit + 1 }),
+    });
+    if (limit === undefined || projects.length <= limit) return { projects, next: null };
+    const page = projects.slice(0, limit);
+    return { projects: page, next: page[page.length - 1]?.id ?? null };
+  }
+
+  async countWithTraces({ organizationId }: { organizationId: string }): Promise<number> {
+    return this.prisma.project.count({
+      where: {
+        team: { organizationId },
+        archivedAt: null,
+        kind: { not: PROJECT_KIND.INTERNAL_GOVERNANCE },
+        firstMessage: true,
+      },
+    });
+  }
+
+  async findSharedProjectSlugs({
+    organizationId,
+    memberUserId,
+    limit,
+  }: {
+    organizationId: string;
+    memberUserId?: string;
+    limit: number;
+  }): Promise<string[]> {
+    const projects = await this.prisma.project.findMany({
+      where: {
+        team: {
+          organizationId,
+          isPersonal: false,
+          ...(memberUserId === undefined ? {} : { members: { some: { userId: memberUserId } } }),
+        },
+        archivedAt: null,
+        // An aggregate is opened on purpose (ADR-177 block F): never landed on.
+        kind: { notIn: [...NEVER_LANDED_ON_PROJECT_KINDS] },
+      },
+      orderBy: { createdAt: "asc" },
+      take: limit,
+      select: { slug: true },
+    });
+    return projects.map((project) => project.slug);
+  }
+
+  async findInternalByOrganization(organizationId: string): Promise<InternalProject | null> {
+    return this.mapInternal(
+      await this.prisma.project.findFirst({
+        where: {
+          kind: PROJECT_KIND.INTERNAL_GOVERNANCE,
+          team: { organizationId },
+          archivedAt: null,
+        },
+      }),
+    );
+  }
+
+  async findLiveInternalIds({ kind }: { kind: InternalProjectKind }): Promise<string[]> {
+    const projects = await this.prisma.project.findMany({
+      where: { kind, archivedAt: null },
+      select: { id: true },
+    });
+
+    return projects.map(({ id }) => id);
+  }
+
+  async findInternalBySlug(slug: string): Promise<InternalProject | null> {
+    return this.mapInternal(await this.prisma.project.findUnique({ where: { slug } }));
+  }
+
+  async createInternalOrFindWinner(input: {
+    id: string;
+    name: string;
+    slug: string;
+    apiKey: string;
+    teamId: string;
+  }): Promise<InternalProject> {
+    try {
+      return this.mapInternalRequired(
+        await this.prisma.project.create({
+          data: {
+            ...input,
+            kind: PROJECT_KIND.INTERNAL_GOVERNANCE,
+            language: "internal",
+            framework: "governance",
+            traceSharingEnabled: false,
+          },
+        }),
+      );
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+        const winner = await this.prisma.project.findUnique({
+          where: { slug: input.slug },
+        });
+        const mapped = this.mapInternal(winner);
+        if (mapped) return mapped;
+      }
+      throw error;
+    }
+  }
+
+  async isPresenceEnabled(projectId: string): Promise<boolean> {
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      select: {
+        presenceEnabled: true,
+        team: { select: { organization: { select: { presenceEnabled: true } } } },
+      },
+    });
+    return Boolean(project?.presenceEnabled && project.team.organization.presenceEnabled);
+  }
+
+  async findById(id: string): Promise<Project | null> {
+    return this.mapProject(await this.prisma.project.findUnique({ where: { id } }));
+  }
+
+  async findOrganizationId(projectId: string): Promise<string | undefined> {
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      select: { team: { select: { organizationId: true } } },
+    });
+    return project?.team?.organizationId;
+  }
+
+  async findWithTeam(id: string): Promise<ProjectWithTeam | null> {
+    const row = await this.prisma.project.findUnique({
+      where: { id, archivedAt: null },
+      include: { team: true },
+    });
+    if (!row) return null;
+    const { team, ...projectRow } = row;
+    return {
+      ...this.mapProjectRequired(projectRow),
+      team,
+    };
+  }
+
+  async updateMetadata({ id, data }: UpdateProjectMetadataInput): Promise<void> {
+    await this.prisma.project.update({ where: { id }, data });
+  }
+
+  async touchCodingAgentSessionSeen(input: TouchCodingAgentActivityInput): Promise<void> {
+    await this.prisma.project.updateMany({
+      where: {
+        id: input.projectId,
+        archivedAt: null,
+        OR: [
+          { lastCodingAgentSessionAt: null },
+          { lastCodingAgentSessionAt: { lte: toDate(input.staleBefore) } },
+        ],
+      },
+      data: { lastCodingAgentSessionAt: toDate(input.at) },
+    });
+  }
+
+  async touchCodingAgentPullRequestSeen(input: TouchCodingAgentActivityInput): Promise<void> {
+    await this.prisma.project.updateMany({
+      where: {
+        id: input.projectId,
+        archivedAt: null,
+        OR: [
+          { lastCodingAgentPullRequestAt: null },
+          { lastCodingAgentPullRequestAt: { lte: toDate(input.staleBefore) } },
+        ],
+      },
+      data: { lastCodingAgentPullRequestAt: toDate(input.at) },
+    });
+  }
+
+  async findWithOrgAdmin(id: string): Promise<ProjectWithOrgAdmin | null> {
+    const project = await this.prisma.project.findUnique({
+      where: { id },
+      select: {
+        firstMessage: true,
+        team: {
+          select: {
+            organization: {
+              select: {
+                id: true,
+                createdAt: true,
+                signupData: true,
+                members: {
+                  where: { role: "ADMIN" },
+                  select: { userId: true },
+                  orderBy: { createdAt: "asc" },
+                  take: 1,
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+    if (!project) return null;
+    return {
+      firstMessage: project.firstMessage,
+      organizationId: project.team?.organization?.id ?? null,
+      onboardingVariant: parseOnboardingVariant(project.team?.organization?.signupData),
+      organizationCreatedAt: project.team?.organization?.createdAt
+        ? fromDate(project.team.organization.createdAt)
+        : null,
+      adminUserId: project.team?.organization?.members?.[0]?.userId ?? null,
+    };
+  }
+
+  async findTraceSharingConfig(id: string): Promise<TraceSharingConfig | null> {
+    const project = await this.prisma.project.findUnique({
+      where: { id },
+      select: {
+        traceSharingEnabled: true,
+        team: { select: { organization: { select: { traceSharingEnabled: true } } } },
+      },
+    });
+    if (!project) return null;
+    return {
+      orgEnabled: project.team.organization.traceSharingEnabled,
+      projectEnabled: project.traceSharingEnabled,
+    };
+  }
+
+  async searchByQuery(input: {
+    query: string;
+    organizationId?: string;
+    limit?: number;
+  }): Promise<SearchProjectsResult[]> {
+    const where: Record<string, unknown> = {
+      OR: [
+        { id: { contains: input.query } },
+        { name: { contains: input.query, mode: "insensitive" } },
+        { slug: { contains: input.query, mode: "insensitive" } },
+      ],
+    };
+    if (input.organizationId) where.team = { organizationId: input.organizationId };
+    return this.prisma.project.findMany({
+      where,
+      select: { id: true, name: true, slug: true },
+      take: input.limit ?? 20,
+    });
+  }
+
+  async create(input: CreateProjectInput): Promise<Project> {
+    return this.mapProjectRequired(await this.prisma.project.create({ data: input }));
+  }
+
+  async update(input: {
+    id: string;
+    organizationId: string;
+    data: UpdateProjectInput;
+  }): Promise<Project> {
+    for (let attempt = 1; attempt < TEAM_MOVE_ATTEMPTS; attempt++) {
+      try {
+        return await this.updateOnce(input);
+      } catch (error) {
+        if (!isRecordNotFound(error)) throw error;
+      }
+    }
+    return this.updateOnce(input);
+  }
+
+  private async updateOnce(input: {
+    id: string;
+    organizationId: string;
+    data: UpdateProjectInput;
+  }): Promise<Project> {
+    const where = {
+      id: input.id,
+      archivedAt: null,
+      team: { organizationId: input.organizationId },
+    };
+    const movedFrom = await this.teamBeingLeft({ where, teamId: input.data.teamId });
+    if (movedFrom === null) {
+      const result = await this.prisma.project.updateMany({ where, data: input.data });
+      if (result.count === 0) throw new ProjectNotFoundError("Project not found");
+      return this.mapProjectRequired(
+        await this.prisma.project.findUniqueOrThrow({ where: { id: input.id } }),
+      );
+    }
+
+    // The gateway caches a key's team budgets by the team of its project. A
+    // team move appends to the change feed it long-polls, in the same write,
+    // and only while the project is still on the team read above, so a
+    // concurrent move re-reads instead of recording a stale origin.
+    return this.mapProjectRequired(
+      await this.prisma.project.update({
+        where: { ...where, teamId: movedFrom },
+        data: {
+          ...input.data,
+          gatewayChangeEvents: {
+            create: {
+              organizationId: input.organizationId,
+              kind: "BUDGET_UPDATED",
+              payload: { projectTeamMoved: { fromTeamId: movedFrom, toTeamId: input.data.teamId } },
+            },
+          },
+        },
+      }),
+    );
+  }
+
+  /**
+   * The team a project is leaving, when an update moves it to another one;
+   * `null` when the update keeps its team. A project outside the organization
+   * reads as not moving, so the plain update path refuses it as not found.
+   */
+  private async teamBeingLeft({
+    where,
+    teamId,
+  }: {
+    where: Prisma.ProjectWhereInput & { id: string };
+    teamId: string | undefined;
+  }): Promise<string | null> {
+    if (teamId === undefined) return null;
+    const current = await this.prisma.project.findFirst({ where, select: { teamId: true } });
+    if (!current || current.teamId === teamId) return null;
+    return current.teamId;
+  }
+
+  async archive(input: { id: string; organizationId: string }): Promise<ArchivedProject> {
+    const archivedAt = new Date();
+    const result = await this.prisma.project.updateMany({
+      where: {
+        id: input.id,
+        archivedAt: null,
+        team: { organizationId: input.organizationId },
+      },
+      data: { archivedAt },
+    });
+    if (result.count === 0) throw new ProjectNotFoundError("Project not found");
+    const project = this.mapProjectRequired(
+      await this.prisma.project.findUniqueOrThrow({ where: { id: input.id } }),
+    );
+    return { ...project, archivedAt };
+  }
+
+  async listAllByOrganization(input: {
+    organizationId: string;
+    page: number;
+    limit: number;
+    projectIds?: string[];
+    includeGovernance?: boolean;
+    hiddenKinds?: ProjectKind[];
+  }): Promise<PaginatedProjects> {
+    const where = {
+      archivedAt: null,
+      team: { organizationId: input.organizationId },
+      kind: {
+        notIn: [
+          ...(input.includeGovernance ? [] : [PROJECT_KIND.INTERNAL_GOVERNANCE]),
+          ...(input.hiddenKinds ?? []),
+        ],
+      },
+      ...(input.projectIds ? { id: { in: input.projectIds } } : {}),
+    };
+    const [rows, total] = await Promise.all([
+      this.prisma.project.findMany({
+        where,
+        skip: (input.page - 1) * input.limit,
+        take: input.limit,
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      }),
+      this.prisma.project.count({ where }),
+    ]);
+    return {
+      data: rows.map((row) => this.mapProjectRequired(row)),
+      pagination: { page: input.page, limit: input.limit, total },
+    };
+  }
+
+  async findAllByTeam(input: {
+    organizationId: string;
+    teamId: string;
+    includeGovernance?: boolean;
+  }): Promise<Project[]> {
+    const rows = await this.prisma.project.findMany({
+      where: {
+        teamId: input.teamId,
+        archivedAt: null,
+        ...(input.includeGovernance ? {} : { kind: { not: PROJECT_KIND.INTERNAL_GOVERNANCE } }),
+        team: { organizationId: input.organizationId },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+    return rows.map((row) => this.mapProjectRequired(row));
+  }
+
+  async findIdentity(id: string): Promise<ProjectIdentity | null> {
+    const project = await this.prisma.project.findUnique({
+      where: { id },
+      select: PROJECT_IDENTITY_SELECT,
+    });
+
+    return project ? mapProjectIdentityRow(project) : null;
+  }
+
+  async findNamesByIds(projectIds: string[]): Promise<ProjectIdentity[]> {
+    if (projectIds.length === 0) {
+      return [];
+    }
+
+    const projects = await this.prisma.project.findMany({
+      where: { id: { in: projectIds } },
+      select: PROJECT_IDENTITY_SELECT,
+    });
+
+    return projects.map(mapProjectIdentityRow);
+  }
+
+  async findIdsByOrganization(organizationId: string): Promise<string[]> {
+    const projects = await this.prisma.project.findMany({
+      where: { team: { organizationId } },
+      select: { id: true },
+    });
+
+    return projects.map((project) => project.id);
+  }
+
+  async findLiveNonGovernanceIds({
+    organizationId,
+    includeArchived,
+  }: {
+    organizationId: string;
+    includeArchived: boolean;
+  }): Promise<string[]> {
+    const projects = await this.prisma.project.findMany({
+      where: {
+        ...(includeArchived ? {} : { archivedAt: null }),
+        team: { organizationId },
+        kind: { not: PROJECT_KIND.INTERNAL_GOVERNANCE },
+      },
+      select: { id: true },
+    });
+
+    return projects.map((project) => project.id);
+  }
+
+  async findLiveByIdInOrganization(input: {
+    id: string;
+    organizationId: string;
+  }): Promise<Project[]> {
+    const row = await this.prisma.project.findFirst({
+      where: { id: input.id, archivedAt: null, team: { organizationId: input.organizationId } },
+    });
+
+    return row ? [this.mapProjectRequired(row)] : [];
+  }
+
+  async findLiveBySlugInOrganization(input: {
+    slug: string;
+    organizationId: string;
+  }): Promise<Project[]> {
+    const row = await this.prisma.project.findFirst({
+      where: { slug: input.slug, archivedAt: null, team: { organizationId: input.organizationId } },
+    });
+
+    return row ? [this.mapProjectRequired(row)] : [];
+  }
+
+  async findActiveByScopes(input: ActiveProjectsByScopesInput): Promise<Project[]> {
+    const rows = await this.prisma.project.findMany({
+      where: {
+        archivedAt: null,
+        team: { organizationId: input.organizationId },
+        ...(input.organizationWide
+          ? {}
+          : {
+              OR: [
+                ...(input.projectIds.length > 0 ? [{ id: { in: input.projectIds } }] : []),
+                ...(input.teamIds.length > 0 ? [{ teamId: { in: input.teamIds } }] : []),
+              ],
+            }),
+      },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      take: input.limit + 1,
+    });
+    return rows.map((row) => this.mapProjectRequired(row));
+  }
+
+  async findBySlugInTeam(input: { slug: string; teamId: string }): Promise<Project | null> {
+    return this.mapProject(await this.prisma.project.findFirst({ where: input }));
+  }
+
+  async findLiveTraceDestination(input: {
+    organizationId: string;
+    projectId: string;
+  }): Promise<TraceDestinationProject | null> {
+    return this.prisma.project.findFirst({
+      where: {
+        id: input.projectId,
+        team: { organizationId: input.organizationId },
+        archivedAt: null,
+        // An aggregate owns no traces (ADR-177 decision 7): a key naming one names nothing.
+        kind: { not: PROJECT_KIND.AGGREGATE },
+      },
+      select: { id: true, teamId: true, archivedAt: true, kind: true },
+    });
+  }
+
+  async findOldestGovernanceTraceDestination(
+    organizationId: string,
+  ): Promise<TraceDestinationProject | null> {
+    return this.prisma.project.findFirst({
+      where: {
+        kind: PROJECT_KIND.INTERNAL_GOVERNANCE,
+        team: { organizationId },
+        archivedAt: null,
+      },
+      select: { id: true, teamId: true, archivedAt: true, kind: true },
+      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+    });
+  }
+
+  countLiveNonGovernanceProjects(organizationId: string): Promise<number> {
+    return this.prisma.project.count({
+      where: {
+        team: { organizationId },
+        kind: { not: PROJECT_KIND.INTERNAL_GOVERNANCE },
+        archivedAt: null,
+      },
+    });
+  }
+
+  async findTraceDestination(projectId: string): Promise<TraceDestinationProject | null> {
+    return this.prisma.project.findUnique({
+      where: { id: projectId },
+      select: { id: true, teamId: true, archivedAt: true, kind: true },
+    });
+  }
+
+  async findTraceDestinations(projectIds: string[]): Promise<TraceDestinationProject[]> {
+    if (projectIds.length === 0) return [];
+    const rows = await this.prisma.project.findMany({
+      where: { id: { in: projectIds } },
+      select: { id: true, teamId: true, archivedAt: true, kind: true },
+    });
+    const byId = new Map(rows.map((row) => [row.id, row]));
+    return projectIds.flatMap((projectId) => {
+      const project = byId.get(projectId);
+      return project ? [project] : [];
+    });
+  }
+
+  async findIdByLegacyApiKey(input: { token: string }): Promise<string | null> {
+    const row = await this.prisma.project.findUnique({
+      where: { apiKey: input.token, archivedAt: null },
+      select: { id: true },
+    });
+    return row?.id ?? null;
+  }
+
+  async rotateLegacyApiKey(input: { projectId: string; token: string }): Promise<boolean> {
+    const result = await this.prisma.project.updateMany({
+      where: { id: input.projectId, archivedAt: null },
+      data: { apiKey: input.token },
+    });
+    return result.count > 0;
+  }
+
+  async createPersonal(input: {
+    id: string;
+    slug: string;
+    apiKey: string;
+    teamId: string;
+    ownerUserId: string;
+  }): Promise<string> {
+    const existing = await this.prisma.project.findFirst({
+      where: { teamId: input.teamId, isPersonal: true },
+      select: { id: true },
+    });
+    if (existing) return existing.id;
+    await this.prisma.project.create({
+      data: {
+        id: input.id,
+        name: "Personal Workspace",
+        slug: input.slug,
+        apiKey: input.apiKey,
+        teamId: input.teamId,
+        language: "other",
+        framework: "other",
+        isPersonal: true,
+        ownerUserId: input.ownerUserId,
+      },
+    });
+    return input.id;
+  }
+
+  async archivePersonalInTeams(input: { teamIds: string[]; archivedAt: Instant }): Promise<void> {
+    await this.prisma.project.updateMany({
+      where: { teamId: { in: input.teamIds }, isPersonal: true, archivedAt: null },
+      data: { archivedAt: toDate(input.archivedAt) },
+    });
+  }
+
+  async revivePersonalInTeam(input: { teamId: string }): Promise<string[]> {
+    const where = { teamId: input.teamId, isPersonal: true, archivedAt: { not: null } };
+    const archived = await this.prisma.project.findMany({ where, select: { id: true } });
+    if (archived.length === 0) return [];
+    await this.prisma.project.updateMany({ where, data: { archivedAt: null } });
+    return archived.map((project) => project.id);
+  }
+
+  async updatePersonalFeatures(input: {
+    projectId: string;
+    features: PersonalFeatures;
+  }): Promise<void> {
+    await this.prisma.project.updateMany({
+      where: { id: input.projectId, isPersonal: true },
+      data: { personalFeatures: input.features },
+    });
+  }
+
+  async findPersonalProjectOwner(input: {
+    organizationId: string;
+    scopeId: string;
+  }): Promise<{ ownerUserId: string | null } | null> {
+    const project = await this.prisma.project.findFirst({
+      where: {
+        id: input.scopeId,
+        team: { organizationId: input.organizationId },
+        OR: [{ isPersonal: true }, { team: { isPersonal: true } }],
+      },
+      select: { team: { select: { ownerUserId: true } } },
+    });
+    return project?.team ?? null;
+  }
+
+  async updateAggregateRule(input: {
+    id: string;
+    organizationId: string;
+    aggregateRule: AggregateRule;
+  }): Promise<Project> {
+    const result = await this.prisma.project.updateMany({
+      where: {
+        id: input.id,
+        kind: PROJECT_KIND.AGGREGATE,
+        archivedAt: null,
+        team: { organizationId: input.organizationId, archivedAt: null },
+      },
+      data: { aggregateRule: input.aggregateRule },
+    });
+    if (result.count === 0) throw new ProjectNotFoundError("Project not found");
+    return this.mapProjectRequired(
+      await this.prisma.project.findUniqueOrThrow({ where: { id: input.id } }),
+    );
+  }
+
+  async findPersonalProjectIds(input: {
+    organizationId: string;
+    ownerUserIds?: readonly string[];
+  }): Promise<string[]> {
+    const rows = await this.prisma.project.findMany({
+      where: {
+        isPersonal: true,
+        archivedAt: null,
+        kind: { notIn: [...NON_DESTINATION_PROJECT_KINDS] },
+        team: { organizationId: input.organizationId, archivedAt: null },
+        ...(input.ownerUserIds ? { ownerUserId: { in: [...input.ownerUserIds] } } : {}),
+      },
+      select: { id: true },
+      orderBy: { id: "asc" },
+    });
+    return rows.map((row) => row.id);
+  }
+
+  async findReadableProjectIds(input: {
+    organizationId: string;
+    projectIds: readonly string[];
+  }): Promise<string[]> {
+    if (input.projectIds.length === 0) return [];
+    const rows = await this.prisma.project.findMany({
+      where: {
+        id: { in: [...input.projectIds] },
+        archivedAt: null,
+        kind: { notIn: [...NON_DESTINATION_PROJECT_KINDS] },
+        team: { organizationId: input.organizationId, archivedAt: null },
+      },
+      select: { id: true },
+      orderBy: { id: "asc" },
+    });
+    return rows.map((row) => row.id);
+  }
+
+  async findCandidateMembers(input: {
+    organizationId: string;
+  }): Promise<AggregateMemberCandidate[]> {
+    const rows = await this.prisma.project.findMany({
+      where: {
+        archivedAt: null,
+        kind: { notIn: [...NON_DESTINATION_PROJECT_KINDS] },
+        team: { organizationId: input.organizationId, archivedAt: null },
+      },
+      select: {
+        id: true,
+        name: true,
+        isPersonal: true,
+        ownerUser: { select: { name: true, email: true } },
+      },
+      orderBy: [{ name: "asc" }, { id: "asc" }],
+    });
+    return rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      isPersonal: row.isPersonal,
+      owner:
+        row.isPersonal && row.ownerUser
+          ? { name: row.ownerUser.name, email: row.ownerUser.email }
+          : null,
+    }));
+  }
+
+  async findAggregate(input: { aggregateProjectId: string }): Promise<StoredAggregateProject[]> {
+    const row = await this.prisma.project.findFirst({
+      where: { id: input.aggregateProjectId, kind: PROJECT_KIND.AGGREGATE },
+      select: {
+        id: true,
+        archivedAt: true,
+        aggregateRule: true,
+        team: { select: { organizationId: true, archivedAt: true } },
+      },
+    });
+    if (!row) return [];
+    return [
+      {
+        id: row.id,
+        organizationId: row.team.organizationId,
+        archived: row.archivedAt !== null || row.team.archivedAt !== null,
+        // A malformed stored rule reads as none: guessing would attach reads nobody asked for.
+        rule: aggregateRuleSchema.safeParse(row.aggregateRule).data ?? null,
+      },
+    ];
+  }
+
+  async findLiveAggregateIds(input: { organizationId: string }): Promise<string[]> {
+    const rows = await this.prisma.project.findMany({
+      where: {
+        kind: PROJECT_KIND.AGGREGATE,
+        archivedAt: null,
+        team: { organizationId: input.organizationId, archivedAt: null },
+      },
+      select: { id: true },
+      orderBy: { id: "asc" },
+    });
+    return rows.map((row) => row.id);
+  }
+
+  async findAllLiveAggregates(): Promise<LiveAggregate[]> {
+    const rows = await this.prisma.project.findMany({
+      where: { kind: PROJECT_KIND.AGGREGATE, archivedAt: null, team: { archivedAt: null } },
+      select: { id: true, team: { select: { organizationId: true } } },
+      orderBy: { id: "asc" },
+    });
+    return rows.map((row) => ({ id: row.id, organizationId: row.team.organizationId }));
+  }
+
+  private mapProject(row: PrismaProject | null): Project | null {
+    return row ? projectSchema.parse(row) : null;
+  }
+
+  private mapProjectRequired(row: PrismaProject): Project {
+    return projectSchema.parse(row);
+  }
+
+  private mapInternal(row: PrismaProject | null): InternalProject | null {
+    if (!row || row.kind !== PROJECT_KIND.INTERNAL_GOVERNANCE) return null;
+    return this.mapInternalRequired(row);
+  }
+
+  private mapInternalRequired(row: PrismaProject): InternalProject {
+    return internalProjectSchema.parse({
+      id: row.id,
+      name: row.name,
+      slug: row.slug,
+      teamId: row.teamId,
+      kind: row.kind,
+      archivedAtMs: row.archivedAt?.getTime() ?? null,
+      traceSharingEnabled: row.traceSharingEnabled,
+    });
+  }
+}
+
+/** How many times an update re-reads the team when a concurrent move changed it underneath. */
+const TEAM_MOVE_ATTEMPTS = 3;
+
+/** Prisma P2025: the conditional move found the project on another team than the one it read. */
+function isRecordNotFound(error: unknown): boolean {
+  return typeof error === "object" && error !== null && "code" in error && error.code === "P2025";
+}

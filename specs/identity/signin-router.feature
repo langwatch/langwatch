@@ -107,6 +107,14 @@ Feature: The identifier-first sign-in router - one auth screen, routed by data
     And the decision never routes to sign-up
 
   @unit
+  Scenario: A migrated account is answered from the projection alone
+    Given an account whose identifier backfill has finalized
+    And legacy rows still carry a method the migration moved
+    When that address is submitted to the router
+    Then the legacy rows are not read
+    And the decision offers only what the projection holds
+
+  @unit
   Scenario: The methods offered are the ones that account holds
     Given "home.net" belongs to no ACTIVE connection
     And the account for "sam@home.net" holds a passkey and no password
@@ -184,7 +192,8 @@ Feature: The identifier-first sign-in router - one auth screen, routed by data
     Then the next question is refused and says how long to wait
     And the router is never asked to decide it
 
-  @unit
+  # Gap: auth meters only the caller (auth.route:<caller>, 200/h); no per-address budget exists, and main had none.
+  @unit @unimplemented
   Scenario: One address probed from many places is eventually refused
     Given the same address is asked about from a new client each time
     When that address's budget for the hour is spent
@@ -314,7 +323,9 @@ Feature: The identifier-first sign-in router - one auth screen, routed by data
     And dialing a branded method names the connection Auth0's own screen offered
     And a self-hosted Auth0 deployment is offered only the generic method
 
-  @unit
+  # Alex 2026-10-06: never built. The rail offers the branded bridge methods, but the router's
+  # account ranking holds no brokered-connection to branded-method mapping (not on main either).
+  @unit @unimplemented
   Scenario: An account brokered through a social connection routes to its own button
     Given the account for "sam@home.net" signed in through the broker's Google connection
     When "sam@home.net" is submitted to the router on SaaS
@@ -421,10 +432,11 @@ Feature: The identifier-first sign-in router - one auth screen, routed by data
     Then that provider is not one of the offered methods
 
   @unit
-  Scenario: The license gate still freezes at startup
-    Given the license gate resolved at startup
-    When a license is activated mid-process
-    Then routing decisions do not change until the next restart
+  Scenario: The license gate re-reads a deny after a minute
+    Given the license gate denied federation
+    When another replica stores a license
+    Then routing decisions do not change for up to one minute
+    And then federation is offered without a restart
 
   # ── Callback linking ───────────────────────────────────────────────────
 
@@ -453,21 +465,23 @@ Feature: The identifier-first sign-in router - one auth screen, routed by data
 
   @unit
   Scenario: An ambiguous match becomes a proposal, not a guess
-    Given the callback's verified email matches a user with identifiers the organization cannot vouch for
+    Given the callback's verified email is held by more than one user
     When the SSO callback completes
     Then a LinkProposed event is recorded and the sign-in is refused with guidance
     And confirming the proposal later attaches the identifier and admits the user
 
+  @unit @unimplemented
+  Scenario: A match holding identifiers the organization cannot vouch for becomes a proposal
+    Given the callback's verified email matches a user with identifiers the organization cannot vouch for
+    When the SSO callback completes
+    Then a LinkProposed event is recorded and the sign-in is refused with guidance
+
   # WHERE THE RULE ABOVE ACTUALLY RUNS.
   #
-  # The four scenarios above describe the callback service that owns the whole
-  # decision: resolve the person, then link, propose or provision. On every
-  # deployment we run, the identity library owns that resolution instead, and
-  # the only moment it offers before a sign-in method exists is one where the
-  # link has already been chosen. So the same rule is applied there, from the
-  # one shared refusal function, and these two scenarios bind THAT — a
-  # scenario bound only to the service above would be bound to code no
-  # deployment reaches.
+  # The callback scenarios above run in the SSO user resolution the identity
+  # library asks before it links or creates anybody. A method added to an
+  # account that already signs in is judged later, when the library is about to
+  # attach it, and these two scenarios bind that moment.
   #
   # It judges an addition to an account that already signs in some way. A
   # person with no sign-in method yet is covered by
@@ -494,7 +508,7 @@ Feature: The identifier-first sign-in router - one auth screen, routed by data
     When the SSO callback completes on a connection that allows JIT
     Then a user is provisioned and signed in
     But on a connection that forbids JIT the sign-in is refused
-    And the refusal carries the reason code "jit_disabled"
+    And the refusal carries the reason code "identity_jit_disabled"
 
   @integration @unimplemented
   Scenario: The pending SSO setup flag is reconciled once and retired
@@ -502,3 +516,16 @@ Feature: The identifier-first sign-in router - one auth screen, routed by data
     When the reconciliation runs
     Then each user's state is re-derived from their identifier data
     And the column is dropped once nothing reads it
+
+  @unit
+  Scenario: The installed router sends an address nobody holds to sign-up
+    Given an email-mode deployment with the identity module installed through the process chain
+    When "nobody@home.net" is submitted through IdentityApi.routeSignIn
+    Then the decision routes to sign-up with the reason code "identifier_unknown"
+    And the decision offers no method at all
+
+  @unit
+  Scenario: The served page names the identifier-first screens as the sign-in front door
+    Given any deployment, whatever its environment says
+    When the auth module projects its browser config
+    Then the browser is told the identifier-first screens are the front door

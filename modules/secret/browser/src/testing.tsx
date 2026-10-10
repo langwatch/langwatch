@@ -1,0 +1,56 @@
+/**
+ * Testing harness for mounting the Secrets screen. Uses a concrete host implementation
+ * (not mocks) that records what the screen asks of the application. Internal to this
+ * package only.
+ */
+
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import type { ReactElement, ReactNode } from "react";
+
+import {
+  SecretHostApi,
+  SecretHostProvider,
+  type SecretFailureNotice,
+  type SecretHostScope,
+} from "./model/secret-host.ts";
+
+export class FakeSecretHost extends SecretHostApi {
+  readonly failures: SecretFailureNotice[] = [];
+
+  constructor(
+    private readonly options: {
+      scope?: Partial<SecretHostScope>;
+      grants?: ReadonlySet<string>;
+      projectSwitcher?: ReactNode | null;
+    } = {},
+  ) {
+    super();
+  }
+
+  scope(): SecretHostScope {
+    return { projectId: "proj-1", ...this.options.scope };
+  }
+
+  hasPermission(permission: string): boolean {
+    return (this.options.grants ?? new Set(["secrets:manage", "secrets:view"])).has(permission);
+  }
+
+  failed(failure: SecretFailureNotice): void {
+    this.failures.push(failure);
+  }
+
+  projectSwitcher(): ReactNode | null {
+    return this.options.projectSwitcher ?? null;
+  }
+}
+
+/** Renders the screen inside the Design System's provider and a host. */
+export function renderWithSecretHost(
+  element: ReactElement,
+  host: FakeSecretHost = new FakeSecretHost(),
+) {
+  return {
+    host,
+    ...renderWithDesignSystem(<SecretHostProvider value={host}>{element}</SecretHostProvider>),
+  };
+}

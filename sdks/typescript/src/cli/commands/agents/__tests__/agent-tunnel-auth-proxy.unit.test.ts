@@ -1,6 +1,8 @@
 import * as http from "node:http";
+
 import type { MockInstance } from "vitest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
 import { startAuthProxy } from "../tunnel/auth-proxy";
 import { DEV_SECRET_HEADER } from "../tunnel/write-back";
 
@@ -26,20 +28,16 @@ describe("startAuthProxy()", () => {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ ok: true }));
     });
-    await new Promise<void>((resolve) =>
-      target.listen(0, "127.0.0.1", resolve),
-    );
+    await new Promise<void>((resolve) => target.listen(0, "127.0.0.1", resolve));
     targetPort = (target.address() as { port: number }).port;
 
     // The proxy reports upstream failures to the terminal. Capturing them
     // keeps the suite output clean and lets a test assert the detail landed
     // there rather than in the response.
     errorLog = [];
-    consoleError = vi
-      .spyOn(console, "error")
-      .mockImplementation((...args: unknown[]) => {
-        errorLog.push(args.map(String).join(" "));
-      });
+    consoleError = vi.spyOn(console, "error").mockImplementation((...args: unknown[]) => {
+      errorLog.push(args.map(String).join(" "));
+    });
   });
 
   afterEach(async () => {
@@ -125,9 +123,7 @@ describe("startAuthProxy()", () => {
       const silent = http.createServer(() => {
         // Never respond: the proxy's upstream timeout has to break the wait.
       });
-      await new Promise<void>((resolve) =>
-        silent.listen(0, "127.0.0.1", resolve),
-      );
+      await new Promise<void>((resolve) => silent.listen(0, "127.0.0.1", resolve));
       const silentPort = (silent.address() as { port: number }).port;
 
       const proxy = await startAuthProxy({
@@ -160,9 +156,7 @@ describe("startAuthProxy()", () => {
       // between the two steps, which makes the failure non-deterministic.
       const refusing = http.createServer();
       refusing.on("connection", (socket) => socket.destroy());
-      await new Promise<void>((resolve) =>
-        refusing.listen(0, "127.0.0.1", resolve),
-      );
+      await new Promise<void>((resolve) => refusing.listen(0, "127.0.0.1", resolve));
       const refusingPort = (refusing.address() as { port: number }).port;
 
       const proxy = await startAuthProxy({
@@ -197,9 +191,7 @@ describe("startAuthProxy()", () => {
         // lands mid-response rather than before the response starts.
         setTimeout(() => res.destroy(), 30);
       });
-      await new Promise<void>((resolve) =>
-        flaky.listen(0, "127.0.0.1", resolve),
-      );
+      await new Promise<void>((resolve) => flaky.listen(0, "127.0.0.1", resolve));
       const flakyPort = (flaky.address() as { port: number }).port;
 
       const proxy = await startAuthProxy({
@@ -214,7 +206,7 @@ describe("startAuthProxy()", () => {
       expect(response.status).toBe(200);
       // The body the client was parsing is cut off, not extended with a JSON
       // error blob it would misparse as agent output.
-      await expect(response.text()).rejects.toThrow();
+      await expect(response.text()).rejects.toThrow(TypeError);
 
       await proxy.close();
       await new Promise<void>((resolve) => flaky.close(() => resolve()));

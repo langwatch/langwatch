@@ -12,7 +12,7 @@ Feature: Groups REST API
   # detail: a group the directory owns is edited by the directory or not at
   # all, whichever way its access is stored underneath. D08 moves the writes
   # a directory push makes onto the grants ledger and scopes its tokens per
-  # connection (specs/identity/scim-connection-sync.feature) - none of which
+  # connection (enterprise/modules/scim/specs/scim-connection-sync.feature) - none of which
   # changes any answer here. If one of these guards ever stops refusing, the
   # next sync silently reverts a customer's edit, which is the failure they
   # exist to prevent.
@@ -185,7 +185,9 @@ Feature: Groups REST API
     Given group "Engineering" exists
     And team "External" belongs to a different organization
     When I send POST /api/groups/:id/bindings with scopeId of "External"
-    Then the response status is 400
+    Then the response status is 422
+    And the response code is scope_not_in_organization
+    And no binding is stored
 
   @unit
   Scenario: DELETE /api/groups/:id/bindings/:bindingId removes a binding

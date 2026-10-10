@@ -1,23 +1,7 @@
 /**
- * Platform-tool policy table.
- *
- * Per-tool toggles that gate the two `langwatch <tool>` paths the
- * wrapper can take:
- *
- *   - allowVk: tool may route through the gateway via the user's
- *     personal VK (Path A). When false, the wrapper forces Path B
- *     even if a VK is present.
- *   - allowOtelDirect: tool may route via OTLP straight to
- *     `/api/otel/v1/logs` with the user's ingestion key (Path B).
- *     When false, the wrapper refuses to install Path B and surfaces
- *     a clear error.
- *
- * The resolver prefers the policy map the CLI cached at login
- * (`cfg.tool_policies`, served by the control plane's
- * PlatformToolPolicyService) and falls back to the hardcoded defaults
- * below when the cache is absent: an offline or legacy CLI that never
- * cached a map, or a tool the server did not return. The defaults must
- * stay in sync with the server-side PLATFORM_TOOL_POLICY_DEFAULTS.
+ * Platform-tool policy: per-tool toggles gating `allowVk` and
+ * `allowOtelDirect`. Falls back to these defaults with no login-cached map;
+ * keep in sync with the server's PLATFORM_TOOL_POLICY_DEFAULTS.
  */
 
 export type PlatformToolSlug =
@@ -72,10 +56,9 @@ function hardcodedPolicy(toolSlug: string): PlatformToolPolicy {
 }
 
 /**
- * Resolve the policy for a given tool slug. Prefers the login-cached
- * server map when it carries an entry for the tool; otherwise falls
- * back to the hardcoded defaults. A non-platform slug (typo) also
- * resolves to DEFAULTS so the wrapper never crashes.
+ * Resolves the policy for a tool slug: prefers the login-cached server map
+ * when it has an entry, else the hardcoded defaults. A non-platform slug
+ * (typo) also resolves to DEFAULTS so the wrapper never crashes.
  */
 export function resolvePlatformToolPolicy(
   toolSlug: string,

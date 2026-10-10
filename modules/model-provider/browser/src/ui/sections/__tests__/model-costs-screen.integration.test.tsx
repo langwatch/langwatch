@@ -1,0 +1,391 @@
+/**
+ * @vitest-environment jsdom
+ * New tests — the moved screen and its old wrapper had none, only the drawer beneath did. Pins the
+ * write-control grant, each editor action's address, and the raw-error-to-host failure path.
+ * Spec: specs/model-providers/model-cost-scoping.feature
+ */
+
+import { cleanup, fireEvent, screen, within } from "@testing-library/react";
+import type { ReactNode } from "react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { FakeModelProviderHost, renderWithModelProviderHost } from "../../../testing.tsx";
+
+const { mockState, mockDelete, mockRefetch } = vi.hoisted(() => ({
+  mockState: { costs: [] as Record<string, unknown>[] },
+  mockDelete: vi.fn(),
+  mockRefetch: vi.fn(),
+}));
+
+vi.mock("../../../behavior/model-provider-api.ts", () => ({
+  modelProviderApi: {
+    llmModelCost: {
+      getAllForProject: {
+        useQuery: () => ({
+          data: mockState.costs,
+          isLoading: false,
+          refetch: mockRefetch,
+        }),
+      },
+      delete: { useMutation: () => ({ mutate: mockDelete, isPending: false }) },
+    },
+  },
+}));
+
+vi.mock("../../../behavior/use-all-model-providers-list.ts", () => ({
+  useAllModelProvidersList: () => ({
+    providers: [{ id: "mp_openai", provider: "openai", enabled: true }],
+    isLoading: false,
+  }),
+}));
+
+vi.mock("@langwatch/design-system/page-layout", () => ({
+  PageLayout: {
+    Heading: ({ children }: { children?: ReactNode }) => <h1>{children}</h1>,
+    Header: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
+    HeaderButton: ({ children, ...props }: { children?: ReactNode; disabled?: boolean }) => (
+      <button data-testid="add-model-cost" {...props}>
+        {children}
+      </button>
+    ),
+  },
+}));
+
+// Menu content renders inline so a pick is one click away.
+vi.mock("@langwatch/design-system/menu", () => ({
+  Menu: {
+    Root: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
+    Trigger: ({ children }: { children?: ReactNode }) => <>{children}</>,
+    Content: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
+    Item: ({
+      children,
+      value,
+      onClick,
+    }: {
+      children?: ReactNode;
+      value?: string;
+      onClick?: (event: { stopPropagation: () => void }) => void;
+    }) => (
+      <button type="button" data-menu-item={value} onClick={onClick}>
+        {children}
+      </button>
+    ),
+  },
+}));
+
+// The tooltip's text rides on the trigger, so a test reads it without hovering.
+vi.mock("@langwatch/design-system/tooltip", () => ({
+  Tooltip: ({ children, content }: { children?: ReactNode; content?: string }) => (
+    <span data-tooltip={content}>{children}</span>
+  ),
+}));
+
+const { default: ModelCostsScreen } = await import("../model-costs-screen.tsx");
+
+/** Main's wire for a catalogue rate: no id, no scope, `projectId: ""`. */
+const CATALOGUE_ROW = {
+  projectId: "",
+  model: "openai/gpt-5.5",
+  regex: "^openai/gpt-5\\.5$",
+  inputCostPerToken: 0.000001,
+  outputCostPerToken: 0.000002,
+};
+
+const STORED_ROW = {
+  id: "cost_1",
+  organizationId: "organization-1",
+  projectId: "proj-1",
+  scopeType: "PROJECT",
+  scopeId: "proj-1",
+  model: "anthropic/claude-sonnet-4-6",
+  regex: "^anthropic/claude",
+  inputCostPerToken: 0.000003,
+  outputCostPerToken: null,
+  cacheReadCostPerToken: null,
+  cacheCreationCostPerToken: null,
+  cacheCreation1hCostPerToken: null,
+  createdAt: "2026-05-15T12:00:00.000Z",
+  updatedAt: "2026-05-15T12:00:00.000Z",
+};
+
+function renderScreen(host = new FakeModelProviderHost()) {
+  return renderWithModelProviderHost(<ModelCostsScreen />, host);
+}
+
+describe("given the LLM Model Costs screen", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockState.costs = [STORED_ROW, CATALOGUE_ROW];
+  });
+
+  afterEach(() => cleanup());
+
+  describe("when the reader may manage the project", () => {
+    it("offers adding a cost rule", () => {
+      renderScreen();
+
+      expect(screen.getByTestId("add-model-cost").hasAttribute("disabled")).toBe(false);
+    });
+
+    it("addresses the cost editor with no row, so it opens in create mode", () => {
+      const { host } = renderScreen();
+
+      fireEvent.click(screen.getByTestId("add-model-cost"));
+
+      expect(host.drawerOpens).toEqual([{ drawer: "llmModelCost", params: {} }]);
+    });
+  });
+
+  describe("when the listing holds stored rules and catalogue rates", () => {
+    it("renders every row and counts them all, as main did", () => {
+      renderScreen();
+
+      expect(screen.getByText("What each of the 2 models costs per token.")).toBeTruthy();
+      expect(screen.getByText("anthropic/claude-sonnet-4-6")).toBeTruthy();
+      expect(screen.getByText("openai/gpt-5.5")).toBeTruthy();
+      expect([...document.querySelectorAll("code")].map((cell) => cell.textContent)).toContain(
+        "^openai/gpt-5\\.5$",
+      );
+    });
+  });
+
+  describe("when a model's provider is set up", () => {
+    it("opens that provider's drawer from the model name", () => {
+      const { host } = renderScreen();
+
+      fireEvent.click(screen.getByRole("button", { name: "Open provider for openai/gpt-5.5" }));
+
+      expect(host.drawerOpens).toEqual([
+        {
+          drawer: "editModelProvider",
+          params: expect.objectContaining({ providerKey: "openai", modelProviderId: "mp_openai" }),
+        },
+      ]);
+    });
+
+    it("leaves a model without a set-up provider as plain code", () => {
+      renderScreen();
+
+      expect(screen.queryByRole("button", { name: /Open provider for anthropic/ })).toBeNull();
+    });
+  });
+
+  describe("when a catalogue rate prices image tokens", () => {
+    it("shows the image input and output rates in their own columns", () => {
+      mockState.costs = [
+        { ...CATALOGUE_ROW, inputImageCostPerToken: 0.000008, outputImageCostPerToken: 0.00003 },
+      ];
+
+      renderScreen();
+
+      expect(screen.getByText("Image input")).toBeTruthy();
+      expect(screen.getByText("Image output")).toBeTruthy();
+      expect(screen.getByText("$8.00")).toBeTruthy();
+      expect(screen.getByText("$30.00")).toBeTruthy();
+    });
+  });
+
+  describe("when the table shows a rate", () => {
+    /** @scenario Rates read as dollars per million tokens */
+    it("prints it as US dollars per million tokens, keeping the exact figure in the tooltip", () => {
+      mockState.costs = [
+        { ...CATALOGUE_ROW, inputCostPerToken: 0.00001, outputCostPerToken: 0.00000125 },
+      ];
+
+      renderScreen();
+
+      const input = screen.getByText("$10.00").closest("[data-tooltip]")!;
+      expect(input.textContent).toBe("$10.00 / 1M");
+      expect(input.getAttribute("data-tooltip")).toBe("$0.00001 per token");
+      const cached = screen.getByText("$1.25").closest("[data-tooltip]")!;
+      expect(cached.getAttribute("data-tooltip")).toBe("$0.00000125 per token");
+    });
+  });
+
+  describe("when the reader may not manage the project", () => {
+    it("blocks adding a cost rule", () => {
+      renderScreen(new FakeModelProviderHost({ grants: new Set([]) }));
+
+      expect(screen.getByTestId("add-model-cost").hasAttribute("disabled")).toBe(true);
+    });
+  });
+
+  describe("when a rule comes from the model catalogue rather than a stored row", () => {
+    it("offers overriding it rather than editing a row that does not exist", () => {
+      const { host } = renderScreen();
+
+      const clone = document.querySelector('[data-menu-item="clone"]');
+      expect(clone?.textContent).toBe("Override cost");
+
+      fireEvent.click(clone!);
+
+      expect(host.drawerOpens).toEqual([
+        { drawer: "llmModelCost", params: { cloneModel: "openai/gpt-5.5" } },
+      ]);
+    });
+  });
+
+  describe("when the reader clicks a row", () => {
+    /** @scenario Clicking a stored cost rule opens it in the editor */
+    it("opens a stored rule in the editor", () => {
+      const { host } = renderScreen();
+
+      fireEvent.click(screen.getByText("anthropic/claude-sonnet-4-6"));
+
+      expect(host.drawerOpens).toEqual([{ drawer: "llmModelCost", params: { id: "cost_1" } }]);
+    });
+
+    /** @scenario Clicking a catalogue rate opens an override for it */
+    it("opens a catalogue rate as a new rule that overrides it", () => {
+      const { host } = renderScreen();
+
+      fireEvent.click(screen.getByText("openai/gpt-5.5").closest("tr")!);
+
+      expect(host.drawerOpens).toEqual([
+        { drawer: "llmModelCost", params: { cloneModel: "openai/gpt-5.5" } },
+      ]);
+    });
+
+    it("opens only the provider when the model name link is clicked", () => {
+      const { host } = renderScreen();
+
+      fireEvent.click(screen.getByRole("button", { name: "Open provider for openai/gpt-5.5" }));
+
+      expect(host.drawerOpens.map((open) => open.drawer)).toEqual(["editModelProvider"]);
+    });
+  });
+
+  describe("when a rule is a stored row", () => {
+    it("addresses the editor with that row's id", () => {
+      const { host } = renderScreen();
+
+      fireEvent.click(document.querySelector('[data-menu-item="edit"]')!);
+
+      expect(host.drawerOpens).toEqual([{ drawer: "llmModelCost", params: { id: "cost_1" } }]);
+    });
+
+    it("deletes it against the project it belongs to", () => {
+      renderScreen();
+
+      fireEvent.click(document.querySelector('[data-menu-item="delete"]')!);
+
+      expect(mockDelete).toHaveBeenCalledWith(
+        { projectId: "proj-1", id: "cost_1" },
+        expect.anything(),
+      );
+    });
+
+    it("confirms the deletion and refreshes the table", () => {
+      renderScreen();
+
+      fireEvent.click(document.querySelector('[data-menu-item="delete"]')!);
+      const { onSuccess } = mockDelete.mock.calls[0]![1] as { onSuccess: () => void };
+      onSuccess();
+
+      expect(mockRefetch).toHaveBeenCalled();
+    });
+
+    it("hands a refusal to the host rather than composing its own sentence", () => {
+      const { host } = renderScreen();
+
+      fireEvent.click(document.querySelector('[data-menu-item="delete"]')!);
+      const { onError } = mockDelete.mock.calls[0]![1] as { onError: (error: unknown) => void };
+      const refusal = { data: { error: { code: "insufficient_permissions" } } };
+      onError(refusal);
+
+      expect(host.failures).toEqual([
+        { error: refusal, fallbackTitle: "Error deleting LLM model cost" },
+      ]);
+    });
+
+    it("stays silent when the application already reported the failure itself", () => {
+      const { host } = renderScreen(new FakeModelProviderHost({ reportedGlobally: true }));
+
+      fireEvent.click(document.querySelector('[data-menu-item="delete"]')!);
+      const { onError } = mockDelete.mock.calls[0]![1] as { onError: (error: unknown) => void };
+      onError(new Error("boom"));
+
+      expect(host.failures).toEqual([]);
+    });
+  });
+
+  describe("when the reader filters the table", () => {
+    const THIRD_ROW = {
+      ...CATALOGUE_ROW,
+      model: "anthropic/claude-haiku-4-5",
+      regex: "^anthropic/claude-haiku",
+    };
+    const search = (value: string) =>
+      fireEvent.change(screen.getByLabelText("Search model costs"), { target: { value } });
+
+    beforeEach(() => {
+      mockState.costs = [STORED_ROW, CATALOGUE_ROW, THIRD_ROW];
+    });
+
+    /** @scenario Searching narrows the table by model name or regex rule */
+    it("narrows rows by model name or regex, ignoring case", () => {
+      renderScreen();
+
+      search("HAIKU");
+
+      expect(screen.getByText("anthropic/claude-haiku-4-5")).toBeTruthy();
+      expect(screen.queryByText("openai/gpt-5.5")).toBeNull();
+      expect(screen.getByText("Showing 1 of 3 models.")).toBeTruthy();
+    });
+
+    /** @scenario Asking which rule matches a model string narrows the table to those rules */
+    it("keeps only rows whose regex rule matches the typed model string", () => {
+      renderScreen();
+
+      fireEvent.change(screen.getByLabelText("Which rule matches this model?"), {
+        target: { value: "anthropic/claude-haiku-4-5-20260101" },
+      });
+
+      expect(screen.getByText("anthropic/claude-haiku-4-5")).toBeTruthy();
+      expect(screen.queryByText("openai/gpt-5.5")).toBeNull();
+    });
+
+    /** @scenario The provider filter narrows the table to one provider */
+    it("narrows rows to the picked provider, with counts in the options", () => {
+      renderScreen();
+
+      const select = screen.getByLabelText("Filter by provider");
+      expect(within(select).getByText("anthropic (2)")).toBeTruthy();
+      fireEvent.change(select, { target: { value: "openai" } });
+
+      expect(screen.getByText("openai/gpt-5.5")).toBeTruthy();
+      expect(screen.queryByText("anthropic/claude-haiku-4-5")).toBeNull();
+    });
+
+    /** @scenario Custom only shows just the project's own cost rules */
+    it("shows only stored rules when custom only is on", () => {
+      renderScreen();
+
+      fireEvent.click(screen.getByText("Custom only"));
+
+      expect(screen.getByText("anthropic/claude-sonnet-4-6")).toBeTruthy();
+      expect(screen.queryByText("openai/gpt-5.5")).toBeNull();
+    });
+
+    /** @scenario A filter that matches nothing shows an empty state */
+    it("shows an empty state when nothing matches", () => {
+      renderScreen();
+
+      search("no-such-model");
+
+      expect(screen.getByText("No models match")).toBeTruthy();
+      expect(screen.getByText("Showing 0 of 3 models.")).toBeTruthy();
+    });
+
+    /** @scenario Clearing the filters restores every model */
+    it("restores every row once the filters are cleared", () => {
+      renderScreen();
+      search("no-such-model");
+
+      fireEvent.click(screen.getAllByText("Clear filters")[0]!);
+
+      expect(screen.getByText("What each of the 3 models costs per token.")).toBeTruthy();
+      expect(screen.getByText("openai/gpt-5.5")).toBeTruthy();
+    });
+  });
+});

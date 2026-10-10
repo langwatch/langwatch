@@ -1,14 +1,15 @@
 /**
- * The `todowrite` tool: the plan channel. It takes the wrapper shape
- * ({ todos: [{content, status}] }; a bare array is tolerated)
- * because the panel checklist and the X/Y progress protocol depend
- * on that shape, but built on pi's official extension pattern
- * (pi.registerTool + session-entry state reconstruction, adapted from
- * examples/extensions/todo.ts).
+ * The `todowrite` tool: the plan channel. Takes the wrapper shape
+ * (`{ todos: [{content, status}] }`, a bare array tolerated) - built on pi's
+ * official extension pattern (examples/extensions/todo.ts).
  */
 
+import type {
+  ExtensionAPI,
+  ExtensionContext,
+  InlineExtension,
+} from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
-import type { ExtensionAPI, ExtensionContext, InlineExtension } from "@earendil-works/pi-coding-agent";
 
 export const TODOWRITE_TOOL_NAME = "todowrite";
 
@@ -30,18 +31,9 @@ const todowriteParams = Type.Object({
 });
 
 /**
- * Every status word that means one of the four this tool promised.
- *
- * The status is a free string, so a model that writes "done", "Completed" or
- * "in-progress" instead used to have every one of its steps recorded as
- * `pending`, and the panel's checklist then read "0 of 5 done" for a turn in
- * which all five steps had finished. The word is lower-cased, and spaces and
- * dashes fold to `_`, before the lookup.
- *
- * Kept identical to `normalisePlanStatus` in the panel
- * (platform/app/src/features/langy/logic/langyPlan.ts). This package compiles
- * to its own binary and does not depend on the app's workspace packages, so
- * the two copies are pinned by tests on both sides rather than shared.
+ * Every status word meaning one of the four this tool promised - free
+ * strings like "Completed" used to silently record as `pending`. Kept
+ * identical to `normalisePlanStatus` in the panel; pinned by tests, not shared.
  */
 const TODO_STATUS_BY_WORD: Record<string, TodoStatus> = {
   pending: "pending",
@@ -66,7 +58,10 @@ const TODO_STATUS_BY_WORD: Record<string, TodoStatus> = {
  */
 export function normalizeTodoStatus(status: unknown): TodoStatus {
   if (typeof status !== "string") return "pending";
-  const word = status.trim().toLowerCase().replace(/[-\s]+/g, "_");
+  const word = status
+    .trim()
+    .toLowerCase()
+    .replace(/[-\s]+/g, "_");
   return TODO_STATUS_BY_WORD[word] ?? "pending";
 }
 
@@ -75,12 +70,14 @@ export function normalizeTodoStatus(status: unknown): TodoStatus {
  * `{ todos: [...] }` wrapper AND a bare array, the status synonyms above, and
  * drops empty-content rows.
  */
+function todoRowsOf(params: unknown): unknown[] {
+  if (Array.isArray(params)) return params;
+  if (typeof params !== "object" || params === null || !("todos" in params)) return [];
+  return Array.isArray(params.todos) ? params.todos : [];
+}
+
 export function normalizeTodos(params: unknown): TodoItem[] {
-  const rows: unknown[] = Array.isArray(params)
-    ? params
-    : typeof params === "object" && params !== null && Array.isArray((params as { todos?: unknown }).todos)
-      ? ((params as { todos: unknown[] }).todos)
-      : [];
+  const rows = todoRowsOf(params);
   const items: TodoItem[] = [];
   for (const row of rows) {
     if (typeof row !== "object" || row === null) continue;
@@ -102,6 +99,25 @@ export function renderTodoList(todos: TodoItem[]): string {
   return todos.map((t) => `${marks[t.status]} ${t.content}`).join("\n");
 }
 
+function todosFromBranch(ctx: ExtensionContext): TodoItem[] {
+  let todos: TodoItem[] = [];
+  for (const entry of ctx.sessionManager.getBranch()) {
+    if (entry.type !== "message") continue;
+    const message = entry.message as {
+      role?: string;
+      toolName?: string;
+      details?: { todos?: TodoItem[] };
+    };
+    if (message.role !== "toolResult" || message.toolName !== TODOWRITE_TOOL_NAME) continue;
+    // A session file written by another worker version can carry statuses
+    // this build does not know, so it is validated and copied, not adopted.
+    if (Array.isArray(message.details?.todos)) {
+      todos = normalizeTodos(message.details.todos);
+    }
+  }
+  return todos;
+}
+
 export function createTodowriteExtension(): InlineExtension {
   return {
     name: "langy-todowrite",
@@ -112,21 +128,7 @@ export function createTodowriteExtension(): InlineExtension {
       // its plan (same pattern as pi's official todo example: state lives in
       // tool result details, which follows branching correctly).
       const reconstructState = (ctx: ExtensionContext) => {
-        todos = [];
-        for (const entry of ctx.sessionManager.getBranch()) {
-          if (entry.type !== "message") continue;
-          const message = entry.message as {
-            role?: string;
-            toolName?: string;
-            details?: { todos?: TodoItem[] };
-          };
-          if (message.role !== "toolResult" || message.toolName !== TODOWRITE_TOOL_NAME) continue;
-          // A session file written by another worker version can carry statuses
-          // this build does not know, so it is validated and copied, not adopted.
-          if (Array.isArray(message.details?.todos)) {
-            todos = normalizeTodos(message.details.todos);
-          }
-        }
+        todos = todosFromBranch(ctx);
       };
 
       pi.on("session_start", async (_event, ctx) => reconstructState(ctx));
@@ -136,7 +138,7 @@ export function createTodowriteExtension(): InlineExtension {
         name: TODOWRITE_TOOL_NAME,
         label: "Todo",
         description:
-          "Maintain the live todo list the user sees. Pass the FULL list on every call ({\"todos\": [{\"content\", \"status\"}]}); each call replaces the previous list. Statuses: pending, in_progress, completed, cancelled. Keep exactly one item in_progress at a time.",
+          'Maintain the live todo list the user sees. Pass the FULL list on every call ({"todos": [{"content", "status"}]}); each call replaces the previous list. Statuses: pending, in_progress, completed, cancelled. Keep exactly one item in_progress at a time.',
         parameters: todowriteParams,
         async execute(_toolCallId, params) {
           todos = normalizeTodos(params);

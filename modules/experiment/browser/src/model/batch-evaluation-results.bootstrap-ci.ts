@@ -1,0 +1,56 @@
+/**
+ * Percentile CI for mean cost or duration. Per-row cost is right-skewed and bounded at
+ * zero, so a normal interval is misleading at these sample sizes.
+ */
+
+import { quantile } from "@langwatch/experiment-contract";
+
+/**
+ * Mulberry32 PRNG. Deterministic, no dependencies, good enough for bootstrap
+ * resampling. Same seed → identical sequence across platforms.
+ */
+export function mulberry32(seed: number): () => number {
+  let a = seed >>> 0;
+  return function () {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/** Resamples per interval. Matches the score bootstrap for the same reason. */
+const DEFAULT_SAMPLES = 1000;
+
+export const bootstrapMeanCI = ({
+  values,
+  samples = DEFAULT_SAMPLES,
+  seed = 1,
+}: {
+  values: number[];
+  samples?: number;
+  seed?: number;
+}): [number, number] | null => {
+  // One observation has no spread to resample: every replicate is that same
+  // value, so the interval would come out zero-width and read as certainty.
+  // Refusing is the honest output.
+  if (values.length < 2) return null;
+  const everyValueIsFinite = values.every((v) => Number.isFinite(v));
+  if (!everyValueIsFinite) return null;
+
+  const rand = mulberry32(seed);
+  const n = values.length;
+  const means: number[] = [];
+
+  for (let b = 0; b < samples; b++) {
+    let total = 0;
+    for (let k = 0; k < n; k++) {
+      total += values[Math.floor(rand() * n)]!;
+    }
+    means.push(total / n);
+  }
+
+  means.sort((a, b) => a - b);
+  return [quantile(means, 0.025), quantile(means, 0.975)];
+};

@@ -41,10 +41,7 @@ export const localPromptConfigSchema = z
     // Parameters persist as JSON: parse them AS json so the value's type
     // matches the API contract (the spec's recursive JsonValue) instead of
     // laundering unknowns into a typed pipeline.
-    parameters: z
-      .record(z.string(), jsonValueSchema)
-      .optional()
-      .default({}),
+    parameters: z.record(z.string(), jsonValueSchema).optional().default({}),
   })
   .loose();
 

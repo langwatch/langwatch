@@ -1,10 +1,7 @@
 /**
- * Maps the platform `/runs/{runId}/results` response (ExperimentRunWithItems)
- * into per-row results.
- *
- * Mirrors the python SDK's `_build_df_from_platform`: dataset entries become the
- * base rows (one per entry, i.e. one per target in multi-target runs), and
- * evaluations are joined onto those rows on `(index, targetId)`.
+ * Maps the platform `/runs/{runId}/results` response into per-row results,
+ * mirroring the python SDK's `_build_df_from_platform`: dataset entries
+ * become base rows, and evaluations join on `(index, targetId)`.
  */
 
 import type { ExperimentRunResultsResponse } from "./experiments-api.service";
@@ -29,37 +26,82 @@ const matchesRow = ({
   return true;
 };
 
+type DatasetEntry = NonNullable<ExperimentRunResultsResponse["dataset"]>[number];
+type RunEvaluation = NonNullable<ExperimentRunResultsResponse["evaluations"]>[number];
+
+const toRow = (entry: DatasetEntry): ExperimentRowResult => {
+  const entryData = entry.entry && typeof entry.entry === "object" ? entry.entry : {};
+
+  const predicted = entry.predicted;
+  const output =
+    predicted && typeof predicted === "object" && "output" in predicted
+      ? predicted.output
+      : predicted;
+
+  const row: ExperimentRowResult = {
+    index: entry.index ?? 0,
+    input: { ...entryData },
+    output,
+    traceId: entry.traceId ?? "",
+    evaluations: {},
+  };
+
+  if (entry.cost != null) row.cost = entry.cost;
+  if (entry.duration != null) row.duration = entry.duration;
+  if (entry.error) row.error = entry.error;
+  if (entry.targetId) row.target = entry.targetId;
+
+  return row;
+};
+
+const recordEvaluation = ({
+  evaluation,
+  index,
+  name,
+  rows,
+}: {
+  evaluation: RunEvaluation;
+  index: number;
+  name: string;
+  rows: ExperimentRowResult[];
+}): void => {
+  for (const row of rows) {
+    if (!matchesRow({ row, index, targetId: evaluation.targetId })) continue;
+
+    const metric = row.evaluations[name] ?? {};
+    if (evaluation.score != null) metric.score = evaluation.score;
+    if (evaluation.passed != null) metric.passed = evaluation.passed;
+    row.evaluations[name] = metric;
+  }
+};
+
+const joinEvaluations = ({
+  evaluations,
+  rowsByIndex,
+}: {
+  evaluations: RunEvaluation[];
+  rowsByIndex: Map<number, ExperimentRowResult[]>;
+}): void => {
+  for (const evaluation of evaluations) {
+    const index = evaluation.index;
+    // A null, undefined, or empty name falls through to the evaluator id
+    // (matching the python builder); the length check keeps the empty-string
+    // case from being collapsed by nullish coalescing.
+    const name =
+      evaluation.name && evaluation.name.length > 0 ? evaluation.name : evaluation.evaluator;
+    if (index == null || !name) continue;
+
+    recordEvaluation({ evaluation, index, name, rows: rowsByIndex.get(index) ?? [] });
+  }
+};
+
 export const mapRunResultsToRows = (
   response: ExperimentRunResultsResponse,
 ): ExperimentRowResult[] => {
   const datasetEntries = response.dataset ?? [];
   const evaluations = response.evaluations ?? [];
 
-  const rows: ExperimentRowResult[] = datasetEntries.map((entry) => {
-    const entryData =
-      entry.entry && typeof entry.entry === "object" ? entry.entry : {};
-
-    const predicted = entry.predicted;
-    const output =
-      predicted && typeof predicted === "object" && "output" in predicted
-        ? (predicted).output
-        : predicted;
-
-    const row: ExperimentRowResult = {
-      index: entry.index ?? 0,
-      input: { ...entryData },
-      output,
-      traceId: entry.traceId ?? "",
-      evaluations: {},
-    };
-
-    if (entry.cost != null) row.cost = entry.cost;
-    if (entry.duration != null) row.duration = entry.duration;
-    if (entry.error) row.error = entry.error;
-    if (entry.targetId) row.target = entry.targetId;
-
-    return row;
-  });
+  const rows: ExperimentRowResult[] = datasetEntries.map(toRow);
 
   // Index rows by their dataset index so each evaluation joins against just the
   // rows for that index (one per target) instead of scanning every row, which
@@ -71,26 +113,7 @@ export const mapRunResultsToRows = (
     else rowsByIndex.set(row.index, [row]);
   }
 
-  for (const evaluation of evaluations) {
-    const index = evaluation.index;
-    // A null, undefined, or empty name falls through to the evaluator id
-    // (matching the python builder); the length check keeps the empty-string
-    // case from being collapsed by nullish coalescing.
-    const name =
-      evaluation.name && evaluation.name.length > 0
-        ? evaluation.name
-        : evaluation.evaluator;
-    if (index == null || !name) continue;
-
-    for (const row of rowsByIndex.get(index) ?? []) {
-      if (!matchesRow({ row, index, targetId: evaluation.targetId })) continue;
-
-      const metric = row.evaluations[name] ?? {};
-      if (evaluation.score != null) metric.score = evaluation.score;
-      if (evaluation.passed != null) metric.passed = evaluation.passed;
-      row.evaluations[name] = metric;
-    }
-  }
+  joinEvaluations({ evaluations, rowsByIndex });
 
   return rows;
 };

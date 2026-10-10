@@ -1,12 +1,14 @@
 import { mkdtempSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { ChartsApiError } from "@/client-sdk/services/charts/charts-api.service";
+
+import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
+
+import { ChartsApiError, ChartsApiService } from "@/client-sdk/services/charts/charts-api.service";
+import { handledErrorFrom } from "@/internal/api/errors";
 
 vi.mock("@/client-sdk/services/charts/charts-api.service", async (importOriginal) => {
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
-  const actual = (await importOriginal()) as Record<string, unknown>;
+  const actual = await importOriginal<Record<string, unknown>>();
   return {
     ...actual,
     ChartsApiService: vi.fn(),
@@ -35,7 +37,6 @@ vi.mock("ora", () => ({
   }),
 }));
 
-import { ChartsApiService } from "@/client-sdk/services/charts/charts-api.service";
 import { createChartCommand } from "../create";
 import { deleteChartCommand } from "../delete";
 import { getChartCommand } from "../get";
@@ -75,14 +76,16 @@ const CHART = {
   rowSpan: 1,
 };
 
+type AsyncMock = Mock<(...args: never[]) => Promise<unknown>>;
+
 interface ServiceMocks {
   schema: ReturnType<typeof vi.fn>;
-  list: ReturnType<typeof vi.fn>;
-  get: ReturnType<typeof vi.fn>;
-  create: ReturnType<typeof vi.fn>;
+  list: AsyncMock;
+  get: AsyncMock;
+  create: AsyncMock;
   update: ReturnType<typeof vi.fn>;
   delete: ReturnType<typeof vi.fn>;
-  place: ReturnType<typeof vi.fn>;
+  place: AsyncMock;
   unplace: ReturnType<typeof vi.fn>;
   runQuery: ReturnType<typeof vi.fn>;
 }
@@ -164,9 +167,7 @@ describe("createChartCommand()", () => {
 
   describe("when no statement is supplied", () => {
     it("refuses locally without calling the API", async () => {
-      await expect(
-        createChartCommand({ name: "No SQL" }),
-      ).rejects.toThrow(ProcessExitError);
+      await expect(createChartCommand({ name: "No SQL" })).rejects.toThrow(ProcessExitError);
       expect(mocks.create).not.toHaveBeenCalled();
     });
   });
@@ -175,9 +176,7 @@ describe("createChartCommand()", () => {
 describe("updateChartCommand()", () => {
   describe("when nothing is supplied to change", () => {
     it("refuses locally, matching the API's own refusal of an empty update", async () => {
-      await expect(updateChartCommand("chart-1", {})).rejects.toThrow(
-        ProcessExitError,
-      );
+      await expect(updateChartCommand("chart-1", {})).rejects.toThrow(ProcessExitError);
       expect(mocks.update).not.toHaveBeenCalled();
     });
   });
@@ -229,9 +228,9 @@ describe("runChartCommand()", () => {
 
   describe("when only one of --start/--end is given", () => {
     it("refuses locally without calling the API", async () => {
-      await expect(
-        runChartCommand("chart-1", { start: "2026-08-01T00:00:00Z" }),
-      ).rejects.toThrow(ProcessExitError);
+      await expect(runChartCommand("chart-1", { start: "2026-08-01T00:00:00Z" })).rejects.toThrow(
+        ProcessExitError,
+      );
       expect(mocks.get).not.toHaveBeenCalled();
       expect(mocks.runQuery).not.toHaveBeenCalled();
     });
@@ -241,9 +240,9 @@ describe("runChartCommand()", () => {
     it("refuses locally, naming the offered steps, without calling the API", async () => {
       const errorSpy = vi.mocked(console.error);
 
-      await expect(
-        runChartCommand("chart-1", { granularity: "86400" }),
-      ).rejects.toThrow(ProcessExitError);
+      await expect(runChartCommand("chart-1", { granularity: "86400" })).rejects.toThrow(
+        ProcessExitError,
+      );
 
       expect(mocks.get).not.toHaveBeenCalled();
       expect(mocks.runQuery).not.toHaveBeenCalled();
@@ -311,9 +310,7 @@ describe("placeChartCommand()", () => {
 
   describe("when no dashboard id is given", () => {
     it("refuses locally without calling the API", async () => {
-      await expect(placeChartCommand("chart-1", {})).rejects.toThrow(
-        ProcessExitError,
-      );
+      await expect(placeChartCommand("chart-1", {})).rejects.toThrow(ProcessExitError);
       expect(mocks.place).not.toHaveBeenCalled();
     });
   });
@@ -370,10 +367,7 @@ describe("the chart family while the workbench switch is off", () => {
   describe("when the platform answers every verb with lwql_not_enabled", () => {
     /** @scenario "Every CLI verb this slice adds refuses while the workbench switch is off, and writes nothing" */
     it("every verb exits non-zero, surfacing the refusal instead of swallowing it", async () => {
-      const flagOff = new ChartsApiError(
-        "Failed: lwql_not_enabled",
-        "workbench switch off",
-      );
+      const flagOff = new ChartsApiError("Failed: lwql_not_enabled", "workbench switch off");
       mocks.list.mockRejectedValue(flagOff);
       mocks.get.mockRejectedValue(flagOff);
       mocks.create.mockRejectedValue(flagOff);
@@ -390,10 +384,7 @@ describe("the chart family while the workbench switch is off", () => {
         ["update", () => updateChartCommand("chart-1", { name: "y" })],
         ["delete", () => deleteChartCommand("chart-1")],
         ["run", () => runChartCommand("chart-1", {})],
-        [
-          "place",
-          () => placeChartCommand("chart-1", { dashboardId: "dashboard-1" }),
-        ],
+        ["place", () => placeChartCommand("chart-1", { dashboardId: "dashboard-1" })],
         ["unplace", () => unplaceChartCommand("chart-1")],
       ];
 
@@ -417,10 +408,9 @@ describe("the chart family while the workbench switch is off", () => {
 });
 
 /**
- * `chart schema` read `.views.length` straight off the response, so a payload
- * without `views` crashed with a TypeError that the error reader then filed as
- * `network_error` and told the user to check their connection. The shape is
- * checked before it is read, and the refusal names the fix.
+ * `chart schema` read `.views.length` straight off the response, so a payload without `views`
+ * crashed with a TypeError that the error reader then filed as `network_error` and told the user to
+ * check their connection. The shape is checked before it is read, and the refusal names the fix.
  */
 describe("given the analytics schema comes back in an unexpected shape", () => {
   /** @scenario "chart schema names a payload it does not recognise" */
@@ -447,5 +437,144 @@ describe("given the analytics schema comes back in an unexpected shape", () => {
     const result = await chartSchemaCommand();
 
     expect(result).toMatchObject({ data: { database: "langwatch" } });
+  });
+});
+
+/**
+ * A platform that keeps what it is given: the only thing between the CLI's flags and the CLI's
+ * read-back here is the CLI itself, so a flag that is mangled on the way in or out shows.
+ */
+const keepWhatIsGiven = () => {
+  const stored = new Map<string, typeof CHART>();
+  mocks.create.mockImplementation(
+    ({ name, definition }: { name: string; definition: (typeof CHART)["definition"] }) => {
+      const chart = { ...CHART, id: `chart-${stored.size + 1}`, name, definition };
+      stored.set(chart.id, chart);
+      return Promise.resolve(chart);
+    },
+  );
+  mocks.get.mockImplementation((id: string) => Promise.resolve(stored.get(id)));
+  mocks.place.mockImplementation(
+    (id: string, placement: { dashboardId: string; gridRow?: number }) => {
+      const placed = { ...stored.get(id)!, ...placement, gridRow: placement.gridRow ?? 3 };
+      stored.set(id, placed as unknown as typeof CHART);
+      return Promise.resolve(placed);
+    },
+  );
+  mocks.list.mockImplementation(() => Promise.resolve({ data: [...stored.values()] }));
+};
+
+describe("authoring a chart through the CLI", () => {
+  describe("when a chart is created from a SQL file, parameters and a specification file", () => {
+    /** @scenario "Langy creates a chart with the CLI and reads it back with the same query, parameters and specification" */
+    it("reads back the SQL, the typed parameter values and the specification that were submitted", async () => {
+      keepWhatIsGiven();
+      const dir = mkdtempSync(join(tmpdir(), "chart-cli-"));
+      const sqlPath = join(dir, "chart.sql");
+      const specPath = join(dir, "spec.json");
+      const sql =
+        "SELECT count() AS value FROM analytics.traces WHERE OccurredAt >= {since:DateTime}";
+      const spec = { mark: "line", encoding: { y: { field: "value", type: "quantitative" } } };
+      writeFileSync(sqlPath, `${sql}\n`);
+      writeFileSync(specPath, JSON.stringify(spec));
+
+      const created = await createChartCommand({
+        name: "Traces",
+        sqlFile: sqlPath,
+        param: ["since=2026-02-01 00:00:00", "limit=7", "exact=true"],
+        specFile: specPath,
+      });
+      const id = (created!.data as typeof CHART).id;
+      const read = await getChartCommand(id);
+
+      const definition = (read!.data as typeof CHART).definition;
+      expect(definition.sql.trim()).toBe(sql);
+      expect(definition.parameters).toEqual({
+        since: "2026-02-01 00:00:00",
+        limit: 7,
+        exact: true,
+      });
+      expect(definition.vegaLiteSpec).toEqual(spec);
+    });
+  });
+
+  describe("when a specification the chart policy refuses is submitted", () => {
+    /** @scenario "A specification the chart policy refuses cannot be written through the CLI" */
+    it("reports saved_workbench_chart_specification_refused, exits non-zero and creates nothing", async () => {
+      keepWhatIsGiven();
+      const refusal = handledErrorFrom({
+        status: 400,
+        body: {
+          error: {
+            type: "validation_error",
+            code: "saved_workbench_chart_specification_refused",
+            message: "The chart specification is refused by the workbench policy.",
+          },
+        },
+      })!;
+      mocks.create.mockRejectedValueOnce(refusal);
+      const dir = mkdtempSync(join(tmpdir(), "chart-cli-"));
+      const specPath = join(dir, "spec.json");
+      writeFileSync(
+        specPath,
+        JSON.stringify({ data: { url: "https://example.invalid/data.json" } }),
+      );
+
+      await expect(
+        createChartCommand({ name: "Bad", sql: "SELECT 1", specFile: specPath }),
+      ).rejects.toThrow(ProcessExitError);
+
+      expect(spinner.fail).toHaveBeenCalledWith(
+        expect.stringContaining("saved_workbench_chart_specification_refused"),
+      );
+      expect((await listChartsCommand())!.data).toEqual({ data: [] });
+    });
+  });
+
+  describe("when the SQL names a column the credentials cannot read", () => {
+    /** @scenario "SQL naming a column Langy's credentials cannot read is refused identically everywhere" */
+    it("reports the validator's own code, exits non-zero and creates nothing", async () => {
+      keepWhatIsGiven();
+      mocks.create.mockRejectedValueOnce(
+        handledErrorFrom({
+          status: 400,
+          body: {
+            error: {
+              type: "forbidden",
+              code: "lwql_not_permitted",
+              message: "The submitted SQL is not permitted by the LangWatchQL analytics policy.",
+            },
+          },
+        })!,
+      );
+
+      await expect(
+        createChartCommand({
+          name: "Gated",
+          sql: "SELECT CapturedInput AS value FROM analytics.traces",
+        }),
+      ).rejects.toThrow(ProcessExitError);
+
+      expect(spinner.fail).toHaveBeenCalledWith(expect.stringContaining("lwql_not_permitted"));
+      expect((await listChartsCommand())!.data).toEqual({ data: [] });
+    });
+  });
+
+  describe("when a saved chart is placed on a dashboard", () => {
+    /** @scenario "Langy places a saved chart on a dashboard with the CLI" */
+    it("sets the dashboard id and grid position, and lists the chart under that dashboard", async () => {
+      keepWhatIsGiven();
+      const created = await createChartCommand({ name: "Traces", sql: "SELECT 1" });
+      const id = (created!.data as typeof CHART).id;
+
+      const placed = await placeChartCommand(id, { dashboardId: "dashboard-1" });
+      const listed = await listChartsCommand();
+
+      expect(placed!.data).toMatchObject({ dashboardId: "dashboard-1", gridRow: 3 });
+      const charts = (listed!.data as { data: (typeof CHART)[] }).data;
+      expect(
+        charts.filter((chart) => chart.dashboardId === "dashboard-1").map((c) => c.id),
+      ).toEqual([id]);
+    });
   });
 });

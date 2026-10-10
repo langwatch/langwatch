@@ -1,0 +1,389 @@
+import { Menu } from "@langwatch/design-system/menu";
+import { Box, IconButton, HStack } from "@langwatch/design-system/primitives";
+import { Drawer } from "@langwatch/design-system/studio-drawer";
+import { Tooltip } from "@langwatch/design-system/tooltip";
+import type { Component, ComponentType } from "@langwatch/workflow-contract";
+import type { Node } from "@xyflow/react";
+import { Columns, Copy, MoreHorizontal, Trash2, X } from "lucide-react";
+import { motion } from "motion/react";
+import type React from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
+import { createPortal } from "react-dom";
+import { useWindowSize } from "usehooks-ts";
+import { useShallow } from "zustand/react/shallow";
+
+import { offerStudioDrawerFooter } from "../../../../behavior/studio-drawer-footer.store.ts";
+import { useWorkflowStore } from "../../../../behavior/use-workflow-store.ts";
+import { ComponentIcon } from "../../../elements/workflow-icons.tsx";
+import { HoverableBigText } from "../../hoverable-big-text.tsx";
+import { ComponentExecutionButton } from "../../workflow-node-execution.tsx";
+import { getNodeDisplayName } from "../../workflow-nodes.tsx";
+import { InputPanel } from "../component_execution/input-panel.tsx";
+import { OutputPanel } from "../component_execution/output-panel.tsx";
+
+/**
+ * Determines whether a node type supports the expand (Input/Output panels)
+ * and play (execution) controls. Entry and end nodes are structural
+ * and cannot be executed individually.
+ */
+function isExpandableNode(node: Pick<Node<Component>, "type">): boolean {
+  return node.type !== "entry" && node.type !== "end";
+}
+
+export type StudioDrawerWrapperProps = {
+  /** The currently selected ReactFlow node. When undefined the drawer is closed. */
+  node: Node<Component> | undefined;
+  /** Content rendered inside the drawer body. */
+  children: React.ReactNode;
+  /** Called when the drawer should close (e.g. close button or backdrop click). */
+  onClose: () => void;
+  /** Content rendered in the drawer footer (e.g. Apply/Save/Discard buttons) */
+  footer?: React.ReactNode;
+};
+
+/** Escape collapses the expanded view first, unless an open popover should take the key. */
+function escapeCollapses(input: { key: string; expanded: boolean }): boolean {
+  const isPopoverOpen = document.querySelector(".chakra-popover__popper") !== null;
+  return input.key === "Escape" && input.expanded && !isPopoverOpen;
+}
+
+/**
+ * StudioDrawerWrapper -- reusable drawer shell for the optimization studio.
+ */
+export function StudioDrawerWrapper({ node, children, onClose, footer }: StudioDrawerWrapperProps) {
+  const { deselectAllNodes, propertiesExpanded, setPropertiesExpanded, duplicateNode, deleteNode } =
+    useWorkflowStore(
+      useShallow((state) => ({
+        deselectAllNodes: state.deselectAllNodes,
+        propertiesExpanded: state.propertiesExpanded,
+        setPropertiesExpanded: state.setPropertiesExpanded,
+        duplicateNode: state.duplicateNode,
+        deleteNode: state.deleteNode,
+      })),
+    );
+
+  // Footer registered by child components via useRegisterDrawerFooter
+  const [registeredFooter, setRegisteredFooter] = useState<React.ReactNode>(null);
+  const effectiveFooter = footer ?? registeredFooter;
+  useLayoutEffect(() => offerStudioDrawerFooter(setRegisteredFooter), []);
+
+  const isOpen = node !== undefined;
+  const showControls = node !== undefined && isExpandableNode(node);
+
+  // Collapse the expanded view when the node is deselected.
+  useEffect(() => {
+    if (!node) {
+      setPropertiesExpanded(false);
+    }
+  }, [node, setPropertiesExpanded]);
+
+  // Allow Escape to collapse the expanded view before closing.
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (escapeCollapses({ key: e.key, expanded: propertiesExpanded })) {
+        setPropertiesExpanded(false);
+        e.stopPropagation();
+        e.preventDefault();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [propertiesExpanded, setPropertiesExpanded]);
+
+  const handleClose = () => {
+    if (propertiesExpanded) {
+      setPropertiesExpanded(false);
+    } else {
+      deselectAllNodes();
+      onClose();
+    }
+  };
+
+  // ---------- Expanded-mode layout measurements ----------
+  const { width: windowWidth, height: windowHeight } = useWindowSize();
+  // Fixed width for the center panel to ensure consistent sizing
+  // regardless of content (evaluator vs prompt drawers)
+  const panelWidth = 512;
+  const halfPanelWidth = Math.round(panelWidth / 2);
+  const middlePoint = Math.round((windowWidth ?? 0) / 2 - halfPanelWidth);
+  const topPanelHeight = 49;
+  const fullPanelHeight = (windowHeight ?? 0) - topPanelHeight - 1;
+
+  const MotionDiv = motion.div;
+
+  // ----- Shared header JSX (used in both drawer and expanded modes) -----
+  const headerContent = node ? (
+    <HStack width="full" justify="space-between" gap={0}>
+      {/* Left: icon + name */}
+      <HStack gap={2} overflow="hidden" flex={1} minWidth={0}>
+        <ComponentIcon type={node.type as ComponentType} cls={node.data.cls} size="lg" />
+        <HoverableBigText
+          lineClamp={2}
+          textStyle="md"
+          fontWeight="medium"
+          overflow="hidden"
+          textOverflow="ellipsis"
+          expandable={false}
+        >
+          {getNodeDisplayName(node)}
+        </HoverableBigText>
+      </HStack>
+
+      {/* Right: action buttons */}
+      <HStack gap={0} flexShrink={0}>
+        {showControls && (
+          <>
+            <ComponentExecutionButton node={node} size="sm" iconSize={16} />
+
+            <Tooltip
+              content={
+                propertiesExpanded
+                  ? "Collapse input and output panels"
+                  : "Expand input and output panels"
+              }
+              showArrow
+              positioning={{ placement: "top" }}
+              openDelay={0}
+              closeDelay={0}
+            >
+              <IconButton
+                variant="ghost"
+                size="sm"
+                color="fg.muted"
+                aria-label="Toggle input and output panels"
+                onClick={() => setPropertiesExpanded(!propertiesExpanded)}
+              >
+                <Columns size={16} />
+              </IconButton>
+            </Tooltip>
+          </>
+        )}
+        {isExpandableNode(node) && (
+          <Menu.Root positioning={{ placement: "bottom-end" }}>
+            <Menu.Trigger asChild>
+              <IconButton variant="ghost" size="sm" color="fg.muted" aria-label="Node actions">
+                <MoreHorizontal size={16} />
+              </IconButton>
+            </Menu.Trigger>
+            <Menu.Content>
+              <Menu.Item value="duplicate" onClick={() => duplicateNode(node.id)}>
+                <Copy size={14} />
+                Duplicate
+              </Menu.Item>
+              <Menu.Item
+                value="delete"
+                onClick={() => {
+                  deleteNode(node.id);
+                  setPropertiesExpanded(false);
+                  deselectAllNodes();
+                  onClose();
+                }}
+              >
+                <Trash2 size={14} />
+                Delete
+              </Menu.Item>
+            </Menu.Content>
+          </Menu.Root>
+        )}
+        <StudioDrawerClose expanded={propertiesExpanded} onClose={handleClose} />
+      </HStack>
+    </HStack>
+  ) : null;
+
+  return (
+    <>
+      {/* ----- Normal drawer mode (closed when expanded) ----- */}
+      <Drawer.Root
+        open={isOpen && !propertiesExpanded}
+        onOpenChange={({ open }) => {
+          if (!open) handleClose();
+        }}
+        size="md"
+        closeOnInteractOutside={false}
+        modal={false}
+      >
+        <Drawer.Content bg="bg" marginTop="56px">
+          {node && <Drawer.Header>{headerContent}</Drawer.Header>}
+
+          <Drawer.Body display="flex" flexDirection="column" overflow="auto" padding={0}>
+            {children}
+          </Drawer.Body>
+
+          {effectiveFooter && <Drawer.Footer>{effectiveFooter}</Drawer.Footer>}
+        </Drawer.Content>
+      </Drawer.Root>
+
+      {/* ----- Expanded mode: entire drawer rendered via portal ----- */}
+      {propertiesExpanded &&
+        node &&
+        createPortal(
+          <Box
+            position="fixed"
+            top={`${topPanelHeight}px`}
+            left={0}
+            width="100vw"
+            height={`${fullPanelHeight}px`}
+            zIndex={1500}
+          >
+            {/* Centre panel: full drawer (header + body + footer) as one unit */}
+            <MotionDiv
+              initial={{
+                right: 0,
+                height: `${fullPanelHeight}px`,
+                marginTop: 0,
+                borderRadius: 0,
+                boxShadow: "0 0 0 transparent",
+              }}
+              animate={{
+                right: `${middlePoint}px`,
+                height: `${fullPanelHeight - 40}px`,
+                marginTop: "20px",
+                borderRadius: "8px",
+                boxShadow: "var(--chakra-shadows-md)",
+              }}
+              transition={{ duration: 0.4, ease: "easeInOut", delay: 0.1 }}
+              style={{
+                position: "absolute",
+                top: 0,
+                right: 0,
+                width: `${panelWidth}px`,
+                display: "flex",
+                flexDirection: "column",
+                background: "var(--chakra-colors-bg)",
+                border: "1px solid",
+                borderColor: "var(--chakra-colors-border-emphasized)",
+                zIndex: 100,
+                overflow: "hidden",
+              }}
+            >
+              {/* Header */}
+              <Box
+                paddingY={2}
+                paddingX={3}
+                borderBottomWidth="1px"
+                borderColor="border"
+                flexShrink={0}
+              >
+                {headerContent}
+              </Box>
+
+              {/* Body */}
+              <Box flex={1} overflowY="auto" overflowX="hidden">
+                {children}
+              </Box>
+
+              {/* Footer */}
+              {effectiveFooter && (
+                <Box
+                  borderTopWidth="1px"
+                  borderColor="border"
+                  paddingX={4}
+                  paddingY={3}
+                  flexShrink={0}
+                >
+                  {effectiveFooter}
+                </Box>
+              )}
+            </MotionDiv>
+
+            {/* Backdrop */}
+            <Box
+              className="fade-in"
+              position="absolute"
+              top={0}
+              left={0}
+              height="100%"
+              width="100%"
+              background="bg.scrim"
+              zIndex={98}
+              onClick={() => setPropertiesExpanded(false)}
+            />
+
+            {/* Input panel (left) */}
+            <Box
+              position="absolute"
+              top={0}
+              left={0}
+              height="100%"
+              width={`calc(50% - ${halfPanelWidth}px)`}
+              overflow="hidden"
+              zIndex={99}
+            >
+              <MotionDiv
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  paddingTop: "40px",
+                  paddingBottom: "40px",
+                  paddingLeft: "40px",
+                }}
+                initial={{ x: "110%" }}
+                animate={{ x: "0%" }}
+                transition={{ duration: 0.1, ease: "easeOut", delay: 0.5 }}
+                className="js-outer-box"
+                onClick={(e: React.MouseEvent<HTMLDivElement>) => {
+                  if ((e.target as HTMLElement).classList.contains("js-outer-box")) {
+                    setPropertiesExpanded(false);
+                  }
+                }}
+              >
+                <InputPanel node={node} />
+              </MotionDiv>
+            </Box>
+
+            {/* Output panel (right) */}
+            <Box
+              position="absolute"
+              top={0}
+              right={0}
+              height="100%"
+              width={`calc(50% - ${halfPanelWidth}px)`}
+              overflow="hidden"
+              zIndex={99}
+            >
+              <MotionDiv
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  paddingTop: "40px",
+                  paddingBottom: "40px",
+                  paddingRight: "40px",
+                }}
+                initial={{ x: "-110%" }}
+                animate={{ x: "0%" }}
+                transition={{ duration: 0.1, ease: "easeOut", delay: 0.5 }}
+                className="js-outer-box"
+                onClick={(e: React.MouseEvent<HTMLDivElement>) => {
+                  if ((e.target as HTMLElement).classList.contains("js-outer-box")) {
+                    setPropertiesExpanded(false);
+                  }
+                }}
+              >
+                <OutputPanel node={node} />
+              </MotionDiv>
+            </Box>
+          </Box>,
+          document.body,
+        )}
+    </>
+  );
+}
+
+/** Expanded canvas panels sit outside the drawer context. */
+function StudioDrawerClose({ expanded, onClose }: { expanded: boolean; onClose: () => void }) {
+  if (!expanded) return <Drawer.CloseTrigger />;
+  return (
+    <IconButton
+      variant="ghost"
+      size="sm"
+      color="fg.muted"
+      aria-label="Close drawer"
+      onClick={onClose}
+    >
+      <X size={16} />
+    </IconButton>
+  );
+}

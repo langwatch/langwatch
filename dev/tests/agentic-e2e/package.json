@@ -1,0 +1,24 @@
+{
+  "name": "langwatch-e2e-tests",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "test": "playwright test",
+    "test:unit": "E2E_UNIT=1 playwright test --project=unit",
+    "test:ui": "playwright test --ui",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@langwatch/e2e-stack": "workspace:*",
+    "@langwatch/enterprise-licensing-process": "workspace:*"
+  },
+  "devDependencies": {
+    "@playwright/test": "catalog:",
+    "@types/node": "catalog:",
+    "@types/pg": "catalog:",
+    "ioredis": "catalog:",
+    "pg": "catalog:",
+    "typescript": "catalog:",
+    "zod": "catalog:"
+  }
+}

@@ -1,8 +1,6 @@
-import { archiveProject as apiArchiveProject } from "../langwatch-api-projects.js";
+import { archiveProject as apiArchiveProject } from "../langwatch-api-projects.ts";
 
-export async function handleArchiveProject(params: {
-  id: string;
-}): Promise<string> {
+export async function handleArchiveProject(params: { id: string }): Promise<string> {
   const result = await apiArchiveProject(params.id);
 
   return (

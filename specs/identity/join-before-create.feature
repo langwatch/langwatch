@@ -207,9 +207,48 @@ Feature: Join before create - the choice happens before an organization is minte
   @integration
   Scenario: Creating an organization on a matching domain is nudged, never blocked
     Given "sam" is an existing user whose domain matches "acme"
+    And "sam" already declined the offer for that domain
     When "sam" opens the create-organization screen
-    Then a soft notice says "acme" is already here and offers joining instead
+    Then a quiet action below the form offers joining "acme" instead
     And creating the organization is still available and still completes
+
+  # ── Declining once is an answer ────────────────────────────────────────
+  #
+  # The sign-up step asks first. Declining it is recorded as the same "no
+  # thanks" the onboarding offer records, so the welcome screen does not cover
+  # the organization form with a second takeover asking the same question.
+  # The way back stays on that form as one quiet action below it, and taking
+  # it runs the same request (or automatic admission) the offer runs.
+
+  @integration
+  Scenario: Declining the team at sign-up is not asked again during onboarding
+    Given an organization "acme" open to requests from "acme.com"
+    When "sam" completes verification and chooses to create a new organization
+    Then the decline is recorded for "acme.com" before "sam" moves on
+    And the welcome screen shows no join takeover over the organization form
+
+  @integration
+  Scenario: After declining, one colleague organization is offered as a quiet action
+    Given "sam" declined the offer for "acme.com"
+    And only "acme" is open to "acme.com"
+    When "sam" reaches the organization step of the welcome screen
+    Then a secondary action below the form reads "Join acme instead"
+    And creating the organization stays the leading action
+
+  @integration
+  Scenario: After declining, several colleague organizations are offered through a chooser
+    Given "sam" declined the offer for "acme.com"
+    And both "acme" and "acme-labs" are open to "acme.com"
+    When "sam" chooses "Join an existing organization" on the organization step
+    Then each organization open to "acme.com" is listed to choose from
+
+  @integration
+  Scenario: Joining from the organization step runs the same request as the offer
+    Given "sam" declined the offer for "acme.com"
+    When "sam" chooses to join "acme" from the organization step
+    Then a request to join "acme" is made, recording where it was made from
+    And "sam" sees the waiting screen naming "acme"
+    And an organization that admits "acme.com" automatically admits "sam" instead
 
   @integration
   Scenario: The step waits for its own answer before sending anybody anywhere
@@ -238,3 +277,29 @@ Feature: Join before create - the choice happens before an organization is minte
     When the sign-up health reporting is read
     Then those organizations are reported as the rate this step exists to reduce
     And the rate is readable for the period before this step existed
+
+  @integration
+  Scenario: A person's organizations are read across tenants through the guarded client
+    Given a person who is a member of two organizations, one membership disabled
+    When creating an organization asks which organizations they already belong to
+    Then the answer comes back through the org-tenancy guard instead of a refusal
+    And only the active membership counts unless disabled ones are asked for
+
+  @integration
+  Scenario: A domain's candidate organizations are read across tenants through the guarded client
+    Given verified colleagues on one domain in two organizations
+    When the join screen looks up where that domain could join
+    Then both organizations come back through the org-tenancy guard
+
+  @unit
+  Scenario: A person's own pending join requests are read across organizations
+    Given a signed-in person with requests to several organizations
+    When the join screen asks what they are waiting on
+    Then a read bounded by that one user passes the org-tenancy guard
+    And a read naming neither an organization nor a user is still refused
+
+  @unit
+  Scenario: With no join offer to make, a password account is offered a passkey
+    Given "sam" signed in with a password and has no organization to join
+    When any app page opens
+    Then the account-security offer is drawn where the join offer would be

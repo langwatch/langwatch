@@ -1,20 +1,18 @@
-import { scopedApiKey } from "@/internal/credentialContext";
-import { createSpinner } from "../../utils/spinner";
-import { resolveCredentials } from "../../utils/apiKey";
-import { failSpinnerFromResponse } from "../../utils/failFromResponse";
-import { failSpinner } from "../../utils/spinnerError";
-import { buildAuthHeaders } from "@/internal/api/auth";
-import type { CommandResult } from "../../utils/output";
-
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
+import { buildRequestHeaders } from "@/internal/api/request-headers";
+import { scopedApiKey } from "@/internal/credentialContext";
 import { langwatchFetch } from "@/internal/http/langwatchFetch";
+
+import { resolveCredentials } from "../../utils/apiKey.ts";
+import { failSpinnerFromResponse } from "../../utils/failFromResponse.ts";
+import type { CommandResult } from "../../utils/output.ts";
+import { createSpinner } from "../../utils/spinner.ts";
+import { failSpinner } from "../../utils/spinnerError.ts";
 /**
  * Returns the deletion outcome rather than printing it: the output port renders
  * it in whatever format the caller asked for (utils/output.ts).
  */
-export const deleteGraphCommand = async (
-  id: string,
-): Promise<CommandResult | void> => {
+export const deleteGraphCommand = async (id: string): Promise<CommandResult | void> => {
   await resolveCredentials();
 
   const apiKey = scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
@@ -23,9 +21,9 @@ export const deleteGraphCommand = async (
   const spinner = createSpinner(`Deleting graph "${id}"...`).start();
 
   try {
-    const response = await langwatchFetch(`${endpoint}/api/graphs/${encodeURIComponent(id)}`, {
+    const response = await langwatchFetch(`${endpoint}/api/v1/graphs/${encodeURIComponent(id)}`, {
       method: "DELETE",
-      headers: buildAuthHeaders({ apiKey }),
+      headers: buildRequestHeaders({ apiKey }),
     });
 
     if (!response.ok) {
@@ -33,7 +31,7 @@ export const deleteGraphCommand = async (
       process.exit(1);
     }
 
-    const result = await response.json() as { id: string; deleted: boolean };
+    const result = (await response.json()) as { id: string; deleted: boolean };
     spinner.succeed(`Graph "${id}" deleted`);
 
     return {

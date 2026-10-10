@@ -1,27 +1,14 @@
 /**
- * The daemon runs concurrent requests in one process; device-mode requests
- * carry no caller API key, so the resolved per-user key must NOT live in the
- * shared `process.env` where an interleaved request could read it. It lives in
- * a per-request holder scope instead. These tests pin the two properties the
- * fix depends on:
- *
- *   1. two interleaved holder scopes each observe only their own credential,
- *      even when the key is set AFTER an await inside the scope (exactly how
- *      the resolver fills it mid-command): the isolation the daemon requires,
- *      and
- *   2. the API-client factory reads the scoped key, with no scope falling back
- *      to the environment exactly as a plain SDK embed does.
- *
- * Feature: specs/ai-governance/cli-onboarding/me-credentials.feature
+ * The daemon runs concurrent requests in one process, so a resolved
+ * per-user key lives in a per-request holder scope, not shared
+ * `process.env` -- pins interleaved scopes see only their own credential.
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 // The real openapi-fetch client keeps its header config private, so capture
 // what the factory hands it: the Authorization the transport would send is
 // exactly what these tests need to observe.
-const createClientCalls = vi.hoisted(
-  () => [] as Array<{ headers?: Record<string, string> }>,
-);
+const createClientCalls = vi.hoisted(() => [] as { headers?: Record<string, string> }[]);
 vi.mock("openapi-fetch", () => ({
   default: (config: { headers?: Record<string, string> }) => {
     createClientCalls.push(config);
@@ -70,7 +57,7 @@ describe("credentialContext", () => {
 
     expect(a).toBe("key-A");
     expect(b).toBe("key-B");
-    expect(seen.sort()).toEqual(["A:key-A", "B:key-B"]);
+    expect(seen.toSorted()).toEqual(["A:key-A", "B:key-B"]);
   });
 
   it("a key set mid-scope is visible to the code that runs afterward", async () => {
@@ -93,9 +80,7 @@ describe("credentialContext", () => {
       // carry the environment key, the unchanged pre-daemon behavior.
       createClientCalls.length = 0;
       createLangWatchApiClient();
-      expect(createClientCalls[0]?.headers?.authorization).toBe(
-        "Bearer env-key",
-      );
+      expect(createClientCalls[0]?.headers?.authorization).toBe("Bearer env-key");
     } finally {
       if (savedEnvKey === undefined) delete process.env.LANGWATCH_API_KEY;
       else process.env.LANGWATCH_API_KEY = savedEnvKey;

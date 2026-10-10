@@ -1,26 +1,17 @@
-/**
- * Integration tests that spawn the real CLI binary and verify every
- * non-prompt command surfaces meaningful server-side error messages.
- *
- * This suite focuses on common failure modes (404/409/422/500 with
- * various payload shapes) so regressions in error propagation are caught
- * at the boundary the user actually experiences.
- */
-import {
-  describe,
-  expect,
-  it,
-  beforeAll,
-  afterAll,
-  beforeEach,
-  afterEach,
-} from "vitest";
-import * as fs from "fs";
-import * as path from "path";
-import * as os from "os";
-import http from "http";
 import { spawn } from "child_process";
+import * as fs from "fs";
+import http from "http";
 import type { AddressInfo } from "net";
+import { clearTimeout, setTimeout } from "node:timers";
+import * as os from "os";
+import * as path from "path";
+
+/**
+ * Integration tests that spawn the real CLI binary and verify every non-prompt command
+ * surfaces meaningful server-side error messages.
+ */
+import { describe, expect, it, beforeAll, afterAll, beforeEach, afterEach } from "vitest";
+
 import { AGENT_MODE_ENV_VARS } from "../../utils/output";
 
 const CLI_PATH = path.resolve(__dirname, "../../../../dist/cli/index.js");
@@ -50,9 +41,7 @@ function matchKey(method: string, urlPath: string): string | undefined {
         (keyPath ?? "")
           .split("/")
           .map((segment) =>
-            segment.startsWith(":")
-              ? "[^/]+"
-              : segment.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
+            segment.startsWith(":") ? "[^/]+" : segment.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
           )
           .join("/") +
         "$",
@@ -101,7 +90,12 @@ interface CliResult {
   exitCode: number | null;
 }
 
-function runCli(args: string[], cwd: string, timeoutMs = 15000): Promise<CliResult> {
+function runCli(
+  args: string[],
+  cwd: string,
+  timeoutMs = 15000,
+  sessionProjectId?: string,
+): Promise<CliResult> {
   return new Promise((resolve) => {
     // This suite asserts on the human (text) rendering. An agent-mode marker
     // inherited from the runner's environment (CLAUDECODE etc.) would flip
@@ -111,12 +105,31 @@ function runCli(args: string[], cwd: string, timeoutMs = 15000): Promise<CliResu
     for (const marker of AGENT_MODE_ENV_VARS) {
       delete baseEnv[marker];
     }
+    const sessionConfigPath = path.join(cwd, "config.json");
+    if (sessionProjectId) {
+      delete baseEnv.LANGWATCH_API_KEY;
+      fs.writeFileSync(
+        sessionConfigPath,
+        JSON.stringify({
+          access_token: "test-session",
+          control_plane_url: baseUrl,
+          gateway_url: baseUrl,
+          personal_project: {
+            api_key: "test",
+            id: sessionProjectId,
+            validated_at: Math.floor(Date.now() / 1000),
+          },
+        }),
+      );
+    }
     const child = spawn("node", [CLI_PATH, ...args], {
       cwd,
       stdio: ["ignore", "pipe", "pipe"],
       env: {
         ...baseEnv,
-        LANGWATCH_API_KEY: "test",
+        ...(sessionProjectId
+          ? { LANGWATCH_CLI_CONFIG: sessionConfigPath }
+          : { LANGWATCH_API_KEY: "test" }),
         LANGWATCH_ENDPOINT: baseUrl,
       },
     });
@@ -142,7 +155,6 @@ function makeTestDir(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), "langwatch-cli-cmd-err-"));
 }
 
-/** @scenario Common error conditions map to actionable messages for every CLI command */
 describe("CLI error propagation across commands", () => {
   let testDir: string;
 
@@ -154,7 +166,8 @@ describe("CLI error propagation across commands", () => {
     fs.rmSync(testDir, { recursive: true, force: true });
   });
 
-  describe("agent create", () => {
+  describe("when running the agent create command", () => {
+    /** @scenario Common error conditions map to actionable messages for every CLI command */
     it("surfaces a 409 conflict body to the user", async () => {
       pushResponse("POST", "/api/v1/agents", {
         status: 409,
@@ -164,22 +177,18 @@ describe("CLI error propagation across commands", () => {
         },
       });
 
-      const result = await runCli(
-        ["agent", "create", "my-agent", "--type", "http"],
-        testDir,
-      );
+      const result = await runCli(["agent", "create", "my-agent", "--type", "http"], testDir);
 
       expect(result.exitCode).toBe(1);
       expect(result.combined.toLowerCase()).toContain("already exists");
-      expect(result.combined.toLowerCase()).not.toContain(
-        "error: internal server error",
-      );
+      expect(result.combined.toLowerCase()).not.toContain("error: internal server error");
     });
   });
 
-  describe("dataset get", () => {
+  describe("when running the dataset get command", () => {
+    /** @scenario Common error conditions map to actionable messages for every CLI command */
     it("maps a 404 to a specific 'not found' message with the id", async () => {
-      pushResponse("GET", "/api/dataset/:slugOrId", {
+      pushResponse("GET", "/api/v1/dataset/:slugOrId", {
         status: 404,
         body: { error: "NotFoundError", message: "Dataset not found" },
       });
@@ -192,9 +201,10 @@ describe("CLI error propagation across commands", () => {
     });
   });
 
-  describe("monitor create", () => {
+  describe("when running the monitor create command", () => {
+    /** @scenario Common error conditions map to actionable messages for every CLI command */
     it("forwards a 422 validation error from the API", async () => {
-      pushResponse("POST", "/api/monitors", {
+      pushResponse("POST", "/api/v1/monitors", {
         status: 422,
         body: {
           error: "ValidationError",
@@ -216,15 +226,14 @@ describe("CLI error propagation across commands", () => {
       );
 
       expect(result.exitCode).toBe(1);
-      expect(result.combined.toLowerCase()).toContain(
-        "must be a valid evaluator type",
-      );
+      expect(result.combined.toLowerCase()).toContain("must be a valid evaluator type");
     });
   });
 
-  describe("secret create", () => {
+  describe("when running the secret create command", () => {
+    /** @scenario Common error conditions map to actionable messages for every CLI command */
     it("surfaces the raw body when the server omits error/message fields", async () => {
-      pushResponse("POST", "/api/secrets", {
+      pushResponse("POST", "/api/v1/secrets", {
         status: 500,
         body: { code: "DB_DOWN", traceId: "abc-123" },
       });
@@ -232,6 +241,8 @@ describe("CLI error propagation across commands", () => {
       const result = await runCli(
         ["secret", "create", "MY_SECRET", "--value", "sekret"],
         testDir,
+        15000,
+        "project-test",
       );
 
       expect(result.exitCode).toBe(1);
@@ -240,9 +251,10 @@ describe("CLI error propagation across commands", () => {
     });
   });
 
-  describe("workflow run", () => {
+  describe("when running the workflow run command", () => {
+    /** @scenario Common error conditions map to actionable messages for every CLI command */
     it("shows the specific error body, not a generic 500", async () => {
-      pushResponse("POST", "/api/workflows/:id/run", {
+      pushResponse("POST", "/api/v1/workflows/:id/run", {
         status: 500,
         body: {
           error: "Internal server error",
@@ -250,21 +262,17 @@ describe("CLI error propagation across commands", () => {
         },
       });
 
-      const result = await runCli(
-        ["workflow", "run", "wf_abc", "--input", '{"x":1}'],
-        testDir,
-      );
+      const result = await runCli(["workflow", "run", "wf_abc", "--input", '{"x":1}'], testDir);
 
       expect(result.exitCode).toBe(1);
-      expect(result.combined.toLowerCase()).toContain(
-        "missing required input",
-      );
+      expect(result.combined.toLowerCase()).toContain("missing required input");
     });
   });
 
-  describe("scenario get", () => {
+  describe("when running the scenario get command", () => {
+    /** @scenario Common error conditions map to actionable messages for every CLI command */
     it("includes the scenario id in the 'not found' message", async () => {
-      pushResponse("GET", "/api/scenarios/:id", {
+      pushResponse("GET", "/api/v1/scenarios/:id", {
         status: 404,
         body: { error: "NotFoundError", message: "Scenario not found" },
       });

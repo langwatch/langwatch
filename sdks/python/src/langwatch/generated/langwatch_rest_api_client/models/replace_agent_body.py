@@ -21,8 +21,7 @@ class ReplaceAgentBody:
     """
     Attributes:
         name (str | Unset):
-        type_ (ReplaceAgentBodyType | Unset): The kind of agent to write. A connected agent is registered from code by
-            the SDK, so "connected" is refused with agent_register_only.
+        type_ (ReplaceAgentBodyType | Unset):
         config (ReplaceAgentBodyConfig | Unset):
         workflow_id (None | str | Unset):
     """

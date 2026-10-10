@@ -1,0 +1,256 @@
+# The local process topology: two Node lanes and one Go lane, not six
+# processes. See dev/docs/adr/004-docker-dev-environment.md
+# ("Amendment: two local processes — backend and go, 2026-09-07"), which
+# reverses the 2026-09-03 amendment FOR DEVELOPMENT ONLY. Production is
+# unchanged: three Node deployments and each Go service its own container.
+
+Feature: The local development topology
+  As a developer running LangWatch locally
+  I want the api and the worker in one process and the Go services in another
+  So that a laptop running several worktrees pays for two runtimes, not six
+
+  # What the 2026-09-03 amendment was really protecting against was never the
+  # process count. It was the SWITCH: WORKERS_IN_PROCESS and START_WORKERS let a
+  # stack be configured into a topology nobody could see, so a stack that served
+  # pages and processed no jobs looked healthy. Both are dead and stay dead —
+  # the backend lane is a launcher, not a process role, and no value of either
+  # variable changes what it starts.
+  #
+  #   ui       apps/ui             Vite, on PORT
+  #   backend  tools/dev-runtime   the api AND the worker application, one process
+  #   go       cmd/service         aigateway AND nlpgo, one process; a dev build
+  #                                (-tags dev) hosts the five simulators there too:
+  #                                idpsim, mailsim, storagesim, voicesim, llmsim
+  #   langy    services/langyagent its own lane, optional
+  #
+  # Ports are unchanged: ui on PORT, api on PORT + 1000, worker metrics on
+  # PORT - 2561, gateway on PORT + 3.
+
+  # --- The backend process ---
+
+  @unit
+  Scenario: The backend process starts the API without waiting for the worker's upgrade
+    Given the backend launcher booting both applications
+    And the worker is still running the upgrade
+    When it starts
+    Then the API application is started beside the worker, not after it
+    And work the API enqueues meanwhile waits for the worker (Alex, 2026-10-09)
+
+  # A refused worker no longer drains the api (Alex, 2026-10-10): see
+  # "A worker that fails to boot never takes the api down" in dev-process-topology.feature.
+  @unit
+  Scenario: A half-started backend drains what it did start
+    Given a worker that started and an api that refuses to boot
+    When the backend launcher boots
+    Then the worker is closed before the api's failure is reported
+    And the caller is left with no half-started process to handle
+
+  # The worker's jobs call back into the API's in-process graph. Closing the
+  # listener first fails them mid-drain, and a job that fails during shutdown
+  # is indistinguishable from one that failed on its merits.
+  @unit
+  Scenario: Shutdown drains the worker before closing the API listener
+    Given a running backend process
+    When it is asked to stop
+    Then the worker is drained first
+    And the API listener is closed after it
+
+  @unit
+  Scenario: A stuck drain still closes the API listener
+    Given a worker whose drain throws
+    When the backend process shuts down
+    Then the API listener is still closed
+    And the drain's failure is still reported
+
+  # Each executable takes a host precisely so something can embed it. Given the
+  # real process, the first of the two to hear SIGTERM would end the process
+  # while the other was still draining.
+  @unit
+  Scenario: Neither hosted application owns the process's signals
+    Given both applications embedded in the backend process
+    When one of them subscribes to a signal or asks to exit
+    Then its subscription reaches nothing
+    And its exit request reaches the one shutdown the process owns
+
+  # --- The Go process ---
+
+  @unit
+  Scenario: The combined Go process hosts the data-plane services
+    Given no service named on the command line
+    When "service combined" starts
+    Then it hosts the AI Gateway and the NLP engine
+    And "combined" is a dispatchable subcommand of the mono-binary
+
+  # The simulators are development tools: a dev build links them, the release
+  # images (built untagged) cannot even select them.
+  @unit
+  Scenario: A dev build hosts the simulators in the combined process
+    Given the mono-binary built with the dev tag
+    When "service combined" resolves what it can host
+    Then it hosts idpsim, mailsim, storagesim, voicesim and llmsim beside the data-plane services
+    And each simulator is still its own subcommand
+
+  @unit
+  Scenario: A release build links no simulator
+    Given the mono-binary built without the dev tag
+    When a caller names idpsim, mailsim, storagesim, voicesim or llmsim
+    Then neither is a dispatchable subcommand
+
+  @unit
+  Scenario: The combined Go process keeps each service's telemetry identity
+    Given the two services sharing one process
+    When each reports a signal
+    Then it carries the same service name it carries when it runs alone
+
+  # SERVER_ADDR cannot address two listeners in one process. Each service is
+  # handed the port the launcher reserved for its own hostname.
+  @unit
+  Scenario: Each hosted service binds the port it was allocated
+    Given the combined process hosting both services
+    When it resolves each service's address
+    Then no service reads SERVER_ADDR
+    And no two services read the same address variable
+
+  @unit
+  Scenario: An unknown combined service is refused by name
+    Given a caller naming a service the combined process does not host
+    When the selection is resolved
+    Then the command is refused
+    And the refusal names the service it would not host
+
+  @unit
+  Scenario: A panicking service in the combined Go process stops alone
+    Given the combined Go process hosts a simulator and the gateway
+    When the simulator's service goroutine panics
+    Then the panic is logged with its stack under that service's identity
+    And the gateway keeps running
+
+  # --- The lanes haven plans ---
+
+  @unit
+  Scenario: Every stack runs the ui and backend lanes
+    Given a worktree with no service selection of its own
+    When haven plans the stack's children
+    Then it plans a "ui" lane and a "backend" lane
+    And neither an "api" lane nor a "workers" lane is planned
+    And no lane carries WORKERS_IN_PROCESS or START_WORKERS
+
+  @unit
+  Scenario: The ui lane is not held back by the API
+    Given a worktree with no service selection of its own
+    When haven plans the stack's children
+    Then the "ui" lane carries no readiness probe
+    And it is started without waiting for the API to answer
+
+  # The api application reads API_PORT alone (default 6560); LANGWATCH_API_PORT
+  # is main's monolith spelling. Told only that, it bound 6560 and /api was a 502.
+  @unit
+  Scenario: The backend lane binds the API port haven routes /api to
+    Given a stack whose API port haven allocated
+    When haven plans the stack's children
+    Then the backend lane is handed that port as API_PORT
+    And the "ui" lane proxies /api to the same port
+
+  @unit
+  Scenario: The Go data-plane services share one lane
+    Given a stack that selected the gateway and the NLP engine
+    When haven plans the stack's children
+    Then it plans one "go" lane running the combined mono-binary subcommand
+    And each service is handed its own address variable, not SERVER_ADDR
+    And neither a "gateway" lane nor an "nlp" lane is planned
+
+  @unit
+  Scenario: A deselected Go service is simply not hosted
+    Given a stack that selected the gateway but not the NLP engine
+    When haven plans the stack's children
+    Then the go lane hosts only the gateway
+    And it carries no address for the service that was not selected
+
+  # A checkout without cmd/service/combined_dev.go, or a monolith one, keeps
+  # Haven's bundled simulator lanes (haven-bundled-simulators.feature).
+  @unit
+  Scenario: A dev checkout's sims lane hosts the simulators
+    Given a checkout whose dev build links the simulators
+    When haven plans a stack selecting every simulator
+    Then a "sims" lane, a second combined Go process, hosts idpsim, mailsim, storagesim, voicesim, llmsim and analyticssim with the env their own lanes carried
+    And the go lane keeps only the gateway and the NLP engine, so load on a simulator cannot starve them
+    And no "idp", "mail", "storage", "voice", "llm" or "analytics" lane is planned
+
+  # One Go process for the data plane and the simulators is the default
+  # (HAVEN-ONE-SWITCH); LANGWATCH_DEV_ONE_PROCESS=0 splits it.
+  @unit
+  Scenario: One Go process hosts the data plane and the simulators unless split
+    Given a checkout whose dev build links the simulators
+    And the one-process switch is on
+    When haven plans a stack selecting the data plane, every simulator and Langy
+    Then the "go" lane hosts aigateway, nlpgo, idpsim, mailsim, storagesim, voicesim, llmsim and analyticssim, each on its own address variable
+    And no "sims" lane is planned
+    And with LANGWATCH_DEV_ONE_PROCESS=0 the "go" and "sims" lanes are planned as before
+    And Langy keeps a lane of its own either way
+
+  @unit
+  Scenario: Services sharing one Go process keep their own telemetry identity
+    Given the gateway and the NLP engine each set up telemetry in one process
+    When a span starts or a counter records under a context naming one of them
+    Then it is recorded by that service's provider, with that service's resource
+    And an OTel SDK error, which names no service, reaches each service's own handler
+    And a process running one service installs its provider and handler as the global, as before
+
+  @unit
+  Scenario: One Go process retires the sims log a split run left behind
+    Given an earlier split run left a sims lane capture
+    When a stack in one-process mode comes up with no sims lane
+    Then the stale sims capture is removed
+    And "haven logs <simulator>" reads the go lane's live capture instead
+
+  # --- Restarting a lane ---
+
+  @unit
+  Scenario: Bouncing the backend lane touches only its own process group
+    Given a running stack
+    When "haven restart backend" runs
+    Then only the process group holding the API port is terminated
+    And the ui lane's group is untouched
+
+  # Offering the old names would let someone bounce one service and silently
+  # take the other down with it.
+  @unit
+  Scenario: The Go data-plane services are restarted as one lane
+    Given a running stack whose gateway and NLP engine share a process
+    When a developer names "gateway" or "nlp" to restart
+    Then the command is refused with the restartable list
+    And "go" is the name that bounces them
+    And "idp", "mail", "storage", "voice", "llm" and "analytics" are offered only as "sims" where the sims lane hosts them
+
+  @unit
+  Scenario: Restarting the sims lane in one Go process says it restarts the go lane
+    Given a stack whose simulators run inside the go lane's process
+    When "haven restart sims" runs
+    Then the go lane's process group is bounced once
+    And the output says the go lane restarts with the simulators
+    And a stack with its own sims lane bounces only that lane, without the note
+
+  # --- The api.<slug> hostname ---
+
+  # The backend lane's API has always been reachable at app.<slug>.../api  - 
+  # Vite proxies /api to the api process's own loopback port, so the browser
+  # and its API share one origin. That stays exactly as it is: this hostname
+  # is additive, a second, direct way to the same port for tooling (a CLI, a
+  # script, an agent) that wants the API with no dev-server proxy in front of
+  # it, not a replacement for the browser's own path.
+  @unit
+  Scenario: The additive api.<slug> hostname routes to the api process
+    Given a running stack
+    When the stack is provisioned
+    Then api.<slug>.langwatch.localhost routes to the same port as app.<slug>.../api
+    And app.<slug>.../api keeps working exactly as it did before
+    And "haven status" lists api.<slug>.langwatch.localhost as the backend URL
+    And tools/havenrun's layout-aware readiness is unaffected, because it reads
+      lanes, not the routed services list
+
+  @unit
+  Scenario: One observability graph is set up and shared by both applications
+    Given the backend process hosts the worker and the API together
+    When it starts them
+    Then the worker is told it owns telemetry and the API is told it does not
+    And so the telemetry SDK is set up exactly once for the process

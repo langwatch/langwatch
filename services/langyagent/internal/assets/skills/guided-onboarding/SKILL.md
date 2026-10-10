@@ -2,7 +2,7 @@
 name: guided-onboarding
 description: Take over from the sign-up tour and set up the path the user picked (Evals & LLM Ops, Coding agents, Gateway or Governance) inside the Langy panel. Use when a user message starts with "Guided onboarding kickoff" or with "Let's set up ... then.", and never otherwise.
 license: MIT
-compatibility: Runs inside a Langy worker session only. Needs the code_access, question, say and secret_snippet tools and the langwatch CLI.
+compatibility: Runs inside a Langy worker session only. Needs the code_access, question, say, secret_snippet, offer_notifications and notify tools and the langwatch CLI.
 metadata:
   category: skill
 ---
@@ -70,6 +70,8 @@ and call `code_access` again, this time without `offer_describe`. Keep their des
 **While a folder is connected, `code_access` is never called again.** The card is for the not-connected case only: the connect brought the folder facts, and the files are read with the `local_*` tools. A folder that looks empty is read with `local_ls`, never with the sandbox's own shell, which holds no project of the user's.
 
 ### 2. Read the code and wire it
+
+The first call of this step, on the turn the folder connected and before any read, is `offer_notifications`, with no arguments. It puts up a card that tells the person the setup takes around 10 minutes and asks whether you may notify them when it is done; the card carries those words and its two buttons, so say nothing about notifications, and do not wait for the answer. It is called once per conversation, only after a folder was shared, and never on a path that went through GitHub or a description.
 
 With the workspace facts from `code_access`, follow the `code-changes` skill to explore: the manifest, the entry point, the file that creates the LLM client or the graph. Detect the framework (LangGraph, OpenAI Agents, Vercel AI SDK, plain OpenAI, and so on) and the language, then keep one line naming what you found, in this shape: "I found a LangGraph agent in app/graph.py." That is the framework line: it is said with `say` right before the question of step 3, with the two lines of item 8. It is said there and nowhere earlier: not when the code is read, and not again after a repair; a line said twice is a line said wrong. The file it names is one you read with `local_read` in this step, and the framework is what that file imports: a docs page is never a source for the line, and a framework no file of theirs shows was not found.
 
@@ -215,6 +217,8 @@ Item 10, only once item 8 is done, so the suite ran and its run is open, and nev
 ```bash
 langwatch onboarding complete-path llmops
 ```
+
+Then call `notify` with the title "Your project is ready" and the body "Tracing, a first scenario and a regression suite are set up. Come back to see the results." It reaches the person only when they are away from the tab and asked for notifications, so it is always called here and never mentioned.
 
 Then, in the same step, say with `say`, verbatim, as the last thing the turn does, and stop, with no reply text after it:
 

@@ -180,13 +180,33 @@ jobs:
             langwatch-app:
               - 'infra/docker/Dockerfile'
               - 'infra/docker/Dockerfile.langyagent'
-              - 'platform/app/**'
+              - 'apps/**'
               - 'packages/**'
+              - 'modules/**'
+              - 'enterprise/**'
               - 'mcp/typescript/**'
               - 'sdks/typescript/**'
               - 'skills/**'
               - 'services/langevals/ts-integration/evaluators.generated.ts'
-              - 'tests/agentic-e2e/package.json'
+              - 'dev/tests/agentic-e2e/package.json'
+              - 'dev/tests/e2e-stack/package.json'
+              - 'tools/seedgen/runner/package.json'
+              - 'patches/**'
+              - 'dev/scripts/**'
+              - 'dev/tsconfig.web-declarations.json'
+              - 'vendor/**'
+              - 'go.work'
+              - 'go.work.sum'
+              - 'cmd/go.*'
+              - 'cmd/devscripts/**'
+              - 'pkg/go.*'
+              - 'services/go.*'
+              - 'tools/go.*'
+              - 'tools/devscripts/**'
+              - 'sdks/go/go.*'
+              - 'infra/clickhouse-serverless/go.*'
+              - 'tsconfig.*.json'
+              - '.dockerignore'
               - 'feature-map.json'
               - 'package.json'
               - 'pnpm-lock.yaml'
@@ -199,13 +219,13 @@ jobs:
               - 'pkg/**'
               - 'services/**'
               - 'sdks/go/**'
-              - 'go.mod'
-              - 'go.sum'
+              - '*/go.mod'
+              - '*/go.sum'
               - '.github/workflows/publish-docker-ecr.yml'
             langwatch-langevals:
               - 'infra/docker/Dockerfile.langevals'
               - 'services/langevals/**'
-              - 'platform/app/src/server/modelProviders/llmModels*.json'
+              - 'modules/model-provider/contract/src/catalog/model-catalog*.json'
               - '.github/workflows/publish-docker-ecr.yml'
             langwatch-gateway:
               - 'infra/docker/Dockerfile.go_service'
@@ -213,8 +233,8 @@ jobs:
               - 'pkg/**'
               - 'services/**'
               - 'sdks/go/**'
-              - 'go.mod'
-              - 'go.sum'
+              - '*/go.mod'
+              - '*/go.sum'
               - '.github/workflows/publish-docker-ecr.yml'
 
       - name: Select the images to build
@@ -336,7 +356,7 @@ jobs:
           # consumers (Lambda in particular) refuse to run.
           provenance: false
           cache-from: type=gha,scope=ecr-${{ matrix.image }}-${{ matrix.arch }}
-          cache-to: type=gha,mode=max,scope=ecr-${{ matrix.image }}-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,ignore-error=true,scope=ecr-${{ matrix.image }}-${{ matrix.arch }}
           # The Go images stamp this into main.Version, which every log line and
           # the OTel resource report; the other images ignore it.
           build-args: |

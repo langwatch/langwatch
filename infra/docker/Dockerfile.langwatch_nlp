@@ -9,15 +9,20 @@
 # ─── Go build ─────────────────────────────────────────────────────────────────
 # Pin the build stage to the host arch (BUILDPLATFORM) and cross-compile to
 # TARGETARCH natively, avoiding QEMU. Mirrors Dockerfile.go_service.
-FROM --platform=$BUILDPLATFORM golang:1.26.6-alpine AS go-build
+FROM --platform=$BUILDPLATFORM golang:1.27.1-alpine AS go-build
 WORKDIR /src
 RUN apk add --no-cache git ca-certificates
 ARG TARGETOS
 ARG TARGETARCH
-# Monorepo: sdks/go is in-tree, resolved via `replace ... => ./sdks/go` in the
-# root go.mod, so its go.mod must be present before `go mod download`.
-COPY go.mod go.sum ./
-COPY sdks/go/go.mod sdks/go/go.sum ./sdks/go/
+# Monorepo: go.work loads only when every module it uses has its go.mod, so
+# all of them land before `go mod download`. Mirrors Dockerfile.go_service.
+COPY go.work go.work.sum ./
+COPY cmd/go.* cmd/
+COPY pkg/go.* pkg/
+COPY services/go.* services/
+COPY tools/go.* tools/
+COPY sdks/go/go.* sdks/go/
+COPY infra/clickhouse-serverless/go.* infra/clickhouse-serverless/
 RUN --mount=type=cache,target=/go/pkg/mod,id=go-mod-${TARGETARCH} \
     go mod download
 COPY cmd/ cmd/
@@ -44,6 +49,7 @@ RUN --mount=type=cache,target=/go/pkg/mod,id=go-mod-${TARGETARCH} \
 # This prune block is shared verbatim with the production Lambda image so both
 # artifacts install byte-identically from the one requirements file.
 FROM python:3.11-slim-bookworm AS sandbox-build
+COPY packages/ksuid-python/ /tmp/langwatch-ksuid/
 COPY sdks/python/ /tmp/langwatch-sdk/
 COPY services/nlpgo/app/engine/blocks/codeblock/sandbox-requirements.txt /tmp/sandbox-requirements.txt
 RUN pip install --no-cache-dir --target=/pylibs -r /tmp/sandbox-requirements.txt

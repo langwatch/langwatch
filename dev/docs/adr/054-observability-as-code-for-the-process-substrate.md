@@ -24,7 +24,7 @@ alerted on" (`langwatch_edge_spool_fail_open_total`,
 added here has no in-repo contract keeping it alive. Meanwhile ADR-051
 moved topic clustering onto durable wakes and a lease-fenced outbox —
 failure modes (dead-lettered intents, overdue wakes, suppressed
-duplicate intents) that are *designed* to be quiet in the product and
+duplicate intents) that are _designed_ to be quiet in the product and
 therefore MUST page somewhere.
 
 Two instrumentation gaps compound this: the wake and outbox workers log

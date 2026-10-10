@@ -1,0 +1,86 @@
+import { bindTrpcMiddlewareContext, createTrpcRuntime } from "@langwatch/api/trpc";
+import type { BillingApi, BillingStaff } from "@langwatch/enterprise-billing-contract";
+import { AdminSurfaceHiddenError, type OpsOperator } from "@langwatch/ops-contract";
+/**
+ * @vitest-environment node
+ * The `connectedBilling.*` surface: which staff member the mount hands billing for the operator
+ * behind the request, and that an impersonator billing cannot name is refused. The platform
+ * door is open here; its refusals are in connected-billing.trpc.door.unit.test.ts.
+ */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { trpcTestMembers } from "@langwatch/test-harness/trpc-members";
+import { initTRPC } from "@trpc/server";
+import { describe, expect, it } from "vitest";
+
+import { connectedBillingTrpcTransport, operatorContext } from "../connected-billing.trpc.ts";
+import type { BillingTrpcTestContext } from "./billing.trpc.harness.ts";
+
+const CUSTOMER = { id: "user_customer", email: "admin@acme.example" };
+
+/** Billing as the mount reaches it: records who it was asked as, and refuses everybody. */
+function mounted() {
+  const askedAs: BillingStaff[] = [];
+  const billing = createApiFixture<BillingApi>({
+    getConnectedBillingOverview: async (_input, by) => {
+      askedAs.push(by);
+      throw new AdminSurfaceHiddenError();
+    },
+  });
+  const trpc = initTRPC.context<BillingTrpcTestContext>().create();
+  const base = trpcTestMembers<BillingTrpcTestContext>();
+  const members = {
+    ...base,
+    authorization: {
+      forRequest: (ctx: BillingTrpcTestContext) => ({
+        ...base.authorization.forRequest(ctx),
+        getPlatformDecision: async () => ({ permitted: true }),
+      }),
+    },
+  };
+  const router = createTrpcRuntime<BillingTrpcTestContext>({
+    root: trpc,
+    procedure: trpc.procedure,
+    members,
+  }).mount(connectedBillingTrpcTransport, () => billing, {
+    middlewareContext: [bindTrpcMiddlewareContext(operatorContext, (ctx) => ctx.operator ?? null)],
+  });
+  const read = async (operator: OpsOperator) => {
+    const failure = await router
+      .createCaller({ actor: { id: operator.id }, operator })
+      .get({ organizationId: "org_acme" })
+      .catch((error: unknown) => error);
+    return { askedAs, failure };
+  };
+
+  return { read };
+}
+
+describe("given an operator impersonating a customer", () => {
+  describe("when the impersonator's id is known", () => {
+    it("asks billing as the impersonator, never the customer", async () => {
+      const { read } = mounted();
+
+      const { askedAs } = await read({
+        ...CUSTOMER,
+        impersonator: { id: "user_operator", email: "ops@langwatch.example" },
+      });
+
+      expect(askedAs).toEqual([{ id: "user_operator", email: "ops@langwatch.example" }]);
+    });
+  });
+
+  describe("when the impersonator carries no id", () => {
+    /** @scenario "An impersonated back-office call with no impersonator id is refused" */
+    it("refuses before billing is asked, and never asks as the customer", async () => {
+      const { read } = mounted();
+
+      const { askedAs, failure } = await read({
+        ...CUSTOMER,
+        impersonator: { email: "ops@langwatch.example" },
+      });
+
+      expect(failure).toMatchObject({ message: "Not found" });
+      expect(askedAs).toEqual([]);
+    });
+  });
+});

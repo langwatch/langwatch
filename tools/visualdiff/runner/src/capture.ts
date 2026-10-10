@@ -1,0 +1,585 @@
+import { mkdirSync } from "node:fs";
+import { dirname } from "node:path";
+
+import type {
+  Browser,
+  BrowserContext,
+  BrowserContextOptions,
+  Page,
+  Request,
+  Response,
+} from "playwright";
+import { chromium } from "playwright";
+
+import { isModuleConsoleError, isModuleRequest } from "./module-load.ts";
+import { isExpectedThrottle, isThrottleConsoleError } from "./noise.ts";
+import {
+  note,
+  type CaptureMessage,
+  type ColorScheme,
+  type PlanSide,
+  type SettleConfig,
+  type Viewport,
+} from "./protocol.ts";
+import { StepRecorder, type Drained } from "./recorder.ts";
+import { InFlightTracker, isPageReady, readyMarker, shouldIgnoreRequest } from "./settle.ts";
+import { prepareBuiltUi, type ServeBuiltUi } from "./static-ui.ts";
+
+/** Animations and carets are the largest source of pixel noise between two identical screens. */
+const FREEZE_CSS =
+  "*,*::before,*::after{animation:none!important;transition:none!important;caret-color:transparent!important}";
+
+// The splash screen and its fade-out ghost (design-system loading-screen.tsx) count as loading.
+const LOADING_SELECTOR =
+  '.chakra-skeleton,[data-skeleton],[aria-busy="true"],[data-loading="true"],.chakra-spinner,[data-testid="loading-screen"],[data-loading-screen-ghost]';
+
+const MAX_SCREENSHOT_HEIGHT = 6000;
+
+const MAX_ARIA_SNAPSHOT = 64_000;
+
+/** Relative times move between two renders of the same screen; they are masked in the pixels. */
+const RELATIVE_TIME =
+  /\b(?:\d+|an?|a few) (?:seconds?|minutes?|hours?|days?|weeks?|months?|years?) ago\b|\bjust now\b/i;
+
+/** StorageState is a signed-in session: a saved file, or one read off a live context. */
+export type StorageState = BrowserContextOptions["storageState"];
+
+export const contextOptions = ({
+  viewport,
+  storageState,
+  colorScheme = "light",
+}: {
+  viewport: Viewport;
+  storageState?: StorageState;
+  colorScheme?: ColorScheme;
+}) => ({
+  viewport: { width: viewport.width, height: viewport.height },
+  reducedMotion: "reduce" as const,
+  colorScheme,
+  deviceScaleFactor: 1,
+  ...(storageState === undefined ? {} : { storageState }),
+});
+
+/** LOADING_WAIT_MILLIS bounds the wait for the ready marker and no skeletons after settling. */
+const LOADING_WAIT_MILLIS = 30_000;
+
+/** LOADING_POLL_MILLIS paces that wait: six pages polling every frame starve the renderer. */
+const LOADING_POLL_MILLIS = 100;
+
+/** SCREENSHOT_TIMEOUT_MILLIS covers a tall page, which the context's default timeout does not. */
+const SCREENSHOT_TIMEOUT_MILLIS = 20_000;
+
+/** EVALUATE_TIMEOUT_MILLIS bounds a page call with no timeout, so a wedged page never hangs. */
+const EVALUATE_TIMEOUT_MILLIS = 5_000;
+
+/** bounded settles to fallback when work takes longer than millis, or fails. */
+export const bounded = async <Value>({
+  work,
+  millis,
+  fallback,
+}: {
+  work: Promise<Value>;
+  millis: number;
+  fallback: Value;
+}): Promise<Value> => {
+  let timer: NodeJS.Timeout | undefined;
+  const late = new Promise<Value>((done) => {
+    timer = setTimeout(() => done(fallback), millis);
+  });
+  try {
+    return await Promise.race([work.catch(() => fallback), late]);
+  } finally {
+    clearTimeout(timer);
+  }
+};
+
+/** requestTiming renders where a late request spent its time, from the browser's own timing. */
+export const requestTiming = ({
+  request,
+  total,
+}: {
+  request: Pick<Request, "timing">;
+  total: number;
+}): string => {
+  const timing = request.timing();
+  const phase = (from: number, to: number): string =>
+    from >= 0 && to >= from ? `${Math.round(to - from)}ms` : "?";
+  return `total=${total}ms queued=${phase(0, timing.requestStart)} server=${phase(timing.requestStart, timing.responseStart)} body=${phase(timing.responseStart, timing.responseEnd)}`;
+};
+
+/** SettleOutcome is how one settle ended, for the caller's deadline alarm. */
+export interface SettleOutcome {
+  expired: boolean;
+  inFlight: string[];
+  stillLoading: boolean;
+}
+
+/** isDocumentLoad is a navigation of the main frame: the previous document's requests are over. */
+const isDocumentLoad = ({ request, page }: { request: Request; page: Page }): boolean => {
+  if (!request.isNavigationRequest()) return false;
+  return request.frame() === page.mainFrame();
+};
+
+/** SideExtras are what only a browser-opened Side carries: a cookieless page, its own context. */
+export interface SideExtras {
+  openAnonymous?: () => Promise<Side>;
+  owns?: BrowserContext;
+  /**
+   * live is a flow's page: each `goto` freezes the browser clock at that moment, so data the
+   * flow created a step ago is never in the page's future. Routes keep the plan's time.
+   */
+  live?: boolean;
+  /** readySelector overrides the shared signed-in header marker for this side. */
+  readySelector?: string;
+}
+
+/** Side is one running stack, with its page and everything that page reported. */
+export class Side {
+  private readonly recorder = new StepRecorder();
+  private readonly tracker: InFlightTracker<Request>;
+  /** late are the requests a settle ran out on, and when each started, logged once they end. */
+  private readonly late = new Map<Request, number>();
+  /** died is set once the page's renderer crashed, usually out of memory: the machine's fault. */
+  private died = false;
+
+  constructor(
+    readonly name: string,
+    readonly baseUrl: string,
+    readonly page: Page,
+    settle: SettleConfig,
+    private readonly extras: SideExtras = {},
+  ) {
+    this.tracker = new InFlightTracker<Request>(settle, Date.now());
+    page.on("request", (request: Request) => {
+      const now = Date.now();
+      if (isDocumentLoad({ request, page })) this.tracker.navigated(now);
+      this.tracker.started({
+        key: request,
+        url: request.url(),
+        resourceType: request.resourceType(),
+        now,
+      });
+    });
+    page.on("requestfinished", (request: Request) => {
+      this.tracker.settled({ key: request, now: Date.now() });
+      this.lateEnded(request);
+    });
+    page.on("requestfailed", (request: Request) => this.requestFailed(request));
+    page.on("response", (response: Response) => this.responded(response));
+    page.on("console", (message) => {
+      if (message.type() !== "error") return;
+      const text = message.text();
+      const { url } = message.location();
+      if (isThrottleConsoleError({ text, url })) return;
+      if (isModuleConsoleError(text)) this.recorder.moduleFailure(text);
+      this.recorder.consoleError(text);
+    });
+    page.on("pageerror", (error) => {
+      this.recorder.consoleError(`pageerror: ${String(error.message)}`);
+    });
+    page.on("dialog", (dialog) => void dialog.accept());
+    page.on("crash", () => {
+      this.died = true;
+    });
+  }
+
+  get crashed(): boolean {
+    return this.died;
+  }
+
+  /** openAnonymous is a fresh page of this stack with no cookies: a share link, a revoked key. */
+  async openAnonymous(): Promise<Side> {
+    if (this.extras.openAnonymous === undefined)
+      throw new Error("this side cannot open an anonymous page");
+    return this.extras.openAnonymous();
+  }
+
+  /** dispose closes the page, and the context too when this side opened its own. */
+  async dispose(): Promise<void> {
+    await (this.extras.owns ?? this.page).close().catch(() => undefined);
+  }
+
+  /** goto opens a path on this side; the tracker forgets the document it leaves. */
+  async goto(path: string): Promise<void> {
+    this.tracker.navigated(Date.now());
+    if (this.extras.live === true) await this.page.context().clock.setFixedTime(Date.now());
+    await this.page.goto(this.baseUrl + path, { waitUntil: "commit", timeout: 20_000 });
+  }
+
+  /** lateEnded logs where a request the deadline gave up on spent its time. */
+  private lateEnded(request: Request): void {
+    const startedAt = this.late.get(request);
+    if (startedAt === undefined) return;
+    this.late.delete(request);
+    note({
+      text: `${this.name} late ${request.method()} ${this.relative(request.url())} ${requestTiming({ request, total: Date.now() - startedAt })}`,
+      err: process.stderr,
+    });
+  }
+
+  private requestFailed(request: Request): void {
+    this.tracker.settled({ key: request, now: Date.now() });
+    this.lateEnded(request);
+    const url = request.url();
+    const errorText = request.failure()?.errorText ?? "";
+    const failure = `FAIL ${request.method()} ${this.relative(url)} ${errorText}`;
+    this.recordModuleFailure({ request, failure });
+    if (shouldIgnoreRequest({ url, resourceType: request.resourceType() })) return;
+    this.recorder.failedRequest(failure);
+  }
+
+  private responded(response: Response): void {
+    const request = response.request();
+    const status = response.status();
+    if (status < 400) return;
+    const url = request.url();
+    const failure = `${status} ${request.method()} ${this.relative(url)}`;
+    this.recordModuleFailure({ request, failure });
+    if (shouldIgnoreRequest({ url, resourceType: request.resourceType() })) return;
+    if (isExpectedThrottle({ url, status })) return;
+    this.recorder.failedRequest(failure);
+  }
+
+  /** recordModuleFailure keeps a failed load of one of the page's own modules apart. */
+  private recordModuleFailure({ request, failure }: { request: Request; failure: string }): void {
+    const url = request.url();
+    const resourceType = request.resourceType();
+    const origin = new URL(this.baseUrl).origin;
+    if (!isModuleRequest({ url, resourceType, origin })) return;
+    if (/net::ERR_ABORTED/.test(failure)) return;
+    this.recorder.moduleFailure(failure);
+  }
+
+  relative(url: string): string {
+    return url.replace(this.baseUrl, "").slice(0, 160);
+  }
+
+  /** waitUntilQuiet waits `loadingScale` times the usual budget for a page still loading. */
+  async waitUntilQuiet({
+    loadingScale = 1,
+  }: { loadingScale?: number } = {}): Promise<SettleOutcome> {
+    this.tracker.begin(Date.now());
+    let expired = false;
+    for (;;) {
+      const decision = this.tracker.decide(Date.now());
+      expired = decision.expired;
+      if (decision.quiet || decision.expired) break;
+      await this.page.waitForTimeout(50);
+    }
+    const now = Date.now();
+    const waiting = expired ? this.tracker.waitingOn(now) : [];
+    const inFlight = waiting.map((request) => request.url);
+    for (const request of waiting) this.late.set(request.key, request.startedAt);
+    if (expired) {
+      const listed = waiting.map(
+        (request) => `${this.relative(request.url)} (${now - request.startedAt}ms)`,
+      );
+      note({
+        text: `${this.name} settle deadline at ${this.relative(this.page.url())}; still in flight: ${listed.join(", ") || "none"}`,
+        err: process.stderr,
+      });
+    }
+    const stillLoading = await this.page
+      .waitForFunction(
+        isPageReady,
+        {
+          loading: LOADING_SELECTOR,
+          ready: readyMarker({
+            path: new URL(this.page.url()).pathname,
+            selector: this.extras.readySelector,
+          }),
+        },
+        { timeout: LOADING_WAIT_MILLIS * loadingScale, polling: LOADING_POLL_MILLIS },
+      )
+      .then(
+        () => false,
+        () => true,
+      );
+    if (stillLoading) {
+      note({
+        text: `${this.name} still loading at ${this.relative(this.page.url())}`,
+        err: process.stderr,
+      });
+    }
+    const millis = EVALUATE_TIMEOUT_MILLIS;
+    await bounded({
+      work: this.page.addStyleTag({ content: FREEZE_CSS }),
+      millis,
+      fallback: undefined,
+    });
+    await bounded({
+      work: this.page.evaluate(async () => {
+        await document.fonts?.ready;
+      }),
+      millis,
+      fallback: undefined,
+    });
+    return { expired, inFlight, stillLoading };
+  }
+
+  /** drain hands back everything reported since the last drain, and forgets it. */
+  drain(): Drained {
+    return this.recorder.drain();
+  }
+
+  /** notFound reports whether the screen is the application's own not-found page. */
+  async notFound(): Promise<boolean> {
+    const text = await this.page.innerText("body").catch(() => "");
+    return /page not found|404/i.test(text.slice(0, 400));
+  }
+
+  /** ariaSnapshot is the page's accessibility tree, or "" when it cannot be read. */
+  async ariaSnapshot(): Promise<string> {
+    const snapshot = await this.page
+      .locator("body")
+      .ariaSnapshot({ timeout: 5_000 })
+      .catch(() => "");
+    return snapshot.slice(0, MAX_ARIA_SNAPSHOT);
+  }
+
+  /** blank reports a page with no text at all, the shape of a shell that never mounted. */
+  async blank(): Promise<boolean> {
+    const text = await this.page.innerText("body").catch(() => "");
+    return text.trim() === "";
+  }
+
+  async screenshot(file: string): Promise<void> {
+    mkdirSync(dirname(file), { recursive: true });
+    const height = await bounded({
+      work: this.page.evaluate(() => document.documentElement.scrollHeight),
+      millis: EVALUATE_TIMEOUT_MILLIS,
+      fallback: 0,
+    });
+    const viewport = this.page.viewportSize();
+    const mask = [this.page.locator("time"), this.page.getByText(RELATIVE_TIME)];
+    if (height > MAX_SCREENSHOT_HEIGHT && viewport) {
+      await this.page.screenshot({
+        path: file,
+        animations: "disabled",
+        mask,
+        timeout: SCREENSHOT_TIMEOUT_MILLIS,
+        clip: { x: 0, y: 0, width: viewport.width, height: MAX_SCREENSHOT_HEIGHT },
+      });
+      return;
+    }
+    await this.page.screenshot({
+      path: file,
+      fullPage: true,
+      animations: "disabled",
+      mask,
+      timeout: SCREENSHOT_TIMEOUT_MILLIS,
+    });
+  }
+}
+
+/**
+ * FULFILLED_SHELL: a document the runner fulfils has no address space, so Chromium reads it as
+ * public and refuses its own stack's websocket as a local-network request.
+ */
+const FULFILLED_SHELL = "--disable-features=LocalNetworkAccessChecks";
+
+/** FAST_ARGS strip Chromium to a lean renderer: quicker, but its pixels are not the full
+ * browser's. */
+const FAST_ARGS = [
+  "--disable-gpu",
+  "--disable-canvas-aa",
+  "--disable-2d-canvas-clip-aa",
+  "--disable-gl-drawing-for-tests",
+  "--js-flags=--max-old-space-size=256",
+];
+
+/** builtAssets reads a side's prebuilt UI once, answering what serves it to each context,
+ * or undefined, saying why, when the side stays on its dev server. */
+const builtAssets = async ({
+  context,
+  side,
+}: {
+  context: BrowserContext;
+  side: PlanSide;
+}): Promise<ServeBuiltUi | undefined> => {
+  const dir = side.staticDir ?? "";
+  try {
+    const serve = await prepareBuiltUi({ context, baseUrl: side.baseUrl, dir });
+    note({ text: `${side.name}: serving the prebuilt UI from ${dir}`, err: process.stderr });
+    return serve;
+  } catch (thrown) {
+    note({
+      text: `${side.name}: the prebuilt UI could not be served, capturing from the dev server: ${String(thrown)}`,
+      err: process.stderr,
+    });
+    return undefined;
+  }
+};
+
+/**
+ * SideBrowser is one stack's browser and its one signed-in context. Every page
+ * it opens is its own Side, with its own tracker and recorder, so pages capture
+ * at once without reading each other's requests.
+ */
+export class SideBrowser {
+  private session: Promise<StorageState> | undefined;
+
+  constructor(
+    readonly definition: PlanSide,
+    private readonly browser: Browser,
+    private readonly context: BrowserContext,
+    private readonly settle: SettleConfig,
+    private readonly freshContext: (state?: StorageState) => Promise<BrowserContext>,
+  ) {}
+
+  get name(): string {
+    return this.definition.name;
+  }
+
+  async openPage(): Promise<Side> {
+    const page = await this.context.newPage();
+    return new Side(this.definition.name, this.definition.baseUrl, page, this.settle, {
+      openAnonymous: async () => this.openAnonymousPage(),
+      readySelector: this.definition.readySelector,
+    });
+  }
+
+  /**
+   * openLane is one job's page, in a context of its own carrying the signed-in session as it
+   * stood at the first call; disposing the Side closes the context and frees its renderer.
+   * A `live` lane (a flow) re-freezes its clock at every `goto` instead of at the plan's time.
+   */
+  async openLane({ live = false }: { live?: boolean } = {}): Promise<Side> {
+    this.session ??= this.context.storageState();
+    const context = await this.freshContext(await this.session);
+    const page = await context.newPage();
+    return new Side(this.definition.name, this.definition.baseUrl, page, this.settle, {
+      owns: context,
+      live,
+      openAnonymous: async () => this.openAnonymousPage(),
+      readySelector: this.definition.readySelector,
+    });
+  }
+
+  private async openAnonymousPage(): Promise<Side> {
+    const context = await this.freshContext();
+    const page = await context.newPage();
+    return new Side(this.definition.name, this.definition.baseUrl, page, this.settle, {
+      owns: context,
+      readySelector: this.definition.readySelector,
+    });
+  }
+
+  async close(): Promise<void> {
+    await closeBrowser(this.browser);
+  }
+}
+
+/** BROWSER_CLOSE_MILLIS bounds a close: Chromium here can take 30s to exit on its own. */
+const BROWSER_CLOSE_MILLIS = 3_000;
+
+/**
+ * closeBrowser asks Chromium to close and stops waiting after BROWSER_CLOSE_MILLIS;
+ * Playwright kills what it launched when this process exits.
+ */
+export const closeBrowser = async (browser: Browser): Promise<void> => {
+  let timer: NodeJS.Timeout | undefined;
+  const bounded = new Promise<void>((resolve) => {
+    timer = setTimeout(resolve, BROWSER_CLOSE_MILLIS);
+  });
+  await Promise.race([browser.close().catch(() => undefined), bounded]);
+  clearTimeout(timer);
+};
+
+export const openSideBrowser = async ({
+  side,
+  viewport,
+  settle,
+  storageState,
+  frozenTime,
+  fast = false,
+  colorScheme = "light",
+}: {
+  side: PlanSide;
+  viewport: Viewport;
+  settle: SettleConfig;
+  storageState?: StorageState;
+  frozenTime?: number;
+  fast?: boolean;
+  colorScheme?: ColorScheme;
+}): Promise<SideBrowser> => {
+  const args = ["--disable-dev-shm-usage"];
+  if (side.staticDir !== undefined) args.push(FULFILLED_SHELL);
+  if (fast) args.push(...FAST_ARGS);
+  const browser = await chromium.launch({ args });
+  let serving: Promise<ServeBuiltUi | undefined> | undefined;
+  const fresh = async (state?: StorageState): Promise<BrowserContext> => {
+    const context = await browser.newContext(
+      contextOptions({ viewport, storageState: state, colorScheme }),
+    );
+    if (frozenTime !== undefined) await context.clock.setFixedTime(frozenTime);
+    // The branch's next-themes follows prefers-color-scheme (the context's colorScheme); main
+    // reads this stored key. A stored `theme` is left alone so a flow's own toggle survives.
+    await context.addInitScript((mode: ColorScheme) => {
+      try {
+        localStorage.setItem("chakra-ui-color-mode", mode);
+      } catch {
+        // A context that refuses storage still renders; the colour mode just falls back.
+      }
+    }, colorScheme);
+    context.setDefaultTimeout(10_000);
+    if (side.staticDir !== undefined) {
+      serving ??= builtAssets({ context, side });
+      await (
+        await serving
+      )?.(context);
+    }
+    return context;
+  };
+  return new SideBrowser(side, browser, await fresh(storageState), settle, fresh);
+};
+
+/** captureMessage assembles one protocol capture from a side's current state. */
+export const captureMessage = ({
+  kind,
+  key,
+  index,
+  label,
+  side,
+  screenshot,
+  error,
+  durationMs,
+  notFound,
+  blank,
+  ariaSnapshot,
+  expect,
+}: {
+  kind: "route" | "flow";
+  key: string;
+  index: number;
+  label: string;
+  side: Side;
+  screenshot: string;
+  error: string;
+  durationMs: number;
+  notFound: boolean;
+  blank: boolean;
+  ariaSnapshot: string;
+  expect?: string;
+}): CaptureMessage => {
+  const drained = side.drain();
+  return {
+    type: "capture",
+    kind,
+    key,
+    index,
+    label,
+    side: side.name,
+    url: side.page.url(),
+    screenshot,
+    consoleErrors: drained.consoleErrors,
+    failedRequests: drained.failedRequests,
+    moduleFailures: drained.moduleFailures,
+    notFound,
+    blank,
+    ariaSnapshot,
+    error,
+    durationMs,
+    ...(expect === undefined ? {} : { expect }),
+  };
+};

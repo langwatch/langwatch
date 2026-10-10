@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
+
 import {
   startDeviceCode,
   exchange,
@@ -14,8 +15,7 @@ const jsonResponse = (status: number, body: unknown): Response =>
     status,
     headers: { "Content-Type": "application/json" },
   });
-const emptyResponse = (status: number): Response =>
-  new Response("", { status });
+const emptyResponse = (status: number): Response => new Response("", { status });
 
 describe("startDeviceCode", () => {
   it("posts to /api/auth/cli/device-code and returns the spec shape", async () => {
@@ -54,6 +54,35 @@ describe("startDeviceCode", () => {
     );
     const dc = await startDeviceCode({ baseUrl: "http://x", fetchImpl });
     expect(dc.interval).toBe(5);
+  });
+
+  describe("when the login asks for management access", () => {
+    const deviceCodeBody = async (init: { management?: boolean }) => {
+      const fetchImpl = vi.fn().mockResolvedValue(
+        jsonResponse(200, {
+          device_code: "DC",
+          user_code: "X-Y",
+          verification_uri: "http://x/cli/auth",
+          expires_in: 600,
+          interval: 5,
+        }),
+      );
+      await startDeviceCode({ baseUrl: "http://x", fetchImpl }, init);
+      const [, request] = fetchImpl.mock.calls[0] as [string, RequestInit];
+      return JSON.parse(request.body as string) as Record<string, unknown>;
+    };
+
+    /** @scenario A CLI login with --management asks for management access */
+    it("sends management in the device code request", async () => {
+      await expect(deviceCodeBody({ management: true })).resolves.toMatchObject({
+        management: true,
+      });
+    });
+
+    /** @scenario A plain CLI login does not ask for management access */
+    it("leaves management off the request otherwise", async () => {
+      await expect(deviceCodeBody({})).resolves.not.toHaveProperty("management");
+    });
   });
 });
 
@@ -120,15 +149,19 @@ describe("exchange", () => {
   ] as const) {
     it(`maps ${status} to DeviceFlowError kind=${kind}`, async () => {
       const fetchImpl = vi.fn().mockResolvedValue(emptyResponse(status));
-      await expect(exchange({ baseUrl: url, fetchImpl }, "DC"))
-        .rejects.toMatchObject({ name: "DeviceFlowError", kind });
+      await expect(exchange({ baseUrl: url, fetchImpl }, "DC")).rejects.toMatchObject({
+        name: "DeviceFlowError",
+        kind,
+      });
     });
   }
 
   it("throws DeviceFlowError(other) on unexpected status", async () => {
     const fetchImpl = vi.fn().mockResolvedValue(jsonResponse(500, { error: "boom" }));
-    await expect(exchange({ baseUrl: url, fetchImpl }, "DC"))
-      .rejects.toMatchObject({ name: "DeviceFlowError", kind: "other" });
+    await expect(exchange({ baseUrl: url, fetchImpl }, "DC")).rejects.toMatchObject({
+      name: "DeviceFlowError",
+      kind: "other",
+    });
   });
 
   it("attaches client_info (hostname, uname, platform) to the exchange POST body", async () => {
@@ -148,9 +181,7 @@ describe("exchange", () => {
     expect(fetchImpl).toHaveBeenCalledTimes(1);
     const init = fetchImpl.mock.calls[0]?.[1] as RequestInit | undefined;
     const rawBody = init?.body;
-    const sent = JSON.parse(
-      typeof rawBody === "string" ? rawBody : "{}",
-    ) as {
+    const sent = JSON.parse(typeof rawBody === "string" ? rawBody : "{}") as {
       device_code: string;
       client_info?: {
         hostname?: string;
@@ -173,7 +204,7 @@ describe("pollUntilDone", () => {
     verification_uri: "http://x/cli/auth",
     expires_in: 60,
     interval: 0.05,
-  } as any;
+  };
 
   const sessionBody = {
     access_token: "at",
@@ -188,9 +219,7 @@ describe("pollUntilDone", () => {
     new Response(
       new ReadableStream<Uint8Array>({
         start(controller) {
-          controller.enqueue(
-            new TextEncoder().encode('data: {"status":"approved"}\n\n'),
-          );
+          controller.enqueue(new TextEncoder().encode('data: {"status":"approved"}\n\n'));
         },
       }),
       { status: 200, headers: { "Content-Type": "text/event-stream" } },
@@ -205,17 +234,17 @@ describe("pollUntilDone", () => {
     exchanges,
     approval = () => emptyResponse(404),
   }: {
-    exchanges: Array<() => Response>;
+    exchanges: (() => Response)[];
     approval?: () => Response;
   }) {
     const polls: string[] = [];
     const fetchImpl = vi.fn().mockImplementation((url: string) => {
-      if (String(url).includes("/device-approval")) {
+      const urlText = String(url);
+      if (urlText.includes("/device-approval")) {
         return Promise.resolve(approval());
       }
       polls.push(String(url));
-      const next =
-        exchanges[polls.length - 1] ?? exchanges[exchanges.length - 1];
+      const next = exchanges[polls.length - 1] ?? exchanges[exchanges.length - 1];
       return Promise.resolve(next!());
     });
     return { fetchImpl, polls };
@@ -223,15 +252,9 @@ describe("pollUntilDone", () => {
 
   it("retries on pending, returns on success", async () => {
     const { fetchImpl, polls } = routedFetch({
-      exchanges: [
-        () => emptyResponse(428),
-        () => jsonResponse(200, sessionBody),
-      ],
+      exchanges: [() => emptyResponse(428), () => jsonResponse(200, sessionBody)],
     });
-    const r = await pollUntilDone(
-      { baseUrl: "http://x", fetchImpl },
-      deviceCode,
-    );
+    const r = await pollUntilDone({ baseUrl: "http://x", fetchImpl }, deviceCode);
     expect(r.kind).toBe("device_session");
     if (r.kind !== "device_session") throw new Error("unreachable");
     expect(r.access_token).toBe("at");
@@ -245,10 +268,7 @@ describe("pollUntilDone", () => {
     });
 
     const started = Date.now();
-    await pollUntilDone(
-      { baseUrl: "http://x", fetchImpl },
-      { ...deviceCode, interval: 30 },
-    );
+    await pollUntilDone({ baseUrl: "http://x", fetchImpl }, { ...deviceCode, interval: 30 });
 
     expect(polls).toHaveLength(1);
     expect(Date.now() - started).toBeLessThan(1000);
@@ -257,10 +277,7 @@ describe("pollUntilDone", () => {
   /** @scenario "The approval stream cuts the wait short" */
   it("polls as soon as the approval stream emits", async () => {
     const { fetchImpl, polls } = routedFetch({
-      exchanges: [
-        () => emptyResponse(428),
-        () => jsonResponse(200, sessionBody),
-      ],
+      exchanges: [() => emptyResponse(428), () => jsonResponse(200, sessionBody)],
       approval: approvalFrame,
     });
 
@@ -279,18 +296,12 @@ describe("pollUntilDone", () => {
   /** @scenario "A server without the approval stream still logs in" */
   it("falls back to the interval when the stream is unavailable", async () => {
     const { fetchImpl, polls } = routedFetch({
-      exchanges: [
-        () => emptyResponse(428),
-        () => jsonResponse(200, sessionBody),
-      ],
+      exchanges: [() => emptyResponse(428), () => jsonResponse(200, sessionBody)],
       approval: () => emptyResponse(404),
     });
 
     const started = Date.now();
-    await pollUntilDone(
-      { baseUrl: "http://x", fetchImpl },
-      { ...deviceCode, interval: 0.2 },
-    );
+    await pollUntilDone({ baseUrl: "http://x", fetchImpl }, { ...deviceCode, interval: 0.2 });
 
     expect(polls).toHaveLength(2);
     // The second poll waited the interval out rather than firing at once.
@@ -307,9 +318,7 @@ describe("pollUntilDone", () => {
         new ReadableStream<Uint8Array>({
           start(controller) {
             frame.emit = () =>
-              controller.enqueue(
-                new TextEncoder().encode('data: {"status":"approved"}\n\n'),
-              );
+              controller.enqueue(new TextEncoder().encode('data: {"status":"approved"}\n\n'));
           },
         }),
         { status: 200, headers: { "Content-Type": "text/event-stream" } },
@@ -318,7 +327,8 @@ describe("pollUntilDone", () => {
     const pollTimes: number[] = [];
     let firstPollReturnedAt = 0;
     const fetchImpl = vi.fn().mockImplementation(async (url: string) => {
-      if (String(url).includes("/device-approval")) return approval();
+      const urlText = String(url);
+      if (urlText.includes("/device-approval")) return approval();
       pollTimes.push(Date.now());
       if (pollTimes.length > 2) return jsonResponse(200, sessionBody);
       if (pollTimes.length === 1) {
@@ -356,7 +366,11 @@ describe("pollUntilDone", () => {
 describe("refresh", () => {
   it("returns rotated tokens on 200", async () => {
     const fetchImpl = vi.fn().mockResolvedValue(
-      jsonResponse(200, { access_token: "at_new", refresh_token: "rt_new", expires_in: 3600 }),
+      jsonResponse(200, {
+        access_token: "at_new",
+        refresh_token: "rt_new",
+        expires_in: 3600,
+      }),
     );
     const r = await refresh({ baseUrl: "http://x", fetchImpl }, "rt_old");
     expect(r.access_token).toBe("at_new");
@@ -364,8 +378,9 @@ describe("refresh", () => {
 
   it("throws DeviceFlowError(unauthorized) on 401 so the caller can wipe local state", async () => {
     const fetchImpl = vi.fn().mockResolvedValue(emptyResponse(401));
-    await expect(refresh({ baseUrl: "http://x", fetchImpl }, "rt_x"))
-      .rejects.toMatchObject({ kind: "unauthorized" });
+    await expect(refresh({ baseUrl: "http://x", fetchImpl }, "rt_x")).rejects.toMatchObject({
+      kind: "unauthorized",
+    });
   });
 });
 
@@ -379,7 +394,8 @@ describe("logout", () => {
 
   it("propagates other failures", async () => {
     const fetchImpl = vi.fn().mockResolvedValue(jsonResponse(500, {}));
-    await expect(logout({ baseUrl: "http://x", fetchImpl }, "rt"))
-      .rejects.toBeInstanceOf(DeviceFlowError);
+    await expect(logout({ baseUrl: "http://x", fetchImpl }, "rt")).rejects.toBeInstanceOf(
+      DeviceFlowError,
+    );
   });
 });

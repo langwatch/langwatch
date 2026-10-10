@@ -51,11 +51,13 @@ Feature: The daemon watches the machine, slows what it can, and reports what it 
     And the occupied count is used rather than the stored count
 
   @unit
-  Scenario: Either signal alone can raise the level
+  Scenario: The compressor alone raises the level; swap alone does not
     Given a machine with swap disabled, so its swap term is permanently zero
     When compressor occupancy alone crosses the threshold
     Then the level rises
     Because a machine with no swap file still thrashes its compressor
+    And a machine whose compressor is idle stays green however full its swap is
+    Because macOS keeps swap in use for hours after the pressure has passed
 
   @unit
   Scenario: An undetectable machine reads as unloaded

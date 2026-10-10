@@ -1,13 +1,14 @@
 import { createOpenApiHttp } from "openapi-msw";
+
 import { type paths } from "../../../src/internal/generated/openapi/api-client";
 import { promptResponseFactory } from "../../factories/prompt.factory";
 
 export const http = createOpenApiHttp<paths>({
-  baseUrl: process.env.LANGWATCH_ENDPOINT
+  baseUrl: process.env.LANGWATCH_ENDPOINT,
 });
 
 export const handles = [
-  http.get("/api/prompts/{id}", ({ params, request, response }) => {
+  http.get("/api/v1/prompts/{id}", ({ params, request, response }) => {
     const url = new URL(request.url);
     const versionParam = url.searchParams.get("version");
     const prompt = promptResponseFactory.build({
@@ -16,7 +17,7 @@ export const handles = [
     });
     return response(200).json(prompt);
   }),
-  http.post("/api/prompts", async ({ request, response }) => {
+  http.post("/api/v1/prompts", async ({ request, response }) => {
     const body = await request.json();
     const prompt = promptResponseFactory.build({
       handle: body?.handle,
@@ -30,7 +31,7 @@ export const handles = [
       projectId: "123",
     });
   }),
-  http.put("/api/prompts/{id}", async ({ params, request, response }) => {
+  http.put("/api/v1/prompts/{id}", async ({ params, request, response }) => {
     const body = await request.json();
     const prompt = promptResponseFactory.build({
       ...body,
@@ -39,7 +40,7 @@ export const handles = [
     });
     return response(200).json(prompt);
   }),
-  http.delete("/api/prompts/{id}", async ({ response }) => {
+  http.delete("/api/v1/prompts/{id}", async ({ response }) => {
     return response(200).json({ success: true });
   }),
 ];

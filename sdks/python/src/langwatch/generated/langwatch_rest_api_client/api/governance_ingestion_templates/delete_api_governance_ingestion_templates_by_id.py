@@ -14,12 +14,6 @@ from ...models.delete_api_governance_ingestion_templates_by_id_response_400 impo
 from ...models.delete_api_governance_ingestion_templates_by_id_response_401 import (
     DeleteApiGovernanceIngestionTemplatesByIdResponse401,
 )
-from ...models.delete_api_governance_ingestion_templates_by_id_response_403 import (
-    DeleteApiGovernanceIngestionTemplatesByIdResponse403,
-)
-from ...models.delete_api_governance_ingestion_templates_by_id_response_404 import (
-    DeleteApiGovernanceIngestionTemplatesByIdResponse404,
-)
 from ...models.delete_api_governance_ingestion_templates_by_id_response_422 import (
     DeleteApiGovernanceIngestionTemplatesByIdResponse422,
 )
@@ -30,13 +24,13 @@ from ...types import Response, safe_http_status
 
 
 def _get_kwargs(
-    id: str,
+    ingestion_template_id: str,
 ) -> dict[str, Any]:
 
     _kwargs: dict[str, Any] = {
         "method": "delete",
-        "url": "/api/governance/ingestion-templates/{id}".format(
-            id=quote(str(id), safe=""),
+        "url": "/api/v1/governance/ingestion-templates/{ingestion_template_id}".format(
+            ingestion_template_id=quote(str(ingestion_template_id), safe=""),
         ),
     }
 
@@ -49,8 +43,6 @@ def _parse_response(
     DeleteApiGovernanceIngestionTemplatesByIdResponse200
     | DeleteApiGovernanceIngestionTemplatesByIdResponse400
     | DeleteApiGovernanceIngestionTemplatesByIdResponse401
-    | DeleteApiGovernanceIngestionTemplatesByIdResponse403
-    | DeleteApiGovernanceIngestionTemplatesByIdResponse404
     | DeleteApiGovernanceIngestionTemplatesByIdResponse422
     | DeleteApiGovernanceIngestionTemplatesByIdResponse500
     | None
@@ -69,16 +61,6 @@ def _parse_response(
         response_401 = DeleteApiGovernanceIngestionTemplatesByIdResponse401.from_dict(response.json())
 
         return response_401
-
-    if response.status_code == 403:
-        response_403 = DeleteApiGovernanceIngestionTemplatesByIdResponse403.from_dict(response.json())
-
-        return response_403
-
-    if response.status_code == 404:
-        response_404 = DeleteApiGovernanceIngestionTemplatesByIdResponse404.from_dict(response.json())
-
-        return response_404
 
     if response.status_code == 422:
         response_422 = DeleteApiGovernanceIngestionTemplatesByIdResponse422.from_dict(response.json())
@@ -102,8 +84,6 @@ def _build_response(
     DeleteApiGovernanceIngestionTemplatesByIdResponse200
     | DeleteApiGovernanceIngestionTemplatesByIdResponse400
     | DeleteApiGovernanceIngestionTemplatesByIdResponse401
-    | DeleteApiGovernanceIngestionTemplatesByIdResponse403
-    | DeleteApiGovernanceIngestionTemplatesByIdResponse404
     | DeleteApiGovernanceIngestionTemplatesByIdResponse422
     | DeleteApiGovernanceIngestionTemplatesByIdResponse500
 ]:
@@ -119,15 +99,13 @@ def _build_response(
 
 
 def sync_detailed(
-    id: str,
+    ingestion_template_id: str,
     *,
     client: AuthenticatedClient,
 ) -> Response[
     DeleteApiGovernanceIngestionTemplatesByIdResponse200
     | DeleteApiGovernanceIngestionTemplatesByIdResponse400
     | DeleteApiGovernanceIngestionTemplatesByIdResponse401
-    | DeleteApiGovernanceIngestionTemplatesByIdResponse403
-    | DeleteApiGovernanceIngestionTemplatesByIdResponse404
     | DeleteApiGovernanceIngestionTemplatesByIdResponse422
     | DeleteApiGovernanceIngestionTemplatesByIdResponse500
 ]:
@@ -137,18 +115,18 @@ def sync_detailed(
     list views. Platform-published rows reject with 403.
 
     Args:
-        id (str):
+        ingestion_template_id (str):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[DeleteApiGovernanceIngestionTemplatesByIdResponse200 | DeleteApiGovernanceIngestionTemplatesByIdResponse400 | DeleteApiGovernanceIngestionTemplatesByIdResponse401 | DeleteApiGovernanceIngestionTemplatesByIdResponse403 | DeleteApiGovernanceIngestionTemplatesByIdResponse404 | DeleteApiGovernanceIngestionTemplatesByIdResponse422 | DeleteApiGovernanceIngestionTemplatesByIdResponse500]
+        Response[DeleteApiGovernanceIngestionTemplatesByIdResponse200 | DeleteApiGovernanceIngestionTemplatesByIdResponse400 | DeleteApiGovernanceIngestionTemplatesByIdResponse401 | DeleteApiGovernanceIngestionTemplatesByIdResponse422 | DeleteApiGovernanceIngestionTemplatesByIdResponse500]
     """
 
     kwargs = _get_kwargs(
-        id=id,
+        ingestion_template_id=ingestion_template_id,
     )
 
     response = client.get_httpx_client().request(
@@ -159,15 +137,13 @@ def sync_detailed(
 
 
 def sync(
-    id: str,
+    ingestion_template_id: str,
     *,
     client: AuthenticatedClient,
 ) -> (
     DeleteApiGovernanceIngestionTemplatesByIdResponse200
     | DeleteApiGovernanceIngestionTemplatesByIdResponse400
     | DeleteApiGovernanceIngestionTemplatesByIdResponse401
-    | DeleteApiGovernanceIngestionTemplatesByIdResponse403
-    | DeleteApiGovernanceIngestionTemplatesByIdResponse404
     | DeleteApiGovernanceIngestionTemplatesByIdResponse422
     | DeleteApiGovernanceIngestionTemplatesByIdResponse500
     | None
@@ -178,32 +154,30 @@ def sync(
     list views. Platform-published rows reject with 403.
 
     Args:
-        id (str):
+        ingestion_template_id (str):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        DeleteApiGovernanceIngestionTemplatesByIdResponse200 | DeleteApiGovernanceIngestionTemplatesByIdResponse400 | DeleteApiGovernanceIngestionTemplatesByIdResponse401 | DeleteApiGovernanceIngestionTemplatesByIdResponse403 | DeleteApiGovernanceIngestionTemplatesByIdResponse404 | DeleteApiGovernanceIngestionTemplatesByIdResponse422 | DeleteApiGovernanceIngestionTemplatesByIdResponse500
+        DeleteApiGovernanceIngestionTemplatesByIdResponse200 | DeleteApiGovernanceIngestionTemplatesByIdResponse400 | DeleteApiGovernanceIngestionTemplatesByIdResponse401 | DeleteApiGovernanceIngestionTemplatesByIdResponse422 | DeleteApiGovernanceIngestionTemplatesByIdResponse500
     """
 
     return sync_detailed(
-        id=id,
+        ingestion_template_id=ingestion_template_id,
         client=client,
     ).parsed
 
 
 async def asyncio_detailed(
-    id: str,
+    ingestion_template_id: str,
     *,
     client: AuthenticatedClient,
 ) -> Response[
     DeleteApiGovernanceIngestionTemplatesByIdResponse200
     | DeleteApiGovernanceIngestionTemplatesByIdResponse400
     | DeleteApiGovernanceIngestionTemplatesByIdResponse401
-    | DeleteApiGovernanceIngestionTemplatesByIdResponse403
-    | DeleteApiGovernanceIngestionTemplatesByIdResponse404
     | DeleteApiGovernanceIngestionTemplatesByIdResponse422
     | DeleteApiGovernanceIngestionTemplatesByIdResponse500
 ]:
@@ -213,18 +187,18 @@ async def asyncio_detailed(
     list views. Platform-published rows reject with 403.
 
     Args:
-        id (str):
+        ingestion_template_id (str):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[DeleteApiGovernanceIngestionTemplatesByIdResponse200 | DeleteApiGovernanceIngestionTemplatesByIdResponse400 | DeleteApiGovernanceIngestionTemplatesByIdResponse401 | DeleteApiGovernanceIngestionTemplatesByIdResponse403 | DeleteApiGovernanceIngestionTemplatesByIdResponse404 | DeleteApiGovernanceIngestionTemplatesByIdResponse422 | DeleteApiGovernanceIngestionTemplatesByIdResponse500]
+        Response[DeleteApiGovernanceIngestionTemplatesByIdResponse200 | DeleteApiGovernanceIngestionTemplatesByIdResponse400 | DeleteApiGovernanceIngestionTemplatesByIdResponse401 | DeleteApiGovernanceIngestionTemplatesByIdResponse422 | DeleteApiGovernanceIngestionTemplatesByIdResponse500]
     """
 
     kwargs = _get_kwargs(
-        id=id,
+        ingestion_template_id=ingestion_template_id,
     )
 
     response = await client.get_async_httpx_client().request(**kwargs)
@@ -233,15 +207,13 @@ async def asyncio_detailed(
 
 
 async def asyncio(
-    id: str,
+    ingestion_template_id: str,
     *,
     client: AuthenticatedClient,
 ) -> (
     DeleteApiGovernanceIngestionTemplatesByIdResponse200
     | DeleteApiGovernanceIngestionTemplatesByIdResponse400
     | DeleteApiGovernanceIngestionTemplatesByIdResponse401
-    | DeleteApiGovernanceIngestionTemplatesByIdResponse403
-    | DeleteApiGovernanceIngestionTemplatesByIdResponse404
     | DeleteApiGovernanceIngestionTemplatesByIdResponse422
     | DeleteApiGovernanceIngestionTemplatesByIdResponse500
     | None
@@ -252,19 +224,19 @@ async def asyncio(
     list views. Platform-published rows reject with 403.
 
     Args:
-        id (str):
+        ingestion_template_id (str):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        DeleteApiGovernanceIngestionTemplatesByIdResponse200 | DeleteApiGovernanceIngestionTemplatesByIdResponse400 | DeleteApiGovernanceIngestionTemplatesByIdResponse401 | DeleteApiGovernanceIngestionTemplatesByIdResponse403 | DeleteApiGovernanceIngestionTemplatesByIdResponse404 | DeleteApiGovernanceIngestionTemplatesByIdResponse422 | DeleteApiGovernanceIngestionTemplatesByIdResponse500
+        DeleteApiGovernanceIngestionTemplatesByIdResponse200 | DeleteApiGovernanceIngestionTemplatesByIdResponse400 | DeleteApiGovernanceIngestionTemplatesByIdResponse401 | DeleteApiGovernanceIngestionTemplatesByIdResponse422 | DeleteApiGovernanceIngestionTemplatesByIdResponse500
     """
 
     return (
         await asyncio_detailed(
-            id=id,
+            ingestion_template_id=ingestion_template_id,
             client=client,
         )
     ).parsed

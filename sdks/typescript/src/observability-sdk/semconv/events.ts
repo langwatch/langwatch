@@ -1,8 +1,6 @@
 /*
-  This file contains the values for the OpenTelemetry semantic conventions for GenAI log
-  record event names.
-
-  👉 https://opentelemetry.io/docs/specs/semconv/gen-ai/gen-ai-events/
+  OpenTelemetry semantic conventions for GenAI log record event names.
+  https://opentelemetry.io/docs/specs/semconv/gen-ai/gen-ai-events/
 */
 
 /**

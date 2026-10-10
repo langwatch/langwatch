@@ -1,6 +1,7 @@
 import inspect
 import json
-import os
+import subprocess
+from pathlib import Path
 from typing import Any, Dict, Literal, Union, get_args, get_origin
 from langevals_core.base_evaluator import (
     EvalCategories,
@@ -15,9 +16,6 @@ from langevals.utils import (
     get_evaluator_definitions,
     load_evaluator_packages,
 )
-
-os.system("npm list -g prettier &> /dev/null || npm install -g prettier")
-
 
 # ---------------------------------------------------------------------------
 # Zod emission. Each evaluator's settings model is rendered directly as a Zod
@@ -176,44 +174,53 @@ def extract_evaluator_info(definitions: EvaluatorDefinitions) -> Dict[str, Any]:
     return evaluator_info
 
 
+def named(name: str, expression: str) -> str:
+    """One exported schema in the named form `langwatch/contract-schema-named` asks for (ADR-178)."""
+    interface = name[0].upper() + name[1:]
+    return (
+        f"const {name}Definition = {expression};\n"
+        f"export interface {interface} extends Named<typeof {name}Definition> {{}}\n"
+        f"export const {name}: {interface} = {name}Definition;\n"
+    )
+
+
 # Fixed result schemas mirroring langevals_core.base_evaluator. These shapes are
-# stable, so they are emitted verbatim rather than reflected.
-RESULT_SCHEMAS = """export const moneySchema = z.object({
+# stable, so they are emitted verbatim rather than reflected. Pydantic sends an
+# unset Optional field as null, so those fields are nullish, not optional.
+RESULT_SCHEMAS = "\n".join(
+    [
+        named('moneySchema', """z.object({
   currency: z.string(),
   amount: z.number(),
-});
-
-export const evaluationResultSchema = z.object({
+})"""),
+        named('evaluationResultSchema', """z.object({
   status: z.literal("processed"),
-  score: z.number().optional(),
-  passed: z.boolean().optional(),
-  label: z.string().optional(),
-  details: z.string().optional(),
-  cost: moneySchema.optional(),
+  score: z.number().nullish(),
+  passed: z.boolean().nullish(),
+  label: z.string().nullish(),
+  details: z.string().nullish(),
+  cost: moneySchema.nullish(),
   raw_response: z.any().optional(),
-});
-
-export const evaluationResultSkippedSchema = z.object({
+})"""),
+        named('evaluationResultSkippedSchema', """z.object({
   status: z.literal("skipped"),
-  details: z.string().optional(),
-  cost: moneySchema.optional(),
-});
-
-export const evaluationResultErrorSchema = z.object({
+  details: z.string().nullish(),
+  cost: moneySchema.nullish(),
+})"""),
+        named('evaluationResultErrorSchema', """z.object({
   status: z.literal("error"),
   error_type: z.string(),
   details: z.string(),
   traceback: z.array(z.string()),
-});
-
-export const singleEvaluationResultSchema = z.union([
+})"""),
+        named('singleEvaluationResultSchema', """z.union([
   evaluationResultSchema,
   evaluationResultSkippedSchema,
   evaluationResultErrorSchema,
-]);
-
-export const batchEvaluationResultSchema = z.array(singleEvaluationResultSchema);
-"""
+])"""),
+        named('batchEvaluationResultSchema', """z.array(singleEvaluationResultSchema)"""),
+    ]
+)
 
 INFERRED_TYPES = """export type Money = z.infer<typeof moneySchema>;
 export type EvaluationResult = z.infer<typeof evaluationResultSchema>;
@@ -264,7 +271,8 @@ def generate_definitions(evaluators_info: Dict[str, Dict[str, Any]]) -> str:
         "// Generated from langevals (see services/langevals/scripts/generate_evaluators_ts.py).\n"
         "// Zod-first: the schemas below are the source of truth and the TypeScript types\n"
         "// are inferred with z.infer. Do not edit by hand.\n"
-        'import { z } from "zod";\n\n'
+        'import { z } from "zod";\n'
+        'import type { Named } from "@langwatch/module";\n\n'
     )
 
     # evaluatorTypesSchema: a string identifier. Catalog keys and `custom/*` keys
@@ -273,10 +281,11 @@ def generate_definitions(evaluators_info: Dict[str, Dict[str, Any]]) -> str:
 
     out += RESULT_SCHEMAS + "\n"
 
-    out += "export const evaluatorsSchema = z.object({\n"
-    for evaluator_name, evaluator_info in evaluators_info.items():
-        out += f"  {json.dumps(evaluator_name)}: z.object({{ settings: {evaluator_info['zodSettings']} }}),\n"
-    out += "});\n\n"
+    evaluator_entries = "".join(
+        f"  {json.dumps(evaluator_name)}: z.object({{ settings: {evaluator_info['zodSettings']} }}),\n"
+        for evaluator_name, evaluator_info in evaluators_info.items()
+    )
+    out += named("evaluatorsSchema", "z.object({\n" + evaluator_entries + "})") + "\n"
 
     out += INFERRED_TYPES + "\n"
 
@@ -317,10 +326,16 @@ def main():
 
     ts_content = generate_definitions(evaluators_info)
 
-    with open("ts-integration/evaluators.generated.ts", "w") as ts_file:
+    output_path = Path("ts-integration/evaluators.generated.ts")
+    with output_path.open("w") as ts_file:
         ts_file.write(ts_content)
 
-    os.system("prettier ts-integration/evaluators.generated.ts --write &> /dev/null")
+    repository_root = Path(__file__).resolve().parents[3]
+    subprocess.run(
+        ["pnpm", "exec", "oxfmt", "--write", str(output_path.resolve())],
+        cwd=repository_root,
+        check=True,
+    )
 
     print("Zod evaluator schemas generated successfully.")
 

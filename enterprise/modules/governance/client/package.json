@@ -1,0 +1,27 @@
+{
+  "name": "@langwatch/enterprise-governance-client",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The tokens governance lends other modules' screens (ARCHITECTURE.md §10.1).",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc -b"
+  },
+  "dependencies": {
+    "@langwatch/module": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "catalog:"
+  }
+}

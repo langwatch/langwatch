@@ -93,12 +93,12 @@ with the model's answer, then a plain `RESULT <cell> OK` or
 
 ## Coverage
 
-| Cell | Image | PDF | Notes |
-|---|---|---|---|
-| `openai_official.py` | yes | yes | OpenAI SDK, autotracked |
-| `anthropic_official.py` | yes | yes | Anthropic SDK, `AnthropicInstrumentor` |
-| `azure_openai.py` | yes | no | Azure OpenAI, autotracked |
-| `google_adk.py` | yes | yes | Google ADK on Gemini, `GoogleADKInstrumentor` |
-| `langgraph_openai.py` | yes | no | LangGraph, LangWatch's LangChain callback |
-| `strands_bedrock.py` | yes | yes | Strands Agent on AWS Bedrock, built-in OpenTelemetry |
-| `vercel-ai.ts` | yes | yes | Vercel AI SDK, `setupObservability` |
+| Cell                    | Image | PDF | Notes                                                |
+| ----------------------- | ----- | --- | ---------------------------------------------------- |
+| `openai_official.py`    | yes   | yes | OpenAI SDK, autotracked                              |
+| `anthropic_official.py` | yes   | yes | Anthropic SDK, `AnthropicInstrumentor`               |
+| `azure_openai.py`       | yes   | no  | Azure OpenAI, autotracked                            |
+| `google_adk.py`         | yes   | yes | Google ADK on Gemini, `GoogleADKInstrumentor`        |
+| `langgraph_openai.py`   | yes   | no  | LangGraph, LangWatch's LangChain callback            |
+| `strands_bedrock.py`    | yes   | yes | Strands Agent on AWS Bedrock, built-in OpenTelemetry |
+| `vercel-ai.ts`          | yes   | yes | Vercel AI SDK, `setupObservability`                  |

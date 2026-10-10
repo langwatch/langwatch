@@ -1,0 +1,46 @@
+import { createHmac } from "node:crypto";
+
+/**
+ * The address, keyed-hashed for the lock-out table (GAC-09). KEYED, not a
+ * bare digest: without the key the table is every address anybody ever typed
+ * here, recoverable because the keyspace of addresses is small.
+ */
+export function keyedIdentifierHasher(secret: string | undefined): (key: string) => string {
+  return (key: string) => {
+    // Fail closed rather than hash with nothing: an empty key is a plain
+    // digest of an address, which looks hashed and is not. Safe to refuse,
+    // because this is reached only once an organization has set a threshold.
+    if (secret === undefined || secret.length === 0) {
+      throw new Error(
+        "cannot key the sign-in lock-out table: this deployment named no browser-session secret",
+      );
+    }
+
+    return (
+      createHmac("sha256", secret)
+        // Domain-separated, so the same deployment secret used elsewhere can
+        // never produce this digest for the same input.
+        .update(`langwatch:sign-in-lockout\0${key}`)
+        .digest("base64url")
+    );
+  };
+}
+
+/**
+ * The sign-in paths a failure is counted against (GAC-09). Only the password
+ * path: the counter is keyed on an address and the second-step endpoints
+ * carry none. Those keep the two-step plugin's own lock.
+ */
+const LOCKOUT_COUNTED_SUFFIXES = ["/sign-in/email"] as const;
+
+export const isLockoutCountedPath = (pathname: string): boolean =>
+  LOCKOUT_COUNTED_SUFFIXES.some((suffix) => pathname.endsWith(suffix));
+
+/** The addresses a sign-in body submitted: one, or none at all. */
+export function findSubmittedAddresses(body: unknown): string[] {
+  if (typeof body !== "object" || body === null) return [];
+
+  const email = (body as { email?: unknown }).email;
+
+  return typeof email === "string" && email.length > 0 ? [email] : [];
+}

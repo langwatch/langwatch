@@ -5,7 +5,7 @@
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { initConfig } from "../config.js";
+import { initConfig } from "../config.ts";
 import {
   countingVerifier,
   MCP_POST_HEADERS,
@@ -18,7 +18,7 @@ import {
   VALID_KEY,
   initializeBody,
   type Harness,
-} from "./support/http-server-harness.js";
+} from "./support/http-server-harness.ts";
 
 beforeEach(() => {
   initConfig({ endpoint: "https://app.langwatch.ai" });
@@ -67,14 +67,11 @@ describe("Credentials in query parameters", () => {
 
     const sessionId = await readSessionId(sseResponse);
 
-    const response = await fetch(
-      `${harness.baseUrl}/messages?sessionId=${sessionId}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: toolsListBody(),
-      }
-    );
+    const response = await fetch(`${harness.baseUrl}/messages?sessionId=${sessionId}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: toolsListBody(),
+    });
 
     expect(response.status).toBe(401);
     controller.abort();

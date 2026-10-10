@@ -1,9 +1,10 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
+
 import { resolveCredentials } from "../../utils/apiKey";
 import { formatTable } from "../../utils/formatting";
-import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 import { createCliRunPlansService } from "./cli-run-plans-service";
 import { describeScope } from "./scopeFlags";
 
@@ -24,9 +25,7 @@ export const listRunPlansCommand = async (options: {
   try {
     const plans = await service.list({ includeArchived: options.archived });
 
-    spinner.succeed(
-      `Found ${plans.length} run plan${plans.length !== 1 ? "s" : ""}`,
-    );
+    spinner.succeed(`Found ${plans.length} run plan${plans.length !== 1 ? "s" : ""}`);
 
     return {
       data: plans,
@@ -35,9 +34,7 @@ export const listRunPlansCommand = async (options: {
           console.log();
           console.log(chalk.gray("No run plans found in this project."));
           console.log(chalk.gray("Start one with:"));
-          console.log(
-            chalk.cyan("  langwatch run-plan run --all --target http:<agentId>"),
-          );
+          console.log(chalk.cyan("  langwatch run-plan run --all --target http:<agentId>"));
           return;
         }
 
@@ -61,9 +58,7 @@ export const listRunPlansCommand = async (options: {
 
         console.log();
         console.log(
-          chalk.gray(
-            `Use ${chalk.cyan("langwatch run-plan get <id>")} to read one plan.`,
-          ),
+          chalk.gray(`Use ${chalk.cyan("langwatch run-plan get <id>")} to read one plan.`),
         );
       },
     };

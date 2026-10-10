@@ -1,12 +1,11 @@
 import chalk from "chalk";
+
 import {
   RolesApiService,
   type UpdateRoleInput,
 } from "@/client-sdk/services/roles/roles-api.service";
-import {
-  commandValidationError,
-  reportCommandError,
-} from "../../utils/errorOutput";
+
+import { commandValidationError, reportCommandError } from "../../utils/errorOutput";
 import { parsePermissionFlags } from "../../utils/managementFlags";
 import type { CommandResult } from "../../utils/output";
 import { orDash, printFacts, runManagement, withParsedFlags } from "../management/_shared";
@@ -18,10 +17,9 @@ export interface UpdateRoleOptions {
 }
 
 /**
- * Update a custom role. Partial, except for the permissions: a `--permission`
- * list REPLACES the set outright, because a role is defined by exactly what it
- * grants and adding to it silently would leave nobody able to say what the
- * role means.
+ * Updates a custom role. Partial, except permissions: `--permission`
+ * REPLACES the set outright -- a role is defined by exactly what it grants,
+ * so adding silently would leave nobody able to say what it means.
  */
 export const updateRoleCommand = async ({
   id,
@@ -30,17 +28,13 @@ export const updateRoleCommand = async ({
   id: string;
   options: UpdateRoleOptions;
 }): Promise<CommandResult | void> => {
-  const permissions = withParsedFlags(() =>
-    parsePermissionFlags(options.permission),
-  );
+  const permissions = withParsedFlags(() => parsePermissionFlags(options.permission));
 
   // Keyed on the flag being GIVEN, not on what it parsed to: a caller who
   // asked to replace the set is asking for exactly the set they named.
   const input: UpdateRoleInput = {
     ...(options.name !== undefined ? { name: options.name } : {}),
-    ...(options.description !== undefined
-      ? { description: options.description }
-      : {}),
+    ...(options.description !== undefined ? { description: options.description } : {}),
     ...(options.permission !== undefined ? { permissions } : {}),
   };
 

@@ -21,13 +21,13 @@ The agent must report its traces to the same LangWatch project that runs the sce
 
 ## Propagation surfaces
 
-| Target | How the trace context reaches your system |
-|---|---|
-| Connected agent | The SDK adopts the turn's context before it calls your function. Always on, with no code of yours involved. |
-| HTTP agent | The `traceparent` header, sent on every call. Always on. |
+| Target                                  | How the trace context reaches your system                                                                                                                                                               |
+| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Connected agent                         | The SDK adopts the turn's context before it calls your function. Always on, with no code of yours involved.                                                                                             |
+| HTTP agent                              | The `traceparent` header, sent on every call. Always on.                                                                                                                                                |
 | HTTP agent, custom header or body field | `{{ traceId }}` and `{{ traceparent }}` render in the URL, the header values and the body template, for a system that reads `X-Trace-Id: {{ traceId }}` or a body field instead of the standard header. |
-| Code agent | `params.trace_id` and `params.traceparent`, injected at call time, for the Python code to forward to whatever it calls. |
-| Workflow | `params.trace_id` and `params.traceparent`, injected at call time, readable by the workflow's nodes. |
+| Code agent                              | `params.trace_id` and `params.traceparent`, injected at call time, for the Python code to forward to whatever it calls.                                                                                 |
+| Workflow                                | `params.trace_id` and `params.traceparent`, injected at call time, readable by the workflow's nodes.                                                                                                    |
 
 `trace_id` and `traceparent` are reserved parameter names: the injected values win over a run parameter with the same name.
 
@@ -87,6 +87,7 @@ The Scenario SDKs fetch the agent's traces from LangWatch with a flag on the run
     ```
 
     `scenario.run()` also accepts both settings, for one run.
+
   </Tab>
   <Tab title="TypeScript">
     ```typescript
@@ -98,6 +99,7 @@ The Scenario SDKs fetch the agent's traces from LangWatch with a flag on the run
     ```
 
     `scenario.config.js` also accepts both settings, for the whole project.
+
   </Tab>
 </Tabs>
 
@@ -117,6 +119,7 @@ When your adapter calls the agent over HTTP, spread the propagation headers onto
             )
             return response.json()["reply"]
     ```
+
   </Tab>
   <Tab title="TypeScript">
     ```typescript

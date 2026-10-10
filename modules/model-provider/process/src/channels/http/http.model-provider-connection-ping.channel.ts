@@ -1,0 +1,58 @@
+import { generateText } from "ai";
+
+import { handleForParameters } from "../../rules/execution-handle.rules.ts";
+import { readPingFailure } from "../../rules/provider-ping.rules.ts";
+import {
+  ModelProviderConnectionPing,
+  type ModelProviderPingReply,
+  type ModelProviderPingRequest,
+} from "../model-provider-connection-ping.channel.ts";
+
+const PING_BUDGET_MS = 20_000;
+const PING_PROMPT = "ping";
+
+/** One token down the execution proxy the product generates through at runtime. */
+export class HttpModelProviderConnectionPingChannel extends ModelProviderConnectionPing {
+  private constructor(
+    private readonly executionProxyBaseUrl: string,
+    private readonly internalSecret: string | undefined,
+  ) {
+    super();
+  }
+
+  static create({
+    executionProxyBaseUrl,
+    nlpInternalSecret,
+  }: {
+    executionProxyBaseUrl: string;
+    /** The engine hop's shared credential, as the process resolved it. */
+    nlpInternalSecret?: string | undefined;
+  }): HttpModelProviderConnectionPingChannel {
+    return new HttpModelProviderConnectionPingChannel(executionProxyBaseUrl, nlpInternalSecret);
+  }
+
+  async ping({
+    providerKey,
+    model,
+    parameters,
+  }: ModelProviderPingRequest): Promise<ModelProviderPingReply> {
+    try {
+      await generateText({
+        model: handleForParameters({
+          providerKey,
+          model,
+          parameters,
+          executionProxyBaseUrl: this.executionProxyBaseUrl,
+          internalSecret: this.internalSecret,
+        }),
+        prompt: PING_PROMPT,
+        maxOutputTokens: 1,
+        maxRetries: 0,
+        abortSignal: AbortSignal.timeout(PING_BUDGET_MS),
+      });
+      return { outcome: "generated" };
+    } catch (error) {
+      return { outcome: "failed", ...readPingFailure(error) };
+    }
+  }
+}

@@ -6,13 +6,13 @@ description: "Upgrade guide for Helm deployments: datasets move to object storag
 Datasets are now stored in object storage instead of PostgreSQL. This makes large datasets faster to load, cheaper to store, and enables direct browser uploads. New datasets go to the new storage backend as soon as you upgrade. Existing datasets keep working from PostgreSQL until you run the one-time migration that moves them.
 
 <Tip>
-The migration **never deletes your data**. All dataset rows are kept in PostgreSQL as a fallback, so you can roll back safely. It is also safe to re-run: if it is interrupted or a dataset fails to migrate, the next run picks up where it left off.
+  The migration **never deletes your data**. All dataset rows are kept in PostgreSQL as a fallback, so you can roll back safely. It is also safe to re-run: if it is interrupted or a dataset fails to migrate, the next run picks up where it left off.
 </Tip>
 
 ## What Changed
 
 - **Dataset storage**: dataset content is written to object storage (a persistent volume by default, or S3-compatible storage if configured)
-- **Migration task**: a one-off task moves existing datasets. The chart does not run it; you start it once after the upgrade, see [Running the migration](#running-the-migration)
+- **Migration step**: a background upgrade step moves existing datasets. The workers run it on their own once every old-version pod is gone, see [Running the migration](#running-the-migration)
 - **Local storage constraints**: with the default local storage, the app and workers now restart together during upgrades, and workers are limited to a single replica
 - **New chart values**: see the [chart README](https://github.com/langwatch/langwatch/blob/main/charts/langwatch/README.md) for the full `app.dataplane` and `app.storedObjects` parameter reference
 
@@ -117,38 +117,16 @@ New datasets created after the upgrade go straight to the new storage backend. E
 
 ## Running the Migration
 
-Run the migration once, after every old-version pod is gone, ideally off-peak. It runs inside a workers pod, which already has the database settings, the storage settings and, with local storage, the shared volume:
-
-```bash
-kubectl -n langwatch exec deploy/langwatch-workers -- \
-  sh -c 'cd /app/platform/app && HOME=/tmp pnpm run task backfillDatasetContentToS3'
-```
-
-<Warning>
-Do not run it while an old-version pod still serves traffic. Dataset edits made through an old pod after its dataset was migrated do not appear in the new storage layout (the rows stay in PostgreSQL, but reconciling them is manual).
-</Warning>
+You do not start the migration. Once every old-version pod is gone, the workers run the `dataset:move-content-to-object-storage` upgrade step in the background. Run the upgrade off-peak if you can. Its progress and report show on **Ops > Upgrades**.
 
 The migration is resilient by design:
 
-- **Safe to re-run**: an interrupted or partial run resumes on the next run
+- **Resumes where it stopped**: an interrupted or partial run carries on from its last checkpoint
 - **Non-destructive**: PostgreSQL rows are kept as a fallback and are not deleted
-- **Detects most concurrent edits**: a dataset whose records change while it is being copied is skipped, and the next run migrates it. The check is best-effort: an edit in the moment between the final check and the switch can be missed, so run the migration when nobody is editing datasets
+- **Detects most concurrent edits**: a dataset whose records change while it is being copied is skipped, and the step stays unfinished. The check is best-effort: an edit in the moment between the final check and the switch can be missed, so avoid dataset edits while the step runs
 - **Per-dataset failures do not stop the run**: a dataset that fails is logged and stays on PostgreSQL, readable as before
 
-The summary at the end of the output lists how many datasets moved, were skipped or failed.
-
-### Dry run
-
-To see what would be migrated without writing anything, add `DATASET_S3_MIGRATE_DRY_RUN=1`:
-
-```bash
-kubectl -n langwatch exec deploy/langwatch-workers -- \
-  sh -c 'cd /app/platform/app && HOME=/tmp DATASET_S3_MIGRATE_DRY_RUN=1 pnpm run task backfillDatasetContentToS3'
-```
-
-### Not migrating yet
-
-Existing datasets keep working from PostgreSQL if you never run the task. Run it on a later upgrade to migrate then.
+The step's report lists how many datasets moved, were skipped or failed.
 
 ## Rolling Back
 
@@ -171,9 +149,7 @@ app:
 
 ### Migration failed
 
-Anything left unmigrated stays readable from PostgreSQL and is picked up when you run the task again. The task output names the dataset and the error.
-
-If the task reports that the dataset chunk-layout columns are not present yet, the database schema has not been updated. Wait for the new app pods to finish their startup migrations, then run it again.
+Anything left unmigrated stays readable from PostgreSQL. The step fails and names the dataset and the error. Fix the cause, then press **Retry step** on **Ops > Upgrades**; it resumes from its last checkpoint.
 
 ## Getting Help
 

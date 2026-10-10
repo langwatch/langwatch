@@ -1,0 +1,85 @@
+import { Card, Heading, Text, VStack } from "@langwatch/design-system/primitives";
+import type { DashboardData } from "@langwatch/ops-contract";
+
+import { api } from "../../../../behavior/ops-api.ts";
+import {
+  AnomaliesCard,
+  BlockedCard,
+  DlqCard,
+  GroupsCard,
+  PipelineTreeCard,
+} from "../../../queue/index.ts";
+import { HealthLine } from "../elements/dashboard-health-line.tsx";
+import { LatencyWindowsCard } from "../elements/latency-windows-card.tsx";
+import { ThroughputChart } from "../elements/throughput-chart.tsx";
+import { TopErrorsCard } from "../elements/top-errors-card.tsx";
+import { ActiveOperationsSection } from "./active-operations-panel.tsx";
+import { PausedCard } from "./paused-panel.tsx";
+import { StatStrip } from "./stat-strip.tsx";
+
+/**
+ * The ops landing page, read top to bottom as strip -> health -> chart ->
+ * structure -> detail (dev/docs/best_practices/ops-dashboard.md). Space is
+ * proportional to trouble: an all-clear state is one line, a problem expands in place.
+ */
+export function OpsDashboardContent({ data }: { data: DashboardData }) {
+  const queuesQuery = api.ops.listQueues.useQuery(undefined, {});
+  const queueNames = (queuesQuery.data ?? []).map((q) => q.name);
+
+  // Read here as well as in AnomaliesCard so the health line can collapse both
+  // all-clear states into one row. React Query serves both from one fetch.
+  const anomaliesQuery = api.ops.listAnomalies.useQuery(undefined, {});
+  // "We could not check" is not "all clear". Until this query has actually
+  // answered, the health line must not claim anomalies are clear — collapsing
+  // an unknown into a green line is how an operator gets told nothing is wrong
+  // during the exact incident that broke the query.
+  const anomaliesKnown = anomaliesQuery.isSuccess;
+  const anomalyCount = anomaliesQuery.data?.anomalies.length ?? 0;
+
+  return (
+    <VStack align="stretch" gap={5} width="full">
+      <ActiveOperationsSection data={data} />
+
+      <StatStrip data={data} />
+
+      <HealthLine
+        errorClusterCount={data.topErrors.length}
+        anomalyCount={anomalyCount}
+        anomaliesKnown={anomaliesKnown}
+      />
+
+      <PausedCard
+        parkedTenants={data.parkedTenants}
+        parkedTenantsBound={data.parkedTenantsBound}
+        pausedKeys={data.pausedKeys}
+      />
+
+      <Card.Root variant="outline" overflow="hidden" borderColor="border.muted" boxShadow="none">
+        <Card.Header>
+          <Heading size="sm">Throughput</Heading>
+          <Text textStyle="sm" color="fg.muted">
+            Arrival and completion rates alongside the queue backlog.
+          </Text>
+        </Card.Header>
+        <Card.Body>
+          <ThroughputChart data={data} />
+        </Card.Body>
+      </Card.Root>
+
+      <LatencyWindowsCard windows={data.latencyWindows} />
+
+      <PipelineTreeCard
+        pipelineTree={data.pipelineTree}
+        pausedKeys={data.pausedKeys}
+        queueNames={queueNames}
+      />
+
+      <TopErrorsCard topErrors={data.topErrors} errorClustersBound={data.errorClustersBound} />
+
+      <AnomaliesCard />
+      <BlockedCard queueNames={queueNames} />
+      <DlqCard queueNames={queueNames} />
+      <GroupsCard queueNames={queueNames} />
+    </VStack>
+  );
+}

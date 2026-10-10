@@ -1,0 +1,656 @@
+import type { ApiKeyApi, ResolvedApiKeyCredential } from "@langwatch/api-key-contract";
+/**
+ * @vitest-environment node
+ * `POST /api/otel/v1/{...}` against the COMPOSITION-built app and
+ * MODULE-declared transports — sibling of the collector composition test.
+ */
+import {
+  canonicalErrorResponse,
+  createRestRuntime,
+  withOtlpPathAliases,
+} from "@langwatch/api/rest";
+import { AuthzApi } from "@langwatch/authz-contract";
+import { DataPrivacyApi } from "@langwatch/data-privacy-contract";
+import { DataRetentionApi } from "@langwatch/data-retention-contract";
+import { EntitlementApi } from "@langwatch/entitlement-contract";
+import { ModelProviderApi } from "@langwatch/model-provider-contract";
+import type * as Observability from "@langwatch/observability";
+import { LocalFeatureApis, type FeatureTransportDescriptor } from "@langwatch/process";
+import { ProjectApi } from "@langwatch/project-contract";
+import { ShareApi } from "@langwatch/share-contract";
+import type { StoredObjectApi } from "@langwatch/stored-object-contract";
+import type * as TestHarness from "@langwatch/test-harness";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
+import { TraceApi, type RecordSpanCommandData } from "@langwatch/trace-contract";
+import { describe, expect, it, vi } from "vitest";
+
+import { TraceModule } from "../../app/trace.app.ts";
+import { S3TraceLegacySpoolChannel } from "../../channels/s3/s3.trace-legacy-spool.channel.ts";
+import { TraceCanonicalisationService } from "../../features/derivation/services/trace-canonicalisation.service.ts";
+import { TraceBlobStoreService } from "../../features/media/services/trace-blob-store.service.ts";
+import { MemoryTraceSpanDedupRepository } from "../../repositories/memory/memory.trace-span-dedup.repository.ts";
+import { MemoryTraceRepositories } from "../../repositories/memory/memory.trace.repositories.ts";
+import type { TraceProcessingCommands } from "../../services/trace-processing-commands.service.ts";
+import { traceProcessModule } from "../../trace.module.ts";
+import { otlpIngestDoor, otlpIngestRest } from "../otlp-ingest.rest.ts";
+
+const doorLog = vi.hoisted(() => ({
+  loggerName: "langwatch:otel:v1:traces",
+  lines: [] as { msg?: string; [field: string]: unknown }[],
+}));
+
+// The receiver's logger is built at import; this hands it a capturing one.
+vi.mock("@langwatch/observability", async (importOriginal) => {
+  const original = await importOriginal<typeof Observability>();
+  const harness = await vi.importActual<typeof TestHarness>("@langwatch/test-harness");
+  const door = harness.createTestLogger();
+  doorLog.lines = door.lines;
+
+  return {
+    ...original,
+    createLogger: (name: string, options?: Parameters<typeof original.createLogger>[1]) =>
+      name === doorLog.loggerName ? door.logger : original.createLogger(name, options),
+  };
+});
+
+const PROJECT = {
+  id: "project-123",
+  name: "Exporting Project",
+  slug: "exporting-project",
+  teamId: "team-1",
+  organizationId: "organization-1",
+  isPersonal: false,
+  ownerUserId: null,
+  kind: "application",
+};
+const TOKEN = "sk-lw-a-project-key";
+const API_KEY_ID = "api-key-1";
+
+/**
+ * The peers the receiver path never reaches, as real feature-API
+ * references: declared but deliberately never bound, so a call refuses by
+ * name instead of quietly answering. No cast, no hand-written twin.
+ */
+function unreachablePeers() {
+  const apis = new LocalFeatureApis();
+  for (const token of [
+    AuthzApi,
+    DataPrivacyApi,
+    DataRetentionApi,
+    EntitlementApi,
+    ModelProviderApi,
+    ProjectApi,
+    ShareApi,
+  ]) {
+    apis.declare(token);
+  }
+
+  return {
+    authz: apis.reference(AuthzApi),
+    dataPrivacy: apis.reference(DataPrivacyApi),
+    dataRetention: apis.reference(DataRetentionApi),
+    plans: apis.reference(EntitlementApi),
+    modelProviders: apis.reference(ModelProviderApi),
+    projects: apis.reference(ProjectApi),
+    share: apis.reference(ShareApi),
+  };
+}
+
+/** What a test may narrow about the credential the door is reached with. */
+type OtlpAccess = {
+  /** Whether the presented token resolves at all. */
+  resolves?: boolean;
+  /** Whether the resolved key holds `traces:create` at its project. */
+  permitted?: boolean;
+  /** The credential class the token resolves to. */
+  type?: ResolvedApiKeyCredential["type"];
+};
+
+/** The two API-key directory operations an ingestion door calls, and no more. */
+function apiKeyDirectory(
+  access: OtlpAccess,
+  markedUsed: string[],
+): Pick<ApiKeyApi, "findResolvedToken" | "markUsed"> {
+  return {
+    findResolvedToken: async () => {
+      if (access.resolves === false) return null;
+      if (access.type === "legacyProjectKey") {
+        return { type: "legacyProjectKey", project: PROJECT };
+      }
+
+      return {
+        type: "apiKey",
+        apiKeyId: API_KEY_ID,
+        userId: "user-1",
+        organizationId: PROJECT.organizationId,
+        ingestSourceType: null,
+        ingestionTemplateId: null,
+        project: PROJECT,
+      };
+    },
+    markUsed: async ({ id }: { id: string }) => {
+      markedUsed.push(id);
+    },
+  };
+}
+
+/**
+ * The trace REST surface this module declares, mounted the way boot mounts it:
+ * the declared transport, over ONE application bound to its own module-API
+ * token.
+ */
+function deployment(
+  access: OtlpAccess = {},
+  handoff: { fails?: boolean; failingSpanIds?: Set<string> } = {},
+) {
+  const recordedSpans: RecordSpanCommandData[] = [];
+  const markedUsed: string[] = [];
+  const peers = unreachablePeers();
+
+  const commands: TraceProcessingCommands = {
+    recordSpan: async (data) => {
+      if (handoff.fails || handoff.failingSpanIds?.has(data.span.spanId)) {
+        throw new Error("queue unavailable");
+      }
+      recordedSpans.push(data);
+    },
+    changeTraceName: async () => undefined,
+    addAnnotation: async () => undefined,
+    removeAnnotation: async () => undefined,
+    assignTopic: async () => undefined,
+  };
+
+  const canonicalisation = TraceCanonicalisationService.create();
+  const app = TraceModule.fromDependencies(
+    TraceModule.composeDependencies({
+      repositories: MemoryTraceRepositories.create(),
+      storedObjects: createApiFixture<StoredObjectApi>(),
+      canonicalisation,
+      blobStore: TraceBlobStoreService.create({
+        legacySpool: S3TraceLegacySpoolChannel.create({
+          resolveS3Client: () => Promise.reject(new Error("no object store in this test")),
+        }),
+      }),
+      dedup: MemoryTraceSpanDedupRepository.create(),
+      commands,
+      broadcast: {
+        getTenantEmitter: () => {
+          throw new Error("no broadcast fabric in this test");
+        },
+        cleanupTenantEmitter: () => undefined,
+      },
+      tenantBroadcast: { publishProjectEvent: async () => {} },
+      apiKeys: apiKeyDirectory(access, markedUsed),
+      // The two questions the ingest path asks, each on its own narrow seam:
+      // may this key create traces, and is this span one a coding agent emits
+      // about itself. The viewer protections below stay unreachable - nothing
+      // on the ingest path resolves a reader's redactions.
+      ingestAuthz: { hasApiKeyPermission: async () => access.permitted !== false },
+      ingestCodingAgents: { shouldFilterSpan: () => false },
+      protections: {
+        authz: peers.authz,
+        projects: peers.projects,
+        plans: peers.plans,
+        dataPrivacy: peers.dataPrivacy,
+        fallbackVisibilityDays: 14,
+      },
+      projects: peers.projects,
+      modelProviders: peers.modelProviders,
+      dataRetention: peers.dataRetention,
+      share: peers.share,
+      requestBounds: peers.plans,
+      exportBounds: null,
+    }),
+  );
+
+  const apis = new LocalFeatureApis();
+  apis.declare(TraceApi);
+  apis.bind(TraceApi, app);
+  apis.ready();
+
+  const runtime = createRestRuntime({
+    doors: {
+      otlp_ingest: otlpIngestDoor.open(apis.reference(TraceApi)),
+    },
+    authorization: restTestAuthorization(),
+    identity: {
+      authenticate: () => {
+        throw new Error("the ingestion doors resolve their own credential");
+      },
+    },
+  });
+
+  // Whether the MODULE declares the receiver among its transports. This is the
+  // point of the file: the door is mounted here only if `trace.module.ts` still
+  // mounts it, so dropping it there turns every request below into the 404 an
+  // OTLP exporter was getting.
+  const declaredRest: readonly FeatureTransportDescriptor[] = traceProcessModule.transports ?? [];
+  const servesOtlp = declaredRest.includes(otlpIngestRest);
+
+  const mounted = servesOtlp
+    ? [
+        // The host rewrites a misconfigured exporter path before routing, as RestHost does.
+        withOtlpPathAliases(
+          runtime.mount(otlpIngestRest.router(), {
+            app: () => apis.reference(TraceApi),
+            credential: "otlp_ingest",
+            onError: canonicalErrorResponse,
+          }),
+        ),
+      ]
+    : [];
+
+  const post = async (path: string, body: unknown, headers: Record<string, string | null> = {}) => {
+    for (const family of mounted) {
+      const sent: Record<string, string> = { "Content-Type": "application/json" };
+      for (const [name, value] of Object.entries({ "X-Auth-Token": TOKEN, ...headers })) {
+        if (value !== null) sent[name] = value;
+      }
+      return family.request(path, { method: "POST", headers: sent, body: JSON.stringify(body) });
+    }
+
+    // Nothing mounted: the same 404 an exporter met while this family was
+    // declared and served by nobody.
+    return new Response(null, { status: 404 });
+  };
+
+  const postStream = async (path: string, chunks: readonly Uint8Array[]) => {
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        for (const chunk of chunks) controller.enqueue(chunk);
+        controller.close();
+      },
+    });
+    for (const family of mounted) {
+      return family.request(path, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Auth-Token": TOKEN },
+        body: stream,
+        duplex: "half",
+      } as RequestInit);
+    }
+
+    return new Response(null, { status: 404 });
+  };
+
+  return { post, postStream, recordedSpans, markedUsed };
+}
+
+const NOW = Date.now();
+const NANOS = "000000";
+
+/** `count` spans, in the JSON shape an OTLP exporter posts them. */
+function otlpTraceBody(count = 1) {
+  return {
+    resourceSpans: [
+      {
+        resource: {
+          attributes: [{ key: "service.name", value: { stringValue: "checkout" } }],
+        },
+        scopeSpans: [
+          {
+            scope: { name: "langwatch-exporter", version: "1.0.0" },
+            spans: Array.from({ length: count }, (_, index) => ({
+              traceId: "b2ca0e1d9f4a4d2ab1c0d3e4f5061728",
+              spanId: `a1b2c3d4e5f6071${index}`,
+              name: "chat completion",
+              kind: 3,
+              startTimeUnixNano: `${NOW - 1000}${NANOS}`,
+              endTimeUnixNano: `${NOW}${NANOS}`,
+              attributes: [],
+            })),
+          },
+        ],
+      },
+    ],
+  };
+}
+
+describe("given the trace module as a process composes it", () => {
+  describe("when an OTLP exporter posts a trace batch to /api/otel/v1/traces", () => {
+    /** @scenario "The OTLP receiver accepts an exported trace batch" */
+    it("accepts the batch", async () => {
+      const { post } = deployment();
+
+      const response = await post("/api/otel/v1/traces", otlpTraceBody());
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toMatchObject({ message: "Trace received successfully." });
+    });
+
+    /** @scenario "An exported span reaches the trace pipeline" */
+    it("sends the span on to the trace pipeline, against the credential's own project", async () => {
+      const { post, recordedSpans } = deployment();
+
+      await post("/api/otel/v1/traces", otlpTraceBody());
+
+      expect(recordedSpans).toHaveLength(1);
+      expect(recordedSpans[0]).toMatchObject({ tenantId: PROJECT.id });
+    });
+
+    /** @scenario "An accepted export stamps the key's last-used clock" */
+    it("marks the api key used once the body has parsed", async () => {
+      const { post, markedUsed } = deployment();
+
+      await post("/api/otel/v1/traces", otlpTraceBody());
+
+      expect(markedUsed).toEqual([API_KEY_ID]);
+    });
+  });
+
+  describe("when the pipeline handoff fails for every span of the batch", () => {
+    /** @scenario "A failed pipeline handoff answers the OTLP export as retryable" */
+    it("answers 503 without a partial success, so the exporter retries", async () => {
+      const { post, recordedSpans } = deployment({}, { fails: true });
+
+      const response = await post("/api/otel/v1/traces", otlpTraceBody());
+
+      expect(response.status).toBe(503);
+      expect(await response.json()).not.toHaveProperty("partialSuccess");
+      expect(recordedSpans).toHaveLength(0);
+    });
+  });
+
+  describe("given a batch where the pipeline takes every span but one", () => {
+    const failingSpanId = "a1b2c3d4e5f60711";
+
+    describe("when the exporter posts it", () => {
+      /** @scenario "A batch where only some handoffs fail is still answered as retryable" */
+      it("answers 503 and keeps the spans it took", async () => {
+        const { post, recordedSpans } = deployment(
+          {},
+          { failingSpanIds: new Set([failingSpanId]) },
+        );
+
+        const response = await post("/api/otel/v1/traces", otlpTraceBody(3));
+
+        expect(response.status).toBe(503);
+        expect(recordedSpans.map((data) => data.span.spanId).toSorted()).toEqual([
+          "a1b2c3d4e5f60710",
+          "a1b2c3d4e5f60712",
+        ]);
+      });
+    });
+
+    describe("when the exporter resends it after the pipeline recovers", () => {
+      /** @scenario "Resending a partly failed batch records each span exactly once" */
+      it("dedupes the taken spans and records the failed one", async () => {
+        const failingSpanIds = new Set([failingSpanId]);
+        const { post, recordedSpans } = deployment({}, { failingSpanIds });
+        await post("/api/otel/v1/traces", otlpTraceBody(3));
+        failingSpanIds.clear();
+
+        const response = await post("/api/otel/v1/traces", otlpTraceBody(3));
+
+        expect(response.status).toBe(200);
+        expect(recordedSpans.map((data) => data.span.spanId).toSorted()).toEqual([
+          "a1b2c3d4e5f60710",
+          "a1b2c3d4e5f60711",
+          "a1b2c3d4e5f60712",
+        ]);
+      });
+    });
+  });
+
+  describe("when the export carries no credential at all", () => {
+    /** @scenario "The OTLP receiver refuses an unauthenticated exporter" */
+    it("refuses with 401 and records nothing", async () => {
+      const { post, recordedSpans } = deployment();
+
+      const response = await post("/api/otel/v1/traces", otlpTraceBody(), { "X-Auth-Token": "" });
+
+      expect(response.status).toBe(401);
+      expect(await response.json()).toEqual({
+        message:
+          "Authentication token is required. Use X-Auth-Token header, Authorization: Bearer token, or Authorization: Basic base64(projectId:token).",
+      });
+      expect(recordedSpans).toHaveLength(0);
+    });
+  });
+
+  describe("when an exporter posts to a path the receiver does not recognise", () => {
+    /** @scenario "The trace door answers an unknown exporter path as not found before it asks for the key" */
+    it("answers 404 with or without a key and records nothing", async () => {
+      const { post, recordedSpans } = deployment();
+
+      const anonymous = await post("/not-an-exporter/v1/traces", otlpTraceBody(), {
+        "X-Auth-Token": "",
+      });
+      const keyed = await post("/not-an-exporter/v1/traces", otlpTraceBody());
+
+      expect([anonymous.status, keyed.status]).toEqual([404, 404]);
+      expect(recordedSpans).toHaveLength(0);
+    });
+  });
+
+  describe("when a refused export is logged for on-call", () => {
+    const refusals = () =>
+      doorLog.lines.filter((line) => line.msg?.startsWith("Authentication failed"));
+
+    /** @scenario A request with no credential header is logged with its fingerprint */
+    it("carries the request's fingerprint and says no empty token was sent", async () => {
+      const { post } = deployment();
+      doorLog.lines.length = 0;
+
+      await post("/api/otel/v1/traces", otlpTraceBody(), {
+        "X-Auth-Token": null,
+        "User-Agent": "otel-exporter/1.2",
+        traceparent: "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01",
+        "X-Forwarded-For": "203.0.113.9",
+      });
+
+      expect(refusals()).toHaveLength(1);
+      expect(refusals()[0]).toMatchObject({
+        msg: "Authentication failed",
+        level: 40,
+        path: "/api/otel/v1/traces",
+        method: "POST",
+        userAgent: "otel-exporter/1.2",
+        traceparent: "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01",
+        forwardedFor: "203.0.113.9",
+        hasEmptyAuthToken: false,
+      });
+    });
+
+    /** @scenario An empty X-Auth-Token is logged as an empty-token submission */
+    it("names the empty token so the caller knows its api_key resolved to nothing", async () => {
+      const { post } = deployment();
+      doorLog.lines.length = 0;
+
+      await post("/api/otel/v1/traces", otlpTraceBody(), { "X-Auth-Token": "" });
+
+      expect(refusals()).toHaveLength(1);
+      expect(refusals()[0]).toMatchObject({
+        msg: "Authentication failed: X-Auth-Token sent but empty",
+        hasEmptyAuthToken: true,
+      });
+    });
+
+    /** @scenario Diagnostic fields are safe to log */
+    it("never carries the presented token or the request body", async () => {
+      const { post } = deployment({ resolves: false });
+      doorLog.lines.length = 0;
+
+      await post("/api/otel/v1/traces", { marker: "request-body-marker", ...otlpTraceBody() });
+
+      expect(refusals()).toHaveLength(1);
+      const logged = JSON.stringify(doorLog.lines);
+      expect(logged).not.toContain(TOKEN);
+      expect(logged).not.toContain("request-body-marker");
+    });
+  });
+
+  describe("when an exporter appends the signal to a root-level base", () => {
+    /** @scenario "A corrected path answers like the canonical one" */
+    it("accepts the same bytes and returns the canonical trace status", async () => {
+      const { post, recordedSpans } = deployment();
+
+      const response = await post("/v1/traces", otlpTraceBody());
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toMatchObject({ message: "Trace received successfully." });
+      expect(recordedSpans).toHaveLength(1);
+    });
+
+    /** @scenario "A corrected path still needs a valid key" */
+    it("applies the canonical credential refusal before parsing the alias body", async () => {
+      const { post, recordedSpans } = deployment();
+
+      const response = await post("/v1/traces", otlpTraceBody(), { "X-Auth-Token": "" });
+
+      expect(response.status).toBe(401);
+      expect(recordedSpans).toHaveLength(0);
+    });
+  });
+
+  describe("when an exporter named the collector as its base endpoint", () => {
+    /** @scenario "An endpoint that named the collector" */
+    it.each(["/api/collector/api/otel/v1/traces", "/api/collector/v1/traces"])(
+      "serves spans posted to %s as trace ingestion",
+      async (path) => {
+        const { post, recordedSpans } = deployment();
+
+        const response = await post(path, otlpTraceBody());
+
+        expect(response.status).toBe(200);
+        expect(await response.json()).toMatchObject({ message: "Trace received successfully." });
+        expect(recordedSpans).toHaveLength(1);
+        expect(recordedSpans[0]).toMatchObject({ tenantId: PROJECT.id });
+      },
+    );
+  });
+
+  describe("when an exporter posts spans to the canonical path with a trailing slash", () => {
+    /** @scenario "An endpoint with a stray trailing slash" */
+    it("serves them as trace ingestion", async () => {
+      const { post, recordedSpans } = deployment();
+
+      const response = await post("/api/otel/v1/traces/", otlpTraceBody());
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toMatchObject({ message: "Trace received successfully." });
+      expect(recordedSpans).toHaveLength(1);
+    });
+  });
+
+  describe("when an exporter streams spans to a misconfigured path", () => {
+    /** @scenario "A streamed payload survives the correction" */
+    it("hands every span of the streamed body to ingestion", async () => {
+      const { postStream, recordedSpans } = deployment();
+      const bytes = new TextEncoder().encode(JSON.stringify(otlpTraceBody(3)));
+      const third = Math.ceil(bytes.byteLength / 3);
+      const chunks = [bytes.slice(0, third), bytes.slice(third, third * 2), bytes.slice(third * 2)];
+
+      const response = await postStream("/v1/traces", chunks);
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toMatchObject({ message: "Trace received successfully." });
+      expect(recordedSpans).toHaveLength(3);
+    });
+  });
+
+  describe("when a request arrives on a path that no known misconfiguration produces", () => {
+    /** @scenario "An unrelated path that happens to end in a signal name" */
+    it.each(["/api/gateway/v1/traces", "/api/rum/v1/traces", "/api/ingest/otel/src_123/v1/traces"])(
+      "does not treat %s as ingestion",
+      async (path) => {
+        const { post, recordedSpans, markedUsed } = deployment();
+
+        const response = await post(path, otlpTraceBody());
+
+        expect(response.status).toBe(404);
+        expect(recordedSpans).toHaveLength(0);
+        expect(markedUsed).toHaveLength(0);
+      },
+    );
+
+    /** @scenario "A path naming something other than a signal" */
+    it.each(["/api/otel/v1/traces/v1/profiles", "/api/otel/v1/traces/v2/traces", "/api/collector"])(
+      "does not treat the unknown suffix of %s as ingestion",
+      async (path) => {
+        const { post, recordedSpans, markedUsed } = deployment();
+
+        const response = await post(path, otlpTraceBody());
+
+        expect(response.status).toBe(404);
+        expect(recordedSpans).toHaveLength(0);
+        expect(markedUsed).toHaveLength(0);
+      },
+    );
+  });
+
+  describe("when an exporter posts repeatedly to the same misconfigured path", () => {
+    /** @scenario "A repeated misconfiguration is reported once a window" */
+    it("reports the correction once rather than once per batch", async () => {
+      const { post } = deployment();
+      const misconfiguredPath = "/api/v1/traces";
+
+      for (let batch = 0; batch < 3; batch += 1) {
+        const response = await post(misconfiguredPath, otlpTraceBody());
+        expect(response.status).toBe(200);
+      }
+
+      const reports = doorLog.lines.filter(
+        (line) =>
+          line.msg?.includes("non-canonical path") && line.originalPath === misconfiguredPath,
+      );
+      expect(reports).toHaveLength(1);
+      expect(reports[0]).toMatchObject({
+        projectId: PROJECT.id,
+        canonicalPath: "/api/otel/v1/traces",
+      });
+    });
+  });
+
+  describe("when the token does not resolve", () => {
+    it("refuses with 401 and records nothing", async () => {
+      const { post, recordedSpans } = deployment({ resolves: false });
+
+      const response = await post("/api/otel/v1/traces", otlpTraceBody());
+
+      expect(response.status).toBe(401);
+      expect(await response.json()).toEqual({ message: "Invalid auth token." });
+      expect(recordedSpans).toHaveLength(0);
+    });
+  });
+
+  describe("when the key resolves but does not hold traces:create", () => {
+    /** @scenario "The OTLP receiver refuses a key without the ingest permission" */
+    it("refuses the batch rather than recording it", async () => {
+      const { post, recordedSpans } = deployment({ permitted: false });
+
+      const response = await post("/api/otel/v1/traces", otlpTraceBody());
+
+      expect(response.status).toBe(403);
+      const body = await response.json();
+      expect(body).toMatchObject({
+        error: "api_key_permission_denied",
+        permission: "traces:create",
+        retryable: false,
+      });
+      expect(body).not.toHaveProperty("code");
+      expect(recordedSpans).toHaveLength(0);
+    });
+  });
+
+  describe("when a legacy project key is presented", () => {
+    /**
+     * Project keys predate RBAC and carry full project access by design, so the
+     * permission ceiling does not apply to them.
+     *
+     * @scenario "A legacy project key still exports"
+     */
+    it("accepts the batch without asking for a permission", async () => {
+      const { post, recordedSpans } = deployment({
+        type: "legacyProjectKey",
+        permitted: false,
+      });
+
+      const response = await post("/api/otel/v1/traces", otlpTraceBody());
+
+      expect(response.status).toBe(200);
+      expect(recordedSpans).toHaveLength(1);
+    });
+  });
+});

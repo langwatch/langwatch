@@ -1,0 +1,60 @@
+---
+title: "Roles & access"
+description: "Roles say what you may do; grants say who holds a role, and where. How the two fit together, and why you cannot grant more than you hold."
+sidebarTitle: Roles & access
+keywords: roles, grants, access, permissions, rbac, escalation, api keys, langwatch
+---
+
+LangWatch describes access with two words.
+
+- A **role** is what you may do: a named set of `resource:action` permissions, such as `traces:view` or `datasets:manage`.
+- A **grant** is who holds a role, and where: one principal, one role, one scope.
+
+For the permission catalogue and the built-in organization and team roles, read [Access Control (RBAC)](/platform/rbac).
+
+## Roles
+
+Every organization has three built-in roles, addressed by stable ids: `admin`, `member` and `viewer`. They cannot be changed or deleted; trying answers 409 `role_is_built_in`.
+
+A custom role is one your organization defines, when the built-in roles are not the shape you need. It is addressed by its id. Custom roles are an Enterprise feature.
+
+`GET /api/v1/roles` lists the built-in roles first, then the custom ones. `?builtIn=true` lists only the built-in roles, `?builtIn=false` only the custom ones. From the CLI:
+
+```bash
+langwatch roles list               # both
+langwatch roles list --built-in    # admin, member and viewer
+langwatch roles list --no-built-in # custom roles only
+```
+
+## Grants
+
+A grant names three things.
+
+| Part      | Options                                              |
+| --------- | ---------------------------------------------------- |
+| Principal | A user, a group, or an API key                       |
+| Role      | `admin`, `member`, `viewer`, or a custom role's id   |
+| Scope     | The organization, one team, or one project           |
+
+A grant at the organization reaches every team and project in it; a grant on a team reaches that team and its projects; a grant on a project reaches that project only. A grant can carry an end date, after which it no longer gives access.
+
+Grants are managed with the [Grants API](/api-reference/grants/overview) and `langwatch grants`, and in the product under **Settings > Roles**.
+
+## You cannot grant more than you hold
+
+You can only grant a role whose permissions you hold yourself, at that scope. The same holds when you change a grant's role, and when you create a custom role or add permissions to one: you cannot add a permission you do not hold. Renaming a role, or keeping permissions it already has, is not held against you.
+
+The rule applies to every principal, yourself included, so a grant cannot be used to raise your own access. It is enforced in one place and every door reaches it: the Grants API, the Role Bindings API and the product.
+
+The caller is checked as itself:
+
+- a person is judged by what they hold, directly and through their groups;
+- a request made with an **API key** is judged by that key's own permissions, never by those of the person who owns it. A key narrower than its owner can grant only what the key holds.
+
+An expired grant does not count towards what you hold.
+
+A refusal is 403 `grant_exceeds_caller_permissions` for a grant, or `role_exceeds_caller_permissions` for a role, and `meta.missingPermissions` lists what you lack. The CLI prints the list under **Details**.
+
+## Role bindings are deprecated
+
+Grants replace role bindings. `/api/v1/role-bindings` keeps working and reads and writes the same records, but every answer carries a `Deprecation: true` header and a `Link` header naming `/api/grants` as its successor, and `langwatch role-bindings` warns on stderr. See [the migration note](/api-reference/role-bindings/overview#migrating-to-grants).

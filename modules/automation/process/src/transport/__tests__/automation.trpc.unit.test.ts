@@ -1,0 +1,188 @@
+/**
+ * @vitest-environment node
+ * The `automation.*` namespace over the real runtime: the wire names the
+ * browser calls, the kind each one is, the permission it is answered behind,
+ * and the caller each write is attributed to.
+ */
+import { bindTrpcMiddlewareContext, createTrpcRuntime } from "@langwatch/api/trpc";
+import type { AutomationApi } from "@langwatch/automation-contract";
+import { trpcTestMembers } from "@langwatch/test-harness/trpc-members";
+import { initTRPC } from "@trpc/server";
+import { describe, expect, it, vi } from "vitest";
+
+import { automationCallerEmailContext, automationTrpcTransport } from "../automation.trpc.ts";
+import type { AutomationTrpcTestContext } from "./automation.trpc.harness.ts";
+
+function mount(
+  options: { app?: Partial<AutomationApi>; permits?: (name: string) => boolean } = {},
+) {
+  const trpc = initTRPC.context<AutomationTrpcTestContext>().create();
+  const router = createTrpcRuntime<AutomationTrpcTestContext>({
+    root: trpc,
+    procedure: trpc.procedure,
+    members: trpcTestMembers<AutomationTrpcTestContext>({ permits: options.permits }),
+  }).mount(automationTrpcTransport, () => options.app as AutomationApi, {
+    middlewareContext: [
+      bindTrpcMiddlewareContext(automationCallerEmailContext, (ctx) => ctx.email ?? null),
+    ],
+  });
+
+  return {
+    router,
+    caller: router.createCaller({ actor: { id: "user-1" }, email: "user@example.com" }),
+  };
+}
+
+describe("the automation tRPC namespace", () => {
+  describe("given the mounted router", () => {
+    it("exposes exactly the procedure names the browser calls", () => {
+      const { router } = mount();
+
+      expect(Object.keys(router._def.procedures).toSorted()).toEqual([
+        "create",
+        "deleteById",
+        "getDailyCap",
+        "getDailyCapStatus",
+        "getFireHistory",
+        "getLatestEvaluation",
+        "getNextFiring",
+        "getRecentActivity",
+        "getRecentFires",
+        "getReportSchedules",
+        "getTriggerById",
+        "getTriggerStats",
+        "getTriggers",
+        "getWebhookDeliveries",
+        "listSlackChannels",
+        "previewTriggerEmail",
+        "testFireTemplate",
+        "toggleTrigger",
+        "updateTriggerFilters",
+        "upsert",
+      ]);
+    });
+
+    it("reads with a query and changes with a mutation", () => {
+      const { router } = mount();
+      const kinds = Object.fromEntries(
+        Object.entries(router._def.procedures).map(([name, procedure]) => [
+          name,
+          (procedure as { _def: { type: string } })._def.type,
+        ]),
+      );
+
+      expect(kinds).toEqual({
+        create: "mutation",
+        deleteById: "mutation",
+        getDailyCap: "query",
+        getDailyCapStatus: "query",
+        getFireHistory: "query",
+        getLatestEvaluation: "query",
+        getNextFiring: "query",
+        getRecentActivity: "query",
+        getRecentFires: "query",
+        getReportSchedules: "query",
+        getTriggerById: "query",
+        getTriggerStats: "query",
+        getTriggers: "query",
+        getWebhookDeliveries: "query",
+        listSlackChannels: "mutation",
+        previewTriggerEmail: "query",
+        testFireTemplate: "mutation",
+        toggleTrigger: "mutation",
+        updateTriggerFilters: "mutation",
+        upsert: "mutation",
+      });
+    });
+  });
+
+  describe("given a caller who may view automations but not change them", () => {
+    describe("when a write is called", () => {
+      it("refuses the write and still answers the read", async () => {
+        const { caller } = mount({
+          app: { getFireStats: async () => [] },
+          permits: (permission) => permission === "triggers:view",
+        });
+
+        await expect(caller.getTriggerStats({ projectId: "project-1" })).resolves.toEqual([]);
+        await expect(
+          caller.deleteById({ projectId: "project-1", triggerId: "trigger-1" }),
+        ).rejects.toMatchObject({ code: "FORBIDDEN" });
+      });
+    });
+
+    describe("when a Slack write is called", () => {
+      /** @scenario "Only a caller who may change automations lists Slack channels or test-fires" */
+      it("asks triggers:update, as main did, and refuses both", async () => {
+        const asked: string[] = [];
+        const { caller } = mount({
+          permits: (permission) => {
+            asked.push(permission);
+            return permission === "triggers:view";
+          },
+        });
+
+        await expect(
+          caller.listSlackChannels({ projectId: "project-1", slackIntegrationId: "slack-1" }),
+        ).rejects.toMatchObject({ code: "FORBIDDEN" });
+        await expect(
+          caller.testFireTemplate({
+            projectId: "project-1",
+            channel: "slack",
+            trigger: { name: "Nightly", alertType: null },
+            draft: {},
+          }),
+        ).rejects.toMatchObject({ code: "FORBIDDEN" });
+
+        expect(asked).toEqual(["triggers:update", "triggers:update"]);
+      });
+    });
+  });
+
+  describe("given the signed-in author", () => {
+    describe("when a test fire is asked for", () => {
+      it("delivers it to the address the process resolved, never one the client sent", async () => {
+        const sendTestFire = vi.fn().mockResolvedValue({
+          channel: "email",
+          recipientCount: 1,
+          usedDefault: false,
+          missingVariables: [],
+          errors: [],
+        });
+        const { caller } = mount({ app: { sendTestFire } });
+
+        await caller.testFireTemplate({
+          projectId: "project-1",
+          channel: "email",
+          trigger: { name: "Nightly", alertType: null },
+          draft: {},
+        } as never);
+
+        expect(sendTestFire).toHaveBeenCalledWith(expect.anything(), {
+          id: "user-1",
+          email: "user@example.com",
+        });
+      });
+    });
+
+    describe("when an automation is saved", () => {
+      it("attributes the write to the caller the door resolved", async () => {
+        const saveAutomation = vi.fn().mockResolvedValue({ id: "trigger-1" });
+        const { caller } = mount({ app: { saveAutomation } });
+
+        await caller
+          .upsert({
+            projectId: "project-1",
+            name: "Nightly",
+            action: "SEND_EMAIL",
+            filters: {},
+            actionParams: {},
+            templates: {},
+          } as never)
+          .catch(() => undefined);
+
+        expect(saveAutomation).toHaveBeenCalledWith(expect.anything(), { id: "user-1" });
+      });
+    });
+  });
+});

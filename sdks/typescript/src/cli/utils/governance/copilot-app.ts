@@ -1,27 +1,7 @@
 /**
- * GitHub Copilot **app** capture (sourceType `copilot_app`, ADR-039
- * §Extension).
- *
- * The standalone GitHub Copilot app is a long-running GUI, not a
- * per-invocation CLI, so there is nothing to wrap. It embeds the same
- * OpenTelemetry runtime as the Copilot CLI and, given the standard
- * OTLP-endpoint env vars, pushes one `gen_ai.*` OTLP record per LLM call
- * straight to LangWatch's `/api/otel` — the exact transport already
- * shipped for `copilot_cli` (§Decision, Path B). There is no file to
- * read, no SQLite, no pairing.
- *
- * Two facts force the delivery shape (both spike-verified against the
- * shipped app, build 1.0.71):
- *   1. Copilot enables OTLP export only through environment variables,
- *      and the ingest key travels in an env-only auth header — no config
- *      file can supply it.
- *   2. A GUI launched from the Dock inherits no shell, but the app DOES
- *      inherit env into its spawned runtime engine when launched with it.
- * So a user-level login agent owns the app's launch and sets the capture
- * env on the app process. This module holds the pure, OS-agnostic core:
- * the env block, app detection, and the per-OS login-agent descriptors.
- * The imperative install/remove (writing the descriptor + registering it
- * with the OS) lives in `copilot-app-agent.ts`.
+ * GitHub Copilot **app** capture (ADR-039 §Extension). The GUI app only
+ * enables OTLP via env vars and inherits no shell from the Dock, so a login
+ * agent owns its launch and sets the capture env (install in `copilot-app-agent.ts`).
  */
 
 import * as path from "node:path";
@@ -46,16 +26,11 @@ export interface CopilotAppEnvOptions {
 }
 
 /**
- * The env the login agent sets on the app process. Reuses the exact
- * Copilot Path-B OTLP block (endpoint + Bearer header + enable +
- * exporter type + protocol + content flag), relabeled `copilot-app` so
- * the surface is distinguishable in resource attributes. Source
- * separation from the CLI is enforced by the distinct `copilot_app`
- * ingest key, stamped at the receiver — not by this label.
+ * The env the login agent sets on the app process: the Copilot Path-B OTLP
+ * block, relabeled `copilot-app` for resource attributes. Source separation
+ * from the CLI is enforced by the distinct `copilot_app` ingest key.
  */
-export function buildCopilotAppEnv(
-  opts: CopilotAppEnvOptions,
-): Record<string, string> {
+export function buildCopilotAppEnv(opts: CopilotAppEnvOptions): Record<string, string> {
   const env = buildOtelEnvBlock("copilot", opts.endpoint, opts.token);
   env.OTEL_RESOURCE_ATTRIBUTES = "service.name=copilot-app";
   if (!opts.captureContent) {
@@ -65,10 +40,9 @@ export function buildCopilotAppEnv(
 }
 
 /**
- * Candidate executables to launch the Copilot app for each platform, in
- * priority order. Launching the executable directly (rather than `open
- * -a`) is what lets the injected env reach the app's spawned runtime
- * engine — verified on macOS.
+ * Candidate executables to launch the Copilot app per platform, in
+ * priority order. Launching directly (not `open -a`) is what lets
+ * injected env reach the app's spawned runtime -- verified on macOS.
  */
 export function copilotAppCandidatePaths(
   platform: AppPlatform,
@@ -85,8 +59,7 @@ export function copilotAppCandidatePaths(
         "/usr/bin/github-copilot",
       ];
     case "win32": {
-      const localAppData =
-        env.LOCALAPPDATA ?? path.join(home, "AppData", "Local");
+      const localAppData = env.LOCALAPPDATA ?? path.join(home, "AppData", "Local");
       const programFiles = env.ProgramFiles ?? "C:\\Program Files";
       return [
         path.join(localAppData, "Programs", "GitHub Copilot", "GitHub Copilot.exe"),
@@ -157,17 +130,9 @@ function windowsAgentDir(home: string): string {
 }
 
 /**
- * Render the OS-native login-agent files that launch the Copilot app with
- * the capture env at login. Pure: returns exact paths + content, fully
- * assertable without touching disk.
- *
- * Per-platform env-injection mechanism:
- *   - macOS   — launchd `EnvironmentVariables` dict on the plist.
- *   - Linux   — systemd `Environment=` directives (ExecStart is quoted so
- *               an app path with spaces is not word-split).
- *   - Windows — Task Scheduler XML has NO way to set process env, so the
- *               task runs a generated `.cmd` wrapper that `set`s the vars
- *               and then `start`s the app.
+ * Renders the OS-native login-agent files that launch Copilot with the
+ * capture env, pure and fully assertable without disk. Windows Task
+ * Scheduler XML can't set process env, so it runs a `.cmd` wrapper.
  */
 export function renderLaunchAgent(spec: LaunchAgentSpec): LaunchAgentDescriptor {
   const entries = Object.entries(spec.env);
@@ -186,10 +151,7 @@ export function renderLaunchAgent(spec: LaunchAgentSpec): LaunchAgentDescriptor 
   switch (spec.platform) {
     case "darwin": {
       const envXml = entries
-        .map(
-          ([k, v]) =>
-            `    <key>${xmlEscape(k)}</key>\n    <string>${xmlEscape(v)}</string>`,
-        )
+        .map(([k, v]) => `    <key>${xmlEscape(k)}</key>\n    <string>${xmlEscape(v)}</string>`)
         .join("\n");
       const content = `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -222,12 +184,10 @@ ${envXml}
       };
     }
     case "linux": {
-      // Escape ORDER matters (CodeQL js/incomplete-sanitization, alert
-      // #249): backslashes FIRST — a value ending in `\` would otherwise
-      // combine with the appended closing quote into an escaped-quote
-      // sequence under systemd's unit-file quoting, unterminating the
-      // value. Then `%` (a specifier introducer, doubled — same reason the
-      // Windows wrapper doubles it for cmd), then `"`.
+      // Escape ORDER matters (CodeQL js/incomplete-sanitization #249):
+      // backslashes first (a trailing backslash would merge with the closing
+      // quote and unterminate the value under systemd quoting), then `%`
+      // (doubled, like the Windows wrapper), then `"`.
       const envLines = entries
         .map(
           ([k, v]) =>
@@ -239,12 +199,10 @@ ${envXml}
         .join("\n");
       // ExecStart is quoted: the app path may contain spaces (e.g.
       // "/opt/GitHub Copilot/github-copilot"); unquoted, systemd would
-      // word-split it into a bogus executable + argument.
-      // graphical-session.target, not default.target: a GUI binary launched
-      // from default.target typically has no DISPLAY/WAYLAND_DISPLAY in the
-      // systemd --user environment and fails to start; tying the unit to the
-      // graphical session starts it when the desktop is actually up and
-      // stops it when the session ends.
+      // word-split it.
+
+      // graphical-session.target, not default.target: a GUI binary from
+      // default.target often lacks DISPLAY/WAYLAND_DISPLAY and fails to start.
       const content = `[Unit]
 Description=LangWatch capture for the GitHub Copilot app
 After=graphical-session.target
@@ -275,13 +233,10 @@ WantedBy=graphical-session.target
       const wrapperPath = path.join(dir, `${COPILOT_APP_AGENT_LABEL}.cmd`);
       const xmlPath = path.join(dir, `${COPILOT_APP_AGENT_LABEL}.xml`);
 
-      // Task Scheduler cannot set env in XML; the task runs this wrapper,
-      // which sets each var then launches the app. `%` is doubled so cmd
-      // does not treat it as a variable reference. A `"` inside a value has
-      // NO reliable in-quote escape in cmd — it would terminate the quoted
-      // `set` early and hand the rest of the value to the shell (same class
-      // as the systemd backslash gap, CodeQL #249) — so refuse to render
-      // rather than emit a corrupted or injectable wrapper.
+      // Task Scheduler cannot set env in XML, so this wrapper sets each var
+      // then launches the app. `%` is doubled for cmd; a `"` in a value has
+      // no reliable in-quote escape (same class as the systemd gap, CodeQL
+      // #249), so refuse to render rather than emit a corrupted wrapper.
       const setLines = entries
         .map(([k, v]) => {
           if (v.includes('"')) {

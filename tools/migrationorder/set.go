@@ -19,6 +19,9 @@ type Set struct {
 	// restructure. Entries found there on the base branch are merged history —
 	// a branch that moves them is not adding them.
 	PreviousDirectories []string
+	// ForbiddenDirectories are old roots that may still exist in base history
+	// but must never contain entries at the branch head.
+	ForbiddenDirectories []string
 	// Key extracts the numeric ordering key from an entry name; its first
 	// capture group must be the digits the entries sort by.
 	Key *regexp.Regexp
@@ -26,27 +29,53 @@ type Set struct {
 	Format string
 	// Render turns a free key into the name fragment the suggested rename uses.
 	Render func(key int64) string
+	// ReleaseKeysTaken marks a set whose database keeps one row per key, so a
+	// key a release line already used is taken whether or not anything has
+	// released it yet (goose; rethink F10). Prisma records full names instead.
+	ReleaseKeysTaken bool
+	// RetiredKeys are keys whose migration was deleted before reaching main.
+	// A database already past the key would skip a file reusing it, so no
+	// later file may take it. The value is the reason, for the finding.
+	RetiredKeys map[int64]string
 }
 
 // Sets are the ordered migration directories in this repository.
 var Sets = []Set{
 	{
 		Name:                "Prisma",
-		Directory:           "platform/app/prisma/migrations",
-		PreviousDirectories: []string{"langwatch/prisma/migrations"},
-		Key:                 regexp.MustCompile(`^(\d{14})_`),
-		Format:              "YYYYMMDDHHMMSS_name",
+		Directory:           "packages/prisma-client/prisma/migrations",
+		PreviousDirectories: []string{"platform/app/prisma/migrations", "langwatch/prisma/migrations"},
+		ForbiddenDirectories: []string{
+			"platform/app/prisma/migrations",
+			"langwatch/prisma/migrations",
+		},
+		Key:    regexp.MustCompile(`^(\d{14})_`),
+		Format: "YYYYMMDDHHMMSS_name",
 		// A literal key rather than a $(date) expansion: free keys count up from
 		// the newest timestamp in play, so twins renamed from one comment get
 		// distinct names instead of colliding on the same second.
 		Render: func(key int64) string { return fmt.Sprintf("%014d", key) },
 	},
 	{
-		Name:                "ClickHouse",
-		Directory:           "platform/app/src/server/clickhouse/migrations",
-		PreviousDirectories: []string{"langwatch/src/server/clickhouse/migrations"},
-		Key:                 regexp.MustCompile(`^(\d{5})_.*\.sql$`),
-		Format:              "NNNNN_name.sql",
-		Render:              func(key int64) string { return fmt.Sprintf("%05d", key) },
+		Name:      "ClickHouse",
+		Directory: "packages/clickhouse-migrations/migrations",
+		PreviousDirectories: []string{
+			"apps/api/src/tasks/clickhouse-migrate/migrations",
+			"platform/app/src/server/clickhouse/migrations",
+			"langwatch/src/server/clickhouse/migrations",
+		},
+		ForbiddenDirectories: []string{
+			"apps/api/src/tasks/clickhouse-migrate/migrations",
+			"platform/app/src/server/clickhouse/migrations",
+			"langwatch/src/server/clickhouse/migrations",
+		},
+		Key:              regexp.MustCompile(`^(\d{5})_.*\.sql$`),
+		Format:           "NNNNN_name.sql",
+		Render:           func(key int64) string { return fmt.Sprintf("%05d", key) },
+		ReleaseKeysTaken: true,
+		RetiredKeys: map[int64]string{
+			107: "00107_create_trace_topic_names was removed with the trace copies",
+			108: "00108 was removed with the trace copies",
+		},
 	},
 }

@@ -1,0 +1,119 @@
+import {
+  bindRestCredential,
+  keyCredentialOfRequest,
+  keyDoorPrincipalOfRequest,
+  projectCredentialOfRequest,
+} from "@langwatch/api/rest";
+import type {
+  GatewayApi,
+  GatewayRequestCredential,
+  GatewayServerConfig,
+} from "@langwatch/gateway-contract";
+import { defineProcessModule, type PublishedProcessModule } from "@langwatch/process";
+import type { RedisConnection } from "@langwatch/redis-client";
+
+import { GatewayModule } from "./app/gateway.app.ts";
+import { gatewayChannels } from "./channels/gateway-channels.registry.ts";
+import { gatewayConnectManagedKeyEventing } from "./eventing/gateway-connect-managed-key.pipeline.ts";
+import { gatewayGovernanceEventsEventing } from "./eventing/gateway-governance-events.pipeline.ts";
+import { gatewayInstantEvalJudgeSpendEventing } from "./eventing/gateway-instant-eval-judge-spend.pipeline.ts";
+import { gatewayPulledUsageLedgerEventing } from "./eventing/gateway-pulled-usage-ledger.pipeline.ts";
+import { gatewayRealtimeSessionEventing } from "./eventing/gateway-realtime-session.pipeline.ts";
+import { gatewaySpendEventing } from "./eventing/gateway-spend.pipeline.ts";
+import {
+  GatewayBudgetChangeDedupeService,
+  type BudgetChangeEventDedupeService,
+} from "./features/budget/services/gateway-budget-change-dedupe.service.ts";
+import { gatewayRepositories } from "./repositories/gateway-repositories.registry.ts";
+import { RedisGatewayBudgetChangeDedupeRepository } from "./repositories/redis/redis.gateway-budget-change-dedupe.repository.ts";
+import { TraceDestinationReportTask } from "./tasks/trace-destination-report.task.ts";
+import { agentCacheRest } from "./transport/agent-cache.rest.ts";
+import { elevenLabsWebhookRest } from "./transport/elevenlabs-webhook.rest.ts";
+import { gatewayBudgetTrpcTransport } from "./transport/gateway-budget.trpc.ts";
+import { gatewayCacheRuleTrpcTransport } from "./transport/gateway-cache-rule.trpc.ts";
+import { gatewayGuardrailTrpcTransport } from "./transport/gateway-guardrail.trpc.ts";
+import { gatewayInternalRest } from "./transport/gateway-internal.rest.ts";
+import { gatewayPlatformRest } from "./transport/gateway-platform.rest.ts";
+import { gatewaySpendEventTrpcTransport } from "./transport/gateway-spend-event.trpc.ts";
+import { gatewaySpendRest } from "./transport/gateway-spend.rest.ts";
+import { gatewayUsageTrpcTransport } from "./transport/gateway-usage.trpc.ts";
+import { virtualKeyTrpcTransport } from "./transport/virtual-key.trpc.ts";
+
+export const gatewayProcessModule: PublishedProcessModule<
+  "gateway",
+  GatewayApi,
+  GatewayServerConfig
+> = defineProcessModule("gateway")
+  .withRepositories(gatewayRepositories)
+  .withChannels(gatewayChannels)
+  .withApi(GatewayModule)
+  .withTransports(
+    agentCacheRest,
+    elevenLabsWebhookRest,
+    gatewayInternalRest,
+    gatewayBudgetTrpcTransport,
+    gatewayCacheRuleTrpcTransport,
+    gatewayGuardrailTrpcTransport,
+    gatewayPlatformRest,
+    gatewaySpendRest,
+    gatewaySpendEventTrpcTransport,
+    gatewayUsageTrpcTransport,
+    virtualKeyTrpcTransport,
+  )
+  .withEventing(gatewayGovernanceEventsEventing)
+  .withEventing(gatewaySpendEventing)
+  .withEventing(gatewayRealtimeSessionEventing)
+  .withEventing(gatewayPulledUsageLedgerEventing)
+  .withEventing(gatewayInstantEvalJudgeSpendEventing)
+  .withEventing(gatewayConnectManagedKeyEventing)
+  .withTasks(({ repositories }) => [
+    TraceDestinationReportTask.create({ repository: () => repositories.traceDestinationReport }),
+  ])
+  .provideMiddlewareBindings(({ app }) => [
+    // The gateway control plane is signed rather than bearer-authenticated.
+    // It owns the same declared secret as the data-plane client.
+    bindRestCredential("internal_secret", () => app.internalDoor()),
+  ])
+  .provideMiddlewareContext({
+    // Organization-owned rows take any API key; the key door asked the route's permission.
+    gatewayKeyCaller: (request) => keyCredentialOfRequest(request),
+    // A virtual key route also serves a project-bound access token, as its person.
+    gatewayVirtualKeyCaller: (request) => keyDoorPrincipalOfRequest(request),
+    // The callback arrives publicly and the application verifies the raw bytes
+    // against the provider row's own stored secret, so the header is all the
+    // transport carries.
+    gatewayRestCredential: (request): GatewayRequestCredential => {
+      const credential = projectCredentialOfRequest(request);
+      if (credential.type === "legacyProjectKey") return { kind: "legacyProjectKey" };
+      if (credential.type === "cliAccessToken") {
+        return {
+          kind: "user",
+          userId: credential.userId,
+          organizationId: credential.organizationId,
+        };
+      }
+
+      return {
+        kind: "apiKey",
+        apiKeyId: credential.apiKeyId,
+        userId: credential.userId,
+        organizationId: credential.organizationId,
+      };
+    },
+    elevenLabsSignature: (request) => ({
+      signature: request.headers.get("elevenlabs-signature") ?? undefined,
+    }),
+  });
+
+/**
+ * The advisory dedupe window a spend graph debits through: without it
+ * BUDGET_UPDATED fires on every debit and a busy project evicts its own gateway
+ * bundles as fast as it spends. With no Redis the stand-in emits every time.
+ */
+export function createGatewayBudgetChangeDedupe(options: {
+  redis?: RedisConnection | null | undefined;
+}): BudgetChangeEventDedupeService {
+  return GatewayBudgetChangeDedupeService.create(
+    options.redis ? RedisGatewayBudgetChangeDedupeRepository.create(options.redis) : null,
+  );
+}

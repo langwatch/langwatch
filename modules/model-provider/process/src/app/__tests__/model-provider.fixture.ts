@@ -1,0 +1,190 @@
+/**
+ * The application a suite drives, over memory repositories and stand-ins
+ * for what a deployment would supply: a registry with no managed providers,
+ * a fixed id suffix, and a rate limiter that never refuses. No network, no DB.
+ */
+import type { AuthzApi } from "@langwatch/authz-contract";
+import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
+import type { ManagedProviderApi } from "@langwatch/enterprise-managed-provider-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
+import { projectWithTeamSchema, type ProjectApi } from "@langwatch/project-contract";
+import type { SecretApi } from "@langwatch/secret-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import type { TraceApi } from "@langwatch/trace-contract";
+
+import { MemoryModelProviderChannels } from "../../channels/memory/memory.model-provider.channels.ts";
+import { CodexAccountService } from "../../features/codex/services/codex-account.service.ts";
+import { CodexOAuthModelProviderTokenRefresherService } from "../../features/codex/services/codex-oauth-model-provider-token-refresher.service.ts";
+import type { ModelProviderCredentialProbe } from "../../features/credential-probe/services/http-model-provider-credential-probe.service.ts";
+import { UnavailableModelProviderCredentialProbeService } from "../../features/credential-probe/services/unavailable-model-provider-credential-probe.service.ts";
+import { WindowedModelProviderConnectionRateLimiterService } from "../../features/credential-probe/services/windowed-model-provider-connection-rate-limiter.service.ts";
+import { MemoryModelProviderRepositories } from "../../repositories/memory/memory.model-provider.repositories.ts";
+import type { ModelProviderRepositories } from "../../repositories/model-provider.repositories.ts";
+import { PrefixedModelProviderIdService } from "../../services/prefixed-model-provider-id.service.ts";
+import { RegistryModelProviderCatalogService } from "../../services/registry-model-provider-catalog.service.ts";
+import { UnmanagedModelProviderGatewayService } from "../../services/unmanaged-model-provider-gateway.service.ts";
+import { VercelAiModelTranslationService } from "../../services/vercel-ai-model-translation.service.ts";
+import { ModelProviderModule, type ModelProviderInfrastructure } from "../model-provider.app.ts";
+
+/** A suite that did not decide the issuer's answers must not reach one. */
+const refuseFetch: typeof fetch = () => {
+  throw new Error("this suite reached the Codex issuer without deciding its answers");
+};
+
+/** The address a resolved model would execute against, unreachable on purpose. */
+const UNREACHABLE_EXECUTION_PROXY = "http://nlp-engine-not-configured.invalid";
+
+export function createModelProviderTestProjects(): ProjectApi {
+  return createApiFixture<ProjectApi>({
+    getWithTeam: async (id: string) => testProject(id),
+    findWithTeam: async (id: string) => testProject(id),
+  });
+}
+
+function testProject(id: string) {
+  return projectWithTeamSchema.parse({
+    id,
+    name: "Test Project",
+    slug: "test-project",
+    apiKey: "test-api-key",
+    lwqlKey: "test-lwql-key",
+    teamId: "team-1",
+    language: "typescript",
+    framework: "langchain",
+    kind: "application",
+    firstMessage: false,
+    integrated: true,
+    createdAt: new Date("2026-01-01T00:00:00.000Z"),
+    updatedAt: new Date("2026-01-01T00:00:00.000Z"),
+    userLinkTemplate: null,
+    traceSharingEnabled: false,
+    presenceEnabled: false,
+    s3Endpoint: null,
+    s3AccessKeyId: null,
+    s3SecretAccessKey: null,
+    s3Bucket: null,
+    archivedAt: null,
+    isPersonal: false,
+    ownerUserId: null,
+    personalFeatures: {},
+    departmentId: null,
+    langyEgressAllowlist: null,
+    lastCodingAgentSessionAt: null,
+    lastCodingAgentPullRequestAt: null,
+    team: {
+      id: "team-1",
+      name: "Test Team",
+      slug: "test-team",
+      organizationId: "organization-1",
+      createdAt: new Date("2026-01-01T00:00:00.000Z"),
+      updatedAt: new Date("2026-01-01T00:00:00.000Z"),
+      archivedAt: null,
+      isPersonal: false,
+      ownerUserId: null,
+      departmentId: null,
+    },
+  });
+}
+
+/** The organization read the scope derivation makes for an organization scope. */
+export function createModelProviderTestOrganizations(): OrganizationApi {
+  return createApiFixture<OrganizationApi>({
+    getBillingProfile: async ({ organizationId }: { organizationId: string }) => ({
+      id: organizationId,
+      name: "Test Organization",
+      billingCustomerId: null,
+    }),
+  });
+}
+
+/** What a deployment answers, as a suite that decided none of it sees it. */
+export function createModelProviderTestInfrastructure(
+  overrides: Partial<ModelProviderInfrastructure> = {},
+): ModelProviderInfrastructure {
+  const projects = createModelProviderTestProjects();
+
+  return {
+    catalog: RegistryModelProviderCatalogService.create({
+      managed: UnmanagedModelProviderGatewayService.create(),
+      probe: UnavailableModelProviderCredentialProbeService.create(),
+      systemProviderEnvironment: {},
+      isSaas: false,
+    }),
+    translation: VercelAiModelTranslationService.create({
+      projects,
+      executionProxyBaseUrl: UNREACHABLE_EXECUTION_PROXY,
+    }),
+    ...MemoryModelProviderChannels.create({ bound: { traces: createModelProviderTestTraces() } }),
+    ids: PrefixedModelProviderIdService.create(),
+    codexTokenRefresher: CodexOAuthModelProviderTokenRefresherService.create(),
+    connectionRateLimiter: WindowedModelProviderConnectionRateLimiterService.create({
+      limiter: { consume: async () => ({ allowed: true, resetAt: 0 }) },
+    }),
+    credentialProbe: UnavailableModelProviderCredentialProbeService.create(),
+    codexAccounts: CodexAccountService.create({ fetchImpl: refuseFetch }),
+    ...overrides,
+  };
+}
+
+/** A trace module that saw no spans: the preview answers "no matches". */
+export function createModelProviderTestTraces(): TraceApi {
+  return createApiFixture<TraceApi>({
+    readModelUsageStats: async () => [],
+    readRecentSpansByModels: async () => [],
+  });
+}
+
+export function createModelProviderTestApp(
+  input: Readonly<{
+    repositories?: ModelProviderRepositories;
+    infrastructure?: Partial<ModelProviderInfrastructure>;
+    dependencies?: Partial<{
+      projects: ProjectApi;
+      organizations: OrganizationApi;
+      permissions: AuthzApi;
+      dataPrivacy: DataPrivacyApi;
+      managed: ManagedProviderApi;
+      secrets: SecretApi;
+    }>;
+  }> = {},
+): ModelProviderModule {
+  return ModelProviderModule.createForTesting({
+    repositories: input.repositories ?? MemoryModelProviderRepositories.create(),
+    infrastructure: createModelProviderTestInfrastructure(input.infrastructure ?? {}),
+    dependencies: {
+      projects: input.dependencies?.projects ?? createModelProviderTestProjects(),
+      organizations: input.dependencies?.organizations ?? createModelProviderTestOrganizations(),
+      permissions:
+        input.dependencies?.permissions ??
+        createApiFixture<AuthzApi>({ hasProjectPermission: async () => true }),
+      dataPrivacy: input.dependencies?.dataPrivacy ?? createModelProviderTestDataPrivacy(),
+      managed: input.dependencies?.managed ?? createModelProviderTestManagedProviders(),
+      secrets: input.dependencies?.secrets ?? createModelProviderTestSecrets(),
+    },
+  });
+}
+
+/** A project store holding no secret: Codex's gateway ping finds no virtual key. */
+export function createModelProviderTestSecrets(values: Record<string, string> = {}): SecretApi {
+  return createApiFixture<SecretApi>({ getValues: async () => values });
+}
+
+/** A deployment with no managed provider: every provider is the customer's own. */
+export function createModelProviderTestManagedProviders(
+  managedOrganizationIds: readonly string[] = [],
+): ManagedProviderApi {
+  return createApiFixture<ManagedProviderApi>({
+    isManagedProvider: ({ organizationId, provider }) =>
+      provider === "bedrock" && managedOrganizationIds.includes(organizationId),
+    buildLitellmParameters: async ({ params }) => params,
+  });
+}
+
+/** A deployment holding no Google credential: data privacy lends `undefined`. */
+export function createModelProviderTestDataPrivacy(credential?: string): DataPrivacyApi {
+  return createApiFixture<DataPrivacyApi>({
+    intoGoogleApplicationCredentials: (build) => build(credential),
+  });
+}
+
+export type { ModelProviderCredentialProbe };

@@ -1,0 +1,104 @@
+import type {
+  CreateTriggerCommand,
+  Trigger,
+  TriggerSummary,
+  UpdateTriggerCommand,
+} from "@langwatch/automation-contract";
+
+import { AutomationLogger } from "../../../services/automation.service.ts";
+import type { ReportScheduleTarget } from "../../trigger.repository.ts";
+import { TriggerRepository } from "../../trigger.repository.ts";
+
+const unavailable = (): Promise<never> => Promise.reject(new Error("unused test dependency"));
+
+export class HeartbeatTriggerRepository extends TriggerRepository {
+  constructor(private readonly triggersByProject: Record<string, TriggerSummary[]>) {
+    super();
+  }
+
+  countUsage(): Promise<{ triggers: number }> {
+    return Promise.resolve({ triggers: 0 });
+  }
+  findActiveForProject(projectId: string): Promise<TriggerSummary[]> {
+    return Promise.resolve(this.triggersByProject[projectId] ?? []);
+  }
+
+  findActiveReportTargets(): Promise<ReportScheduleTarget[]> {
+    return unavailable();
+  }
+
+  findAllReportTargets(): Promise<ReportScheduleTarget[]> {
+    return unavailable();
+  }
+
+  claimSend(): Promise<boolean> {
+    return unavailable();
+  }
+
+  isSendClaimed(): Promise<boolean> {
+    return unavailable();
+  }
+
+  findSlackTriggers(): Promise<Trigger[]> {
+    return unavailable();
+  }
+
+  findActiveSlackTriggerPage(): Promise<Trigger[]> {
+    return unavailable();
+  }
+
+  replaceActionParamsIfUnchanged(): Promise<boolean> {
+    return unavailable();
+  }
+
+  findClaimedTraceIds(): Promise<Set<string>> {
+    return unavailable();
+  }
+
+  updateLastRunAt(): Promise<void> {
+    return unavailable();
+  }
+
+  findByIdOrThrow(): Promise<Trigger> {
+    return unavailable();
+  }
+
+  findById(): Promise<Trigger | null> {
+    return unavailable();
+  }
+
+  findAllByProjectId(): Promise<Trigger[]> {
+    return unavailable();
+  }
+
+  findByCustomGraphId(): Promise<Trigger | null> {
+    return unavailable();
+  }
+
+  findByCustomGraphIds(): Promise<Trigger[]> {
+    return unavailable();
+  }
+
+  create(_input: CreateTriggerCommand): Promise<Trigger> {
+    return unavailable();
+  }
+
+  update(_input: UpdateTriggerCommand): Promise<Trigger> {
+    return unavailable();
+  }
+
+  openSecret(): string {
+    throw new Error("The heartbeat never opens a secret.");
+  }
+
+  sealSecret(): string {
+    throw new Error("The heartbeat never seals a secret.");
+  }
+}
+
+export class SilentAutomationLogger extends AutomationLogger {
+  error(): void {}
+  debug(): void {}
+  info(): void {}
+  warn(): void {}
+}

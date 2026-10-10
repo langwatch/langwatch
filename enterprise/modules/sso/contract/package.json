@@ -1,0 +1,40 @@
+{
+  "name": "@langwatch/enterprise-sso-contract",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Portable Enterprise SSO configuration, gate, matching, and path contracts.",
+  "license": "SEE LICENSE IN ../../../LICENSE.md",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    },
+    "./sign-in-providers": {
+      "types": "./dist/sso-sign-in-providers.d.ts",
+      "default": "./src/sso-sign-in-providers.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc -b",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@langwatch/authorization": "workspace:*",
+    "@langwatch/config": "workspace:*",
+    "@langwatch/identity-contract": "workspace:*",
+    "@langwatch/module": "workspace:*",
+    "@langwatch/secrets": "workspace:*",
+    "better-auth": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

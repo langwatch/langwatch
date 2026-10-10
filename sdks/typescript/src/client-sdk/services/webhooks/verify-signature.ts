@@ -1,46 +1,25 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 
 /**
- * Receiver-side verification of a LangWatch webhook delivery.
- *
- * Every delivery carries
- *
- *   X-LangWatch-Signature: t=<unix seconds>,v1=<hex hmac-sha256>[,v1=<hex>]
- *
- * where each `v1` is HMAC-SHA256 over `"<t>.<raw body>"` under one currently
- * valid signing secret. `v1` REPEATS during a secret rotation, newest first,
- * which is what lets a receiver swap secrets on its own schedule instead of
- * dropping deliveries mid-swap.
- *
- * That repetition is the reason this helper exists. A hand-rolled parser that
- * keeps the LAST `v1` it sees, or splits the header into a flat key/value map,
- * rejects every delivery to a receiver that has already moved to the new
- * secret: the signature it kept is the one computed from the OLD secret. The
- * bug only appears during a rotation, which is exactly when a receiver can
- * least afford to be dropping deliveries.
- *
- * The algorithm here is pinned to the sender's by the vectors in
- * `specs/webhooks/signature-vectors.json`, generated from the server's own
- * signing code and asserted by the suite next to this file.
+ * Verify webhook delivery signature in X-LangWatch-Signature header.
+ * Handles secret rotation: v1 repeats with newest first.
+ * Pinned to sender's algorithm by specs/webhooks/signature-vectors.json.
  */
 
 /** The header a delivery carries its signature in. */
 export const WEBHOOK_SIGNATURE_HEADER = "X-LangWatch-Signature";
 
 /**
- * Identifies one delivery ATTEMPT on the webhook platform's endpoints.
- *
- * The natural idempotency key for a receiver: retries of the same batch repeat
- * it, so a receiver that has already processed this id can acknowledge and
- * stop rather than applying the batch twice.
+ * Identifies one delivery ATTEMPT on the webhook platform's endpoints. The
+ * natural idempotency key: retries of the same batch repeat it, so a
+ * receiver that already processed this id can stop, not apply it twice.
  */
 export const WEBHOOK_DELIVERY_ID_HEADER = "X-LangWatch-Delivery-Id";
 
 /**
  * The same role on automation deliveries (graph alerts and friends), which
- * group their attempts by the logical fire rather than by the batch.
- *
- * Two names because they are two senders: read whichever the delivery carries.
+ * group attempts by the logical fire rather than the batch. Two names
+ * because they are two senders: read whichever the delivery carries.
  */
 export const WEBHOOK_EVENT_ID_HEADER = "X-LangWatch-Event-Id";
 
@@ -51,14 +30,8 @@ export const WEBHOOK_EVENT_ID_HEADER = "X-LangWatch-Event-Id";
 export const WEBHOOK_SIGNATURE_DEFAULT_TOLERANCE_SECONDS = 300;
 
 /**
- * Why a delivery was refused. Switch on this rather than on the message: the
- * message is written for a human reading a log and will change, the code is
- * the contract.
- *
- * The three mean genuinely different things to an operator. `stale_timestamp`
- * is a clock or a replay and is worth alerting on; `invalid_signature` is a
- * wrong secret or a tampered body; `malformed_header` is almost always
- * something other than LangWatch posting to the URL.
+ * Why a delivery was refused: malformed_header, stale_timestamp, invalid_signature.
+ * Switch on code, not message; message is for logs and may change.
  */
 export type WebhookSignatureFailureCode =
   | "malformed_header"
@@ -66,11 +39,7 @@ export type WebhookSignatureFailureCode =
   | "invalid_signature";
 
 /**
- * A delivery that did not verify.
- *
- * One class carrying a `code` rather than three classes, because the SDK and
- * the platform both ask callers to branch on a stable code instead of on the
- * error's identity, which does not survive a serialization boundary.
+ * A delivery that did not verify. Use code, not error type, to branch logic.
  */
 export class WebhookSignatureVerificationError extends Error {
   readonly code: WebhookSignatureFailureCode;
@@ -84,22 +53,17 @@ export class WebhookSignatureVerificationError extends Error {
 
 export interface VerifyWebhookSignatureOptions {
   /**
-   * The EXACT bytes of the request body, as received.
-   *
-   * Not a parsed object, and not the result of re-serializing one: the digest
-   * is over the bytes the sender hashed, and `JSON.parse` followed by
-   * `JSON.stringify` reorders keys, drops insignificant whitespace and
-   * re-escapes non-ASCII, any of which changes the digest. Read the raw body
-   * before your framework's JSON middleware does.
+   * The EXACT bytes of the request body, as received — not a parsed or
+   * re-serialized object: `JSON.stringify` reorders keys and re-escapes
+   * text, changing the digest. Read the raw body before your JSON middleware.
    */
   body: string | Uint8Array;
   /** The `X-LangWatch-Signature` header value, verbatim. */
   header: string;
   /**
    * The signing secret, or every secret this receiver currently accepts.
-   *
-   * Pass both values during a rotation and the delivery verifies under
-   * either, so there is no window where deliveries are refused.
+   * Pass both during a rotation and the delivery verifies under either, so
+   * there is no window where deliveries are refused.
    */
   secret: string | readonly string[];
   /**
@@ -143,58 +107,47 @@ function digestsMatch(expected: string, candidate: string): boolean {
 
 function signedPayload(timestamp: number, body: string | Uint8Array): Buffer {
   const prefix = Buffer.from(`${timestamp}.`, "utf8");
-  const bytes =
-    typeof body === "string" ? Buffer.from(body, "utf8") : Buffer.from(body);
+  const bytes = typeof body === "string" ? Buffer.from(body, "utf8") : Buffer.from(body);
   return Buffer.concat([prefix, bytes]);
 }
 
-/**
- * Verify a webhook delivery, or throw explaining which check failed.
- *
- * ```ts
- * app.post("/langwatch", express.raw({ type: "application/json" }), (req, res) => {
- *   try {
- *     verifyWebhookSignature({
- *       body: req.body, // the raw Buffer, before JSON parsing
- *       header: req.header("X-LangWatch-Signature") ?? "",
- *       secret: [process.env.WEBHOOK_SECRET_NEW, process.env.WEBHOOK_SECRET_OLD],
- *     });
- *   } catch (error) {
- *     return res.status(400).send((error as WebhookSignatureVerificationError).code);
- *   }
- *   // Trusted from here.
- * });
- * ```
- *
- * Throws rather than returning false so that a delivery cannot be trusted by
- * forgetting to check a return value. The thrown
- * {@link WebhookSignatureVerificationError} carries a
- * {@link WebhookSignatureFailureCode} saying which check failed.
- *
- * Checks run in a fixed order, so a delivery that is both stale and wrongly
- * signed reports the staleness: a header that did not parse has no
- * trustworthy timestamp to judge, and a timestamp outside the window makes
- * the digest moot.
- *
- * A missing or empty secret is a configuration mistake rather than a bad
- * delivery, and raises `TypeError`. Reporting it as a failed verification
- * would let a receiver that lost its secret quietly refuse every delivery as
- * if the sender were at fault.
- */
-export function verifyWebhookSignature(
-  options: VerifyWebhookSignatureOptions,
-): void {
-  const secrets = (
-    typeof options.secret === "string" ? [options.secret] : options.secret
-  ).filter((secret) => typeof secret === "string" && secret.length > 0);
-  if (secrets.length === 0) {
-    throw new TypeError(
-      "verifyWebhookSignature needs at least one non-empty signing secret",
-    );
+function matchesAnySignature({
+  secrets,
+  candidates,
+  payload,
+}: {
+  secrets: string[];
+  candidates: string[];
+  payload: Buffer;
+}): boolean {
+  let matched = false;
+
+  for (const secret of secrets) {
+    const expected = createHmac("sha256", secret).update(payload).digest("hex");
+    for (const candidate of candidates) {
+      // Every pair is compared even once one has matched, so the work does
+      // not depend on WHICH secret or which v1 was the right one.
+      if (digestsMatch(expected, candidate)) matched = true;
+    }
   }
 
-  const tolerance =
-    options.toleranceSeconds ?? WEBHOOK_SIGNATURE_DEFAULT_TOLERANCE_SECONDS;
+  return matched;
+}
+
+/**
+ * Verify a webhook delivery, throwing (not returning false) so a check can't
+ * be skipped by accident. A missing/empty secret throws a plain `TypeError`
+ * instead of a verification failure, so it's never mistaken for sender fault.
+ */
+export function verifyWebhookSignature(options: VerifyWebhookSignatureOptions): void {
+  const secrets = (typeof options.secret === "string" ? [options.secret] : options.secret).filter(
+    (secret) => typeof secret === "string" && secret.length > 0,
+  );
+  if (secrets.length === 0) {
+    throw new TypeError("verifyWebhookSignature needs at least one non-empty signing secret");
+  }
+
+  const tolerance = options.toleranceSeconds ?? WEBHOOK_SIGNATURE_DEFAULT_TOLERANCE_SECONDS;
   const now = options.nowSeconds ?? Math.floor(Date.now() / 1000);
 
   const { timestamp, candidates } = parseSignatureHeader(options.header);
@@ -219,15 +172,7 @@ export function verifyWebhookSignature(
   }
 
   const payload = signedPayload(timestamp, options.body);
-  let matched = false;
-  for (const secret of secrets) {
-    const expected = createHmac("sha256", secret).update(payload).digest("hex");
-    for (const candidate of candidates) {
-      // Every pair is compared even once one has matched, so the work does
-      // not depend on WHICH secret or which v1 was the right one.
-      if (digestsMatch(expected, candidate)) matched = true;
-    }
-  }
+  const matched = matchesAnySignature({ secrets, candidates, payload });
 
   if (!matched) {
     throw new WebhookSignatureVerificationError(

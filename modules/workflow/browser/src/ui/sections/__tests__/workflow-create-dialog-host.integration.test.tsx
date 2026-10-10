@@ -1,0 +1,71 @@
+/**
+ * @vitest-environment jsdom
+ * @see specs/workflows/workflow-management.feature
+ */
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, fireEvent, screen, within } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("@langwatch/evaluator-client", () => ({
+  evaluatorClient: {
+    evaluators: {
+      getAll: { useQuery: () => ({ data: undefined, isLoading: false }) },
+      listByWorkflow: { useQuery: () => ({ data: undefined, isLoading: false }) },
+    },
+  },
+}));
+
+vi.mock("@langwatch/monitor-client", () => ({
+  monitorClient: {
+    monitors: {
+      getAllForProject: { useQuery: () => ({ data: undefined, isLoading: false }) },
+    },
+  },
+}));
+
+vi.mock("../../../behavior/workflow-api.ts", () => {
+  const mutation = () => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false });
+  return {
+    workflowApi: {
+      useUtils: () => ({ workflow: { getAll: { invalidate: vi.fn() } } }),
+      workflow: {
+        create: { useMutation: mutation },
+        archive: { useMutation: mutation },
+        cascadeArchive: { useMutation: mutation },
+        syncFromSource: { useMutation: mutation },
+        getRelatedEntities: { useQuery: () => ({ data: undefined, isLoading: false }) },
+      },
+    },
+  };
+});
+
+vi.mock("../../../model/workflow-host.ts", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  useWorkflowHost: () => ({
+    scope: () => ({ projectId: "project_1", projectSlug: "project-one" }),
+    navigate: vi.fn(),
+    failed: vi.fn(),
+  }),
+}));
+
+vi.mock("../../blocks/workflow-emoji-picker.tsx", () => ({
+  WorkflowEmojiPicker: () => null,
+}));
+
+import { WorkflowCreateDialogHost } from "../workflow-create-dialog-host.tsx";
+
+describe("WorkflowCreateDialogHost", () => {
+  afterEach(cleanup);
+
+  describe("when the blank template is chosen", () => {
+    /** @scenario "The create dialog's submit button says what it creates" */
+    it("offers a submit button reading Create workflow", () => {
+      renderWithDesignSystem(<WorkflowCreateDialogHost open onClose={vi.fn()} />);
+
+      fireEvent.click(within(screen.getByTestId("new-workflow-card-blank")).getByRole("button"));
+
+      expect(screen.getByRole("button", { name: "Create workflow" })).toBeInTheDocument();
+      expect(screen.queryByText("Create StudioWorkflow")).toBeNull();
+    });
+  });
+});

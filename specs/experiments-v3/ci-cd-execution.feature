@@ -23,14 +23,13 @@ Feature: CI/CD Execution of Platform Evaluations
 
   Scenario: API key authentication via X-Auth-Token header
     Given a valid API key in the X-Auth-Token header
-    When I POST to /api/experiments/my-evaluation/run
-    Then I receive 200 OK
-    And the response contains a runId
+    When the project key door identifies the request that POSTs to /api/experiments/my-evaluation/run
+    Then the key resolves to exactly its own project
 
   Scenario: API key authentication via Authorization Bearer header
     Given a valid API key in the Authorization header as "Bearer {key}"
-    When I POST to /api/experiments/my-evaluation/run
-    Then I receive 200 OK
+    When the project key door identifies the request that POSTs to /api/experiments/my-evaluation/run
+    Then the key resolves to exactly its own project
 
   @unimplemented
   Scenario: Missing API key returns 401
@@ -60,6 +59,12 @@ Feature: CI/CD Execution of Platform Evaluations
     When I POST to /api/experiments/non-existent/run
     Then I receive 404 Not Found
     And the response contains error "Evaluation not found"
+
+  Scenario: A run call is read whatever Content-Type it carries, as on main
+    Given the SDK posts the run with no body and no Content-Type, or a JSON body under text/plain
+    When it calls /api/experiments/non-existent/run or /api/evaluations/v3/non-existent/run
+    Then the call is never refused 415
+    And I receive 404 Not Found
 
   @unimplemented
   Scenario: Evaluation belongs to different project returns 404
@@ -203,3 +208,13 @@ Feature: CI/CD Execution of Platform Evaluations
     When execution completes
     Then the run appears in the evaluation's run history
     And can be viewed in the LangWatch UI
+
+  # ==========================================================================
+  # The SDKs' older path
+  # ==========================================================================
+
+  Scenario: The evaluations v3 alias answers what the experiments run doors answer
+    Given the SDK still calls "/api/evaluations/v3" instead of "/api/experiments"
+    When it starts a run, polls it, reads its results, or reads, saves or pages the saved setup
+    Then the status and body equal those of the same call under "/api/experiments"
+    And the older path is left out of the published API reference

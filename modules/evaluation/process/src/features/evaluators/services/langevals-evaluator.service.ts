@@ -1,0 +1,269 @@
+import { convertTo } from "@langwatch/dataset-contract";
+import {
+  EvaluatorExecutionError,
+  EvaluatorInputTooLargeError,
+} from "@langwatch/evaluation-contract";
+import {
+  AVAILABLE_EVALUATORS,
+  batchEvaluationResultSchema,
+  type BatchEvaluationResult,
+  type EvaluatorTypes,
+  type SingleEvaluationResult,
+} from "@langwatch/evaluator-contract";
+import { createLogger } from "@langwatch/observability";
+
+import {
+  type LangevalsChannel,
+  type LangevalsPayloadStaging,
+  PayloadTooLargeError,
+} from "../../../channels/langevals.channel.ts";
+import { toLangevalsContexts } from "../../../rules/langevals-contexts.rules.ts";
+import type { EvaluationExecutionMetricsService } from "../../execution/services/evaluation-execution-metrics.service.ts";
+
+const logger = createLogger("langwatch:langevals-http-client");
+
+function throwFetchFailure({
+  error,
+  url,
+  timeoutMs,
+  evaluatorType,
+  onTooLarge,
+}: {
+  error: unknown;
+  url: string;
+  timeoutMs: number;
+  evaluatorType: string;
+  onTooLarge: () => void;
+}): never {
+  if (error instanceof PayloadTooLargeError) {
+    onTooLarge();
+    throw new EvaluatorInputTooLargeError({ meta: { evaluatorType } });
+  }
+
+  if (error instanceof Error && error.name === "AbortError") {
+    logger.warn({ url, timeoutMs }, "Evaluator request timed out");
+    // The address dialled stays in the log line above: `meta` rides the
+    // experiment SSE stream to the browser, and it is a deployment's own
+    // internal service address.
+    throw new EvaluatorExecutionError(`Evaluator timed out after ${timeoutMs}ms`, {
+      meta: { evaluatorType, timeoutMs },
+    });
+  }
+
+  if (error instanceof Error && error.message.includes("fetch failed")) {
+    logger.warn({ error, url }, "Evaluator cannot be reached");
+    throw new EvaluatorExecutionError("Evaluator cannot be reached", {
+      meta: { evaluatorType },
+    });
+  }
+
+  throw error;
+}
+
+/**
+ * What the transport needs from the deployment: where the evaluator service
+ * lives, how long a call may take and how many times a 5xx is retried.
+ */
+type LangevalsRuntimeConfig = Readonly<{
+  endpoint: string | undefined;
+  maxRetries: number;
+  timeoutMs: number;
+}>;
+
+interface LangevalsEvaluatorInput {
+  readonly config: LangevalsRuntimeConfig;
+  readonly langevals: LangevalsChannel;
+  readonly staging: LangevalsPayloadStaging;
+  readonly telemetry?: Pick<EvaluationExecutionMetricsService, "record"> | undefined;
+}
+
+/** Runs one installed evaluator over the langevals channel: retry, timeout and result mapping. */
+export class LangevalsEvaluatorService {
+  static create(input: LangevalsEvaluatorInput): LangevalsEvaluatorService {
+    return new LangevalsEvaluatorService(input);
+  }
+
+  private readonly config: LangevalsRuntimeConfig;
+  private readonly langevals: LangevalsChannel;
+  private readonly staging: LangevalsPayloadStaging;
+  private readonly telemetry: Pick<EvaluationExecutionMetricsService, "record"> | undefined;
+
+  private constructor(input: LangevalsEvaluatorInput) {
+    this.config = input.config;
+    this.langevals = input.langevals;
+    this.staging = input.staging;
+    this.telemetry = input.telemetry;
+  }
+
+  async evaluate(params: LangevalsEvaluateParams): Promise<SingleEvaluationResult> {
+    return this.evaluateWithRetry(params, this.config.maxRetries);
+  }
+
+  private async evaluateWithRetry(
+    params: LangevalsEvaluateParams,
+    retriesLeft: number,
+  ): Promise<SingleEvaluationResult> {
+    const { evaluatorType, data, settings, env, idempotencyKey, signal } = params;
+    const url = `${this.config.endpoint}/${evaluatorType}/evaluate`;
+    const startTime = performance.now();
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), this.config.timeoutMs);
+
+    let response: Response;
+    try {
+      response = await this.langevals.post({
+        url,
+        kind: "evaluation",
+        staging: this.staging,
+        headers: idempotencyKey ? { "Idempotency-Key": idempotencyKey } : {},
+        signal: withCallerSignal({ own: controller.signal, caller: signal }),
+        body: evaluationBody({ evaluatorType, data, settings, env }),
+      });
+    } catch (error) {
+      throwFetchFailure({
+        error,
+        url,
+        timeoutMs: this.config.timeoutMs,
+        evaluatorType,
+        onTooLarge: () =>
+          this.telemetry?.record({
+            evaluatorType,
+            status: "skipped",
+            durationMs: performance.now() - startTime,
+          }),
+      });
+    } finally {
+      clearTimeout(timeout);
+    }
+
+    if (!response.ok) {
+      if (response.status >= 500 && retriesLeft > 0 && !signal?.aborted) {
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        return this.evaluateWithRetry(params, retriesLeft - 1);
+      }
+
+      return this.throwHttpFailure({ response, evaluatorType, startTime });
+    }
+
+    const duration = performance.now() - startTime;
+    let results: BatchEvaluationResult;
+    try {
+      results = batchEvaluationResultSchema.parse(await response.json());
+    } catch (error) {
+      this.telemetry?.record({ evaluatorType, status: "error", durationMs: duration });
+      throw new EvaluatorExecutionError("Unexpected response: invalid results", {
+        meta: { evaluatorType },
+        ...(error instanceof Error ? { reasons: [error] } : {}),
+      });
+    }
+
+    const result = results[0];
+    if (!result) {
+      this.telemetry?.record({ evaluatorType, status: "error", durationMs: duration });
+      throw new EvaluatorExecutionError("Unexpected response: empty results", {
+        meta: { evaluatorType },
+      });
+    }
+
+    this.telemetry?.record({ evaluatorType, status: result.status, durationMs: duration });
+    return result;
+  }
+
+  private async throwHttpFailure({
+    response,
+    evaluatorType,
+    startTime,
+  }: {
+    response: Response;
+    evaluatorType: string;
+    startTime: number;
+  }): Promise<never> {
+    const duration = performance.now() - startTime;
+    let statusText = response.statusText;
+    try {
+      statusText = JSON.stringify(await response.json(), undefined, 2);
+    } catch {
+      // The status text remains the meaningful response summary.
+    }
+
+    if (response.status === 413) {
+      this.telemetry?.record({ evaluatorType, status: "skipped", durationMs: duration });
+      throw new EvaluatorInputTooLargeError({
+        meta: { evaluatorType, httpStatus: response.status },
+      });
+    }
+
+    this.telemetry?.record({ evaluatorType, status: "error", durationMs: duration });
+    throw new EvaluatorExecutionError(`${response.status} ${statusText}`, {
+      meta: { evaluatorType, httpStatus: response.status },
+    });
+  }
+}
+
+const CANONICAL_KEYS: ReadonlySet<string> = new Set([
+  "input",
+  "output",
+  "contexts",
+  "expected_contexts",
+  "expected_output",
+  "conversation",
+]);
+
+/** The non-canonical fields the evaluator declares (a comparison's `candidates`), as sent. */
+function declaredExtras({
+  evaluatorType,
+  data,
+}: Pick<LangevalsEvaluateParams, "evaluatorType" | "data">): Record<string, unknown> {
+  const declared = AVAILABLE_EVALUATORS[evaluatorType as EvaluatorTypes];
+  const allowed = new Set([
+    ...(declared?.requiredFields ?? []),
+    ...(declared?.optionalFields ?? []),
+  ]);
+
+  return Object.fromEntries(
+    Object.entries(data).filter(([key]) => allowed.has(key) && !CANONICAL_KEYS.has(key)),
+  );
+}
+
+function evaluationBody({
+  evaluatorType,
+  data,
+  settings,
+  env,
+}: Pick<LangevalsEvaluateParams, "evaluatorType" | "data" | "settings" | "env">) {
+  return {
+    data: [
+      {
+        ...declaredExtras({ evaluatorType, data }),
+        input: convertTo(data.input, "string"),
+        output: convertTo(data.output, "string"),
+        contexts: toLangevalsContexts(data.contexts),
+        expected_contexts: toLangevalsContexts(data.expected_contexts),
+        expected_output: convertTo(data.expected_output, "string"),
+        conversation: convertTo(data.conversation, "array"),
+      },
+    ],
+    settings: settings ?? {},
+    env,
+  };
+}
+
+function withCallerSignal({
+  own,
+  caller,
+}: {
+  own: AbortSignal;
+  caller: AbortSignal | undefined;
+}): AbortSignal {
+  return caller ? AbortSignal.any([own, caller]) : own;
+}
+
+export type LangevalsEvaluateParams = Readonly<{
+  evaluatorType: string;
+  data: Record<string, unknown>;
+  settings: Record<string, unknown>;
+  env: Record<string, string>;
+  idempotencyKey?: string;
+  /** The caller's cancellation, combined with this client's own timeout. */
+  signal?: AbortSignal | undefined;
+}>;

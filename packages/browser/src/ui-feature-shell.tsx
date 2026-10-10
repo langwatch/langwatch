@@ -1,0 +1,460 @@
+/**
+ * What `apps/ui` mounts around every routed page.
+ */
+
+import { cachePlanFor, type UiQueryVersions } from "@langwatch/browser-host/cache-tiers";
+import {
+  BrowserUiDocumentTitle,
+  resolveUiHostServices,
+  UiHostServicesContextProvider,
+  UNAVAILABLE_UI_FEEDBACK,
+  UNAVAILABLE_UI_SCOPE,
+  UNAVAILABLE_UI_SESSION,
+  type UiHostServiceInstall,
+  type UiRpc,
+  type UiSessionHostServices,
+  type UiSessionSource,
+  UiHostServiceProvider,
+} from "@langwatch/browser-host/capabilities";
+import { CurrentDrawer, type UiDrawerRegistry } from "@langwatch/browser-host/drawer";
+import { useRouterUiNavigation, useRouterUiRoute } from "@langwatch/browser-host/navigation";
+import {
+  indexedDbQueryStore,
+  persistUiQueries,
+  sealedUiQueryStore,
+  type UiQueryStore,
+} from "@langwatch/browser-host/query-persistence";
+import { startUiQuerySync } from "@langwatch/browser-host/query-sync";
+import { SessionVersionWatch, sessionVersionFetch } from "@langwatch/browser-host/session-version";
+import { BrowserUiStorage, setUiStorage } from "@langwatch/browser-host/storage";
+import { setUiFeedbackHost } from "@langwatch/browser-host/toaster";
+import { UiScopeHostProvider } from "@langwatch/browser-host/use-organization-team-project";
+import {
+  focusManager,
+  QueryClientContext,
+  QueryClientProvider,
+  useQueryClient,
+  type QueryClient,
+} from "@tanstack/react-query";
+import {
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ComponentType,
+  type ReactNode,
+} from "react";
+
+import { runHostServices, type UiHostServiceRun } from "./module/ui-module-host-services.ts";
+import { UiApiWaitingGate } from "./ui-api-waiting-gate.tsx";
+import type { UiFailureHost, UiFailureInterceptor } from "./ui-feature.ts";
+import type { UiProviderShell } from "./ui-outer-providers.tsx";
+import { BrowserUiRpc } from "./wire/browser-rpc.ts";
+import { createUiQueryClient, resetUiQueries } from "./wire/query-client.ts";
+import { readHintStreamOver, startUiQueryHints } from "./wire/query-hints.ts";
+import {
+  createUiFeatureApiClient,
+  type UiFeatureApiBinding,
+  type UiFeatureApiTransport,
+} from "./wire/transport.ts";
+
+/** The device store the shell publishes to every feature. */
+const SHELL_UI_STORAGE = new BrowserUiStorage();
+
+/** A newer session version's refetch is spread over this window, so tabs do not stampede. */
+const SESSION_BUMP_JITTER_MS = 2_000;
+
+/** What sync reads when nothing is mirrored: no plan, or no sealing key yet. */
+const EMPTY_QUERY_STORE: UiQueryStore = {
+  get: () => Promise.resolve(void 0),
+  put: () => Promise.resolve(),
+  delete: () => Promise.resolve(),
+  keys: () => Promise.resolve([]),
+};
+
+export type UiFeatureShellInstall = {
+  /** One entry per feature package whose hooks this application serves. */
+  apis: readonly UiFeatureApiBinding[];
+  /** The host service ports the composing application answers itself. */
+  capabilities: UiHostServiceInstall;
+  /** Every installed module's drawers, as one registry. */
+  drawers?: UiDrawerRegistry;
+  /**
+   * Every installed module's host mounts, composed. They wrap the routed page
+   * and the open drawer alike: a drawer reads the same `*HostApi` its screens do.
+   */
+  moduleHosts?: ComponentType<{ children?: ReactNode }>;
+  /** Drawn once beside the open drawer, so it reads the host services a screen does. */
+  footer?: ComponentType;
+  /** The transport those hooks run on. Built same-origin when absent. */
+  transport?: UiFeatureApiTransport;
+  /** The watch the supplied transport's fetch reports session versions to (ADR-170). */
+  sessionVersions?: SessionVersionWatch;
+  /** The disk the planned reads are sealed onto; IndexedDB when absent. */
+  queryStore?: UiQueryStore<unknown>;
+  /**
+   * Every feature's reader of a failed mutation, in install order. A failure a
+   * feature answers application-wide is reported here once, rather than by
+   * every screen that happens to trip it.
+   */
+  failures?: readonly UiFailureInterceptor[];
+  /**
+   * The live session this application reads for itself, when it has one to
+   * read. `useBrowserUiSession` is the one this package ships.
+   */
+  session?: UiSessionSource;
+  /** Each host service's loaded source, run on every render in this order (record §10.1). */
+  hostServices?: readonly UiHostServiceRun[];
+  /** Whether this browser composition is a development build. */
+  isDevelopment?: boolean;
+  /**
+   * The query key the composing application's session read is cached
+   * under — auth's to name, supplied as data so this package names no
+   * module. See `UiApiWaitingGate`.
+   */
+  sessionQueryKey: readonly unknown[];
+};
+
+/**
+ * The keys the session read carries, read off its cached answer the way `UiApiWaitingGate`
+ * reads `unreachable`: auth names the read, this package names no module.
+ */
+function sealingKeysOf(answer: unknown): {
+  cacheKey: string | undefined;
+  previousCacheKey: string | undefined;
+} {
+  if (typeof answer !== "object" || answer === null) {
+    return { cacheKey: void 0, previousCacheKey: void 0 };
+  }
+  const cacheKey =
+    "cacheKey" in answer && typeof answer.cacheKey === "string" ? answer.cacheKey : void 0;
+  const previousCacheKey =
+    "previousCacheKey" in answer && typeof answer.previousCacheKey === "string"
+      ? answer.previousCacheKey
+      : void 0;
+  return { cacheKey, previousCacheKey };
+}
+
+type SeenSession = { userId: string | undefined; cacheKey: string | undefined };
+
+/** Another actor, or a session that is not the held one's next epoch, holds nothing of the last. */
+function isAnotherSession({
+  was,
+  userId,
+  cacheKey,
+  previousCacheKey,
+}: {
+  was: SeenSession;
+  userId: string | undefined;
+  cacheKey: string | undefined;
+  previousCacheKey: string | undefined;
+}): boolean {
+  if (was.userId === undefined) return false;
+  if (was.userId !== userId) return true;
+  if (cacheKey === undefined || was.cacheKey === undefined) return false;
+  return cacheKey !== was.cacheKey && was.cacheKey !== previousCacheKey;
+}
+
+/** A composition that installed no module host mounts. */
+function UiNoModuleHosts({ children }: { children?: ReactNode }) {
+  return <>{children}</>;
+}
+
+/** The session and scope of a composition that declared neither. Refuse by name. */
+const useUnavailableUiSession: UiSessionSource = () => ({
+  session: UNAVAILABLE_UI_SESSION,
+  scope: UNAVAILABLE_UI_SCOPE,
+});
+
+/** Mirrors the planned reads onto the sealed disk and syncs tabs; returns the stop. */
+function startQueryMirror({
+  queryClient,
+  plan,
+  userId,
+  cacheKey,
+  previousCacheKey,
+  watch,
+  store,
+  sessionQueryKey,
+  versions,
+}: {
+  queryClient: QueryClient;
+  plan: ReturnType<typeof cachePlanFor>;
+  userId: string;
+  cacheKey: string | undefined;
+  previousCacheKey: string | undefined;
+  watch: SessionVersionWatch;
+  store: UiQueryStore<unknown>;
+  sessionQueryKey: readonly unknown[];
+  versions: UiQueryVersions;
+}): () => void {
+  const sealed =
+    cacheKey !== void 0 && plan.persisted.size > 0
+      ? sealedUiQueryStore({ store, cacheKey, previousCacheKey })
+      : void 0;
+  const unsubscribe = sealed
+    ? persistUiQueries({
+        queryClient,
+        plan,
+        userId,
+        store: sealed,
+        sessionQueryKey,
+        versions,
+        servedSchemaHashFor: (path) => watch.servedSchemaHashFor(path),
+      }).unsubscribe
+    : () => void 0;
+  const stopSync = startUiQuerySync({
+    queryClient,
+    plan,
+    store: sealed ?? EMPTY_QUERY_STORE,
+    userId,
+    versions,
+  });
+  return () => {
+    unsubscribe();
+    stopSync();
+  };
+}
+
+/** A newer session version marks every read stale; returns the stop. */
+function refetchOnNewerSession({
+  watch,
+  queryClient,
+}: {
+  watch: SessionVersionWatch;
+  queryClient: QueryClient;
+}): () => void {
+  let pending: ReturnType<typeof setTimeout> | undefined;
+  const stop = watch.onNewer(() => {
+    void queryClient.invalidateQueries({ refetchType: "none" });
+    pending ??= setTimeout(() => {
+      pending = void 0;
+      if (!focusManager.isFocused()) return;
+      void queryClient.refetchQueries({ type: "active", stale: true });
+    }, Math.random() * SESSION_BUMP_JITTER_MS);
+  });
+  return () => {
+    stop();
+    clearTimeout(pending);
+  };
+}
+
+/** What a composition with no footer draws there: nothing. */
+function UiNoFooter() {
+  return null;
+}
+
+export function createUiFeatureShell({
+  apis,
+  capabilities,
+  drawers = {},
+  moduleHosts: ModuleHosts = UiNoModuleHosts,
+  footer: Footer = UiNoFooter,
+  transport,
+  sessionVersions,
+  queryStore,
+  failures = [],
+  session,
+  hostServices = [],
+  isDevelopment = false,
+  sessionQueryKey,
+}: UiFeatureShellInstall): UiProviderShell {
+  // Chosen once per shell, never per render, so the hook it calls is the same
+  // hook on every pass.
+  const useSessionHostService = session ?? useUnavailableUiSession;
+  // Every installed module's declared cache policies, as one plan.
+  const cachePlan = cachePlanFor({ contracts: apis.flatMap((api) => api.contracts ?? []) });
+  // The version each mirrored read was last stored under, shared by the mirror and the tab sync.
+  const versions: UiQueryVersions = new Map();
+
+  function UiHostServices({
+    transport: sessionTransport,
+    rpc,
+    watch,
+    children,
+  }: {
+    transport: UiFeatureApiTransport;
+    rpc: UiRpc;
+    watch: SessionVersionWatch;
+    children: ReactNode;
+  }) {
+    const navigation = useRouterUiNavigation();
+    const route = useRouterUiRoute();
+    const [documentTitle] = useState(() => BrowserUiDocumentTitle.create());
+    // The installed feedback port, resolved ahead of the session rather than
+    // read back out of the resolution: a refused session read is told through
+    // it, and it is the only failure with nobody else to tell.
+    const feedback = capabilities.feedback ?? UNAVAILABLE_UI_FEEDBACK;
+    const live: UiSessionHostServices = useSessionHostService({
+      transport: sessionTransport,
+      feedback,
+    });
+    // The same sources on every render, so the hooks inside them keep their order.
+    const hostServiceValues = runHostServices({
+      sources: hostServices,
+      input: { transport: sessionTransport, feedback, session: live.session, scope: live.scope },
+    });
+    const queryClient = useQueryClient();
+    const userId =
+      live.session === UNAVAILABLE_UI_SESSION ? void 0 : live.session.currentUser()?.id;
+    const { cacheKey, previousCacheKey } = sealingKeysOf(queryClient.getQueryData(sessionQueryKey));
+    const seen = useRef<SeenSession>({ userId: void 0, cacheKey: void 0 });
+    // Declared ahead of the mirror: its cleanup has run, so nothing cleared is written back.
+    useEffect(() => {
+      const was = seen.current;
+      seen.current = {
+        userId,
+        cacheKey: cacheKey ?? (userId === was.userId ? was.cacheKey : void 0),
+      };
+      if (!isAnotherSession({ was, userId, cacheKey, previousCacheKey })) return;
+      resetUiQueries({ queryClient, sessionQueryKey });
+      versions.clear();
+    }, [queryClient, userId, cacheKey, previousCacheKey]);
+    // The planned reads are mirrored per user, sealed under the session read's keys. No key, no
+    // mirror. Sync runs for any signed-in user: the focus pass revalidates stale mounted reads.
+    useEffect(() => {
+      if (!userId) return;
+      return startQueryMirror({
+        queryClient,
+        plan: cachePlan,
+        userId,
+        cacheKey,
+        previousCacheKey,
+        watch,
+        store: queryStore ?? indexedDbQueryStore,
+        sessionQueryKey,
+        versions,
+      });
+    }, [queryClient, userId, cacheKey, previousCacheKey, watch]);
+    const resolved = useMemo(
+      () =>
+        resolveUiHostServices({
+          install: capabilities,
+          documentTitle,
+          navigation,
+          route,
+          rpc,
+          scope: live.scope,
+          copyTargets: live.copyTargets,
+          traceFilters: live.traceFilters,
+          session: live.session,
+        }),
+      [documentTitle, navigation, route, rpc, live],
+    );
+    // A visible tab's one read-hint stream, for where it stands (read-hints.feature).
+    const { organizationId, projectId } =
+      !resolved.scope || resolved.scope === UNAVAILABLE_UI_SCOPE
+        ? { organizationId: null, projectId: null }
+        : resolved.scope.activeScope();
+    useEffect(() => {
+      if (!userId || !organizationId) return;
+      const stream = readHintStreamOver({ rpc, organizationId, projectId });
+      return startUiQueryHints({ queryClient, stream });
+    }, [queryClient, rpc, userId, organizationId, projectId]);
+
+    // The toast and error singletons are called from mutation callbacks and
+    // store actions, where no hook can run, so the resolved feedback port is
+    // published to them here rather than read through the context.
+    setUiFeedbackHost(resolved.feedback);
+    setUiStorage(SHELL_UI_STORAGE);
+
+    // The one scope host every feature's shared hook reads, on every route; a
+    // session with nothing resolved publishes none and the hook reads unresolved.
+    return (
+      <UiHostServicesContextProvider value={resolved}>
+        <UiHostServiceProvider value={hostServiceValues}>
+          <UiScopeHostProvider value={resolved.scope?.scopeHost()}>
+            {/* Nothing is answering on the API's address, so the reader waits
+              here rather than being signed out of a stack that is booting. */}
+            <UiApiWaitingGate isDevelopment={isDevelopment} sessionQueryKey={sessionQueryKey}>
+              <ModuleHosts>
+                {children}
+                <CurrentDrawer drawers={drawers} isDevelopment={isDevelopment} />
+                <Footer />
+              </ModuleHosts>
+            </UiApiWaitingGate>
+          </UiScopeHostProvider>
+        </UiHostServiceProvider>
+      </UiHostServicesContextProvider>
+    );
+  }
+
+  return function UiFeatureShell({ children }: { children: ReactNode }) {
+    // The host's QueryClient when this renders inside one, which is what makes
+    // a feature's cache and the host's the same cache. Read through the
+    // context rather than `useQueryClient()`, which throws when there is none
+    // — a composition without a host transport is a legitimate shape, and the
+    // fallback below is what serves it.
+    const hostQueryClient = useContext(QueryClientContext);
+    const navigation = useRouterUiNavigation();
+    // The interceptors are installed on a cache built once, but what they may
+    // do about a failure is only knowable further down this render. The box
+    // is what carries it there, and it refuses by name until it is filled.
+    const [failureHost] = useState<{ current: UiFailureHost | null }>(() => ({ current: null }));
+    const [ownQueryClient] = useState(() =>
+      createUiQueryClient({
+        onMutationError: (error) => reportFailure({ error, failures, host: failureHost.current }),
+        sessionQueryKey,
+      }),
+    );
+    const queryClient = hostQueryClient ?? ownQueryClient;
+    const [watch] = useState(() => sessionVersions ?? SessionVersionWatch.create());
+    const [ownTransport] = useState(
+      () => transport ?? createUiFeatureApiClient({ fetch: sessionVersionFetch({ watch }) }),
+    );
+    // A newer session version marks every read stale at once; the mounted ones refetch after a
+    // jitter, one pending refetch per tab, and a hidden tab leaves them to its pass when shown.
+    useEffect(() => refetchOnNewerSession({ watch, queryClient }), [watch, queryClient]);
+
+    // The by-path dispatcher a screen too wide for a procedure map asks for.
+    // Built here because this is where both halves of it are: the transport and
+    // the QueryClient a feature may not reach for itself.
+    const rpc = useMemo(
+      () => BrowserUiRpc.create({ transport: ownTransport, queryClient }),
+      [ownTransport, queryClient],
+    );
+    failureHost.current = { rpc, navigate: (href: string) => navigation.navigate(href) };
+
+    // Innermost first, so the list reads in mount order at the call site.
+    const mounted = apis.reduceRight<ReactNode>(
+      (inner, { Provider }) => (
+        <Provider client={ownTransport} queryClient={queryClient}>
+          {inner}
+        </Provider>
+      ),
+      <UiHostServices transport={ownTransport} rpc={rpc} watch={watch}>
+        {children}
+      </UiHostServices>,
+    );
+
+    // Always mounted, host client or own: a Provider that appears only in one
+    // of the two shapes changes the element type at this position, and React
+    // answers that by remounting the whole routed subtree.
+    return <QueryClientProvider client={queryClient}>{mounted}</QueryClientProvider>;
+  };
+}
+
+/**
+ * Runs every installed interceptor over one failed mutation. They all run: two
+ * features answering the same failure both have something to say about it, and
+ * one throwing must not silence the rest.
+ */
+function reportFailure({
+  error,
+  failures,
+  host,
+}: {
+  error: unknown;
+  failures: readonly UiFailureInterceptor[];
+  host: UiFailureHost | null;
+}): void {
+  if (!host) return;
+  for (const interceptor of failures) {
+    try {
+      interceptor(error, host);
+    } catch (interceptorError) {
+      console.error("A failure interceptor threw while reporting a failure:", interceptorError);
+    }
+  }
+}

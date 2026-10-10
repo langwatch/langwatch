@@ -1,0 +1,238 @@
+import type { AuditLogApi } from "@langwatch/audit-log-contract";
+import type { AuthzApi } from "@langwatch/authz-contract";
+import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
+import type { SsoApi } from "@langwatch/enterprise-sso-contract";
+/**
+ * A signed-in caller's own confirmation link: refused without an address,
+ * metered per caller, and started as identity's session-bound ceremony.
+ * @see specs/identity/authentication-settings.feature
+ */
+import type { EntitlementApi } from "@langwatch/entitlement-contract";
+import type { IdentityApi } from "@langwatch/identity-contract";
+import type { NotificationService } from "@langwatch/notification-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
+import { ScopedSecrets } from "@langwatch/secrets";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { describe, expect, it } from "vitest";
+
+import { MemoryAuthChannels } from "../../channels/memory/memory.auth.channels.ts";
+import type { AuthRepositories } from "../../repositories/auth.repositories.ts";
+import { MemoryAuthRepositories } from "../../repositories/memory/memory.auth.repositories.ts";
+import { AuthModule } from "../auth.app.ts";
+import { NO_SIGN_IN_PROVIDERS } from "./support/sign-in-providers.ts";
+import { TestUserApi } from "./support/test-user-api.ts";
+
+/** The limiter repository, over a memory counter, remembering the window each check named. */
+function countingLimiter() {
+  const counts = new Map<string, number>();
+  const windows: ({ requests: number; seconds: number } | undefined)[] = [];
+
+  const rateLimiter = {
+    check: async (key: string, limit?: { requests: number; seconds: number }) => {
+      windows.push(limit);
+      const used = (counts.get(key) ?? 0) + 1;
+      counts.set(key, used);
+      const requests = limit?.requests ?? 1;
+
+      return used <= requests ? { allowed: true } : { allowed: false, retryAfterSeconds: 60 };
+    },
+  };
+
+  return { rateLimiter, windows };
+}
+
+const CHALLENGE = "c".repeat(43);
+
+/** The memory repositories, metering through the counting limiter instead of their own. */
+function withRateLimits(
+  memory: MemoryAuthRepositories,
+  rateLimits: AuthRepositories["rateLimits"],
+): AuthRepositories {
+  return {
+    sessions: memory.sessions,
+    cliSessions: memory.cliSessions,
+    signUpTokens: memory.signUpTokens,
+    signInLocks: memory.signInLocks,
+    rateLimits,
+    betterAuthStorage: memory.betterAuthStorage,
+    betterAuthSecondaryStorage: memory.betterAuthSecondaryStorage,
+    betterAuthHooks: memory.betterAuthHooks,
+    directory: memory.directory,
+    pendingSsoSetup: memory.pendingSsoSetup,
+    sessionCache: memory.sessionCache,
+  };
+}
+
+async function appFor(
+  limiter: ReturnType<typeof countingLimiter>["rateLimiter"],
+  identity: IdentityApi = createApiFixture<IdentityApi>({
+    createStorageAdapter: ({ legacyEngine }) => legacyEngine,
+  }),
+  mailDelivery: { provider?: string; misconfigured?: boolean } = { provider: "smtp" },
+): Promise<AuthModule> {
+  return AuthModule.create({
+    config: {
+      sessionUrl: undefined,
+      mfaEnrollmentOpen: false,
+      passkeysEnabled: false,
+      passkeyHandleSecret: undefined,
+      trustedIdpOrigins: undefined,
+      idpSimulatorUrl: undefined,
+      localPasswords: false,
+      auth0ManagementClientId: undefined,
+      cliRefreshTokenTtlSeconds: undefined,
+      isSaas: false,
+      signInProviders: NO_SIGN_IN_PROVIDERS,
+      signUpMode: "open",
+      publicBaseUrl: undefined,
+      nodeEnvironment: undefined,
+    },
+    repositories: withRateLimits(MemoryAuthRepositories.create(), limiter),
+    dependencies: {
+      projects: createApiFixture<ProjectApi>(),
+      users: new TestUserApi({}) as never,
+      apiKeys: {
+        findResolvedToken: async () => ({ project: { slug: "acme" } }),
+      } as never,
+      featureFlags: {} as never,
+      identity,
+      organizations: createApiFixture<OrganizationApi>(),
+      entitlements: createApiFixture<EntitlementApi>(),
+      licensing: createApiFixture<LicensingApi>(),
+      notifications: createApiFixture<NotificationService>({
+        getMailDelivery: async () => ({
+          misconfigured: false,
+          ...mailDelivery,
+          smtpConfigured: false,
+          smtpSendsCredentials: false,
+        }),
+      }),
+      sso: createApiFixture<SsoApi>(),
+      authz: createApiFixture<AuthzApi>({}),
+      auditLog: createApiFixture<AuditLogApi>({
+        record: async () => ({ id: "audit", occurredAt: 0 }),
+      }),
+    },
+    channels: MemoryAuthChannels.create({
+      bound: { notifications: createApiFixture<NotificationService>() },
+    }),
+    resources: { own: () => undefined } as never,
+    secrets: new ScopedSecrets(async (_handle, build) => build(void 0)),
+  });
+}
+
+describe("given a signed-in caller asking for their own confirmation link", () => {
+  describe("when the process resolved no address for the account", () => {
+    it("refuses by name before spending any budget", async () => {
+      const { rateLimiter, windows } = countingLimiter();
+      const app = await appFor(rateLimiter);
+
+      await expect(
+        app.sendMyAddressConfirmation({
+          actorId: "user_ana",
+          email: null,
+          codeChallenge: CHALLENGE,
+        }),
+      ).rejects.toMatchObject({ code: "auth_no_address_to_confirm" });
+      expect(windows).toEqual([]);
+    });
+  });
+
+  describe("when the caller has spent the hour's budget", () => {
+    it("refuses with the throttle's code and the wait the counter measured", async () => {
+      const { rateLimiter, windows } = countingLimiter();
+      const app = await appFor(rateLimiter);
+
+      for (let attempt = 0; attempt < 10; attempt += 1) {
+        await app
+          .sendMyAddressConfirmation({
+            actorId: "user_ana",
+            email: "ana@acme.com",
+            codeChallenge: CHALLENGE,
+          })
+          .catch(() => null);
+      }
+      const refusal = await app
+        .sendMyAddressConfirmation({
+          actorId: "user_ana",
+          email: "ana@acme.com",
+          codeChallenge: CHALLENGE,
+        })
+        .catch((error: unknown) => error);
+
+      expect(refusal).toMatchObject({
+        code: "auth_rate_limited",
+        httpStatus: 429,
+        meta: { retryAfterSeconds: 60 },
+      });
+      expect(windows).toEqual(Array.from({ length: 11 }, () => ({ requests: 10, seconds: 3600 })));
+    });
+  });
+
+  describe("when the caller is inside the budget", () => {
+    /** @scenario "The own address confirmation only ever goes to the session's own address" */
+    it("starts the session-bound ceremony for the session's own address, never a sign-up link", async () => {
+      const { rateLimiter } = countingLimiter();
+      const started: Parameters<IdentityApi["sendOwnAddressConfirmation"]>[0][] = [];
+      const app = await appFor(
+        rateLimiter,
+        createApiFixture<IdentityApi>({
+          createStorageAdapter: ({ legacyEngine }) => legacyEngine,
+          sendOwnAddressConfirmation: async (input) => {
+            started.push(input);
+            return { identifierId: "idf_own" };
+          },
+        }),
+      );
+
+      await expect(
+        app.sendMyAddressConfirmation({
+          actorId: "user_ana",
+          email: "ana@acme.com",
+          codeChallenge: CHALLENGE,
+        }),
+      ).resolves.toEqual({ identifierId: "idf_own" });
+      expect(started).toEqual([
+        { userId: "user_ana", email: "ana@acme.com", codeChallenge: CHALLENGE },
+      ]);
+    });
+  });
+
+  describe("when the installation has no email provider configured", () => {
+    /** @scenario "Without a way to send email, the address confirmation nudge stays silent" */
+    it("says a confirmation cannot be sent", async () => {
+      const { rateLimiter } = countingLimiter();
+      const app = await appFor(
+        rateLimiter,
+        createApiFixture<IdentityApi>({ createStorageAdapter: ({ legacyEngine }) => legacyEngine }),
+        {},
+      );
+
+      await expect(app.getMyAddressConfirmation({ email: null })).resolves.toEqual({
+        email: null,
+        confirmed: false,
+        canSendConfirmation: false,
+      });
+    });
+
+    /** @scenario "Without a way to send email, the address confirmation nudge stays silent" */
+    it("refuses to send with a named error before spending budget or starting a ceremony", async () => {
+      const { rateLimiter, windows } = countingLimiter();
+      const app = await appFor(
+        rateLimiter,
+        createApiFixture<IdentityApi>({ createStorageAdapter: ({ legacyEngine }) => legacyEngine }),
+        {},
+      );
+
+      await expect(
+        app.sendMyAddressConfirmation({
+          actorId: "user_ana",
+          email: "ana@acme.com",
+          codeChallenge: CHALLENGE,
+        }),
+      ).rejects.toMatchObject({ code: "auth_email_sending_unavailable", httpStatus: 400 });
+      expect(windows).toEqual([]);
+    });
+  });
+});

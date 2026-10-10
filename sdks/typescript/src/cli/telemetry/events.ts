@@ -1,39 +1,17 @@
 /**
- * The CLI's live event channel: a running commentary on a command while it runs,
- * so the Langy panel can show a status line, a rolling stat card and a progress
- * bar instead of a spinner.
- *
- * Three rules shape everything in here, in this order:
- *
- * 1. OFF BY DEFAULT, AT ZERO COST. The CLI is a user-facing product. With no
- *    transport configured, `createCommandEvents` hands back a frozen no-op: no
- *    exporter, no socket, no timer, no extra byte on stdout. The OTLP path is
- *    loaded through a deferred `import()` rather than a top-level one, because
- *    pulling `@opentelemetry/sdk-logs` and the exporter into the module graph
- *    costs ~60ms of parse+init on EVERY `langwatch` invocation — measured, 28ms
- *    to 90ms — and a user who never asked for telemetry must not pay it. (The IPC
- *    sink needs no such trick: it imports node builtins only.)
- *
- * 2. TELEMETRY IS NEVER THE USER'S PROBLEM. Every emit is fire-and-forget onto a
- *    serial chain: call sites never await, never see a rejection, never slow down.
- *    A collector that 500s, hangs, or does not exist can only ever cost the
- *    bounded flush at the end of the command.
- *
- * 3. NO CREDENTIALS, EVER. Failure messages are scrubbed — of anything shaped
- *    like a secret, and of the literal values of this process's own secrets —
- *    before they leave.
- *
- * The wire itself is deliberately not this module's business; see `sink.ts`.
- *
- * Spec: specs/telemetry/langy-live-events.feature
+ * The CLI's live event channel: a running commentary for the Langy panel's
+ * status line, stat card and progress bar. Off by default at zero cost.
+ * Spec: telemetry/langy-live-events.feature
  */
 
 // The zod-free subpath, deliberately: this module is on the hot path of every
 // instrumented command, and the package root pulls in the (zod-based) card
 // schemas, which cost ~28ms an invocation to load and which nothing here needs.
-import { handledErrorFromThrown } from "@langwatch/langy/cards/handled-error";
+import { handledErrorFromThrown } from "@langwatch/handled-error/langwatch-handled-error";
+
 import { LANGWATCH_SDK_VERSION } from "@/internal/constants";
 import { resolveLogsEndpoint } from "@/internal/endpoint";
+
 import {
   LANGWATCH_EVENT_ATTRIBUTES as ATTR,
   LANGWATCH_EVENTS,
@@ -61,12 +39,7 @@ export interface CommandEvents {
   /** A headline number is known — the stat card's value. */
   count: (args: { count: number; total?: number; message: string }) => void;
   /** The command advanced. `progress` is a 0..1 fraction; out-of-range is clamped. */
-  progress: (args: {
-    progress: number;
-    count?: number;
-    total?: number;
-    message: string;
-  }) => void;
+  progress: (args: { progress: number; count?: number; total?: number; message: string }) => void;
   /** The command succeeded. Duration is measured from `createCommandEvents`. */
   completed: (args: { count?: number; total?: number; message: string }) => void;
   /**
@@ -93,25 +66,17 @@ const NOOP_EVENTS: CommandEvents = Object.freeze({
 });
 
 const isTruthy = (value: string | undefined): boolean =>
-  value !== undefined &&
-  ["1", "true", "yes", "on"].includes(value.trim().toLowerCase());
+  value !== undefined && ["1", "true", "yes", "on"].includes(value.trim().toLowerCase());
 
 /** Which transport, if any, this environment is asking for. */
-export type Transport =
-  | { kind: "ipc"; path: string }
-  | { kind: "otlp"; endpoint: string }
-  | null;
+export type Transport = { kind: "ipc"; path: string } | { kind: "otlp"; endpoint: string } | null;
 
 /**
- * Resolve the transport. A pure env read — this is the gate that keeps a disabled
- * CLI at zero cost, so it must stay free of imports and side effects.
- *
- * IPC wins when both are configured: a host that handed us a socket is a host that
- * is listening, and the socket is both cheaper to load and faster to deliver.
+ * Resolves the transport. A pure env read, free of imports and side effects
+ * -- the gate that keeps a disabled CLI at zero cost. IPC wins when both are
+ * configured: it's cheaper to load and faster to deliver.
  */
-export const resolveTransport = (
-  env: NodeJS.ProcessEnv = process.env,
-): Transport => {
+export const resolveTransport = (env: NodeJS.ProcessEnv = process.env): Transport => {
   const socket = env[LANGWATCH_EVENTS_SOCKET_ENV]?.trim();
   if (socket) return { kind: "ipc", path: socket };
 
@@ -122,14 +87,11 @@ export const resolveTransport = (
 };
 
 /** Whether anything at all will be emitted. */
-export const areEventsEnabled = (
-  env: NodeJS.ProcessEnv = process.env,
-): boolean => resolveTransport(env) !== null;
+export const areEventsEnabled = (env: NodeJS.ProcessEnv = process.env): boolean =>
+  resolveTransport(env) !== null;
 
 const truncate = (value: string): string =>
-  value.length <= MAX_MESSAGE_LENGTH
-    ? value
-    : `${value.slice(0, MAX_MESSAGE_LENGTH - 1)}…`;
+  value.length <= MAX_MESSAGE_LENGTH ? value : `${value.slice(0, MAX_MESSAGE_LENGTH - 1)}…`;
 
 /** Env vars whose *values* must never appear in an outbound message. */
 const SECRET_ENV_VARS = [
@@ -147,15 +109,11 @@ const SECRET_PATTERNS: RegExp[] = [
 ];
 
 /**
- * Scrub a message before it leaves the process. Belt and braces: the literal
- * values of this environment's secrets go first — the strongest guarantee, since
- * an API key echoed back by a server is caught by value whatever shape it has —
- * then anything that merely LOOKS like a credential.
+ * Scrubs a message before it leaves the process: the literal values of this
+ * environment's secrets go first (catches any shape), then anything that
+ * merely looks like a credential.
  */
-export const redactSecrets = (
-  message: string,
-  env: NodeJS.ProcessEnv = process.env,
-): string => {
+export const redactSecrets = (message: string, env: NodeJS.ProcessEnv = process.env): string => {
   let scrubbed = message;
 
   for (const name of SECRET_ENV_VARS) {
@@ -182,12 +140,9 @@ const softDelay = (ms: number): Promise<void> =>
   });
 
 /**
- * The OTLP logs sink. Everything heavy is imported here, on the enabled path only
- * — see rule 1 in the module docstring.
- *
- * `SimpleLogRecordProcessor`, not the batch one, because this is a LIVE channel:
- * the panel wants "Searching traces…" now, not up to five seconds from now, and a
- * read command emits a handful of records, not a firehose.
+ * The OTLP logs sink; everything heavy is imported here, on the enabled path
+ * only. `SimpleLogRecordProcessor`, not the batch one, because this is a LIVE
+ * channel: the panel wants "Searching traces..." now, not five seconds from now.
  */
 const createOtlpSink = async (endpoint: string): Promise<EventSink> => {
   const [{ LoggerProvider, SimpleLogRecordProcessor }, { OTLPLogExporter }, resources] =
@@ -197,17 +152,11 @@ const createOtlpSink = async (endpoint: string): Promise<EventSink> => {
       import("@opentelemetry/resources"),
     ]);
 
-  // `defaultResource()` does NOT read OTEL_RESOURCE_ATTRIBUTES — it only stamps
-  // service.name + telemetry.sdk.*. Only `envDetector` reads it, so it is wired in
-  // explicitly. This matters: Langy's worker passes `langy.conversation_id` /
-  // `langy.turn_id` that way, and without the detector every event would arrive
-  // uncorrelated and the panel would have nothing to attach it to.
-  //
-  // The detector reads `process.env` directly, per the OTEL spec — which is what we
-  // want in production, where it and the injected `env` are the same object.
-  //
-  // Merge order is precedence order: the environment is the operator's word, and
-  // wins over our defaults.
+  // `defaultResource()` doesn't read OTEL_RESOURCE_ATTRIBUTES — only
+  // `envDetector` does, so it's wired in explicitly: Langy's worker passes
+  // `langy.conversation_id`/`langy.turn_id` that way, and without it every
+  // event would arrive uncorrelated. Merge order is precedence order: the
+  // environment is the operator's word and wins over our defaults.
   const resource = resources
     .defaultResource()
     .merge(
@@ -222,7 +171,10 @@ const createOtlpSink = async (endpoint: string): Promise<EventSink> => {
     resource,
     processors: [
       new SimpleLogRecordProcessor({
-        exporter: new OTLPLogExporter({ url: endpoint, timeoutMillis: EXPORT_TIMEOUT_MS }),
+        exporter: new OTLPLogExporter({
+          url: endpoint,
+          timeoutMillis: EXPORT_TIMEOUT_MS,
+        }),
       }),
     ],
   });
@@ -256,10 +208,9 @@ const openSink = async (transport: NonNullable<Transport>): Promise<EventSink> =
     : createOtlpSink(transport.endpoint);
 
 /**
- * Open the live event channel for one command.
- *
- * Returns a no-op when no transport is configured, so a call site can emit
- * unconditionally and an unconfigured CLI pays nothing for the privilege.
+ * Opens the live event channel for one command. Returns a no-op when no
+ * transport is configured, so a call site can emit unconditionally and an
+ * unconfigured CLI pays nothing for the privilege.
  */
 export const createCommandEvents = ({
   resource,
@@ -324,7 +275,7 @@ export const createCommandEvents = ({
         LANGWATCH_EVENTS.count,
         {
           [ATTR.count]: Math.trunc(count),
-          ...(total === undefined ? {} : { [ATTR.total]: Math.trunc(total) }),
+          ...countAttributes({ total }),
           [ATTR.message]: truncate(message),
         },
         { message },
@@ -336,8 +287,7 @@ export const createCommandEvents = ({
         LANGWATCH_EVENTS.progress,
         {
           [ATTR.progress]: Math.min(1, Math.max(0, progress)),
-          ...(count === undefined ? {} : { [ATTR.count]: Math.trunc(count) }),
-          ...(total === undefined ? {} : { [ATTR.total]: Math.trunc(total) }),
+          ...countAttributes({ count, total }),
           [ATTR.message]: truncate(message),
         },
         { message },
@@ -348,8 +298,7 @@ export const createCommandEvents = ({
       emit(
         LANGWATCH_EVENTS.completed,
         {
-          ...(count === undefined ? {} : { [ATTR.count]: Math.trunc(count) }),
-          ...(total === undefined ? {} : { [ATTR.total]: Math.trunc(total) }),
+          ...countAttributes({ count, total }),
           [ATTR.progress]: 1,
           [ATTR.durationMs]: Date.now() - startedAt,
           [ATTR.message]: truncate(message),
@@ -371,9 +320,7 @@ export const createCommandEvents = ({
           [ATTR.error]: reason,
           [ATTR.errorKind]: handled.kind,
           [ATTR.errorIsHandled]: handled.isHandled,
-          ...(handled.httpStatus > 0
-            ? { [ATTR.errorStatus]: handled.httpStatus }
-            : {}),
+          ...(handled.httpStatus > 0 ? { [ATTR.errorStatus]: handled.httpStatus } : {}),
           [ATTR.message]: line,
           [ATTR.durationMs]: Date.now() - startedAt,
         },
@@ -399,3 +346,16 @@ export const createCommandEvents = ({
     },
   };
 };
+
+function countAttributes({
+  count,
+  total,
+}: {
+  count?: number;
+  total?: number;
+}): Record<string, number> {
+  return {
+    ...(count === void 0 ? {} : { [ATTR.count]: Math.trunc(count) }),
+    ...(total === void 0 ? {} : { [ATTR.total]: Math.trunc(total) }),
+  };
+}

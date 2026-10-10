@@ -6,11 +6,11 @@ sidebarTitle: Model Naming
 
 The `model` field accepts three forms. Each one tells the gateway a different amount about where the request goes.
 
-| Form | Example | Where the request goes |
-|---|---|---|
-| Bare model | `"model": "gpt-5-mini"` | The provider on the key that serves that model. The gateway infers the provider. |
-| Provider and model | `"model": "openai/gpt-5-mini"` | A provider of that kind on the key. |
-| Instance handle and model | `"model": "europe/claude-sonnet-5"` | The one provider instance that carries the handle `europe`. |
+| Form                      | Example                             | Where the request goes                                                           |
+| ------------------------- | ----------------------------------- | -------------------------------------------------------------------------------- |
+| Bare model                | `"model": "gpt-5-mini"`             | The provider on the key that serves that model. The gateway infers the provider. |
+| Provider and model        | `"model": "openai/gpt-5-mini"`      | A provider of that kind on the key.                                              |
+| Instance handle and model | `"model": "europe/claude-sonnet-5"` | The one provider instance that carries the handle `europe`.                      |
 
 A fourth kind of name, an alias, is a name a routing policy maps to one of the forms above. See [Model Aliases](/ai-gateway/model-aliases).
 
@@ -48,11 +48,11 @@ If all four steps leave no provider, the request is refused with `model_not_reco
 
 The vendor table in step 2:
 
-| Model name starts with | Provider |
-|---|---|
-| `claude-` | `anthropic` |
-| `gpt-`, `o1-`, `o3-`, `o4-`, `chatgpt-`, `text-embedding-`, `dall-e-`, `whisper-`, `tts-` | `openai` |
-| `gemini-` | `gemini` |
+| Model name starts with                                                                    | Provider    |
+| ----------------------------------------------------------------------------------------- | ----------- |
+| `claude-`                                                                                 | `anthropic` |
+| `gpt-`, `o1-`, `o3-`, `o4-`, `chatgpt-`, `text-embedding-`, `dall-e-`, `whisper-`, `tts-` | `openai`    |
+| `gemini-`                                                                                 | `gemini`    |
 
 Bedrock and Vertex are not in the table. Write `bedrock/anthropic.claude-…` or `vertex/…`, or use an alias, to reach a Claude or Gemini model through them.
 
@@ -90,13 +90,13 @@ A key with one provider does not need this. Every model name is forwarded to tha
 
 Every refusal is a JSON error with `error.code`, and the HTTP status is fixed per code.
 
-| `error.code` | HTTP | Cause |
-|---|---|---|
-| `missing_model` | 400 | The request names no model. The message says where this endpoint expects it. |
-| `model_not_recognized` | 400 | A bare model name that no provider on the key serves, and the key holds more than one provider. |
-| `model_provider_not_bound` | 400 | The request named a provider family or a handle that this key cannot reach. Also returned when a request arrives on a provider-native route (`/v1/messages`, the Gemini `/v1beta` route) and the key has no provider of that vendor. |
-| `model_not_allowed` | 400 | The model resolved, but the key's `models_allowed` list, its provider access, or its routing policy excludes it. |
-| `no_provider_configured` | 400 | The organization has no model provider at all. Add one in **Settings → Model Providers**. |
+| `error.code`               | HTTP | Cause                                                                                                                                                                                                                                |
+| -------------------------- | ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `missing_model`            | 400  | The request names no model. The message says where this endpoint expects it.                                                                                                                                                         |
+| `model_not_recognized`     | 400  | A bare model name that no provider on the key serves, and the key holds more than one provider.                                                                                                                                      |
+| `model_provider_not_bound` | 400  | The request named a provider family or a handle that this key cannot reach. Also returned when a request arrives on a provider-native route (`/v1/messages`, the Gemini `/v1beta` route) and the key has no provider of that vendor. |
+| `model_not_allowed`        | 400  | The model resolved, but the key's `models_allowed` list, its provider access, or its routing policy excludes it.                                                                                                                     |
+| `no_provider_configured`   | 400  | The organization has no model provider at all. Add one in **Settings → Model Providers**.                                                                                                                                            |
 
 `model_provider_not_bound` and `model_not_recognized` list the prefixes the key accepts, so the caller can correct the request from the message. The list is capped at ten names and is also in `error.meta.options`.
 
@@ -125,9 +125,7 @@ Every refusal is a JSON error with `error.code`, and the HTTP status is fixed pe
 ## Choosing a form
 
 <Steps>
-  <Step title="One provider on the key">
-    Use the bare model name.
-  </Step>
+  <Step title="One provider on the key">Use the bare model name.</Step>
   <Step title="Several providers, different models">
     Use the bare model name. Each provider declares its own models, so the name is enough.
   </Step>
@@ -138,6 +136,8 @@ Every refusal is a JSON error with `error.code`, and the HTTP status is fixed pe
     Use an alias in the routing policy. See [Model Aliases](/ai-gateway/model-aliases).
   </Step>
   <Step title="Failover between providers">
-    Name a model that more than one provider on the key serves. The gateway carries the same model name to the next provider in the chain. See [Fallback Chains](/ai-gateway/providers/fallback-chains).
+    Name a model that more than one provider on the key serves. The gateway carries the same model
+    name to the next provider in the chain. See [Fallback
+    Chains](/ai-gateway/providers/fallback-chains).
   </Step>
 </Steps>

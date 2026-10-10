@@ -1,0 +1,262 @@
+import type { Named } from "@langwatch/module";
+import { REDACTION_MARKER_ENTITIES, SECRET_MARKER_ENTITY } from "@langwatch/redaction";
+import { z } from "zod";
+
+export const DATA_PRIVACY_FEATURE_ID = "data-privacy" as const;
+export const CONTENT_CATEGORIES = ["input", "output", "system", "tools"] as const;
+export type ContentCategory = (typeof CONTENT_CATEGORIES)[number];
+export const DISPOSITIONS = ["capture", "restrict", "drop"] as const;
+export type Disposition = (typeof DISPOSITIONS)[number];
+export const PII_LEVELS = ["disabled", "essential", "strict", "custom"] as const;
+export type PiiLevel = (typeof PII_LEVELS)[number];
+/** The PII level as `/api/projects` names it: the scoped levels minus `custom`, upper-cased. */
+export const dataPrivacyPiiRedactionLevelSchema = z.enum(["STRICT", "ESSENTIAL", "DISABLED"]);
+export type DataPrivacyPiiRedactionLevel = z.infer<typeof dataPrivacyPiiRedactionLevelSchema>;
+export const DATA_PRIVACY_SCOPE_TYPES = ["ORGANIZATION", "DEPARTMENT", "TEAM", "PROJECT"] as const;
+export type DataPrivacyScopeType = (typeof DATA_PRIVACY_SCOPE_TYPES)[number];
+
+const VALID_PII_ENTITIES = new Set(
+  [...REDACTION_MARKER_ENTITIES].filter((entity) => entity !== SECRET_MARKER_ENTITY),
+);
+
+const audienceSchemaDefinition = z
+  .object({
+    admins: z.boolean().optional(),
+    allMembers: z.boolean().optional(),
+    members: z.boolean().optional(),
+    viewers: z.boolean().optional(),
+    projectOwner: z.boolean().optional(),
+    groupIds: z.array(z.string()).optional(),
+  })
+  .strict();
+export interface AudienceSchema extends Named<typeof audienceSchemaDefinition> {}
+export const audienceSchema: AudienceSchema = audienceSchemaDefinition;
+export type Audience = z.infer<typeof audienceSchema>;
+
+const categorySettingSchemaDefinition = z
+  .object({ disposition: z.enum(DISPOSITIONS), audience: audienceSchema.optional() })
+  .strict();
+export interface CategorySettingSchema extends Named<typeof categorySettingSchemaDefinition> {}
+export const categorySettingSchema: CategorySettingSchema = categorySettingSchemaDefinition;
+export type CategorySetting = z.infer<typeof categorySettingSchema>;
+
+export const CUSTOM_ATTRIBUTE_DISPOSITIONS = ["restrict", "drop"] as const;
+export type CustomAttributeDisposition = (typeof CUSTOM_ATTRIBUTE_DISPOSITIONS)[number];
+const customAttributeRuleSchemaDefinition = z
+  .object({
+    pattern: z.string().trim().min(1).max(256),
+    disposition: z.enum(CUSTOM_ATTRIBUTE_DISPOSITIONS),
+    audience: audienceSchema.optional(),
+  })
+  .strict();
+export interface CustomAttributeRuleSchema extends Named<
+  typeof customAttributeRuleSchemaDefinition
+> {}
+export const customAttributeRuleSchema: CustomAttributeRuleSchema =
+  customAttributeRuleSchemaDefinition;
+export type CustomAttributeRule = z.infer<typeof customAttributeRuleSchema>;
+
+const dataPrivacyConfigSchemaDefinition = z
+  .object({
+    categories: z
+      .object({
+        input: categorySettingSchema.optional(),
+        output: categorySettingSchema.optional(),
+        system: categorySettingSchema.optional(),
+        tools: categorySettingSchema.optional(),
+      })
+      .strict()
+      .optional(),
+    pii: z
+      .object({
+        level: z.enum(PII_LEVELS),
+        entities: z
+          .array(
+            z.string().refine((entity) => VALID_PII_ENTITIES.has(entity), {
+              message: "Unknown PII entity",
+            }),
+          )
+          .max(64)
+          .optional(),
+        exceptPatterns: z.array(z.string().trim().min(1).max(512)).max(50).optional(),
+      })
+      .strict()
+      .superRefine((pii, ctx) => {
+        if (pii.level === "custom" && (!pii.entities || pii.entities.length === 0)) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "The custom PII level needs at least one entity",
+            path: ["entities"],
+          });
+        }
+        if (pii.level !== "custom" && pii.entities && pii.entities.length > 0) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "Entities can only be set when the level is custom",
+            path: ["entities"],
+          });
+        }
+        if (pii.level === "disabled" && pii.exceptPatterns?.length) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "Exception patterns need a PII level that redacts something",
+            path: ["exceptPatterns"],
+          });
+        }
+      })
+      .optional(),
+    secrets: z
+      .object({ enabled: z.boolean(), customPatterns: z.array(z.string()).optional() })
+      .strict()
+      .optional(),
+    customAttributes: z.array(customAttributeRuleSchema).max(50).optional(),
+  })
+  .strict();
+export interface DataPrivacyConfigSchema extends Named<typeof dataPrivacyConfigSchemaDefinition> {}
+export const dataPrivacyConfigSchema: DataPrivacyConfigSchema = dataPrivacyConfigSchemaDefinition;
+export type DataPrivacyConfig = z.infer<typeof dataPrivacyConfigSchema>;
+
+const resolvedAudienceSchemaDefinition = z
+  .object({
+    admins: z.boolean(),
+    allMembers: z.boolean(),
+    members: z.boolean(),
+    viewers: z.boolean(),
+    projectOwner: z.boolean(),
+    groupIds: z.array(z.string()),
+  })
+  .strict();
+export interface ResolvedAudienceSchema extends Named<typeof resolvedAudienceSchemaDefinition> {}
+export const resolvedAudienceSchema: ResolvedAudienceSchema = resolvedAudienceSchemaDefinition;
+export type ResolvedAudience = z.infer<typeof resolvedAudienceSchema>;
+
+const resolvedCategorySchemaDefinition = z
+  .object({ disposition: z.enum(DISPOSITIONS), audience: resolvedAudienceSchema })
+  .strict();
+export interface ResolvedCategorySchema extends Named<typeof resolvedCategorySchemaDefinition> {}
+export const resolvedCategorySchema: ResolvedCategorySchema = resolvedCategorySchemaDefinition;
+export type ResolvedCategory = z.infer<typeof resolvedCategorySchema>;
+
+const resolvedCustomAttributeRuleSchemaDefinition = z
+  .object({
+    pattern: z.string(),
+    disposition: z.enum(CUSTOM_ATTRIBUTE_DISPOSITIONS),
+    audience: resolvedAudienceSchema,
+  })
+  .strict();
+export interface ResolvedCustomAttributeRuleSchema extends Named<
+  typeof resolvedCustomAttributeRuleSchemaDefinition
+> {}
+export const resolvedCustomAttributeRuleSchema: ResolvedCustomAttributeRuleSchema =
+  resolvedCustomAttributeRuleSchemaDefinition;
+export type ResolvedCustomAttributeRule = z.infer<typeof resolvedCustomAttributeRuleSchema>;
+
+/** Every field populated: the cascade's answer, never a partial rule. */
+const resolvedDataPrivacySchemaDefinition = z
+  .object({
+    categories: z
+      .object({
+        input: resolvedCategorySchema,
+        output: resolvedCategorySchema,
+        system: resolvedCategorySchema,
+        tools: resolvedCategorySchema,
+      })
+      .strict(),
+    pii: z
+      .object({
+        level: z.enum(PII_LEVELS),
+        entities: z.array(z.string()),
+        exceptPatterns: z.array(z.string()),
+      })
+      .strict(),
+    secrets: z.object({ enabled: z.boolean(), customPatterns: z.array(z.string()) }).strict(),
+    customAttributes: z.array(resolvedCustomAttributeRuleSchema),
+  })
+  .strict();
+export interface ResolvedDataPrivacySchema extends Named<
+  typeof resolvedDataPrivacySchemaDefinition
+> {}
+export const resolvedDataPrivacySchema: ResolvedDataPrivacySchema =
+  resolvedDataPrivacySchemaDefinition;
+export type ResolvedDataPrivacy = z.infer<typeof resolvedDataPrivacySchema>;
+
+export const EMPTY_AUDIENCE: ResolvedAudience = {
+  admins: false,
+  allMembers: false,
+  members: false,
+  viewers: false,
+  projectOwner: false,
+  groupIds: [],
+};
+export const PLATFORM_DEFAULT_DATA_PRIVACY: ResolvedDataPrivacy = {
+  categories: {
+    input: { disposition: "capture", audience: { ...EMPTY_AUDIENCE } },
+    output: { disposition: "capture", audience: { ...EMPTY_AUDIENCE } },
+    system: { disposition: "capture", audience: { ...EMPTY_AUDIENCE } },
+    tools: { disposition: "capture", audience: { ...EMPTY_AUDIENCE } },
+  },
+  pii: { level: "essential", entities: [], exceptPatterns: [] },
+  secrets: { enabled: true, customPatterns: [] },
+  customAttributes: [],
+};
+export function resolveAudience(audience?: Audience): ResolvedAudience {
+  return {
+    admins: audience?.admins ?? false,
+    allMembers: audience?.allMembers ?? false,
+    members: audience?.members ?? false,
+    viewers: audience?.viewers ?? false,
+    projectOwner: audience?.projectOwner ?? false,
+    groupIds: audience?.groupIds ?? [],
+  };
+}
+
+const dataPrivacyPolicySchemaDefinition = z
+  .object({
+    id: z.string().min(1),
+    organizationId: z.string().min(1),
+    scopeType: z.enum(DATA_PRIVACY_SCOPE_TYPES),
+    scopeId: z.string().min(1),
+    personalOnly: z.boolean(),
+    config: dataPrivacyConfigSchema,
+    createdAt: z.date(),
+    updatedAt: z.date(),
+  })
+  .strict();
+export interface DataPrivacyPolicySchema extends Named<typeof dataPrivacyPolicySchemaDefinition> {}
+export const dataPrivacyPolicySchema: DataPrivacyPolicySchema = dataPrivacyPolicySchemaDefinition;
+export type DataPrivacyPolicy = z.infer<typeof dataPrivacyPolicySchema>;
+
+const dataPrivacyRowSchemaDefinition = z
+  .object({
+    scopeType: z.enum(DATA_PRIVACY_SCOPE_TYPES),
+    scopeId: z.string().min(1),
+    personalOnly: z.boolean(),
+    config: dataPrivacyConfigSchema,
+  })
+  .strict();
+export interface DataPrivacyRowSchema extends Named<typeof dataPrivacyRowSchemaDefinition> {}
+export const dataPrivacyRowSchema: DataPrivacyRowSchema = dataPrivacyRowSchemaDefinition;
+
+export interface DataPrivacyScope {
+  scopeType: DataPrivacyScopeType;
+  scopeId: string;
+}
+export interface DataPrivacyScopeFacts {
+  organizationId: string;
+  teamId: string;
+  projectId: string;
+  departmentId: string | null;
+  isPersonal: boolean;
+}
+export type DataPrivacyRow = z.infer<typeof dataPrivacyRowSchema>;
+
+/**
+ * Folded policies one request has already resolved, keyed by its sorted project ids
+ * (ADR-144 decision 9). Lives on the request context and dies with it, so it needs no
+ * invalidation: a member's rule change reaches the next request.
+ */
+export type PrivacyPolicyRequestMemo = Map<string, Promise<ResolvedDataPrivacy>>;
+
+export function newPrivacyPolicyRequestMemo(): PrivacyPolicyRequestMemo {
+  return new Map();
+}

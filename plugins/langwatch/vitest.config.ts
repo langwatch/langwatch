@@ -1,16 +1,10 @@
-import { defineConfig } from "vitest/config";
+import { defineModuleVitestConfig } from "@langwatch/vitest-config";
 
-/**
- * The suite is three files: JSON contract assertions, the launcher against
- * fake CLIs, and the launcher against the built CLI and a local collector.
- * All are node-only, none needs a service.
- *
- * The worker cap is the point of having this file at all. Vitest's default is
- * one fork per core minus one, which on a developer laptop running several
- * worktrees at once is several gigabytes of resident processes for three test
- * files. Two is enough to keep the files parallel.
- */
-export default defineConfig({
+/** Two workers keep this node-only suite parallel without excess memory. */
+
+export default defineModuleVitestConfig({
+  kind: "node",
+  isolate: false,
   test: {
     environment: "node",
     include: ["__tests__/**/*.test.ts"],

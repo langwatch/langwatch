@@ -1,0 +1,181 @@
+/**
+ * Personal column entries (usage, traces, sessions, library). PersonalSidebarLinks
+ * only; column came from DashboardLayout (deleted). Personal project from host.
+ * Spec: modules/navigation/specs/product-sidebars.feature
+ */
+
+import {
+  Bot,
+  ClipboardList,
+  Database,
+  Gauge,
+  GitPullRequest,
+  ListTree,
+  Sliders,
+  Sparkles,
+  SquareTerminal,
+} from "lucide-react";
+
+import { navigationApi, type NavigationApiMap } from "../../behavior/navigation-api.ts";
+import { isOnlineEvaluationsActivePath } from "../../model/navigation-active-state.ts";
+import { useNavigationHost } from "../../model/navigation-host.ts";
+import { isPathUnder } from "../../model/products.ts";
+import { SideMenuLink } from "../blocks/side-menu-link.tsx";
+
+/**
+ * The advanced features a reader turned on in their personal workspace:
+ * default-empty storage means an existing reader sees Traces only, until
+ * the bundle checkbox in `/me/configure` flips them on atomically.
+ */
+type PersonalWorkspaceFeatures =
+  NavigationApiMap["personalWorkspaceFeatures"]["get"]["query"]["output"];
+
+export const PersonalSidebarLinks = function PersonalSidebarLinks({
+  showExpanded,
+}: {
+  showExpanded: boolean;
+}) {
+  const host = useNavigationHost();
+  const pathname = host.pathname();
+  const { personalProjectSlug, features } = usePersonalWorkspace();
+  const tracesHref = personalProjectSlug ? `/${personalProjectSlug}/traces` : null;
+
+  return (
+    <>
+      <SideMenuLink
+        icon={Gauge}
+        label="My Usage"
+        href="/me"
+        isActive={pathname === "/me"}
+        showLabel={showExpanded}
+      />
+      {tracesHref && (
+        <SideMenuLink
+          icon={ListTree}
+          label="Traces"
+          href={tracesHref}
+          isActive={pathname.includes("/traces")}
+          showLabel={showExpanded}
+        />
+      )}
+      <SideMenuLink
+        icon={SquareTerminal}
+        label="Sessions"
+        href="/me/sessions"
+        isActive={isPathUnder({ pathname, base: "/me/sessions" })}
+        showLabel={showExpanded}
+      />
+      <SideMenuLink
+        icon={GitPullRequest}
+        label="Pull Requests"
+        href="/me/pull-requests"
+        isActive={isPathUnder({ pathname, base: "/me/pull-requests" })}
+        showLabel={showExpanded}
+      />
+      <PersonalLibraryLinks
+        showExpanded={showExpanded}
+        pathname={pathname}
+        personalProjectSlug={personalProjectSlug}
+        features={features}
+      />
+      <SideMenuLink
+        icon={Sliders}
+        label="Configure"
+        href="/me/configure"
+        isActive={isPathUnder({ pathname, base: "/me/configure" })}
+        showLabel={showExpanded}
+      />
+    </>
+  );
+};
+
+function usePersonalWorkspace(): {
+  personalProjectSlug: string | null;
+  features: PersonalWorkspaceFeatures | undefined;
+} {
+  // Scoped to the organization the chrome is showing: a personal workspace
+  // exists per organization, and `openableTeams()` is already derived from
+  // the ambient organization with the ambient team ordered first, so finding
+  // the first personal team here carries the same per-organization scoping
+  // main's `findPersonalProject({ organizationId })` fix added.
+  const host = useNavigationHost();
+  const openableTeams = host.openableTeams();
+  const userId = host.currentUser()?.id;
+
+  // Own team only (main's findPersonalProject): an admin also sees members' personal teams.
+  const personalProject =
+    openableTeams.find(
+      (team) => team.isPersonal && team.ownerUserId === userId && !!team.projects[0],
+    )?.projects[0] ?? null;
+
+  const personalProjectId = personalProject?.id ?? null;
+  const featuresQuery = navigationApi.personalWorkspaceFeatures.get.useQuery(
+    { projectId: personalProjectId ?? "" },
+    { enabled: !!personalProjectId, refetchOnWindowFocus: false },
+  );
+
+  return {
+    personalProjectSlug: personalProject?.slug ?? null,
+    features: featuresQuery.data,
+  };
+}
+
+/**
+ * The library entries link to the personal project's own `/[project]/<section>`
+ * routes, so they highlight off the current path the way the project column
+ * does for project navigation.
+ */
+function PersonalLibraryLinks({
+  showExpanded,
+  pathname,
+  personalProjectSlug,
+  features,
+}: {
+  showExpanded: boolean;
+  pathname: string;
+  personalProjectSlug: string | null;
+  features: PersonalWorkspaceFeatures | undefined;
+}) {
+  if (!personalProjectSlug) return null;
+
+  return (
+    <>
+      {features?.evaluations && (
+        <SideMenuLink
+          icon={ClipboardList}
+          label="Online Evals"
+          href={`/${personalProjectSlug}/online-evaluations`}
+          isActive={isOnlineEvaluationsActivePath(pathname)}
+          showLabel={showExpanded}
+        />
+      )}
+      {features?.datasets && (
+        <SideMenuLink
+          icon={Database}
+          label="Datasets"
+          href={`/${personalProjectSlug}/datasets`}
+          isActive={pathname.includes("/datasets")}
+          showLabel={showExpanded}
+        />
+      )}
+      {features?.annotations && (
+        <SideMenuLink
+          icon={Sparkles}
+          label="Annotations"
+          href={`/${personalProjectSlug}/annotations`}
+          isActive={pathname.includes("/annotations")}
+          showLabel={showExpanded}
+        />
+      )}
+      {features?.automations && (
+        <SideMenuLink
+          icon={Bot}
+          label="Automations"
+          href={`/${personalProjectSlug}/automations`}
+          isActive={pathname.includes("/automations")}
+          showLabel={showExpanded}
+        />
+      )}
+    </>
+  );
+}

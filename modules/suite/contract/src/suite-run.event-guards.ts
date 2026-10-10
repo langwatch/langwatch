@@ -1,0 +1,32 @@
+import { SUITE_RUN_EVENT_TYPES } from "./suite-run.constants.ts";
+import type {
+  SuiteRunItemCompletedEvent,
+  SuiteRunItemRegradedEvent,
+  SuiteRunItemStartedEvent,
+  SuiteRunProcessingEvent,
+  SuiteRunStartedEvent,
+} from "./suite-run.events.ts";
+
+export function isSuiteRunStartedEvent(
+  event: SuiteRunProcessingEvent,
+): event is SuiteRunStartedEvent {
+  return event.type === SUITE_RUN_EVENT_TYPES.STARTED;
+}
+
+export function isSuiteRunItemStartedEvent(
+  event: SuiteRunProcessingEvent,
+): event is SuiteRunItemStartedEvent {
+  return event.type === SUITE_RUN_EVENT_TYPES.ITEM_STARTED;
+}
+
+export function isSuiteRunItemCompletedEvent(
+  event: SuiteRunProcessingEvent,
+): event is SuiteRunItemCompletedEvent {
+  return event.type === SUITE_RUN_EVENT_TYPES.ITEM_COMPLETED;
+}
+
+export function isSuiteRunItemRegradedEvent(
+  event: SuiteRunProcessingEvent,
+): event is SuiteRunItemRegradedEvent {
+  return event.type === SUITE_RUN_EVENT_TYPES.ITEM_REGRADED;
+}

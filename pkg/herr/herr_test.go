@@ -41,6 +41,14 @@ func TestNewLight_PanicsOnNilReason(t *testing.T) {
 	})
 }
 
+func TestWithRetryable_OverridesTheTerminalDefault(t *testing.T) {
+	terminal := New(context.Background(), codeInternal, nil)
+	retryable := terminal.WithRetryable(true)
+
+	assert.False(t, terminal.Retryable)
+	assert.True(t, retryable.Retryable)
+}
+
 func TestE_Error_IncludesCodeAndMeta(t *testing.T) {
 	reason := errors.New("timeout")
 	e := New(context.Background(), codeInternal, M{"svc": "db"}, reason)

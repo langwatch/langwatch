@@ -33,7 +33,7 @@ the six install roots merged.)
 minimumReleaseAge: 10080
 minimumReleaseAgeExclude:
   - litellm
-  - '@scope/package'
+  - "@scope/package"
 ```
 
 pnpm also supports version-scoped exceptions when the fix should be pinned to a

@@ -29,8 +29,8 @@ import (
 )
 
 // ServerAddressEnv is the address of the Pyroscope that profiles are pushed to.
-// Unset is the off switch. In local development haven writes it into the
-// worktree's .env.portless whenever the shared observability stack is up, so a
+// Unset is the off switch. In local development haven injects it into every
+// process it starts whenever the shared observability stack is up, so a
 // developer gets flame graphs from the same `make haven up` that gives them
 // traces; in production it names the in-cluster Pyroscope service.
 const ServerAddressEnv = "PYROSCOPE_SERVER_ADDRESS"

@@ -14,6 +14,8 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
+	"os"
+	"path/filepath"
 )
 
 // seedPreset is one seed variant: env switches for prisma:seed plus which
@@ -25,42 +27,37 @@ type seedPreset struct {
 	// ingest is the ordered list of live-stack pnpm scripts to run after the
 	// base seed — they go through the running stack's real collector and
 	// event-sourcing commands, so the stack must be up.
+	//
+	// EVERY SHIPPED PRESET'S LIST IS EMPTY. The five scripts that filled it
+	// (seed:retention, seed:sample-traces, seed:realistic-platform, seed:mass,
+	// seed:langy-prompts) lived in the platform application's scripts/ and were
+	// deleted with it; nothing that survives loads data through the collector,
+	// and there is no script left to repoint at. The field, runSeedIngest and
+	// ingestPlaySeed are the seam those seeds come back through, so they stay
+	// and stay tested — an empty list is a no-op, not a silent failure.
 	ingest  []string
 	summary string
 }
 
-// seedRetentionStep pins the local-dev org's data retention to two years,
-// partition-aligned, before any data lands. A dev stack keeps only 7 days by
-// default (DefaultRetentionDays in the overlay), so a preset that loads data —
-// especially the backdated mass history — has to raise retention first or its
-// rows would be written pre-expired. Runs first in every data-loading preset;
-// unseeded presets (onboarding/bare) keep the tiny default.
-const seedRetentionStep = "seed:retention"
-
-// defaultMassSeedMonths is the mass preset's backdated window, mirroring
-// seed-mass.ts's own fallback. Kept as a string because it travels as an
-// environment value to both seed:retention and seed:mass, which must agree on
-// the window or the retention pin will not cover the oldest rows.
-const defaultMassSeedMonths = "3"
-
 // seedPresets is the registry of variants, shared by `db seed` and `db reset`.
+// Every entry is env switches the storage-seed task reads for itself — see
+// apps/tasks/src/storage-seed/storage-seed.ts, which is the whole seed now.
 var seedPresets = map[string]seedPreset{
-	"demo":            {env: []string{"HAVEN_SEED_PRESET=demo"}, ingest: []string{seedRetentionStep, "seed:sample-traces", "seed:realistic-platform"}, summary: "past onboarding + sample traces + realistic platform data"},
-	"traces":          {ingest: []string{seedRetentionStep, "seed:sample-traces"}, summary: "the deterministic sample traces on top of the stable identity"},
+	"demo":            {env: []string{"HAVEN_SEED_PRESET=demo"}, summary: "past onboarding, with the demo prompt, HTTP agent and dataset"},
 	"onboarding":      {env: []string{"HAVEN_SEED_FIRST_MESSAGE=0"}, summary: "a fresh onboarding journey (first-trace flag cleared)"},
 	"post-onboarding": {env: []string{"HAVEN_SEED_FIRST_MESSAGE=1"}, summary: "past onboarding, no demo content"},
 	"bare":            {env: []string{"HAVEN_SEED_MODEL_PROVIDERS=0", "HAVEN_SEED_FEATURE_FLAGS=0"}, summary: "identity only — no env-derived providers, stock feature flags"},
-	// mass: a superset of demo — months of coherent, backdated activity.
-	// Event-sourced products are seeded through their event logs (replayed by
-	// the projection workers); traces backdate through the collector inside
-	// its 31-day window and, older than that, through recordSpan commands.
-	// HAVEN_SEED_MONTHS tunes the window (default 3). It is set explicitly rather
-	// than left to seed:mass's own default because seed:retention reads the same
-	// variable to decide whether to wait out the retention-policy cache before
-	// backdated rows are written: unset, it computed a zero-day window, skipped
-	// the wait, and a worker holding the cached 7-day default could stamp months
-	// of history pre-expired.
-	"mass": {env: []string{"HAVEN_SEED_PRESET=demo", "HAVEN_SEED_MONTHS=" + defaultMassSeedMonths}, ingest: []string{seedRetentionStep, "seed:sample-traces", "seed:realistic-platform", "seed:mass"}, summary: "demo plus months of backdated traces, runs, and metric series (HAVEN_SEED_MONTHS, default 3)"},
+}
+
+// retiredSeedPresets are preset names whose ENTIRE content was ingest steps
+// that no longer exist, mapped to what happened to them. Refused by name
+// rather than simply dropped, for the reason `±workers` is refused by name in
+// domain/selection.go: "unknown preset" reads as a typo, and a developer who
+// has been typing `haven db seed mass` for months would go looking for their
+// own mistake. Delete an entry once its data has a home again.
+var retiredSeedPresets = map[string]string{
+	"traces": "its only content was the seed:sample-traces ingest step",
+	"mass":   "its content was the seed:retention, seed:sample-traces, seed:realistic-platform and seed:mass ingest steps",
 }
 
 // SeedPresetNames lists the registry for errors and help, sorted.
@@ -86,6 +83,11 @@ func ValidateSeedPreset(name string) error {
 func resolveSeedPreset(name string) (seedPreset, error) {
 	if name == "" {
 		return seedPreset{}, nil
+	}
+	if why, retired := retiredSeedPresets[name]; retired {
+		return seedPreset{}, fmt.Errorf(
+			"the %q seed preset is retired: %s, and those scripts were deleted with the platform application — no seed loads data through the collector today. Available: %s",
+			name, why, strings.Join(SeedPresetNames(), ", "))
 	}
 	pre, ok := seedPresets[name]
 	if !ok {
@@ -129,19 +131,34 @@ func (o *Orchestrator) DBReset(ctx context.Context, p UpParams, preset string) e
 		}
 		fmt.Printf("dropped postgres database %q\n", db)
 	}
+	if o.rds != nil && o.cfg.ShouldManageRedis {
+		if _, err := o.rds.Ensure(ctx); err != nil {
+			return fmt.Errorf("managed redis is unavailable: %w", err)
+		}
+		rdb := o.redisDBFor(slug)
+		if err := o.rds.FlushDB(ctx, rdb); err != nil {
+			return fmt.Errorf("flushing redis db %d: %w", rdb, err)
+		}
+		fmt.Printf("flushed redis db %d (this stack's queues and caches)\n", rdb)
+	}
+	if err := os.RemoveAll(filepath.Join(o.cfg.Home, "storage", slug)); err != nil {
+		return fmt.Errorf("removing storagesim objects: %w", err)
+	}
+	fmt.Printf("removed storagesim objects for %q\n", slug)
 
 	env, err := o.managedStackEnv(ctx, slug)
 	if err != nil {
 		return err
 	}
-	env = append(env, "DOTENV_CONFIG_QUIET=true")
+	env = append(env, "DOTENV_CONFIG_QUIET=true", o.compileCacheEnv(slug))
 	env = append(env, pre.env...)
-	if err := o.sup.RunOnce(ctx, "prepare", p.LwDir, "pnpm -s run start:prepare:db", env); err != nil {
+	if err := o.sup.RunOnce(ctx, "prepare", p.WorktreeDir, prepareDBShell, env); err != nil {
 		return fmt.Errorf("migrations failed on the fresh database: %w", err)
 	}
-	if err := o.sup.RunOnce(ctx, "seed", p.LwDir, seedShell("pnpm -s run prisma:seed", env), env); err != nil {
+	if err := o.sup.RunOnce(ctx, "seed", p.WorktreeDir, seedShell("pnpm --silent run prisma:seed", env), env); err != nil {
 		return fmt.Errorf("seed failed: %w", err)
 	}
+	o.ClearSeedStatus(slug)
 	fmt.Printf("stack %q databases reset — migrated and seeded fresh\n", slug)
 	return o.runSeedIngest(ctx, p, pre, "haven db reset "+preset)
 }
@@ -159,9 +176,9 @@ func (o *Orchestrator) runSeedIngest(ctx context.Context, p UpParams, pre seedPr
 
 // managedStackEnv builds the environment a database-rebuilding child runs
 // with: the managed servers are ensured (recreating this slug's freshly
-// dropped databases empty), then the registered stack's full overlay is
-// preferred when one exists — it carries the same database URLs plus
-// everything else a seeder might dial. Unlike `up`'s warn-and-continue
+// dropped databases empty), then the registered stack's overlay supplies
+// everything else a seeder might dial, its database URLs replaced by the
+// ones just ensured. Unlike `up`'s warn-and-continue
 // ensures, an unavailable managed server is a hard error here: there is no
 // .env fallback that could make "reset the managed database" mean anything.
 func (o *Orchestrator) managedStackEnv(ctx context.Context, slug string) ([]string, error) {
@@ -175,31 +192,35 @@ func (o *Orchestrator) managedStackEnv(ctx context.Context, slug string) ([]stri
 	if o.cfg.ShouldManagePostgres && st.PostgresDatabase == "" {
 		return nil, fmt.Errorf("managed postgres is unavailable — cannot rebuild database %q", domain.DatabaseForSlug(slug))
 	}
-	ensured := st.OverlayEnv()
 	if reg, ok := o.stackBySlug(slug); ok {
-		// A registered stack's overlay wins where it has a value — it describes
-		// the ports the running stack actually bound. But it only carries a
-		// database URL if it recorded one, so a stack registered while haven was
-		// not managing that server has none, and the child would fall through to
-		// whatever `.env` names: the guards above would have vouched for `st`
-		// while the seed ran somewhere else entirely. Fill those gaps from the
-		// endpoints just ensured.
-		return devNodeEnv(withMissingEnv(reg.OverlayEnv(), ensured)), nil
+		// The registered overlay keeps the ports the running stack bound, but its
+		// database endpoints are whatever its last `up` recorded (a native server
+		// since swapped for the container, say). The reset dropped on the servers
+		// just ensured, so the child migrates and seeds exactly those.
+		env := append(withDatabasesOf(reg, st).OverlayEnv(), o.credentialEnv(slug, reg.WorktreeDir)...)
+		return devNodeEnv(append(env, simulatorsEnv(domain.SelectionFromStack(reg), reg, reg.WorktreeDir)...)), nil
 	}
-	return devNodeEnv(ensured), nil
+	// No running stack: name the app origin `up` would, or sign-in refuses to load.
+	proxyScheme, proxyPort := o.proxy.Endpoint()
+	scheme, port := o.serviceEndpoint(proxyScheme, proxyPort, 0)
+	st.Services = append(st.Services, domain.Service{Name: "app", URL: o.cfg.Naming.URL("app", slug, scheme, port)})
+	return devNodeEnv(st.OverlayEnv()), nil
 }
 
-// withMissingEnv appends any KEY=… from extra whose KEY is absent from base.
-// Order matters to the children: earlier assignments win, so base is authoritative.
-func withMissingEnv(base, extra []string) []string {
-	for _, kv := range extra {
-		key, _, ok := strings.Cut(kv, "=")
-		if !ok || hasEnvKey(base, key) {
-			continue
-		}
-		base = append(base, kv)
+// withDatabasesOf points reg at every endpoint ensured holds; an unmanaged
+// server (empty in ensured) keeps whatever reg recorded.
+func withDatabasesOf(reg, ensured domain.Stack) domain.Stack {
+	if ensured.ClickHouseDatabase != "" {
+		reg.ClickHouseHTTPPort, reg.ClickHouseDatabase = ensured.ClickHouseHTTPPort, ensured.ClickHouseDatabase
+		reg.ClickHousePostgresHost = ensured.ClickHousePostgresHost
 	}
-	return base
+	if ensured.PostgresDatabase != "" {
+		reg.PostgresPort, reg.PostgresDatabase = ensured.PostgresPort, ensured.PostgresDatabase
+	}
+	if ensured.RedisPort != 0 {
+		reg.RedisPort, reg.RedisDB = ensured.RedisPort, ensured.RedisDB
+	}
+	return reg
 }
 
 // devNodeEnv marks the one-shot lanes (prepare, seed, codegen) as development.
@@ -225,7 +246,7 @@ func (o *Orchestrator) DBSeed(ctx context.Context, p UpParams, preset string) er
 		return err
 	}
 	env := append(o.seedEnv(p), pre.env...)
-	if err := o.sup.RunOnce(ctx, "seed", p.LwDir, seedShell("pnpm -s run prisma:seed", env), env); err != nil {
+	if err := o.sup.RunOnce(ctx, "seed", p.WorktreeDir, seedShell("pnpm --silent run prisma:seed", env), env); err != nil {
 		return fmt.Errorf("seed failed: %w", err)
 	}
 	return o.runSeedIngest(ctx, p, pre, "haven db seed "+preset)
@@ -241,7 +262,8 @@ func (o *Orchestrator) seedEnv(p UpParams) []string {
 	var env []string
 	if slug, err := o.resolveSlug(p); err == nil {
 		if st, ok := o.stackBySlug(slug); ok {
-			env = st.OverlayEnv()
+			env = append(st.OverlayEnv(), o.credentialEnv(slug, st.WorktreeDir)...)
+			env = append(env, simulatorsEnv(domain.SelectionFromStack(st), st, st.WorktreeDir)...)
 		}
 	}
 	if o.cfg.LocalAPIKey != "" && !hasEnvKey(env, "HAVEN_SEED_LANGWATCH_API_KEY") {
@@ -331,7 +353,7 @@ func (o *Orchestrator) DBURL(ctx context.Context, p UpParams, engine string) err
 func (o *Orchestrator) DownAll(ctx context.Context) error {
 	var stopped []int
 	for _, st := range o.store.Stacks() {
-		if o.sys.ProcessAlive(st.LauncherPID) {
+		if o.launcherIsOurs(st) {
 			stopped = append(stopped, st.LauncherPID)
 		}
 		if err := o.DownStack(ctx, st.Slug); err != nil {
@@ -353,7 +375,8 @@ func (o *Orchestrator) DownAll(ctx context.Context) error {
 		o.ch.Stop()
 		fmt.Println("stopped managed clickhouse-server (data kept)")
 	}
-	if info, ok := o.store.Daemon(); ok && o.sys.ProcessAlive(info.PID) {
+	o.stopColimaIfIdle(ctx)
+	if info, ok := o.store.Daemon(); ok && o.pidIsOurs(info.PID, info.Start) {
 		o.sys.Terminate(info.PID)
 		o.store.ClearDaemon()
 		fmt.Printf("stopped haven daemon (pid %d)\n", info.PID)

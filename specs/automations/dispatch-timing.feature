@@ -64,15 +64,15 @@ Feature: Per-trigger dispatch timing — cadence and trace-readiness debounce
       Then each destination is configured as its own trigger
       And one trigger carries exactly one cadence
 
-  Rule: Cadence defaults preserve existing behavior
+  Rule: Cadence defaults are deterministic
 
-    Scenario: Existing triggers keep firing immediately after the upgrade
-      Given an automation that existed before the cadence feature shipped
+    Scenario: A trigger without stored cadence fires immediately
+      Given an automation with no explicit cadence value
       When a matching trace arrives
       Then the notification is sent immediately
       And the trigger's cadence is shown as "Immediate" in settings
 
-    Scenario: New notification automations default to a 5-minute digest
+    Scenario: Notification automations default to a 5-minute digest
       When the user creates a new email or Slack automation
       Then its cadence is "Every 5 minutes" by default
 
@@ -139,8 +139,8 @@ Feature: Per-trigger dispatch timing — cadence and trace-readiness debounce
       When the user creates any automation
       Then the first logical match in an activity window schedules evaluation 30 seconds later
 
-    Scenario: Existing triggers also default to 30s after migration
-      Given an automation that existed before the debounce feature shipped
+    Scenario: A trigger without stored debounce uses 30 seconds
+      Given an automation with no explicit debounce value
       Then its activity is grouped into 30-second settle windows
       And the operator can flip it to 0 to restore eager evaluation
 

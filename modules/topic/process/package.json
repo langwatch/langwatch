@@ -1,0 +1,52 @@
+{
+  "name": "@langwatch/topic-process",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Canonical server-side Topic feature and private persistence.",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc -b",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@langwatch/api": "workspace:*",
+    "@langwatch/data-retention-contract": "workspace:*",
+    "@langwatch/evaluation-contract": "workspace:*",
+    "@langwatch/eventing": "workspace:*",
+    "@langwatch/handled-error": "workspace:*",
+    "@langwatch/ksuid": "workspace:*",
+    "@langwatch/model-provider-contract": "workspace:*",
+    "@langwatch/module": "workspace:*",
+    "@langwatch/observability": "workspace:*",
+    "@langwatch/prisma-client": "workspace:*",
+    "@langwatch/process": "workspace:*",
+    "@langwatch/redis-client": "workspace:*",
+    "@langwatch/task": "workspace:*",
+    "@langwatch/time": "workspace:*",
+    "@langwatch/topic-contract": "workspace:*",
+    "@langwatch/trace-contract": "workspace:*",
+    "@langwatch/upgrade": "workspace:*",
+    "@trpc/server": "catalog:",
+    "ioredis": "catalog:",
+    "nanoid": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@langwatch/authorization": "workspace:*",
+    "@langwatch/process-stores": "workspace:*",
+    "@langwatch/test-harness": "workspace:*",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

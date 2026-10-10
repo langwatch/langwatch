@@ -51,6 +51,10 @@ func (s *streamCounter) Close() error {
 	return s.inner.Close()
 }
 
+// Unwrap exposes the wrapped iterator so its optional extensions stay
+// reachable (domain.StreamHeadersOf).
+func (s *streamCounter) Unwrap() domain.StreamIterator { return s.inner }
+
 // RawFraming delegates so writers can still detect raw-framed (Gemini
 // passthrough) streams through wrapper chains.
 func (s *streamCounter) RawFraming() bool {

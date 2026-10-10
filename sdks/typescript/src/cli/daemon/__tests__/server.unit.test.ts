@@ -1,22 +1,17 @@
-/**
- * The socket-file bookkeeping: which FILE a path leads to, whether this process
- * is allowed to remove it, and how a bound socket takes on the shared name.
- *
- * Real files, no sockets — the lifecycle these rules protect is exercised over
- * real sockets in daemon-server.integration.test.ts. The one call this file
- * replaces is `fs.linkSync`: publishing has a fallback precisely for a
- * filesystem that refuses to hard-link a socket, and no filesystem a test can
- * create here behaves that way.
- */
-import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import * as fs from "node:fs";
 // The mock factory below needs the module's type. A top-level `import type`
 // gives it that without an inline `import()` annotation: the CLI's exception
 // for inline imports covers load-bearing LAZY RUNTIME imports that keep the
 // boot graph small, not a type argument, which costs nothing to hoist.
-import type * as NodeFs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
+
+/**
+ * Real files, no sockets — the socket lifecycle is exercised over real sockets in
+ * daemon-server.integration.test.ts. This file only fakes `fs.linkSync`, since publishing's
+ * fallback exists for a filesystem that refuses to hard-link a socket.
+ */
+import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 
 import { MAX_STAGING_OVERHEAD_BYTES } from "../identity";
 import {
@@ -31,7 +26,7 @@ const { refuseLink } = vi.hoisted(() => ({
 }));
 
 vi.mock("node:fs", async (importOriginal) => {
-  const actual = await importOriginal<typeof NodeFs>();
+  const actual = await importOriginal<typeof fs>();
   const linkSync: typeof actual.linkSync = (existingPath, newPath) => {
     if (refuseLink.code === null) {
       actual.linkSync(existingPath, newPath);
@@ -82,13 +77,10 @@ describe("unlinkIfSameFile", () => {
       it("leaves the replacement alone", () => {
         const mine = identify(filePath);
 
-        // Hold the original inode open for the duration, which is what the real
-        // daemon does — its socket is still bound while it decides whether to
-        // unlink the shared name. That is load-bearing, not test scaffolding:
-        // an inode with no remaining reference is free for immediate reuse, and
-        // Linux DOES reuse the number, so without a live handle the successor's
-        // file can land on the same (dev, ino) and the guard cannot tell the two
-        // apart. Keeping ours open is what makes the identity meaningful.
+        // Holds the original inode open, as the real daemon does while
+        // deciding to unlink. Load-bearing, not scaffolding: an inode with no
+        // reference is free for reuse, and Linux DOES reuse it, so a live
+        // handle is what lets the guard tell two files on the same (dev, ino) apart.
         const held = fs.openSync(filePath, "r");
         try {
           // What a successor daemon does: unlink the corpse, bind its own.
@@ -125,12 +117,9 @@ describe("unlinkIfSameFile", () => {
   });
 
   /**
-   * A LIVE symlink is the case `stat` gets quietly wrong. `stat` succeeds on
-   * it, so the identity recorded is the TARGET's inode — while `unlink(2)`
-   * removes the LINK. The guard would then be authorising a removal against an
-   * inode the removal does not touch, which is wrong in both directions: two
-   * different links to one target compare equal, and one link repointed between
-   * the identify and the unlink compares unequal.
+   * A LIVE symlink is the case `stat` gets quietly wrong: it records the
+   * TARGET's inode while `unlink(2)` removes the LINK, so the guard would
+   * authorise a removal against an inode it never touches.
    */
   describe("given a live symlink standing where the socket should be", () => {
     let target: string;
@@ -167,16 +156,14 @@ describe("stagingSocketPath", () => {
   describe("given the shared socket path", () => {
     describe("when a daemon derives the name it will bind", () => {
       it("stays in the same directory, so publishing is a same-filesystem link", () => {
-        expect(path.dirname(stagingSocketPath(shared, 4242))).toBe(
-          path.dirname(shared),
-        );
+        expect(path.dirname(stagingSocketPath(shared, 4242))).toBe(path.dirname(shared));
       });
 
       it("stays within the sockaddr_un budget the shared path was sized against", () => {
         // The staging path is the one handed to bind(), so it — not the shared
         // path — is what has to fit. Worst case is the longest pid a platform
         // can issue (7 digits on Linux) standing in for `.sock`.
-        //
+
         // Asserted against the CONSTANT, not a literal 3: that constant is the
         // allowance `daemonSocketDir` and `isDaemonSocketPathUsable` reserve, so
         // a literal here would keep passing after somebody widened the budget
@@ -192,9 +179,7 @@ describe("stagingSocketPath", () => {
 
     describe("when two daemons race to start", () => {
       it("gives them different files to bind", () => {
-        expect(stagingSocketPath(shared, 101)).not.toBe(
-          stagingSocketPath(shared, 102),
-        );
+        expect(stagingSocketPath(shared, 101)).not.toBe(stagingSocketPath(shared, 102));
         expect(stagingSocketPath(shared, 101)).not.toBe(shared);
       });
     });
@@ -251,9 +236,7 @@ describe("publishSocket", () => {
         fs.writeFileSync(socketPath, "theirs");
         const theirs = identify(socketPath);
 
-        expect(() => publishSocket(stagingPath, socketPath)).toThrow(
-          DaemonAlreadyRunningError,
-        );
+        expect(() => publishSocket(stagingPath, socketPath)).toThrow(DaemonAlreadyRunningError);
 
         expect(identify(socketPath)).toEqual(theirs);
         expect(fs.readFileSync(socketPath, "utf8")).toBe("theirs");
@@ -284,9 +267,7 @@ describe("publishSocket", () => {
         fs.writeFileSync(socketPath, "theirs");
         const theirs = identify(socketPath);
 
-        expect(() => publishSocket(stagingPath, socketPath)).toThrow(
-          DaemonAlreadyRunningError,
-        );
+        expect(() => publishSocket(stagingPath, socketPath)).toThrow(DaemonAlreadyRunningError);
 
         // The winner still answers to the shared name. A rename here would
         // have left it running, holding resolved credentials, on an inode no

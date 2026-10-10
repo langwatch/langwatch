@@ -1,0 +1,1109 @@
+import { ALL_PERMISSIONS } from "@langwatch/authorization";
+import { describe, expect, it } from "vitest";
+
+import type { AuthzScopeRef, CollectedBinding, CollectedGrants, ResourceGrant } from "../authz.ts";
+import { AuthzEngine } from "../engine.ts";
+import { seatCapsBinding } from "../matchers.ts";
+import { builtinRoleGrants } from "../roles.ts";
+
+const engine = new AuthzEngine();
+
+describe("seatCapsBinding()", () => {
+  const groupGrant: Pick<CollectedBinding, "scopeType" | "viaGroupId"> = {
+    scopeType: "TEAM",
+    viaGroupId: "grp-1",
+  };
+
+  /** @scenario "Admins see that a group grant is capped for want of a full seat" */
+  it("marks a group grant beyond Lite Member permissions as capped on a Lite seat only", () => {
+    const permissions = ["annotations:create", "datasets:manage"];
+    expect(
+      seatCapsBinding({ binding: groupGrant, organizationRole: "EXTERNAL", permissions }),
+    ).toBe(true);
+    expect(seatCapsBinding({ binding: groupGrant, organizationRole: "MEMBER", permissions })).toBe(
+      false,
+    );
+  });
+
+  it("leaves a grant within Lite Member permissions uncapped on a Lite seat", () => {
+    expect(
+      seatCapsBinding({
+        binding: groupGrant,
+        organizationRole: "EXTERNAL",
+        permissions: ["annotations:create"],
+      }),
+    ).toBe(false);
+  });
+
+  it("marks any organization-wide group grant on a Lite seat as capped", () => {
+    expect(
+      seatCapsBinding({
+        binding: { scopeType: "ORGANIZATION", viaGroupId: "grp-1" },
+        organizationRole: "EXTERNAL",
+        permissions: ["annotations:create"],
+      }),
+    ).toBe(true);
+  });
+});
+
+const ORG = "org-1";
+const TEAM = "team-1";
+const PROJECT = "proj-1";
+
+const projectScope: AuthzScopeRef = {
+  type: "project",
+  id: PROJECT,
+  teamId: TEAM,
+  organizationId: ORG,
+};
+const otherProjectScope: AuthzScopeRef = {
+  type: "project",
+  id: "proj-other",
+  teamId: "team-other",
+  organizationId: ORG,
+};
+const orgScope: AuthzScopeRef = { type: "organization", id: ORG };
+const teamScope: AuthzScopeRef = {
+  type: "team",
+  id: TEAM,
+  organizationId: ORG,
+};
+const TRACE = "trace-1";
+const traceScope: Extract<AuthzScopeRef, { type: "resource" }> = {
+  type: "resource",
+  kind: "trace",
+  id: TRACE,
+  shareTokens: ["share-token-1"],
+  projectId: PROJECT,
+  teamId: TEAM,
+  organizationId: ORG,
+};
+const publicTraceGrant: ResourceGrant = {
+  kind: "trace",
+  id: TRACE,
+  projectId: PROJECT,
+  permission: "traces:view",
+  audience: { kind: "anyone" },
+};
+
+function makeGrants({
+  bindings = [] as CollectedBinding[],
+  organizationRole = "MEMBER" as CollectedGrants["organizationRole"],
+  isOrgMember = organizationRole != null,
+  customRolePermissions = new Map<string, readonly string[]>(),
+  principal = { type: "user", id: "user-1" } as CollectedGrants["principal"],
+  membershipDisabled = false,
+}: Partial<CollectedGrants> = {}): CollectedGrants {
+  return {
+    principal,
+    organizationId: ORG,
+    organizationRole,
+    isOrgMember,
+    membershipDisabled,
+    bindings,
+    customRolePermissions,
+  };
+}
+
+const binding = (
+  partial: Partial<CollectedBinding> & Pick<CollectedBinding, "scopeType" | "scopeId">,
+): CollectedBinding => ({
+  roleKey: "member",
+  viaGroupId: null,
+  ...partial,
+});
+
+describe("authz engine decide()", () => {
+  describe("given an org admin binding and a project viewer binding", () => {
+    const bindings = [
+      binding({ roleKey: "admin", scopeType: "ORGANIZATION", scopeId: ORG }),
+      binding({ roleKey: "viewer", scopeType: "PROJECT", scopeId: PROJECT }),
+    ];
+    const grants = makeGrants({ bindings });
+
+    /** @scenario "Grants are an additive union across scopes" */
+    /** @scenario "A permission check uses the caller's current grants" */
+    it("grants via the union — the narrower binding is inert", () => {
+      const decision = engine.decide({
+        grants,
+        permission: "traces:update",
+        scope: projectScope,
+      });
+      expect(decision.allowed).toBe(true);
+      expect(decision.via).toBe("binding");
+    });
+
+    /** @scenario "Grants are an additive union across scopes" */
+    it("reaches the same verdict with the bindings collected in the other order", () => {
+      const decision = engine.decide({
+        grants: makeGrants({ bindings: [...bindings].reverse() }),
+        permission: "traces:update",
+        scope: projectScope,
+      });
+      expect(decision.allowed).toBe(true);
+      expect(decision.via).toBe("binding");
+    });
+  });
+
+  describe("given only a viewer binding on one project", () => {
+    const grants = makeGrants({
+      bindings: [binding({ roleKey: "viewer", scopeType: "PROJECT", scopeId: PROJECT })],
+    });
+
+    it("grants view on that project", () => {
+      expect(
+        engine.decide({
+          grants,
+          permission: "traces:view",
+          scope: projectScope,
+        }).allowed,
+      ).toBe(true);
+    });
+
+    /** @scenario "Narrow access is expressed by granting less, not by overriding" */
+    it("denies update on that project", () => {
+      const decision = engine.decide({
+        grants,
+        permission: "traces:update",
+        scope: projectScope,
+      });
+      expect(decision.allowed).toBe(false);
+      expect(decision.denialReason).toBe("no-grant");
+    });
+
+    /** @scenario "Narrow access is expressed by granting less, not by overriding" */
+    /** @scenario "A permission check without a matching grant is denied" */
+    it("denies everything on a different project (scope chain filter)", () => {
+      expect(
+        engine.decide({
+          grants,
+          permission: "traces:view",
+          scope: otherProjectScope,
+        }).allowed,
+      ).toBe(false);
+    });
+  });
+
+  describe("given the ADR-021 scope fence", () => {
+    const customRolePermissions = new Map([["cr-1", ["governance:manage"]]]);
+
+    /** @scenario "A permission can only be granted at scopes where its resource exists" */
+    it("never grants an org-exclusive permission from a TEAM binding, even via custom role", () => {
+      const grants = makeGrants({
+        bindings: [
+          binding({
+            roleKey: "custom:cr-1",
+            scopeType: "TEAM",
+            scopeId: TEAM,
+          }),
+        ],
+        customRolePermissions,
+      });
+      expect(
+        engine.decide({
+          grants,
+          permission: "governance:manage",
+          scope: projectScope,
+        }).allowed,
+      ).toBe(false);
+    });
+
+    it("grants the same permission from an ORGANIZATION binding", () => {
+      const grants = makeGrants({
+        bindings: [
+          binding({
+            roleKey: "custom:cr-1",
+            scopeType: "ORGANIZATION",
+            scopeId: ORG,
+          }),
+        ],
+        customRolePermissions,
+      });
+      expect(
+        engine.decide({
+          grants,
+          permission: "governance:manage",
+          scope: orgScope,
+        }).allowed,
+      ).toBe(true);
+    });
+  });
+
+  describe("given org-scoped built-in bindings (scope-conditional enum semantics)", () => {
+    it("ADMIN at org scope grants everything", () => {
+      const grants = makeGrants({
+        bindings: [
+          binding({
+            roleKey: "admin",
+            scopeType: "ORGANIZATION",
+            scopeId: ORG,
+          }),
+        ],
+      });
+      expect(
+        engine.decide({
+          grants,
+          permission: "governance:manage",
+          scope: orgScope,
+        }).allowed,
+      ).toBe(true);
+    });
+
+    it("MEMBER at org scope grants only the org-member bag", () => {
+      const grants = makeGrants({
+        bindings: [
+          binding({
+            roleKey: "member",
+            scopeType: "ORGANIZATION",
+            scopeId: ORG,
+          }),
+        ],
+      });
+      expect(
+        engine.decide({
+          grants,
+          permission: "organization:view",
+          scope: orgScope,
+        }).allowed,
+      ).toBe(true);
+      expect(
+        engine.decide({
+          grants,
+          permission: "organization:manage",
+          scope: orgScope,
+        }).allowed,
+      ).toBe(false);
+    });
+  });
+
+  describe("given a lite member (EXTERNAL org role)", () => {
+    /** @scenario "Lite member capability comes from the lite-member role's own grants" */
+    it("caps a team MEMBER binding at the lite-member bag", () => {
+      const grants = makeGrants({
+        organizationRole: "EXTERNAL",
+        bindings: [binding({ roleKey: "member", scopeType: "TEAM", scopeId: TEAM })],
+      });
+      expect(
+        engine.decide({
+          grants,
+          permission: "annotations:create",
+          scope: projectScope,
+        }).allowed,
+      ).toBe(true);
+      const denied = engine.decide({
+        grants,
+        permission: "datasets:manage",
+        scope: projectScope,
+      });
+      expect(denied.allowed).toBe(false);
+      expect(denied.denialReason).toBe("lite-member-restricted");
+    });
+
+    /** @scenario "A Lite Member seat caps a direct custom role at Lite Member permissions" */
+    it("caps a direct custom role at the lite-member bag, at any scope", () => {
+      const grants = makeGrants({
+        organizationRole: "EXTERNAL",
+        bindings: [
+          binding({ roleKey: "custom:cr-2", scopeType: "TEAM", scopeId: TEAM }),
+          binding({ roleKey: "custom:cr-2", scopeType: "ORGANIZATION", scopeId: ORG }),
+        ],
+        customRolePermissions: new Map([["cr-2", ["datasets:manage", "annotations:create"]]]),
+      });
+      expect(
+        engine.decide({ grants, permission: "annotations:create", scope: projectScope }).allowed,
+      ).toBe(true);
+      const denied = engine.decide({ grants, permission: "datasets:manage", scope: projectScope });
+      expect(denied.allowed).toBe(false);
+      expect(denied.denialReason).toBe("lite-member-restricted");
+    });
+
+    it("skips org-scoped non-CUSTOM bindings entirely", () => {
+      const grants = makeGrants({
+        organizationRole: "EXTERNAL",
+        bindings: [
+          binding({
+            roleKey: "admin",
+            scopeType: "ORGANIZATION",
+            scopeId: ORG,
+          }),
+        ],
+      });
+      expect(
+        engine.decide({
+          grants,
+          permission: "datasets:manage",
+          scope: projectScope,
+        }).allowed,
+      ).toBe(false);
+    });
+  });
+
+  describe("given directory group grants carrying the admin role", () => {
+    const viaGroupId = "group-admins";
+    const groupGrants = [
+      binding({ roleKey: "admin", scopeType: "ORGANIZATION", scopeId: ORG, viaGroupId }),
+      binding({ roleKey: "admin", scopeType: "TEAM", scopeId: TEAM, viaGroupId }),
+      binding({ roleKey: "custom:cr-admin", scopeType: "ORGANIZATION", scopeId: ORG, viaGroupId }),
+      binding({ roleKey: "custom:cr-admin", scopeType: "TEAM", scopeId: TEAM, viaGroupId }),
+    ];
+    const adminCustomRole = new Map([["cr-admin", ["datasets:manage", "annotations:create"]]]);
+    const heldOnProject = ({ grants }: { grants: CollectedGrants }) =>
+      ALL_PERMISSIONS.filter(
+        (permission) => engine.decide({ grants, permission, scope: projectScope }).allowed,
+      );
+    const beyondLite = ({ held }: { held: readonly string[] }) =>
+      held.filter((permission) => !builtinRoleGrants({ role: "lite-member", permission }));
+
+    describe("when the person holds a Lite Member seat", () => {
+      const grants = makeGrants({
+        organizationRole: "EXTERNAL",
+        bindings: groupGrants,
+        customRolePermissions: adminCustomRole,
+      });
+
+      /** @scenario "A directory group granting admin past the seats is capped to Lite Member permissions" */
+      it("holds only Lite Member permissions through the group", () => {
+        const held = heldOnProject({ grants });
+        expect(held).toContain("annotations:create");
+        expect(beyondLite({ held })).toEqual([]);
+        const denied = engine.decide({
+          grants,
+          permission: "datasets:manage",
+          scope: projectScope,
+        });
+        expect(denied.allowed).toBe(false);
+        expect(denied.denialReason).toBe("lite-member-restricted");
+      });
+
+      it("keeps a direct Viewer grant as written", () => {
+        const direct = makeGrants({
+          organizationRole: "EXTERNAL",
+          bindings: [binding({ roleKey: "viewer", scopeType: "TEAM", scopeId: TEAM })],
+        });
+        expect(
+          engine.decide({ grants: direct, permission: "traces:view", scope: projectScope }).allowed,
+        ).toBe(true);
+      });
+    });
+
+    describe("when the person holds a full seat", () => {
+      const grants = makeGrants({
+        organizationRole: "MEMBER",
+        bindings: groupGrants,
+        customRolePermissions: adminCustomRole,
+      });
+
+      /** @scenario "A capped group grant lifts once a full seat frees" */
+      it("holds the group grant's admin permissions", () => {
+        expect(
+          engine.decide({ grants, permission: "datasets:manage", scope: projectScope }).allowed,
+        ).toBe(true);
+        expect(beyondLite({ held: heldOnProject({ grants }) })).not.toEqual([]);
+      });
+
+      it("keeps a custom role carried by the group as written", () => {
+        const customOnly = makeGrants({
+          organizationRole: "MEMBER",
+          bindings: [
+            binding({
+              roleKey: "custom:cr-admin",
+              scopeType: "ORGANIZATION",
+              scopeId: ORG,
+              viaGroupId,
+            }),
+          ],
+          customRolePermissions: adminCustomRole,
+        });
+        expect(
+          engine.decide({ grants: customOnly, permission: "datasets:manage", scope: projectScope })
+            .allowed,
+        ).toBe(true);
+      });
+    });
+  });
+
+  describe("given a Developer seat (DEVELOPER org role)", () => {
+    /** @scenario A Developer works inside their own project */
+    it("grants through a direct binding on their own team", () => {
+      const grants = makeGrants({
+        organizationRole: "DEVELOPER",
+        bindings: [binding({ roleKey: "admin", scopeType: "TEAM", scopeId: TEAM })],
+      });
+      expect(
+        engine.decide({ grants, permission: "traces:view", scope: projectScope }).allowed,
+      ).toBe(true);
+      expect(
+        engine.decide({ grants, permission: "datasets:manage", scope: projectScope }).allowed,
+      ).toBe(true);
+    });
+
+    /** @scenario A Developer never sees a shared project */
+    it("gets nothing from an ORGANIZATION-scoped binding, even admin", () => {
+      const grants = makeGrants({
+        organizationRole: "DEVELOPER",
+        bindings: [binding({ roleKey: "admin", scopeType: "ORGANIZATION", scopeId: ORG })],
+      });
+      const denied = engine.decide({ grants, permission: "traces:view", scope: projectScope });
+      expect(denied.allowed).toBe(false);
+      expect(denied.denialReason).toBe("developer-restricted");
+    });
+
+    /** @scenario A Developer never sees a shared project */
+    it("gets nothing from a group-delivered binding on a shared team", () => {
+      const grants = makeGrants({
+        organizationRole: "DEVELOPER",
+        bindings: [
+          binding({ roleKey: "member", scopeType: "TEAM", scopeId: TEAM, viaGroupId: "group-9" }),
+        ],
+      });
+      const denied = engine.decide({ grants, permission: "traces:view", scope: projectScope });
+      expect(denied.allowed).toBe(false);
+      expect(denied.denialReason).toBe("developer-restricted");
+    });
+
+    it("still receives the organization floor at organization scope", () => {
+      const grants = makeGrants({ organizationRole: "DEVELOPER" });
+      expect(
+        engine.decide({ grants, permission: "organization:view", scope: orgScope }).allowed,
+      ).toBe(true);
+    });
+  });
+
+  describe("given an empty custom role", () => {
+    it("denies instead of inheriting the viewer bag", () => {
+      const grants = makeGrants({
+        bindings: [
+          binding({
+            roleKey: "custom:cr-empty",
+            scopeType: "TEAM",
+            scopeId: TEAM,
+          }),
+        ],
+        customRolePermissions: new Map([["cr-empty", []]]),
+      });
+      expect(
+        engine.decide({
+          grants,
+          permission: "datasets:view",
+          scope: projectScope,
+        }).allowed,
+      ).toBe(false);
+      expect(
+        engine.decide({
+          grants,
+          permission: "datasets:manage",
+          scope: projectScope,
+        }).allowed,
+      ).toBe(false);
+    });
+
+    it("denies when the custom role fact is missing", () => {
+      const grants = makeGrants({
+        bindings: [
+          binding({
+            roleKey: "custom:cr-missing",
+            scopeType: "TEAM",
+            scopeId: TEAM,
+          }),
+        ],
+      });
+      expect(
+        engine.decide({
+          grants,
+          permission: "datasets:view",
+          scope: projectScope,
+        }).allowed,
+      ).toBe(false);
+    });
+  });
+
+  describe("given org-scope checks (legacy floor, gate, and team union)", () => {
+    it("denies non-members outright, bindings or not", () => {
+      const grants = makeGrants({
+        organizationRole: null,
+        isOrgMember: false,
+        bindings: [
+          binding({
+            roleKey: "admin",
+            scopeType: "ORGANIZATION",
+            scopeId: ORG,
+          }),
+        ],
+      });
+      const decision = engine.decide({
+        grants,
+        permission: "organization:view",
+        scope: orgScope,
+      });
+      expect(decision.allowed).toBe(false);
+      expect(decision.denialReason).toBe("no-membership");
+    });
+
+    it("grants the org-member floor to any member with zero bindings", () => {
+      const grants = makeGrants({ organizationRole: "MEMBER" });
+      const decision = engine.decide({
+        grants,
+        permission: "organization:view",
+        scope: orgScope,
+      });
+      expect(decision.allowed).toBe(true);
+      expect(decision.via).toBe("org-role-floor");
+      expect(
+        engine.decide({
+          grants,
+          permission: "organization:manage",
+          scope: orgScope,
+        }).allowed,
+      ).toBe(false);
+    });
+  });
+
+  describe("given a user with no OrganizationUser row", () => {
+    const nonMember = (overrides: Partial<CollectedGrants> = {}) =>
+      makeGrants({ organizationRole: null, isOrgMember: false, ...overrides });
+
+    it("denies at project scope despite a PROJECT binding naming them", () => {
+      const decision = engine.decide({
+        grants: nonMember({
+          bindings: [
+            binding({
+              roleKey: "admin",
+              scopeType: "PROJECT",
+              scopeId: PROJECT,
+            }),
+          ],
+        }),
+        permission: "traces:view",
+        scope: projectScope,
+      });
+      expect(decision.allowed).toBe(false);
+      expect(decision.denialReason).toBe("no-membership");
+    });
+
+    it("denies at team scope despite a TEAM binding naming them", () => {
+      const decision = engine.decide({
+        grants: nonMember({
+          bindings: [binding({ roleKey: "admin", scopeType: "TEAM", scopeId: TEAM })],
+        }),
+        permission: "traces:view",
+        scope: teamScope,
+      });
+      expect(decision.allowed).toBe(false);
+      expect(decision.denialReason).toBe("no-membership");
+    });
+
+    it("denies at resource scope despite a leftover binding on the resource's lineage", () => {
+      // The membership gate defers on resource scopes so share links stay
+      // reachable — but membership-before-bindings must still hold, or a
+      // removed member's leftover PROJECT binding reads every trace under it.
+      const decision = engine.decide({
+        grants: nonMember({
+          bindings: [
+            binding({
+              roleKey: "admin",
+              scopeType: "PROJECT",
+              scopeId: PROJECT,
+            }),
+          ],
+        }),
+        permission: "traces:view",
+        scope: traceScope,
+      });
+      expect(decision.allowed).toBe(false);
+    });
+
+    it("still resolves a presented share link through the resource tier", () => {
+      const decision = engine.decide({
+        grants: nonMember(),
+        permission: "traces:view",
+        scope: traceScope,
+        resourceGrants: [publicTraceGrant],
+      });
+      expect(decision.allowed).toBe(true);
+      expect(decision.via).toBe("resource-grant");
+      expect(decision.audience).toBe("public");
+    });
+  });
+
+  describe("given several resource grants matching the same trace", () => {
+    const orgTraceGrant: ResourceGrant = {
+      kind: "trace",
+      id: TRACE,
+      projectId: PROJECT,
+      permission: "traces:view",
+      audience: { kind: "organization", id: ORG },
+    };
+    const decideWith = (resourceGrants: ResourceGrant[]) =>
+      engine.decide({
+        grants: makeGrants(),
+        permission: "traces:view",
+        scope: traceScope,
+        resourceGrants,
+      });
+
+    it("picks the least-redacting audience whatever order the rows arrive in", () => {
+      for (const resourceGrants of [
+        [publicTraceGrant, orgTraceGrant],
+        [orgTraceGrant, publicTraceGrant],
+      ]) {
+        const decision = decideWith(resourceGrants);
+        expect(decision.allowed).toBe(true);
+        expect(decision.via).toBe("resource-grant");
+        expect(decision.audience).toBe("member");
+      }
+    });
+
+    it("falls back to the public audience when only the public grant matches", () => {
+      expect(decideWith([publicTraceGrant]).audience).toBe("public");
+    });
+  });
+
+  describe("given the demo project", () => {
+    /** @scenario "The demo project opens for signed-in callers only" */
+    it("grants demo-bag permissions to any signed-in caller, and nothing else", () => {
+      const grants = makeGrants({
+        organizationRole: null,
+        isOrgMember: false,
+      });
+      const view = engine.decide({
+        grants,
+        permission: "traces:view",
+        scope: projectScope,
+        demoProjectId: PROJECT,
+      });
+      expect(view.allowed).toBe(true);
+      expect(view.via).toBe("demo-project");
+      expect(
+        engine.decide({
+          grants,
+          permission: "traces:update",
+          scope: projectScope,
+          demoProjectId: PROJECT,
+        }).allowed,
+      ).toBe(false);
+    });
+
+    /** @scenario "The demo project opens for signed-in callers only" */
+    it("denies the demo bag to an api-key caller — legacy reaches it from the session path only", () => {
+      const decision = engine.decide({
+        grants: makeGrants({
+          principal: { type: "apiKey", id: "key-1" },
+          organizationRole: null,
+          isOrgMember: false,
+        }),
+        permission: "traces:view",
+        scope: projectScope,
+        demoProjectId: PROJECT,
+      });
+      expect(decision.allowed).toBe(false);
+    });
+
+    /** @scenario "The demo project opens for signed-in callers only" */
+    it("denies the demo bag to an anonymous caller — legacy only reaches it behind a session", () => {
+      const decision = engine.decide({
+        grants: makeGrants({
+          principal: { type: "anonymous" },
+          organizationRole: null,
+          isOrgMember: false,
+        }),
+        permission: "traces:view",
+        scope: projectScope,
+        demoProjectId: PROJECT,
+      });
+      expect(decision.allowed).toBe(false);
+    });
+  });
+});
+
+describe("authz engine decideWithCeiling()", () => {
+  const keyGrants = makeGrants({
+    principal: { type: "apiKey", id: "key-1" },
+    organizationRole: null,
+    isOrgMember: false,
+    bindings: [binding({ roleKey: "member", scopeType: "PROJECT", scopeId: PROJECT })],
+  });
+
+  describe("given an owner whose access was reduced to viewer", () => {
+    const ownerGrants = makeGrants({
+      bindings: [binding({ roleKey: "viewer", scopeType: "PROJECT", scopeId: PROJECT })],
+    });
+
+    /** @scenario "An API key is capped by its owner's current grants" */
+    it("denies what the key alone would grant (owner ceiling)", () => {
+      const decision = engine.decideWithCeiling({
+        keyGrants,
+        ownerGrants,
+        permission: "datasets:manage",
+        scope: projectScope,
+      });
+      expect(decision.allowed).toBe(false);
+      expect(decision.denialReason).toBe("owner-ceiling");
+    });
+
+    it("still grants what both hold", () => {
+      expect(
+        engine.decideWithCeiling({
+          keyGrants,
+          ownerGrants,
+          permission: "traces:view",
+          scope: projectScope,
+        }).allowed,
+      ).toBe(true);
+    });
+  });
+
+  describe("given an owner with no live grant and no organization membership", () => {
+    const ownerGrants = makeGrants({ organizationRole: null, isOrgMember: false, bindings: [] });
+
+    /** @scenario A key cannot regain access from legacy membership */
+    it("refuses what the key's own binding carries, whatever the old membership rows held", () => {
+      const decision = engine.decideWithCeiling({
+        keyGrants,
+        ownerGrants,
+        permission: "traces:view",
+        scope: projectScope,
+      });
+      expect(decision.allowed).toBe(false);
+      expect(decision.denialReason).toBe("owner-ceiling");
+    });
+  });
+
+  describe("given an owner who holds more than the key", () => {
+    const ownerGrants = makeGrants({
+      bindings: [binding({ roleKey: "admin", scopeType: "ORGANIZATION", scopeId: ORG })],
+    });
+
+    /** @scenario "Promotion does not grow a scoped API key" */
+    it("denies what only the owner holds — a scoped key never grows", () => {
+      const decision = engine.decideWithCeiling({
+        keyGrants,
+        ownerGrants,
+        permission: "project:delete",
+        scope: projectScope,
+      });
+      expect(decision.allowed).toBe(false);
+      expect(decision.denialReason).toBe("no-grant");
+    });
+
+    /** @scenario "Promotion does not grow a scoped API key" */
+    it("allows the owner's own session the same permission — the ceiling is not what denied", () => {
+      expect(
+        engine.decide({
+          grants: ownerGrants,
+          permission: "project:delete",
+          scope: projectScope,
+        }).allowed,
+      ).toBe(true);
+    });
+  });
+
+  describe("given a lite-member owner", () => {
+    /** @scenario "A lite member's API key is capped exactly like their session" */
+    it("caps the key exactly like the owner's own session", () => {
+      const ownerGrants = makeGrants({
+        organizationRole: "EXTERNAL",
+        bindings: [binding({ roleKey: "member", scopeType: "TEAM", scopeId: TEAM })],
+      });
+      const decision = engine.decideWithCeiling({
+        keyGrants,
+        ownerGrants,
+        permission: "datasets:manage",
+        scope: projectScope,
+      });
+      expect(decision.allowed).toBe(false);
+      expect(decision.denialReason).toBe("owner-ceiling");
+    });
+  });
+
+  describe("given an owner with keys on a shared and a personal project, then moved to Developer", () => {
+    const personalScope = otherProjectScope;
+    const teamKey = (teamId: string) =>
+      makeGrants({
+        principal: { type: "apiKey", id: `key-${teamId}` },
+        organizationRole: null,
+        isOrgMember: false,
+        bindings: [binding({ roleKey: "admin", scopeType: "TEAM", scopeId: teamId })],
+      });
+    const sharedKey = teamKey(TEAM);
+    const personalKey = teamKey(personalScope.teamId);
+    const ownerAs = (organizationRole: "MEMBER" | "DEVELOPER", teamIds: string[]) =>
+      makeGrants({
+        organizationRole,
+        bindings: teamIds.map((scopeId) =>
+          binding({ roleKey: "admin", scopeType: "TEAM", scopeId }),
+        ),
+      });
+
+    /** @scenario A key on a shared project stops working after downgrade */
+    it("refuses the unchanged shared-project key and keeps the personal one working", () => {
+      const may = ({
+        key,
+        owner,
+        scope,
+      }: {
+        key: CollectedGrants;
+        owner: CollectedGrants;
+        scope: AuthzScopeRef;
+      }) =>
+        engine.decideWithCeiling({
+          keyGrants: key,
+          ownerGrants: owner,
+          permission: "traces:view",
+          scope,
+        });
+      const fullOwner = ownerAs("MEMBER", [TEAM, personalScope.teamId]);
+      // The seat change deletes the shared team row and keeps the personal one (ADR-171).
+      const developerOwner = ownerAs("DEVELOPER", [personalScope.teamId]);
+
+      expect(may({ key: sharedKey, owner: fullOwner, scope: projectScope }).allowed).toBe(true);
+
+      const shared = may({ key: sharedKey, owner: developerOwner, scope: projectScope });
+      expect(shared.allowed).toBe(false);
+      expect(shared.denialReason).toBe("owner-ceiling");
+      expect(may({ key: personalKey, owner: developerOwner, scope: personalScope }).allowed).toBe(
+        true,
+      );
+    });
+  });
+
+  describe("given a service key (no owner)", () => {
+    it("applies no ceiling", () => {
+      expect(
+        engine.decideWithCeiling({
+          keyGrants,
+          ownerGrants: null,
+          permission: "datasets:manage",
+          scope: projectScope,
+        }).allowed,
+      ).toBe(true);
+    });
+  });
+});
+
+describe("authz engine explain()", () => {
+  it("renders the walk with the verdict first", () => {
+    const grants = makeGrants({
+      bindings: [
+        binding({
+          roleKey: "viewer",
+          scopeType: "TEAM",
+          scopeId: TEAM,
+          viaGroupId: "group-9",
+        }),
+      ],
+    });
+    const decision = engine.decide({
+      grants,
+      permission: "datasets:delete",
+      scope: projectScope,
+    });
+    const lines = engine.explain({ decision, grants });
+    expect(lines[0]).toContain("DENIED datasets:delete");
+    expect(lines.join("\n")).toContain("via group group-9");
+    expect(lines.join("\n")).toContain("denial reason: no-grant");
+  });
+  describe("given a membership an admin disabled to free its seat", () => {
+    /** These cases pin what the ENGINE does with a disabled snapshot: deny
+     *  everywhere a member could act, and say which gate closed. */
+    const disabled = (overrides: Partial<CollectedGrants> = {}): CollectedGrants =>
+      makeGrants({
+        organizationRole: null,
+        isOrgMember: false,
+        membershipDisabled: true,
+        ...overrides,
+      });
+
+    it("denies at organization scope, where a plain member holds the floor", () => {
+      const decision = engine.decide({
+        grants: disabled(),
+        permission: "organization:view",
+        scope: orgScope,
+      });
+      expect(decision.allowed).toBe(false);
+      expect(decision.denialReason).toBe("membership-disabled");
+    });
+
+    it("denies at team and project scope", () => {
+      for (const scope of [teamScope, projectScope]) {
+        const decision = engine.decide({
+          grants: disabled(),
+          permission: "traces:view",
+          scope,
+        });
+        expect(decision.allowed).toBe(false);
+        expect(decision.denialReason).toBe("membership-disabled");
+      }
+    });
+
+    it("names the disabled seat rather than the absence it causes", () => {
+      // Reported as "no-membership" this would tell somebody who IS a member
+      // that they are not, and point them at nothing they can do.
+      const decision = engine.decide({
+        grants: disabled(),
+        permission: "traces:view",
+        scope: projectScope,
+      });
+      expect(decision.denialReason).not.toBe("no-membership");
+      expect(decision.denialReason).toBe("membership-disabled");
+    });
+
+    /** @scenario "A disabled member cannot act through any permission path" */
+    it("denies even where a stale binding survived on the scope chain", () => {
+      // Belt and braces: the reader already withholds these rows. If one ever
+      // reaches the engine, membership still decides before bindings do.
+      const decision = engine.decide({
+        grants: disabled({
+          bindings: [binding({ roleKey: "admin", scopeType: "TEAM", scopeId: TEAM })],
+        }),
+        permission: "project:delete",
+        scope: projectScope,
+      });
+      expect(decision.allowed).toBe(false);
+      expect(decision.denialReason).toBe("membership-disabled");
+    });
+
+    /** @scenario A link that was public to anyone still opens for a disabled member */
+    it("still resolves a public share link, which never depended on membership", () => {
+      // ADR-057: a link anyone can open is not an organization privilege, so
+      // disabling a seat does not close it. It drops to the public audience.
+      const decision = engine.decide({
+        grants: disabled(),
+        permission: "traces:view",
+        scope: traceScope,
+        resourceGrants: [publicTraceGrant],
+      });
+      expect(decision.allowed).toBe(true);
+      expect(decision.audience).toBe("public");
+    });
+
+    /** @scenario A link that was public to anyone still opens for a disabled member */
+    it("loses the member-audience share link, which did depend on membership", () => {
+      const decision = engine.decide({
+        grants: disabled(),
+        permission: "traces:view",
+        scope: traceScope,
+        resourceGrants: [
+          {
+            kind: "trace",
+            id: TRACE,
+            projectId: PROJECT,
+            permission: "traces:view",
+            audience: { kind: "organization", id: ORG },
+          },
+        ],
+      });
+      expect(decision.allowed).toBe(false);
+      expect(decision.denialReason).toBe("membership-disabled");
+    });
+
+    it("still sees the demo project, which every signed-in user sees", () => {
+      // Not an oversight: the demo project is a product tour, granted to any
+      // signed-in user before membership is consulted at all. Pinned so the
+      // next reader does not "close" it and break the tour for everyone.
+      const decision = engine.decide({
+        grants: disabled(),
+        permission: "traces:view",
+        scope: projectScope,
+        demoProjectId: PROJECT,
+      });
+      expect(decision.allowed).toBe(true);
+      expect(decision.via).toBe("demo-project");
+    });
+
+    /** @scenario A disabled member's API keys stop working */
+    it("stops the API keys they own, through the owner ceiling", () => {
+      // ADR-092 §9: effective(key) = grants(key) ∩ grants(owner). A disabled
+      // owner grants nothing, so their personal keys stop too — which is the
+      // point (a revoked person must not keep a live credential), and is the
+      // one consequence of disabling that reaches beyond their own session.
+      const decision = engine.decideWithCeiling({
+        keyGrants: makeGrants({
+          principal: { type: "apiKey", id: "key-1" },
+          organizationRole: null,
+          isOrgMember: false,
+          bindings: [binding({ roleKey: "admin", scopeType: "TEAM", scopeId: TEAM })],
+        }),
+        ownerGrants: disabled(),
+        permission: "traces:view",
+        scope: projectScope,
+      });
+      expect(decision.allowed).toBe(false);
+      expect(decision.denialReason).toBe("owner-ceiling");
+    });
+
+    /** @scenario A disabled member's API keys stop working */
+    it("leaves a service key alone, because it has no owner to disable", () => {
+      const decision = engine.decideWithCeiling({
+        keyGrants: makeGrants({
+          principal: { type: "apiKey", id: "key-2" },
+          organizationRole: null,
+          isOrgMember: false,
+          bindings: [binding({ roleKey: "admin", scopeType: "TEAM", scopeId: TEAM })],
+        }),
+        ownerGrants: null,
+        permission: "traces:view",
+        scope: projectScope,
+      });
+      expect(decision.allowed).toBe(true);
+    });
+
+    it("re-enabling restores access, because nothing else was taken away", () => {
+      const decision = engine.decide({
+        grants: makeGrants({
+          organizationRole: "MEMBER",
+          isOrgMember: true,
+          membershipDisabled: false,
+          bindings: [binding({ roleKey: "admin", scopeType: "TEAM", scopeId: TEAM })],
+        }),
+        permission: "project:delete",
+        scope: projectScope,
+      });
+      expect(decision.allowed).toBe(true);
+    });
+  });
+});
+
+describe("migrated custom bindings", () => {
+  /** @scenario "Migrated custom bindings retain their permission restrictions" */
+  it.each(["ORGANIZATION", "TEAM", "PROJECT"] as const)(
+    "honors the custom role key at %s scope",
+    (scopeType) => {
+      const scopeIds = { ORGANIZATION: ORG, TEAM, PROJECT };
+      const grants = makeGrants({
+        bindings: [
+          binding({
+            roleKey: "custom:restricted",
+            scopeType,
+            scopeId: scopeIds[scopeType],
+          }),
+        ],
+        customRolePermissions: new Map([["restricted", ["traces:view"]]]),
+      });
+      expect(
+        engine.decide({
+          grants,
+          permission: "traces:view",
+          scope: projectScope,
+        }).allowed,
+      ).toBe(true);
+      expect(
+        engine.decide({
+          grants,
+          permission: "project:delete",
+          scope: projectScope,
+        }).allowed,
+      ).toBe(false);
+      const missingRole = {
+        ...grants,
+        customRolePermissions: new Map<string, readonly string[]>(),
+      };
+      expect(
+        engine.decide({
+          grants: missingRole,
+          permission: "traces:view",
+          scope: projectScope,
+        }).allowed,
+      ).toBe(false);
+    },
+  );
+});

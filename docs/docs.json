@@ -293,6 +293,7 @@
                 "pages": [
                   "platform/members-and-teams",
                   "platform/rbac",
+                  "platform/roles-and-access",
                   "platform/sso",
                   "platform/sso-update",
                   "platform/api-keys",
@@ -646,6 +647,7 @@
               "ai-gateway/billing-events",
               "features/webhooks",
               "ai-gateway/cookbooks/metering-and-rebilling",
+              "ai-gateway/cookbooks/consumer-voice-app",
               "ai-gateway/demo-agent-platform"
             ]
           },
@@ -920,8 +922,11 @@
             "group": "Investigate With Your Agent",
             "pages": [
               "coding-agents/explore-your-usage-with-your-own-agent",
+              "coding-agents/reduce-coding-agent-cost",
               "coding-agents/find-your-context-sweet-spot",
-              "coding-agents/compare-provider-costs"
+              "coding-agents/compare-provider-costs",
+              "coding-agents/cost-experiments",
+              "coding-agents/codebase-experiment"
             ]
           }
         ]
@@ -999,6 +1004,7 @@
               "self-hosting/configuration/environment-variables",
               "self-hosting/configuration/sizing-and-scaling",
               "self-hosting/configuration/backups",
+              "self-hosting/configuration/object-storage-lifecycle",
               "self-hosting/configuration/sso",
               "self-hosting/configuration/email",
               "self-hosting/configuration/observability",
@@ -1028,6 +1034,7 @@
             "pages": [
               "self-hosting/security",
               "self-hosting/compliance",
+              "self-hosting/releases",
               "self-hosting/upgrade",
               "self-hosting/upgrade-v3",
               "self-hosting/upgrade-dataset-storage"
@@ -1076,8 +1083,8 @@
               "api-reference/traces/get-trace",
               "api-reference/traces/get-transcript",
               "api-reference/traces/update-trace-metadata",
-              "api-reference/traces/create-public-trace-path",
-              "api-reference/traces/delete-public-trace-path",
+              "api-reference/traces/action-share",
+              "api-reference/traces/action-unshare",
               "api-reference/traces/projection-dsl"
             ]
           },
@@ -1088,23 +1095,21 @@
               "api-reference/datasets/list-dataset",
               "api-reference/datasets/create-dataset",
               "api-reference/datasets/create-attachments",
-              "api-reference/datasets/create-direct-upload",
+              "api-reference/datasets/create-an-upload-for-an-image-or-file-ce",
               "api-reference/datasets/evaluate-a-dataset",
+              "api-reference/datasets/create-a-dataset-from-an-uploaded-file",
               "api-reference/datasets/create-upload",
               "api-reference/datasets/get-entries",
               "api-reference/datasets/get-dataset",
               "api-reference/datasets/get-records",
               "api-reference/datasets/update-dataset",
               "api-reference/datasets/update-records",
-              "api-reference/datasets/update-staging",
               "api-reference/datasets/post-dataset-entries",
+              "api-reference/datasets/import-an-uploaded-file-into-a-dataset",
               "api-reference/datasets/action-records",
               "api-reference/datasets/action-upload",
-              "api-reference/datasets/action-finalize",
-              "api-reference/datasets/action-retry",
               "api-reference/datasets/delete-dataset",
-              "api-reference/datasets/delete-records",
-              "api-reference/datasets/delete-direct-upload"
+              "api-reference/datasets/delete-records"
             ]
           },
           {
@@ -1282,7 +1287,7 @@
             "pages": [
               "api-reference/simulation-runs/overview",
               "api-reference/simulation-runs/list-simulation-runs",
-              "api-reference/simulation-runs/list-list",
+              "api-reference/simulation-runs/get-list-list",
               "api-reference/simulation-runs/get-simulation-runs",
               "api-reference/simulation-runs/get-batches"
             ]
@@ -1384,8 +1389,7 @@
             "group": "Events",
             "pages": [
               "api-reference/events/overview",
-              "api-reference/events/create-track",
-              "api-reference/events/track-an-event-legacy-path"
+              "api-reference/events/create-track"
             ]
           },
           {
@@ -1409,7 +1413,7 @@
               "api-reference/dashboards/list-dashboards",
               "api-reference/dashboards/create-dashboards",
               "api-reference/dashboards/get-dashboards",
-              "api-reference/dashboards/update-reorder",
+              "api-reference/dashboards/put-update-reorder-reorder",
               "api-reference/dashboards/update-dashboards",
               "api-reference/dashboards/delete-dashboards"
             ]
@@ -1447,11 +1451,11 @@
             "group": "Secrets",
             "pages": [
               "api-reference/secrets/overview",
-              "api-reference/secrets/list-secrets",
-              "api-reference/secrets/create-secrets",
-              "api-reference/secrets/get-secrets",
-              "api-reference/secrets/update-secrets",
-              "api-reference/secrets/delete-secrets"
+              "api-reference/secrets/list-project-secrets",
+              "api-reference/secrets/create-a-project-secret",
+              "api-reference/secrets/get-project-secret-metadata",
+              "api-reference/secrets/replace-a-project-secret-value",
+              "api-reference/secrets/delete-a-project-secret"
             ]
           },
           {
@@ -1558,6 +1562,17 @@
             ]
           },
           {
+            "group": "Grants",
+            "pages": [
+              "api-reference/grants/overview",
+              "api-reference/grants/list-grants",
+              "api-reference/grants/grant-a-role",
+              "api-reference/grants/get-a-grant",
+              "api-reference/grants/change-a-grant-s-role",
+              "api-reference/grants/revoke-a-grant"
+            ]
+          },
+          {
             "group": "Role Bindings",
             "pages": [
               "api-reference/role-bindings/overview",
@@ -1612,6 +1627,8 @@
               "api-reference/api-keys/overview",
               "api-reference/api-keys/list-api-keys",
               "api-reference/api-keys/create-api-key",
+              "api-reference/api-keys/create-a-full-access-api-key",
+              "api-reference/api-keys/create-an-ingestion-api-key",
               "api-reference/api-keys/get-api-key",
               "api-reference/api-keys/update-api-key",
               "api-reference/api-keys/revoke-api-key"

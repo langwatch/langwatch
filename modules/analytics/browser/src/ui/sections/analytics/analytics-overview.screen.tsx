@@ -1,0 +1,213 @@
+import {
+  Alert,
+  Box,
+  Button,
+  Card,
+  Flex,
+  Grid,
+  Heading,
+  HStack,
+  Tabs,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
+import { isAggregateProjectKind } from "@langwatch/project-contract";
+import { ArrowUpRight, Plus } from "lucide-react";
+import { useMemo } from "react";
+import { BarChart2 } from "react-feather";
+
+import { useTopUsedDocuments } from "../../../behavior/use-analytics-documents.ts";
+import { useDashboards } from "../../../behavior/use-dashboards.ts";
+import { useFilterParams } from "../../../behavior/use-filter-params.ts";
+import { useAnalyticsHost } from "../../../model/analytics-host.ts";
+import { Link } from "../../../ui/elements/analytics-link.tsx";
+import AnalyticsLayout from "../../../ui/sections/analytics-layout.tsx";
+import {
+  DocumentsCountsSummary,
+  DocumentsCountsTable,
+} from "../../../ui/sections/documents-counts-table.tsx";
+import { FilterSidebar } from "../../../ui/sections/filter-sidebar.tsx";
+import { LLMMetrics } from "../../../ui/sections/llm-metrics.tsx";
+import { UserMetrics } from "../../../ui/sections/user-metrics.tsx";
+import { withAggregateAnalyticsGate } from "../aggregate-analytics-gate.tsx";
+
+function AnalyticsContent() {
+  const host = useAnalyticsHost();
+  const project = host.project();
+
+  return (
+    <AnalyticsLayout title="Overview" railEntry="overview">
+      {project && !project.hasFirstMessage && (
+        <Alert.Root status="warning" marginBottom={6}>
+          <Alert.Indicator />
+          <Alert.Content>
+            <Alert.Title>No traces received yet</Alert.Title>
+            <Alert.Description>
+              <Text as="span">
+                {"Tracing is not integrated yet, so there's no data to display. Go to the "}
+              </Text>
+              <Link textDecoration="underline" href={`/${project.slug}/traces`}>
+                setup
+              </Link>
+              <Text as="span"> page to get started.</Text>
+            </Alert.Description>
+          </Alert.Content>
+        </Alert.Root>
+      )}
+
+      <HStack align="start" width="full" gap={8}>
+        <VStack align="start" width="full">
+          <UserMetrics />
+          <LLMMetrics />
+          <DocumentsMetrics />
+          {project && <CustomReportsSection slug={project.slug} />}
+        </VStack>
+        <FilterSidebar hideTopics={true} />
+      </HStack>
+    </AnalyticsLayout>
+  );
+}
+
+function DocumentsMetrics() {
+  const { filterParams, queryOpts } = useFilterParams();
+  const params = useMemo(() => ({ filterParams, queryOpts }), [filterParams, queryOpts]);
+  const documents = useTopUsedDocuments(params);
+
+  const count = documents.data?.totalUniqueDocuments;
+
+  // A failed query says nothing about whether there are documents, so the section stays up
+  // and its panels show the error with a Retry.
+  if (!documents.error && (!count || count === 0)) {
+    return null;
+  }
+
+  return (
+    <>
+      <HStack width="full" align="top">
+        <Heading as="h2" size="md" paddingTop={6} paddingBottom={2}>
+          Documents
+        </Heading>
+      </HStack>
+      <Card.Root width="full">
+        <Card.Body>
+          <Tabs.Root variant="plain" defaultValue="total-documents">
+            <Tabs.List gap={12}>
+              <Tabs.Trigger value="total-documents" paddingX={0} paddingBottom={4}>
+                <VStack align="start">
+                  <Text color="fg">Total documents</Text>
+                  <Box textStyle="2xl" color="fg" fontWeight="bold">
+                    <DocumentsCountsSummary params={params} />
+                  </Box>
+                </VStack>
+              </Tabs.Trigger>
+              <Tabs.Indicator
+                mt="-1.5px"
+                height="4px"
+                bg="orange.solid"
+                borderRadius="1px"
+                bottom={0}
+              />
+            </Tabs.List>
+            <Tabs.Content value="total-documents">
+              <DocumentsCountsTable params={params} />
+            </Tabs.Content>
+          </Tabs.Root>
+        </Card.Body>
+      </Card.Root>
+    </>
+  );
+}
+
+function CustomReportsSection({ slug }: { slug: string }) {
+  const host = useAnalyticsHost();
+  const project = host.project();
+  const dashboardsQuery = useDashboards({ projectId: project?.id ?? "" });
+  const dashboards = dashboardsQuery.data ?? [];
+
+  if (dashboards.length === 0 && !dashboardsQuery.isLoading) {
+    // An aggregate (ADR-177) keeps no dashboards of its own, so it is not invited to build one.
+    if (isAggregateProjectKind(project?.kind)) return null;
+    return (
+      <>
+        <Heading as="h2" size="md" paddingTop={6} paddingBottom={2}>
+          Custom Dashboards
+        </Heading>
+        <Card.Root borderStyle="dashed">
+          <Card.Body padding={5}>
+            <HStack gap={4}>
+              <Box color="fg.subtle">
+                <BarChart2 size={20} />
+              </Box>
+              <VStack align="start" gap={1} flex={1}>
+                <Text textStyle="sm" fontWeight="500">
+                  Build your own dashboard
+                </Text>
+                <Text textStyle="xs" color="fg.muted">
+                  Drag and drop charts to track the metrics that matter most to your team.
+                </Text>
+              </VStack>
+              <Link href={`/${slug}/analytics/reports`} _hover={{ textDecoration: "none" }}>
+                <Button size="sm" variant="outline">
+                  <Plus size={14} /> Create
+                </Button>
+              </Link>
+            </HStack>
+          </Card.Body>
+        </Card.Root>
+      </>
+    );
+  }
+
+  if (dashboards.length === 0) return null;
+
+  return (
+    <>
+      <Heading as="h2" size="md" paddingTop={6} paddingBottom={2}>
+        Custom Dashboards
+      </Heading>
+      <Grid width="full" gap={3} gridTemplateColumns="repeat(auto-fill, minmax(250px, 1fr))">
+        {dashboards.map((dashboard) => (
+          <Link
+            key={dashboard.id}
+            href={`/${slug}/analytics/reports?dashboard=${dashboard.id}`}
+            _hover={{ textDecoration: "none" }}
+          >
+            <Card.Root
+              width="full"
+              cursor="pointer"
+              borderColor="border"
+              _hover={{ borderColor: "orange.emphasized", shadow: "sm" }}
+              transition="all 0.15s ease"
+            >
+              <Card.Body paddingX={4} paddingY={3}>
+                <Flex gap={3} alignItems="center">
+                  <Box padding={2} borderRadius="md" bg="orange.subtle" color="orange.fg">
+                    <BarChart2 size={16} />
+                  </Box>
+                  <VStack align="start" gap={0} flex={1}>
+                    <Text fontWeight="500" textStyle="sm">
+                      {dashboard.name}
+                    </Text>
+                    <Text textStyle="xs" color="fg.muted">
+                      Custom Dashboard
+                    </Text>
+                  </VStack>
+                  <Box color="fg.subtle" marginLeft="auto">
+                    <ArrowUpRight size={14} />
+                  </Box>
+                </Flex>
+              </Card.Body>
+            </Card.Root>
+          </Link>
+        ))}
+      </Grid>
+    </>
+  );
+}
+
+/**
+ * The page guard is the routes section's, not this module's: the
+ * `analytics:view` permission and layout chrome are stated once in
+ * `analytics-routes.tsx`, in front of the same loader registry.
+ */
+export default withAggregateAnalyticsGate("Analytics", AnalyticsContent);

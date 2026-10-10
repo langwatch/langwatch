@@ -1,0 +1,127 @@
+# Ops, admin and health screens (lane green-ops). Every expect names text both trees draw, taken
+# from main's components (components/ops/**, settings/checkup). The stacks run SaaS, so the
+# checkup draws its "self-hosted installs only" notice and the instance-admin screens are left
+# to the self-hosted pass.
+flows:
+  - id: ops-settings-checkup-cloud-notice
+    title: Settings checkup says it is for self-hosted installs
+    steps:
+      - action: go
+        with:
+          path: /settings/checkup
+      - action: expect
+        with:
+          text: The checkup is for self-hosted installs
+      - action: expect
+        with:
+          text: LangWatch Cloud is wired for you.
+
+  - id: ops-dashboard-panels
+    title: The ops dashboard draws its throughput chart, stat strip and latency windows
+    steps:
+      - action: go
+        with:
+          path: /ops
+      - action: expect
+        with:
+          text: Ops Dashboard
+      - action: expect
+        with:
+          text: Throughput
+      - action: expect
+        with:
+          text: Completed/s
+      - action: expect
+        with:
+          text: Failed/s
+      - action: expect
+        with:
+          text: P99
+      - action: expect
+        with:
+          text: Last hour
+      - action: expect
+        with:
+          text: All time
+
+  - id: ops-event-sourcing-projections-table
+    title: The projections workspace lists its columns and the old projections address follows to it
+    steps:
+      - action: go
+        with:
+          path: /ops/projections
+      - action: expect
+        with:
+          url: /ops/event-sourcing/projections
+      - action: expect
+        with:
+          text: Projections
+      - action: expect
+        with:
+          text: Projection
+      - action: expect
+        with:
+          text: Pending
+
+  - id: ops-feature-flags-catalogue
+    title: The operator feature flag catalogue groups flags by scope and shows what each resolves to
+    steps:
+      - action: go
+        with:
+          path: /ops/feature-flags
+      - action: expect
+        with:
+          text: Feature Flags
+      - action: expect
+        with:
+          text: Flag families
+      - action: expect
+        with:
+          text: Product
+      - action: expect
+        with:
+          text: Effective
+      - action: expect
+        with:
+          text: Last edit
+
+  - id: ops-deja-view-and-payload-store
+    title: Deja View draws its search header and the payload store describes what it lists
+    steps:
+      - action: go
+        with:
+          path: /ops/dejaview
+      - action: expect
+        with:
+          text: Deja View
+      - action: go
+        with:
+          path: /ops/blobs
+      - action: expect
+        with:
+          text: Payload store
+      - action: expect
+        with:
+          text: Stored job payloads
+
+  - id: ops-dead-letters-and-schedules
+    title: Dead letters and schedules draw their titles and the event-sourcing sidebar links between them
+    steps:
+      - action: go
+        with:
+          path: /ops/event-sourcing/dead-letters
+      - action: expect
+        with:
+          text: Dead Letters
+      - action: expect
+        with:
+          text: Payload store
+      - action: click
+        with:
+          text: Schedules
+      - action: expect
+        with:
+          url: /ops/event-sourcing/schedules
+      - action: expect
+        with:
+          text: Schedules

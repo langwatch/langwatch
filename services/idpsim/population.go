@@ -109,6 +109,7 @@ func (t *Tenant) Populate(spec PopulationSpec) PopulationResult {
 		random: random,
 	})
 	t.assignMembership(groups)
+	fillEnterprise(t.users, t.seedOr(spec.Seed))
 
 	return PopulationResult{
 		Users:   len(t.users),
@@ -359,6 +360,7 @@ func (t *Tenant) Churn(spec ChurnSpec) ChurnResult {
 	result.Renamed = t.churnRename(spec.Rename, random)
 	result.Regrouped = t.churnRegroup(spec.Regroup, random)
 
+	fillEnterprise(t.users, t.seedOr(spec.Seed))
 	t.reindexGroups()
 	result.Users = len(t.users)
 	return result

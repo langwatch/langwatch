@@ -238,6 +238,23 @@ Feature: Ops dashboard information density
     When the operator opens the projections page
     Then the most recent replay is reported there
 
+  # The replay wizard used to be opened by name through the application's drawer
+  # registry. It is addressed by the projections page's own query string now, so
+  # the property worth stating is the one the registry was actually providing:
+  # an operator mid-incident can hand the URL to whoever is on call with them.
+
+  @integration
+  Scenario: A started replay is in the address, not only on the screen
+    Given an operator on the projections page
+    When they start a replay
+    Then the address carries the open wizard
+
+  @integration
+  Scenario: The replay address opens the wizard for whoever follows it
+    Given an operator on the projections page
+    When they open an address that carries the wizard
+    Then the wizard is open when the page renders
+
   # ── The page as a whole ───────────────────────────────────────────────
 
   @unimplemented

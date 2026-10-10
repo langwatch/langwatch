@@ -1,4 +1,4 @@
-import { listTriggerFires as apiListTriggerFires } from "../langwatch-api-triggers.js";
+import { listTriggerFires as apiListTriggerFires } from "../langwatch-api-triggers.ts";
 
 /**
  * Handles the platform_list_trigger_fires MCP tool invocation: one page of
@@ -11,9 +11,7 @@ export async function handleListTriggerFires(params: {
 }): Promise<string> {
   const page = await apiListTriggerFires(params);
   if (page.fires.length === 0) {
-    return params.cursor
-      ? "No more fires."
-      : "This automation has not fired yet.";
+    return params.cursor ? "No more fires." : "This automation has not fired yet.";
   }
   return JSON.stringify(page, null, 2);
 }

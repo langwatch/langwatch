@@ -55,6 +55,9 @@ Feature: Detect and display stalled scenario runs
     When the finish command emits the terminal event
     Then the event carries failure results encoding that reason
 
+  # The upgrade step backstopping the watchdog for historical runs:
+  # modules/scenario/specs/close-stalled-runs-step.feature.
+
   # ============================================================================
   # End-to-End - User Workflow
   # ============================================================================

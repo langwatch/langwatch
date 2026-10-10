@@ -242,6 +242,19 @@ backend for you:
         PostSync hook, which already waits for the rollout to be healthy;
         plain Helm should upgrade with --wait when crossing the ADR-032
         boundary (see the migration Job template header).
+      • GitOps: the pre-roll upgrade Job (rendered only with
+        serializeUpgrades) is a pre-upgrade hook, which ArgoCD/Flux map to PreSync and run on the
+        first sync too; `upgrade` is idempotent, so it is a no-op there.
+
+  • Upgrades: the new worker pods run `pnpm task upgrade`; the new app pods
+    report not ready until it is done, so the old pods keep serving (pass
+    --wait --timeout 45m). With serializeUpgrades on, a pre-roll Job runs it
+    first instead. To run it yourself from the new image:
+      kubectl run langwatch-upgrade --rm -it --restart=Never \
+        --image={{ .Values.images.app.repository }}:{{ .Values.images.app.tag }} \
+        -- sh -c 'cd /app/apps/api && pnpm --silent run start:prepare:db'
+    (with the app's environment). A first install needs nothing: the
+    worker's first boot runs it once on the empty database.
 
   • Production / multi-pod: enable app.dataplane (S3 / MinIO / Azure).
     Then configure these on the bucket and deployment, or uploads and
@@ -272,7 +285,6 @@ CreateContainerConfigError; `kubectl describe pod` names the missing key.
 
   {{ include "langwatch.appSecretName" . }} keys (always required):
     - credentialsEncryptionKey
-    - cronApiKey
     - nextAuthSecret
     - virtualKeyPepper
 {{- if and .Values.gateway .Values.gateway.chartManaged }}
@@ -323,7 +335,6 @@ CreateContainerConfigError; `kubectl describe pod` names the missing key.
 
     kubectl -n {{ .Release.Namespace }} create secret generic {{ include "langwatch.appSecretName" . }} \
       --from-literal=credentialsEncryptionKey="$(openssl rand -hex 32)" \
-      --from-literal=cronApiKey="$(openssl rand -hex 32)" \
       --from-literal=nextAuthSecret="$(openssl rand -hex 32)" \
       --from-literal=virtualKeyPepper="$(openssl rand -hex 32)" \
 {{- if and .Values.gateway .Values.gateway.chartManaged }}

@@ -1,0 +1,999 @@
+import { type BoundMiddlewareBindings, type TransportPeers } from "@langwatch/api";
+import { type EventUpcastReader, type FeatureEventing } from "@langwatch/eventing";
+import {
+  type DependencyToken,
+  type FeatureApiIdentity,
+  ModuleApiToken,
+  type TokenIdentity,
+  type TokenMap,
+  tokenName,
+} from "@langwatch/module";
+import type { StoresMemberSource } from "@langwatch/process-stores";
+import type { ScopedSecrets, SecretHandle } from "@langwatch/secrets";
+
+import {
+  DependencyCycleError,
+  DuplicateFeatureError,
+  DuplicateProviderError,
+  MissingProviderError,
+  RoleContributionError,
+  StoreTierUnstatedError,
+} from "./boot-errors.ts";
+import { channelsBind, channelsRequire, type AnyChannelRegistry } from "./channel-registry.ts";
+/** Declares, constructs and starts the process graph (ARCHITECTURE.md §5). */
+import type {
+  FeatureTransportDescriptor,
+  InstallableServerFeature,
+  InstalledFeatureState,
+  FeatureInstallArguments,
+  FeatureProvider,
+  ModuleConfigGuard,
+  ModuleConfigRecord,
+  ModuleOperatorReadsScope,
+  ModuleSecretsScope,
+  PublishedProcessModule,
+  ServerFeatureDeclaration,
+  ServerRole,
+} from "./feature-installer.ts";
+import {
+  RuntimeLifecycle,
+  cleanupAfterFailure,
+  type RuntimeService,
+} from "./lifecycle/runtime-lifecycle.ts";
+import { LocalFeatureApis } from "./local-feature-api.ts";
+import { migrationStepsOf } from "./migration/migration-steps.ts";
+import { processProjectionReplayer } from "./migration/projection-replayer.ts";
+import {
+  commandsOf,
+  buildModuleEventing,
+  eventingHostFrom,
+  installEventingMaintenance,
+  installProjectionReads,
+  installReadHints,
+  eventingConsumers,
+  type EventingHost,
+} from "./module-eventing.ts";
+import { buildClaimedMembers } from "./module-members.ts";
+import {
+  assertRepositoryOwnership,
+  snapshotRepositories,
+  type FeatureRepositories,
+} from "./repository-ownership.ts";
+import {
+  repositoriesRequire,
+  selectedRepositoryOwnership,
+  validateRepositorySelection,
+  type AnyRepositoryRegistry,
+  type RepositorySelection,
+} from "./repository-registry.ts";
+import { type ResourceOwnership, ResourceScope } from "./resource-scope.ts";
+import type { TestPeer } from "./testing.ts";
+import type { Tier } from "./tiers.ts";
+import {
+  declaredForRole,
+  mountDeclaredTransports,
+  type DeclaredTransports,
+  type FeatureTransportHosts,
+  type MountedTransports,
+} from "./transport-mounting.ts";
+import { transportPeersOf } from "./transport-peers.ts";
+
+/** What a booted runtime hands back for one feature. */
+export interface InstalledFeature<Provided, Rest, Trpc, Worker> {
+  /** Whatever that feature's setup constructed. Both doors read this one. */
+  readonly provided: Provided;
+  /** The feature's REST contribution, throws when unavailable in this role. */
+  rest(): Rest;
+  /** The feature's tRPC contribution, throws when unavailable in this role. */
+  trpc(): Trpc;
+  /** The feature's background contribution, throws when unavailable in this role. */
+  worker(): Worker;
+}
+
+/** A booted application: everything constructed, nothing serving yet. */
+export class BootedRuntime<Members, Rest = never, Trpc = never> {
+  private readonly lifecycle: RuntimeLifecycle;
+  private readonly services: readonly RuntimeService[];
+  readonly name: string;
+  readonly role: ServerRole;
+  /** Members built: union of modules' required members, nothing else. */
+  readonly members: Readonly<Partial<Members>>;
+  /** Mounted transports, in install/namespace order. */
+  readonly transports: MountedTransports<Rest, Trpc>;
+  private readonly installed: ReadonlyMap<string, InstalledFeatureState>;
+  private readonly provided: ReadonlyMap<TokenIdentity, unknown>;
+  /** Background work this role owns (workers/tasks/empty for others). */
+  readonly contributions: readonly unknown[];
+  /** Which feature declared each contribution, so a bad one can be named. */
+  private readonly declaredBy: ReadonlyMap<unknown, string>;
+  /**
+   * What this process serves: ONE composed handler, built by the surface the chain exposed once
+   * everything mounted. Absent in every role that serves no requests, and in a test.
+   */
+  readonly handler: unknown;
+  /** This role's event-sourcing runtime, where it holds one. */
+  private readonly eventing: EventingHost | undefined;
+
+  constructor({
+    name,
+    role,
+    members,
+    transports,
+    installed,
+    provided,
+    contributions,
+    scope,
+    services,
+    declaredBy = new Map(),
+    handler = void 0,
+    eventing = void 0,
+  }: {
+    name: string;
+    role: ServerRole;
+    members: Readonly<Partial<Members>>;
+    transports: MountedTransports<Rest, Trpc>;
+    installed: ReadonlyMap<string, InstalledFeatureState>;
+    provided: ReadonlyMap<TokenIdentity, unknown>;
+    contributions: readonly unknown[];
+    scope: ResourceScope;
+    services: readonly RuntimeService[];
+    declaredBy?: ReadonlyMap<unknown, string>;
+    handler?: unknown;
+    eventing?: EventingHost | undefined;
+  }) {
+    this.name = name;
+    this.role = role;
+    this.members = members;
+    this.transports = transports;
+    this.installed = installed;
+    this.provided = provided;
+    this.contributions = contributions;
+    this.declaredBy = declaredBy;
+    this.handler = handler;
+    this.eventing = eventing;
+    this.lifecycle = new RuntimeLifecycle(services, scope);
+    this.services = services;
+  }
+
+  /**
+   * The one-shot work this process runs, narrowed by the caller's guard: the kernel cannot name
+   * `Task`, so the predicate keeps the narrowing cast-free and a module that declared a non-task
+   * fails boot by name.
+   */
+  tasks<Task>(isTask: (contribution: unknown) => contribution is Task): readonly Task[] {
+    if (this.role !== "tasks") {
+      throw new Error(
+        `Asked "${this.name}" for its one-shot tasks, but only the "tasks" role hosts them ` +
+          `and this process is "${this.role}". Build it with server.container("tasks").`,
+      );
+    }
+    const tasks: Task[] = [];
+    for (const contribution of this.contributions) {
+      if (isTask(contribution)) {
+        tasks.push(contribution);
+        continue;
+      }
+      throw new RoleContributionError(
+        this.declaredBy.get(contribution) ?? "an unnamed feature",
+        this.role,
+        "something withTasks accepted that is not a task",
+      );
+    }
+    return tasks;
+  }
+
+  /** The migration steps this process's modules declared, narrowed by the caller's guard. */
+  migrationSteps<Step extends { readonly id: string }>(
+    isMigrationStep: (contribution: unknown) => contribution is Step,
+  ): readonly Step[] {
+    const { name, role, installed } = this;
+    return migrationStepsOf({ process: name, role, installed, isMigrationStep });
+  }
+
+  /**
+   * The declared event upcasts and the stored events each still covers, for the upgrade ledger
+   * (§9; Alex, 2026-10-09). Undefined where this role holds no event log.
+   */
+  upcastReader(): EventUpcastReader | undefined {
+    return this.eventing?.upcastReader?.();
+  }
+
+  /**
+   * One installed module, typed by its own declaration. The stored state is
+   * erased — the root installs modules it knows nothing else about — so the
+   * declaration's own types are what name it again here.
+   */
+  module<
+    Config,
+    Dependencies extends TokenMap,
+    TransportDependencies extends TokenMap,
+    Provided,
+    Transport,
+    Rest,
+    Trpc,
+    Worker,
+  >(
+    declaration: ServerFeatureDeclaration<
+      Config,
+      Dependencies,
+      TransportDependencies,
+      Provided,
+      Transport,
+      Rest,
+      Trpc,
+      Worker
+    >,
+  ): InstalledFeature<Provided, Rest, Trpc, Worker>;
+  module<Provided>(
+    declaration: PublishedProcessModule<string, Provided, unknown>,
+  ): InstalledFeature<Provided, never, never, never>;
+  module(
+    declaration: InstallableServerFeature,
+  ): InstalledFeature<unknown, unknown, unknown, unknown> {
+    const state = this.installed.get(declaration.name);
+    if (!state) {
+      throw new Error(`Feature "${declaration.name}" is not installed on ${this.name}.`);
+    }
+    return {
+      provided: state.provided,
+      rest: state.rest ?? unavailable(declaration.name, this.role, "REST"),
+      trpc: state.trpc ?? unavailable(declaration.name, this.role, "tRPC"),
+      worker: state.worker ?? unavailable(declaration.name, this.role, "worker"),
+    };
+  }
+
+  /**
+   * The instance behind one token, for code that has not been converted yet
+   * and holds no declaration to read it from.
+   */
+  service<Instance>(token: DependencyToken<Instance>): Instance {
+    if (!this.provided.has(token)) {
+      throw new Error(`Nothing on ${this.name} provides ${tokenName(token)}.`);
+    }
+    return this.provided.get(token) as Instance;
+  }
+
+  start(): Promise<void> {
+    return this.lifecycle.start();
+  }
+
+  stop(): Promise<void> {
+    return this.lifecycle.stop();
+  }
+}
+
+/** One feature declared on an application, before boot looks at it. */
+interface DeclaredFeature {
+  readonly name: string;
+  /** The event sourcing this module declared, installed where a runtime exists. */
+  readonly eventing: FeatureEventing | undefined;
+  /** The background work this module declared, started by the worker role. */
+  readonly workers: readonly unknown[];
+  /** The one-shot work this module declared, exposed by the tasks role. */
+  readonly tasks: readonly unknown[];
+  readonly transports: readonly FeatureTransportDescriptor[];
+  readonly repositories?: FeatureRepositories;
+  readonly repositoryRegistry?: AnyRepositoryRegistry;
+  readonly channelRegistry?: AnyChannelRegistry;
+  readonly apiContract?: FeatureApiIdentity;
+  readonly dependencies: TokenMap;
+  readonly transportDependencies: TokenMap;
+  readonly providers: readonly FeatureProvider<never>[];
+  readonly contributesWorkerWork: boolean;
+  /** Repository tier: live or memory, as the supplied stores state it. */
+  readonly tier: Tier;
+  /** The handles this module declared, for the root to scope its resolver to. */
+  readonly secrets?: Readonly<Record<string, SecretHandle<unknown>>>;
+  /** The operator-read handles this module declared, scoped the same way (§7). */
+  readonly operatorReads?: Readonly<Record<string, unknown>>;
+  readonly install: (args: FeatureInstallArguments) => Promise<InstalledFeatureState>;
+}
+
+/** One instance the process itself answers for, by the token that names it. */
+interface ProcessProvision {
+  readonly token: TokenIdentity;
+  readonly instance: unknown;
+}
+
+/** A feature as installed, before boot checks a tier was stated for it. */
+type CollectedFeature = Omit<DeclaredFeature, "tier"> & Readonly<{ tier: Tier | undefined }>;
+
+/** What a builder collects, shared when one is re-parameterised by its doors. */
+interface BuilderState<Rest, Trpc> {
+  readonly features: CollectedFeature[];
+  readonly services: RuntimeService[];
+  /** Peers the process hands in itself, rather than by installing their module. */
+  readonly provisions: ProcessProvision[];
+  hosts: TransportHostSource<Rest, Trpc>;
+  /**
+   * What this process serves, once every declared transport has mounted. Called
+   * at the one moment it can be: the whole surface exists and nothing is
+   * listening yet.
+   */
+  serve?: (() => unknown) | undefined;
+}
+
+/** Factory to build doors after all modules install (needed when doors read modules). */
+export type TransportHostFactory<Rest, Trpc> = (
+  peers: TransportPeers,
+) => FeatureTransportHosts<Rest, Trpc>;
+
+/** Either shape a caller may name its doors in. */
+export type TransportHostSource<Rest, Trpc> =
+  | FeatureTransportHosts<Rest, Trpc>
+  | TransportHostFactory<Rest, Trpc>;
+
+/** Process role, config, and member sources. */
+export interface ApplicationOptions<Config extends ModuleConfigRecord = ModuleConfigRecord> {
+  readonly role: ServerRole;
+  /** Module config slices, checked at install. */
+  readonly config?: Config;
+  /** The stores this process opened; omitted means none, and a module requiring one refuses. */
+  readonly stores?: StoresMemberSource;
+  /**
+   * Scopes the process's resolver to one module's own declared handles (§6).
+   * A process that states no secrets chain omits it, and a module resolving
+   * one anyway is refused by name rather than reading an undeclared secret.
+   */
+  readonly secrets?: ModuleSecretsScope;
+  /** Scopes the stores' operator reads to one module's declared handles (§7). */
+  readonly operatorReads?: ModuleOperatorReadsScope;
+  /** Stand-ins for peers the process does not install: `testPeer` or `.provide()` values. */
+  readonly peers?: readonly TestPeer[];
+}
+
+/** An application with its members named, collecting declarations. */
+export class ApplicationBuilder<
+  Members = never,
+  Rest = never,
+  Trpc = never,
+  Config extends ModuleConfigRecord = ModuleConfigRecord,
+> {
+  private readonly state: BuilderState<Rest, Trpc>;
+  private readonly role: ServerRole;
+  private readonly config: Readonly<Record<string, unknown>>;
+  private readonly stores: StoresMemberSource;
+  private readonly secrets: ModuleSecretsScope | undefined;
+  private readonly operatorReads: ModuleOperatorReadsScope | undefined;
+  readonly name: string;
+
+  constructor(options: ApplicationOptions<Config>, state?: BuilderState<Rest, Trpc>) {
+    this.role = options.role;
+    this.config = options.config ?? {};
+    this.stores = options.stores ?? NO_STORES;
+    this.secrets = options.secrets;
+    this.operatorReads = options.operatorReads;
+    this.name = options.role;
+    this.state = state ?? { features: [], services: [], provisions: [], hosts: {} };
+    for (const peer of options.peers ?? []) {
+      peer.bind((token, instance) => this.addProvision(token, instance));
+    }
+  }
+
+  /**
+   * Process doors; features' transports mount on them. Can be a factory
+   * run after all modules install.
+   */
+  withTransports<NextRest, NextTrpc>(
+    hosts: TransportHostSource<NextRest, NextTrpc>,
+    serve?: () => unknown,
+  ): ApplicationBuilder<Members, NextRest, NextTrpc, Config> {
+    return new ApplicationBuilder<Members, NextRest, NextTrpc, Config>(
+      {
+        role: this.role,
+        config: this.config as Config,
+        stores: this.stores,
+        ...(this.secrets ? { secrets: this.secrets } : {}),
+        ...(this.operatorReads ? { operatorReads: this.operatorReads } : {}),
+      },
+      { ...this.state, hosts, serve },
+    );
+  }
+
+  /** Modules to install; guards ensure members and config align. */
+  withModules<const Modules extends readonly InstallableServerFeature[]>(
+    modules: Modules & ModuleConfigGuard<Modules, Config>,
+  ): this {
+    for (const module of modules as readonly InstallableServerFeature[]) {
+      this.addFeature(module);
+    }
+    return this;
+  }
+
+  private addFeature(declaration: InstallableServerFeature): this {
+    this.state.features.push({
+      name: declaration.name,
+      transports: declaration.transports ?? [],
+      repositories: snapshotRepositories(declaration.repositories),
+      repositoryRegistry: declaration.repositoryRegistry,
+      ...(declaration.channelRegistry ? { channelRegistry: declaration.channelRegistry } : {}),
+      apiContract: declaration.apiContract,
+      dependencies: declaration.dependencies,
+      transportDependencies: declaration.transportDependencies,
+      providers: declaration.providers,
+      contributesWorkerWork: declaration.contributesWorkerWork,
+      tier: declaration.tier ?? this.stores.tier,
+      workers: declaration.workers ?? [],
+      tasks: declaration.tasks ?? [],
+      eventing: declaration.eventing,
+      // Copied member by member above, so an omission here silently disables a
+      // seam rather than failing to compile: without this the root scopes every
+      // module's resolver to nothing and every declared handle reads undeclared.
+      ...(declaration.secrets ? { secrets: declaration.secrets } : {}),
+      ...(declaration.operatorReads ? { operatorReads: declaration.operatorReads } : {}),
+      install: (args) => declaration.install(args as FeatureInstallArguments),
+    });
+    return this;
+  }
+
+  private addProvision<Instance>(token: DependencyToken<Instance>, instance: Instance): void {
+    if (this.state.provisions.some((provision) => provision.token === token)) {
+      throw new DuplicateProviderError(tokenName(token), ["the process", "the process"]);
+    }
+    this.state.provisions.push({ token, instance });
+  }
+
+  /** Exactly this module's own handles: a peer's are not reachable by name. */
+  private secretsFor(declaration: DeclaredFeature): { secrets?: ScopedSecrets } {
+    if (!this.secrets) return {};
+
+    return { secrets: this.secrets(declaration.name, Object.values(declaration.secrets ?? {})) };
+  }
+
+  /**
+   * The module's own operator reads join only its repository members, so only
+   * the live tier its registry builds can hold a cross-organization client (§7).
+   */
+  private repositoryMembersFor(
+    declaration: DeclaredFeature,
+    members: Readonly<Record<string, unknown>>,
+  ): Readonly<Record<string, unknown>> {
+    if (!this.operatorReads || !declaration.operatorReads) return members;
+
+    const operatorReads = this.operatorReads({
+      owner: declaration.name,
+      declared: Object.values(declaration.operatorReads),
+    });
+    return { ...members, operatorReads };
+  }
+
+  /** Something the runtime starts and stops around the feature graph. */
+  withService(service: RuntimeService): this {
+    this.state.services.push(service);
+    return this;
+  }
+
+  /** Validates providers, allocates peer clients and constructs Apps before serving. */
+  async boot(): Promise<BootedRuntime<Members, Rest, Trpc>> {
+    const role = this.role;
+    const config = this.config;
+
+    // A missing tier refuses first, by module, before anything reads a tier or opens a client.
+    const declarations = this.state.features.map(statedTier);
+    // Everything readable off the declarations alone comes first, so a graph
+    // that cannot be built is refused before this process opens one client.
+    // Table ownership is the first of them: two modules writing the same rows
+    // is a fact about the code, not about what this deployment configured.
+    assertRepositoryOwnership(
+      declarations.map((declaration) => ({
+        ...declaration,
+        repositories: {
+          ...declaration.repositories,
+          ...(declaration.repositoryRegistry
+            ? selectedRepositoryOwnership(declaration.repositoryRegistry, {
+                tier: declaration.tier,
+                members: {},
+              })
+            : {}),
+        },
+      })),
+    );
+    // Providers next: the same feature declared twice is reported by the token
+    // it claims twice, which is the thing a reader can act on. A feature that
+    // provides nothing still gets the plainer refusal below. All of it is read
+    // off the declarations, so a graph that cannot be built is refused before
+    // this process opens a single client.
+    const providerOf = this.resolveProviders(declarations);
+    this.assertApiDeclarations(declarations);
+    this.assertUniqueFeatures(declarations);
+    this.assertEveryDependencyProvided(declarations, providerOf, role);
+    const order = orderByDependency(declarations, providerOf, role);
+
+    // Exactly the union of what every installed module's repository and channel
+    // tiers require, built eagerly in the source's own construction order. A store
+    // client this process cannot supply refuses HERE, naming the module and the
+    // client, rather than on the first request that reaches it.
+    const members = buildClaimedMembers({
+      source: this.stores,
+      claims: declarations.map((declaration) => ({
+        module: declaration.name,
+        members: claimedBy(declaration),
+      })),
+    });
+    const selections = new Map<string, RepositorySelection>(
+      declarations.map((declaration) => [
+        declaration.name,
+        { tier: declaration.tier, members: this.repositoryMembersFor(declaration, members) },
+      ]),
+    );
+    // Belt and braces over the union above: a source that answered a claimed
+    // member with null built something a factory cannot use.
+    assertRepositoryBackend(declarations, selections);
+    const eventing = eventingHostFrom(eventingMemberFor(declarations, this.stores), role);
+    const consumers = eventingConsumers(eventing);
+    const replayer = processProjectionReplayer({ eventing });
+    const scope = new ResourceScope();
+    const featureServices: RuntimeService[] = [];
+    const installed = new Map<string, InstalledFeatureState>();
+    // Called, not handed: ops installs before the modules whose tenant steps it drives (S6-FEED).
+    const declaredMigrationSteps = () =>
+      [...installed.values()].flatMap((state) => state.migrationSteps ?? []);
+    const provided = new Map<TokenIdentity, unknown>();
+    const apis = new LocalFeatureApis();
+    const declared: DeclaredTransports[] = [];
+    this.allocateApiClients(apis, providerOf, provided);
+    let transports: MountedTransports<Rest, Trpc> = { rest: [], trpc: {} };
+    let handler: unknown;
+    try {
+      for (const declaration of order) {
+        const resources = new ResourceScope();
+        scope.own(declaration.name, () => resources.close());
+        const state = await declaration.install({
+          resources,
+          config: config[declaration.name],
+          ...this.secretsFor(declaration),
+          repositorySelection: selections.get(declaration.name),
+          role,
+          replayer,
+          declaredMigrationSteps,
+          resolve: (token) => resolveInstallToken({ token, provided, apis }),
+        });
+        featureServices.push(...resources.sealServices());
+        this.bindProviders({ declaration, state, apis, provided });
+        const installedState = declaration.apiContract
+          ? { ...state, provided: apis.reference(declaration.apiContract) }
+          : state;
+        installed.set(declaration.name, installedState);
+        installModuleEventing({ declaration, state, eventing, resources });
+        declared.push(...declaredTransportsOf(declaration, installedState));
+      }
+      installEventingMaintenance(eventing);
+      installReadHints({ eventing, declared });
+      installProjectionReads({ eventing, declared });
+      apis.ready();
+      scope.own("feature API bindings", () => apis.close());
+      // After every application exists, so a handler reaching a peer through
+      // its own app gets the same instance every other caller holds.
+      if (role === "api") {
+        // Now: all Apps exist, nothing serves yet. Only moment doors can be built.
+        const middlewareBindings = [...installed].map(([feature, state]) => ({
+          feature,
+          middlewareBindings: state.middlewareBindings ?? [],
+        }));
+        const hosts = this.openDoors((token) => provided.get(token), middlewareBindings);
+        if (
+          hosts.rest !== void 0 ||
+          hosts.trpc !== void 0 ||
+          hosts.websocket !== void 0 ||
+          hosts.rawhttp !== void 0
+        ) {
+          transports = mountDeclaredTransports({
+            declared: declaredForRole(declared, "api"),
+            hosts,
+          });
+        }
+        // A bundle-only API still serves even when neither protocol has declarations.
+        handler = this.state.serve?.();
+      }
+      const workerDoors = role === "worker" ? declaredForRole(declared, "worker") : [];
+      // A worker opens its doors only when a module declared one, so a factory never runs for none.
+      if (workerDoors.some((entry) => entry.transports.length > 0)) {
+        const hosts = this.openDoors((token) => provided.get(token));
+        if (hosts.rawsocket !== void 0) mountDeclaredTransports({ declared: workerDoors, hosts });
+      }
+    } catch (error) {
+      apis.close();
+      return cleanupAfterFailure(error, () => scope.close());
+    }
+
+    const contributions = roleContributions(declarations, role, installed);
+
+    return new BootedRuntime<Members, Rest, Trpc>({
+      name: this.name,
+      role,
+      members: members as Readonly<Partial<Members>>,
+      transports,
+      installed,
+      provided,
+      contributions: contributions.contributions,
+      scope,
+      services: [...featureServices, ...this.state.services, ...consumers],
+      declaredBy: contributions.declaredBy,
+      handler,
+      eventing,
+    });
+  }
+
+  /**
+   * The doors this process opens, resolved once: named hosts come back as they are; a factory
+   * runs here over every installed App, by contract token, and every module's middleware bindings.
+   */
+  private openDoors(
+    resolve: (token: TokenIdentity) => unknown,
+    middlewareBindings: readonly BoundMiddlewareBindings[] = [],
+  ): FeatureTransportHosts<Rest, Trpc> {
+    const source = this.state.hosts;
+    return typeof source === "function"
+      ? source(transportPeersOf(resolve, middlewareBindings))
+      : source;
+  }
+
+  /** Store peer instances as-is; declare module API tokens. */
+  private allocateApiClients(
+    apis: LocalFeatureApis,
+    providerOf: ReadonlyMap<TokenIdentity, string>,
+    provided: Map<TokenIdentity, unknown>,
+  ): void {
+    for (const provision of this.state.provisions)
+      provided.set(provision.token, provision.instance);
+    for (const [token, owner] of providerOf) {
+      if (owner !== "the process" && token instanceof ModuleApiToken) apis.declare(token);
+    }
+  }
+
+  private bindProviders({
+    declaration,
+    state,
+    apis,
+    provided,
+  }: {
+    declaration: DeclaredFeature;
+    state: InstalledFeatureState;
+    apis: LocalFeatureApis;
+    provided: Map<TokenIdentity, unknown>;
+  }): void {
+    for (const provider of declaration.providers) {
+      const value = provider.read(state.provided as never);
+      if (provider.token instanceof ModuleApiToken) {
+        apis.bind(provider.token, value);
+        provided.set(provider.token, apis.reference(provider.token));
+      } else {
+        provided.set(provider.token, value);
+      }
+    }
+  }
+
+  private assertUniqueFeatures(declarations: readonly DeclaredFeature[]): void {
+    const seen = new Set<string>();
+    for (const declaration of declarations) {
+      if (seen.has(declaration.name)) throw new DuplicateFeatureError(declaration.name);
+      seen.add(declaration.name);
+    }
+  }
+
+  /** Which feature answers for each token, refusing a token claimed twice. */
+  private resolveProviders(
+    declarations: readonly DeclaredFeature[],
+  ): ReadonlyMap<TokenIdentity, string> {
+    const providerOf = new Map<TokenIdentity, string>();
+    const apiOwners = new Map<string, string>();
+    /**
+     * A module's contract token claims the module's name; the process claims no
+     * name, so a core token named for a module is not thereby that module's API.
+     */
+    const register = (token: TokenIdentity, owner: string, claimsName: boolean): void => {
+      const existing =
+        providerOf.get(token) ??
+        (claimsName && token instanceof ModuleApiToken ? apiOwners.get(token.name) : void 0);
+      if (existing !== void 0) {
+        throw new DuplicateProviderError(tokenName(token), [existing, owner]);
+      }
+      if (claimsName && token instanceof ModuleApiToken) apiOwners.set(token.name, owner);
+      providerOf.set(token, owner);
+    };
+    // The process's own provisions first, so a module answering for the very
+    // same token is refused rather than silently overwriting what the caller
+    // handed in. That check is by identity, so it holds for both.
+    for (const provision of this.state.provisions) {
+      register(provision.token, "the process", false);
+    }
+    for (const declaration of declarations) {
+      for (const provider of declaration.providers) {
+        register(provider.token, declaration.name, true);
+      }
+    }
+    return providerOf;
+  }
+
+  private assertApiDeclarations(declarations: readonly DeclaredFeature[]): void {
+    for (const declaration of declarations) {
+      if (!declaration.apiContract) {
+        assertLegacyProviders(declaration);
+        continue;
+      }
+      if (declaration.apiContract.name !== declaration.name) {
+        throw new Error(
+          `Feature "${declaration.name}" cannot provide API "${declaration.apiContract.name}".`,
+        );
+      }
+      for (const [key, token] of Object.entries(declaration.dependencies)) {
+        if (!(token instanceof ModuleApiToken)) {
+          throw new Error(
+            `Feature "${declaration.name}" dependency "${key}" must use a dependency token.`,
+          );
+        }
+      }
+    }
+  }
+
+  private assertEveryDependencyProvided(
+    declarations: readonly DeclaredFeature[],
+    providerOf: ReadonlyMap<TokenIdentity, string>,
+    role: ServerRole,
+  ): void {
+    for (const declaration of declarations) {
+      for (const [key, token] of dependenciesFor(declaration, role)) {
+        if (!providerOf.has(token)) {
+          throw new MissingProviderError(declaration.name, key, tokenName(token));
+        }
+      }
+      // A bound channel is no peer and orders nothing, but its provider must be installed.
+      const channels = declaration.channelRegistry;
+      for (const [key, token] of channels ? channelsBind(channels, declaration.tier) : []) {
+        if (!providerOf.has(token)) {
+          throw new MissingProviderError(declaration.name, `channels.${key}`, tokenName(token));
+        }
+      }
+    }
+  }
+}
+
+/** The eventing runtime member if this process holds one and eventing is declared. */
+function eventingMemberFor(
+  declarations: readonly DeclaredFeature[],
+  source: StoresMemberSource,
+): Readonly<Record<string, unknown>> {
+  const named = source.order.find((member) => member === "eventing");
+  if (named === void 0) return {};
+  if (!declarations.some((declaration) => declaration.eventing)) return {};
+  try {
+    return { eventing: source.read(named) };
+  } catch {
+    return {};
+  }
+}
+
+/** A process that opened no stores: a module requiring one refuses by name at boot. */
+const NO_STORES: StoresMemberSource = Object.freeze({
+  order: Object.freeze([]),
+  read(name: string): never {
+    throw new Error(`This process opened no stores, so it cannot read "${name}".`);
+  },
+});
+
+/** A module with repositories boots only on a stated tier; nothing picks one for it (§7). */
+function statedTier(feature: CollectedFeature): DeclaredFeature {
+  if (feature.tier !== void 0) return { ...feature, tier: feature.tier };
+  if (feature.repositoryRegistry !== void 0) throw new StoreTierUnstatedError(feature.name);
+  // No registry reads the tier, so a module without one never needs it stated.
+  return { ...feature, tier: "live" };
+}
+
+function claimedBy(declaration: DeclaredFeature): readonly string[] {
+  const registry = declaration.repositoryRegistry;
+  const tier = registry === void 0 ? [] : repositoriesRequire(registry, declaration.tier);
+  const channels = declaration.channelRegistry;
+  const channelTier = channels === void 0 ? [] : channelsRequire(channels, declaration.tier);
+  // The root hands `operatorReads` to the live tier itself; no store answers it.
+  return [...tier.filter((member) => member !== "operatorReads"), ...channelTier];
+}
+
+/** Install module's eventing pipeline if runtime exists. */
+function installModuleEventing({
+  declaration,
+  state,
+  eventing,
+  resources,
+}: {
+  declaration: DeclaredFeature;
+  state: InstalledFeatureState;
+  eventing: EventingHost | undefined;
+  resources: ResourceOwnership;
+}): void {
+  const module = declaration.eventing;
+  if (!module || !eventing) return;
+  const definition = buildModuleEventing({
+    eventing: module,
+    setup: {
+      participation: eventing.participation,
+      repositories: state.repositories,
+      app: state.provided,
+      processStore: eventing.processStore,
+      resources,
+      ...(eventing.notifyOutbox
+        ? { notifyOutbox: (processName: string) => eventing.notifyOutbox?.(processName) }
+        : {}),
+    },
+    log: () => eventing.eventStore,
+  });
+  const registration = eventing.register(definition);
+  module.connect?.({ app: state.provided, commands: commandsOf(registration) });
+  if (eventing.participation !== "produce" || !eventing.describe) return;
+  eventing.describe(
+    buildModuleEventing({
+      eventing: module,
+      setup: {
+        participation: "describe",
+        repositories: state.repositories,
+        app: state.provided,
+        processStore: eventing.processStore,
+      },
+      log: () => eventing.eventStore,
+    }),
+  );
+}
+
+/**
+ * What this role starts: declared workers on a worker, declared tasks on tasks. The declaring
+ * feature is kept beside each contribution. Flattening loses it otherwise, and a module that
+ * declared the wrong thing is then only findable by reading every `withTasks` call in the tree.
+ */
+function roleContributions(
+  declarations: readonly DeclaredFeature[],
+  role: ServerRole,
+  installed: ReadonlyMap<string, InstalledFeatureState>,
+): { contributions: readonly unknown[]; declaredBy: ReadonlyMap<unknown, string> } {
+  const declaredBy = new Map<unknown, string>();
+  const contributions: unknown[] = [];
+  for (const declaration of declarations) {
+    const declared = [
+      ...contributionsFor({ declaration, role }),
+      ...(role === "tasks" ? (installed.get(declaration.name)?.tasks ?? []) : []),
+    ];
+    for (const contribution of declared) {
+      contributions.push(contribution);
+      if (typeof contribution === "object" && contribution !== null) {
+        declaredBy.set(contribution, declaration.name);
+      }
+    }
+  }
+  return { contributions, declaredBy };
+}
+
+function contributionsFor({
+  declaration,
+  role,
+}: {
+  declaration: DeclaredFeature;
+  role: ServerRole;
+}): readonly unknown[] {
+  if (role === "worker") return declaration.workers;
+  if (role === "tasks") return declaration.tasks;
+  return [];
+}
+
+function resolveInstallToken({
+  token,
+  provided,
+  apis,
+}: {
+  token: TokenIdentity;
+  provided: ReadonlyMap<TokenIdentity, unknown>;
+  apis: LocalFeatureApis;
+}): unknown {
+  if (provided.has(token)) return provided.get(token);
+  if (token instanceof ModuleApiToken) return apis.reference(token);
+  return void 0;
+}
+
+/** Verify each module's tier has required members; no inference from environment. */
+function assertRepositoryBackend(
+  declarations: readonly DeclaredFeature[],
+  selections: ReadonlyMap<string, RepositorySelection>,
+): void {
+  for (const declaration of declarations) {
+    const selection = selections.get(declaration.name);
+    if (!declaration.repositoryRegistry || !selection) continue;
+    validateRepositorySelection(declaration.repositoryRegistry, selection);
+  }
+}
+
+/** What one feature contributes to the process's doors, or nothing. */
+function declaredTransportsOf(
+  declaration: DeclaredFeature,
+  state: InstalledFeatureState,
+): readonly DeclaredTransports[] {
+  if (declaration.transports.length === 0) return [];
+
+  return [
+    {
+      feature: declaration.name,
+      transports: declaration.transports,
+      provided: () => state.provided,
+      // What the MODULE bound for its own routes, built by its install in this
+      // role. The process binds only its own doors' middleware context and never
+      // re-declares a route to supply a module's.
+      middlewareBindings: state.middlewareBindings ?? [],
+    },
+  ];
+}
+
+/** Every token one feature needs in this role, with the key that names it. */
+function dependenciesFor(
+  declaration: DeclaredFeature,
+  role: ServerRole,
+): readonly (readonly [string, TokenIdentity])[] {
+  const always = Object.entries(declaration.dependencies);
+  const transport = role === "api" ? Object.entries(declaration.transportDependencies) : [];
+  return [...always, ...transport];
+}
+
+/** Only legacy constructor dependencies impose construction order; API clients are preallocated. */
+function orderByDependency(
+  declarations: readonly DeclaredFeature[],
+  providerOf: ReadonlyMap<TokenIdentity, string>,
+  role: ServerRole,
+): readonly DeclaredFeature[] {
+  const byName = new Map(declarations.map((declaration) => [declaration.name, declaration]));
+  const ordered: DeclaredFeature[] = [];
+  const done = new Set<string>();
+  const path: string[] = [];
+
+  const visit = (declaration: DeclaredFeature): void => {
+    if (done.has(declaration.name)) return;
+    if (path.includes(declaration.name)) {
+      throw new DependencyCycleError([
+        ...path.slice(path.indexOf(declaration.name)),
+        declaration.name,
+      ]);
+    }
+    path.push(declaration.name);
+    for (const dependency of constructorDependencies({ declaration, role, providerOf, byName })) {
+      visit(dependency);
+    }
+    path.pop();
+    done.add(declaration.name);
+    ordered.push(declaration);
+  };
+
+  for (const declaration of declarations) visit(declaration);
+  return ordered;
+}
+
+function assertLegacyProviders(declaration: DeclaredFeature): void {
+  const providesApi = declaration.providers.some(
+    (provider) => provider.token instanceof ModuleApiToken,
+  );
+  if (providesApi) {
+    throw new Error(
+      `Feature "${declaration.name}" must provide its API through defineProcessModule().withApi().`,
+    );
+  }
+}
+
+function constructorDependencies({
+  declaration,
+  role,
+  providerOf,
+  byName,
+}: {
+  declaration: DeclaredFeature;
+  role: ServerRole;
+  providerOf: ReadonlyMap<TokenIdentity, string>;
+  byName: ReadonlyMap<string, DeclaredFeature>;
+}): DeclaredFeature[] {
+  const dependencies: DeclaredFeature[] = [];
+  for (const [, token] of dependenciesFor(declaration, role)) {
+    if (token instanceof ModuleApiToken) continue;
+    const provider = providerOf.get(token);
+    const dependency = provider === void 0 ? void 0 : byName.get(provider);
+    if (dependency) dependencies.push(dependency);
+  }
+  return dependencies;
+}
+
+function unavailable(feature: string, role: ServerRole, contribution: string): () => never {
+  return () => {
+    throw new RoleContributionError(feature, role, `${contribution} (unavailable)`);
+  };
+}

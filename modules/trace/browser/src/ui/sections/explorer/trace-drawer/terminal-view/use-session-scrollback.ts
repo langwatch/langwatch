@@ -1,0 +1,459 @@
+import type { TranscriptEntry } from "@langwatch/coding-agent-contract";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+
+import { api } from "../../../../../behavior/trace-api.ts";
+import { useConversationContext } from "../../../../../features/conversation/behavior/use-conversation-context.ts";
+import {
+  CONVERSATION_TURN_CAP,
+  type EarlierTotals,
+  type LoadedTurn,
+  mergeSessionTurns,
+  type ScrollbackStatus,
+  type TurnDivider,
+} from "../../../../../model/coding-agent/trace/terminal-session-scrollback.ts";
+import {
+  type TerminalToolSpan,
+  indexToolSpansBySpanId,
+} from "../../../../../model/coding-agent/trace/terminal-tool-spans.ts";
+import type { ConversationTurn } from "../../../../../model/explorer/conversation-turn.ts";
+
+/**
+ * How many turns `traces.conversationContext` returns. A session longer than
+ * this cannot be walked to its start, and the view says so rather than
+ * pretending the oldest turn it can see is the beginning.
+ */
+
+/** The turn a read is asked for: its trace, and the partition hint. */
+interface TurnTarget {
+  traceId: string;
+  timestamp: number;
+}
+
+/**
+ * What the top of the screen is currently offering.
+ */
+
+interface SessionScrollback {
+  entries: TranscriptEntry[];
+  rowKeys: string[];
+  toolSpans: ReadonlyMap<string, TerminalToolSpan>;
+  turnDividers: ReadonlyMap<number, TurnDivider>;
+  status: ScrollbackStatus;
+  /** Turns of the session still older than the oldest one loaded. */
+  earlierCount: number;
+  /**
+   * Totals of those unloaded earlier turns, from the session's turn list, so the bottom
+   * bar can count the whole session up to the reader's position. Loading a turn moves
+   * its share from here into the loaded entries, so the sum the bar shows stays put.
+   */
+  earlierTotals: EarlierTotals | null;
+  /** When the session's first turn started; null without a walkable session. */
+  sessionStartAtMs: number | null;
+  loadEarlier: () => void;
+}
+
+/**
+ * Read one turn of the session: its transcript, and the tool spans that carry what its
+ * tools actually did.
+ */
+async function readTurn({
+  utils,
+  projectId,
+  tenantId,
+  target,
+}: {
+  utils: ReturnType<typeof api.useUtils>;
+  projectId: string;
+  /** The member the drawer is on, on an aggregate; its session's turns. */
+  tenantId: string | null;
+  target: TurnTarget;
+}): Promise<LoadedTurn> {
+  const input = {
+    projectId,
+    traceId: target.traceId,
+    occurredAtMs: target.timestamp,
+    ...(tenantId !== null ? { tenantId } : {}),
+  };
+  const [transcript, spans, events] = await Promise.all([
+    utils.codingAgents.transcript.fetch(input),
+    utils.traces.spansFull.fetch(input).catch(() => []),
+    utils.traces.traceEvents.fetch(input).catch(() => []),
+  ]);
+
+  return {
+    traceId: target.traceId,
+    timestamp: target.timestamp,
+    entries: transcript.entries,
+    toolSpans: indexToolSpansBySpanId({ spans, events }),
+  };
+}
+
+/** The turns in memory, and what the last read of one did. */
+interface Ledger {
+  /** Which trace of which session this ledger was built for. */
+  key: string;
+  /** Oldest first, all strictly older than the opened turn. */
+  turns: LoadedTurn[];
+  phase: "idle" | "loading" | "error";
+}
+
+/** The prior ledger when it was built for this key, else a fresh one. */
+function ledgerFor(prev: Ledger, key: string): Ledger {
+  return prev.key === key ? prev : { key, turns: [], phase: "idle" };
+}
+
+/**
+ * What the top of the screen offers, from what is known about the session. An opened
+ * turn the list does not carry has no history to walk: on a full page that means the
+ * session runs past what the list reaches, otherwise the trace simply has no siblings.
+ */
+function deriveStatus({
+  hasSession,
+  conversationId,
+  turnCount,
+  isTurnListLoading,
+  phase,
+  earlierCount,
+}: {
+  hasSession: boolean;
+  conversationId: string | null;
+  turnCount: number;
+  /** The session's turn list read is still in flight. */
+  isTurnListLoading: boolean;
+  phase: Ledger["phase"];
+  earlierCount: number;
+}): ScrollbackStatus {
+  if (!hasSession) {
+    if (conversationId && isTurnListLoading) return "pending";
+    return conversationId && turnCount >= CONVERSATION_TURN_CAP ? "unavailable" : "hidden";
+  }
+  if (phase === "loading") return "loading";
+  if (phase === "error") return "error";
+  return earlierCount === 0 ? "start" : "available";
+}
+
+/**
+ * Read the target turn and commit it onto the ledger, unless the reader moved
+ * to another trace while the read was in flight, in which case the resolution
+ * belongs to a ledger that no longer exists and is dropped.
+ */
+async function loadTurnIntoLedger({
+  utils,
+  projectId,
+  tenantId,
+  target,
+  key,
+  epoch,
+  epochRef,
+  setLedger,
+}: {
+  utils: ReturnType<typeof api.useUtils>;
+  projectId: string;
+  tenantId: string | null;
+  target: TurnTarget;
+  key: string;
+  epoch: number;
+  epochRef: { current: number };
+  setLedger: (update: (prev: Ledger) => Ledger) => void;
+}): Promise<void> {
+  try {
+    const loaded = await readTurn({ utils, projectId, tenantId, target });
+    if (epochRef.current !== epoch) return;
+    setLedger((prev) => ({
+      key,
+      turns: [loaded, ...ledgerFor(prev, key).turns],
+      phase: "idle",
+    }));
+  } catch {
+    if (epochRef.current !== epoch) return;
+    setLedger((prev) => ({
+      key,
+      turns: ledgerFor(prev, key).turns,
+      phase: "error",
+    }));
+  }
+}
+
+/**
+ * The ledger of earlier turns for one opened trace, and the one way to grow
+ * it. Owns the state, the in-flight guard and the epoch that drops reads
+ * resolving after the reader moved to another trace.
+ */
+function useTurnLedger({
+  projectId,
+  tenantId,
+  traceId,
+  conversationId,
+}: {
+  projectId: string;
+  tenantId: string | null;
+  traceId: string;
+  conversationId: string | null | undefined;
+}): { current: Ledger; loadTurn: (target: TurnTarget) => void } {
+  const utils = api.useUtils();
+  const key = ledgerKeyOf({ projectId, traceId, conversationId, tenantId });
+  const [ledger, setLedger] = useState<Ledger>(() => ({
+    key,
+    turns: [],
+    phase: "idle",
+  }));
+  // A ledger built for another trace is not this trace's history. Ignoring it
+  // here, rather than clearing it from an effect, keeps the wrong session's
+  // turns from rendering for the frame before the effect runs.
+  const current = useMemo<Ledger>(() => ledgerFor(ledger, key), [ledger, key]);
+
+  // A read that resolves after the reader moved on belongs to a ledger that no
+  // longer exists; it is dropped rather than committed onto the new one.
+  const epochRef = useRef(0);
+  useEffect(
+    () => () => {
+      epochRef.current += 1;
+    },
+    [key],
+  );
+  const inFlightRef = useRef(false);
+
+  const loadTurn = useCallback(
+    (target: TurnTarget) => {
+      if (inFlightRef.current) return;
+      inFlightRef.current = true;
+      const epoch = epochRef.current;
+      setLedger((prev) => ({
+        key,
+        turns: ledgerFor(prev, key).turns,
+        phase: "loading",
+      }));
+      void loadTurnIntoLedger({
+        utils,
+        projectId,
+        tenantId,
+        target,
+        key,
+        epoch,
+        epochRef,
+        setLedger,
+      }).finally(() => {
+        inFlightRef.current = false;
+      });
+    },
+    [utils, key, projectId, tenantId],
+  );
+
+  return { current, loadTurn };
+}
+
+/**
+ * The loaded turns and the opened one, merged into the flat shape the view
+ * renders. Memoized on exactly what the merge reads, so a scroll or status
+ * change never rebuilds the rows.
+ */
+function useMergedTurns({
+  current,
+  opened,
+  turnCount,
+  firstTurnNumber,
+}: {
+  current: Ledger;
+  opened: LoadedTurn;
+  turnCount: number;
+  firstTurnNumber: number;
+}) {
+  return useMemo(
+    () =>
+      mergeSessionTurns([...current.turns, opened], {
+        turnCount,
+        firstTurnNumber,
+      }),
+    [current.turns, opened, turnCount, firstTurnNumber],
+  );
+}
+
+/** What the tab knows about the turn it opened on. */
+interface SessionScrollbackInput {
+  projectId: string;
+  /**
+   * On an aggregate, the member the drawer is on: the session's earlier turns
+   * are that member's. Null on a plain project, whose reads are unchanged.
+   */
+  tenantId: string | null;
+  traceId: string;
+  occurredAtMs?: number;
+  /** The agent's session id, which is the conversation these turns share. */
+  conversationId: string | null;
+  openedTranscript: TranscriptEntry[];
+  openedToolSpans: ReadonlyMap<string, TerminalToolSpan>;
+}
+
+/**
+ * Where the opened turn sits in the session, and how far back the loaded window already
+ * reaches.
+ */
+function useSessionPosition({
+  turns,
+  traceId,
+  conversationId,
+  loadedCount,
+}: {
+  turns: ConversationTurn[];
+  traceId: string;
+  conversationId: string | null;
+  /** Earlier turns already on the ledger. */
+  loadedCount: number;
+}): { openedIndex: number; hasSession: boolean; oldestLoadedIndex: number } {
+  const openedIndex = useMemo(
+    () => turns.findIndex((turn) => turn.traceId === traceId),
+    [turns, traceId],
+  );
+  const hasSession = Boolean(conversationId) && openedIndex >= 0;
+  return {
+    openedIndex,
+    hasSession,
+    oldestLoadedIndex: hasSession ? Math.max(openedIndex - loadedCount, 0) : 0,
+  };
+}
+
+/**
+ * The opened turn as a ledger entry, stable while its parts are, so the merge
+ * below it does not rebuild on every render.
+ */
+function useOpenedTurn({ traceId, timestamp, entries, toolSpans }: LoadedTurn): LoadedTurn {
+  return useMemo(
+    () => ({ traceId, timestamp, entries, toolSpans }),
+    [traceId, timestamp, entries, toolSpans],
+  );
+}
+
+/**
+ * What the bottom bar counts from the turns above the loaded window.
+ */
+
+/**
+ * The sum, or null when one of the values is absent. A turn that carries no
+ * total is not a turn that counted for nothing, so a sum that skips it is not a
+ * total at all.
+ */
+function sumOrNull(values: (number | null | undefined)[]): number | null {
+  let sum = 0;
+  for (const value of values) {
+    if (value == null) return null;
+    sum += value;
+  }
+  return sum;
+}
+
+/**
+ * Where the bottom bar counts from: the totals of the turns above the loaded window,
+ * and the session's own start.
+ */
+function useSessionBaseline({
+  hasSession,
+  turns,
+  oldestLoadedIndex,
+}: {
+  hasSession: boolean;
+  turns: ConversationTurn[];
+  oldestLoadedIndex: number;
+}): {
+  earlierTotals: EarlierTotals | null;
+  sessionStartAtMs: number | null;
+} {
+  const earlierTotals = useMemo(() => {
+    if (!hasSession) return null;
+    const earlier = turns.slice(0, oldestLoadedIndex);
+    return {
+      tokens: sumOrNull(earlier.map((turn) => turn.totalTokens)),
+      costUsd: sumOrNull(earlier.map((turn) => turn.totalCost)),
+    };
+  }, [hasSession, turns, oldestLoadedIndex]);
+
+  return {
+    earlierTotals,
+    sessionStartAtMs: hasSession ? (turns[0]?.timestamp ?? null) : null,
+  };
+}
+
+/**
+ * Which trace of which session, on which member, a ledger is built for. The
+ * member is appended only on an aggregate, so a plain project's key is as it
+ * was.
+ */
+function ledgerKeyOf({
+  projectId,
+  traceId,
+  conversationId,
+  tenantId,
+}: {
+  projectId: string;
+  traceId: string;
+  conversationId: string | null | undefined;
+  tenantId: string | null;
+}): string {
+  const base = `${projectId}|${traceId}|${conversationId ?? ""}`;
+  return tenantId === null ? base : `${base}|${tenantId}`;
+}
+
+/**
+ * The session behind the opened turn, read backwards on demand.
+ */
+export function useSessionScrollback(input: SessionScrollbackInput): SessionScrollback {
+  const { traceId, occurredAtMs, conversationId, openedTranscript } = input;
+  const { turns, isLoading: isTurnListLoading } = useConversationContext(conversationId, traceId);
+  const { current, loadTurn } = useTurnLedger(input);
+
+  const { openedIndex, hasSession, oldestLoadedIndex } = useSessionPosition({
+    turns,
+    traceId,
+    conversationId,
+    loadedCount: current.turns.length,
+  });
+  const earlierCount = oldestLoadedIndex;
+
+  const status = deriveStatus({
+    hasSession,
+    conversationId,
+    turnCount: turns.length,
+    isTurnListLoading,
+    phase: current.phase,
+    earlierCount,
+  });
+
+  const opened = useOpenedTurn({
+    traceId,
+    timestamp: turns[openedIndex]?.timestamp ?? occurredAtMs ?? openedTranscript[0]?.atMs ?? 0,
+    entries: openedTranscript,
+    toolSpans: input.openedToolSpans,
+  });
+
+  const merged = useMergedTurns({
+    current,
+    opened,
+    turnCount: turns.length,
+    firstTurnNumber: oldestLoadedIndex + 1,
+  });
+
+  const { earlierTotals, sessionStartAtMs } = useSessionBaseline({
+    hasSession,
+    turns,
+    oldestLoadedIndex,
+  });
+
+  const loadEarlier = useCallback(() => {
+    if (!hasSession) return;
+    const target = turns[oldestLoadedIndex - 1];
+    if (!target) return;
+    if (current.turns.some((turn) => turn.traceId === target.traceId)) return;
+    loadTurn(target);
+  }, [hasSession, oldestLoadedIndex, turns, current.turns, loadTurn]);
+
+  return useMemo(
+    () => ({
+      ...merged,
+      status,
+      earlierCount,
+      earlierTotals,
+      sessionStartAtMs,
+      loadEarlier,
+    }),
+    [merged, status, earlierCount, earlierTotals, sessionStartAtMs, loadEarlier],
+  );
+}

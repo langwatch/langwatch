@@ -59,15 +59,15 @@ func TestExtractFindsMarkdownAndHTMLLinks(t *testing.T) {
 
 func TestClassifyIgnoresWhatCannotBeResolved(t *testing.T) {
 	for target, want := range map[string]linkcheck.Kind{
-		"#section":                       linkcheck.Ignored,
-		"mailto:security@langwatch.ai":   linkcheck.Ignored,
-		"http://localhost:5560":          linkcheck.Ignored,
-		"https://docs.langwatch.ai/x":    linkcheck.URL,
-		"/LICENSE.md":                    linkcheck.RepoPath,
-		"platform/app/ee/LICENSE.md":     linkcheck.RepoPath,
-		"/platform/app/ee/":              linkcheck.RepoPath,
-		"tel:+310000000":                 linkcheck.Ignored,
-		"https://langwatch.ai/pricing#x": linkcheck.URL,
+		"#section":                         linkcheck.Ignored,
+		"mailto:security@langwatch.ai":     linkcheck.Ignored,
+		"http://localhost:5560":            linkcheck.Ignored,
+		"https://docs.langwatch.ai/x":      linkcheck.URL,
+		"/LICENSE.md":                      linkcheck.RepoPath,
+		"packages/handled-error/README.md": linkcheck.RepoPath,
+		"/apps/api/src/":                   linkcheck.RepoPath,
+		"tel:+310000000":                   linkcheck.Ignored,
+		"https://langwatch.ai/pricing#x":   linkcheck.URL,
 	} {
 		if got := linkcheck.Classify(target); got != want {
 			t.Errorf("Classify(%q) = %v, want %v", target, got, want)
@@ -272,15 +272,15 @@ func targetsOf(links []linkcheck.Link) []string {
 // @scenario "A relative link to a path that no longer exists fails the check"
 func TestRunFailsOnARelativeLinkToAnAbsentPath(t *testing.T) {
 	checker := linkcheck.Checker{RepoRoot: t.TempDir()}
-	document := "[gone](/platform/app/ee/LICENSE.md)"
+	document := "[gone](/apps/api/LICENSE.md)"
 
 	results := checker.Run(t.Context(), "README.md", document)
 
-	missing := verdictOf(t, results, "/platform/app/ee/LICENSE.md")
+	missing := verdictOf(t, results, "/apps/api/LICENSE.md")
 	if missing.Verdict != linkcheck.Dead {
 		t.Errorf("got %v, want Dead", missing.Verdict)
 	}
-	if !strings.Contains(missing.Detail, "platform/app/ee/LICENSE.md") {
+	if !strings.Contains(missing.Detail, "apps/api/LICENSE.md") {
 		t.Errorf("want the offending path reported, got %q", missing.Detail)
 	}
 }

@@ -1,6 +1,7 @@
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
+
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // The two login-flow entry points are the seam: project login goes through
@@ -31,21 +32,19 @@ const saveConfig = vi.fn();
 vi.mock("@/cli/utils/governance/config", () => ({
   loadConfig: () => loadConfig(),
   saveConfig: (...args: unknown[]) => saveConfig(...args),
-  isLoggedIn: (cfg: { access_token?: string } | undefined) =>
-    !!cfg?.access_token,
+  isLoggedIn: (cfg: { access_token?: string } | undefined) => !!cfg?.access_token,
 }));
 
-// The slug path's server boundary: POST /api/auth/cli/project-key.
-const fetchProjectKeyBySlug = vi.fn();
+// The slug path's server boundary: a forked project session minting the full-access key.
+const mintProjectFullAccessKey = vi.fn();
 vi.mock("@/cli/utils/governance/session-api", async () => {
-  const actual = await vi.importActual<
-    typeof import("@/cli/utils/governance/session-api")
-  >("@/cli/utils/governance/session-api");
+  const actual = await vi.importActual<typeof sessionApiModule>(
+    "@/cli/utils/governance/session-api",
+  );
   return {
     SessionApiError: actual.SessionApiError,
     fetchPersonalProject: vi.fn(),
-    fetchProjectKeyBySlug: (...args: unknown[]) =>
-      fetchProjectKeyBySlug(...args),
+    mintProjectFullAccessKey: (...args: unknown[]) => mintProjectFullAccessKey(...args),
   };
 });
 
@@ -54,6 +53,8 @@ vi.mock("@/cli/utils/identityNotice", () => ({
   rememberProjectName: vi.fn(),
   maybePrintIdentityNotice: vi.fn(async () => undefined),
 }));
+
+import type * as sessionApiModule from "@/cli/utils/governance/session-api";
 
 import { loginCommand } from "../login";
 
@@ -98,7 +99,7 @@ describe("loginCommand", () => {
     beforeEach(() => setTTY(false));
 
     describe("when the command is invoked with no flags", () => {
-      /** @scenario `langwatch login` (no flags, NON-TTY) defaults to project login, never AI-tools */
+      /** @scenario "`langwatch login` (no flags, NON-TTY) defaults to project login, never AI-tools" */
       it("keeps the project-login default but fails fast instead of polling a browser", async () => {
         await expect(loginCommand({})).rejects.toThrow("process.exit(1)");
 
@@ -127,9 +128,7 @@ describe("loginCommand", () => {
     it("fails fast with every non-interactive path forward, never starting the poll", async () => {
       const errorSpy = console.error as unknown as ReturnType<typeof vi.fn>;
 
-      await expect(loginCommand({ project: true })).rejects.toThrow(
-        "process.exit(1)",
-      );
+      await expect(loginCommand({ project: true })).rejects.toThrow("process.exit(1)");
 
       expect(runUnifiedLoginFlow).not.toHaveBeenCalled();
       const printed = errorSpy.mock.calls.flat().join("\n");
@@ -147,13 +146,14 @@ describe("loginCommand", () => {
           control_plane_url: "https://app.langwatch.ai",
           access_token: "lw_at_x",
         } as never);
-        fetchProjectKeyBySlug.mockResolvedValue({
+        mintProjectFullAccessKey.mockResolvedValue({
           api_key: "sk-lw-project",
+          kind: "full-access",
           project: { id: "p1", slug: "checkout", name: "Checkout" },
         });
       });
 
-      /** @scenario `langwatch login --project <slug>` resolves the key through the device session, no browser */
+      /** @scenario "`langwatch login --project <slug>` resolves the key through the device session, no browser" */
       it("resolves the key through the session, writes .env, never opens a browser", async () => {
         // The slug path writes LANGWATCH_API_KEY into $CWD/.env; run it in a
         // scratch directory so the repo's own .env is never touched.
@@ -163,7 +163,7 @@ describe("loginCommand", () => {
         try {
           await loginCommand({ project: "checkout" });
 
-          expect(fetchProjectKeyBySlug).toHaveBeenCalledWith(
+          expect(mintProjectFullAccessKey).toHaveBeenCalledWith(
             expect.objectContaining({ access_token: "lw_at_x" }),
             "checkout",
           );
@@ -171,6 +171,53 @@ describe("loginCommand", () => {
           expect(promptsMock).not.toHaveBeenCalled();
           expect(fs.readFileSync(path.join(dir, ".env"), "utf8")).toContain(
             "LANGWATCH_API_KEY=sk-lw-project",
+          );
+        } finally {
+          process.chdir(cwd);
+          fs.rmSync(dir, { recursive: true, force: true });
+        }
+      });
+
+      /** @scenario `langwatch login --project <slug>` writes a full-access key */
+      it("says it saved the project's API key", async () => {
+        const cwd = process.cwd();
+        const dir = fs.mkdtempSync(path.join(os.tmpdir(), "lw-login-"));
+        process.chdir(dir);
+        try {
+          await loginCommand({ project: "checkout" });
+
+          const printed = (console.log as unknown as ReturnType<typeof vi.fn>).mock.calls
+            .flat()
+            .join("\n");
+          expect(printed).toContain("API key for project");
+          expect(printed).not.toContain("Ingestion key");
+        } finally {
+          process.chdir(cwd);
+          fs.rmSync(dir, { recursive: true, force: true });
+        }
+      });
+
+      /** @scenario A person who cannot manage the project gets an ingestion key and is told so */
+      it("says an ingestion key only sends traces, and how to get one that does more", async () => {
+        mintProjectFullAccessKey.mockResolvedValue({
+          api_key: "sk-lw-ingest",
+          kind: "ingestion",
+          project: { id: "p1", slug: "checkout", name: "Checkout" },
+        });
+        const cwd = process.cwd();
+        const dir = fs.mkdtempSync(path.join(os.tmpdir(), "lw-login-"));
+        process.chdir(dir);
+        try {
+          await loginCommand({ project: "checkout" });
+
+          const printed = (console.log as unknown as ReturnType<typeof vi.fn>).mock.calls
+            .flat()
+            .join("\n");
+          expect(printed).toContain("Ingestion key for project");
+          expect(printed).toContain("only sends traces");
+          expect(printed).toContain("project:manage");
+          expect(fs.readFileSync(path.join(dir, ".env"), "utf8")).toContain(
+            "LANGWATCH_API_KEY=sk-lw-ingest",
           );
         } finally {
           process.chdir(cwd);
@@ -188,11 +235,9 @@ describe("loginCommand", () => {
         });
         const errorSpy = console.error as unknown as ReturnType<typeof vi.fn>;
 
-        await expect(loginCommand({ project: "checkout" })).rejects.toThrow(
-          "process.exit(1)",
-        );
+        await expect(loginCommand({ project: "checkout" })).rejects.toThrow("process.exit(1)");
 
-        expect(fetchProjectKeyBySlug).not.toHaveBeenCalled();
+        expect(mintProjectFullAccessKey).not.toHaveBeenCalled();
         const printed = errorSpy.mock.calls.flat().join("\n");
         expect(printed).toContain("langwatch login");
         expect(printed).toContain("--api-key");
@@ -210,6 +255,37 @@ describe("loginCommand", () => {
         expect(runDeviceFlowLogin).toHaveBeenCalledTimes(1);
         expect(runUnifiedLoginFlow).not.toHaveBeenCalled();
       });
+
+      /** @scenario A plain CLI login does not ask for management access */
+      it("does not ask for management access", async () => {
+        await loginCommand({ device: true });
+
+        expect(runDeviceFlowLogin).toHaveBeenCalledWith(
+          expect.objectContaining({ management: false }),
+        );
+      });
+    });
+
+    describe("when the command is invoked with --device --management", () => {
+      /** @scenario A CLI login with --management asks for management access */
+      it("asks the device login for management access", async () => {
+        await loginCommand({ device: true, management: true });
+
+        expect(runDeviceFlowLogin).toHaveBeenCalledWith(
+          expect.objectContaining({ management: true }),
+        );
+      });
+    });
+  });
+
+  describe("given --management with a project login", () => {
+    it("refuses, since only the device login key can carry management access", async () => {
+      await expect(loginCommand({ project: "checkout", management: true })).rejects.toThrow(
+        ProcessExitError,
+      );
+
+      expect(runDeviceFlowLogin).not.toHaveBeenCalled();
+      expect(mintProjectFullAccessKey).not.toHaveBeenCalled();
     });
   });
 
@@ -231,9 +307,7 @@ describe("loginCommand", () => {
     });
 
     const warningsFrom = (): string =>
-      (console.error as unknown as ReturnType<typeof vi.fn>).mock.calls
-        .flat()
-        .join("\n");
+      (console.error as unknown as ReturnType<typeof vi.fn>).mock.calls.flat().join("\n");
 
     /** @scenario "Logging in against a local instance says the machine's global config now points there" */
     it("warns that the global config now points local, and names the isolation env vars", async () => {
@@ -305,12 +379,9 @@ describe("loginCommand", () => {
         await loginCommand({});
 
         const firstCall = promptsMock.mock.calls[0]![0] as {
-          choices: Array<{ value: string }>;
+          choices: { value: string }[];
         };
-        expect(firstCall.choices.map((c) => c.value)).toEqual([
-          "cloud",
-          "self-hosted",
-        ]);
+        expect(firstCall.choices.map((c) => c.value)).toEqual(["cloud", "self-hosted"]);
       });
     });
 
@@ -348,14 +419,10 @@ describe("loginCommand", () => {
         await loginCommand({});
 
         const call = promptsMock.mock.calls[0]![0] as {
-          choices: Array<{ value: string; title: string }>;
+          choices: { value: string; title: string }[];
           initial?: number;
         };
-        expect(call.choices.map((c) => c.value)).toEqual([
-          "keep",
-          "self-hosted",
-          "cloud",
-        ]);
+        expect(call.choices.map((c) => c.value)).toEqual(["keep", "self-hosted", "cloud"]);
         expect(call.choices[0]!.title).toContain("http://localhost:5560");
         expect(call.initial).toBe(0);
       });

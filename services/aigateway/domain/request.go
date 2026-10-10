@@ -89,16 +89,49 @@ func (r *Request) ModelBodyPath() string {
 	return "model"
 }
 
-// TranscriptionUpload is the normalized content of a /v1/audio/transcriptions
-// multipart form: the audio file plus the OpenAI-wire optional parameters.
+// FormField is one text part of a multipart form, as the caller sent it.
+type FormField struct {
+	Name  string
+	Value string
+}
+
+// TranscriptionUpload is the normalized content of an audio transcription
+// multipart form: the audio and every text part beside it.
 type TranscriptionUpload struct {
 	File     []byte
 	Filename string
-	// Params holds the optional string form fields exactly as received
-	// (language, prompt, response_format, temperature). The dispatcher maps
-	// them onto the provider request; unknown fields are dropped by the
-	// router rather than forwarded blind.
+	// Params holds the first value of each text part, keyed by the part name
+	// without any "[]" suffix. It serves the dispatchers that map named
+	// fields onto a provider request.
 	Params map[string]string
+	// Fields holds every text part except the model, in the order and under
+	// the names the caller sent them, repeated parts included. A dispatcher
+	// that speaks the caller's wire forwards them as they are.
+	Fields []FormField
+}
+
+// Values returns every value sent under name or under name[], in order.
+func (u *TranscriptionUpload) Values(name string) []string {
+	var values []string
+	for _, f := range u.Fields {
+		if f.Name == name || f.Name == name+"[]" {
+			values = append(values, f.Value)
+		}
+	}
+	return values
+}
+
+// Streams reports whether the caller asked for the transcript as an event
+// stream.
+func (u *TranscriptionUpload) Streams() bool {
+	if u == nil {
+		return false
+	}
+	switch u.Params["stream"] {
+	case "true", "True", "TRUE", "1":
+		return true
+	}
+	return false
 }
 
 // ImageEditUpload is the normalized content of a /v1/images/edits multipart
@@ -159,38 +192,6 @@ type Surface struct {
 func GeminiSurface() Surface {
 	return Surface{Name: "/v1beta", Providers: []ProviderID{ProviderGemini, ProviderVertex}}
 }
-
-// RequestType classifies the inbound endpoint.
-type RequestType string
-
-const (
-	RequestTypeChat       RequestType = "chat"
-	RequestTypeMessages   RequestType = "messages"
-	RequestTypeEmbeddings RequestType = "embeddings"
-	RequestTypeResponses  RequestType = "responses"
-	// RequestTypePassthrough routes the body verbatim to the provider's
-	// native HTTP endpoint. Used for Gemini-native /v1beta paths where
-	// the inbound shape (Google GenAI SDK, gemini-cli) doesn't match any
-	// of the OpenAI/Anthropic-family schemas Bifrost exposes through its
-	// typed entry points.
-	RequestTypePassthrough RequestType = "passthrough"
-	// RequestTypeSpeech is POST /v1/audio/speech (OpenAI-wire TTS). The
-	// response body is binary audio, not JSON.
-	RequestTypeSpeech RequestType = "speech"
-	// RequestTypeTranscription is POST /v1/audio/transcriptions
-	// (OpenAI-wire multipart STT).
-	RequestTypeTranscription RequestType = "transcription"
-	// RequestTypeImageGeneration is POST /v1/images/generations
-	// (OpenAI-wire image generation). Non-streaming only.
-	RequestTypeImageGeneration RequestType = "image_generation"
-	// RequestTypeImageEdit is POST /v1/images/edits (OpenAI-wire multipart
-	// image edit). Non-streaming only.
-	RequestTypeImageEdit RequestType = "image_edit"
-	// RequestTypeRealtimeSession mints a vendor session credential for a
-	// realtime voice socket the gateway does not carry (ADR-097). Its spend
-	// record is admitted here and closed later, by the vendor's own report.
-	RequestTypeRealtimeSession RequestType = "realtime_session"
-)
 
 // RequestMetadata holds extracted fields for policy evaluation (guardrails, blocked patterns).
 type RequestMetadata struct {

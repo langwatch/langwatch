@@ -1,0 +1,140 @@
+@unit
+Feature: The project.* browser namespace is served by the application the composition builds
+  As somebody signed in to a project
+  I want the project screens to answer
+  So that I can change settings, archive a project and ask for topics
+
+  # The sibling of specs/projects/projects-management-door.feature, for the
+  # tRPC door rather than the REST one, and for the same defect: the namespace
+  # is declared against a witness interface (`ProjectBrowserApi`) that nothing
+  # in the composition implements. Boot hands a door the operations-only proxy
+  # over its module's application, so a member the door names and the
+  # application does not serve is not caught at the seam — it is a TypeError on
+  # the first access, which the boundary degrades to a generic "unknown".
+  # apidiff never saw this family, because apidiff probes REST only.
+  #
+  # These scenarios are bound to tests that build the REAL ProjectModule over its
+  # own repository interface and reach it through that same proxy.
+  #
+  # The scenarios below drive each procedure through the INSTALLED module
+  # on the production tRPC runtime (door audit 2026-09-24). Each failed first
+  # with "exposes operations only: <member> is not callable".
+
+  Scenario: creating a project answers with the new project's slug
+    Given the project module installed over memory repositories
+    When somebody creates a project into a new team
+    Then they are answered with the slug of the project created
+
+  # The door moved to traces.getFieldRedactionStatus with the protections' owner (CD-2,
+  # T2b 2026-10-08): modules/trace/specs/trace-viewer-protection.feature.
+  Scenario: the redaction status is read from traces, not project
+    Given the project module installed over memory repositories
+    When somebody reads the field redaction status on the project namespace
+    Then they are answered as for a procedure that does not exist
+
+  # Project records the creation as a fact; Langy mints from its own side, so project never
+  # names Langy (peer cycle cut, ARCHITECTURE.md §5 and §9).
+  Scenario: creating a project provisions Langy's virtual key from Langy's side
+    Given project has recorded a project somebody created
+    When Langy hears the creation
+    Then it mints the project's gateway key on the creator's behalf
+
+  Scenario: a project with no creator or recorded by a backfill gets no Langy key on creation
+    Given project has recorded a personal workspace's project or a backfilled one
+    When Langy hears the creation
+    Then it mints nothing, and the first chat mints the key instead
+
+  Scenario: a Langy key that cannot be minted does not fail the project's creation
+    Given the gateway key cannot be minted for a new project
+    When Langy hears the creation
+    Then the failure is reported and nothing is retried
+
+  # Moves to the onboarding module, its own lane (Alex, 2026-09-24).
+  @unimplemented
+  Scenario: the setup checklist answers for the project
+    Given the project module installed over memory repositories
+    When somebody reads the project's setup checklist
+    Then they are answered with the project's setup counts
+
+  Scenario: The storage secret field is write-only
+    Given somebody who manages an organization whose storage is configured
+    When the settings page opens
+    Then the secret field is empty and says a stored secret is replaced by typing a new one
+
+  @integration
+  Scenario: A blank organization name is refused on the field
+    Given somebody who manages an organization
+    When the organization form is saved with the name cleared
+    Then the name field says it is required, as on main
+    And no organization update is sent
+
+  Scenario: A blank storage secret leaves the stored secret unchanged
+    Given storage settings with a stored secret
+    When the settings form is saved with an endpoint and a key id but a blank secret
+    Then the stored secret is not touched
+
+  Scenario: A first-time storage setup with a blank secret is refused
+    Given storage settings with no stored secret
+    When the settings form is saved with an endpoint and a key id but a blank secret
+    Then the request is refused as invalid
+    And nothing is stored
+
+  Scenario: A new storage secret replaces the stored one
+    Given storage settings with a stored secret
+    When the settings form is saved with a new secret
+    Then the new secret is stored
+
+  Scenario: Clearing the storage settings clears the stored secret
+    Given storage settings with a stored secret
+    When the settings form is saved with every storage field blank
+    Then the stored secret is cleared
+
+  Scenario: A storage secret needs an endpoint and a key id
+    Given somebody saving the settings form
+    When they send a secret without an endpoint and a key id
+    Then the request is refused as invalid
+
+  Scenario: stored-object credentials are written through the deployment's cipher
+    Given somebody signed in to a project
+    When they save stored-object credentials on the settings form
+    Then each credential is stored enciphered by the deployment's own cipher
+
+  Scenario: flipping trace sharing asks the caller's own standing
+    Given somebody who may change a project but not manage it
+    When they flip trace sharing on the settings form
+    Then the request is refused
+    And the project's trace sharing is left as it was
+
+  Scenario: archiving another project is probed on that project
+    Given somebody signed in to one project archiving a different one
+    When the request is served
+    Then their standing is asked about the project being archived
+    And the project is archived only when that answer permits it
+
+  Scenario: A project manager revokes the legacy project key and is shown no key
+    Given a project with a legacy project key
+    And somebody who is an administrator of the project
+    When they ask whether the project still has a legacy key
+    Then the answer is that it does, and carries no part of the key
+    When they revoke the legacy key
+    Then the answer is that it was revoked, and carries no key
+    And the old key no longer resolves to the project
+    And asking again says the project has no legacy key
+    And the revocation is recorded in the audit trail with who did it
+
+  Scenario: Revoking the legacy project key again succeeds and changes nothing a caller can use
+    Given a project whose legacy key was already revoked
+    When an administrator revokes the legacy key again
+    Then the answer is that it was revoked
+    And the project still has no legacy key
+
+  Scenario: A member who is not an admin cannot revoke the project key
+    Given somebody who may change a project but not manage it
+    When they revoke the legacy project key
+    Then the request is refused
+    And the legacy key still resolves to the project
+
+  Scenario: A member who is not an admin cannot read the legacy key status
+    Given somebody who may change a project but not manage it
+    When they ask whether the project still has a legacy key
+    Then the request is refused

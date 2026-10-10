@@ -5,10 +5,6 @@ import httpx
 from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.get_api_webhooks_v1_events_response_200 import GetApiWebhooksV1EventsResponse200
-from ...models.get_api_webhooks_v1_events_response_400 import GetApiWebhooksV1EventsResponse400
-from ...models.get_api_webhooks_v1_events_response_401 import GetApiWebhooksV1EventsResponse401
-from ...models.get_api_webhooks_v1_events_response_403 import GetApiWebhooksV1EventsResponse403
-from ...models.get_api_webhooks_v1_events_response_500 import GetApiWebhooksV1EventsResponse500
 from ...types import UNSET, Response, Unset, safe_http_status
 
 
@@ -46,38 +42,11 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> (
-    GetApiWebhooksV1EventsResponse200
-    | GetApiWebhooksV1EventsResponse400
-    | GetApiWebhooksV1EventsResponse401
-    | GetApiWebhooksV1EventsResponse403
-    | GetApiWebhooksV1EventsResponse500
-    | None
-):
+) -> GetApiWebhooksV1EventsResponse200 | None:
     if response.status_code == 200:
         response_200 = GetApiWebhooksV1EventsResponse200.from_dict(response.json())
 
         return response_200
-
-    if response.status_code == 400:
-        response_400 = GetApiWebhooksV1EventsResponse400.from_dict(response.json())
-
-        return response_400
-
-    if response.status_code == 401:
-        response_401 = GetApiWebhooksV1EventsResponse401.from_dict(response.json())
-
-        return response_401
-
-    if response.status_code == 403:
-        response_403 = GetApiWebhooksV1EventsResponse403.from_dict(response.json())
-
-        return response_403
-
-    if response.status_code == 500:
-        response_500 = GetApiWebhooksV1EventsResponse500.from_dict(response.json())
-
-        return response_500
 
     if client.raise_on_unexpected_status:
         raise errors.UnexpectedStatus(response.status_code, response.content)
@@ -87,13 +56,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[
-    GetApiWebhooksV1EventsResponse200
-    | GetApiWebhooksV1EventsResponse400
-    | GetApiWebhooksV1EventsResponse401
-    | GetApiWebhooksV1EventsResponse403
-    | GetApiWebhooksV1EventsResponse500
-]:
+) -> Response[GetApiWebhooksV1EventsResponse200]:
     # LangWatch override: use safe_http_status to tolerate non-IANA status codes
     # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
     # Tracked upstream: https://github.com/openapi-generators/openapi-python-client/pull/1407
@@ -113,18 +76,12 @@ def sync_detailed(
     to: int,
     cursor: str | Unset = UNSET,
     limit: int | Unset = 50,
-) -> Response[
-    GetApiWebhooksV1EventsResponse200
-    | GetApiWebhooksV1EventsResponse400
-    | GetApiWebhooksV1EventsResponse401
-    | GetApiWebhooksV1EventsResponse403
-    | GetApiWebhooksV1EventsResponse500
-]:
+) -> Response[GetApiWebhooksV1EventsResponse200]:
     """List emitted events
 
      The organization's emitted-events log for the request families: cursor-paged, newest first, filter
     by type. `from` and `to` bound the created range in epoch milliseconds, are REQUIRED, and `from`
-    must not be later than `to` — a range that ends before it starts is rejected rather than answered
+    must not be later than `to` - a range that ends before it starts is rejected rather than answered
     with an empty page. They are required because the log is a ranged read over the 13-month spend table
     and an unbounded walk sorts all of it on every page. Webhooks are push over this log, never the only
     copy of it. SERVES `gateway.request.completed` and `gateway.request.settled` ONLY. The governance
@@ -144,7 +101,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[GetApiWebhooksV1EventsResponse200 | GetApiWebhooksV1EventsResponse400 | GetApiWebhooksV1EventsResponse401 | GetApiWebhooksV1EventsResponse403 | GetApiWebhooksV1EventsResponse500]
+        Response[GetApiWebhooksV1EventsResponse200]
     """
 
     kwargs = _get_kwargs(
@@ -170,19 +127,12 @@ def sync(
     to: int,
     cursor: str | Unset = UNSET,
     limit: int | Unset = 50,
-) -> (
-    GetApiWebhooksV1EventsResponse200
-    | GetApiWebhooksV1EventsResponse400
-    | GetApiWebhooksV1EventsResponse401
-    | GetApiWebhooksV1EventsResponse403
-    | GetApiWebhooksV1EventsResponse500
-    | None
-):
+) -> GetApiWebhooksV1EventsResponse200 | None:
     """List emitted events
 
      The organization's emitted-events log for the request families: cursor-paged, newest first, filter
     by type. `from` and `to` bound the created range in epoch milliseconds, are REQUIRED, and `from`
-    must not be later than `to` — a range that ends before it starts is rejected rather than answered
+    must not be later than `to` - a range that ends before it starts is rejected rather than answered
     with an empty page. They are required because the log is a ranged read over the 13-month spend table
     and an unbounded walk sorts all of it on every page. Webhooks are push over this log, never the only
     copy of it. SERVES `gateway.request.completed` and `gateway.request.settled` ONLY. The governance
@@ -202,7 +152,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        GetApiWebhooksV1EventsResponse200 | GetApiWebhooksV1EventsResponse400 | GetApiWebhooksV1EventsResponse401 | GetApiWebhooksV1EventsResponse403 | GetApiWebhooksV1EventsResponse500
+        GetApiWebhooksV1EventsResponse200
     """
 
     return sync_detailed(
@@ -223,18 +173,12 @@ async def asyncio_detailed(
     to: int,
     cursor: str | Unset = UNSET,
     limit: int | Unset = 50,
-) -> Response[
-    GetApiWebhooksV1EventsResponse200
-    | GetApiWebhooksV1EventsResponse400
-    | GetApiWebhooksV1EventsResponse401
-    | GetApiWebhooksV1EventsResponse403
-    | GetApiWebhooksV1EventsResponse500
-]:
+) -> Response[GetApiWebhooksV1EventsResponse200]:
     """List emitted events
 
      The organization's emitted-events log for the request families: cursor-paged, newest first, filter
     by type. `from` and `to` bound the created range in epoch milliseconds, are REQUIRED, and `from`
-    must not be later than `to` — a range that ends before it starts is rejected rather than answered
+    must not be later than `to` - a range that ends before it starts is rejected rather than answered
     with an empty page. They are required because the log is a ranged read over the 13-month spend table
     and an unbounded walk sorts all of it on every page. Webhooks are push over this log, never the only
     copy of it. SERVES `gateway.request.completed` and `gateway.request.settled` ONLY. The governance
@@ -254,7 +198,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[GetApiWebhooksV1EventsResponse200 | GetApiWebhooksV1EventsResponse400 | GetApiWebhooksV1EventsResponse401 | GetApiWebhooksV1EventsResponse403 | GetApiWebhooksV1EventsResponse500]
+        Response[GetApiWebhooksV1EventsResponse200]
     """
 
     kwargs = _get_kwargs(
@@ -278,19 +222,12 @@ async def asyncio(
     to: int,
     cursor: str | Unset = UNSET,
     limit: int | Unset = 50,
-) -> (
-    GetApiWebhooksV1EventsResponse200
-    | GetApiWebhooksV1EventsResponse400
-    | GetApiWebhooksV1EventsResponse401
-    | GetApiWebhooksV1EventsResponse403
-    | GetApiWebhooksV1EventsResponse500
-    | None
-):
+) -> GetApiWebhooksV1EventsResponse200 | None:
     """List emitted events
 
      The organization's emitted-events log for the request families: cursor-paged, newest first, filter
     by type. `from` and `to` bound the created range in epoch milliseconds, are REQUIRED, and `from`
-    must not be later than `to` — a range that ends before it starts is rejected rather than answered
+    must not be later than `to` - a range that ends before it starts is rejected rather than answered
     with an empty page. They are required because the log is a ranged read over the 13-month spend table
     and an unbounded walk sorts all of it on every page. Webhooks are push over this log, never the only
     copy of it. SERVES `gateway.request.completed` and `gateway.request.settled` ONLY. The governance
@@ -310,7 +247,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        GetApiWebhooksV1EventsResponse200 | GetApiWebhooksV1EventsResponse400 | GetApiWebhooksV1EventsResponse401 | GetApiWebhooksV1EventsResponse403 | GetApiWebhooksV1EventsResponse500
+        GetApiWebhooksV1EventsResponse200
     """
 
     return (

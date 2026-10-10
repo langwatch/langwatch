@@ -1,8 +1,10 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+
 import {
   SKILL_TOOL_NAME,
   createSkillExtension,
@@ -14,19 +16,24 @@ import {
 
 type RegisteredTool = {
   name: string;
-  execute: (toolCallId: string, params: unknown) => Promise<{ content: { type: string; text: string }[] }>;
+  execute: (
+    toolCallId: string,
+    params: unknown,
+  ) => Promise<{ content: { type: string; text: string }[] }>;
 };
 
 describe("parseSkillFrontmatter", () => {
   describe("when a SKILL.md with frontmatter", () => {
     it("reads name and description", () => {
       expect(
-        parseSkillFrontmatter("---\nname: agent-performance\ndescription: Traces and stats\n---\n# Body"),
+        parseSkillFrontmatter(
+          "---\nname: agent-performance\ndescription: Traces and stats\n---\n# Body",
+        ),
       ).toEqual({ name: "agent-performance", description: "Traces and stats" });
     });
 
     it("strips surrounding quotes", () => {
-      expect(parseSkillFrontmatter('---\nname: "quoted"\ndescription: \'also\'\n---\n')).toEqual({
+      expect(parseSkillFrontmatter("---\nname: \"quoted\"\ndescription: 'also'\n---\n")).toEqual({
         name: "quoted",
         description: "also",
       });
@@ -78,7 +85,10 @@ describe("listSkills", () => {
       mkdirSync(join(skillsDir, "gamma"));
       writeFileSync(join(skillsDir, "gamma", "SKILL.md"), '---\nname: ""\ndescription: G\n---\n');
       mkdirSync(join(skillsDir, "delta"));
-      writeFileSync(join(skillsDir, "delta", "SKILL.md"), "---\nname: '   '\ndescription: D\n---\n");
+      writeFileSync(
+        join(skillsDir, "delta", "SKILL.md"),
+        "---\nname: '   '\ndescription: D\n---\n",
+      );
 
       expect(listSkills(skillsDir).map((s) => s.name)).toEqual(["delta", "gamma"]);
     });
@@ -95,9 +105,7 @@ describe("listSkills", () => {
 describe("renderSkillInventory", () => {
   it("lists names with descriptions", () => {
     expect(
-      renderSkillInventory([
-        { name: "a", description: "does a", filePath: "/x", baseDir: "/" },
-      ]),
+      renderSkillInventory([{ name: "a", description: "does a", filePath: "/x", baseDir: "/" }]),
     ).toBe("Installed skills:\n- a: does a");
   });
 
@@ -111,13 +119,18 @@ describe("readSkillBody", () => {
   beforeEach(() => {
     skillsDir = mkdtempSync(join(tmpdir(), "langy-skill-body-"));
     mkdirSync(join(skillsDir, "guided-onboarding"));
-    writeFileSync(join(skillsDir, "guided-onboarding", "SKILL.md"), "---\nname: guided-onboarding\n---\n# Body\n");
+    writeFileSync(
+      join(skillsDir, "guided-onboarding", "SKILL.md"),
+      "---\nname: guided-onboarding\n---\n# Body\n",
+    );
   });
   afterEach(() => rmSync(skillsDir, { recursive: true, force: true }));
 
   describe("when the skill is installed", () => {
     it("returns its SKILL.md whole", () => {
-      expect(readSkillBody({ skillsDir, name: "guided-onboarding" })).toBe("---\nname: guided-onboarding\n---\n# Body\n");
+      expect(readSkillBody({ skillsDir, name: "guided-onboarding" })).toBe(
+        "---\nname: guided-onboarding\n---\n# Body\n",
+      );
     });
   });
 
@@ -139,7 +152,10 @@ describe("createSkillExtension", () => {
       "---\nname: guided-onboarding\ndescription: The path\n---\n# Script\n",
     );
     mkdirSync(join(skillsDir, "tracing"));
-    writeFileSync(join(skillsDir, "tracing", "SKILL.md"), "---\nname: tracing\ndescription: Traces\n---\n# Tracing\n");
+    writeFileSync(
+      join(skillsDir, "tracing", "SKILL.md"),
+      "---\nname: tracing\ndescription: Traces\n---\n# Tracing\n",
+    );
   });
   afterEach(() => rmSync(skillsDir, { recursive: true, force: true }));
 
@@ -150,9 +166,9 @@ describe("createSkillExtension", () => {
       registerTool: (tool: RegisteredTool) => tools.set(tool.name, tool),
       on: () => undefined,
     };
-    (createSkillExtension({ skillsDir, refuse }) as { factory: (pi: ExtensionAPI) => void }).factory(
-      pi as unknown as ExtensionAPI,
-    );
+    (
+      createSkillExtension({ skillsDir, refuse }) as { factory: (pi: ExtensionAPI) => void }
+    ).factory(pi as unknown as ExtensionAPI);
     return tools.get(SKILL_TOOL_NAME)!;
   }
 

@@ -1,0 +1,452 @@
+/**
+ * The regression this lane exists to prevent: the application chrome drew a
+ * bare outlet because nothing implemented `NavigationHost`. The chrome must
+ * draw `NavigationShell` over a mounted host that answers the address.
+ * @vitest-environment jsdom
+ */
+
+import {
+  BrowserUiDocumentTitle,
+  UiHostServicesContextProvider,
+  UiFeedback,
+  UiNavigation,
+  UiRoute,
+  UiRpc,
+  UiSession,
+  type UiActiveScope,
+  type UiActor,
+  type UiHostServices,
+  UiScope,
+} from "@langwatch/browser-host/capabilities";
+import { resetGraphicsQualityOverrideForTests } from "@langwatch/browser-host/facilities";
+import type { UiSessionSnapshot } from "@langwatch/browser-host/session";
+import { UiDesignSystemShell } from "@langwatch/browser/outer-providers";
+import type { ProcessWebConfig } from "@langwatch/config/public-app-config";
+import { FrontendFlags } from "@langwatch/feature-flag-contract";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
+import type { ReactNode } from "react";
+import { MemoryRouter, Route, Routes } from "react-router";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import UiAppChrome from "../ui-app-chrome";
+import { loadUiRootHostServices } from "../ui-root-host-services";
+
+const LOADED = await loadUiRootHostServices();
+/** The lent chrome host service stands in for the shell, so the test reads the host alone. */
+const ROOT: typeof LOADED = {
+  ...LOADED,
+  navigationChrome: {
+    ...LOADED.navigationChrome,
+    useNavigationTracking: () => undefined,
+    NavigationShell: ({ children }: { children?: ReactNode }) => (
+      <div data-testid="navigation-shell">{children}</div>
+    ),
+  },
+};
+const PROCESS: ProcessWebConfig = { mode: "test", deployment: "self-hosted", nlp: true };
+const { useOptionalNavigationHost } = ROOT.navigationHost;
+
+const ORGANIZATION_ID = "org_1";
+const PROJECT_ID = "project_1";
+
+const GRAPH = [
+  {
+    id: ORGANIZATION_ID,
+    name: "Acme",
+    presenceEnabled: true,
+    members: [{ role: "ADMIN" }],
+    teams: [
+      {
+        id: "team_1",
+        name: "Platform",
+        members: [{ userId: "user_1" }],
+        projects: [
+          { id: PROJECT_ID, name: "My project", slug: "my-project", presenceEnabled: false },
+        ],
+      },
+    ],
+  },
+];
+
+class GraphRpc extends UiRpc {
+  query(path: string): Promise<unknown> {
+    if (path === "organization.getScopeGraph") return Promise.resolve(GRAPH);
+    return Promise.resolve(null);
+  }
+
+  mutate(): Promise<unknown> {
+    return Promise.resolve(null);
+  }
+
+  subscribe() {
+    return { unsubscribe: () => void 0 };
+  }
+}
+
+class SilentNavigation extends UiNavigation {
+  navigate(): void {}
+  replace(): void {}
+  back(): void {}
+}
+
+class TracesRoute extends UiRoute {
+  reading() {
+    return { params: { project: "my-project" }, query: {} };
+  }
+  setQuery(): void {}
+}
+
+class SilentFeedback extends UiFeedback {
+  succeeded(): void {}
+  warned(): void {}
+  informed(): void {}
+  failed(): void {}
+}
+
+class SignedInScope extends UiScope {
+  activeScope(): UiActiveScope {
+    return { organizationId: ORGANIZATION_ID, projectId: PROJECT_ID };
+  }
+}
+
+class SignedInSession extends UiSession {
+  currentUser(): UiActor {
+    return { id: "user_1", name: "Ada", email: "ada@example.com", image: null };
+  }
+  snapshot(): UiSessionSnapshot {
+    return {
+      session: { status: "authenticated", user: this.currentUser() },
+      scope: {
+        status: "ready",
+        organization: { id: ORGANIZATION_ID },
+        team: undefined,
+        project: undefined,
+      },
+      permissions: {
+        status: "ready",
+        isLoading: false,
+        can: () => false,
+        canInOrganization: () => false,
+      },
+    };
+  }
+  hasPermission(): boolean {
+    return false;
+  }
+  isSettled(): boolean {
+    return true;
+  }
+}
+
+const HOST_SERVICES: UiHostServices = {
+  documentTitle: BrowserUiDocumentTitle.create(),
+  feedback: new SilentFeedback(),
+  navigation: new SilentNavigation(),
+  route: new TracesRoute(),
+  rpc: new GraphRpc(),
+  scope: new SignedInScope(),
+  session: new SignedInSession(),
+};
+
+/** Reads the host the chrome mounted, from a page drawn inside it. */
+function HostProbe() {
+  const host = useOptionalNavigationHost();
+  if (!host) return <div data-testid="probe">no host</div>;
+  return (
+    <div
+      data-testid="probe"
+      data-pathname={host.pathname()}
+      data-project={host.project()?.slug ?? ""}
+      data-loading={String(host.isLoading())}
+      data-organizations={host.organizations().length}
+      data-presence={host.accountMenu()?.presence ? "offered" : "absent"}
+      data-graphics={host.accountMenu()?.graphicsQuality?.label ?? "absent"}
+      data-langy={host.langy() ? "offered" : "absent"}
+      data-flag={JSON.stringify(host.featureFlag(FrontendFlags.release_langy_enabled))}
+    >
+      <button type="button" onClick={() => host.accountMenu()?.graphicsQuality?.set("on")}>
+        reduce graphics
+      </button>
+    </div>
+  );
+}
+
+/** The session answered by the time the graph did, but the scope it resolves has not. */
+class SettlingScope extends UiScope {
+  activeScope(): UiActiveScope {
+    return { organizationId: ORGANIZATION_ID, projectId: null };
+  }
+}
+
+class SettlingSession extends SignedInSession {
+  override isSettled(): boolean {
+    return false;
+  }
+}
+
+function renderChrome(
+  hostServices: UiHostServices = HOST_SERVICES,
+  address: { path: string; pattern: string } = {
+    path: "/my-project/traces",
+    pattern: "/:project/traces",
+  },
+) {
+  return render(
+    <MemoryRouter initialEntries={[address.path]}>
+      <QueryClientProvider
+        client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
+      >
+        <UiHostServicesContextProvider value={hostServices}>
+          <UiDesignSystemShell>
+            <Routes>
+              <Route element={<UiAppChrome rootHostServices={ROOT} process={PROCESS} />}>
+                <Route path={address.pattern} element={<HostProbe />} />
+              </Route>
+            </Routes>
+          </UiDesignSystemShell>
+        </UiHostServicesContextProvider>
+      </QueryClientProvider>
+    </MemoryRouter>,
+  );
+}
+
+/** jsdom answers no media query; the design system asks one on mount. */
+beforeEach(() => {
+  Object.defineProperty(window, "matchMedia", {
+    configurable: true,
+    value: (query: string): MediaQueryList => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+      addListener: () => undefined,
+      removeListener: () => undefined,
+      dispatchEvent: () => false,
+    }),
+  });
+});
+
+afterEach(cleanup);
+
+class CountingRpc extends GraphRpc {
+  calls = 0;
+  override query(path: string): Promise<unknown> {
+    this.calls += 1;
+    return super.query(path);
+  }
+}
+
+class UserSession extends SignedInSession {
+  constructor(private readonly id: string) {
+    super();
+  }
+  override currentUser(): UiActor {
+    return { id: this.id, name: "Ada", email: "ada@example.com", image: null };
+  }
+}
+
+describe("the application chrome", () => {
+  /** @scenario A user switch never shows another user's cache */
+  it("reads the organization graph again, under its own key, when the user changes", async () => {
+    const rpc = new CountingRpc();
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const tree = (session: UiSession) => (
+      <MemoryRouter initialEntries={["/my-project/traces"]}>
+        <QueryClientProvider client={client}>
+          <UiHostServicesContextProvider value={{ ...HOST_SERVICES, rpc, session }}>
+            <UiDesignSystemShell>
+              <Routes>
+                <Route element={<UiAppChrome rootHostServices={ROOT} process={PROCESS} />}>
+                  <Route path="/:project/traces" element={<HostProbe />} />
+                </Route>
+              </Routes>
+            </UiDesignSystemShell>
+          </UiHostServicesContextProvider>
+        </QueryClientProvider>
+      </MemoryRouter>
+    );
+    const view = render(tree(new UserSession("user_1")));
+    await waitFor(() =>
+      expect(screen.getByTestId("probe").getAttribute("data-organizations")).toBe("1"),
+    );
+    const before = rpc.calls;
+
+    view.rerender(tree(new UserSession("user_2")));
+
+    await waitFor(() => expect(rpc.calls).toBeGreaterThan(before));
+  });
+
+  it("draws NavigationShell over a mounted navigation host", async () => {
+    renderChrome();
+
+    await waitFor(() => expect(screen.getByTestId("probe")).toBeTruthy());
+    const shell = screen.getByTestId("navigation-shell");
+    expect(shell.contains(screen.getByTestId("probe"))).toBe(true);
+    expect(screen.getByTestId("probe").getAttribute("data-pathname")).toBe("/my-project/traces");
+  });
+
+  it("answers the workspace graph the shell read", async () => {
+    renderChrome();
+
+    await waitFor(() =>
+      expect(screen.getByTestId("probe").getAttribute("data-project")).toBe("my-project"),
+    );
+  });
+
+  describe("when the session has settled but the graph has not answered", () => {
+    /** @scenario The workspace is still resolving while the organization graph is read */
+    it("reports the workspace as still resolving", async () => {
+      class PendingRpc extends GraphRpc {
+        override query(): Promise<unknown> {
+          return new Promise(() => void 0);
+        }
+      }
+
+      renderChrome({ ...HOST_SERVICES, rpc: new PendingRpc() });
+
+      await waitFor(() => expect(screen.getByTestId("probe")).toBeTruthy());
+      expect(screen.getByTestId("probe").getAttribute("data-loading")).toBe("true");
+      expect(screen.getByTestId("probe").getAttribute("data-organizations")).toBe("0");
+    });
+  });
+
+  describe("when the graph has answered but the session and scope have not settled", () => {
+    /** @scenario "A project address is not called missing while its scope is still settling" */
+    /** @scenario The workspace is still resolving while the session is */
+    it("reports the workspace as still resolving rather than a project that is not there", async () => {
+      renderChrome({
+        ...HOST_SERVICES,
+        scope: new SettlingScope(),
+        session: new SettlingSession(),
+      });
+
+      await waitFor(() =>
+        expect(screen.getByTestId("probe").getAttribute("data-organizations")).toBe("1"),
+      );
+      const probe = screen.getByTestId("probe");
+      expect(probe.getAttribute("data-project")).toBe("");
+      expect(probe.getAttribute("data-loading")).toBe("true");
+    });
+
+    /** @scenario A workspace whose graph has answered has resolved */
+    it("reports the workspace resolved once they have", async () => {
+      renderChrome();
+
+      await waitFor(() =>
+        expect(screen.getByTestId("probe").getAttribute("data-loading")).toBe("false"),
+      );
+    });
+  });
+
+  describe("when the graph refuses the read", () => {
+    class FailingRpc extends GraphRpc {
+      override query(): Promise<unknown> {
+        return Promise.reject(new Error("refused"));
+      }
+    }
+
+    /** @scenario A graph that refused the read is not a graph still reading */
+    it("draws the refusal rather than a chrome still reading", async () => {
+      renderChrome({ ...HOST_SERVICES, rpc: new FailingRpc() });
+
+      await waitFor(() => expect(screen.getByTestId("retry-workspace")).toBeTruthy());
+      expect(screen.queryByTestId("probe")).toBeNull();
+    });
+
+    /** @scenario The landing address says a refused read failed rather than waiting on it */
+    it("says the workspace could not be opened on the landing address", async () => {
+      renderChrome({ ...HOST_SERVICES, rpc: new FailingRpc() }, { path: "/", pattern: "/" });
+
+      await waitFor(() => expect(screen.getByTestId("retry-workspace")).toBeTruthy());
+      expect(screen.getByText(/couldn't open your workspace/i)).toBeTruthy();
+    });
+  });
+
+  it("offers the presence toggle on the surface that broadcasts presence", async () => {
+    renderChrome();
+
+    await waitFor(() =>
+      expect(screen.getByTestId("probe").getAttribute("data-presence")).toBe("offered"),
+    );
+  });
+
+  /** @scenario The avatar menu offers the reduced graphics switch and remembers the pick */
+  it("offers the reduced graphics switch and persists the pick", async () => {
+    resetGraphicsQualityOverrideForTests();
+    renderChrome();
+
+    await waitFor(() =>
+      expect(screen.getByTestId("probe").getAttribute("data-graphics")).toBe("Auto"),
+    );
+    act(() => screen.getByRole("button", { name: "reduce graphics" }).click());
+    await waitFor(() =>
+      expect(screen.getByTestId("probe").getAttribute("data-graphics")).toBe("On"),
+    );
+    resetGraphicsQualityOverrideForTests();
+  });
+
+  it("draws the address bare when no application shell answers, rather than throwing", () => {
+    render(
+      <MemoryRouter initialEntries={["/my-project/traces"]}>
+        <Routes>
+          <Route element={<UiAppChrome rootHostServices={ROOT} process={PROCESS} />}>
+            <Route path="/:project/traces" element={<HostProbe />} />
+          </Route>
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByTestId("probe").textContent).toBe("no host");
+    expect(screen.queryByTestId("navigation-shell")).toBeNull();
+  });
+
+  it("offers no Langy hand-off without the grant, and keeps an unanswered flag pending", async () => {
+    renderChrome();
+
+    await waitFor(() => expect(screen.getByTestId("probe")).toBeTruthy());
+    expect(screen.getByTestId("probe").getAttribute("data-langy")).toBe("absent");
+    expect(screen.getByTestId("probe").getAttribute("data-flag")).toBe(
+      JSON.stringify({ enabled: false, isLoading: true }),
+    );
+  });
+
+  describe("when the workspace read is refused", () => {
+    it("says the workspace could not be opened and offers to try again", async () => {
+      class FailingRpc extends GraphRpc {
+        override query(): Promise<unknown> {
+          return Promise.reject(new Error("the workspace graph refused"));
+        }
+      }
+      const reload = vi.fn();
+      vi.spyOn(window, "location", "get").mockReturnValue(
+        Object.create(window.location, { reload: { value: reload } }),
+      );
+
+      render(
+        <MemoryRouter initialEntries={["/my-project/traces"]}>
+          <QueryClientProvider
+            client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
+          >
+            <UiHostServicesContextProvider value={{ ...HOST_SERVICES, rpc: new FailingRpc() }}>
+              <UiDesignSystemShell>
+                <Routes>
+                  <Route element={<UiAppChrome rootHostServices={ROOT} process={PROCESS} />}>
+                    <Route path="/:project/traces" element={<HostProbe />} />
+                  </Route>
+                </Routes>
+              </UiDesignSystemShell>
+            </UiHostServicesContextProvider>
+          </QueryClientProvider>
+        </MemoryRouter>,
+      );
+
+      const retry = await screen.findByTestId("retry-workspace");
+      expect(screen.getByText("We couldn't open your workspace")).toBeTruthy();
+      expect(screen.queryByTestId("probe")).toBeNull();
+      retry.click();
+      expect(reload).toHaveBeenCalledTimes(1);
+    });
+  });
+});

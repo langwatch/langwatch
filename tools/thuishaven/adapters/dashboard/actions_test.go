@@ -1,0 +1,334 @@
+package dashboard
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"net"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
+
+	"github.com/langwatch/langwatch/tools/thuishaven/domain"
+)
+
+// actionServer is a Server over one live stack, with whichever actions the test
+// wants wired.
+func actionServer(actions Actions) *Server {
+	return New(Config{
+		Stacks: func() []domain.Stack {
+			return []domain.Stack{{Slug: "portless", WorktreeDir: "/repos/wt/portless", LauncherPID: 42}}
+		},
+		SharedURL: func(svc string) string { return "https://" + svc + ".langwatch.localhost" },
+		Actions:   actions,
+	})
+}
+
+// post issues one action request, with the headers a browser on this page sends.
+func post(s *Server, path, body string) *httptest.ResponseRecorder {
+	req := httptest.NewRequest(http.MethodPost, path, strings.NewReader(body))
+	req.Header.Set("Sec-Fetch-Site", "same-origin")
+	rec := httptest.NewRecorder()
+	s.routes().ServeHTTP(rec, req)
+	return rec
+}
+
+// @scenario "A running stack can be restarted from the dashboard"
+func TestRestartFromTheBrowser(t *testing.T) {
+	t.Run("given a live stack and a wired restart", func(t *testing.T) {
+		var got [2]string
+		s := actionServer(Actions{Restart: func(slug, service string) (string, error) {
+			got = [2]string{slug, service}
+			return "app bounced", nil
+		}})
+
+		t.Run("when the button posts", func(t *testing.T) {
+			rec := post(s, "/api/stacks/portless/restart", "")
+			if rec.Code != http.StatusOK {
+				t.Fatalf("status = %d, body %s", rec.Code, rec.Body)
+			}
+			if got[0] != "portless" {
+				t.Errorf("restarted %q, want portless", got[0])
+			}
+			if !strings.Contains(rec.Body.String(), "app bounced") {
+				t.Errorf("the answer should carry what happened, got %s", rec.Body)
+			}
+		})
+
+		t.Run("when a stack nobody registered is named", func(t *testing.T) {
+			if rec := post(s, "/api/stacks/nosuch/restart", ""); rec.Code != http.StatusNotFound {
+				t.Errorf("status = %d, want 404", rec.Code)
+			}
+		})
+	})
+
+	t.Run("given a haven built without the action", func(t *testing.T) {
+		if rec := post(actionServer(Actions{}), "/api/stacks/portless/restart", ""); rec.Code != http.StatusNotImplemented {
+			t.Errorf("status = %d, want 501", rec.Code)
+		}
+	})
+}
+
+// @scenario "A worktree with nothing running can be started from the dashboard"
+func TestStartFromTheBrowser(t *testing.T) {
+	t.Run("given a wired start", func(t *testing.T) {
+		var asked string
+		s := actionServer(Actions{Start: func(dir string) error { asked = dir; return nil }})
+
+		t.Run("when a worktree is started", func(t *testing.T) {
+			rec := post(s, "/api/worktrees/start", `{"dir":"/repos/wt/other"}`)
+			if rec.Code != http.StatusOK {
+				t.Fatalf("status = %d, body %s", rec.Code, rec.Body)
+			}
+			if asked != "/repos/wt/other" {
+				t.Errorf("started %q", asked)
+			}
+		})
+
+		t.Run("when no directory is named", func(t *testing.T) {
+			if rec := post(s, "/api/worktrees/start", `{}`); rec.Code != http.StatusBadRequest {
+				t.Errorf("status = %d, want 400", rec.Code)
+			}
+		})
+	})
+}
+
+// @scenario "Only the dashboard's own page may take a lifecycle action"
+func TestActionsRefuseAnotherOrigin(t *testing.T) {
+	s := actionServer(Actions{
+		Restart: func(string, string) (string, error) { t.Fatal("must not run"); return "", nil },
+		Start:   func(string) error { t.Fatal("must not run"); return nil },
+	})
+
+	t.Run("given a request from a page on another site", func(t *testing.T) {
+		for _, path := range []string{"/api/stacks/portless/restart", "/api/worktrees/start"} {
+			req := httptest.NewRequest(http.MethodPost, path, strings.NewReader(`{"dir":"/x"}`))
+			req.Header.Set("Sec-Fetch-Site", "cross-site")
+			req.Header.Set("Origin", "https://evil.example")
+			rec := httptest.NewRecorder()
+			s.routes().ServeHTTP(rec, req)
+			if rec.Code != http.StatusForbidden {
+				t.Errorf("%s: status = %d, want 403", path, rec.Code)
+			}
+		}
+	})
+
+	t.Run("given a request that says nothing about where it came from", func(t *testing.T) {
+		// Refused rather than trusted: a bare cross-origin POST from a page
+		// carries no Origin for a simple request, and "no header" is exactly
+		// what an attacker's request looks like.
+		req := httptest.NewRequest(http.MethodPost, "/api/worktrees/start", strings.NewReader(`{"dir":"/x"}`))
+		rec := httptest.NewRecorder()
+		s.routes().ServeHTTP(rec, req)
+		if rec.Code != http.StatusForbidden {
+			t.Errorf("status = %d, want 403", rec.Code)
+		}
+	})
+
+	t.Run("given a GET", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/api/stacks/portless/restart", nil)
+		req.Header.Set("Sec-Fetch-Site", "same-origin")
+		rec := httptest.NewRecorder()
+		s.routes().ServeHTTP(rec, req)
+		if rec.Code != http.StatusMethodNotAllowed {
+			t.Errorf("status = %d, want 405", rec.Code)
+		}
+	})
+}
+
+// hubActions reads what /api/hub offers: each stack's restart and each idle
+// worktree's start, the flags apps/haven-web draws its buttons from.
+func hubActions(t *testing.T, config Config) (restart map[string]bool, start map[string]bool) {
+	t.Helper()
+	req := httptest.NewRequest(http.MethodGet, "/api/hub", nil)
+	rec := httptest.NewRecorder()
+	New(config).routes().ServeHTTP(rec, req)
+	var hub hubJSON
+	if err := json.Unmarshal(rec.Body.Bytes(), &hub); err != nil {
+		t.Fatalf("decoding /api/hub: %v", err)
+	}
+	restart, start = map[string]bool{}, map[string]bool{}
+	for i := range hub.Stacks {
+		restart[hub.Stacks[i].Slug] = hub.Stacks[i].CanRestart
+	}
+	for _, wt := range hub.Worktrees {
+		start[wt.Dir] = wt.CanStart
+	}
+	return restart, start
+}
+
+// @scenario "A running stack can be restarted from the dashboard"
+func TestButtonsAppearOnlyWhenWired(t *testing.T) {
+	config := Config{
+		Stacks: func() []domain.Stack {
+			return []domain.Stack{{Slug: "portless", WorktreeDir: "/repos/wt/portless", LauncherPID: 42}}
+		},
+		SharedURL: func(svc string) string { return "https://" + svc + ".langwatch.localhost" },
+		Probes:    Probes{ProcessAlive: func(int) bool { return true }},
+		Extras: func() Extras {
+			return Extras{Worktrees: []WorktreeView{{Slug: "idle", Dir: "/repos/wt/idle", Branch: "main"}}}
+		},
+	}
+
+	t.Run("given a haven with no actions wired", func(t *testing.T) {
+		restart, start := hubActions(t, config)
+		if restart["portless"] || start["/repos/wt/idle"] {
+			t.Errorf("a button nothing is wired to would answer every press with a refusal: restart %v start %v", restart, start)
+		}
+	})
+
+	wired := config
+	wired.Actions = Actions{Restart: func(string, string) (string, error) { return "", nil }, Start: func(string) error { return nil }}
+
+	t.Run("given both actions wired", func(t *testing.T) {
+		restart, start := hubActions(t, wired)
+		if !restart["portless"] {
+			t.Error("a live stack offers restart")
+		}
+		if !start["/repos/wt/idle"] {
+			t.Error("an idle worktree offers start")
+		}
+	})
+
+	t.Run("given a stack whose launcher is gone", func(t *testing.T) {
+		stale := wired
+		stale.Probes = Probes{ProcessAlive: func(int) bool { return false }}
+		if restart, _ := hubActions(t, stale); restart["portless"] {
+			t.Error("bouncing a stack with no launcher would find nothing to signal; that one is started, not restarted")
+		}
+	})
+}
+
+// TestDownAndDestroyFromTheBrowser pins the stack card's Down and Destroy routes.
+func TestDownAndDestroyFromTheBrowser(t *testing.T) {
+	var downed, destroyed string
+	s := actionServer(Actions{
+		Down:    func(_ context.Context, slug string) error { downed = slug; return nil },
+		Destroy: func(_ context.Context, slug string) error { destroyed = slug; return nil },
+	})
+
+	if rec := post(s, "/api/stacks/portless/down", ""); rec.Code != http.StatusOK || downed != "portless" {
+		t.Errorf("down: status %d, downed %q", rec.Code, downed)
+	}
+	if rec := post(s, "/api/stacks/portless/destroy", `{"confirm":"other"}`); rec.Code != http.StatusBadRequest || destroyed != "" {
+		t.Errorf("destroy without the typed slug: status %d, destroyed %q", rec.Code, destroyed)
+	}
+	if rec := post(s, "/api/stacks/portless/destroy", `{"confirm":"portless"}`); rec.Code != http.StatusOK || destroyed != "portless" {
+		t.Errorf("destroy with the typed slug: status %d, destroyed %q", rec.Code, destroyed)
+	}
+	if rec := post(s, "/api/stacks/nosuch/destroy", `{"confirm":"nosuch"}`); rec.Code != http.StatusNotFound {
+		t.Errorf("unknown stack: status %d, want 404", rec.Code)
+	}
+	if rec := post(actionServer(Actions{}), "/api/stacks/portless/down", ""); rec.Code != http.StatusNotImplemented {
+		t.Errorf("unwired down: status %d, want 501", rec.Code)
+	}
+}
+
+// @scenario "A service the stack does not run is started from its row"
+func TestStartServiceFromTheBrowser(t *testing.T) {
+	var slug, service string
+	s := actionServer(Actions{StartService: func(sl, svc string) error { slug, service = sl, svc; return nil }})
+
+	if rec := post(s, "/api/stacks/portless/start-service?service=mail", ""); rec.Code != http.StatusOK || slug != "portless" || service != "mail" {
+		t.Errorf("start-service: status %d, slug %q, service %q", rec.Code, slug, service)
+	}
+	if rec := post(s, "/api/stacks/nosuch/start-service?service=mail", ""); rec.Code != http.StatusNotFound {
+		t.Errorf("unknown stack: status %d, want 404", rec.Code)
+	}
+	if rec := post(actionServer(Actions{}), "/api/stacks/portless/start-service?service=mail", ""); rec.Code != http.StatusNotImplemented {
+		t.Errorf("unwired start-service: status %d, want 501", rec.Code)
+	}
+}
+
+// @scenario "A stack whose database is below the upgrade floor can reset its databases from the stack home"
+func TestResetDatabasesFromTheBrowser(t *testing.T) {
+	var reset string
+	s := actionServer(Actions{ResetDatabases: func(sl string) error { reset = sl; return nil }})
+
+	if rec := post(s, "/api/stacks/portless/reset-databases", `{"confirm":"portless"}`); rec.Code != http.StatusBadRequest || reset != "" {
+		t.Errorf("reset with the slug instead of the database name: status %d, reset %q", rec.Code, reset)
+	}
+	confirm := `{"confirm":"` + domain.DatabaseForSlug("portless") + `"}`
+	if rec := post(s, "/api/stacks/portless/reset-databases", confirm); rec.Code != http.StatusOK || reset != "portless" {
+		t.Errorf("reset with the database name: status %d, reset %q", rec.Code, reset)
+	}
+	if rec := post(s, "/api/stacks/nosuch/reset-databases", confirm); rec.Code != http.StatusNotFound {
+		t.Errorf("unknown stack: status %d, want 404", rec.Code)
+	}
+	if rec := post(actionServer(Actions{}), "/api/stacks/portless/reset-databases", confirm); rec.Code != http.StatusNotImplemented {
+		t.Errorf("unwired reset: status %d, want 501", rec.Code)
+	}
+}
+
+// @scenario "The daemon refuses to start a keeper for a stack it does not know"
+func TestStartKeeperRoute(t *testing.T) {
+	var started []string
+	s := actionServer(Actions{StartKeeper: func(_ context.Context, slug string) error {
+		started = append(started, slug)
+		return nil
+	}})
+	daemon := httptest.NewServer(s.routes())
+	defer daemon.Close()
+	port := daemon.Listener.Addr().(*net.TCPAddr).Port
+
+	t.Run("the CLI client starts a known stack's keeper", func(t *testing.T) {
+		if err := (Client{}).StartKeeper(context.Background(), port, "portless"); err != nil {
+			t.Fatal(err)
+		}
+		if len(started) != 1 || started[0] != "portless" {
+			t.Errorf("started %v", started)
+		}
+	})
+
+	t.Run("an unknown slug is a 404 and starts nothing", func(t *testing.T) {
+		if rec := post(s, "/api/stacks/nosuch/start", ""); rec.Code != http.StatusNotFound {
+			t.Errorf("status = %d, want 404", rec.Code)
+		}
+		if err := (Client{}).StartKeeper(context.Background(), port, "nosuch"); err == nil || !strings.Contains(err.Error(), "404") {
+			t.Errorf("client err = %v, want the 404", err)
+		}
+		if len(started) != 1 {
+			t.Errorf("started %v", started)
+		}
+	})
+
+	t.Run("a refusal from the app layer reaches the CLI", func(t *testing.T) {
+		refusing := httptest.NewServer(actionServer(Actions{StartKeeper: func(context.Context, string) error {
+			return errors.New(`stack "portless" is not waiting for a keeper`)
+		}}).routes())
+		defer refusing.Close()
+		err := (Client{}).StartKeeper(context.Background(), refusing.Listener.Addr().(*net.TCPAddr).Port, "portless")
+		if err == nil || !strings.Contains(err.Error(), "not waiting for a keeper") {
+			t.Errorf("err = %v", err)
+		}
+	})
+
+	t.Run("a daemon without the route is named as such", func(t *testing.T) {
+		old := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			_, _ = w.Write([]byte("<!doctype html>"))
+		}))
+		defer old.Close()
+		err := (Client{}).StartKeeper(context.Background(), old.Listener.Addr().(*net.TCPAddr).Port, "portless")
+		if err == nil || !strings.Contains(err.Error(), "haven daemon restart") {
+			t.Errorf("err = %v", err)
+		}
+	})
+}
+
+// @scenario "A page on the app's origin cannot start a keeper"
+func TestStartKeeperRefusesTheAppOrigin(t *testing.T) {
+	s := actionServer(Actions{StartKeeper: func(context.Context, string) error { t.Fatal("must not run"); return nil }})
+	req := httptest.NewRequest(http.MethodPost, "/api/stacks/portless/start", nil)
+	req.Host = "portless.langwatch.localhost"
+	req.Header.Set("Sec-Fetch-Site", "same-site")
+	req.Header.Set("Origin", "https://app.portless.langwatch.localhost")
+	rec := httptest.NewRecorder()
+	s.routes().ServeHTTP(rec, req)
+	if rec.Code != http.StatusForbidden {
+		t.Errorf("status = %d, want 403", rec.Code)
+	}
+	if rec := (orbCall{http.MethodOptions, "/api/stacks/portless/start", "https://app.portless.langwatch.localhost", ""}).on(s); rec.Header().Get("Access-Control-Allow-Origin") != "" {
+		t.Errorf("preflight allowed the app origin: %v", rec.Header())
+	}
+}

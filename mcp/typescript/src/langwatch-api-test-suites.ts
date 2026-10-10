@@ -1,20 +1,12 @@
-import { makeRequest } from "./langwatch-api.js";
-import type {
-  RunParameters,
-  RunPlanRunResult,
-} from "./langwatch-api-run-plans.js";
-import type { RunPlanTargetWire } from "./schemas/run-plan.js";
-import type {
-  EvaluatorAttachmentWire,
-  SuiteField,
-} from "./schemas/suite-fields.js";
+import type { RunParameters, RunPlanRunResult } from "./langwatch-api-run-plans.ts";
+import { makeRequest } from "./langwatch-api.ts";
+import type { RunPlanTargetWire } from "./schemas/run-plan.ts";
+import type { EvaluatorAttachmentWire, SuiteField } from "./schemas/suite-fields.ts";
 
 /**
- * Client for `/api/v1/test-suites`.
- *
- * A test suite groups scenarios: a name and the scenarios filed in it.
- * Running one is sugar over a run plan, so the run returns the same result a
- * run plan does.
+ * Client for `/api/v1/test-suites`. A test suite groups scenarios by
+ * name; running one is sugar over a run plan, returning the same
+ * result shape.
  */
 
 export interface TestSuite {
@@ -34,7 +26,7 @@ export interface TestSuite {
 }
 
 export interface TestSuiteDetail extends TestSuite {
-  scenarios: Array<{ id: string; name: string }>;
+  scenarios: { id: string; name: string }[];
 }
 
 export interface TestSuiteArchiveResponse {
@@ -53,11 +45,7 @@ export async function createTestSuite(data: {
   fields?: SuiteField[];
   evaluators?: EvaluatorAttachmentWire[];
 }): Promise<TestSuite> {
-  return makeRequest(
-    "POST",
-    "/api/v1/test-suites",
-    data,
-  ) as Promise<TestSuite>;
+  return makeRequest("POST", "/api/v1/test-suites", data) as Promise<TestSuite>;
 }
 
 /** Retrieves a test suite with the scenarios filed in it. */
@@ -87,21 +75,14 @@ export async function updateTestSuite(params: {
 }
 
 /** Renames a test suite. */
-export async function renameTestSuite(params: {
-  id: string;
-  name: string;
-}): Promise<TestSuite> {
-  return makeRequest(
-    "PATCH",
-    `/api/v1/test-suites/${encodeURIComponent(params.id)}`,
-    { name: params.name },
-  ) as Promise<TestSuite>;
+export async function renameTestSuite(params: { id: string; name: string }): Promise<TestSuite> {
+  return makeRequest("PATCH", `/api/v1/test-suites/${encodeURIComponent(params.id)}`, {
+    name: params.name,
+  }) as Promise<TestSuite>;
 }
 
 /** Archives a test suite and the scenarios filed in it. */
-export async function archiveTestSuite(
-  id: string,
-): Promise<TestSuiteArchiveResponse> {
+export async function archiveTestSuite(id: string): Promise<TestSuiteArchiveResponse> {
   return makeRequest(
     "DELETE",
     `/api/v1/test-suites/${encodeURIComponent(id)}`,

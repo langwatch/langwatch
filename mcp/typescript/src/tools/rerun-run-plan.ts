@@ -1,8 +1,5 @@
-import {
-  rerunRunPlan as apiRerunRunPlan,
-  type RunParameters,
-} from "../langwatch-api-run-plans.js";
-import { formatRunPlanRun } from "./format-run-plan.js";
+import { rerunRunPlan as apiRerunRunPlan, type RunParameters } from "../langwatch-api-run-plans.ts";
+import { formatRunPlanRun } from "./format-run-plan.ts";
 
 /**
  * Handles the platform_rerun_run_plan MCP tool invocation.

@@ -1,15 +1,9 @@
-/**
- * The `test-suite` commands.
- *
- * A test suite is a group of scenarios: a name and the scenarios filed in it.
- * It holds no targets, so running one sends them with the request and the
- * platform files the run under a run plan.
- *
- * Spec: specs/features/test-suite-cli.feature
- */
+// Test the test-suite commands; a suite is scenarios sent with the request.
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { stdoutDocuments } from "../../../utils/__tests__/stdout-documents";
+
 import { TestSuitesApiError } from "@/client-sdk/services/test-suites";
+
+import { stdoutDocuments } from "../../../utils/__tests__/stdout-documents";
 import { AGENT_MODE_ENV_VARS } from "../../../utils/output";
 
 const listSpy = vi.hoisted(() => vi.fn());
@@ -50,13 +44,13 @@ vi.mock("ora", () => ({
   }),
 }));
 
-import { listTestSuitesCommand } from "../list";
+import { archiveTestSuiteCommand } from "../archive";
 import { createTestSuiteCommand } from "../create";
 import { getTestSuiteCommand } from "../get";
+import { listTestSuitesCommand } from "../list";
 import { renameTestSuiteCommand } from "../rename";
-import { updateTestSuiteCommand } from "../update";
-import { archiveTestSuiteCommand } from "../archive";
 import { runTestSuiteCommand } from "../run";
+import { updateTestSuiteCommand } from "../update";
 
 class ProcessExitError extends Error {
   constructor(public code: number) {
@@ -104,9 +98,7 @@ let savedAgentEnv: Record<string, string | undefined> = {};
 
 beforeEach(() => {
   vi.clearAllMocks();
-  savedAgentEnv = Object.fromEntries(
-    AGENT_MODE_ENV_VARS.map((name) => [name, process.env[name]]),
-  );
+  savedAgentEnv = Object.fromEntries(AGENT_MODE_ENV_VARS.map((name) => [name, process.env[name]]));
   for (const name of AGENT_MODE_ENV_VARS) delete process.env[name];
   listSpy.mockResolvedValue([makeSuite()]);
   createSpy.mockResolvedValue(makeSuite({ scenarioIds: [], scenarioCount: 0 }));
@@ -179,9 +171,7 @@ describe("listTestSuitesCommand()", () => {
 
   describe("when the API call fails", () => {
     it("exits with code 1", async () => {
-      listSpy.mockRejectedValue(
-        new TestSuitesApiError("Network error", "list test suites"),
-      );
+      listSpy.mockRejectedValue(new TestSuitesApiError("Network error", "list test suites"));
 
       await expect(listTestSuitesCommand()).rejects.toThrow(ProcessExitError);
     });
@@ -359,9 +349,7 @@ describe("updateTestSuiteCommand()", () => {
       });
 
       expect(updateSpy).toHaveBeenCalledWith("suite_abc", {
-        evaluators: [
-          expect.objectContaining({ evaluatorId: "evaluator_sql", required: true }),
-        ],
+        evaluators: [expect.objectContaining({ evaluatorId: "evaluator_sql", required: true })],
       });
     });
   });
@@ -369,18 +357,14 @@ describe("updateTestSuiteCommand()", () => {
   describe("when nothing is given", () => {
     /** @scenario "An update with nothing to change is refused" */
     it("refuses before sending anything", async () => {
-      await expect(updateTestSuiteCommand("Refunds")).rejects.toThrow(
-        ProcessExitError,
-      );
+      await expect(updateTestSuiteCommand("Refunds")).rejects.toThrow(ProcessExitError);
       expect(updateSpy).not.toHaveBeenCalled();
     });
   });
 
   describe("when the suite does not exist", () => {
     it("refuses before patching anything", async () => {
-      await expect(
-        updateTestSuiteCommand("Nope", { name: "x" }),
-      ).rejects.toThrow(ProcessExitError);
+      await expect(updateTestSuiteCommand("Nope", { name: "x" })).rejects.toThrow(ProcessExitError);
       expect(updateSpy).not.toHaveBeenCalled();
     });
   });
@@ -454,9 +438,7 @@ describe("getTestSuiteCommand()", () => {
     it("refuses and points at the listing", async () => {
       listSpy.mockResolvedValue([]);
 
-      await expect(getTestSuiteCommand("nonexistent-id")).rejects.toThrow(
-        ProcessExitError,
-      );
+      await expect(getTestSuiteCommand("nonexistent-id")).rejects.toThrow(ProcessExitError);
 
       const reported = vi.mocked(console.error).mock.calls.flat().join("\n");
       expect(reported).toContain("not found");
@@ -467,14 +449,9 @@ describe("getTestSuiteCommand()", () => {
   describe("when two suites share the name", () => {
     /** @scenario "Get a name two test suites share" */
     it("refuses, naming both IDs", async () => {
-      listSpy.mockResolvedValue([
-        makeSuite({ id: "suite_1" }),
-        makeSuite({ id: "suite_2" }),
-      ]);
+      listSpy.mockResolvedValue([makeSuite({ id: "suite_1" }), makeSuite({ id: "suite_2" })]);
 
-      await expect(getTestSuiteCommand("Refunds")).rejects.toThrow(
-        ProcessExitError,
-      );
+      await expect(getTestSuiteCommand("Refunds")).rejects.toThrow(ProcessExitError);
 
       const reported = vi.mocked(console.error).mock.calls.flat().join("\n");
       expect(reported).toContain("suite_1");
@@ -513,9 +490,7 @@ describe("archiveTestSuiteCommand()", () => {
     it("refuses before archiving anything", async () => {
       listSpy.mockResolvedValue([]);
 
-      await expect(archiveTestSuiteCommand("nonexistent-id")).rejects.toThrow(
-        ProcessExitError,
-      );
+      await expect(archiveTestSuiteCommand("nonexistent-id")).rejects.toThrow(ProcessExitError);
 
       expect(archiveSpy).not.toHaveBeenCalled();
     });
@@ -591,9 +566,9 @@ describe("runTestSuiteCommand()", () => {
   describe("when no target is given", () => {
     /** @scenario "Run a test suite with no target" */
     it("refuses before anything is scheduled", async () => {
-      await expect(
-        runTestSuiteCommand({ reference: "suite_abc", options: {} }),
-      ).rejects.toThrow(ProcessExitError);
+      await expect(runTestSuiteCommand({ reference: "suite_abc", options: {} })).rejects.toThrow(
+        ProcessExitError,
+      );
 
       expect(runSpy).not.toHaveBeenCalled();
     });
@@ -739,9 +714,7 @@ describe("runTestSuiteCommand()", () => {
 
       // The spec says no OTHER line reaches stdout: the spy on the raw
       // stream is what catches a write that bypasses `console.log`.
-      const stdoutWrite = vi
-        .spyOn(process.stdout, "write")
-        .mockImplementation(() => true);
+      const stdoutWrite = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
       vi.useFakeTimers();
       try {
         const promise = runTestSuiteCommand({
@@ -783,9 +756,7 @@ describe("runTestSuiteCommand()", () => {
 
   describe("when the API call fails", () => {
     it("exits with code 1", async () => {
-      runSpy.mockRejectedValue(
-        new TestSuitesApiError("Not found", 'run test suite "suite_abc"'),
-      );
+      runSpy.mockRejectedValue(new TestSuitesApiError("Not found", 'run test suite "suite_abc"'));
 
       await expect(
         runTestSuiteCommand({
