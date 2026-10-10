@@ -31,6 +31,17 @@ one row per simulator with whether it runs in this stack, its console URL, the
 OTLP traffic:
 `haven telemetry send|load|fuzz|status|stop`.
 
+Forced errors: `haven llm|analytics|mail|storage set --error <0|4xx|5xx>` makes that sim
+refuse calls (llm: generation; analytics: captures; mail: SMTP sends; storage: PUT/GET
+object); `--error 0` clears it. `haven browser click <ref> --download-to <path>` saves the
+download a click starts and prints its name, size and mediaType as JSON.
+
+Second factors are mfasim, which lives in the `haven browser` daemon rather than a Go
+service: `haven mfa add|list|remove|uv` attaches Chromium virtual passkeys, security keys
+and U2F tokens to a lane's page, and `haven mfa totp enroll|fill [--wrong]` reads a TOTP
+secret off the enrolment page into the lane's state (mode 600) and types codes from it.
+No verb prints the secret or a code. Skill: `.claude/skills/mfasim/SKILL.md`.
+
 In a checkout whose dev build links the simulators (`cmd/service/combined_dev.go`),
 with `LANGWATCH_DEV_ONE_PROCESS=0` every selected simulator runs in the `sims` lane: a second `service combined`
 process beside the `go` lane, which keeps only the gateway and the NLP engine. A
@@ -411,21 +422,52 @@ machinery itself is intact and tested (`seedPreset.ingest`, `runSeedIngest`,
 `ingestPlaySeed`); it is the seam those seeds return through, and every
 shipped preset's list is empty until they do.
 
-**Keyed API calls.** `haven api <METHOD> <path> [--body file|-] [--header k:v]
-[--json] [--stack slug]` calls this stack's REST API (`LANGWATCH_API_URL`, the
-loopback API port) as the seeded project, sending the seeded project key
-(`HAVEN_SEED_LANGWATCH_API_KEY`) as `X-Auth-Token`. The key never prints: the
-output is the status line, the response headers with `Authorization`,
-`Set-Cookie` and `X-Auth-Token` redacted, and the body, and any echo of the key
-in a header or the body becomes `<redacted>`. `haven api whoami` names the
-project and the key, never its value. Only the seeded `local-dev-project` has a
-key haven holds; `--project` naming another is refused. The key is shared by
-every stack on the machine, so there is no `key rotate`: set
+**Keyed API calls.** `haven api <METHOD> <path> [--key project|org|personal]
+[--project slug] [--body file|-] [--header k:v] [--json] [--stack slug]` calls
+this stack's REST API (`LANGWATCH_API_URL`, the loopback API port) with a key
+haven holds, sent as `X-Auth-Token`:
+
+- `--key project` (the default) is the seeded project key
+  (`HAVEN_SEED_LANGWATCH_API_KEY`) for `local-dev-project`. With `--project
+  <slug>` naming another project, haven mints a service key bound to that one
+  project through `POST /api/api-keys`.
+- `--key org` is a service key over the whole organization, minted once through
+  `POST /api/api-keys` as the seeded admin.
+- `--key personal` is the seeded admin's personal access token
+  (`LANGWATCH_PRIVATE_ACCESS_TOKEN`, organization ADMIN).
+- With `org` or `personal`, `--project <slug>` sends that project's
+  `X-Project-Id`.
+
+Minted keys are held in `~/.langwatch/portless/keys/<slug>.json` (mode 600) and
+reused; a held key the stack answers 401 to (a reseed or reset) is minted again
+once. No key ever prints: the output is the status line, the response headers
+with `Authorization`, `Set-Cookie` and `X-Auth-Token` redacted, and the body,
+and any echo of any key haven knows becomes `<redacted>`, errors included.
+`haven api whoami [--key kind] [--project slug]` names the key's principal and
+scope, never its value. An unknown `--key` is refused. The seeded key is shared
+by every stack on the machine, so there is no `key rotate`: set
 `LANGWATCH_LOCAL_API_KEY` and reseed to change it.
 
 ```bash
 haven api GET /api/prompts --json
+haven api GET /api/api-keys --key org
+haven api whoami --key personal
 echo '{"name":"x"}' | haven api POST /api/datasets --body -
+```
+
+**Gateway calls.** `haven gateway <METHOD> <path> [--vk name] [--body file|-]
+[--header k:v] [--json] [--stack slug]` calls this stack's AI gateway (the
+`+gateway` add-on, at `LW_GATEWAY_INTERNAL_URL`) with a virtual key for
+`local-dev-project`, sent as `Authorization: Bearer`. haven mints the key through
+`POST /api/gateway/v1/virtual-keys` with the seeded project key, named
+`haven <name>`, and holds it beside the API keys. `--vk <name>` uses or mints a
+separate named key (default `default`), so a walker can put budgets or policies
+on one key without touching another. The secret never prints.
+
+```bash
+echo '{"model":"openai/gpt-5-mini","messages":[{"role":"user","content":"hi"}]}' \
+  | haven gateway POST /v1/chat/completions --body -
+haven gateway GET /v1/models --vk budget-walk
 ```
 
 **Resource caps.** Everything haven manages is bounded: the ClickHouse

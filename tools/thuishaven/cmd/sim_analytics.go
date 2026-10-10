@@ -13,7 +13,7 @@ import (
 	"github.com/langwatch/langwatch/tools/thuishaven/cmd/viewer/sources"
 )
 
-const analyticsUsage = "usage: haven analytics <status|records [--provider] [--kind] [--event|--name] [--id]|record <id>|clear|wait --event <name> [--timeout]> [--json]"
+const analyticsUsage = "usage: haven analytics <status|records [--provider] [--kind] [--event|--name] [--id]|record <id>|clear|wait --event <name> [--timeout]|set --error <0|4xx|5xx>> [--json]"
 
 // analyticsPollEvery is how often `wait` re-reads the records.
 const analyticsPollEvery = 250 * time.Millisecond
@@ -79,6 +79,8 @@ func analyticsCommand(ctx context.Context, api sources.SimAPI, inv invocation, a
 		return simDone(asJSON, "cleared", "records cleared")
 	case "wait":
 		return analyticsWait(ctx, api, inv, asJSON)
+	case "set":
+		return simSetForcedError(api, "analytics", inv, asJSON)
 	}
 	return fmt.Errorf("unknown `haven analytics` subcommand %q; %s", inv.args[0], analyticsUsage)
 }

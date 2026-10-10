@@ -28,7 +28,7 @@ import (
 // re-signs a lane in when its page lands on sign-in and exits once no lane
 // is left; every command waits on page events, never a fixed sleep.
 
-const browserUsage = "usage: haven browser <open|goto|snapshot|click|hover|drag|upload|fill|select|type|press|screenshot|eval|state-load|record|replay|authenticator|close|status|stop> [args] --lane <name> [--as admin|email]"
+const browserUsage = "usage: haven browser <open|goto|snapshot|click|hover|drag|upload|fill|select|type|press|screenshot|eval|state-load|record|replay|close|status|stop> [args] --lane <name> [--as admin|email]"
 
 // browserStartTimeout bounds the daemon's first line: a cold browser on a loaded machine.
 const browserStartTimeout = 90 * time.Second
@@ -36,7 +36,7 @@ const browserStartTimeout = 90 * time.Second
 func browserSpec() commandSpec {
 	return commandSpec{
 		name:    "browser",
-		summary: "one shared headless browser per stack, a signed-in context per --lane, playwright-cli's verbs: open | goto | snapshot | click | hover | drag | upload | fill | select | type | press | screenshot | eval | state-load | record | replay | authenticator | close | status | stop",
+		summary: "one shared headless browser per stack, a signed-in context per --lane, playwright-cli's verbs: open | goto | snapshot | click | hover | drag | upload | fill | select | type | press | screenshot | eval | state-load | record | replay | close | status | stop",
 		args:    "<verb> [ref|selector|url|text|key|expression|file] [text|file...]",
 		maxArgs: -1,
 		flags: []flagSpec{
@@ -44,14 +44,12 @@ func browserSpec() commandSpec {
 			{long: "--as", takesValue: true, value: "<admin|email>", summary: "sign the lane in as this login (haven auth); omit to stay signed out"},
 			{long: "--wait-for", takesValue: true, value: "<selector>", summary: "also wait for this CSS or text= selector before answering"},
 			{long: "--out", takesValue: true, value: "<file>", summary: "screenshot: where to write the PNG; record stop: where to write the script"},
+			{long: "--download-to", takesValue: true, value: "<path>", summary: "click: save the download the click starts to this file and print its name, size and mediaType as JSON"},
 			{long: "--playwright", takesValue: true, value: "<file>", summary: "record export: where to write the Playwright test"},
 			{long: "--by", takesValue: true, value: "<dx,dy>", summary: "drag: move the element by this many pixels instead of onto a target"},
 			{long: "--grep", takesValue: true, value: "<text>", summary: "snapshot: only nodes whose role or name contain text, plus their ancestors"},
 			{long: "--depth", takesValue: true, value: "<n>", summary: "snapshot: only the first n levels of the tree"},
 			{long: "--max-chars", takesValue: true, value: "<n>", summary: "snapshot: cut after n characters with a truncated footer"},
-			{long: "--kind", takesValue: true, value: "<passkey|security-key|u2f>", summary: "authenticator add: the virtual authenticator to attach (default passkey)"},
-			{long: "--uv", takesValue: true, value: "<yes|no>", summary: "authenticator add: whether it verifies the user (fingerprint or PIN)"},
-			{long: "--resident", takesValue: true, value: "<yes|no>", summary: "authenticator add: whether it keeps discoverable credentials"},
 			{long: "--timeout", takesValue: true, value: "<dur>", summary: "how long a command may wait on the page (default 30s)"},
 			{long: "--json", summary: "machine-readable"},
 			{long: "--stack", takesValue: true, value: "<slug>", summary: "another worktree's stack by slug"},
@@ -84,12 +82,14 @@ func runBrowser(ctx context.Context, d deps, inv invocation) error {
 			return exportScript(inv)
 		}
 	}
-	if verb == "authenticator" {
-		var err error
-		if verb, inv, err = authenticatorVerb(inv); err != nil {
-			return err
-		}
+	if strings.HasPrefix(verb, "mfa-") {
+		return errors.New(browserUsage)
 	}
+	return driveBrowser(ctx, d, verb, inv)
+}
+
+// driveBrowser sends one daemon verb for the lane; `haven mfa` shares it.
+func driveBrowser(ctx context.Context, d deps, verb string, inv invocation) error {
 	slug, err := d.orch.ResolveSlug(authParams(d, inv))
 	if err != nil {
 		return err
@@ -159,7 +159,7 @@ func browserRequest(verb string, inv invocation) (map[string]any, error) {
 	if err := browserExtras(verb, inv, req); err != nil {
 		return nil, err
 	}
-	if err := authenticatorExtras(verb, inv, req); err != nil {
+	if err := mfaExtras(verb, inv, req); err != nil {
 		return nil, err
 	}
 	if err := absolutise(req); err != nil {
@@ -205,7 +205,7 @@ func fillPositionals(verb string, given []string, req map[string]any) error {
 
 // absolutise makes the file and out paths absolute: the daemon runs elsewhere.
 func absolutise(req map[string]any) error {
-	for _, field := range []string{"file", "out"} {
+	for _, field := range []string{"file", "out", "downloadTo"} {
 		if raw, ok := req[field].(string); ok {
 			abs, err := filepath.Abs(raw)
 			if err != nil {
@@ -228,6 +228,12 @@ func browserExtras(verb string, inv invocation, req map[string]any) error {
 	}
 	if verb == "drag" && req["targetRef"] == nil && req["by"] == nil {
 		return errors.New("haven browser drag needs <targetRef> or --by dx,dy")
+	}
+	if to := inv.value("--download-to"); to != "" {
+		if verb != "click" {
+			return errors.New("--download-to is for haven browser click")
+		}
+		req["downloadTo"] = to
 	}
 	if grep := inv.value("--grep"); grep != "" {
 		req["grep"] = grep
@@ -252,7 +258,8 @@ var browserVerbArgs = map[string][]string{
 	"click": {"ref"}, "hover": {"ref"}, "drag": {"ref", "targetRef?"}, "upload": {"ref"}, "fill": {"ref", "text"}, "select": {"ref", "text"}, "type": {"text"}, "press": {"key"},
 	"eval": {"expression"}, "state-load": {"file"},
 	"record-start": nil, "record-stop": nil, "replay": {"file"},
-	"authenticator-add": nil, "authenticator-list": nil, "authenticator-remove": {"authenticatorId"}, "authenticator-uv": {"authenticatorId", "verified"},
+	"mfa-add": nil, "mfa-list": nil, "mfa-remove": {"authenticatorId"}, "mfa-uv": {"authenticatorId", "verified"},
+	"mfa-totp-enroll": {"ref?"}, "mfa-totp-fill": {"ref"},
 }
 
 func printBrowserReply(verb string, reply map[string]any, asJSON bool) error {
@@ -264,21 +271,36 @@ func printBrowserReply(verb string, reply map[string]any, asJSON bool) error {
 		fmt.Printf("- Page URL: %v\n- Page Title: %v\n%v\n", reply["url"], reply["title"], reply["snapshot"])
 	case "screenshot":
 		fmt.Printf("%v\n", reply["file"])
+	case "click":
+		printClick(reply)
 	case "eval":
 		value, _ := json.Marshal(reply["value"])
 		fmt.Println(string(value))
 	case "close":
 		fmt.Println("closed")
-	case "authenticator-add":
+	case "mfa-add":
 		fmt.Println(reply["authenticatorId"])
-	case "authenticator-list":
+	case "mfa-list":
 		printAuthenticators(reply)
-	case "authenticator-remove", "authenticator-uv":
+	case "mfa-remove", "mfa-uv":
 		fmt.Println("ok")
+	case "mfa-totp-enroll":
+		fmt.Printf("enrolled: %v digits every %vs (secret kept by the browser daemon)\n", reply["digits"], reply["period"])
+	case "mfa-totp-fill":
+		fmt.Println("filled")
 	default:
 		fmt.Printf("%v  %v\n", reply["url"], reply["title"])
 	}
 	return nil
+}
+
+// printClick prints a download click's file as JSON, else the page it landed on.
+func printClick(reply map[string]any) {
+	if reply["file"] == nil {
+		fmt.Printf("%v  %v\n", reply["url"], reply["title"])
+		return
+	}
+	_ = json.NewEncoder(os.Stdout).Encode(reply)
 }
 
 // browserControl is `status` and `stop`: they talk to a running daemon and never start one.

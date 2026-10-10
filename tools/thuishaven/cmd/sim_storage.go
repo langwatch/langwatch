@@ -11,7 +11,7 @@ import (
 	"github.com/langwatch/langwatch/tools/thuishaven/cmd/viewer/sources"
 )
 
-const storageUsage = "usage: haven storage <buckets|objects [bucket]|object <bucket> <key> [--raw]|presign <bucket> <key> [--put] [--expires=<s>]|delete <bucket> <key>|clear [bucket]|seed|requests> [--json]"
+const storageUsage = "usage: haven storage <buckets|objects [bucket]|object <bucket> <key> [--raw]|presign <bucket> <key> [--put] [--expires=<s>]|delete <bucket> <key>|clear [bucket]|seed|requests|set --error <0|4xx|5xx>> [--json]"
 
 type storageObject struct {
 	Bucket       string    `json:"bucket"`
@@ -77,6 +77,8 @@ func storageCommand(api sources.SimAPI, inv invocation, asJSON bool) error {
 		return storagePresign(api, inv, asJSON)
 	case "seed":
 		return storageSeed(api, asJSON)
+	case "set":
+		return simSetForcedError(api, "storage", inv, asJSON)
 	case "requests":
 		return simGet(api, "/_sim/api/requests", nil, asJSON, func(v struct{ Requests []storageRequest }) {
 			for _, r := range v.Requests {

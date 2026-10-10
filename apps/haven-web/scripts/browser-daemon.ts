@@ -5,6 +5,7 @@
  */
 import { execFile } from "node:child_process";
 import {
+  chmodSync,
   closeSync,
   existsSync,
   mkdirSync,
@@ -13,9 +14,10 @@ import {
   readSync,
   statSync,
   watch,
+  writeFileSync,
 } from "node:fs";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
-import { basename, dirname, join } from "node:path";
+import { basename, dirname, extname, join } from "node:path";
 import { promisify } from "node:util";
 
 import { chromium, type BrowserContext, type CDPSession, type Page } from "playwright";
@@ -34,6 +36,7 @@ import {
   type Step,
 } from "./browser-record.ts";
 import { filterSnapshot } from "./browser-snapshot.ts";
+import { parseTotp, redactSecrets, totpCode, wrongCode, type Totp } from "./mfa-totp.ts";
 
 const env = (name: string) => {
   const value = process.env[name];
@@ -84,7 +87,7 @@ type Lane = {
   seen: Query[];
   inflight: number;
   recording?: Script;
-  /** The CDP session holding this lane's virtual authenticators; detaching it drops them. */
+  /** The CDP session with the lane's virtual authenticators (haven mfa); closing drops them. */
   webauthn?: CDPSession;
   authenticators: Map<string, { kind: string; userVerified: boolean }>;
 };
@@ -382,6 +385,8 @@ type Request = {
   timeoutMs?: number;
   expression?: string;
   out?: string;
+  /** click: save the download this click starts to this absolute path. */
+  downloadTo?: string;
   ref?: string;
   text?: string;
   key?: string;
@@ -396,7 +401,7 @@ type Request = {
   depth?: number;
   maxChars?: number;
   kind?: string;
-  /** CDP's VirtualAuthenticatorOptions, built by haven (browser_authenticator.go). */
+  /** CDP's VirtualAuthenticatorOptions, built by haven (mfa.go). */
   options?: {
     protocol: "ctap2" | "u2f";
     transport: "usb" | "nfc" | "ble" | "internal";
@@ -407,7 +412,49 @@ type Request = {
   };
   authenticatorId?: string;
   verified?: boolean;
+  /** `haven mfa totp fill --wrong`: type a code no window accepts. */
+  wrong?: boolean;
 };
+
+const MEDIA_TYPES: Record<string, string> = {
+  ".csv": "text/csv",
+  ".json": "application/json",
+  ".jsonl": "application/x-ndjson",
+  ".txt": "text/plain",
+  ".md": "text/markdown",
+  ".html": "text/html",
+  ".pdf": "application/pdf",
+  ".zip": "application/zip",
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".svg": "image/svg+xml",
+  ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+};
+
+/** Click and save the download it starts; the media type comes from the file name's extension. */
+async function clickDownload({
+  page,
+  body,
+  timeout,
+}: {
+  page: Page;
+  body: Request;
+  timeout: number;
+}) {
+  const file = body.downloadTo ?? "";
+  const started = page.waitForEvent("download", { timeout });
+  await targetOf({ page, body }).click({ timeout });
+  const download = await started;
+  mkdirSync(dirname(file), { recursive: true });
+  await download.saveAs(file);
+  const name = download.suggestedFilename();
+  return {
+    file,
+    name,
+    size: statSync(file).size,
+    mediaType: MEDIA_TYPES[extname(name).toLowerCase()] ?? "application/octet-stream",
+  };
+}
 
 type Act = (args: { page: Page; body: Request; timeout: number }) => Promise<unknown>;
 
@@ -420,7 +467,10 @@ const actions: Record<string, Act> = {
     url: page.url(),
     title: await page.title(),
     snapshot: filterSnapshot({
-      text: await page.ariaSnapshot({ mode: "ai", timeout }),
+      text: redactSecrets({
+        text: await page.ariaSnapshot({ mode: "ai", timeout }),
+        secrets: await shownSecrets({ page, lane: body.lane ?? "" }),
+      }),
       grep: body.grep,
       depth: body.depth,
       maxChars: body.maxChars,
@@ -429,10 +479,14 @@ const actions: Record<string, Act> = {
   screenshot: async ({ page, body, timeout }) => {
     const file = body.out ?? join(DIR, `${body.lane}.png`);
     mkdirSync(dirname(file), { recursive: true });
-    await page.screenshot({ path: file, timeout, animations: "disabled" });
+    const mask = (await shownSecrets({ page, lane: "" })).length
+      ? [page.locator(SECRET_SELECTORS), page.getByText(/^([A-Z2-7]{4} ){3,}[A-Z2-7]{1,4}$/)]
+      : [];
+    await page.screenshot({ path: file, timeout, animations: "disabled", mask });
     return { url: page.url(), file };
   },
   click: async ({ page, body, timeout }) => {
+    if (body.downloadTo) return clickDownload({ page, body, timeout });
     await targetOf({ page, body }).click({ timeout });
     return afterInput({ page, timeout });
   },
@@ -483,11 +537,51 @@ const actions: Record<string, Act> = {
     await page.keyboard.press(body.key ?? "");
     return afterInput({ page, timeout });
   },
-  eval: async ({ page, body }) => ({
-    url: page.url(),
-    value: await page.evaluate(body.expression ?? "undefined"),
-  }),
+  eval: async ({ page, body }) => {
+    const value: unknown = await page.evaluate(body.expression ?? "undefined");
+    const secrets = await shownSecrets({ page, lane: body.lane ?? "" });
+    const text = JSON.stringify(value);
+    return {
+      url: page.url(),
+      value: text === undefined ? value : JSON.parse(redactSecrets({ text, secrets })),
+    };
+  },
 };
+
+/** The app's TOTP setup: the scannable code and the setup-key field (two-step-setup-panel.tsx). */
+const SECRET_SELECTORS =
+  '[data-testid="two-factor-scannable-code"], [data-testid="two-factor-shared-secret"]';
+
+/** What could be a TOTP secret on the page: otpauth:// URIs anywhere, then the setup key. */
+function totpOnPage(): string[] {
+  const found = [...document.documentElement.outerHTML.matchAll(/otpauth:\/\/[^\s"'<>]+/g)].map(
+    (match) => match[0].replaceAll("&amp;", "&"),
+  );
+  for (const field of document.querySelectorAll("input, textarea"))
+    if ((field as HTMLInputElement).value.startsWith("otpauth://"))
+      found.push((field as HTMLInputElement).value);
+  const key = document.querySelector<HTMLInputElement>(
+    '[data-testid="two-factor-shared-secret"] input',
+  );
+  if (key?.value) found.push(key.value);
+  return found;
+}
+
+/** Every secret a snapshot, eval or screenshot hides: on the page now, or enrolled on the lane. */
+async function shownSecrets({ page, lane }: { page: Page; lane: string }) {
+  const raw = await page.evaluate(totpOnPage).catch(() => [] as string[]);
+  const secrets = raw.flatMap((text) => parseTotp({ raw: text })?.secret ?? []);
+  const stored = lane ? readTotp({ lane }) : undefined;
+  return stored ? [...secrets, stored.secret] : secrets;
+}
+
+/** Where a lane's TOTP secret lives: the daemon's own state, mode 600, never echoed. */
+const totpFile = ({ lane }: { lane: string }) => join(DIR, "mfa", `${lane}.totp.json`);
+
+function readTotp({ lane }: { lane: string }): Totp | undefined {
+  const file = totpFile({ lane });
+  return existsSync(file) ? (JSON.parse(readFileSync(file, "utf8")) as Totp) : undefined;
+}
 
 /** A snapshot ref (`e12`, `f1e3`) or, failing that, a CSS selector. */
 function locatorFor({ page, ref }: { page: Page; ref: string }) {
@@ -727,23 +821,27 @@ async function recordCommand({
   throw new Error(`unknown verb ${verb}`);
 }
 
-/** `haven browser authenticator`: Chromium's virtual WebAuthn authenticators on the lane's page. */
-async function authenticatorCommand({
+/** `haven mfa`: virtual WebAuthn authenticators and TOTP codes on the lane's page. */
+async function mfaCommand({
   lane,
   verb,
   body,
+  timeout,
 }: {
   lane: Lane;
   verb: string;
   body: Request;
+  timeout: number;
 }) {
+  if (verb === "mfa-totp-enroll") return totpEnroll({ lane, body, timeout });
+  if (verb === "mfa-totp-fill") return withSlot({ run: () => totpFill({ lane, body, timeout }) });
   if (!lane.webauthn) {
     lane.webauthn = await lane.context.newCDPSession(lane.page);
     await lane.webauthn.send("WebAuthn.enable");
   }
   const session = lane.webauthn;
-  if (verb === "authenticator-add") {
-    if (!body.options) throw new Error("authenticator add needs options");
+  if (verb === "mfa-add") {
+    if (!body.options) throw new Error("mfa add needs options");
     const { authenticatorId } = await session.send("WebAuthn.addVirtualAuthenticator", {
       options: body.options,
     });
@@ -751,7 +849,7 @@ async function authenticatorCommand({
     lane.authenticators.set(authenticatorId, { kind: body.kind ?? "passkey", userVerified });
     return { authenticatorId };
   }
-  if (verb === "authenticator-list") {
+  if (verb === "mfa-list") {
     const authenticators = [];
     for (const [id, about] of lane.authenticators) {
       const { credentials } = await session.send("WebAuthn.getCredentials", {
@@ -774,21 +872,65 @@ async function authenticatorCommand({
   const authenticatorId = body.authenticatorId ?? "";
   const about = lane.authenticators.get(authenticatorId);
   if (!about)
-    throw new Error(
-      `lane ${lane.name} has no authenticator ${authenticatorId} (authenticator list)`,
-    );
-  if (verb === "authenticator-remove") {
+    throw new Error(`lane ${lane.name} has no authenticator ${authenticatorId} (haven mfa list)`);
+  if (verb === "mfa-remove") {
     await session.send("WebAuthn.removeVirtualAuthenticator", { authenticatorId });
     lane.authenticators.delete(authenticatorId);
     return { removed: authenticatorId };
   }
-  if (verb === "authenticator-uv") {
+  if (verb === "mfa-uv") {
     const isUserVerified = body.verified === true;
     await session.send("WebAuthn.setUserVerified", { authenticatorId, isUserVerified });
     about.userVerified = isUserVerified;
     return { authenticatorId, userVerified: isUserVerified };
   }
   throw new Error(`unknown verb ${verb}`);
+}
+
+/** Reads the secret off the setup page (a ref, else totpOnPage) into the lane's state. */
+async function totpEnroll({ lane, body, timeout }: { lane: Lane; body: Request; timeout: number }) {
+  const raw = body.ref
+    ? [
+        await targetOf({ page: lane.page, body }).evaluate(
+          (el) =>
+            (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement
+              ? el.value
+              : el.querySelector("input")?.value) ||
+            el.getAttribute("href") ||
+            el.textContent ||
+            "",
+          undefined,
+          { timeout },
+        ),
+      ]
+    : await lane.page.evaluate(totpOnPage);
+  const totp = raw.map((text) => parseTotp({ raw: text })).find(Boolean);
+  if (!totp)
+    throw new Error(
+      "no TOTP secret on this page: open the two-step setup first, or name the ref that shows the key",
+    );
+  const file = totpFile({ lane: lane.name });
+  mkdirSync(dirname(file), { recursive: true, mode: 0o700 });
+  writeFileSync(file, JSON.stringify(totp), { mode: 0o600 });
+  chmodSync(file, 0o600);
+  return { enrolled: lane.name, digits: totp.digits, period: totp.period };
+}
+
+/** Types the current code (or, with --wrong, one no window accepts) without returning it. */
+async function totpFill({ lane, body, timeout }: { lane: Lane; body: Request; timeout: number }) {
+  const totp = readTotp({ lane: lane.name });
+  if (!totp) throw new Error(`lane ${lane.name} has no TOTP secret (haven mfa totp enroll)`);
+  const code = body.wrong
+    ? wrongCode({ totp, now: Date.now() })
+    : totpCode({ totp, now: Date.now() });
+  try {
+    await targetOf({ page: lane.page, body }).fill(code, { timeout });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(message.replaceAll(code, "***"));
+  }
+  await afterInput({ page: lane.page, timeout });
+  return { filled: lane.name, wrong: body.wrong === true };
 }
 
 async function handle({ verb, body }: { verb: string; body: Request }): Promise<unknown> {
@@ -805,12 +947,8 @@ async function handle({ verb, body }: { verb: string; body: Request }): Promise<
     await closeLane({ name });
     return { closed: name };
   }
-  const authenticatorVerb = verb.startsWith("authenticator-");
-  if (
-    !actions[verb] &&
-    !authenticatorVerb &&
-    !["record-start", "record-stop", "replay"].includes(verb)
-  )
+  const mfaVerb = verb.startsWith("mfa-");
+  if (!actions[verb] && !mfaVerb && !["record-start", "record-stop", "replay"].includes(verb))
     throw new Error(`unknown verb ${verb}`);
   if (idled.delete(name) && verb !== "open" && !lanes.has(name))
     throw new Error(`lane ${name} was closed after idling; reopen with open`);
@@ -820,7 +958,7 @@ async function handle({ verb, body }: { verb: string; body: Request }): Promise<
   touch({ lane });
   if (verb === "record-start" || verb === "record-stop" || verb === "replay")
     return recordCommand({ lane, verb, body, timeout });
-  if (authenticatorVerb) return authenticatorCommand({ lane, verb, body });
+  if (mfaVerb) return mfaCommand({ lane, verb, body, timeout });
   return withSlot({ run: () => perform({ lane, verb, body, timeout }) });
 }
 

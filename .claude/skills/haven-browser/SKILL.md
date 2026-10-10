@@ -1,6 +1,6 @@
 ---
 name: haven-browser
-description: "Drive a signed-in headless browser against this worktree's stack with `haven browser`: lanes, --as, snapshots, clicks, forms, screenshots, record and replay, with no password handled by the agent. Use when someone says 'haven browser', 'drive the UI', 'open the app in a browser', 'sign in as admin in the browser', 'snapshot the page', 'screenshot the app', 'browser lane', 'record a flow', 'replay a flow', 'turn a walk into an e2e test', or 'should I use Playwright'. Passkeys and security keys are webauthnsim."
+description: "Drive a signed-in headless browser against this worktree's stack with `haven browser`: lanes, --as, snapshots, clicks, forms, screenshots, record and replay, with no password handled by the agent. Use when someone says 'haven browser', 'drive the UI', 'open the app in a browser', 'sign in as admin in the browser', 'snapshot the page', 'screenshot the app', 'browser lane', 'record a flow', 'replay a flow', 'turn a walk into an e2e test', or 'should I use Playwright'. Passkeys, security keys and TOTP codes are mfasim."
 user-invocable: true
 argument-hint: "[open <url> | snapshot | click <ref> | screenshot | record start|stop | close] --lane <name> --as admin"
 ---
@@ -25,6 +25,7 @@ haven browser snapshot --lane qa-1 --as admin              # accessibility tree 
 haven browser snapshot --grep Save --lane qa-1 --as admin  # only nodes whose role or name contain "Save", plus ancestors
 haven browser snapshot --depth 3 --max-chars 4000 --lane qa-1 --as admin  # first 3 levels; cut with a "truncated" footer
 haven browser click e12 --lane qa-1 --as admin             # a ref from the last snapshot (or a CSS selector)
+haven browser click e12 --download-to /tmp/out/report.csv --lane qa-1 --as admin  # waits for the download the click starts, saves it, prints {"file","name","size","mediaType"}
 haven browser hover e12 --lane qa-1 --as admin             # menus, hover cards, toast stacks
 haven browser drag e12 e30 --lane qa-1 --as admin          # real mouse moves, centre to centre
 haven browser drag e12 --by 120,-40 --lane qa-1 --as admin # or by dx,dy pixels (a node on a canvas)
@@ -41,8 +42,8 @@ haven browser status                                       # the whole browser
 haven browser stop                                         # every lane and the daemon
 ```
 
-Passkeys and security keys: `haven browser authenticator add|list|remove|uv` (`--kind`,
-`--uv`, `--resident`), taught by the `webauthnsim` skill.
+Passkeys, security keys and TOTP codes: `haven mfa add|list|remove|uv|totp` on the same
+`--lane`, taught by the `mfasim` skill.
 
 ## Flags
 

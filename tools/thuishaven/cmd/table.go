@@ -379,10 +379,11 @@ var baseTable = []commandSpec{
 	},
 	{
 		name:    "mail",
-		summary: "read this worktree's caught email: address | inbox | list | get <id> | links <id> | wait | delete <id> | clear",
-		args:    "<address|inbox|list|get|links|wait|delete|clear> [id]",
+		summary: "read this worktree's caught email: address | inbox | list | get <id> | links <id> | wait | delete <id> | clear | set --error <status>",
+		args:    "<address|inbox|list|get|links|wait|delete|clear|set> [id]",
 		maxArgs: 2,
 		flags: []flagSpec{
+			simErrorFlag,
 			{long: "--to", takesValue: true, value: "<addr>", summary: "list/wait: only messages to a matching recipient"},
 			{long: "--subject", takesValue: true, value: "<text>", summary: "list/wait: only messages with a matching subject"},
 			{long: "--timeout", takesValue: true, value: "<dur>", summary: "wait: how long to block for a match (default 30s)"},
@@ -407,10 +408,11 @@ var baseTable = []commandSpec{
 	},
 	{
 		name:    "analytics",
-		summary: "analyticssim's caught PostHog and Customer.io calls: status | records | clear | wait",
-		args:    "<status|records|clear|wait>",
+		summary: "analyticssim's caught PostHog and Customer.io calls: status | records | clear | wait | set --error <status>",
+		args:    "<status|records|clear|wait|set>",
 		maxArgs: 1,
 		flags: simFlags(
+			simErrorFlag,
 			flagSpec{long: "--provider", takesValue: true, value: "<name>", summary: "records/wait: posthog or customerio"},
 			flagSpec{long: "--kind", takesValue: true, value: "<kind>", summary: "records/wait: only this kind of record"},
 			flagSpec{long: "--event", takesValue: true, value: "<name>", summary: "records/wait: only this event name"},
@@ -490,10 +492,11 @@ var baseTable = []commandSpec{
 	},
 	{
 		name:    "storage",
-		summary: "storagesim's S3: buckets | objects [bucket] | object <bucket> <key> [--raw] | presign <bucket> <key> | delete | clear [bucket] | seed | requests",
-		args:    "<buckets|objects|object|presign|delete|clear|seed|requests> [bucket] [key]",
+		summary: "storagesim's S3: buckets | objects [bucket] | object <bucket> <key> [--raw] | presign <bucket> <key> | delete | clear [bucket] | seed | requests | set --error <status>",
+		args:    "<buckets|objects|object|presign|delete|clear|seed|requests|set> [bucket] [key]",
 		maxArgs: 3,
 		flags: simFlags(
+			simErrorFlag,
 			flagSpec{long: "--raw", summary: "object: the stored bytes instead of the metadata"},
 			flagSpec{long: "--put", summary: "presign: a PUT URL instead of a GET"},
 			flagSpec{long: "--expires", takesValue: true, value: "<seconds>", summary: "presign: lifetime, 1..604800 (default 3600)"},
@@ -535,9 +538,11 @@ var baseTable = []commandSpec{
 	querySpec(),
 	seedSpec(),
 	apiSpec(),
+	gatewaySpec(),
 	telemetrySpec(),
 	authSpec(),
 	browserSpec(),
+	mfaSpec(),
 	{
 		name:    "status",
 		summary: "one-shot report: every stack, service health, shared servers, RAM",

@@ -25,6 +25,7 @@ key. Code: `services/storagesim`, console `apps/storagesim-web`.
 GET    /_sim/api/buckets   /objects   /object?bucket=&key=   /object/raw?bucket=&key=
 GET    /_sim/api/requests            recent S3 calls: status, auth (presigned|header|none), requestId
 GET    /_sim/api/presign?bucket=&key=[&method=PUT][&expires=s]   a presigned URL for this host
+GET|PUT /_sim/api/settings   {"forcedError": 0|4xx|5xx}: PUT, GET and HEAD object answer an S3 InternalError with that status
 POST   /_sim/api/seed                adds the demo objects, answers {"seeded": n}
 DELETE /_sim/api/object?bucket=&key=   one object
 DELETE /_sim/api/objects[?bucket=]     every object (in one bucket), answers {"deleted": n}
@@ -59,5 +60,6 @@ haven storage object <bucket> <key> [--raw]     # --raw writes the stored bytes 
 haven storage delete <bucket> <key>
 haven storage clear [bucket]                    # every bucket without one
 haven storage presign <bucket> <key> [--put] [--expires=<s>]   # GET by default, 3600 s
+haven storage set --error <0|4xx|5xx>      # PUT/GET object refused with that status; 0 clears it
 haven storage seed                              # the demo objects, as STORAGESIM_SEED does
 ```

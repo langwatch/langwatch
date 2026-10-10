@@ -25,6 +25,7 @@ and never checked: a dev shim, never expose it. Code: `services/analyticssim`, c
 GET    /_sim/api/records?provider=posthog|customerio&kind=event|identify|alias|group&id=&name=
 GET    /_sim/api/status
 DELETE /_sim/api/records
+GET|PUT /_sim/api/settings   {"forcedError": 0|4xx|5xx}: capture calls (PostHog, Customer.io) answer that status
 ```
 
 Records carry `provider`, `kind`, `distinctId`, `name`, `properties`, `receivedAt` and `raw`.
@@ -50,6 +51,7 @@ Newest first. Assert: trigger the action, then filter by `id` and `name`.
 haven analytics status        # record count + activity (last 5 min, distinct ids, last call)
 haven analytics records [--provider] [--kind] [--event|--name] [--id] | clear
 haven analytics record <id>   # one record: facts, properties, raw call
+haven analytics set --error <0|4xx|5xx>   # the next capture calls fail with that status; 0 clears it
 haven analytics wait --event <name> [--provider] [--kind] [--id] [--timeout 30s]   # exit 1 on timeout
 ```
 

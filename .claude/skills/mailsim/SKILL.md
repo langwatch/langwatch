@@ -27,6 +27,7 @@ GET    /api/messages/wait?to=&subject=&after=<id>&timeout=30s
                                              long poll; 200 message, 204 on timeout
 DELETE /api/messages   |   DELETE /api/messages/{id}
 GET    /api/inbox                            stack, own address, SMTP address, persistence
+GET|PUT /_sim/api/settings                   {"forcedError": 0|4xx|5xx}: SMTP MAIL FROM refused with that code
 ```
 
 Test pattern: trigger the action, then `curl ".../api/messages/wait?to=a@x.test&subject=verify&timeout=20s"`
@@ -51,5 +52,6 @@ and read `links[0]`. Use `after=<newest id>` to ignore older mail.
 
 ```
 haven mail address | inbox | list [--to] [--subject] | get <id> [--html] | links <id>
+haven mail set --error <0|4xx|5xx>         # SMTP sends refused with that reply code (4xx retry, 5xx permanent); 0 clears it
 haven mail wait [--to] [--subject] [--after <id>] [--timeout 30s] | delete <id> | clear
 ```

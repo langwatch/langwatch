@@ -11,6 +11,8 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	"github.com/langwatch/langwatch/tools/thuishaven/cmd/viewer/sources"
 )
 
 // The `haven mail` noun: read this worktree's own caught email — one client
@@ -216,7 +218,7 @@ func (c mailClient) getHTML(ctx context.Context, id string) (string, error) {
 }
 
 // mailUsage is printed on a missing or unknown subcommand.
-const mailUsage = "usage: haven mail <address|inbox|list [--to] [--subject]|get <id> [--html]|links <id>|wait [--to] [--subject] [--after <id>] [--timeout]|delete <id>|clear> [--json]"
+const mailUsage = "usage: haven mail <address|inbox|list [--to] [--subject]|get <id> [--html]|links <id>|wait [--to] [--subject] [--after <id>] [--timeout]|delete <id>|clear|set --error <0|4xx|5xx>> [--json]"
 
 // runMail is `haven mail <address|inbox|list|get|links|wait|delete|clear>`.
 func runMail(ctx context.Context, d deps, inv invocation) error {
@@ -254,6 +256,9 @@ type mailSink struct {
 // sink's base URL — split out so it can be unit-tested against a stub HTTP
 // server implementing the pinned contract, with no Orchestrator involved.
 func runMailSubcommand(ctx context.Context, inv invocation, sink mailSink) error {
+	if inv.args[0] == "set" {
+		return simSetForcedError(sources.NewSimAPIAt(sink.baseURL), "mail", inv, sink.asJSON)
+	}
 	cmd := mailCommand{client: newMailClient(sink.baseURL), asJSON: sink.asJSON}
 	switch inv.args[0] {
 	case "list":

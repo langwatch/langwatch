@@ -41,6 +41,9 @@ only the part you need.
 | Last distinct failures, grouped             | `haven errors --agent`                                           |
 | Restart one lane                            | `haven restart sims`                                             |
 | Logins and stack credentials                | `haven seed --json --reveal`, `haven env --reveal` (never paste) |
+| Keyed REST call, key never printed          | `haven api GET /api/... [--key project\|org\|personal] [--project slug]` |
+| Which principal and scope a key has         | `haven api whoami --key org`                                     |
+| AI gateway call with a held virtual key     | `haven gateway POST /v1/chat/completions --body - [--vk name]`   |
 
 - Bare `haven up` without a TTY never returns and dies with your shell. Always `-d`.
 - `--agent` (or `HAVEN_AGENT=1`) makes output plain: no colour, no redraws.
