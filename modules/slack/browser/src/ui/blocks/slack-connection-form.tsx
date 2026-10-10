@@ -99,7 +99,8 @@ export function SlackConnectionForm({
       <SlackErrorAlert error={save.error} fallbackTitle="Couldn't save the Slack connection" />
       <HStack justify="space-between" align="start">
         <Button
-          colorPalette="blue"
+          colorPalette="orange"
+          variant="solid"
           disabled={save.isPending}
           loading={save.isPending}
           onClick={() => form.submit().forEach((draft) => save.run(draft))}
@@ -199,6 +200,7 @@ function KindField({
   }
   return (
     <RadioCard.Root
+      colorPalette="orange"
       value={kind}
       onValueChange={({ value }) => {
         const next = SLACK_CONNECTION_KINDS.find((candidate) => candidate.value === value);

@@ -104,7 +104,8 @@ export function AuditExportDialog({
             Cancel
           </Button>
           <Button
-            colorPalette="blue"
+            colorPalette="orange"
+            variant="solid"
             size="sm"
             disabled={!chosen || isExporting}
             loading={isExporting}
