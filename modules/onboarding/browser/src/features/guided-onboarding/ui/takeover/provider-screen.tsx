@@ -64,8 +64,7 @@ export function ProviderScreen({
       <Box
         minH="68px"
         fontFamily="display"
-        fontSize="24px"
-        lineHeight="1.375"
+        textStyle="pageTitle"
         color="fg"
         data-testid="provider-line"
       >
@@ -113,7 +112,7 @@ export function ProviderScreen({
                 <Box w="16px" h="16px" flexShrink={0} css={{ "& > svg": { w: "full", h: "full" } }}>
                   {modelProviderIcons[provider.registryKey]}
                 </Box>
-                <Text fontSize="12.5px" fontWeight="500" color={isSelected ? "fg" : "fg.muted"}>
+                <Text textStyle="label" color={isSelected ? "fg" : "fg.muted"}>
                   {provider.name}
                 </Text>
               </chakra.button>
@@ -154,8 +153,7 @@ export function ProviderScreen({
               emit("clicked", "skip_tour");
               setConfirmSkip(true);
             }}
-            fontSize="12.5px"
-            fontWeight="500"
+            textStyle="label"
             color="fg.subtle"
             cursor="pointer"
             _hover={{ color: "fg.muted" }}
@@ -173,12 +171,10 @@ export function ProviderScreen({
       >
         <Dialog.Content maxW="400px">
           <Dialog.Header pb={1}>
-            <Dialog.Title fontSize="15px" fontWeight="600">
-              {SKIP_TOUR_COPY.title}
-            </Dialog.Title>
+            <Dialog.Title>{SKIP_TOUR_COPY.title}</Dialog.Title>
           </Dialog.Header>
           <Dialog.Body pt={0}>
-            <Text fontSize="12.5px" lineHeight="1.6" color="fg.muted">
+            <Text textStyle="bodySm" color="fg.muted">
               {SKIP_TOUR_COPY.body}
             </Text>
           </Dialog.Body>

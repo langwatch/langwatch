@@ -27,11 +27,7 @@ import { type ProjectFormData, TechStackSelector } from "../../blocks/tech-stack
 /** The sign-in doors' label voice: small mono capitals. Reaches the tech stack's labels too. */
 const FIELD_LABELS = {
   "& [data-scope=field][data-part=label]": {
-    fontFamily: "mono",
-    fontSize: "11px",
-    fontWeight: "normal",
-    textTransform: "uppercase",
-    letterSpacing: "0.14em",
+    textStyle: "eyebrow",
     color: "fg.muted",
     marginBottom: "4px",
   },
@@ -184,7 +180,7 @@ export default function ProjectOnboarding() {
             )}
             <TechStackSelector form={form} language={language} framework={framework} />
             {createProject.error && (
-              <Text role="alert" fontSize="12.5px" color="fg.error">
+              <Text role="alert" textStyle="caption" color="fg.error">
                 Something went wrong!
               </Text>
             )}
