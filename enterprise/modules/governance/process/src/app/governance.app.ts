@@ -819,6 +819,7 @@ export class GovernanceModule implements GovernanceRestApi {
       destinations: PullDestinationService.create(),
       providerAccounts: HttpProviderAccountChannel.create(),
       diagnostics: { warn: (message, context) => logger.warn(context, message) },
+      ottl,
     });
     this.ottl = ottl;
     this.sourceReads = IngestionSourceReadService.create({
