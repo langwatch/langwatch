@@ -77,7 +77,12 @@ function UnfinishedTable({
     error: steps.some((step) => step.lastError !== null),
   };
   return (
-    <ListTable data-testid="upgrade-steps-unfinished">
+    <ListTable
+      density="compact"
+      columnRules={false}
+      containerProps={{ overflowX: "auto" }}
+      data-testid="upgrade-steps-unfinished"
+    >
       <Table.Header>
         <Table.Row>
           <Table.ColumnHeader>Step</Table.ColumnHeader>
@@ -97,9 +102,18 @@ function UnfinishedTable({
             data-testid={`upgrade-step-${step.id}`}
           >
             <Table.Cell verticalAlign="top">
-              <Text textStyle="sm" fontFamily="mono" whiteSpace="nowrap">
+              <Button
+                variant="plain"
+                size="sm"
+                whiteSpace="normal"
+                textAlign="start"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onOpenStep(step.id);
+                }}
+              >
                 {step.id}
-              </Text>
+              </Button>
               <Text textStyle="xs" color="fg.muted" whiteSpace="nowrap">
                 {step.kind}
               </Text>
@@ -135,7 +149,13 @@ function FinishedTable({
 }) {
   const showOwner = steps.some((step) => step.owner !== null);
   return (
-    <ListTable size="sm" data-testid="upgrade-steps-finished">
+    <ListTable
+      density="compact"
+      columnRules={false}
+      containerProps={{ overflowX: "auto" }}
+      size="sm"
+      data-testid="upgrade-steps-finished"
+    >
       <Table.Header>
         <Table.Row>
           <Table.ColumnHeader>Step</Table.ColumnHeader>
@@ -154,8 +174,19 @@ function FinishedTable({
             onClick={() => onOpenStep(step.id)}
             data-testid={`upgrade-step-${step.id}`}
           >
-            <Table.Cell fontFamily="mono" whiteSpace="nowrap">
-              {step.id}
+            <Table.Cell>
+              <Button
+                variant="plain"
+                size="sm"
+                whiteSpace="normal"
+                textAlign="start"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onOpenStep(step.id);
+                }}
+              >
+                {step.id}
+              </Button>
             </Table.Cell>
             <Table.Cell whiteSpace="nowrap">{step.kind}</Table.Cell>
             <Table.Cell>{modeLabel(step.mode)}</Table.Cell>
