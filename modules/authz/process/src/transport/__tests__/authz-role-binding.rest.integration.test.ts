@@ -90,6 +90,7 @@ function world({ rows = [] as AuthzManagedOrganizationBinding[] } = {}) {
     };
   };
   const runtime = createRestRuntime({
+    audit: { record: () => {} },
     authorization: restTestAuthorization(),
     identity: {
       identify: ({ request }) => admit(request),

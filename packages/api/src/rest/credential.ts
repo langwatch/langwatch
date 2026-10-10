@@ -288,6 +288,24 @@ export function organizationCredentialOfRequest(
   return credential;
 }
 
+/** What a key-bearing door recorded for this request, or nothing where it recorded none. */
+export function recordedKeyCredentialOf({
+  door,
+  request,
+}: {
+  door: "project" | "organization" | "api_key";
+  request: Request;
+}):
+  | RestResolvedProjectCredential
+  | RestResolvedOrganizationCredential
+  | RestKeyDoorPrincipal
+  | undefined {
+  if (door === "project") return projectCredentials.get(request);
+  if (door === "organization") return organizationCredentials.get(request);
+
+  return keyCredentials.get(request);
+}
+
 /** The same, for the key door, with a project-bound access token let through as its person. */
 export function keyDoorPrincipalOfRequest(request: Request): RestKeyDoorPrincipal {
   const credential = keyCredentials.get(request);

@@ -46,6 +46,7 @@ export const opsBugReportRest = defineRestRouter(OpsApi)
   .withAddressing("literal", { v1Twin: true })
 
   .post("/api/bug-reports", "submitBugReport")
+  .withoutAudit("report intake")
   .withInput(submitBugReportSchema)
   .withDocs({
     summary: "File an issue report from a coding agent",

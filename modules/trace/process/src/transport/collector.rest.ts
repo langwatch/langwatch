@@ -293,6 +293,7 @@ export const collectorRest = defineRestRouter(CollectorApi)
   .withAddressing("literal", { v1Twin: false })
 
   .post("/api/collector", "collectTrace")
+  .withoutAudit("ingestion")
   .withInput(z.looseObject({}), { mediaType: PRODUCES_JSON, mismatch: "malformed_request" })
   .withAccess(
     publicRoute({

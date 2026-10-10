@@ -58,6 +58,7 @@ function mount(options: { secret?: string | undefined } = {}) {
   });
 
   const runtime = createRestRuntime({
+    audit: { record: () => {} },
     authorization: restTestAuthorization(),
     identity: {
       authenticate: () => {

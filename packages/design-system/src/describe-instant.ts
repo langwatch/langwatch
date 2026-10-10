@@ -21,6 +21,9 @@ const offsetLabel = (offsetMs: number) => {
   return `UTC${sign}${hh}:${mm}`;
 };
 
+/** An exact wall-clock reading: 24-hour, to the second, so it never needs AM or PM. */
+const CLOCK = { hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23" } as const;
+
 /** One instant through every lens the date hover popover lists. */
 export function describeInstant({
   epochMs,
@@ -59,10 +62,28 @@ export function describeInstant({
       shift === 0 ? "Same offset as you" : `${hours}h ${shift > 0 ? "ahead of" : "behind"} you`;
   }
 
+  const partsIn = (timeZone: string) => ({
+    zone: timeZone,
+    text: inZone(timeZone),
+    abbreviation:
+      new Intl.DateTimeFormat(locale, { timeZone, timeZoneName: "short" })
+        .formatToParts(epochMs)
+        .find((part) => part.type === "timeZoneName")?.value ?? timeZone,
+    date: new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeZone }).format(epochMs),
+    time: new Intl.DateTimeFormat(locale, { timeStyle: "medium", timeZone }).format(epochMs),
+    clock: new Intl.DateTimeFormat(locale, { ...CLOCK, timeZone }).format(epochMs),
+    offset: offsetLabel(zoneOffsetMs({ epochMs, timeZone })),
+  });
+
   return {
-    viewer: { zone: viewerTimeZone, text: inZone(viewerTimeZone) },
+    viewer: partsIn(viewerTimeZone),
     utc: inZone("UTC"),
-    source: sourceTimeZone ? { zone: sourceTimeZone, text: inZone(sourceTimeZone) } : null,
+    utcParts: partsIn("UTC"),
+    source: sourceTimeZone ? partsIn(sourceTimeZone) : null,
+    heading: new Intl.DateTimeFormat(locale, {
+      dateStyle: "full",
+      timeZone: viewerTimeZone,
+    }).format(epochMs),
     relative,
     relativeToViewer,
     iso: Temporal.Instant.fromEpochMilliseconds(epochMs).toString(),
@@ -84,9 +105,12 @@ export function formatInstant({
   locale,
   timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone,
   showZone = false,
+  seconds = false,
 }: {
   epochMs: number;
   display?: InstantDisplay;
+  /** Adds seconds to any time the label shows, for a log read to the second. */
+  seconds?: boolean;
   nowMs?: number;
   locale?: string;
   timeZone?: string;
@@ -97,7 +121,11 @@ export function formatInstant({
   const zone = showZone ? ({ timeZoneName: "short" } as const) : {};
   const format = (options: Intl.DateTimeFormatOptions) =>
     new Intl.DateTimeFormat(locale, { timeZone, ...options, ...zone }).format(epochMs);
-  const time = { hour: "numeric", minute: "2-digit" } as const;
+  const time = {
+    hour: "numeric",
+    minute: "2-digit",
+    ...(seconds ? { second: "2-digit" as const } : {}),
+  } as const;
   const date = { year: "numeric", month: "short", day: "numeric" } as const;
 
   if (display === "date") {

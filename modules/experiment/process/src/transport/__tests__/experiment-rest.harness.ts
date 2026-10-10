@@ -65,6 +65,7 @@ export function mountExperimentRest(
   const checked = options.checked ?? [];
 
   const runtime = createRestRuntime({
+    audit: { record: () => {} },
     authorization: restTestAuthorization(),
     identity: {
       authenticate: ({ request, permission }) => {

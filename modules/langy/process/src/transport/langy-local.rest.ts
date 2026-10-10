@@ -79,6 +79,7 @@ export const langyLocalRest = defineRestRouter(LangyApi)
   // ── the control request the card renders ──────────────────────────────────
 
   .post("/api/langy/local/requests", "langyLocalCreateRequest")
+  .withAudit("langy.createLocalRequest")
   .withAccess(LOCAL_ACCESS)
   .withInput(langyLocalCreateRequestBodySchema)
   .withBodyLimit({ maxBytes: MAX_BODY_BYTES, onExceeded: () => new PayloadTooLargeError() })
@@ -95,6 +96,7 @@ export const langyLocalRest = defineRestRouter(LangyApi)
   // ── one local tool call ───────────────────────────────────────────────────
 
   .post("/api/langy/local/calls", "langyLocalStartCall")
+  .withoutAudit("run, not a change")
   .withAccess(LOCAL_ACCESS)
   // `langyLocalStartCallRequestSchema` intersects a discriminated union, which
   // `.withInput()`'s `SourceSchema` does not admit; parsed by hand instead,
@@ -126,6 +128,7 @@ export const langyLocalRest = defineRestRouter(LangyApi)
   )
 
   .post("/api/langy/local/calls/:callId/cancel", "langyLocalCancelCall")
+  .withoutAudit("run, not a change")
   .withAccess(LOCAL_ACCESS)
   .withParams(langyLocalCallIdParamsSchema)
   .withInput(controlActionBodySchema)
@@ -142,6 +145,7 @@ export const langyLocalRest = defineRestRouter(LangyApi)
   // ── the question the worker asks ──────────────────────────────────────────
 
   .post("/api/langy/waits", "langyLocalStartWait")
+  .withoutAudit("run, not a change")
   .withAccess(LOCAL_ACCESS)
   .withInput(langyLocalStartWaitRequestSchema)
   .withBodyLimit({ maxBytes: MAX_BODY_BYTES, onExceeded: () => new PayloadTooLargeError() })

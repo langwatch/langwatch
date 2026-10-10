@@ -113,6 +113,7 @@ describe("the voice-session procedures", () => {
 function audioDoor(stream: ScenarioApi["streamVoiceSessionAudio"]) {
   const streamVoiceSessionAudio = vi.fn(stream);
   const runtime = createRestRuntime({
+    audit: { record: () => {} },
     authorization: restTestAuthorization(),
     identity: {
       authenticate: () => ({ actor: null, scope: null }),
@@ -171,6 +172,7 @@ describe("GET /api/voice/session/:conversationId/audio", () => {
 function runAudioDoor(stream: ScenarioApi["streamVoiceRunAudio"]) {
   const streamVoiceRunAudio = vi.fn(stream);
   const runtime = createRestRuntime({
+    audit: { record: () => {} },
     authorization: restTestAuthorization(),
     identity: {
       authenticate: () => ({ actor: null, scope: null }),
@@ -236,6 +238,7 @@ function sessionDoor({
   signedIn?: boolean;
 }) {
   const runtime = createRestRuntime({
+    audit: { record: () => {} },
     authorization: restTestAuthorization(),
     identity: {
       authenticate: () => ({ actor: null, scope: null }),

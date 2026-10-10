@@ -41,12 +41,14 @@ const notes = notesRouter()
   .withInput(note, { mediaType: JSON_TYPE })
   .withPermission("organization:manage")
   .withOutput(note)
+  .withoutAudit("test route")
   .handle(async ({ app, input }) => app.record({ text: input.text }))
 
   .post("/legacy", "recordLegacyNote")
   .withInput(note, { mediaType: JSON_TYPE, mismatch: "malformed_request" })
   .withPermission("organization:manage")
   .withOutput(note)
+  .withoutAudit("test route")
   .handle(async ({ app, input }) => app.record({ text: input.text }))
   .build();
 

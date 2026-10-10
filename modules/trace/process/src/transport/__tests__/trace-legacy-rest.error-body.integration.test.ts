@@ -19,6 +19,7 @@ const project = { id: "project-123" };
 const INTERNAL_MESSAGE = "TraceService requires EvaluationService for evaluation reads";
 
 const runtime = createRestRuntime({
+  audit: { record: () => {} },
   authorization: restTestAuthorization(),
   identity: {
     authenticate: () => ({

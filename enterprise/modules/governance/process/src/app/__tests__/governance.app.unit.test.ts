@@ -372,6 +372,7 @@ describe("GovernanceModule as the module a process installs", () => {
     it("writes a plan refusal behind its CLI token door in main's CLI body (Q31)", async () => {
       const { app } = await buildCliApp();
       const routes = createRestRuntime({
+        audit: { record: () => {} },
         authorization: restTestAuthorization(),
         identity: app.cliTokenDoor,
         entitlements: {

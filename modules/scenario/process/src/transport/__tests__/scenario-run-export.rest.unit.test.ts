@@ -26,6 +26,7 @@ function buildApi(permitted = true) {
   const app = createApiFixture<ScenarioApi>({ downloadScenarioRunExport });
   const authorize = vi.fn(() => ({ permitted, organizationRole: null }));
   const runtime = createRestRuntime({
+    audit: { record: () => {} },
     authorization: restTestAuthorization(),
     identity: {
       authenticate: () => ({ actor: null, scope: null }),

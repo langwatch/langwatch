@@ -49,6 +49,7 @@ import {
   DEVELOPER_ADMISSION_AUDIT_ACTION,
   type DeveloperAdmissionVia,
 } from "../../rules/admission-audit.rules.ts";
+import { auditOriginOf } from "../../rules/audit-origin.rules.ts";
 import {
   isActiveAdmin,
   isAdminDemotion,
@@ -2253,6 +2254,12 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
         after: log.after,
         actorUserId: actorIds.get(log.id) ?? null,
         actorUser: userMap.get(actorIds.get(log.id) ?? "") ?? null,
+        ...auditOriginOf({
+          metadata: log.metadata,
+          action: log.action,
+          args: log.args,
+          userId: log.userId,
+        }),
       };
     });
 

@@ -23,6 +23,7 @@ import {
 import { nowInstant, Temporal, type Instant } from "@langwatch/time";
 
 import type { DeveloperAdmissionVia } from "../../rules/admission-audit.rules.ts";
+import { auditOriginOf } from "../../rules/audit-origin.rules.ts";
 import { isCustomRole } from "../../rules/custom-role-naming.rules.ts";
 import {
   isActiveAdmin,
@@ -825,6 +826,12 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
       after: row.after,
       actorUserId,
       actorUser: actor ? { id: actor.id, name: actor.name, email: actor.email } : null,
+      ...auditOriginOf({
+        metadata: row.metadata,
+        action: row.action,
+        args: row.args,
+        userId: row.userId,
+      }),
     };
   }
 

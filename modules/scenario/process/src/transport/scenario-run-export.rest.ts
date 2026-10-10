@@ -14,6 +14,7 @@ export const scenarioRunExportRest = defineRestRouter(ScenarioApi)
   .withInput(scenarioRunExportRequestSchema)
   .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES })
   .withPermission("scenarios:view", { at: "route", param: "projectId" })
+  .withoutAudit("read sent as a POST")
   .withResponse("bytes", { produces: "text/csv; charset=utf-8" })
   .withDocs({ description: "Stream a project's simulation run history as gzipped CSV" })
   .handle(async ({ app, input: request, actor, signal, response }) => {

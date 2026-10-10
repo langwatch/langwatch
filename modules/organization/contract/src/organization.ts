@@ -124,7 +124,15 @@ export type EnrichedAuditLog = {
   /** Who really acted when that is not `userId` (an operator impersonating). */
   actorUserId: string | null;
   actorUser: { id: string; name: string | null; email: string | null } | null;
+  /** Which door the change came through: the app's own calls or the public API (E11). */
+  channel: AuditChannel | null;
+  /** The API key the call presented: a service key acting alone, or a person's own key. */
+  apiKeyId: string | null;
 };
+
+/** The door an audit row came through. */
+export const auditChannelSchema = z.enum(["app", "api"]);
+export type AuditChannel = z.infer<typeof auditChannelSchema>;
 
 /** What the tRPC door writes into an impersonated audit row's metadata. */
 export const auditImpersonationMetadataSchema = z.object({ impersonatorId: z.string().min(1) });

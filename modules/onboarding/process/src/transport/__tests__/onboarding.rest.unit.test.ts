@@ -29,6 +29,7 @@ function mount(options: { credential?: Credential; onboarding?: Partial<Onboardi
       : options.credential;
   const app = createApiFixture<OnboardingApi>(options.onboarding ?? {});
   const hono = createRestRuntime({
+    audit: { record: () => {} },
     authorization: restTestAuthorization(),
     identity: {
       authenticate: () => ({

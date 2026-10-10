@@ -12,6 +12,8 @@ interface InlineCodeProps extends Omit<BoxProps, "children"> {
   tail?: number;
   /** One click selects the whole value, so a copy takes all of it. On by default. */
   selectOnClick?: boolean;
+  /** `neutral` drops the blue accent, for dense tables where many ids sit side by side. */
+  variant?: "accent" | "neutral";
 }
 
 /** Splits on `*` so a glob wildcard can be emphasised. */
@@ -39,6 +41,28 @@ export function middleTail({ text, tail }: { text: string; tail?: number }): num
 }
 
 const SELECT_ALL = { userSelect: "all", WebkitUserSelect: "all" } as const;
+const ACCENT = {
+  verticalAlign: "baseline",
+  paddingX: "1",
+  borderRadius: "xs",
+  bg: "blue.subtle",
+  color: "blue.fg",
+  fontSize: "0.875em",
+} as const;
+/** A fixed 18px chip, so a table row of ids keeps one height whatever surrounds it. */
+const NEUTRAL = {
+  verticalAlign: "middle",
+  alignItems: "center",
+  height: "18px",
+  paddingX: "4px",
+  paddingY: "1px",
+  borderRadius: "2px",
+  borderWidth: 0,
+  bg: "bg.muted",
+  color: "fg",
+  fontSize: "12px",
+  lineHeight: "16px",
+} as const;
 
 /**
  * The one look for a machine identifier in running UI: event names, permission ids,
@@ -49,22 +73,18 @@ export function InlineCode({
   truncate = "end",
   tail,
   selectOnClick = true,
+  variant = "accent",
   ...props
 }: InlineCodeProps): React.ReactElement {
   const shared = {
     as: "code",
     title: children,
     "data-truncate": truncate,
-    verticalAlign: "baseline",
     maxWidth: "full",
     whiteSpace: "nowrap",
-    paddingX: "1",
-    borderRadius: "xs",
-    bg: "blue.subtle",
-    color: "blue.fg",
     fontFamily: "mono",
-    fontSize: "0.875em",
     css: selectOnClick ? SELECT_ALL : undefined,
+    ...(variant === "neutral" ? NEUTRAL : ACCENT),
   } as const;
 
   if (truncate === "middle") {

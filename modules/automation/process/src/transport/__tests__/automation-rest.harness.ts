@@ -27,6 +27,7 @@ const defaultPlatformUrl = ({ projectSlug, path }: { projectSlug: string; path: 
 
 function runtime() {
   return createRestRuntime({
+    audit: { record: () => {} },
     authorization: restTestAuthorization(),
     identity: {
       authenticate: () => ({
@@ -101,6 +102,7 @@ export function mountSlackAutomationRest(app: Partial<AutomationApi>) {
 /** `/api/trigger/slack` for a caller the credential chain refuses: no handler is ever reached. */
 export function mountSlackAutomationRestForUnauthenticatedCaller(app: Partial<AutomationApi>) {
   const refusing = createRestRuntime({
+    audit: { record: () => {} },
     authorization: restTestAuthorization(),
     identity: {
       authenticate: () => {

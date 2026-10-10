@@ -40,7 +40,34 @@ interface CodePreviewProps {
   diff?: boolean;
   /** A gutter of line numbers; a diff numbers its old and new lines side by side. */
   lineNumbers?: boolean;
+  /** Light chrome for a detail panel: small title, quiet border, 12px soft-wrapped body. */
+  compact?: boolean;
 }
+
+const COMPACT_BODY = {
+  "& pre": {
+    margin: 0,
+    padding: "8px 12px",
+    fontSize: "12px",
+    lineHeight: "18px",
+    whiteSpace: "pre-wrap",
+    wordBreak: "break-word",
+  },
+} as const;
+
+/** The window's frame: a full title bar, or a detail panel's quiet 28px strip. */
+const WINDOW_CHROME = {
+  root: { borderRadius: "xl", borderColor: "border.emphasized" },
+  strip: { paddingY: 1, borderBottomWidth: "1px" },
+  title: {},
+  copy: {},
+} as const;
+const COMPACT_CHROME = {
+  root: { borderRadius: "4px", borderColor: "border.muted" },
+  strip: { paddingY: 0, height: "28px", borderBottomWidth: 0 },
+  title: { lineHeight: "18px", fontWeight: "medium", color: "fg.muted" },
+  copy: { boxSize: "24px", minWidth: "24px" },
+} as const;
 
 /** One gutter string per line, drawn by CSS so selecting the code never takes it. */
 function gutters({
@@ -104,6 +131,7 @@ export function CodePreview({
   maxHeight,
   diff = false,
   lineNumbers = false,
+  compact = false,
 }: CodePreviewProps): React.ReactElement | null {
   const { colorMode } = useColorMode();
   const { copied, copy } = useCopyToClipboard();
@@ -131,19 +159,24 @@ export function CodePreview({
 
   if (!code) return null;
   const html = highlighted?.key === key ? highlighted.html : null;
+  const chrome = compact ? COMPACT_CHROME : WINDOW_CHROME;
 
   return (
     <Box
-      borderRadius="xl"
       border="1px solid"
-      borderColor="border.emphasized"
+      bg="bg.panel/60"
+      {...chrome.root}
       overflow="hidden"
       width="full"
+      minWidth={0}
     >
-      <HStack justify="space-between" paddingX={3} paddingY={1} borderBottomWidth="1px">
-        <Text fontSize="xs">{filename ?? (diff ? `${language} diff` : language)}</Text>
+      <HStack justify="space-between" paddingX={3} {...chrome.strip}>
+        <Text fontSize="xs" {...chrome.title}>
+          {filename ?? (diff ? `${language} diff` : language)}
+        </Text>
         <IconButton
           size="2xs"
+          {...chrome.copy}
           variant="ghost"
           aria-label={copied ? "Copied" : "Copy code"}
           onClick={() => copy(code)}
@@ -155,7 +188,15 @@ export function CodePreview({
         overflow="auto"
         maxHeight={maxHeight}
         css={{
-          "& pre": { margin: 0, padding: "12px 16px", whiteSpace: "pre", overflowX: "auto" },
+          // The window's own ground, as SnippetPreview's, not the Shiki theme's lighter one.
+          "& pre": {
+            margin: 0,
+            padding: "12px 16px",
+            whiteSpace: "pre",
+            overflowX: "auto",
+            background: "transparent !important",
+          },
+          ...(compact ? COMPACT_BODY : {}),
           ...(guttered ? GUTTERED : {}),
         }}
       >

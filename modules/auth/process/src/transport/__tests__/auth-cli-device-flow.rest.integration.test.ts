@@ -1625,6 +1625,7 @@ async function personSession(world: ReturnType<typeof deviceFlowWorld>) {
 
 function mount(world: ReturnType<typeof deviceFlowWorld>) {
   const runtime = createRestRuntime({
+    audit: { record: () => {} },
     authorization: restTestAuthorization(),
     identity: {
       authenticate: () => {

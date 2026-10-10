@@ -308,6 +308,7 @@ function createTracesRest() {
     .withVersion(MANAGEMENT_API_VERSION)
 
     .post("/search", "searchTraces")
+    .withoutAudit("read sent as a POST")
     .withInput(traceSearchBodySchema)
     .withPermission("traces:view")
     .withResponse("bytes", { produces: "application/json" })
@@ -405,6 +406,7 @@ function createTracesRest() {
 
   router = router
     .patch("/:traceId/metadata", "updateTraceMetadata")
+    .withAudit("traces.changeMetadata")
     .withParams(traceIdParamsSchema)
     .withInput(traceMetadataBodySchema)
     .withPermission("traces:update")

@@ -65,6 +65,7 @@ const signedDoor: RestIdentity = {
 
 function mount(app: Partial<ConnectApi>, door: RestIdentity = gatewayDoor) {
   const hono = createRestRuntime({
+    audit: { record: () => {} },
     authorization: restTestAuthorization(),
     identity: door,
     doors: { internal_secret: door },

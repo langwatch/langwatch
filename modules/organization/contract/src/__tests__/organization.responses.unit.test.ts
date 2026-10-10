@@ -36,6 +36,8 @@ describe("organizationAuditLogPageSchema", () => {
           after: { limit: 2 },
           actorUserId: null,
           actorUser: null,
+          channel: "app",
+          apiKeyId: null,
         },
       ],
     };

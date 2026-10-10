@@ -65,6 +65,7 @@ function mount(
   const { app } = mountableModelProviderApp({ modelProviders: options.modelProviders ?? {} });
   const hono = createRestRuntime({
     authorization: restTestAuthorization(),
+    audit: { record: () => {} },
     identity: {
       authenticate: ({ permission }) => {
         asked.push(permission);

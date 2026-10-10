@@ -42,6 +42,7 @@ const BODY = {
 /** The door over an experiment App answering `evaluateDataset` as given. */
 function mount(evaluateDataset: ExperimentApi["evaluateDataset"], refused: unknown[] = []) {
   const runtime = createRestRuntime({
+    audit: { record: () => {} },
     authorization: restTestAuthorization(),
     identity: {
       authenticate: () => ({

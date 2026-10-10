@@ -12,6 +12,8 @@ import { z } from "zod";
 import { authorizationPort } from "../../__tests__/api-double.ts";
 import { createErrorHandler, EndpointWithdrawnError } from "../../errors.ts";
 import type { RestAuditRow, RestIdentity } from "../../hosting/api-door.ts";
+import { ClientAddress } from "../../policy/client-address.ts";
+import { recordOrganizationCredential } from "../credential.ts";
 import { defineRestRouter } from "../declaration.ts";
 import { createRestRuntime, type RestRuntimeMembers } from "../runtime.ts";
 
@@ -209,6 +211,69 @@ describe("given a route that declares the trail it leaves", () => {
     });
   });
 
+  describe("when the call arrives from an address with a user agent", () => {
+    it("carries the address the door resolved and the user agent", async () => {
+      const sink = recordingSink();
+      const request = new Request("http://localhost/api/api-keys/key-one", {
+        method: "DELETE",
+        headers: { "user-agent": "Mozilla/5.0 (audit test)" },
+      });
+      ClientAddress.classifyByAddress().handle({ request, socketAddress: "203.0.113.7" });
+
+      await mounted({ audit: sink }).request(request);
+
+      expect(sink.rows).toEqual([
+        expect.objectContaining({
+          actorId: "user-1",
+          ipAddress: "203.0.113.7",
+          userAgent: "Mozilla/5.0 (audit test)",
+        }),
+      ]);
+    });
+  });
+
+  describe("when an organization key makes the call", () => {
+    function keyDoor(userId: string | null): RestIdentity {
+      return {
+        authenticate: ({ request }) => {
+          recordOrganizationCredential(request, {
+            type: "apiKey-org",
+            apiKeyId: "key-9",
+            userId,
+            organizationId: "organization-1",
+          });
+
+          return {
+            actor: userId ? { type: "user", id: userId } : null,
+            scope: { tier: "organization", id: "organization-1" },
+          };
+        },
+      };
+    }
+
+    it("names the key beside no actor for a key acting as nobody", async () => {
+      const sink = recordingSink();
+
+      await call(mounted({ audit: sink, identity: keyDoor(null) }), "DELETE", "/api/api-keys/k");
+
+      expect(sink.rows).toEqual([expect.objectContaining({ actorId: null, apiKeyId: "key-9" })]);
+    });
+
+    it("names the key's person and the key for a personal key", async () => {
+      const sink = recordingSink();
+
+      await call(
+        mounted({ audit: sink, identity: keyDoor("user-7") }),
+        "DELETE",
+        "/api/api-keys/k",
+      );
+
+      expect(sink.rows).toEqual([
+        expect.objectContaining({ actorId: "user-7", apiKeyId: "key-9" }),
+      ]);
+    });
+  });
+
   describe("when a route answers on a runtime with no audit sink", () => {
     it("refuses the mount naming the action", () => {
       const runtime = createRestRuntime({
@@ -227,7 +292,7 @@ describe("given a route that declares the trail it leaves", () => {
     });
   });
 
-  describe("when a route names an action that is not dotted lower kebab case", () => {
+  describe("when a route names an action that is not dotted segments", () => {
     it("refuses the declaration where it is written", () => {
       expect(() =>
         defineRestRouter(KeyApi)
@@ -235,7 +300,64 @@ describe("given a route that declares the trail it leaves", () => {
           .withVersion(VERSION)
           .post("/", "createApiKey")
           .withAudit("Created An API Key"),
-      ).toThrow(/must be dotted lower kebab case/);
+      ).toThrow(/must be dotted segments/);
+    });
+
+    it("accepts the tRPC path the same write audits under", () => {
+      expect(() =>
+        defineRestRouter(KeyApi)
+          .withNamespace("api-keys")
+          .withVersion(VERSION)
+          .post("/", "createApiKey")
+          .withAudit("modelProvider.role_defined"),
+      ).not.toThrow();
+    });
+  });
+
+  describe("when a write route says nothing about its trail", () => {
+    it("refuses the route where it is written, naming the operation", () => {
+      expect(() =>
+        defineRestRouter(KeyApi)
+          .withNamespace("api-keys")
+          .withVersion(VERSION)
+          .post("/", "createApiKey")
+          .withPermission("organization:manage")
+          .handle(async () => void 0),
+      ).toThrow(/REST createApiKey is a write route: declare withAudit/);
+    });
+
+    it("lets a read route leave it unsaid", () => {
+      expect(() =>
+        defineRestRouter(KeyApi)
+          .withNamespace("api-keys")
+          .withVersion(VERSION)
+          .get("/", "createApiKey")
+          .withPermission("organization:view")
+          .handle(async () => void 0),
+      ).not.toThrow();
+    });
+  });
+
+  describe("when a route declares whether it leaves a trail twice", () => {
+    it("refuses withoutAudit after withAudit", () => {
+      expect(() =>
+        defineRestRouter(KeyApi)
+          .withNamespace("api-keys")
+          .withVersion(VERSION)
+          .post("/", "createApiKey")
+          .withAudit("api-key.created")
+          .withoutAudit("ingestion"),
+      ).toThrow(/already declared withAudit\(\) or withoutAudit\(\)/);
+    });
+
+    it("refuses withoutAudit with no reason", () => {
+      expect(() =>
+        defineRestRouter(KeyApi)
+          .withNamespace("api-keys")
+          .withVersion(VERSION)
+          .post("/", "createApiKey")
+          .withoutAudit(" "),
+      ).toThrow(/needs a reason/);
     });
   });
 });

@@ -54,6 +54,7 @@ import {
   UnsupportedMediaTypeError,
 } from "../errors.ts";
 import type { RestAuditSink, RestCaller, RestIdentity } from "../hosting/api-door.ts";
+import { ClientAddress } from "../policy/client-address.ts";
 import type { RateLimiter, ResponseCache } from "../ports.ts";
 import { type RegisteredSharedPath, registerRoutePolicy } from "../route-registry.ts";
 import {
@@ -94,6 +95,7 @@ import {
   assertKeyKind,
   isKeyDoor,
   keyCredentialOfDoor,
+  recordedKeyOfDoor,
   type RestKeyCredential,
 } from "./key-credential.ts";
 import { legacyErrorScopes, withLegacyError } from "./legacy-error.ts";
@@ -1445,6 +1447,7 @@ function handlerMiddleware<Api>({
         route,
         ports,
         actor,
+        credential,
         scope: resolved,
         context,
         run: async () =>
@@ -1515,6 +1518,7 @@ async function auditing<TResult>({
   route,
   ports,
   actor,
+  credential,
   scope,
   context,
   run,
@@ -1522,6 +1526,7 @@ async function auditing<TResult>({
   route: RestTransportRoute<unknown>;
   ports: RestRuntimeMembers;
   actor: Actor | null;
+  credential: RestDoorCredential;
   scope: AuthzDeclaredScopeId | null;
   context: Context;
   run: () => Promise<TResult>;
@@ -1532,23 +1537,18 @@ async function auditing<TResult>({
 
   const sink = requireAudit(ports);
   const params = auditParams({ route, context });
+  const caller = auditCaller({ actor, credential, request: context.req.raw });
 
   try {
     const result = await run();
 
-    await sink.record({
-      actorId: normalizedActor(actor)?.id ?? null,
-      action,
-      scope,
-      params,
-      resultId: resultIdOf(result),
-    });
+    await sink.record({ ...caller, action, scope, params, resultId: resultIdOf(result) });
 
     return result;
   } catch (error) {
     if (error instanceof HandledError) {
       await sink.record({
-        actorId: normalizedActor(actor)?.id ?? null,
+        ...caller,
         action,
         scope,
         params,
@@ -1559,6 +1559,37 @@ async function auditing<TResult>({
 
     throw error;
   }
+}
+
+/**
+ * Who a row names (E11): the actor, the operator behind an impersonated call,
+ * the key the call presented, and where it came from as the door resolved it.
+ */
+function auditCaller({
+  actor,
+  credential,
+  request,
+}: {
+  actor: Actor | null;
+  credential: RestDoorCredential;
+  request: Request;
+}) {
+  const named = normalizedActor(actor);
+  const impersonatorId = named?.type === "user" ? named.impersonatorId : void 0;
+  const doorKeyId = isKeyDoor(credential)
+    ? recordedKeyOfDoor({ door: credential, request })?.apiKeyId
+    : null;
+  const apiKeyId = named?.type === "api_key" ? named.id : doorKeyId;
+  const ipAddress = ClientAddress.resolvedFor(request);
+  const userAgent = request.headers.get("user-agent");
+
+  return {
+    actorId: named?.type === "user" ? named.id : null,
+    ...(impersonatorId ? { impersonatorId } : {}),
+    ...(apiKeyId ? { apiKeyId } : {}),
+    ...(ipAddress ? { ipAddress } : {}),
+    ...(userAgent ? { userAgent } : {}),
+  };
 }
 
 /**

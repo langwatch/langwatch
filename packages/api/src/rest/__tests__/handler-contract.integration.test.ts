@@ -27,6 +27,7 @@ const notes = defineRestRouter(NoteApi)
   .withInput(z.object({ projectId: z.string(), pages: z.coerce.number().int() }))
   .withPermission("annotations:update")
   .withOutput(z.object({ id: z.string(), pages: z.number() }))
+  .withoutAudit("test route")
   .handle(({ app, input }) => app.createNote(input))
   .build();
 

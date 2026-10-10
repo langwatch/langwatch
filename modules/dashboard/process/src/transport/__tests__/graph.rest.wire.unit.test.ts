@@ -20,6 +20,7 @@ function mountedGraphs() {
     scope: { tier: "project" as const, id: PROJECT_ID },
   };
   const runtime = createRestRuntime({
+    audit: { record: () => {} },
     authorization: restTestAuthorization(),
     identity: { authenticate: () => caller, identify: () => caller },
   });

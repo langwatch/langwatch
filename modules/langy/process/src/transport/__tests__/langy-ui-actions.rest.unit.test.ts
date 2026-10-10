@@ -58,6 +58,7 @@ function buildDoor(options: { dark?: boolean } = {}) {
     },
   });
   const hono = createRestRuntime({
+    audit: { record: () => {} },
     authorization: restTestAuthorization(),
     identity: { authenticate, identify },
   }).mount(langyUiActionsRest.router(), {

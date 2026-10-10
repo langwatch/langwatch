@@ -23,6 +23,7 @@ export const analyticsRest = defineRestRouter(AnalyticsApi)
   .withVersion(MANAGEMENT_API_VERSION)
 
   .post("/timeseries", "postApiAnalyticsTimeseries")
+  .withoutAudit("read sent as a POST")
   .withInput(analyticsTimeseriesRestBodySchema)
   .withPermission("analytics:view")
   .withOutput(analyticsTimeseriesResponseSchema)

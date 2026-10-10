@@ -45,6 +45,20 @@ describe("formatInstant", () => {
       ).toBe("2:32 PM UTC");
     });
   });
+
+  describe("given seconds", () => {
+    it("reads the time to the second", () => {
+      expect(
+        formatInstant({
+          epochMs: AT + 9_000,
+          display: "time",
+          locale: "en-US",
+          timeZone: "UTC",
+          seconds: true,
+        }),
+      ).toBe("2:32:09 PM");
+    });
+  });
 });
 
 describe("relativeRefreshMs", () => {
@@ -66,6 +80,14 @@ describe("FormattedDate", () => {
     });
   });
 
+  describe("given a keyboard reader", () => {
+    it("makes the time reachable by Tab", () => {
+      const { container } = renderWithDesignSystem(<FormattedDate value="2026-10-08T14:32:00Z" />);
+
+      expect(container.querySelector("button time")).toBeTruthy();
+    });
+  });
+
   describe("given an unreadable value", () => {
     it("draws a dash", () => {
       renderWithDesignSystem(<FormattedDate value="not a date" />);
@@ -77,11 +99,24 @@ describe("FormattedDate", () => {
 describe("DateFormats", () => {
   /** @scenario "The date hover copies every form on click" */
   it("offers every form as a copy button", () => {
-    renderWithDesignSystem(<DateFormats epochMs={AT} />);
+    renderWithDesignSystem(<DateFormats epochMs={AT} timeZone="Europe/Amsterdam" locale="en-US" />);
 
     expect(
       screen.getByRole("button", { name: /^Copy ISO 8601: 2026-10-08T14:32:00Z$/ }),
     ).toBeTruthy();
     expect(screen.getByRole("button", { name: `Copy Unix ms: ${AT}` })).toBeTruthy();
+    expect(
+      screen.getByRole("button", {
+        name: "Copy Local: Oct 8, 2026 16:32:00 Europe/Amsterdam (UTC+02:00)",
+      }),
+    ).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Copy UTC: Oct 8, 2026 14:32:00 UTC" })).toBeTruthy();
+  });
+
+  it("lists UTC once when the reader is already in UTC", () => {
+    renderWithDesignSystem(<DateFormats epochMs={AT} timeZone="UTC" sourceTimeZone="Etc/UTC" />);
+
+    expect(screen.queryByRole("button", { name: /^Copy UTC:/ })).toBeNull();
+    expect(screen.queryByText("Source timezone")).toBeNull();
   });
 });

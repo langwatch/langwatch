@@ -1,6 +1,8 @@
 /** Contract schemas for the organization feature's tRPC responses. */
 import { z } from "zod";
 
+import { auditChannelSchema } from "./organization.ts";
+
 /** A write with nothing else to report. */
 export const organizationWriteAckSchema = z.object({ success: z.literal(true) }).strict();
 export type OrganizationWriteAck = z.infer<typeof organizationWriteAckSchema>;
@@ -254,6 +256,8 @@ const organizationAuditLogEntrySchema = z
       .object({ id: z.string().min(1), name: z.string().nullable(), email: z.string().nullable() })
       .strict()
       .nullable(),
+    channel: auditChannelSchema.nullable(),
+    apiKeyId: z.string().nullable(),
   })
   .strict();
 

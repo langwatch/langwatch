@@ -67,6 +67,7 @@ const items = defineRestRouter(ItemApi)
       ...documentedResponses({ 404: errorSchema, 409: apiErrorSchema }),
     },
   })
+  .withoutAudit("test route")
   .handle(async ({ app, input }) => app.update(input))
   .build();
 

@@ -48,6 +48,7 @@ const keyDoor = () => ({
 function mountedPlatform() {
   const app = createApiFixture<GatewayApi>({});
   const runtime = createRestRuntime({
+    audit: { record: () => {} },
     authorization: restTestAuthorization(),
     // Unrelated creates on this family declare themselves replayable, so the
     // whole family refuses to mount without the port. It runs and keeps no
