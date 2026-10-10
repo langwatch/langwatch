@@ -18,6 +18,7 @@ func seedWorkspace() *slackWorkspace {
 			{ID: "C0GENERAL", Name: "general", IsChannel: true, IsMember: true},
 			{ID: "C0ALERTS", Name: "alerts", IsChannel: true, IsMember: true},
 			{ID: "C0BUGS", Name: "bug-reports", IsChannel: true, IsMember: true},
+			{ID: "C0OLD", Name: "old-archive", IsChannel: true, IsMember: true, IsArchived: true},
 		},
 	}
 }

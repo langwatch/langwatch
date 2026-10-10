@@ -53,6 +53,16 @@ Feature: outboundsim, a local stand-in for Slack, webhook receivers and SQS
       Then outboundsim answers 200 with ok false and error "invalid_auth" or "token_revoked"
 
     @unit
+    Scenario: A token that lapsed after connecting passes the check and fails the post
+      When a client with a bearer token containing "lapsed" calls auth.test and then chat.postMessage
+      Then auth.test answers ok and the post answers error "token_revoked"
+
+    @unit
+    Scenario: A post to an archived channel fails as Slack fails it
+      When the product posts to /api/chat.postMessage naming the seeded archived channel C0OLD
+      Then outboundsim answers 200 with ok false and error "is_archived"
+
+    @unit
     Scenario: A post to an unknown channel fails as Slack fails it
       When the product posts to /api/chat.postMessage naming a channel the workspace does not have
       Then outboundsim answers 200 with ok false and error "channel_not_found"

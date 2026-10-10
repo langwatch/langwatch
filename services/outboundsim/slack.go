@@ -12,10 +12,11 @@ import (
 
 // slackChannel is one channel of the seeded workspace, in conversations.list's shape.
 type slackChannel struct {
-	ID        string `json:"id"`
-	Name      string `json:"name"`
-	IsChannel bool   `json:"is_channel"`
-	IsMember  bool   `json:"is_member"`
+	ID         string `json:"id"`
+	Name       string `json:"name"`
+	IsChannel  bool   `json:"is_channel"`
+	IsMember   bool   `json:"is_member"`
+	IsArchived bool   `json:"is_archived"`
 }
 
 // slackWorkspace is the one Slack team outboundsim answers for.
@@ -35,6 +36,17 @@ func (w *slackWorkspace) channel(ref string) (slackChannel, bool) {
 		}
 	}
 	return slackChannel{}, false
+}
+
+// listed is the channels conversations.list shows: an archived one is postable by id, not listed.
+func (w *slackWorkspace) listed() []slackChannel {
+	out := make([]slackChannel, 0, len(w.channels))
+	for _, ch := range w.channels {
+		if !ch.IsArchived {
+			out = append(out, ch)
+		}
+	}
+	return out
 }
 
 // nextTS is a message timestamp, unique for the life of the server.
@@ -141,19 +153,24 @@ func (s *Server) slackAnswer(method, token string, args map[string]any) reply {
 		})
 	case "conversations.list":
 		return jsonReply(http.StatusOK, map[string]any{
-			"ok": true, "channels": s.slack.channels, "response_metadata": map[string]string{"next_cursor": ""},
+			"ok": true, "channels": s.slack.listed(), "response_metadata": map[string]string{"next_cursor": ""},
 		})
 	}
-	return s.slackPost(args)
+	return s.slackPost(token, args)
 }
 
-func (s *Server) slackPost(args map[string]any) reply {
+// slackPost answers a chat.postMessage; a token containing "lapsed" was revoked after it connected.
+func (s *Server) slackPost(token string, args map[string]any) reply {
 	text, _ := args["text"].(string)
 	ref, _ := args["channel"].(string)
 	ch, found := s.slack.channel(ref)
 	switch {
+	case strings.Contains(token, "lapsed"):
+		return slackError("token_revoked")
 	case !found:
 		return slackError("channel_not_found")
+	case ch.IsArchived:
+		return slackError("is_archived")
 	case text == "" && args["blocks"] == nil && args["attachments"] == nil:
 		return slackError("no_text")
 	}
