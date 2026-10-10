@@ -5,8 +5,8 @@ import type { Pool } from "pg";
 import type { PrismaConfiguration } from "./config.ts";
 import { PrismaDriverAdapterService, type PrismaDriverAdapterFactory } from "./driver-adapter.ts";
 import { type Prisma, PrismaClient } from "./generated/client.ts";
+import { skipTenantCheck } from "./multi-tenancy-guard.ts";
 import { OperatorReadGuard, type OperatorReadMint } from "./operator-read.ts";
-import { skipTenantCheck } from "./skip-tenant-check.ts";
 
 /**
  * A short constant name per Prisma log level, used as the pino `msg` so a

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { llmsimCustomModels } from "../seed-llmsim-models.ts";
+import { llmsimCustomModels } from "../storage-seed.ts";
 
 describe("given the seed creates a model provider row", () => {
   /** @scenario "The seeded OpenAI provider offers llmsim's error models" */

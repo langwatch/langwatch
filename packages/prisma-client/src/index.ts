@@ -22,8 +22,8 @@ export {
   type OnSkippedTenantCheck,
   PROJECT_TENANCY_REGIMES,
   SCOPED_MODEL_NAMES,
+  skipTenantCheck,
 } from "./multi-tenancy-guard.ts";
-export { skipTenantCheck } from "./skip-tenant-check.ts";
 export {
   guardOrganizationId,
   ORG_BEARING_MODEL_NAMES,

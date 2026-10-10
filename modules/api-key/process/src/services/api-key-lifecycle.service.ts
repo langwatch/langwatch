@@ -351,11 +351,7 @@ export class ApiKeyLifecycleService {
     return this.revokeChildrenOf(input);
   }
 
-  /**
-   * Retires the keys minted under one key — best effort, never fails the
-   * triggering revoke (parent already dead; an orphan is refused at auth
-   * anyway). `callerIsAdmin` is forced true: retiring a dead session's key.
-   */
+  /** Best effort, never fails the parent's revoke; `callerIsAdmin` is forced true here. */
   private async revokeChildrenOf({
     parentApiKeyId,
     organizationId,
@@ -450,8 +446,7 @@ export class ApiKeyLifecycleService {
       userId: input.createdByUserId,
       apiKeyId: input.callerApiKeyId,
     });
-    // A key's own role is bounded only here, so nobody to bound it by is a platform
-    // mint or nothing.
+    // A key's own role is bounded only here: no one to bound it by is a platform mint.
     if (input.permissions?.length && principals.length === 0 && !input.isSystemManaged) {
       throw new ApiKeyScopeViolationError(
         "A restricted key needs an owner, a creator or a requesting key to bound its permissions",

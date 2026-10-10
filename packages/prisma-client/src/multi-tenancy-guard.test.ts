@@ -8,9 +8,9 @@ import {
   PROJECT_TENANCY_REGIMES,
   projectGuard,
   SCOPED_MODEL_NAMES,
+  skipTenantCheck,
 } from "./multi-tenancy-guard.ts";
 import { guardOrganizationId, ORG_BEARING_MODEL_NAMES } from "./organization-guard.ts";
-import { skipTenantCheck } from "./skip-tenant-check.ts";
 
 /**
  * Regression tests for multitenancy guard's exempt list. Org-scoped models need exemption

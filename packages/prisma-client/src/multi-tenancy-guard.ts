@@ -1,5 +1,8 @@
+import { randomUUID } from "node:crypto";
+
 import { z } from "zod";
 
+import { Prisma } from "./generated/client.ts";
 import {
   clauseField,
   isClause,
@@ -7,7 +10,26 @@ import {
   type GuardParams,
 } from "./guard-middleware.ts";
 import { ORG_BEARING_MODEL_NAMES, PRISMA_READ_ACTIONS } from "./organization-guard.ts";
-import { skipsTenantCheck } from "./skip-tenant-check.ts";
+
+// Per process and unguessable; held on the global so a reloaded copy of this module agrees.
+const NONCE = Symbol.for("langwatch.prisma-client.skip-tenant-check");
+const holder = globalThis as { [NONCE]?: string };
+holder[NONCE] ??= randomUUID();
+const MARKER = `/* SKIP_TENANT_CHECK ${holder[NONCE]} */`;
+
+/**
+ * Lets one raw statement through the tenant guard without a tenant predicate. Interpolate it
+ * into the SQL (`.sql` for an `Unsafe` string); a comment directly above the flag gives the
+ * reason (`langwatch/skip-tenant-check-reason`). Every skip is counted and logged.
+ */
+export function skipTenantCheck(flag: { SKIP_TENANT_CHECK: true }): Prisma.Sql {
+  return flag.SKIP_TENANT_CHECK ? Prisma.raw(MARKER) : Prisma.empty;
+}
+
+/** Whether a raw statement's text carries the marker {@link skipTenantCheck} made. */
+export function skipsTenantCheck(sql: string): boolean {
+  return sql.includes(MARKER);
+}
 
 // A raw statement is tenant-scoped when it compares a tenant column with a bound parameter
 // (`"projectId" = $1`, `= ANY($1)`, `IN ($1, $2)`); `?` is how a template's holes are joined.
