@@ -48,13 +48,15 @@ const toastGlass = (hue: keyof typeof TOAST_DRIFT) => {
     `color-mix(in srgb, var(--chakra-colors-${h}-${n}) ${alpha}, transparent)`;
   const drift = (n: number, alpha: string) =>
     `color-mix(in srgb, color-mix(in srgb, var(--chakra-colors-${TOAST_DRIFT[hue]}-${n}) 55%, var(--chakra-colors-${hue}-${n})) ${alpha}, transparent)`;
+  const between = (a: number, b: number, alpha: string) =>
+    `color-mix(in srgb, color-mix(in srgb, var(--chakra-colors-${hue}-${a}) 50%, var(--chakra-colors-${hue}-${b})) ${alpha}, transparent)`;
   const field = "50% calc(100% + var(--viewport-offset-bottom, 1rem) - var(--toast-shift))";
   return {
-    bg: c(600, "90%"),
+    bg: between(600, 700, "92%"),
     backgroundImage: [
       "linear-gradient(180deg, rgba(255, 255, 255, 0.12) 0%, transparent 45%)",
       `radial-gradient(40% 24% at 50% 100%, ${c(500, "62%")} 0%, transparent 100%)`,
-      `linear-gradient(170deg, ${c(600, "94%")} 0%, ${c(600, "92%")} 55%, ${drift(500, "92%")} 70%, ${drift(400, "90%")} 80%, ${c(500, "90%")} 90%, ${c(400, "90%")} 100%)`,
+      `linear-gradient(170deg, ${between(600, 700, "93%")} 0%, ${drift(600, "92%")} 50%, ${c(600, "92%")} 75%, ${between(500, 600, "92%")} 100%)`,
     ].join(", "),
     backgroundSize: "100% 100%, 100vw 100vh, 100vw 100vh",
     backgroundPosition: `0 0, ${field}, ${field}`,
