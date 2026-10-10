@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import { canSearchCapturedContent } from "../../../../rules/trace-read-mappers.rules.ts";
+import {
+  traceDerivedAttrPrefixes,
+  traceReadMapperPorts,
+} from "../../../../rules/trace-read-mapper-ports.rules.ts";
+import {
+  canSearchCapturedContent,
+  hiddenAttributeKeyMatcher,
+} from "../../../../rules/trace-read-mappers.rules.ts";
 import { translateFilterAst, translateTraceTag } from "../trace-query.rules.ts";
 
 const timeRange = { from: 0, to: 1 };
@@ -57,6 +64,37 @@ describe("free-text search and the viewer's content visibility", () => {
       expect(searchContent).toBe(true);
       expect(sql).toContain("ComputedInput");
       expect(sql).toContain("ComputedOutput");
+    });
+  });
+});
+
+describe("attribute filters and the viewer's content visibility", () => {
+  const isHiddenAttribute = hiddenAttributeKeyMatcher({
+    protections: { canSeeCapturedInput: false, canSeeCapturedOutput: true },
+    contentPrivacy: traceReadMapperPorts.contentPrivacy,
+    derivedPrefixes: traceDerivedAttrPrefixes,
+  });
+
+  function attributeSql(queryText: string): string | null {
+    return translateFilterAst({
+      queryText,
+      ctx: { paramCounter: 0, nodeCount: 0, params: {}, timeRange },
+      translateTag: (tag, negated, ctx) =>
+        translateTraceTag({ tag, negated, ctx, fieldDefs: new Map(), isHiddenAttribute }),
+    });
+  }
+
+  /** @scenario "An attribute filter on a value the viewer may not read matches nothing" */
+  describe("given a viewer the captured input is hidden from", () => {
+    it("matches nothing on a captured-input attribute", () => {
+      expect(attributeSql('span.attribute.gen_ai.prompt:"shipped"')).toBe("0 = 1");
+      expect(attributeSql('trace.attribute.langwatch.gen_ai.input.text:"shipped"')).toBe("0 = 1");
+    });
+
+    it("still filters on an attribute the viewer may read", () => {
+      expect(attributeSql('span.attribute.gen_ai.request.model:"gpt-5"')).toContain(
+        "SpanAttributes",
+      );
     });
   });
 });

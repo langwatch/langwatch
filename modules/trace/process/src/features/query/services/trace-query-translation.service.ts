@@ -17,20 +17,21 @@ export class TraceQueryTranslationService {
   }
 
   /**
-   * Translates a liqe query into a parameterized WHERE fragment or null.
-   * `evalRuns` carries the runs registered for the query's `eval` chips;
-   * `searchContent` false keeps free text off captured input and output.
+   * A liqe query as a parameterized WHERE fragment, or null. `searchContent` false and
+   * `isHiddenAttribute` keep a protected viewer's filter off what they may not read.
    */
   translateFilter({
     queryText,
     timeRange,
     evalRuns,
     searchContent = true,
+    isHiddenAttribute,
   }: {
     queryText: string;
     timeRange: { from: number; to: number };
     evalRuns?: readonly ResolvedInstantEvalRun[];
     searchContent?: boolean;
+    isHiddenAttribute?: (key: string) => boolean;
   }): { sql: string; params: Record<string, unknown> } | null {
     const ctx: TranslationContext = {
       paramCounter: 0,
@@ -53,6 +54,7 @@ export class TraceQueryTranslationService {
           ctx: tagCtx,
           fieldDefs: this.#fields.fieldDefByName,
           searchContent,
+          ...(isHiddenAttribute ? { isHiddenAttribute } : {}),
         }),
       translateScope: (scope, scopeCtx) =>
         translateEvaluationScope({ scope, ctx: scopeCtx, fields: this.#fields }),

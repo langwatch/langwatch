@@ -423,6 +423,7 @@ import {
   mapSpanToDetail,
   canSearchCapturedContent,
   contentSearchTermsForViewer,
+  hiddenAttributeKeyMatcher,
   readDroppedFromParams,
   readPiiIncompleteFromParams,
   redactV2Content,
@@ -1413,11 +1414,12 @@ export class TraceModule implements TraceApi, CollectorApp {
         ? TraceExportDownloadService.create({
             exports: TraceExportService.create({
               traceService: dependencies.traces.read,
-              compileFilter: ({ request }) =>
+              compileFilter: ({ request, protections }) =>
                 this.compileExplorerTraceFilter({
                   query: request.query ?? "",
                   tenantId: request.projectId,
                   timeRange: { from: request.startDate, to: request.endDate },
+                  protections,
                 }),
               authorizeOwnRead: ({ projectId }) =>
                 this.#authorizeOwnRead({
@@ -2518,7 +2520,16 @@ export class TraceModule implements TraceApi, CollectorApp {
       queryText: input.query,
       timeRange: input.timeRange,
       ...(input.evalRuns ? { evalRuns: input.evalRuns } : {}),
-      ...(input.protections ? { searchContent: canSearchCapturedContent(input.protections) } : {}),
+      ...(input.protections
+        ? {
+            searchContent: canSearchCapturedContent(input.protections),
+            isHiddenAttribute: hiddenAttributeKeyMatcher({
+              protections: input.protections,
+              contentPrivacy: traceReadMapperPorts.contentPrivacy,
+              derivedPrefixes: traceDerivedAttrPrefixes,
+            }),
+          }
+        : {}),
     });
   }
 
@@ -2581,11 +2592,34 @@ export class TraceModule implements TraceApi, CollectorApp {
         query: input.filter,
         tenantId: input.projectId,
         timeRange: input.window,
+        protections: await this.#protectionsOfProof({
+          projectId: input.projectId,
+          authorization: input.authorization,
+        }),
       }),
       limit: input.limit,
     });
 
     return refs.map((ref) => ref.traceId);
+  }
+
+  /** The protections of whoever holds the proof; a system or internal read is unprotected. */
+  async #protectionsOfProof(input: {
+    projectId: string;
+    authorization: Authorization;
+  }): Promise<Protections | undefined> {
+    const { principal } = input.authorization;
+    if (principal.type === "user") {
+      return this.resolveViewerProtections({
+        projectId: input.projectId,
+        userId: principal.id,
+        authorization: input.authorization,
+      });
+    }
+    if (principal.type === "apiKey") {
+      return this.resolveApiKeyProtections({ projectId: input.projectId, principal });
+    }
+    return undefined;
   }
 
   /** The query's positive bare-word terms, for a content (log-body) search. */
