@@ -22,7 +22,7 @@ func TestRenderClickHouseConfig(t *testing.T) {
 
 			t.Run("caps every kept system log at the default TTL", func(t *testing.T) {
 				for _, name := range KeptSystemLogs {
-					want := "<" + name + "><ttl>event_date + INTERVAL 7 DAY</ttl></" + name + ">"
+					want := "<" + name + "><ttl>event_date + INTERVAL 7 DAY</ttl><flush_interval_milliseconds>60000</flush_interval_milliseconds></" + name + ">"
 					if !strings.Contains(cfg, want) {
 						t.Errorf("missing %q in:\n%s", want, cfg)
 					}

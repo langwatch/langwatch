@@ -87,12 +87,10 @@ func (l ClickHouseLimits) EffectiveSystemLogTTLDays() int {
 	return l.SystemLogTTLDays
 }
 
-// NoisySystemLogs are the system tables LightweightLogsEnabled turns off: pure volume
-// with no local-debugging value. text_log duplicates what the container already
-// writes to stdout; the metric logs are sampled telemetry nobody reads on a dev
-// box (asynchronous_metric_log alone reached 70M rows in the measurement above);
-// trace_log and the profile logs only matter during deliberate profiling, which
-// is what HAVEN_CLICKHOUSE_FULL_LOGS=1 is for.
+// NoisySystemLogs are the system tables LightweightLogsEnabled turns off: volume
+// with no local-debugging value (text_log duplicates stdout; the metric, trace and
+// profile logs matter only when profiling, which HAVEN_CLICKHOUSE_FULL_LOGS=1 is
+// for; part_log logs every part written, doubling the server's own file churn).
 var NoisySystemLogs = []string{
 	"text_log",
 	"trace_log",
@@ -100,15 +98,15 @@ var NoisySystemLogs = []string{
 	"asynchronous_metric_log",
 	"processors_profile_log",
 	"query_metric_log",
+	"part_log",
 }
 
 // KeptSystemLogs are the system tables LightweightLogsEnabled keeps, capped at
-// SystemLogTTLDays. These are the ones actually worth reaching for locally:
-// query_log answers "why was that slow", part_log explains merge behaviour, and
-// error_log/crash_log are tiny and matter exactly when something broke.
+// SystemLogTTLDays and flushed every SystemLogFlushMillis. query_log answers "why
+// was that slow" (tests read it after SYSTEM FLUSH LOGS), and error_log/crash_log
+// are tiny and matter exactly when something broke.
 var KeptSystemLogs = []string{
 	"query_log",
-	"part_log",
 	"error_log",
 	"crash_log",
 }
@@ -134,6 +132,11 @@ func DefaultClickHouseLimits(totalRAMBytes uint64) ClickHouseLimits {
 // DefaultSystemLogTTLDays is how long the kept system logs live. A week spans
 // "it was slow last Thursday" without letting query_log grow without bound.
 const DefaultSystemLogTTLDays = 7
+
+// SystemLogFlushMillis is how often a kept system log writes a new part. The stock
+// 7.5s wrote hundreds of small files a minute on an idle dev box; readers that need
+// fresh rows run SYSTEM FLUSH LOGS first.
+const SystemLogFlushMillis = 60000
 
 // ClickHouseConfigFile is the config.d override haven mounts read-only into the
 // container — additive to the image's own config.d, never replacing it.
@@ -192,7 +195,7 @@ func renderLogConfig(l ClickHouseLimits) string {
 		fmt.Fprintf(&b, "    <%s remove=\"1\"/>\n", name)
 	}
 	for _, name := range KeptSystemLogs {
-		fmt.Fprintf(&b, "    <%s><ttl>event_date + INTERVAL %d DAY</ttl></%s>\n", name, l.EffectiveSystemLogTTLDays(), name)
+		fmt.Fprintf(&b, "    <%s><ttl>event_date + INTERVAL %d DAY</ttl><flush_interval_milliseconds>%d</flush_interval_milliseconds></%s>\n", name, l.EffectiveSystemLogTTLDays(), SystemLogFlushMillis, name)
 	}
 	return b.String()
 }
