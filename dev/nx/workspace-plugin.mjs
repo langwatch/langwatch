@@ -60,7 +60,7 @@ export const createNodes = [
         executor: "nx:run-commands",
         options: {
           cwd: "{workspaceRoot}",
-          command: `GOMEMLIMIT=2GiB tsc -b --builders 1 ${contracts}`,
+          command: `GOMAXPROCS=2 GOMEMLIMIT=2GiB tsc -b --builders 1 ${contracts}`,
         },
         cache: true,
         inputs,
@@ -86,7 +86,7 @@ export const createNodes = [
         executor: "nx:run-commands",
         options: {
           cwd: "{workspaceRoot}",
-          command: "GOMEMLIMIT=2GiB tsc -b --builders 1 --checkers 1",
+          command: "GOMAXPROCS=2 GOMEMLIMIT=2GiB tsc -b --builders 1 --checkers 1",
         },
         cache: false,
         syncGenerators: ["@nx/js:typescript-sync"],

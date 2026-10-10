@@ -9,7 +9,7 @@
     "test:suite:all": "node _tests/scripts/run-scenario-suite.mjs --all",
     "compile": "node _compiler/compile.ts",
     "sync": "node _publish/sync.ts",
-    "typecheck": "tsc -b"
+    "typecheck": "GOMAXPROCS=2 GOMEMLIMIT=2GiB tsc -b"
   },
   "dependencies": {
     "remark-frontmatter": "^5.0.0",

@@ -6,7 +6,7 @@
     "test": "playwright test",
     "test:unit": "E2E_UNIT=1 playwright test --project=unit",
     "test:ui": "playwright test --ui",
-    "typecheck": "tsc -b"
+    "typecheck": "GOMAXPROCS=2 GOMEMLIMIT=2GiB tsc -b"
   },
   "dependencies": {
     "@langwatch/e2e-stack": "workspace:*",

@@ -12,7 +12,7 @@
   },
   "scripts": {
     "start": "node --experimental-transform-types --import @langwatch/observability/register $(test -f ../../.env && echo --env-file=../../.env) src/main.ts",
-    "typecheck": "tsc -b"
+    "typecheck": "GOMAXPROCS=2 GOMEMLIMIT=2GiB tsc -b"
   },
   "dependencies": {
     "@langwatch/observability": "workspace:*",

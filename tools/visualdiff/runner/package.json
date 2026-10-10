@@ -19,7 +19,7 @@
   "scripts": {
     "capture": "node --experimental-transform-types src/capture.entrypoint.ts",
     "preflight": "node --experimental-transform-types src/preflight.ts",
-    "typecheck": "tsc -b",
+    "typecheck": "GOMAXPROCS=2 GOMEMLIMIT=2GiB tsc -b",
     "test": "vitest run"
   },
   "dependencies": {

@@ -20,7 +20,7 @@
     "start": "node --experimental-transform-types --import @langwatch/observability/register $(test -f ../../.env && echo --env-file=../../.env) src/main.ts",
     "predev": "pnpm -w run ensure:built",
     "dev": "node --experimental-transform-types $(test -f ../../.env && echo --env-file=../../.env) src/main.ts",
-    "typecheck": "tsc -b",
+    "typecheck": "GOMAXPROCS=2 GOMEMLIMIT=2GiB tsc -b",
     "pretest": "FORCE_COLOR=0 NX_LOAD_DOT_ENV_FILES=false pnpm -w exec nx run @langwatch/mail:build --outputStyle=static",
     "test": "vitest run",
     "pretest:unit": "FORCE_COLOR=0 NX_LOAD_DOT_ENV_FILES=false pnpm -w exec nx run @langwatch/mail:build --outputStyle=static",

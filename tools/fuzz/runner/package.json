@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "start": "node --experimental-transform-types src/fuzz.entrypoint.ts",
-    "typecheck": "tsc -b",
+    "typecheck": "GOMAXPROCS=2 GOMEMLIMIT=2GiB tsc -b",
     "test": "vitest run"
   },
   "dependencies": {

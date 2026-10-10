@@ -13,7 +13,7 @@
   },
   "scripts": {
     "build": "node scripts/build-child.mjs",
-    "typecheck": "tsc -b",
+    "typecheck": "GOMAXPROCS=2 GOMEMLIMIT=2GiB tsc -b",
     "test": "vitest run"
   },
   "dependencies": {
