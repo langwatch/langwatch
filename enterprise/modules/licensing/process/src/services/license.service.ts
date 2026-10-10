@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 
+import { isUpgradeInProgress } from "@langwatch/api";
 import type { LicenseCryptography } from "@langwatch/enterprise-license-signing";
 import {
   LICENSE_ERRORS,
@@ -192,10 +193,7 @@ export class LicenseService extends LicensingServiceContract {
     try {
       return await this.platformSsoGate;
     } catch (error) {
-      this.logger.error(
-        { error },
-        "the platform single sign-on license scan failed; denying for now",
-      );
+      logScanFailure({ logger: this.logger, error });
       return false;
     }
   }
@@ -412,6 +410,12 @@ export class LicenseService extends LicensingServiceContract {
       );
     }
   }
+}
+
+/** Before the worker creates the license table (install, upgrade) a failed scan is expected. */
+function logScanFailure({ logger, error }: { logger: LicenseLogger; error: unknown }): void {
+  if (isUpgradeInProgress(error)) return;
+  logger.error({ error }, "the platform single sign-on license scan failed; denying for now");
 }
 
 export interface LicenseLogger {

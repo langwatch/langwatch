@@ -58,6 +58,36 @@ describe("failedFirstInstallRun", () => {
     });
   });
 
+  describe("given the first install failed in a schema phase, writing no failed step", () => {
+    const schemaFailure = run({
+      outcome: "failed",
+      report: { error: "goose: table already exists", logTail: ["applying clickhouse"] },
+    });
+    const askWithoutSteps = ({ ledger }: { ledger: readonly Run[] }) =>
+      failedFirstInstallRun({
+        verdict: apiPhaseVerdict({ outstanding: [SCHEMA_STEP] }),
+        findFailedSteps: async () => [],
+        findRuns: async () => ledger,
+      });
+
+    /** @scenario "A first install that failed in a schema phase opens the console without a failed step" */
+    it("opens the console with the run's error closing its log tail", async () => {
+      expect(await askWithoutSteps({ ledger: [seed, schemaFailure] })).toMatchObject({
+        outcome: "upgrading",
+        failedRun: {
+          failedSteps: [],
+          logTail: ["applying clickhouse", "goose: table already exists"],
+        },
+      });
+    });
+
+    it("opens no console while no finished upgrade run failed", async () => {
+      const verdict = await askWithoutSteps({ ledger: [seed, run({})] });
+
+      expect(verdict).not.toHaveProperty("failedRun");
+    });
+  });
+
   describe("given the installation finished an upgrade before", () => {
     /** @scenario "A failure on an installation that finished an upgrade before opens no console" */
     it("leaves the upgrading verdict without a failed run, for Ops > Upgrades to show", async () => {

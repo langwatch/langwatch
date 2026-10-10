@@ -258,6 +258,20 @@ Feature: The new image's worker runs its blocking upgrade while the api serves, 
     Then the console shows the failed step, its error and the last 50 lines of the run report's log
 
   @unit
+  Scenario: A read ahead of the schema while upgrading logs no error
+    Given the worker is upgrading and the ledger is behind this image
+    When a request reads a Postgres table or column the schema does not have yet
+    Then it answers 503 upgrade_in_progress
+    And the request is logged at info, not error
+
+  @unit
+  Scenario: A first install that failed in a schema phase opens the console without a failed step
+    Given the worker's first install failed in its Postgres or ClickHouse schema phase
+    And the failure wrote no failed step row, only the run's failed outcome
+    When the operator opens the console with the token
+    Then the console shows the run's error and the last lines of its log
+
+  @unit
   Scenario: A failure on an installation that finished an upgrade before opens no console
     Given the worker's upgrade failed on a blocking step of an installation that finished an upgrade before
     When a browser requests any page

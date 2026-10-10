@@ -291,6 +291,18 @@ describe("LicenseService", () => {
       expect(repository.listCalls).toBe(0);
     });
 
+    /** @scenario "The SSO scan before the license table exists logs no error" */
+    it("denies without an error while the license table does not exist yet", async () => {
+      repository.findOrganizationsWithLicense = async () => {
+        throw Object.assign(new Error("table `OrganizationLicense` does not exist"), {
+          code: "P2021",
+        });
+      };
+
+      await expect(service.isPlatformSsoLicensed({ isSaas: false })).resolves.toBe(false);
+      expect(logger.errors).toEqual([]);
+    });
+
     it("denies while the scan fails, and scans again on the next ask", async () => {
       const findOrganizationsWithLicense = repository.findOrganizationsWithLicense.bind(repository);
       let failing = true;

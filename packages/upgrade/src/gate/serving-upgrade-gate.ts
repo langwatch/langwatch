@@ -203,6 +203,10 @@ export function upgradeGateOver({
 }
 
 const logTailSchema = z.array(z.string()).catch([]);
+/** A failed run's report: a schema phase failure writes its error here, never on a step row. */
+const failedReportSchema = z
+  .object({ logTail: logTailSchema, error: z.string().nullable().catch(null).default(null) })
+  .catch({ logTail: [], error: null });
 
 /** The api's console Retry: each failed blocking step back to `pending` (UIW-7, Q10). */
 function consoleRetryFor({
@@ -225,9 +229,9 @@ function consoleRetryFor({
 type LedgerRun = Pick<UpgradeRun, "kind" | "outcome" | "report">;
 
 /**
- * UIW-7, NO-HOLDS: an api whose installation never finished an upgrade run (a first install, so
- * nobody can sign in to Ops > Upgrades; the ledger seed's run does not count) reads the failure
- * from the ledger for the token console.
+ * UIW-7, NO-HOLDS: an api whose installation never finished an upgrade run (the seed's run does
+ * not count) reads the failure for the token console; a failed schema phase writes no step row,
+ * so a failed last finished run opens it too, its error closing the log tail.
  */
 export async function failedFirstInstallRun({
   verdict,
@@ -242,9 +246,13 @@ export async function failedFirstInstallRun({
   const runs = await findRuns();
   if (runs.some((run) => run.kind === "upgrade" && run.outcome === "succeeded")) return verdict;
   const failedSteps = await findFailedSteps();
-  if (failedSteps.length === 0) return verdict;
+  const lastFinished = runs.findLast((run) => run.kind === "upgrade" && run.outcome !== null);
+  if (failedSteps.length === 0 && lastFinished?.outcome !== "failed") return verdict;
   const report = runs.findLast((run) => run.kind === "upgrade" && run.outcome === "failed")?.report;
-  return { ...verdict, failedRun: { failedSteps, logTail: logTailSchema.parse(report?.logTail) } };
+  const { logTail, error } = failedReportSchema.parse(report ?? {});
+  const named =
+    error === null || failedSteps.length > 0 || logTail.some((line) => line.includes(error));
+  return { ...verdict, failedRun: { failedSteps, logTail: named ? logTail : [...logTail, error] } };
 }
 
 /** Who holds the upgrade lease now, or null when it is free (a lapsed lease is free). */

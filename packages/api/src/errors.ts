@@ -538,6 +538,12 @@ export function promoteStoreFailure<T>(raised: T): T | Error {
   return new Error(`schema and ledger disagree: ${detail}`, { cause: raised });
 }
 
+/** A read ahead of the schema while the worker upgrades: expected, so logged below error. */
+export function isUpgradeInProgress(raised: unknown): boolean {
+  const promoted = promoteStoreFailure(raised);
+  return HandledError.isHandled(promoted) && promoted.code === "upgrade_in_progress";
+}
+
 // ---------------------------------------------------------------------------
 // Hono onError handler
 // ---------------------------------------------------------------------------

@@ -447,3 +447,9 @@ Feature: Enterprise licensing lifecycle
     Given licensing applied a sign-in provider fact
     When the same fact is delivered again, or an older one arrives late
     Then the stored provider, mount state and applied event id are unchanged
+
+  @unit
+  Scenario: The SSO scan before the license table exists logs no error
+    Given a self-hosted install whose worker has not created the license table yet
+    When the platform single sign-on gate scans for a license
+    Then it denies for now, logs no error and scans again on the next ask
