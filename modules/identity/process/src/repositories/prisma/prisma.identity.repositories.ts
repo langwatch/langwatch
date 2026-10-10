@@ -17,6 +17,7 @@ import { PrismaSsoRegistrantReadRepository } from "../../features/sso-connection
 import { newSsoAuthenticationActivityId } from "../../features/sso-connection/rules/sso-connection-id.rules.ts";
 import { PrismaSsoDomainOwnershipRepository } from "../../features/sso-domain/repositories/prisma/prisma.sso-domain-ownership.repository.ts";
 import { PrismaSsoDomainReproofTargetRepository } from "../../features/sso-domain/repositories/prisma/prisma.sso-domain-reproof.repository.ts";
+import { EventingIdentityHistoryRepository } from "../eventing/eventing.identity-history.repository.ts";
 import type { IdentityRepositories } from "../identity.repositories.ts";
 import { RedisIdentityRateLimitRepository } from "../redis/redis.identity-rate-limit.repository.ts";
 import { PrismaIdentityAccountRekeyRepository } from "./prisma.identity-account-rekey.repository.ts";
@@ -100,6 +101,9 @@ export class PostgresIdentityRepositories {
         database,
         newSsoAuthenticationActivityId,
       ),
+      identityHistory: EventingIdentityHistoryRepository.create({
+        eventReadSeat: members.eventReadSeat,
+      }),
       identityProjection: PrismaIdentityProjectionRepository.create({
         prisma: database,
         reservations,

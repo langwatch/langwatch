@@ -35,6 +35,7 @@ import type { IdentityAccountRekeyRepository } from "./identity-account-rekey.re
 import type { IdentityBackfillRepository } from "./identity-backfill.repository.ts";
 import type { IdentityConnectionIssuersRepository } from "./identity-connection-issuers.repository.ts";
 import type { IdentityHeadsRepository } from "./identity-heads.repository.ts";
+import type { IdentityHistoryRepository } from "./identity-history.repository.ts";
 import type { IdentityLatchRepository } from "./identity-latch.repository.ts";
 import type { IdentityLookupRepository } from "./identity-lookup.repository.ts";
 import type { IdentityMigrationRepository } from "./identity-migration.repository.ts";
@@ -94,6 +95,8 @@ export interface IdentityRepositories {
   readonly ssoRegistrants: SsoRegistrantReadRepository;
   readonly ssoMigrationEvidence: SsoMigrationEvidenceRepository;
   /** The folded heads each identity pipeline writes, under the queue's per-aggregate lock. */
+  /** A person's identity facts and link proposals, read off the event log in every role. */
+  readonly identityHistory: IdentityHistoryRepository;
   readonly identityProjection: StateProjectionStore<IdentityFoldState> & ProvisionalHeadsWriter;
   readonly mfaProjection: StateProjectionStore<MfaFoldState>;
   readonly joinRequestProjection: StateProjectionStore<JoinRequestFoldState>;

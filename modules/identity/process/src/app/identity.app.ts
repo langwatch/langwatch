@@ -12,7 +12,6 @@ import {
   IdentityCapabilityUnavailableError,
   identityConfig,
   type IdentityEmailResolution,
-  IDENTITY_PIPELINE_NAME,
   JOIN_REQUEST_PIPELINE_NAME,
   type IdentityLookupAnswer,
   type IdentityLookupApi,
@@ -150,7 +149,6 @@ import { SsoDomainCeremonyService } from "../features/sso-domain/services/sso-do
 import { SsoDomainOwnershipBackfillService } from "../features/sso-domain/services/sso-domain-ownership-backfill.service.ts";
 import { SsoDomainReproofService } from "../features/sso-domain/services/sso-domain-reproof.service.ts";
 import { SsoDomainOwnershipMigrationService } from "../features/sso-domain/services/system-migration-sso-domain-ownership.service.ts";
-import { EventingIdentityHistoryRepository } from "../repositories/eventing/eventing.identity-history.repository.ts";
 import type { IdentityRateLimitRepository } from "../repositories/identity-rate-limit.repository.ts";
 import type { IdentityRepositories } from "../repositories/identity.repositories.ts";
 import { LocalDoorBreakGlassBindingRepository } from "../repositories/local/local.door-break-glass-binding.repository.ts";
@@ -465,10 +463,7 @@ export class IdentityModule
     });
     const identityEventing = ConnectedIdentityEventing.create();
     const eventStores = IdentityEventStores.create();
-    // Read through user_identity's own store: the lookup, the link proposals and the pipeline.
-    const identityHistory = EventingIdentityHistoryRepository.create({
-      eventStore: eventStores.of({ pipeline: IDENTITY_PIPELINE_NAME }),
-    });
+    const identityHistory = setup.repositories.identityHistory;
     const ledger = IdentityLedgerStore.create({
       projectionStore: setup.repositories.identityProjection,
       heads: setup.repositories.heads,
