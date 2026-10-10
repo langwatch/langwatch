@@ -6,15 +6,15 @@
  */
 
 import { RawCheckbox as Checkbox } from "@langwatch/design-system/checkbox";
+import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
 import {
-  Box,
   Button,
   chakra,
   HStack,
-  Skeleton,
+  Table,
   Text,
-  VStack,
+  VisuallyHidden,
 } from "@langwatch/design-system/primitives";
 import type { ScenarioLastResultSummary } from "@langwatch/scenario-contract";
 import { format } from "@langwatch/time";
@@ -31,14 +31,48 @@ import { RecentRunsSubmenu } from "./recent-runs-menu.tsx";
 export type CaseLastResult = ScenarioLastResultSummary;
 
 /**
- * The columns of the table: the scenario name takes the free space, the row
- * actions take what they need on the right. A checkbox column is added at
- * the start of every row when the table is in selection mode.
+ * The columns of the table: the scenario name takes the free width, the row actions what
+ * they need on the right (a Run button only for someone who may run). Selection mode adds
+ * a checkbox column at the start. A width holds the cell padding as well as the content.
  */
-const BASE_COLUMNS = "minmax(0,1fr) auto";
-const CHECKBOX_COLUMN = "24px";
+function caseColumns({
+  isSelectionMode,
+  canManage,
+}: {
+  isSelectionMode: boolean;
+  canManage: boolean;
+}): { key: string; width?: string }[] {
+  return [
+    ...(isSelectionMode ? [{ key: "select", width: "52px" }] : []),
+    { key: "scenario" },
+    { key: "actions", width: canManage ? "124px" : "52px" },
+  ];
+}
+
 /** A set that runs from code has no controls, and a last run column instead. */
-const EXTERNAL_COLUMNS = "minmax(0,1fr) 110px";
+const EXTERNAL_LAST_RUN_WIDTH = "138px";
+
+/** The table, laid out by its columns so a long name truncates rather than widening it. */
+function CasesListTable({
+  columns,
+  testId,
+  children,
+}: {
+  columns: { key: string; width?: string }[];
+  testId: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <ListTable tableLayout="fixed" data-testid={testId}>
+      <Table.ColumnGroup>
+        {columns.map((column) => (
+          <Table.Column key={column.key} width={column.width} data-column={column.key} />
+        ))}
+      </Table.ColumnGroup>
+      {children}
+    </ListTable>
+  );
+}
 
 export type CasesTableProps = {
   /** The scenarios of the open suite, in order. */
@@ -61,52 +95,6 @@ export type CasesTableProps = {
   onArchive: (testCase: TestCase) => void;
 };
 
-function TableCard({ children, ...rest }: React.ComponentProps<typeof Box>) {
-  return (
-    <Box
-      borderWidth="1px"
-      borderColor="border"
-      borderRadius="xl"
-      background="bg.panel"
-      overflow="hidden"
-      boxShadow="0 1px 2px color-mix(in srgb, var(--chakra-colors-bg-scrim) 4%, transparent)"
-      {...rest}
-    >
-      {children}
-    </Box>
-  );
-}
-
-/** The line of column names above the rows. */
-function TableHeaderRow({
-  templateColumns,
-  children,
-}: {
-  templateColumns: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <Box
-      display="grid"
-      gridTemplateColumns={templateColumns}
-      columnGap={3}
-      alignItems="center"
-      paddingX={4}
-      paddingY={2}
-      background="bg.muted/50"
-      borderBottomWidth="1px"
-      borderBottomColor="border"
-      textStyle="micro"
-      fontWeight="semibold"
-      textTransform="uppercase"
-      letterSpacing="0.025em"
-      color="fg.muted"
-    >
-      {children}
-    </Box>
-  );
-}
-
 export function CasesTable({
   cases,
   canManage,
@@ -122,29 +110,27 @@ export function CasesTable({
   onDuplicate,
   onArchive,
 }: CasesTableProps) {
-  const templateColumns = isSelectionMode ? `${CHECKBOX_COLUMN} ${BASE_COLUMNS}` : BASE_COLUMNS;
+  const columns = caseColumns({ isSelectionMode, canManage });
 
   return (
-    <TableCard data-testid="agent-testing-cases-table">
-      <TableHeaderRow templateColumns={templateColumns}>
-        {isSelectionMode && <Text as="span" />}
-        <Text as="span">Scenario</Text>
-        <Text as="span" />
-      </TableHeaderRow>
+    <CasesListTable columns={columns} testId="agent-testing-cases-table">
+      <Table.Header>
+        <Table.Row>
+          {isSelectionMode && (
+            <Table.ColumnHeader>
+              <VisuallyHidden>Select</VisuallyHidden>
+            </Table.ColumnHeader>
+          )}
+          <Table.ColumnHeader>Scenario</Table.ColumnHeader>
+          <ListTable.ActionHeader />
+        </Table.Row>
+      </Table.Header>
 
-      <Box
-        css={{
-          "& > * + *": {
-            borderTopWidth: "1px",
-            borderTopColor: "var(--chakra-colors-border-muted)",
-          },
-        }}
-      >
+      <Table.Body>
         {cases.map((testCase) => (
           <CaseRow
             key={testCase.id}
             testCase={testCase}
-            templateColumns={templateColumns}
             canManage={canManage}
             period={period}
             hasLastRun={hasLastRunByCase(testCase.id)}
@@ -159,14 +145,13 @@ export function CasesTable({
             onArchive={onArchive}
           />
         ))}
-      </Box>
-    </TableCard>
+      </Table.Body>
+    </CasesListTable>
   );
 }
 
 function CaseRow({
   testCase,
-  templateColumns,
   canManage,
   period,
   hasLastRun,
@@ -181,7 +166,6 @@ function CaseRow({
   onArchive,
 }: {
   testCase: TestCase;
-  templateColumns: string;
   canManage: boolean;
   period: Period;
   hasLastRun: boolean;
@@ -204,20 +188,14 @@ function CaseRow({
   };
 
   return (
-    <Box
-      display="grid"
-      gridTemplateColumns={templateColumns}
-      columnGap={3}
-      alignItems="center"
-      paddingX={4}
-      paddingY="10px"
+    <Table.Row
       cursor="pointer"
-      _hover={{ background: "bg.muted/40" }}
       onClick={handleRowClick}
+      data-selected={isSelectionMode && isSelected ? "" : undefined}
       data-testid={`case-row-${testCase.name}`}
     >
       {isSelectionMode && (
-        <Box onClick={(event) => event.stopPropagation()}>
+        <Table.Cell onClick={(event) => event.stopPropagation()}>
           <Checkbox.Root
             checked={isSelected}
             onCheckedChange={() => onToggleSelected(testCase.id)}
@@ -227,25 +205,28 @@ function CaseRow({
             <Checkbox.HiddenInput />
             <Checkbox.Control />
           </Checkbox.Root>
-        </Box>
+        </Table.Cell>
       )}
-      <HStack gap={1.5} minWidth={0} flexWrap="wrap">
-        <chakra.button
-          type="button"
-          minWidth={0}
-          textAlign="left"
-          cursor="pointer"
-          onClick={(event) => {
-            event.stopPropagation();
-            onRowClick(testCase);
-          }}
-        >
-          <Text textStyle="bodySm" fontWeight="medium" color="fg" truncate>
-            {testCase.name}
-          </Text>
-        </chakra.button>
-        <TagList labels={testCase.labels} tone="pastel" />
-      </HStack>
+      <Table.Cell>
+        <HStack gap={1.5} minWidth={0} flexWrap="wrap">
+          <chakra.button
+            type="button"
+            minWidth={0}
+            maxWidth="full"
+            textAlign="left"
+            cursor="pointer"
+            onClick={(event) => {
+              event.stopPropagation();
+              onRowClick(testCase);
+            }}
+          >
+            <Text textStyle="bodySm" fontWeight="medium" color="fg" truncate>
+              {testCase.name}
+            </Text>
+          </chakra.button>
+          <TagList labels={testCase.labels} tone="pastel" />
+        </HStack>
+      </Table.Cell>
 
       <CaseRowActions
         testCase={testCase}
@@ -258,7 +239,7 @@ function CaseRow({
         onStartMoveToSuite={onStartMoveToSuite}
         onArchive={onArchive}
       />
-    </Box>
+    </Table.Row>
   );
 }
 
@@ -284,19 +265,21 @@ function CaseRowActions({
   onArchive: (testCase: TestCase) => void;
 }) {
   return (
-    <HStack gap={1} justify="flex-end" onClick={(event) => event.stopPropagation()}>
-      {canManage && <RunCaseButton caseName={testCase.name} onOpen={() => onRunCase(testCase)} />}
-      <CaseRowActionsMenu
-        testCase={testCase}
-        canManage={canManage}
-        period={period}
-        hasLastRun={hasLastRun}
-        onEdit={onEdit}
-        onDuplicate={onDuplicate}
-        onStartMoveToSuite={onStartMoveToSuite}
-        onArchive={onArchive}
-      />
-    </HStack>
+    <ListTable.ActionCell>
+      <HStack gap={1} justify="flex-end">
+        {canManage && <RunCaseButton caseName={testCase.name} onOpen={() => onRunCase(testCase)} />}
+        <CaseRowActionsMenu
+          testCase={testCase}
+          canManage={canManage}
+          period={period}
+          hasLastRun={hasLastRun}
+          onEdit={onEdit}
+          onDuplicate={onDuplicate}
+          onStartMoveToSuite={onStartMoveToSuite}
+          onArchive={onArchive}
+        />
+      </HStack>
+    </ListTable.ActionCell>
   );
 }
 
@@ -397,58 +380,66 @@ export function ExternalCasesTable({
   onRowClick: (scenarioId: string) => void;
 }) {
   return (
-    <TableCard data-testid="agent-testing-external-cases-table">
-      <TableHeaderRow templateColumns={EXTERNAL_COLUMNS}>
-        <Text as="span">Scenario</Text>
-        <Text as="span" textAlign="right">
-          Last run
-        </Text>
-      </TableHeaderRow>
-      <Box
-        css={{
-          "& > * + *": {
-            borderTopWidth: "1px",
-            borderTopColor: "var(--chakra-colors-border-muted)",
-          },
-        }}
-      >
+    <CasesListTable
+      columns={[{ key: "scenario" }, { key: "last-run", width: EXTERNAL_LAST_RUN_WIDTH }]}
+      testId="agent-testing-external-cases-table"
+    >
+      <Table.Header>
+        <Table.Row>
+          <Table.ColumnHeader>Scenario</Table.ColumnHeader>
+          <Table.ColumnHeader textAlign="end">Last run</Table.ColumnHeader>
+        </Table.Row>
+      </Table.Header>
+      <Table.Body>
         {cases.map((externalCase) => (
-          <chakra.button
+          <Table.Row
             key={externalCase.scenarioId}
-            type="button"
-            width="full"
-            textAlign="left"
-            display="grid"
-            gridTemplateColumns={EXTERNAL_COLUMNS}
-            columnGap={3}
-            alignItems="center"
-            paddingX={4}
-            paddingY="10px"
             cursor="pointer"
-            _hover={{ background: "bg.muted/40" }}
             onClick={() => onRowClick(externalCase.scenarioId)}
             data-testid={`external-case-row-${externalCase.name}`}
           >
-            <Text textStyle="bodySm" fontWeight="medium" color="fg" truncate>
-              {externalCase.name}
-            </Text>
-            <Text textStyle="micro" color="fg.muted" whiteSpace="nowrap" textAlign="right">
-              {format(externalCase.lastRunAt, "MMM d, HH:mm")}
-            </Text>
-          </chakra.button>
+            <Table.Cell>
+              <chakra.button
+                type="button"
+                minWidth={0}
+                maxWidth="full"
+                textAlign="left"
+                cursor="pointer"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onRowClick(externalCase.scenarioId);
+                }}
+              >
+                <Text textStyle="bodySm" fontWeight="medium" color="fg" truncate>
+                  {externalCase.name}
+                </Text>
+              </chakra.button>
+            </Table.Cell>
+            <Table.Cell textAlign="end">
+              <Text textStyle="micro" color="fg.muted" whiteSpace="nowrap">
+                {format(externalCase.lastRunAt, "MMM d, HH:mm")}
+              </Text>
+            </Table.Cell>
+          </Table.Row>
         ))}
-      </Box>
-    </TableCard>
+      </Table.Body>
+    </CasesListTable>
   );
 }
 
-/** The skeleton the table stands in as while the scenario list is read. */
+/** The table the scenario list stands in as while it is read: its header over placeholder rows. */
 export function CasesTableSkeleton() {
   return (
-    <VStack align="stretch" gap={2} data-testid="agent-testing-cases-skeleton">
-      <Skeleton height="44px" />
-      <Skeleton height="44px" />
-      <Skeleton height="44px" />
-    </VStack>
+    <ListTable data-testid="agent-testing-cases-skeleton">
+      <Table.Header>
+        <Table.Row>
+          <Table.ColumnHeader>Scenario</Table.ColumnHeader>
+          <ListTable.ActionHeader />
+        </Table.Row>
+      </Table.Header>
+      <Table.Body>
+        <ListTable.LoadingRows rows={3} columns={2} />
+      </Table.Body>
+    </ListTable>
   );
 }
