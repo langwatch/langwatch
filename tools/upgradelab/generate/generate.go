@@ -21,9 +21,6 @@ import (
 	"github.com/langwatch/langwatch/tools/upgradelab/seed"
 )
 
-// Floor is the oldest release an upgrade accepts (the LTS floor).
-const Floor = "3.20.1"
-
 var (
 	mainRelease  = regexp.MustCompile(`^main@[0-9a-f]{7,40}$`)
 	tagRelease   = regexp.MustCompile(`^(\d+)\.(\d+)\.(\d+)$`)
@@ -69,8 +66,6 @@ func Build(request Request) (Plan, error) {
 		return Plan{}, fmt.Errorf("release %q: cloud shapes come from main@<sha>, cloud never runs a release tag", request.Release)
 	case !cloud && !tagRelease.MatchString(request.Release):
 		return Plan{}, fmt.Errorf("release %q: self-hosted shapes come from a release tag", request.Release)
-	case !cloud && belowFloor(request.Release):
-		return Plan{}, fmt.Errorf("release %s is below the floor %s; the 3.19.4 refusal recipe is an overlay (lane L5)", request.Release, Floor)
 	}
 	tenancy := seed.BuildTenancy(seed.TenancyInput{Shape: request.Shape, Seed: request.Seed, Anchor: request.Anchor, Cloud: cloud})
 	seedText := strconv.FormatInt(request.Seed, 10)
@@ -85,18 +80,6 @@ func Build(request Request) (Plan, error) {
 		{Name: "capture", Args: map[string]string{"anchor": request.Anchor.UTC().Format(time.RFC3339)}},
 	}
 	return Plan{Request: request, Tenancy: tenancy, TenancyS: tenancy.SQL(), Steps: steps}, nil
-}
-
-func belowFloor(release string) bool {
-	parse := func(value string) [3]int {
-		var parts [3]int
-		for i, part := range tagRelease.FindStringSubmatch(value)[1:] {
-			parts[i], _ = strconv.Atoi(part)
-		}
-		return parts
-	}
-	got, floor := parse(release), parse(Floor)
-	return slices.Compare(got[:], floor[:]) < 0
 }
 
 // Digest is the hash of the logical plan: the fingerprint input two runs with one seed share.

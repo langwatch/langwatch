@@ -1,15 +1,15 @@
 ---
 name: upgrade
-description: "How the upgrade system works end to end, for an engineer changing or debugging it: `pnpm task upgrade` (`status`, `plan`, `steps`), the ledger schema, the runner lease and the serving roster, release manifests in `packages/upgrade/releases/`, blocking, background and operator steps, `.withMigrations`, the code-step generator and `code-step-ids.generated.ts`, `-- after:` notes, the serving gate and the floor refusal, rollback, the Ops Upgrades console and `retryStep`, the worker running the upgrade, serving while upgrading (no holds, `upgrade_in_progress`, `ClickHouseColumns`), the first-install token console, and how to test it (live fixture, migration-compat, rehearsal, upgradelab). Use when someone says 'how does the upgrade work', 'pnpm task upgrade', 'the ledger', 'upgrade lease', 'serving roster', 'serving gate', 'refuses to serve', 'behind this image', 'release manifest', 'stamp the release', 'code-step-ids', 'image-code-steps', 'CodeStepId', 'after: note', 'refused_below_floor', 'upgrade_in_progress', 'serves while upgrading', 'no holds', 'token console', 'the worker runs the upgrade', 'rollback reopened', 'Upgrades page', 'retry a failed step', 'upgradelab', 'upgrade rehearsal' or 'migration-compat'."
+description: "How the upgrade system works end to end, for an engineer changing or debugging it: `pnpm task upgrade` (`status`, `plan`, `steps`), the ledger schema, the runner lease and the serving roster, release manifests in `packages/upgrade/releases/`, blocking, background and operator steps, `.withMigrations`, the code-step generator and `code-step-ids.generated.ts`, `-- after:` notes, the serving gate, rollback, the Ops Upgrades console and `retryStep`, the worker running the upgrade, serving while upgrading (no holds, `upgrade_in_progress`, `ClickHouseColumns`), the first-install token console, and how to test it (live fixture, migration-compat, rehearsal, upgradelab). Use when someone says 'how does the upgrade work', 'pnpm task upgrade', 'the ledger', 'upgrade lease', 'serving roster', 'serving gate', 'refuses to serve', 'behind this image', 'release manifest', 'stamp the release', 'code-step-ids', 'image-code-steps', 'CodeStepId', 'after: note', 'upgrade_in_progress', 'serves while upgrading', 'no holds', 'token console', 'the worker runs the upgrade', 'rollback reopened', 'Upgrades page', 'retry a failed step', 'upgradelab', 'upgrade rehearsal' or 'migration-compat'."
 user-invocable: true
 argument-hint: "<the part of the upgrade you are changing or debugging>"
 ---
 
 # The upgrade system
 
-Record: `dev/docs/ARCHITECTURE.md` §7 ("Upgrades run on deploy", the LTS paragraph after it);
+Record: `dev/docs/ARCHITECTURE.md` §7 ("Upgrades run on deploy", no required stop);
 `dev/docs/adr/173-upgrades-run-on-deploy.md`; ADR-155 for the window. Writing a migration is the
-`migration` skill; naming an LTS is `lts-release`; operator view is `docs/self-hosting/upgrade.mdx`.
+`migration` skill; operator view is `docs/self-hosting/upgrade.mdx`.
 
 ## The shape
 
@@ -17,7 +17,7 @@ Record: `dev/docs/ARCHITECTURE.md` §7 ("Upgrades run on deploy", the LTS paragr
 new image ─► worker boot ─► gate.admit (behind or first install)
                  │            lease `upgrade` free? ─► child `pnpm task upgrade`
                  │            held by a peer / failed run ─► wait, re-ask every 10 s, wait for Retry
-                 │              ledger schema, lease, seed, floor check, plan
+                 │              ledger schema, lease, seed, plan
                  │              per release: schema (Prisma, goose) ─► blocking steps ─► reconcilers
                  ▼
              ledger current ─► takes jobs ─► background steps (per-step leases)
@@ -48,10 +48,10 @@ worker as a sidecar (metrics on 9465, so it never clashes with the api's 9464). 
 | Lease (ttl 60 s, heartbeat 15 s, wait 10 min)                   | `packages/upgrade/src/runner/runner-lease.ts` (`DEFAULT_LEASE_TIMING`)                                                                               |
 | Ledger kinds, modes, statuses                                   | `packages/upgrade/src/ledger.ts`                                                                                                                     |
 | Ledger schema and tables                                        | `packages/upgrade/src/ledger-tables.ts`                                                                                                              |
-| Plan, floor refusal, `after` ordering, `-- after:` inlining     | `packages/upgrade/src/plan/plan-upgrade.ts`                                                                                                          |
+| Plan, `after` ordering, `-- after:` inlining                    | `packages/upgrade/src/plan/plan-upgrade.ts`                                                                                                          |
 | Installed release inferred from the ledger                      | `packages/upgrade/src/runner/installed-release.ts`                                                                                                   |
 | One release at a time                                           | `packages/upgrade/src/stepping/` (`apply-release.ts`, `rerunnable-migrations.ts`)                                                                    |
-| Manifests and floor                                             | `packages/upgrade/releases/*.json`, `packages/upgrade/src/manifest/`                                                                                 |
+| Manifests                                                       | `packages/upgrade/releases/*.json`, `packages/upgrade/src/manifest/`                                                                                 |
 | Step declaration                                                | `packages/upgrade/src/step/migration-step.ts`, `projection-replay-step.ts`                                                                           |
 | Collection over the installed list                              | `packages/process/src/migration/migration-steps.ts`                                                                                                  |
 | Serving gate; the worker's wait loop (`admitAfterFirstInstall`) | `packages/process/src/migration/upgrade-gate.ts` → `packages/upgrade/src/gate/serving-upgrade-gate.ts`; the child is `gate/first-install-upgrade.ts` |
@@ -78,17 +78,17 @@ Modes: `blocking` (in `upgrade`, before serving; only `data` may block, frozen S
 (worker, after the last release), `operator` (an operator starts it). Statuses: `pending`,
 `running`, `done`, `not-needed`, `failed`, `gated`.
 
-## Release manifests and the floor
+## Release manifests
 
 `packages/upgrade/releases/<release>.json` is `{ release, previous, cutAt, steps[] }`
 (`releaseManifestSchema`). CI stamps it on the release PR with `packages/upgrade/scripts/stamp-release.ts`
 (`stamp-release-manifest` job, `.github/workflows/release-please-sdks.yml`); never hand-write one.
 Steps the image ships that no manifest lists yet are "unreleased" and run in one pass at the end.
 
-`lts-floor.json` is `{ release, namedAt }` (`ltsFloorSchema`): the oldest release this image
-upgrades from. Below it the plan refuses (`below_lts_floor` → exit 2 `refused_below_floor`, the
-message names the LTS to stop at); an image older than the floor the ledger recorded refuses
-`refused_image_below_floor`. The floor moves only by the `lts-release` procedure.
+No release is a required stop on the way to the latest (Alex, 2026-10-11): any install upgrades straight to the
+latest image, which plans every release after the installed one and the worker rolls through every
+step. An install older than the first manifest's `previous` (the 3.18.1 baseline) plans from the
+baseline; settled schema no manifest names is inferred there too (`runner/installed-release.ts`).
 
 ## Declaring code steps
 
@@ -130,20 +130,19 @@ Specs: `specs/upgrade/in-app-upgrade.feature`, `packages/process/specs/upgrade-h
 ## Serving gate, roster and rollback
 
 The gate refuses to start, by name, while a blocking step of the image is not `done`/`not-needed`,
-the release is below the floor, or ClickHouse is missing (`NO_CLICKHOUSE_REFUSAL`). Admitted, a
+or ClickHouse is missing (`NO_CLICKHOUSE_REFUSAL`). Admitted, a
 process writes a roster row every 15 s; the stale bound is generous so a database blip never takes
 a process out of service (`serving-upgrade-gate.ts`). Background steps with `needsOldWritersGone`
 wait until every live row declares them. A rollback is an older image's live row after the last
-finished run: it reopens level-triggered background steps, never one retired below the floor
-(`rollback.ts`). There is no down migration; the way back is the previous image on the new schema.
+finished run: it reopens level-triggered background steps newer than that image, never one
+shipped at or below its release (`rollback.ts`). There is no down migration; the way back is the previous image on the new schema.
 
 ## The Ops Upgrades console
 
 `/ops/upgrades`, platform operators. Reads ask `ops:view`; `retryStep` asks `ops:manage` and returns
 a `failed` background step to `pending` (refuses `upgrade_step_not_failed` otherwise). The page
-refreshes on the runner's read hint, never a timer. Eight installation states: Up to date,
-Finishing in background, Behind, Never upgraded, Upgrading, Rolled back, Needs attention,
-Unsupported. Specs: `modules/ops/specs/upgrades.feature`, `upgrade-alerts.feature`,
+refreshes on the runner's read hint, never a timer. Seven installation states: Up to date,
+Finishing in background, Behind, Never upgraded, Upgrading, Rolled back, Needs attention. Specs: `modules/ops/specs/upgrades.feature`, `upgrade-alerts.feature`,
 `upgrades-checkup.feature`.
 
 ## Test it
@@ -153,7 +152,7 @@ Unsupported. Specs: `modules/ops/specs/upgrades.feature`, `upgrade-alerts.featur
 | Plan, stepping, gate, reader     | unit and integration suites in `packages/upgrade` (`specs/upgrade/*.feature`, `packages/upgrade/specs/`)                          |
 | Code step list drift             | `image-code-steps.ts --check` (above)                                                                                             |
 | Whole upgrade on test stores     | `apps/api/src/__tests__/live-upgrade.fixture.ts` (`specs/upgrade/live-test-fixtures.feature`)                                     |
-| Old image on head's schema       | `.github/workflows/migration-compat.yml` (per PR, and the nightly `lts-floor` job booting the floor image)                        |
+| Old image on head's schema       | `.github/workflows/migration-compat.yml` (per PR, and the nightly `previous-release` job booting the newest manifest's image)     |
 | A real upgrade from an old image | `dev/scripts/upgrade-rehearsal/rehearse.sh` (`upgrade-rehearsal.yml`, manual dispatch; `specs/upgrade/upgrade-rehearsal.feature`) |
 | Snapshots of a seeded install    | `tools/upgradelab` (`cd tools && go run ../cmd/upgradelab snapshot capture                                                        | restore | fingerprint | verify`); harness phases not landed yet, see its README |
 
@@ -162,5 +161,5 @@ Unsupported. Specs: `modules/ops/specs/upgrades.feature`, `upgrade-alerts.featur
 - Run a step from the api, add a `migrate` compose service or an npx migration phase, or wait without a deadline.
 - Hold a request while upgrading, or map a schema error per module: `promoteStoreFailure` is the one place.
 - Read a column a pending ClickHouse step adds without `ClickHouseColumns`.
-- Hand-edit a stamped manifest or a merged migration; move the floor outside `lts-release`.
+- Hand-edit a stamped manifest or a merged migration.
 - Write the ledger by hand to unstick a run: fix the cause and re-run `upgrade`, or `retryStep`.

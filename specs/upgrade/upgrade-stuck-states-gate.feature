@@ -87,9 +87,9 @@ Feature: An upgrade never sticks in the gate, the background runner or the statu
   @integration
   Scenario: The preview plans a cut first install as fresh, as the runner does
     Given a seeded ledger whose only upgrade run planned a fresh install and failed
-    And the ledger records schema below the LTS floor
+    And the ledger records schema no manifest names
     When the Upgrades page previews the upgrade
-    Then the plan is a fresh install, not a refusal below the floor
+    Then the plan is a fresh install, not a roll through every release
 
   @integration
   Scenario: The preview reads the tools' records until a seed run has succeeded
@@ -98,34 +98,12 @@ Feature: An upgrade never sticks in the gate, the background runner or the statu
     When the Upgrades page previews the upgrade
     Then the installed release is read from Prisma's history
 
-  # Gate review, 2026-10-10: a refusal is shown as one, never as "upgrading" or a retry loop.
-  @unit
-  Scenario: A worker whose upgrade refuses below the floor runs it once and refuses by name
-    Given a worker behind its image whose upgrade exits 2, refused below the LTS floor
-    When it runs the upgrade
-    Then it runs it once and never retries it on a backoff
-    And it refuses to serve, naming the refusal code and the release to stop at
-
   @unit
   Scenario: A first install whose ledger seed succeeded still opens the console
     Given an installation whose only succeeded run is the ledger seed
     And the worker's first upgrade run failed on a blocking step
     When the api asks the gate
     Then the verdict carries the failed run for the console
-
-  @unit
-  Scenario: A refused upgrade on an installation that never finished one opens the console
-    Given an installation whose only succeeded run is the ledger seed
-    And the newest upgrade run of this image refused below the floor
-    When the api asks the gate
-    Then the verdict carries a failed run whose lines name the refusal and the release to stop at
-
-  @unit
-  Scenario: A refused upgrade on an installation that finished one before refuses by name
-    Given an installation that finished an upgrade before
-    And the newest upgrade run of this image refused below the floor
-    When the api asks the gate
-    Then it refuses, naming the refusal code and the release to stop at, instead of upgrading
 
   @unit
   Scenario: The gate's connection gives up on a statement that never answers

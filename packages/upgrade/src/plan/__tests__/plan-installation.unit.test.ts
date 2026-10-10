@@ -1,4 +1,7 @@
-/** @see specs/upgrade/upgrade-reader.feature */
+/**
+ * @see specs/upgrade/upgrade-reader.feature
+ * @see specs/upgrade/release-manifests.feature
+ */
 import { describe, expect, it } from "vitest";
 
 import type { ManifestStep, ReleaseManifest } from "../../manifest/manifest.ts";
@@ -54,6 +57,24 @@ describe("planInstallation()", () => {
       });
       expect(installed).toBe("3.20.1");
       expect(plan.releases.map((release) => release.release)).toEqual(["3.21.0", "3.22.0"]);
+    });
+  });
+
+  describe("when the last succeeded upgrade recorded a release older than the 3.18.1 baseline", () => {
+    /** @scenario "An install older than the 3.18.1 baseline plans every release from the baseline" */
+    it("plans every shipped release, starting with the one after the baseline", () => {
+      const fromBaseline = [
+        manifest("3.19.0", "3.18.1", "prisma:20260901000000_a"),
+        manifest("3.19.1", "3.19.0", "prisma:20260915000000_b"),
+      ];
+      const { installed, plan } = planInstallation({
+        image: { release: "3.19.1", steps: fromBaseline.flatMap((release) => release.steps) },
+        releases: { manifests: fromBaseline },
+        steps: [],
+        runs: [upgradeTo("3.16.0")],
+      });
+      expect(installed).toBe("3.16.0");
+      expect(plan.releases.map((release) => release.release)).toEqual(["3.19.0", "3.19.1"]);
     });
   });
 

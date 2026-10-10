@@ -1,20 +1,19 @@
 ---
 name: clickhouse-migration
-description: "Change the ClickHouse schema without breaking any release still in the supported window: where the goose migrations live, `clickhouse:<NNNNN>` numbering and the migration-order check for collisions, one owner per file, one statement per StatementBegin block, IF NOT EXISTS / IF EXISTS on every statement, why a variable-size column added by ALTER needs a DEFAULT, why down migrations stay commented out, partition keys and TTL, deduped tables and argMax, the LTS floor (3.20.1) and the retirement note required before any DROP or type change, historic values by a background .withMigrations step instead of an operator comment, the `-- background step:` note on a mutation (MODIFY TTL needs materialize_ttl_after_modify = 0) and the deploy-time rewrites it never excuses (MODIFY ORDER BY, OPTIMIZE FINAL, POPULATE), a changed view under a new name, every ClickHouse target applied by `pnpm task upgrade`, keeping the LWQL catalogue in step, and the expand/contract recipes. Use whenever someone says 'add a ClickHouse column', 'add a ClickHouse table', 'change that column type', 'drop the old table', 'replace the view', 'backfill a ClickHouse column', 'MATERIALIZE', 'write a goose migration', 'goose number taken', 'Code 173', 'Code 241', or the migration-safety test named their migration."
+description: "Change the ClickHouse schema without breaking any release still in the supported window: where the goose migrations live, `clickhouse:<NNNNN>` numbering and the migration-order check for collisions, one owner per file, one statement per StatementBegin block, IF NOT EXISTS / IF EXISTS on every statement, why a variable-size column added by ALTER needs a DEFAULT, why down migrations stay commented out, partition keys and TTL, deduped tables and argMax, why a DROP or type change waits until old writers are gone and the retirement note it needs, historic values by a background .withMigrations step instead of an operator comment, the `-- background step:` note on a mutation (MODIFY TTL needs materialize_ttl_after_modify = 0) and the deploy-time rewrites it never excuses (MODIFY ORDER BY, OPTIMIZE FINAL, POPULATE), a changed view under a new name, every ClickHouse target applied by `pnpm task upgrade`, keeping the LWQL catalogue in step, and the expand/contract recipes. Use whenever someone says 'add a ClickHouse column', 'add a ClickHouse table', 'change that column type', 'drop the old table', 'replace the view', 'backfill a ClickHouse column', 'MATERIALIZE', 'write a goose migration', 'goose number taken', 'Code 173', 'Code 241', or the migration-safety test named their migration."
 user-invocable: true
 argument-hint: "<the schema change, or the migration name the scanner refused>"
 ---
 
 # Change the ClickHouse schema inside the window
 
-**The rule** (ADR-155, widened to the floor; ADR-173): every release from the LTS floor
-(`packages/upgrade/releases/lts-floor.json`, `3.20.1`) to head keeps running on every later schema.
-`upgrade` runs under a lease while the old pods keep serving, and a rollback puts an older image on
+**The rule** (ADR-155; ADR-173): no release is a required stop (Alex, 2026-10-11); any install upgrades
+to the latest image through every step. `upgrade` runs under a lease while the old pods keep serving, and a rollback puts an older image on
 the new schema. (A one-release upgrade runs goose `up` on each target in one pass; a jump across
 several releases runs goose `up-to` each release's last version in turn, `releaseSteppingApplier`
 in `apps/tasks/src/upgrade.ts`, `specs/upgrade/stepping.feature`.) Every change is
-expand/contract, and a destructive step may only remove what **no release at or above the floor**
-reads. Which recipe applies at all: the `migration` skill.
+expand/contract: a DROP or contract waits until old writers are gone (`needsOldWritersGone`), and
+the step that drops is kept, like every step. Which recipe applies at all: the `migration` skill.
 
 Files: `packages/clickhouse-migrations/migrations/<NNNNN>_<slug>.sql`, applied by goose in sequence
 order. Read `dev/docs/best_practices/clickhouse-queries.md` before writing any query the migration
@@ -112,31 +111,30 @@ Never `MODIFY COLUMN` to a new type: it rewrites every part while older releases
 
 1. **Expand**: a new column of the new type with a `DEFAULT`, beside the old.
 2. **Migrate**: dual-write from release A; a background step backfills history; readers switch in A.
-3. **Contract**: drop the old column once the LTS floor is at or above A, with the note.
+3. **Contract**: drop the old column once old writers are gone (`needsOldWritersGone`), with the note.
 
 `MODIFY COLUMN` that sets only a `CODEC`, a `TTL` or a comment is not a type change: write
 `MODIFY COLUMN <name> CODEC(...)` without restating the type.
 
 ## Recipe: remove a column, a table or a view
 
-Release A stops reading it; the first release whose LTS floor is at or above A drops it, with the note
-naming A:
+Release A stops reading it; a later release drops it once old writers are gone
+(`needsOldWritersGone`), with the note naming A:
 
 ```sql
 -- contract: retired in 3.20.1
 ALTER TABLE ${CLICKHOUSE_DATABASE}.trace_summaries DROP COLUMN IF EXISTS LegacyCost;
 ```
 
-The note's release must be at or below the floor (`retirement-note-above-floor`). When it is not,
-leave the drop out and name it in the handoff: a lane does not move the floor.
+The step that drops is kept, like every step: an install on any older release runs it in turn.
 
 ## Recipe: change a view
 
 - **Same columns, same meaning** (a fix to the body): `CREATE OR REPLACE VIEW`, or
   `EXCHANGE TABLES` for a materialized one. Never drop-and-create: every read in the gap fails.
 - **Different columns**: a view replaced in place is destructive (plan 6.12, enforcement item 2).
-  Create a new view under a new name, switch readers in release A, drop the old view under the
-  floor rule.
+  Create a new view under a new name, switch readers in release A, drop the old view once old
+  writers are gone, with the note.
 
 Either way the catalogue moves with it (below).
 
@@ -173,7 +171,6 @@ with the fix:
 | Rule                                       | Refuses                                                                                                                                                                          |
 | ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `drop-without-retirement-note`             | a `DROP` with no `-- contract: retired in <release>`                                                                                                                             |
-| `retirement-note-above-floor`              | a note naming a release above the floor                                                                                                                                          |
 | `modify-column-type`                       | `MODIFY COLUMN` to a new type                                                                                                                                                    |
 | `add-variable-size-column-without-default` | `Array`, `Map`, `Tuple`, `Nested` added with no `DEFAULT`                                                                                                                        |
 | `one-statement-per-goose-block`            | two statements in one `StatementBegin` block                                                                                                                                     |

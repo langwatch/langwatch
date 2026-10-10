@@ -1466,7 +1466,7 @@ tags fails the guards rather than passing (Alex, 2026-10-09).
   Operator-started jobs (re-sealing credentials after a `CREDENTIALS_SECRET` rotation, moving object
   storage to another provider) are not release steps: they stay named tasks an operator starts, safe to
   run again, outside the ledger (Alex, 2026-10-09). Main's virtual-key config backfill is deleted, not
-  ported: its strip migration shipped in 3.19.0, below the 3.20.1 floor (Alex, 2026-10-09). Each serving
+  ported: its strip migration shipped in 3.19.0 (Alex, 2026-10-09). Each serving
   process's roster row records `credentialKeyFingerprint` of every credential key it accepts, never the
   key, and `credentials-reseal` refuses to apply while any live row lacks the current or the previous
   key (Alex, 2026-10-09). Governance's anomaly destination migration passes a migration-only `idempotencyKey` on
@@ -1515,7 +1515,7 @@ the row's; an unrelated organization update inside the mirror lag makes stale co
 host clocks differ, which is the accepted ceiling (Alex, 2026-10-09).
 A step that moves a stored value to a new shape annotates the old shape (an inline anomaly webhook
 destination gains an optional `endpointId`) so a rolled-back image still reads it, and a contract step
-after the floor rewrites it to the new shape (Alex, 2026-10-09, D1-A).
+rewrites it to the new shape once old writers are gone (Alex, 2026-10-09, D1-A).
 An image is the newest stamped release (`packages/upgrade/releases/`) only when it ships no step
 beyond the stamped ones; otherwise it names itself "unreleased", and its unstamped steps show under
 the Unreleased row (Alex, 2026-10-10, IMAGE-IDENTITY).
@@ -1528,12 +1528,11 @@ or marks the contract step failed and applies nothing. A re-run copies only a st
 plan` reports what would be archived. Only Postgres contracts archive so far; a goose contract that
 asks fails. Every Postgres contract carries `-- archive: <table>` or `-- archive: none (<reason>)`; the migration-safety guard refuses one without (`contract-without-archive-note`).
 
-**An LTS is an upgrade stop, never a maintained line** (Alex, 2026-10-09, LTS-SCHEDULE). An LTS is
-named every April and October; the first is 3.20.1 (2026-10-06), the next April 2027. Only the
-latest release gets fixes: no LTS or older line is ever patched. Naming an LTS moves the floor
-(`packages/upgrade/releases/lts-floor.json`) to the previous LTS, so the newest LTS always upgrades
-straight to head, a stale installation stops at most once a year, and dead schema lives about 12
-months before its contract step (ADR-173 D8) may ship.
+**No release is a required stop on the way to the latest** (Alex, 2026-10-11). Any install, of any release, pulls the
+latest image and the worker rolls it through every step from the release it is on; an install older
+than the first manifest's `previous` (the 3.18.1 baseline) plans from the baseline. Only the latest
+release gets fixes. So every step, alias and upcast is kept: a DROP or contract waits until old
+writers are gone (`needsOldWritersGone`), and the step that drops is kept, like every step.
 
 **A framework package takes module values by injection, never by import** (Alex, 2026-10-06, rounds 5
 and 6, Q211). `packages/group-queue` takes a `mintUri` function and a generic destination type for its
@@ -1669,8 +1668,9 @@ window; the producer-only rule stands for everything else (Alex, 2026-10-06, rou
 **A trace summary lookup is anchored on its event's time** (Alex, 2026-10-10): a summary is filed
 under its trace's start, which never moves, so a lookup reads windows widening back from the span's
 own occurredAt (3, 7, 21, 30 days, plus 1 day forward), stops at the first hit, and never scans every
-partition. Parked for later: a `trace_index` ClickHouse table for one exact read by trace id
-(`dev/docs/plans/trace-index-2026-10-10.md`), and a default retention-period bound on every ClickHouse read.
+partition. Next: per-owner id index tables (unpartitioned, filled by a materialised view) for one
+exact read by id (`dev/docs/plans/id-index-2026-10-10.md`), replacing this ladder; parked: a
+default retention-period bound on every ClickHouse read.
 
 **A ClickHouse table has one owner, and others read it through that owner** (Alex, 2026-10-06,
 round 3, Q207). A plain read of another module's table is a query operation on its owner's `*Api`
@@ -2116,16 +2116,16 @@ pipeline declares `.withUpcasts({ events: [{ from: { type, aggregateType? }, to,
 drain? })` after `.withEvents`, `to` one of its declared types and `data` a pure payload transform.
 Its queued-event parse, its event-store reads (the renamed aggregate type read beside its own) and
 replay apply it, so consumers and type filters see only the current type; `drain: { pipeline,
-jobNames?, removeAfter }` routes jobs a previous release queued under the former pipeline's keys into the current
-lanes for one release. Each upcast is an `event-upcast` background step in the upgrade ledger, and
+jobNames? }` routes jobs an older release queued under the former pipeline's keys into the current
+lanes, and is kept like every alias (Alex, 2026-10-11). Each upcast is an `event-upcast` background step in the upgrade ledger, and
 `EventUpcastReader` answers the stored events it still covers (`packages/eventing/specs/event-upcast.feature`).
 The eventing member builds it over the raw event log, the booted process answers it as `upcastReader()`, and every
 `pnpm task upgrade` run records each upcast's step (Alex, 2026-10-09).
 An upcast's step id is `upcast:<pipeline>:<stored type>`; its optional rewrite copies corrected events into
-`event_log`, and a renamed aggregate's originals are deleted only by a contract step at the LTS floor; a
-lint names any drain older than one release (`langwatch/upcast-drain-window`, against `removeAfter`); a fresh install plans upcast steps by their mode (Alex,
-2026-10-06, rounds 15 and 16).
-A lane that moved or was renamed declares `.withLaneAliases([{ from, to: { jobType, lane }, eventTypes?, data?, removeAfter }])` on its pipeline: jobs the previous release queued under `from` run on that lane, its own or its peer lane, for one release. They are chosen by the event type they carry, and a reactor's body is read as its event unless `data` reads it. A lane with no successor is tombstoned (`{ from, tombstone, removeAfter }`), and an aliased job whose event type no successor takes is acknowledged with a log line; an alias whose lane is not installed still retries. The worker installation test refuses an alias once its `removeAfter` release has been cut (Alex, 2026-10-08, round 49 E4; `packages/eventing/specs/lane-alias.feature`).
+`event_log`, and a renamed aggregate's originals are deleted only by a contract step that waits until old writers
+are gone; a fresh install plans upcast steps by their mode (Alex, 2026-10-06, rounds 15 and 16;
+no floor, Alex, 2026-10-11).
+A lane that moved or was renamed declares `.withLaneAliases([{ from, to: { jobType, lane }, eventTypes?, data? }])` on its pipeline: jobs an older release queued under `from` run on that lane, its own or its peer lane; the alias is kept like every step (Alex, 2026-10-11). They are chosen by the event type they carry, and a reactor's body is read as its event unless `data` reads it. A lane with no successor is tombstoned (`{ from, tombstone }`), and an aliased job whose event type no successor takes is acknowledged with a log line; an alias whose lane is not installed still retries (Alex, 2026-10-08, round 49 E4; `packages/eventing/specs/lane-alias.feature`).
 `defineProjectionReplayStep` takes `since`, the instant a first run replays from, so a handed-over
 fold is refolded over the deploy overlap only; absent, the start of the log (round 16).
 A process-manager handler emits intents through the typed accessor `ctx.intent(name, key, payload)`, and
@@ -2223,6 +2223,16 @@ reacts to trace's span and origin events and evaluation's completed and reported
 keeping main's settle windows and reading fold state through `TraceApi.findSummary` and
 `EvaluationApi.findRunByEvaluationId`; neither owner knows automation (Alex, 2026-10-01).
 Coding-agent reacts to log's received-record and metric's received-point events the same way.
+**A cross-module fact is always an event; the receiver keeps the applied event id** (Alex,
+2026-10-11; [ADR-179](adr/179-cross-module-facts-are-events-the-receiver-versions.md)). "Something
+happened" reaches another module as the owner's fact event and the receiver's peer subscriber, never a
+new `*Api` call. A subscriber is best-effort (stores nothing: SSE, read hints, live views) or durable
+(changes a row it owns). A durable receiver's guarantee is its own: it stores `lastAppliedEventId` on
+the row it changes and skips an event its stored id has already passed (`freshnessOf`, never a string
+compare), so redelivery is idempotent and a late older event never overwrites a newer state; a receiver
+that accumulates dedupes by `idempotencyKey ?? eventId`. That id is the row's version: a read over the
+row carries it as its cursor, for read hints and the client's cache version alike, and still answers in
+full. Existing outboxes and intents stay; new code adds no per-event delivery table for a fact.
 A delivery is not a reaction: a producer still calls a destination kind's `requestDelivery`, and the
 destination holds no producer code (Alex, 2026-10-01; [ADR-167](adr/167-outbound-delivery.md)). The runtime's own maintenance
 pipelines (blob sweep, process-manager retention) are built by the eventing member where a Redis and a

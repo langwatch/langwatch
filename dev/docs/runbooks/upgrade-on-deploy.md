@@ -169,8 +169,9 @@ The cloud size measurement is an operator task, not part of this lane.
 The rolled-back image writes roster entries without the newer steps, so "old
 writers gone" turns false again and any step waiting on it waits again. Blocking
 steps the newer build applied stay applied and are harmless to the older one.
-Contract steps wait for the LTS floor on cloud as on self-hosted (ADR-173,
-decision 4), so a rollback within the supported window always finds its schema.
+Contract steps wait until old writers are gone (`needsOldWritersGone`) on cloud as
+on self-hosted, and no release is a required stop (Alex, 2026-10-11), so a rollback
+always finds its schema.
 
 **A rollback to an image before the roster** (`origin/main` or 3.20.1) writes no roster row, so
 nothing sees it, and level-triggered steps would never re-run over what it wrote. Before rolling

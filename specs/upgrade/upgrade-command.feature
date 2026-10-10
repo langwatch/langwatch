@@ -3,9 +3,10 @@
 # 5.2, row mig-s3-runner; deltas D4 and D6).
 #
 # `pnpm task upgrade` is the one command that changes the schema. It takes the runner lease, plans
-# from the ledger and the shipped manifests, refuses an installation below the LTS floor, applies the
-# plan release by release, records every step and every ClickHouse target in the ledger, runs the
-# reconcilers last and records the run. Exit codes: 0 done, 1 failed, 2 refused, 3 lease not taken.
+# from the ledger and the shipped manifests, applies the plan release by release from whatever
+# release the installation is on (no required stop; Alex, 2026-10-11), records every step and every
+# ClickHouse target in the ledger, runs the reconcilers last and records the run. Exit codes: 0 done,
+# 1 failed, 3 lease not taken.
 # Every integration scenario runs in its own scratch Postgres schema; the schema applier is a fake
 # that records what it was asked to apply.
 
@@ -57,12 +58,11 @@ Feature: The upgrade command
     And the run is recorded failed
 
   @integration
-  Scenario: An installation below the LTS floor is refused before any schema change
-    Given the ledger records a succeeded upgrade to 3.16.0 and the LTS floor is 3.20.1
-    When the upgrade runs
-    Then it exits with code 2
-    And its message says to upgrade to 3.20.1 (LTS) first
-    And the schema applier is never called
+  Scenario: An installation on any older release rolls through every step to the image
+    Given the ledger records a succeeded upgrade to 3.16.0, older than every manifest
+    When the upgrade runs from a 3.21.0 image
+    Then it exits with code 0
+    And the schema applier applies every shipped release up to 3.21.0
 
   @integration
   Scenario: A fresh install applies the schema and marks every non-schema step not-needed
@@ -71,7 +71,7 @@ Feature: The upgrade command
     Then the schema applier is called once
     And every schema step is recorded done
     And every data and tenant step is recorded not-needed
-    And the run is recorded succeeded with the image's release and the LTS floor
+    And the run is recorded succeeded with the image's release
 
   # The ledger has its own Postgres schema, `<installation schema>_upgrade_ledger` (round 21), so
   # it exists before Prisma's first deploy, which refuses a non-empty schema it has no record of
@@ -173,7 +173,7 @@ Feature: The upgrade command
   @integration
   Scenario: Running an older image marks completed background steps pending again
     Given the ledger records a succeeded upgrade to 3.22.0 with a done background step of 3.22.0
-    When the upgrade runs from a 3.21.0 image at or above the floor
+    When the upgrade runs from a 3.21.0 image
     Then the 3.22.0 background step is recorded pending
 
   # Run phases (round 9, U2-PHASES): in the run report, a fixed shape the reader parses.
@@ -197,13 +197,6 @@ Feature: The upgrade command
     When the upgrade runs
     Then the run's report ends with a failed ClickHouse schema phase
     And no reconcile phase is recorded
-
-  @integration
-  Scenario: A refused upgrade is recorded as a failed run whose report names the refusal
-    Given the ledger records a succeeded upgrade to 3.16.0 and the LTS floor is 3.20.1
-    When the upgrade runs
-    Then the run is recorded failed with the report's refused naming "below_lts_floor"
-    And its only phase is a failed preflight
 
   # Live status (round 8, U2-LIVE): the runner raises a read hint; the api relays it.
   @integration

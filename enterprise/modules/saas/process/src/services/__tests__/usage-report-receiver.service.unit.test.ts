@@ -50,7 +50,6 @@ function setup({
     release: {
       latestRelease: void 0,
       latestReleaseCommit: void 0,
-      releaseFloor: void 0,
       ...release,
     },
   });
@@ -154,21 +153,19 @@ describe("UsageReportReceiverService", () => {
     });
   });
 
-  describe("when Cloud names the latest release and the floor", () => {
-    /** @scenario "Cloud's answer names the latest release with its commit, and the floor" */
-    it("answers with the release, its commit and the floor", async () => {
+  describe("when Cloud names the latest release", () => {
+    /** @scenario "Cloud's answer names the latest release with its commit" */
+    it("answers with the release and its commit", async () => {
       const { receiver } = setup({
         release: {
           latestRelease: "3.21.0",
           latestReleaseCommit: "0a1b2c3d",
-          releaseFloor: "3.20.1",
         },
       });
 
       await expect(receiver.receive(report())).resolves.toEqual({
         message: "Event captured",
         latest_release: { release: "3.21.0", commit: "0a1b2c3d" },
-        floor: "3.20.1",
       });
     });
   });

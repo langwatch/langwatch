@@ -1,6 +1,6 @@
 ---
 name: migration
-description: "Route any change to stored data, its schema or an event type to the step that ships it safely: add a column, drop a column or table, rename a column, table or event, change a type, make a column required, add an index or unique constraint, backfill, copy data to a new place, move to object storage, a tenant or system migration, retire a legacy path. Says which step kind and mode to write, which skill holds the recipe, the expand/contract rule and the LTS floor (3.20.1), what the linters and guard tests refuse, how `pnpm task upgrade`, the ledger and the serving gate run it, how to test it and what an operator sees. Use when someone says 'add a column', 'add a field', 'add a table', 'drop a table', 'drop the column', 'rename a column', 'rename an event', 'rename the pipeline', 'change the payload', 'change the type', 'make it NOT NULL', 'add an index', 'backfill', 'data migration', 'write a migration', 'migrate the data', 'tenant migration', 'system migration', 'withMigrations', 'withUpcasts', 'upcast', 'is this a breaking migration', 'LTS floor', 'pnpm task upgrade', 'the gate refuses', 'behind this image', or a migration guard test named their file."
+description: "Route any change to stored data, its schema or an event type to the step that ships it safely: add a column, drop a column or table, rename a column, table or event, change a type, make a column required, add an index or unique constraint, backfill, copy data to a new place, move to object storage, a tenant or system migration, retire a legacy path. Says which step kind and mode to write, which skill holds the recipe, the expand/contract rule (no required stop), what the linters and guard tests refuse, how `pnpm task upgrade`, the ledger and the serving gate run it, how to test it and what an operator sees. Use when someone says 'add a column', 'add a field', 'add a table', 'drop a table', 'drop the column', 'rename a column', 'rename an event', 'rename the pipeline', 'change the payload', 'change the type', 'make it NOT NULL', 'add an index', 'backfill', 'data migration', 'write a migration', 'migrate the data', 'tenant migration', 'system migration', 'withMigrations', 'withUpcasts', 'upcast', 'is this a breaking migration', 'pnpm task upgrade', 'the gate refuses', 'behind this image', or a migration guard test named their file."
 user-invocable: true
 argument-hint: "<the change: a schema edit, an event rename, a backfill, a tenant move, a retirement>"
 ---
@@ -13,25 +13,20 @@ window. Rulings: `.claude/coordinator/rulings-2026-10-06-rounds.md` rounds 8 to 
 the recipes are in the skills it names.
 
 - How the upgrade machinery itself works (ledger, gate, manifests, console, tests): the `upgrade` skill.
-- Naming an LTS each April and October and moving the floor: the `lts-release` skill.
 
 ## The one rule
 
-**Every change is expand/contract inside the supported window.** The window is every release from
-the **LTS floor** (`packages/upgrade/releases/lts-floor.json`, today `3.20.1`) to head. An LTS is named every April
-and October and the floor then moves to the previous LTS; no LTS is ever patched (Alex,
-2026-10-09, LTS-SCHEDULE). While
-`upgrade` runs, and for the whole rollout after it, the previous image keeps serving on the new
+**Every change is expand/contract.** No release is a required stop on the way to the latest (Alex, 2026-10-11): an
+install of any release pulls the latest image and the worker rolls it through every step, so every
+step, alias and upcast is kept. While `upgrade` runs, and for the whole rollout after it, the previous image keeps serving on the new
 schema, and a rollback puts an older image back on it. So:
 
 - **Expand** (add a table, a nullable or defaulted column, a new event type, a new view name) ships
   in any release.
 - **Migrate** (dual-write, backfill, upcast) ships with or after the expand.
 - **Contract** (drop, rename's last step, type change's last step, `SET NOT NULL`, deleting an old
-  copy) ships only once **no release at or above the floor** reads or writes what it removes,
-  marked `-- contract: retired in <release>` with `<release>` at or below the floor. Cloud waits
-  for the same floor (ADR-173, D8). A lane never moves the floor; a contract the floor does not
-  yet allow is left out and named in the handoff.
+  copy) waits until old writers are gone (`needsOldWritersGone`), marked
+  `-- contract: retired in <release>`; the step that drops is kept, like every step.
 
 ## Route the request
 
@@ -71,7 +66,7 @@ Kinds and modes are `upgradeStepKindSchema` and `upgradeStepModeSchema` in
 - `pnpm task upgrade [status | plan] [--json]` (`apps/tasks/src/upgrade.ts`) first creates the ledger
   in its own Postgres schema (`<schema>_upgrade_ledger`, round 21; a role without `CREATE` ends the
   run `schema_failed`), takes the runner lease there (ttl 60 s, heartbeat every 15 s, a second run
-  waits 10 min; `DEFAULT_LEASE_TIMING`, `packages/upgrade/src/runner/runner-lease.ts`), seeds an empty ledger, refuses an installation below the floor (exit 2), then walks
+  waits 10 min; `DEFAULT_LEASE_TIMING`, `packages/upgrade/src/runner/runner-lease.ts`), seeds an empty ledger, then walks
   the plan release by release: the release's schema, then its blocking steps; then the reconcilers.
   **A one-release upgrade applies its schema in one pass (`oneReleaseApplier`); a jump across
   several releases steps (`releaseSteppingApplier`, `apps/tasks/src/upgrade.ts`): each release's
@@ -84,8 +79,7 @@ Kinds and modes are `upgradeStepKindSchema` and `upgradeStepModeSchema` in
   run `failed_prisma_migration` naming the `prisma migrate resolve` command
   (`specs/upgrade/rerunnable-migrations.feature`). Exit codes: 0 done; 1 any failure
   (`failed_prisma_migration`, `rerunnable_migration_failed`, `schema_failed`, `step_failed`,
-  `reconciler_failed`, `lease_lost`, `failed`); 2 the installation or the image below the floor
-  (`refused_below_floor`, `refused_image_below_floor`); 3 lease not acquired
+  `reconciler_failed`, `lease_lost`, `failed`); 3 lease not acquired
   (`packages/upgrade/src/runner/upgrade-outcome.ts`). Operator table: `docs/self-hosting/upgrade.mdx`.
 - `pnpm start:prepare:db` (apps/api) is the one preparation script: `pnpm task upgrade` alone, no
   system-migrations pass. Local launchers (`pnpm dev`, haven) run it once before the lanes. In a
@@ -94,8 +88,7 @@ Kinds and modes are `upgradeStepKindSchema` and `upgradeStepModeSchema` in
   `serializeUpgrades` (`specs/upgrade/entry-points.feature`, UPGRADE-IN-WORKER).
 - The **api never migrates** and holds nothing (NO-HOLDS): it serves every route and reports not
   ready until the ledger is current; a Postgres read ahead of the schema answers
-  `upgrade_in_progress`, a ClickHouse read of a pending column goes through `ClickHouseColumns`. Its serving gate refuses to start, by name, while
-  its release is below the floor, and the worker takes no job until the ledger is current. ClickHouse
+  `upgrade_in_progress`, a ClickHouse read of a pending column goes through `ClickHouseColumns`. The worker takes no job until the ledger is current. ClickHouse
   steps always count: an install with a database and no ClickHouse refuses, naming `CLICKHOUSE_URL`
   (round 20; `NO_CLICKHOUSE_REFUSAL`). Admitted, each writes a
   roster entry, refreshed every 15 s, stale after 10 min. A roster blip never takes a process out
@@ -121,23 +114,22 @@ Kinds and modes are `upgradeStepKindSchema` and `upgradeStepModeSchema` in
 
 ## Landed and not landed (checked 2026-10-08)
 
-| Piece                                                                     | State                                                                                                                 |
-| ------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| Ledger, runner, `upgrade` / `upgrade status` / `upgrade plan`, floor      | landed (`packages/upgrade/src/runner/upgrade-runner.ts`, `apps/tasks/src/upgrade.ts`)                                 |
-| Stepping applier (one release's schema at a time) for multi-release jumps | landed (`releaseSteppingApplier`, `apps/tasks/src/upgrade.ts`)                                                        |
-| Serving gate, first-install upgrade, roster 15 s / 60 s, rollback reopen  | landed (`packages/upgrade/src/gate/serving-upgrade-gate.ts`, `SERVING_ROSTER_TIMING`)                                 |
-| No ClickHouse configured refuses to serve                                 | landed (`NO_CLICKHOUSE_REFUSAL`, `packages/upgrade/src/gate/serving-upgrade-gate.ts`)                                 |
-| Prisma and ClickHouse guard scanners, floor check, lock-heavy refusals    | landed (`packages/{prisma-client,clickhouse-migrations}/src/__tests__/migration-safety.rules.ts`)                     |
-| `migration-order` CI check, `migration-owners` policy                     | landed (`cmd/migrationorder/main.go`, `packages/architecture-enforcer/src/policies/index.ts`)                         |
-| `defineMigrationStep` and `.withMigrations` collection                    | landed (`packages/upgrade/src/step/migration-step.ts`, `packages/process/src/migration/migration-steps.ts`)           |
-| The upgrade task running declared blocking steps                          | landed (`app.migrationSteps(isMigrationStep)`, `apps/tasks/src/upgrade.ts`)                                           |
-| The worker running background steps after the serving roster allows it    | landed (`packages/upgrade/src/background/background-steps.service.ts`, `packages/process/src/process-server.ts`)      |
-| `.withUpcasts` read-time upcast, drain, one ledger step per upcast        | landed (`packages/upgrade/src/ledger.ts`, `packages/eventing/specs/event-upcast.feature`)                             |
-| Upcast rewrite step                                                       | **not landed** (three `@unimplemented` scenarios in `packages/eventing/specs/event-upcast.feature`)                   |
-| Drain-age lint (a drain older than one release)                           | **not landed** (record §9 names it; no rule or policy in `packages/oxlint-rules` or the enforcer)                     |
-| Re-runnable migration policy and the runner's auto-resolve                | landed (`packages/upgrade/src/stepping/rerunnable-migrations.ts`)                                                     |
-| No new foreign key or `@relation` (W-01)                                  | landed (`new-foreign-key` scanner rule; `packages/architecture-enforcer/tests/baselines/prisma-relations.json`)       |
-| Projection replay steps and peer projections                              | landed (`packages/upgrade/src/step/projection-replay-step.ts`, `packages/eventing/src/projections/peerProjection.ts`) |
+| Piece                                                                      | State                                                                                                                 |
+| -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| Ledger, runner, `upgrade` / `upgrade status` / `upgrade plan`              | landed (`packages/upgrade/src/runner/upgrade-runner.ts`, `apps/tasks/src/upgrade.ts`)                                 |
+| Stepping applier (one release's schema at a time) for multi-release jumps  | landed (`releaseSteppingApplier`, `apps/tasks/src/upgrade.ts`)                                                        |
+| Serving gate, first-install upgrade, roster 15 s / 60 s, rollback reopen   | landed (`packages/upgrade/src/gate/serving-upgrade-gate.ts`, `SERVING_ROSTER_TIMING`)                                 |
+| No ClickHouse configured refuses to serve                                  | landed (`NO_CLICKHOUSE_REFUSAL`, `packages/upgrade/src/gate/serving-upgrade-gate.ts`)                                 |
+| Prisma and ClickHouse guard scanners, retirement note, lock-heavy refusals | landed (`packages/{prisma-client,clickhouse-migrations}/src/__tests__/migration-safety.rules.ts`)                     |
+| `migration-order` CI check, `migration-owners` policy                      | landed (`cmd/migrationorder/main.go`, `packages/architecture-enforcer/src/policies/index.ts`)                         |
+| `defineMigrationStep` and `.withMigrations` collection                     | landed (`packages/upgrade/src/step/migration-step.ts`, `packages/process/src/migration/migration-steps.ts`)           |
+| The upgrade task running declared blocking steps                           | landed (`app.migrationSteps(isMigrationStep)`, `apps/tasks/src/upgrade.ts`)                                           |
+| The worker running background steps after the serving roster allows it     | landed (`packages/upgrade/src/background/background-steps.service.ts`, `packages/process/src/process-server.ts`)      |
+| `.withUpcasts` read-time upcast, drain, one ledger step per upcast         | landed (`packages/upgrade/src/ledger.ts`, `packages/eventing/specs/event-upcast.feature`)                             |
+| Upcast rewrite step                                                        | **not landed** (three `@unimplemented` scenarios in `packages/eventing/specs/event-upcast.feature`)                   |
+| Re-runnable migration policy and the runner's auto-resolve                 | landed (`packages/upgrade/src/stepping/rerunnable-migrations.ts`)                                                     |
+| No new foreign key or `@relation` (W-01)                                   | landed (`new-foreign-key` scanner rule; `packages/architecture-enforcer/tests/baselines/prisma-relations.json`)       |
+| Projection replay steps and peer projections                               | landed (`packages/upgrade/src/step/projection-replay-step.ts`, `packages/eventing/src/projections/peerProjection.ts`) |
 
 ## Wrong first moves
 
@@ -149,8 +141,9 @@ What an agent reaches for first, and what to write instead:
   generate with `--create-only` and rewrite to expand/contract (`postgres-migration`).
 - **A backfill as a one-shot task, a script or an operator comment**: a `defineMigrationStep` in
   the owning module's `.withMigrations`, `data`, `background` (`migration-data-step`).
-- **A `DROP` in the same release that stops reading the column**: the drop waits for the floor and
-  carries `-- contract: retired in <release>`; until then it is left out and named in the handoff.
+- **A `DROP` in the same release that stops reading the column**: the drop waits until old writers
+  are gone (`needsOldWritersGone`) and carries `-- contract: retired in <release>`; the step that
+  drops is kept, like every step.
 - **A blocking step that calls a service or the typed Prisma client**: blocking means frozen SQL
   through the owner's migration repository, or it is background.
 - **Applying schema outside the ledger**: `pnpm prisma:migrate` and `pnpm clickhouse:migrate` are
@@ -163,7 +156,7 @@ What an agent reaches for first, and what to write instead:
 - Edit a merged migration or a released step; write a new one.
 - Move data in place. Copy to the new place; deleting the old copy is a contract step.
 - Write a down migration that runs. The way back is the previous image on the new schema.
-- Rewrite stored events to rename a type. Upcast at read time; the copy comes later, at the floor.
+- Rewrite stored events to rename a type. Upcast at read time; the optional rewrite is a later step.
 - Add a foreign key or an `@relation` (Alex, 2026-10-06).
 
 ## Test it

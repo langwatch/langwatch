@@ -30,11 +30,11 @@ Feature: The new image's worker runs its blocking upgrade while the api serves, 
     And the report says nothing is needed from the operator
 
   @unit
-  Scenario: An image below the installation's floor runs nothing and refuses
-    Given an api whose release is below the ledger's floor
+  Scenario: An image whose gate refuses runs nothing and refuses by name
+    Given an api whose database role cannot create the upgrade ledger
     When its upgrade gate admits it
     Then it runs no upgrade
-    And it refuses, naming the floor
+    And it refuses, naming the refusal
 
   @integration
   Scenario: The api never runs the upgrade when its installation is behind

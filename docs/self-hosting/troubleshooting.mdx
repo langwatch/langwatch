@@ -208,7 +208,7 @@ Ensure the service account has S3 access (IRSA) or static credentials are config
 
 The api never migrates; the workers run the upgrade when they start. The api logs `refuses to serve: the installation is behind this image` with the outstanding steps and is not ready while the upgrade has not run for its version. Check the workers' log for why the upgrade did not finish, or run it from the new image (see [Run the upgrade](/self-hosting/upgrade#run-the-upgrade)).
 
-The refusal names the cause: outstanding steps, a release below the installation's floor, or no ClickHouse configured (set `CLICKHOUSE_URL`, run the upgrade, start again). **Ops > Upgrades** and `pnpm task upgrade status` show the state.
+The refusal names the cause: outstanding steps, or no ClickHouse configured (set `CLICKHOUSE_URL`, run the upgrade, start again). **Ops > Upgrades** and `pnpm task upgrade status` show the state.
 
 On Helm, read the workers' log. When upgrades are serialised (`serializeUpgrades` on and no `app.dataplane`), the pre-upgrade Job runs it instead:
 

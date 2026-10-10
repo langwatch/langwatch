@@ -54,9 +54,9 @@ Feature: Generating a typical upgrade snapshot from an old release
     Then planning fails naming the four shapes
 
   @unit
-  Scenario: a release below the floor is refused
+  Scenario: an install of an old release is planned, to upgrade straight to latest
     When I plan shape "sh-free" from release "3.19.4" at volume "S" with seed 1
-    Then planning fails naming the floor 3.20.1
+    Then the plan brings release 3.19.4 up as the old release
 
   @unit
   Scenario: a saas shape from a release tag is refused

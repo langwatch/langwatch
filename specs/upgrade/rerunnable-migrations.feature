@@ -14,7 +14,7 @@ Feature: Re-runnable migrations are resolved and retried by the upgrade
   So that a busy table costs a retry, not a manual `prisma migrate resolve`, and never a double apply
 
   Background:
-    Given a scratch Postgres database at the LTS floor
+    Given a scratch Postgres database at an older release
 
   @integration
   Scenario: A re-runnable migration cancelled by lock_timeout mid-way is resolved and completes

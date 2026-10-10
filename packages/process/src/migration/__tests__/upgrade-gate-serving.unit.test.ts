@@ -117,13 +117,13 @@ describe("the upgrade gate of an api that upgrades", () => {
 });
 
 describe("the upgrade gate of a process whose gate refuses with an outcome", () => {
-  describe("given a gate answering below-floor", () => {
-    /** @scenario "An image below the installation's floor runs nothing and refuses" */
+  describe("given a gate answering that the ledger cannot be created", () => {
+    /** @scenario "An image whose gate refuses runs nothing and refuses by name" */
     it("refuses by name instead of treating the refusal as upgrading", async () => {
       const verdict: UpgradeGateVerdict = {
         admitted: false,
-        outcome: "below-floor",
-        refusal: "this image is below the installation's floor 3.20.1",
+        outcome: "ledger-not-creatable",
+        refusal: "the database role cannot create the upgrade ledger",
       };
       const hosted = upgradeGateComponent({
         server: "gate-refuse-test",

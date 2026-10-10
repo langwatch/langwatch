@@ -10,7 +10,7 @@
 #   packages/clickhouse-migrations/src/__tests__/migration-safety.{rules.ts,unit.test.ts}
 #
 # A drop or contract carries a retirement note and waits until old writers are gone
-# (needsOldWritersGone); there is no upgrade floor (Alex, 2026-10-11), and the step that
+# (needsOldWritersGone); no release is a required stop (Alex, 2026-10-11), and the step that
 # drops is kept, like every step.
 #
 # Teaching: .claude/skills/postgres-migration, .claude/skills/clickhouse-migration.

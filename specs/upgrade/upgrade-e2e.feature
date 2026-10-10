@@ -2,7 +2,7 @@
 # over real Postgres and ClickHouse databases, applying real migrations with `prisma migrate
 # deploy` and goose. Each scenario gets its own databases and drops them after. ADR-173.
 #
-# The fixture releases: 3.20.1 (the LTS floor) creates a Postgres table and a ClickHouse table;
+# The fixture releases: 3.20.1 creates a Postgres table and a ClickHouse table;
 # 3.21.0 adds a column on each and declares one blocking data step.
 
 Feature: The upgrade holds up end to end over live stores
@@ -20,7 +20,7 @@ Feature: The upgrade holds up end to end over live stores
     Then it exits 0, applies nothing and changes no step row
 
   @integration
-  Scenario: An installation at the LTS floor upgrades to the next release
+  Scenario: An installation on an older release upgrades to the next release
     Given an installation upgraded to 3.20.1
     When the upgrade for 3.21.0 runs
     Then the 3.21.0 migrations apply on both stores and the blocking data step runs once

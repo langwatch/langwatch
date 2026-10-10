@@ -154,14 +154,12 @@ func TestEveryDeclaredStepIsCovered(t *testing.T) {
 }
 
 // @scenario "an unknown shape is refused"
-// @scenario "a release below the floor is refused"
 // @scenario "a saas shape from a release tag is refused"
 // @scenario "a self-hosted shape from main is refused"
 // @scenario "volumes other than S are refused here"
 func TestRefusals(t *testing.T) {
 	cases := []struct{ scenario, shape, release, volume, want string }{
 		{"an unknown shape is refused", "cloud", "3.20.1", "S", "sh-free"},
-		{"a release below the floor is refused", "sh-free", "3.19.4", "S", "floor 3.20.1"},
 		{"a saas shape from a release tag is refused", "saas", "3.20.1", "S", "main@<sha>"},
 		{"a self-hosted shape from main is refused", "sh-licensed", "main@abc1234", "S", "release tag"},
 		{"volumes other than S are refused here", "sh-free", "3.20.1", "L", "scale generator"},
@@ -171,6 +169,14 @@ func TestRefusals(t *testing.T) {
 		if err == nil || !strings.Contains(err.Error(), c.want) {
 			t.Errorf("%s: got %v, want %q", c.scenario, err, c.want)
 		}
+	}
+}
+
+// @scenario "an install of an old release is planned, to upgrade straight to latest"
+func TestOldReleaseOrigin(t *testing.T) {
+	plan := mustBuild(t, "sh-free", "3.19.4", 1)
+	if plan.Steps[1].Args["release"] != "3.19.4" {
+		t.Fatalf("old release step %v", plan.Steps[1])
 	}
 }
 

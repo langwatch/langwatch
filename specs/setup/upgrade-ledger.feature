@@ -101,10 +101,10 @@ Feature: The upgrade ledger records every step an installation has taken
     And the seed run still records that it ran
 
 # The widened ledger (mig-ledger-widen; dev/docs/plans/migrations-blitz-2026-10-06.md 5.3, D2, D4,
-# Q-U11). Additive only: a step gains an owner and a description, a run gains the floor it applied
-# with, and three runner-owned tables arrive beside the first two: one row per ClickHouse target of
-# a step, the runner's lease, and one serving roster entry per serving process. Storage only; plans, gates
-# and runs read and write these through the repository and decide for themselves.
+# Q-U11). Additive only: a step gains an owner and a description, and three runner-owned tables
+# arrive beside the first two: one row per ClickHouse target of a step, the runner's lease, and one
+# serving roster entry per serving process. Storage only; plans, gates and runs read and write
+# these through the repository and decide for themselves.
 
   @integration
   Scenario: Widening a ledger that holds a recorded step keeps the step
@@ -173,12 +173,6 @@ Feature: The upgrade ledger records every step an installation has taken
     Given a declared step the ledger already holds as done
     When the declared steps are registered again with a new description
     Then the step is still done, and only its owner and description are refreshed
-
-  @integration
-  Scenario: A run records the floor it applied with
-    Given an upgrade run started with the LTS floor "3.20.1"
-    When the runs are read
-    Then the run carries the floor "3.20.1"
 
   @unit
   Scenario: A step declared without a description is refused
