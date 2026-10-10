@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import { PrismaRepository } from "@langwatch/prisma-client";
+import { Prisma } from "@langwatch/prisma-client/generated";
 
 import type {
   NurturingMilestonesRepository,
@@ -28,11 +29,21 @@ export class PrismaNurturingMilestonesRepository
     adminUserId,
     seeded,
   }: Parameters<NurturingMilestonesRepository["recordOrganization"]>[0]): Promise<void> {
-    await this.prisma.nurturingOrganization.upsert({
-      where: { organizationId },
-      create: { organizationId, adminUserId, seeded },
-      update: adminUserId ? { adminUserId } : {},
-    });
+    const update = adminUserId ? { adminUserId } : {};
+    const upsert = () =>
+      this.prisma.nurturingOrganization.upsert({
+        where: { organizationId },
+        create: { organizationId, adminUserId, seeded },
+        update,
+      });
+    try {
+      await upsert();
+    } catch (error) {
+      // Concurrent events for one organization race the create; the loser now updates the row.
+      if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== "P2002")
+        throw error;
+      await upsert();
+    }
   }
 
   countEvaluation({
