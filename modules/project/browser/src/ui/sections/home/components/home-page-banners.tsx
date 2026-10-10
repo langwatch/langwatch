@@ -1229,7 +1229,7 @@ function BriefingBanner({
         borderRadius="14px"
         borderWidth="1px"
         borderColor="border.muted"
-        background="bg.surface"
+        background="bg.card"
         overflow="hidden"
         onMouseEnter={() => {
           hoveredRef.current = true;
