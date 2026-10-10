@@ -445,7 +445,12 @@ export function createUpgradeReader({
     });
     return {
       installed,
-      plan: previewUpgradeTo({ plan, image: planning.image, to }),
+      plan: previewUpgradeTo({
+        plan,
+        image: planning.image,
+        manifests: planning.releases.manifests,
+        to,
+      }),
       preflight: await preflight(),
     };
   }

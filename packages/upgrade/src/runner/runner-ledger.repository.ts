@@ -198,16 +198,18 @@ export class UpgradeRunnerRepository {
   }
 
   /**
-   * Reopens done steps as pending, checkpoint cleared so the re-run is whole, except a projection
-   * replay's cursor, which a re-run continues from. Answers the ids this call reopened: one
-   * already reopened, here or concurrently, is not reopened twice.
+   * Reopens done steps (or, for the holder whose run a rollback overtook, running ones) as pending,
+   * checkpoint cleared so the re-run is whole, except a projection replay's cursor, which a re-run
+   * continues from. Answers the ids this call reopened: none is reopened twice.
    */
   async reopenDoneSteps({
     ids,
     reason,
+    from = "done",
   }: {
     ids: readonly string[];
     reason: string;
+    from?: Extract<UpgradeStepStatus, "done" | "running">;
   }): Promise<string[]> {
     if (ids.length === 0) return [];
     const { rows } = await this.query<{ id: string }>(
@@ -215,9 +217,9 @@ export class UpgradeRunnerRepository {
           SET "status" = 'pending', "last_error" = $2, "inferred" = false, "finished_at" = NULL,
               "report" = CASE WHEN "report" ? $3 THEN "report" END,
               "updated_at" = ${NOW_UTC}
-        WHERE "id" = ANY($1::text[]) AND "status" = 'done'
+        WHERE "id" = ANY($1::text[]) AND "status" = $4
        RETURNING "id"`,
-      [ids, reason, PROJECTION_REPLAY_CURSOR],
+      [ids, reason, PROJECTION_REPLAY_CURSOR, from],
     );
     return rows.map((row) => row.id).toSorted();
   }

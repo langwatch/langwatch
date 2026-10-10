@@ -224,6 +224,55 @@ describe("admitAfterFirstInstall", () => {
     });
   });
 
+  describe("given a worker whose upgrade refuses below the LTS floor", () => {
+    /** @scenario "A worker whose upgrade refuses below the floor runs it once and refuses by name" */
+    it("runs it once, never backs off, and refuses naming the code and the release to stop at", async () => {
+      const said: string[] = [];
+      const waits: number[] = [];
+      let runs = 0;
+      const refusal: ServingVerdict = {
+        admitted: false,
+        outcome: "below-floor",
+        release: "3.22.0",
+        floor: "3.20.1",
+        refusal:
+          "`pnpm task upgrade` refused (refused_below_floor): this installation is on 3.15.0; upgrade to 3.20.1 (LTS) first, then to this image",
+      };
+      const verdict = await admitAfterFirstInstall({
+        gate: { admit: async () => behind() },
+        firstInstall: async () => {
+          runs += 1;
+          return { exitCode: 2, logTail: ["upgrade stopped (refused_below_floor)"] };
+        },
+        findRefusal: async () => refusal,
+        warn: (message) => void said.push(message),
+        wait: async (ms) => void waits.push(ms),
+      });
+
+      expect(runs).toBe(1);
+      expect(waits).toEqual([]);
+      expect(verdict).toEqual(refusal);
+      expect(said.filter((line) => line.includes("refused_below_floor"))).toHaveLength(1);
+      expect(said.find((line) => line.includes("refused_below_floor"))).toContain("3.20.1");
+    });
+
+    it("backs off as before when the ledger recorded no refusal for the exit", async () => {
+      const waits: number[] = [];
+      const exits = [2, 0];
+      const answers = [behind(), behind(), current];
+      const verdict = await admitAfterFirstInstall({
+        gate: { admit: async () => answers.shift() ?? current },
+        firstInstall: async () => ({ exitCode: exits.shift() ?? 0, logTail: [] }),
+        findRefusal: async () => null,
+        warn: () => undefined,
+        wait: async (ms) => void waits.push(ms),
+      });
+
+      expect(verdict).toEqual(current);
+      expect(waits).toEqual([10_000]);
+    });
+  });
+
   describe("given runs that fail with no failed step row", () => {
     /** @scenario "A failed run with no failed step retries on a backoff, saying why" */
     it("retries on a doubling wait, saying it retries and the run's last line, never a Retry", async () => {

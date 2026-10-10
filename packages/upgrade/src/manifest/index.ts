@@ -27,6 +27,13 @@ export {
 } from "./stamp.ts";
 export type { DeclaredStepSource, ReleaseTreeSteps } from "./stamp.ts";
 export {
+  loadReleaseBaseline,
+  parseReleaseBaseline,
+  RELEASE_BASELINE_FILE,
+  releaseBaselineSchema,
+} from "./baseline.ts";
+export type { ReleaseBaseline } from "./baseline.ts";
+export {
   DEPRECATIONS_FILE,
   deprecationSchema,
   deprecationsSchema,

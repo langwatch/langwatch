@@ -63,9 +63,9 @@ function plannedRelease({
 }
 
 /**
- * Plans an upgrade from the ledger and the shipped manifests (rethink 6.4, blitz 3.2): refusals
- * first, then release by release, then unreleased steps as one virtual release. Settled steps are
- * left out; specs/upgrade/release-manifests.feature is the behaviour.
+ * Plans from the ledger and the manifests (rethink 6.4): refusals, then each release above
+ * `installed` or with a schema or blocking step open, then unreleased steps as one virtual one.
+ * Specs: specs/upgrade/release-manifests.feature, packages/upgrade/specs/unfinished-steps.feature.
  */
 export function planUpgrade({
   installed,
@@ -129,8 +129,14 @@ export function planUpgrade({
     };
   }
 
+  const gating = (step: ManifestStep) =>
+    SCHEMA_STEP_KINDS.has(step.kind) || step.mode === "blocking";
   const releases = shipped
-    .filter((manifest) => compareReleases({ left: manifest.release, right: installed }) > 0)
+    .filter(
+      (manifest) =>
+        compareReleases({ left: manifest.release, right: installed }) > 0 ||
+        open(manifest.steps).some(gating),
+    )
     .map((manifest) => plannedRelease({ release: manifest.release, steps: open(manifest.steps) }));
   const pendingUnreleased = open(unreleased);
   if (pendingUnreleased.length > 0) {

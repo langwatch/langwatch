@@ -30,6 +30,11 @@ const manifests = [
   manifest("3.23.0", "3.22.0", [step("prisma:20270101000000_drop_legacy_key", "postgres-schema")]),
 ];
 const imageSteps = manifests.flatMap((release) => release.steps);
+/** What a succeeded run to `release` leaves: every step through it done. */
+const settledThrough = (release: string) =>
+  manifests
+    .filter((manifest) => manifest.release <= release)
+    .flatMap((manifest) => manifest.steps.map(({ id }) => ({ id, status: "done" as const })));
 const noLedger = { floor: null, steps: [] };
 
 describe("planUpgrade()", () => {
@@ -88,7 +93,10 @@ describe("planUpgrade()", () => {
         manifests,
         ledger: {
           floor: "3.19.0",
-          steps: [{ id: "prisma:20270101000000_drop_legacy_key", status: "done" }],
+          steps: [
+            ...settledThrough("3.22.0"),
+            { id: "prisma:20270101000000_drop_legacy_key", status: "done" },
+          ],
         },
       });
 
@@ -189,7 +197,7 @@ describe("planUpgrade()", () => {
           image: { release: null, steps: [...imageSteps, ...unreleased] },
           floor: { release: "3.19.0", namedAt: "2026-10-06" },
           manifests,
-          ledger: { floor: "3.19.0", steps: [] },
+          ledger: { floor: "3.19.0", steps: settledThrough("3.23.0") },
         }),
       ).toEqual({
         outcome: "planned",

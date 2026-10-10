@@ -3,8 +3,9 @@ import { setTimeout as sleep } from "node:timers/promises";
 import { generate } from "@langwatch/ksuid";
 
 import { BackgroundStepsService } from "../background/background-steps.service.ts";
+import { BLOCKING_STEP_DEADLINE_MS, stepDeadline } from "../background/step-deadline.ts";
 import { imageContractArchives, imageContractSteps } from "../gate/image-tree.ts";
-import { UpgradeLedgerSeedService } from "../ledger-seed.service.ts";
+import { UpgradeLedgerSeedService, withReinferred } from "../ledger-seed.service.ts";
 import { LEDGER_LOCK_TIMEOUT_MS } from "../ledger-tables.ts";
 import { UpgradeLedgerRepository } from "../ledger.repository.ts";
 import type { UpcastStepInput, UpgradeRun, UpgradeStep, UpgradeStepStatus } from "../ledger.ts";
@@ -19,12 +20,7 @@ import {
 import type { UpgradeClickHouse, UpgradePostgres } from "../ports.ts";
 import type { UpgradeStatus } from "../reader/reader.schema.ts";
 import { createUpgradeReader } from "../reader/reader.service.ts";
-import {
-  gooseSteps,
-  prismaSteps,
-  readGooseVersions,
-  readPrismaMigrations,
-} from "../seed-sources.ts";
+import { prismaSteps, readPrismaMigrations } from "../seed-sources.ts";
 import type { MigrationStep } from "../step/migration-step.ts";
 import { isRerunnablePrismaMigration } from "../stepping/rerunnable-migrations.ts";
 import { ContractArchiveRepository } from "./contract-archive/contract-archive.repository.ts";
@@ -118,6 +114,51 @@ function targetStatus({
   if (target.applied?.has(id) === true) return "done";
   if (!target.ok && !blamed) return "failed";
   return "pending";
+}
+
+/**
+ * A schema apply that reported success but left open steps unapplied (a skipped engine, no
+ * ClickHouse target, an unreadable goose history): the run fails rather than succeed behind.
+ * Spec: packages/upgrade/specs/unfinished-steps.feature.
+ */
+function unfinishedSchemaFailure({
+  unfinished,
+  reports,
+}: {
+  unfinished: readonly string[];
+  reports: readonly SchemaTargetReport[];
+}): UpgradeRunFailure {
+  const noClickHouse =
+    unfinished.some(isGoose) && !reports.some((report) => report.engine === "clickhouse");
+  const why = noClickHouse ? "; no ClickHouse target was configured" : "";
+  return new UpgradeRunFailure(
+    "schema_failed",
+    `schema steps did not end done after the apply: ${unfinished.join(", ")}${why}`,
+    { steps: [...unfinished] },
+  );
+}
+
+/** Once no Prisma migration failed: a failing target fails the run, else an unfinished step. */
+function schemaFailure({
+  reports,
+  unfinished,
+}: {
+  reports: readonly SchemaTargetReport[];
+  unfinished: readonly string[];
+}): UpgradeRunFailure | null {
+  const failing = reports.filter((report) => !report.ok);
+  if (failing.length === 0) {
+    return unfinished.length > 0 ? unfinishedSchemaFailure({ unfinished, reports }) : null;
+  }
+  const named = failing.map(
+    (report) => `${report.target} (${redactSecrets(report.error ?? "no error given")})`,
+  );
+  return new UpgradeRunFailure("schema_failed", `schema failed on ${named.join(", ")}`, {
+    targets: failing.map(({ target, error }) => ({
+      target,
+      error: error === null ? null : redactSecrets(error),
+    })),
+  });
 }
 
 /** Why the runner did not resolve a failed migration itself; null when it was never asked to. */
@@ -303,21 +344,37 @@ export class UpgradeRunnerService {
     });
   }
 
-  /** The ledger as the planner reads it; an empty or absent one is read from the tools' records. */
+  /**
+   * The ledger as the planner reads it, inferred rows re-read as a run re-infers them; an empty or
+   * absent one is read from the tools' records.
+   */
   private async readLedger(): Promise<{ steps: LedgerFacts; runs: UpgradeRun[] }> {
-    if ((await this.runner.ledgerExists()) && (await this.seeded())) {
-      return { steps: await this.ledger.findSteps(), runs: await this.ledger.findRuns() };
-    }
     const { postgres, clickhouse } = this.options;
-    const prisma = prismaSteps({ rows: await readPrismaMigrations({ postgres }) });
-    const goose = clickhouse ? gooseSteps({ rows: await readGooseVersions({ clickhouse }) }) : [];
-    return { steps: [...prisma, ...goose], runs: [] };
+    const history = await UpgradeLedgerSeedService.create({ postgres, clickhouse }).readHistory();
+    if ((await this.runner.ledgerExists()) && (await this.succeededSeed())) {
+      const steps = withReinferred({ steps: await this.ledger.findSteps(), history });
+      return { steps, runs: await this.ledger.findRuns() };
+    }
+    return { steps: history, runs: [] };
   }
 
   /** A seed that failed or was cut after its run row seeds again, never reads as fresh. */
-  private async seeded(): Promise<boolean> {
+  private async succeededSeed(): Promise<UpgradeRun | undefined> {
     const runs = await this.ledger.findRuns();
-    return runs.some((run) => run.kind === "seed" && run.outcome === "succeeded");
+    return runs.find((run) => run.kind === "seed" && run.outcome === "succeeded");
+  }
+
+  /**
+   * Seeds the ledger once, then re-infers its seeded rows every run, so a refused install that
+   * upgraded with an image older than the ledger is planned from where it is now.
+   * Spec: packages/upgrade/specs/ledger-seed.feature.
+   */
+  private async seedOrReinfer(): Promise<void> {
+    const { postgres, clickhouse } = this.options;
+    const seeder = UpgradeLedgerSeedService.create({ postgres, clickhouse });
+    const seed = await this.succeededSeed();
+    if (seed) await seeder.reinfer({ seedRunId: seed.id });
+    else await seeder.seed();
   }
 
   /** `fresh`: this runner found no Prisma history, so what the ledger holds it applied itself. */
@@ -341,10 +398,7 @@ export class UpgradeRunnerService {
     signal: AbortSignal;
     fresh: boolean;
   }): Promise<UpgradeOutcome> {
-    if (!(await this.seeded())) {
-      const { postgres, clickhouse } = this.options;
-      await UpgradeLedgerSeedService.create({ postgres, clickhouse }).seed();
-    }
+    await this.seedOrReinfer();
     const before = { steps: await this.ledger.findSteps(), runs: await this.ledger.findRuns() };
     const { installed, plan } = this.planFrom({ ...before, fresh });
     if (plan.outcome === "refused") return this.refuse({ plan });
@@ -615,32 +669,28 @@ export class UpgradeRunnerService {
       if (open.length > 0) await phases.start({ name, release: release.release });
     }
     const { reports, attempts } = await this.applyWithRetry({ release, signal });
-    await this.recordPrisma({ open: engines[0].open, runId });
-    await this.recordClickHouse({ open: engines[1].open, reports, runId });
+    const done = new Set([
+      ...(await this.recordPrisma({ open: engines[0].open, runId })),
+      ...(await this.recordClickHouse({ open: engines[1].open, reports, runId })),
+    ]);
+    const unfinished = release.schema.filter((id) => !done.has(id));
     const failedPrisma = await this.failedPrismaMigrations();
     const failedOn = (engine: SchemaTargetReport["engine"]) =>
       reports.some((report) => report.engine === engine && !report.ok);
-    const postgresFailed = failedPrisma.length > 0 || failedOn("postgres");
+    const postgresFailed =
+      failedPrisma.length > 0 || failedOn("postgres") || unfinished.some(isPrisma);
+    const clickhouseFailed = failedOn("clickhouse") || unfinished.some(isGoose);
     const outcome = (failed: boolean) => (failed ? "failed" : "succeeded");
     await phases.end({ name: "postgres-schema", outcome: outcome(postgresFailed) });
-    await phases.end({ name: "clickhouse-schema", outcome: outcome(failedOn("clickhouse")) });
+    await phases.end({ name: "clickhouse-schema", outcome: outcome(clickhouseFailed) });
     if (failedPrisma.length > 0) {
       const reason = this.resolvable({ names: failedPrisma });
       if (reason !== null) throw prismaFailure({ names: failedPrisma, reason });
       const error = reports.find((report) => report.engine === "postgres" && !report.ok)?.error;
       throw rerunnableFailure({ names: failedPrisma, attempts, error: error ?? null });
     }
-    const failing = reports.filter((report) => !report.ok);
-    if (failing.length === 0) return;
-    const named = failing.map(
-      (report) => `${report.target} (${redactSecrets(report.error ?? "no error given")})`,
-    );
-    throw new UpgradeRunFailure("schema_failed", `schema failed on ${named.join(", ")}`, {
-      targets: failing.map(({ target, error }) => ({
-        target,
-        error: error === null ? null : redactSecrets(error),
-      })),
-    });
+    const failure = schemaFailure({ reports, unfinished });
+    if (failure) throw failure;
   }
 
   /**
@@ -718,6 +768,7 @@ export class UpgradeRunnerService {
       const lastError = prisma.get(id)?.lastError ?? null;
       await this.runner.setStatus({ ids: [id], status: "failed", runId, lastError });
     }
+    return done;
   }
 
   /** D4: one target row per step and endpoint; the step is the aggregate, failed if any is. */
@@ -729,9 +780,9 @@ export class UpgradeRunnerService {
     open: readonly string[];
     reports: readonly SchemaTargetReport[];
     runId: string;
-  }): Promise<void> {
+  }): Promise<string[]> {
     const targets = reports.flatMap((report) => (report.engine === "clickhouse" ? [report] : []));
-    if (targets.length === 0 || open.length === 0) return;
+    if (targets.length === 0 || open.length === 0) return [];
     const statuses = new Map<string, TargetStatus[]>();
     for (const target of targets) {
       let blamed = false;
@@ -752,14 +803,17 @@ export class UpgradeRunnerService {
       }
     }
     const failedOn = targets.filter((target) => !target.ok).map((target) => target.target);
+    const done: string[] = [];
     for (const [id, perTarget] of statuses) {
       if (perTarget.includes("failed")) {
         const lastError = `failed on ${failedOn.join(", ")}`;
         await this.runner.setStatus({ ids: [id], status: "failed", runId, lastError });
       } else if (perTarget.every((status) => status === "done")) {
         await this.runner.setStatus({ ids: [id], status: "done", runId });
+        done.push(id);
       }
     }
+    return done;
   }
 
   private async runBlockingStep({
@@ -785,15 +839,20 @@ export class UpgradeRunnerService {
     await this.runner.markRunning({ id, runId });
     const resuming = (recorded?.report ?? null) !== null;
     this.narrate.stepStarted({ id, description: step.description, resuming });
+    const minutes = BLOCKING_STEP_DEADLINE_MS / 60_000;
+    const reason = `blocking step ${id} passed its ${minutes}-minute deadline`;
+    const deadline = stepDeadline({ signal, deadlineMs: BLOCKING_STEP_DEADLINE_MS, reason });
     try {
-      const report = await step.run({
-        checkpoint: {
-          resumeFrom: recorded?.report ?? null,
-          save: ({ report: saved }) => this.runner.saveReport({ id, report: saved }),
-        },
-        dryRun: false,
-        signal,
-      });
+      const report = await deadline.race(
+        step.run({
+          checkpoint: {
+            resumeFrom: recorded?.report ?? null,
+            save: ({ report: saved }) => this.runner.saveReport({ id, report: saved }),
+          },
+          dryRun: false,
+          signal: deadline.signal,
+        }),
+      );
       // A run that returns aborted stopped early: it stays running with its checkpoint (F-2).
       signal.throwIfAborted();
       await this.runner.setStatus({ ids: [id], status: "done", runId, report });
@@ -806,6 +865,8 @@ export class UpgradeRunnerService {
       throw new UpgradeRunFailure("step_failed", `blocking step ${id} failed: ${lastError}`, {
         step: id,
       });
+    } finally {
+      deadline.stop();
     }
   }
 
@@ -850,6 +911,7 @@ export class UpgradeRunnerService {
         markRunning: (input) => this.runner.markRunning(input),
         setStatus: (input) => this.runner.setStatus(input),
         saveReport: (input) => this.runner.saveReport(input),
+        reopen: (input) => this.runner.reopenDoneSteps({ ...input, from: "running" }),
       },
       steps: [...this.codeSteps.values()],
       serving: () => true,

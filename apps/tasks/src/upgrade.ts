@@ -817,7 +817,12 @@ async function printPlan({
   }
   const preview = {
     installed: planned.installed,
-    plan: previewUpgradeTo({ plan: planned.plan, image, to: command.to }),
+    plan: previewUpgradeTo({
+      plan: planned.plan,
+      image,
+      manifests: loadReleases().manifests,
+      to: command.to,
+    }),
     preflight: preflightFrom({ status: await runner.status() }),
   };
   write(`${command.json ? JSON.stringify(preview, null, 2) : formatPreview(preview)}\n`);

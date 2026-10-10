@@ -11,6 +11,7 @@ import { UpgradeLedgerRepository } from "../ledger.repository.ts";
 import type { UpgradeLease, UpgradeRun } from "../ledger.ts";
 import { loadReleases } from "../manifest/manifest-loader.ts";
 import type { ReleaseTreeSteps } from "../manifest/stamp.ts";
+import { upgradePlanSchema } from "../plan/plan-upgrade.ts";
 import type { UpgradePostgres } from "../ports.ts";
 import { UPGRADE_LEASE_NAME } from "../runner/runner-lease.ts";
 import { UpgradeRunnerRepository } from "../runner/runner-ledger.repository.ts";
@@ -26,6 +27,7 @@ import { type FirstInstallUpgrade, spawnFirstInstallUpgrade } from "./first-inst
 import { IMAGE_CODE_STEPS_FILE, readImageCodeSteps } from "./image-code-steps.ts";
 import { imageGateSteps, imageRelease, readImageTree } from "./image-tree.ts";
 import {
+  ledgerFloor,
   type ServingRole,
   type ServingVerdict,
   UPGRADE_COMMAND,
@@ -148,6 +150,7 @@ export function upgradeGateOver({
   const findBlockingFailures = async () =>
     (await findFailedSteps()).filter(({ id }) => blocking.has(id));
   const findLeaseHolder = () => liveLeaseHolder({ runner });
+  const findRefusal = async () => refusedRunVerdict({ runs: await findRuns(), release });
   let closed: Promise<void> | null = null;
   const closeOnce = () => (closed ??= close());
   return {
@@ -161,10 +164,12 @@ export function upgradeGateOver({
                 warn,
                 findFailedSteps: findBlockingFailures,
                 findLeaseHolder,
+                findRefusal,
                 wait,
               })
             : await failedFirstInstallRun({
                 verdict: await gate.admit(),
+                release,
                 findFailedSteps: findBlockingFailures,
                 findRuns,
               });
@@ -219,27 +224,63 @@ function consoleRetryFor({
   };
 }
 
+type LedgerRun = Pick<UpgradeRun, "kind" | "release" | "floor" | "outcome" | "plan" | "report">;
+
 /**
- * UIW-7, NO-HOLDS: an api whose installation never finished an upgrade (a first install, so
- * nobody can sign in to Ops > Upgrades) reads the failure from the ledger for the token console:
- * its image's failed blocking steps and the last failed run's log tail; later ones go to Upgrades.
+ * UIW-7, NO-HOLDS: an api whose installation never finished an upgrade run (a first install, so
+ * nobody can sign in to Ops > Upgrades; the ledger seed's run does not count) reads the failure
+ * from the ledger for the token console. A refusal is shown as one, never as "upgrading".
  */
 export async function failedFirstInstallRun({
   verdict,
+  release,
   findFailedSteps,
   findRuns,
 }: {
   verdict: ServingVerdict;
+  release: string | null;
   findFailedSteps: () => Promise<UpgradeFailedRun["failedSteps"]>;
-  findRuns: () => Promise<readonly Pick<UpgradeRun, "outcome" | "report">[]>;
+  findRuns: () => Promise<readonly LedgerRun[]>;
 }): Promise<ServingVerdict> {
   if (verdict.outcome !== "upgrading") return verdict;
   const runs = await findRuns();
-  if (runs.some((run) => run.outcome === "succeeded")) return verdict;
+  const upgraded = runs.some((run) => run.kind === "upgrade" && run.outcome === "succeeded");
+  const refused = refusedRunVerdict({ runs, release });
+  if (refused) {
+    if (upgraded) return refused;
+    return { ...verdict, failedRun: { failedSteps: [], logTail: [refused.refusal] } };
+  }
+  if (upgraded) return verdict;
   const failedSteps = await findFailedSteps();
   if (failedSteps.length === 0) return verdict;
-  const report = runs.findLast((run) => run.outcome === "failed")?.report;
+  const report = runs.findLast((run) => run.kind === "upgrade" && run.outcome === "failed")?.report;
   return { ...verdict, failedRun: { failedSteps, logTail: logTailSchema.parse(report?.logTail) } };
+}
+
+/**
+ * This image's newest upgrade run, when its plan refused (exit 2): a floor refusal naming the
+ * outcome code and the plan's message, which names the release to stop at. Null otherwise.
+ */
+export function refusedRunVerdict({
+  runs,
+  release,
+}: {
+  runs: readonly Omit<LedgerRun, "report">[];
+  release: string | null;
+}): Extract<ServingVerdict, { outcome: "below-floor" }> | null {
+  const newest = runs.filter((run) => run.kind === "upgrade" && run.release === release).at(-1);
+  if (newest?.outcome !== "failed") return null;
+  const plan = upgradePlanSchema.safeParse(newest.plan);
+  if (!plan.success || plan.data.outcome !== "refused") return null;
+  const { code, stopAt, message } = plan.data;
+  const named = code === "below_lts_floor" ? "refused_below_floor" : "refused_image_below_floor";
+  return {
+    admitted: false,
+    outcome: "below-floor",
+    release: release ?? "unreleased",
+    floor: stopAt ?? ledgerFloor({ runs }) ?? "unknown",
+    refusal: `\`${UPGRADE_COMMAND}\` refused (${named}): ${message}`,
+  };
 }
 
 /** Who holds the upgrade lease now, or null when it is free (a lapsed lease is free). */
@@ -321,8 +362,8 @@ function settled({
 
 /**
  * The worker runs `upgrade` while its installation is behind (UPGRADE-IN-WORKER): it waits while
- * another runner holds the lease, after a failed step for a Retry that returns it to `pending`,
- * and after a failure with no failed step retries on a backoff (STUCK-STATES).
+ * another runner holds the lease, after a failed step for a Retry, after a failure with no failed
+ * step retries on a backoff (STUCK-STATES), and after a refusal (exit 2) refuses by name.
  */
 export async function admitAfterFirstInstall({
   gate,
@@ -330,6 +371,7 @@ export async function admitAfterFirstInstall({
   warn,
   findFailedSteps = async () => [],
   findLeaseHolder = async () => null,
+  findRefusal = async () => null,
   wait = (ms) => sleep(ms),
   reAskMs = UPGRADE_RE_ASK_MS,
 }: {
@@ -338,6 +380,8 @@ export async function admitAfterFirstInstall({
   warn: ServingGateWarn;
   findFailedSteps?: () => Promise<UpgradeFailedRun["failedSteps"]>;
   findLeaseHolder?: UpgradeLeaseHolder;
+  /** The refusal the ledger recorded for this image's newest run, read after an exit 2. */
+  findRefusal?: () => Promise<ServingVerdict | null>;
   wait?: (ms: number) => Promise<unknown>;
   reAskMs?: number;
 }): Promise<ServingVerdict> {
@@ -369,6 +413,15 @@ export async function admitAfterFirstInstall({
       retries = 0;
       continue;
     }
+    const refused = await refusalOf({ exitCode, findRefusal });
+    if (refused) {
+      warn(`${refused.refusal}; this worker runs it no more and refuses to serve`, {
+        phase: verdict.outcome,
+        waitingOn: "nothing",
+        next: "do what the refusal names, then start this worker again",
+      });
+      return refused;
+    }
     // After any run a failed step waits for a Retry; a lease loser's exit is not a failure.
     mayRunPastFailure = false;
     retries = await waitAfterFailedRun({
@@ -380,6 +433,19 @@ export async function admitAfterFirstInstall({
       reAskMs,
     });
   }
+}
+
+/** An exit 2 is a refusal no retry clears; one the ledger did not record backs off as before. */
+async function refusalOf({
+  exitCode,
+  findRefusal,
+}: {
+  exitCode: number;
+  findRefusal: () => Promise<ServingVerdict | null>;
+}): Promise<(ServingVerdict & { refusal: string }) | null> {
+  if (exitCode !== EXIT_CODES.refused_below_floor) return null;
+  const refused = await findRefusal().catch(() => null);
+  return refused && "refusal" in refused ? refused : null;
 }
 
 /** The longest a worker waits between runs that fail with no failed step (STUCK-STATES). */
@@ -471,6 +537,7 @@ function backgroundStepsOver({
           markRunning: (input) => runner.markRunning(input),
           setStatus: (input) => runner.setStatus(input),
           saveReport: (input) => runner.saveReport(input),
+          reopen: (input) => runner.reopenDoneSteps({ ...input, from: "running" }),
         },
         steps: steps.filter(isMigrationStep),
         serving: () => gate.serving(),
@@ -483,6 +550,12 @@ function backgroundStepsOver({
   };
 }
 
+/** The gate's statements give up rather than hold its one connection (gate review, 2026-10-10). */
+export const GATE_STATEMENT_TIMEOUT_MS = 15_000;
+
+/** Client side, for a connection that stops answering at all: a little past the server's own. */
+export const GATE_QUERY_TIMEOUT_MS = 20_000;
+
 /** The gate's one connection, in the schema `?schema=` names, where the runner wrote the ledger. */
 export function gatePoolConfig({ databaseUrl }: { databaseUrl: string }): pg.PoolConfig {
   const schema = URL.canParse(databaseUrl) ? new URL(databaseUrl).searchParams.get("schema") : null;
@@ -490,6 +563,8 @@ export function gatePoolConfig({ databaseUrl }: { databaseUrl: string }): pg.Poo
     connectionString: databaseUrl,
     max: 1,
     allowExitOnIdle: true,
+    statement_timeout: GATE_STATEMENT_TIMEOUT_MS,
+    query_timeout: GATE_QUERY_TIMEOUT_MS,
     ...(schema
       ? { options: `-c search_path="${schema}" -c TimeZone=UTC` }
       : { options: "-c TimeZone=UTC" }),

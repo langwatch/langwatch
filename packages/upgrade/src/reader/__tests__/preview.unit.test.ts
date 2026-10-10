@@ -119,3 +119,33 @@ describe("preflightFrom()", () => {
     });
   });
 });
+
+describe("previewUpgradeTo() from an unreleased image", () => {
+  const manifests = [{ release: "3.22.0" }, { release: "3.23.0" }, { release: "3.21.0" }];
+
+  describe("when the target is newer than the newest manifest the image ships", () => {
+    /** @scenario "An unreleased image refuses a preview to a release newer than its newest manifest" */
+    it("refuses with the command that previews from the target image", () => {
+      const preview = previewUpgradeTo({ plan, image: { release: null }, manifests, to: "3.24.0" });
+      expect(preview).toMatchObject({
+        outcome: "refused",
+        code: "target_not_in_image",
+        stopAt: "3.24.0",
+      });
+      expect(preview.outcome === "refused" && preview.message).toContain(
+        "this image is unreleased and ships no manifest for 3.24.0",
+      );
+    });
+  });
+
+  describe("when the target is a manifest the image ships", () => {
+    /** @scenario "An unreleased image previews to a release it ships a manifest for" */
+    it("narrows the plan to that release", () => {
+      const preview = previewUpgradeTo({ plan, image: { release: null }, manifests, to: "3.22.0" });
+      expect(preview.outcome === "planned" && preview.releases.map((r) => r.release)).toEqual([
+        "3.21.0",
+        "3.22.0",
+      ]);
+    });
+  });
+});

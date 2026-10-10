@@ -1002,11 +1002,76 @@ describe.skipIf(!DB_URL)("the upgrade runner", () => {
       await run(runnerFor({ release: "3.22.0", applier, clickhouse: unreachable })).catch(
         () => null,
       );
-      const outcome = await run(runnerFor({ release: "3.22.0", applier, clickhouse: gooseAt }));
+      const copyKeys: MigrationStep = defineMigrationStep({
+        id: "dataset:copy-keys",
+        kind: "data",
+        mode: "blocking",
+        description: "copies the keys",
+        run: async () => ({ copied: 0 }),
+      });
+      const outcome = await run(
+        runnerFor({ release: "3.22.0", applier, clickhouse: gooseAt, codeSteps: [copyKeys] }),
+      );
       expect(outcome.code).toBe("done");
       expect(await statusOf("dataset:copy-keys")).not.toBe("not-needed");
       const base = (await ledger().findSteps()).find((s) => s.id === "prisma:20261001000000_base");
       expect(base).toMatchObject({ status: "done", inferred: true });
+    });
+  });
+});
+
+describe.skipIf(!DB_URL)("the upgrade runner on an unfinished or stale ledger", () => {
+  describe("when the schema apply reports success but leaves an open schema step not done", () => {
+    /** @scenario "A run whose schema apply left an open schema step not done fails with schema_failed naming it" */
+    it("fails with schema_failed naming the step and records no succeeded run", async () => {
+      const applier = fakeApplier({ release: "3.21.0", targets: [] });
+      const outcome = await run(runnerFor({ release: "3.21.0", applier }));
+      expect(outcome).toMatchObject({ code: "schema_failed", exitCode: 1 });
+      expect(outcome.message).toContain("clickhouse:00001");
+      expect(outcome.message).toContain("no ClickHouse target was configured");
+      expect(await statusOf("prisma:20261001000000_base")).toBe("done");
+      expect(await statusOf("clickhouse:00001")).not.toBe("done");
+      const upgrades = (await ledger().findRuns()).filter((r) => r.kind === "upgrade");
+      expect(upgrades.map((r) => r.outcome)).toEqual(["failed"]);
+    });
+  });
+
+  describe("when a refused install upgrades with an image older than the ledger and retries", () => {
+    /** @scenario "A refused install that upgrades to the stop-at release and retries is admitted" */
+    it("re-reads the seeded rows and admits it instead of refusing for good", async () => {
+      await scratch.postgres.query(
+        `INSERT INTO "_prisma_migrations" ("migration_name", "finished_at") VALUES ($1, now())`,
+        ["20200101000000_ancient"],
+      );
+      let gooseVersions = `[]`;
+      const goose: UpgradeClickHouse = {
+        queryRows: async (sql) =>
+          JSON.parse(sql.includes("system.tables") ? `[{"present":1}]` : gooseVersions),
+      };
+      const applier = fakeApplier({ release: "3.21.0" });
+      const refused = await run(runnerFor({ release: "3.21.0", applier, clickhouse: goose }));
+      expect(refused).toMatchObject({ code: "refused_below_floor", detail: { stopAt: "3.20.1" } });
+
+      await scratch.postgres.query(
+        `INSERT INTO "_prisma_migrations" ("migration_name", "finished_at") VALUES ($1, now())`,
+        ["20261001000000_base"],
+      );
+      gooseVersions = `[{"version_id":1,"is_applied":1}]`;
+      const copyKeys: MigrationStep = defineMigrationStep({
+        id: "dataset:copy-keys",
+        kind: "data",
+        mode: "blocking",
+        description: "copies the keys",
+        run: async () => ({ copied: 0 }),
+      });
+      const admitted = await run(
+        runnerFor({ release: "3.21.0", applier, clickhouse: goose, codeSteps: [copyKeys] }),
+      );
+      expect(admitted.code).toBe("done");
+      expect(applier.calls).toEqual(["3.21.0"]);
+      expect(await statusOf("prisma:20261002000000_add")).toBe("done");
+      const seeds = (await ledger().findRuns()).filter((r) => r.kind === "seed");
+      expect(seeds).toHaveLength(1);
     });
   });
 });
