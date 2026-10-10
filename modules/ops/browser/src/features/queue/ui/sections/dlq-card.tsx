@@ -381,7 +381,7 @@ function DlqCardHeader({
           a red process-outbox count. */}
       {groupCount > 0 && (
         <>
-          <Text textStyle="sm" fontWeight="medium" color="orange.500">
+          <Text textStyle="sm" fontWeight="medium" color="orange.fg">
             Dead Letter Queue: {isFiltering ? `${shownCount} of ` : ""}
             {groupCount} group{groupCount !== 1 ? "s" : ""}
           </Text>

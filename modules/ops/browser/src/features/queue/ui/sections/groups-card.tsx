@@ -476,19 +476,19 @@ function GroupRow({
         </Text>
       </Table.Cell>
       <Table.Cell height="49px" textAlign="end">
-        <Text textStyle="xs" fontFamily="mono" color={c.attempt > 0 ? "orange.500" : "fg.muted"}>
+        <Text textStyle="xs" fontFamily="mono" color={c.attempt > 0 ? "orange.fg" : "fg.muted"}>
           {c.attempt > 0 ? c.attempt : "—"}
         </Text>
       </Table.Cell>
       <Table.Cell height="49px">
-        <Text textStyle="xs" color={c.state === "retrying" ? "orange.500" : "fg.muted"}>
+        <Text textStyle="xs" color={c.state === "retrying" ? "orange.fg" : "fg.muted"}>
           {describeNextRun(c, now)}
         </Text>
       </Table.Cell>
       <Table.Cell height="49px">
         <Text
           textStyle="xs"
-          color={overdue ? "orange.500" : "fg.muted"}
+          color={overdue ? "orange.fg" : "fg.muted"}
           fontWeight={overdue ? "medium" : undefined}
         >
           {formatTimeAgo(group.oldestJobMs)}
