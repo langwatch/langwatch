@@ -20,8 +20,8 @@ import {
   isCommentScannedPath,
 } from "./rules/comment-block-size.rule.mjs";
 import { conditionShapeRule } from "./rules/condition-shape.rule.mjs";
-import { contractSchemaNamedRule } from "./rules/contract-schema-named.rule.mjs";
 import { conditionalTypeDepthRule } from "./rules/conditional-type-depth.rule.mjs";
+import { contractSchemaNamedRule } from "./rules/contract-schema-named.rule.mjs";
 import { effectDerivesStateRule } from "./rules/effect-derives-state.rule.mjs";
 import { emDashInCopyRule } from "./rules/em-dash-in-copy.rule.mjs";
 import { enterpriseLicenseHeaderRule } from "./rules/enterprise-license-header.rule.mjs";
@@ -49,6 +49,7 @@ import { noInlineDynamicImportRule } from "./rules/no-inline-dynamic-import.rule
 import { noLoggerSpyRule } from "./rules/no-logger-spy.rule.mjs";
 import { noPortVocabularyRule } from "./rules/no-port-vocabulary.rule.mjs";
 import { noPrototypeStubRule } from "./rules/no-prototype-stub.rule.mjs";
+import { noRawFontSizeRule } from "./rules/no-raw-font-size.rule.mjs";
 import { noReduxRule } from "./rules/no-redux.rule.mjs";
 import { noRuntimeReflectionRule } from "./rules/no-runtime-reflection.rule.mjs";
 import { noTautologicalAssertionRule } from "./rules/no-tautological-assertion.rule.mjs";
@@ -98,6 +99,7 @@ const HOUSE_RULES = [
   clickhouseTenantIdRule,
   skipTenantCheckReasonRule,
   noFormWatchInChildRule,
+  noRawFontSizeRule,
   noTautologicalAssertionRule,
   requireFetchTimeoutRule,
   bannedVerbPrefixRule,

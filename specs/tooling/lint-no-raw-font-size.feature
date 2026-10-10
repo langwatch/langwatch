@@ -2,8 +2,8 @@ Feature: The no-raw-font-size lint rule
   Text in module browser code is sized by a named product text style from the
   design system (`textStyle="bodySm"`, `caption`, `label`...), never by a pixel,
   em or rem literal or a bare number. Where an API takes a number (chart ticks,
-  editor options) the value comes from `TYPE_SCALE_PX`. The rule is written but
-  not registered until the type-scale sweep brings the tree to zero findings.
+  editor options) the value comes from `TYPE_SCALE_PX`; block-glyph art uses
+  `GLYPH_ART_PX`.
 
   @unit
   Scenario: A raw font size on a JSX prop is reported

@@ -32,6 +32,7 @@
     "langwatch/browser-store-containment": "error",
     "langwatch/effect-derives-state": "error",
     "langwatch/no-redux": "error",
+    "langwatch/no-raw-font-size": "error",
     "langwatch/query-data-in-state": "error",
     "langwatch/unresolved-relative-import": "error",
     "langwatch/cognitive-complexity": ["error", { "max": 15 }],
