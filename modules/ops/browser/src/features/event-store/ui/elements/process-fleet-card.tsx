@@ -118,9 +118,8 @@ export function ProcessFleetCard({
               columnRules={false}
               containerProps={{ overflowX: "auto" }}
               size="sm"
-              variant="line"
+              variant="embedded"
               width="full"
-              minWidth="720px"
             >
               <Table.Header whiteSpace="nowrap">
                 <Table.Row>

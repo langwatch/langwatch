@@ -173,7 +173,7 @@ export function BlockedCard({ queueNames: _queueNames }: { queueNames: string[] 
               columnRules={false}
               containerProps={{ overflow: "visible" }}
               size="sm"
-              variant="line"
+              variant="embedded"
             >
               <Table.Header position="sticky" top={0} zIndex={1} bg="bg.panel">
                 <Table.Row>

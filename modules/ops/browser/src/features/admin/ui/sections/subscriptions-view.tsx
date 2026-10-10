@@ -25,7 +25,7 @@ import { useDebounce } from "use-debounce";
 import { useOpsToaster, useShowErrorToast } from "../../../../behavior/ops-feedback.ts";
 import { useAdminCreate, useAdminList, useAdminUpdate } from "../../behavior/use-admin-resource.ts";
 import { PlanTypes, SubscriptionStatus } from "../../model/admin-enums.ts";
-import { dateInputToISO, EmptyCell, formatDate } from "../elements/admin-cells.tsx";
+import { AdminDate, EmptyCell, dateInputToISO, formatDate } from "../elements/admin-cells.tsx";
 import { AdminTable } from "./admin-table-shell.tsx";
 interface AdminSubscription {
   id: string;
@@ -148,7 +148,6 @@ export default function SubscriptionsView() {
           density="compact"
           columnRules={false}
           containerProps={{ overflowX: "auto" }}
-          variant="line"
           size="sm"
           width="full"
         >
@@ -195,8 +194,12 @@ export default function SubscriptionsView() {
                   </Badge>
                 </Table.Cell>
                 <Table.Cell>{sub.stripeSubscriptionId ?? <EmptyCell />}</Table.Cell>
-                <Table.Cell>{formatDate(sub.startDate)}</Table.Cell>
-                <Table.Cell>{formatDate(sub.endDate)}</Table.Cell>
+                <Table.Cell>
+                  <AdminDate value={sub.startDate} display="date" />
+                </Table.Cell>
+                <Table.Cell>
+                  <AdminDate value={sub.endDate} display="date" />
+                </Table.Cell>
                 <Table.Cell textAlign="right">
                   <Box width="full" height="full" display="flex" justifyContent="end">
                     <Menu.Root>

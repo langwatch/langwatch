@@ -61,7 +61,7 @@ export function AnomaliesCard() {
             columnRules={false}
             containerProps={{ overflow: "visible" }}
             size="sm"
-            variant="line"
+            variant="embedded"
           >
             <Table.Header>
               <Table.Row>

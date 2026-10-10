@@ -7,6 +7,7 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { TYPE_SCALE_PX } from "@langwatch/design-system/typography";
 import type { DashboardData } from "@langwatch/ops-contract";
 import { readableDate } from "@langwatch/time";
 import { useRef, useState } from "react";
@@ -375,13 +376,13 @@ export function ThroughputChart({ data }: { data: DashboardData }) {
             scale="time"
             ticks={timeTicks}
             tickFormatter={formatTime}
-            tick={{ fontSize: 10, fill: "var(--chakra-colors-fg-muted)" }}
+            tick={{ fontSize: TYPE_SCALE_PX.micro, fill: "var(--chakra-colors-fg-muted)" }}
             axisLine={false}
             tickLine={false}
           />
           <YAxis
             yAxisId="rate"
-            tick={{ fontSize: 10, fill: "var(--chakra-colors-fg-muted)" }}
+            tick={{ fontSize: TYPE_SCALE_PX.micro, fill: "var(--chakra-colors-fg-muted)" }}
             axisLine={false}
             tickLine={false}
             width={40}
@@ -393,7 +394,7 @@ export function ThroughputChart({ data }: { data: DashboardData }) {
             <YAxis
               yAxisId="count"
               orientation="right"
-              tick={{ fontSize: 10, fill: "var(--chakra-colors-fg-muted)" }}
+              tick={{ fontSize: TYPE_SCALE_PX.micro, fill: "var(--chakra-colors-fg-muted)" }}
               axisLine={false}
               tickLine={false}
               width={40}

@@ -1,13 +1,6 @@
 import { DeleteConfirmationDialog } from "@langwatch/design-system/delete-confirmation-dialog";
-import {
-  Button,
-  Center,
-  HStack,
-  Spacer,
-  Spinner,
-  Text,
-  VStack,
-} from "@langwatch/design-system/primitives";
+import { Button, HStack, Spacer, Text, VStack } from "@langwatch/design-system/primitives";
+import { SkeletonRows } from "@langwatch/design-system/skeletons";
 import { nowInstant } from "@langwatch/time";
 import { RotateCcw, XCircle } from "lucide-react";
 import { useState } from "react";
@@ -42,11 +35,7 @@ export function DeadLettersContent() {
   const query = api.ops.listDeadLetters.useQuery({ processName, page, pageSize: PAGE_SIZE }, {});
 
   if (query.isPending) {
-    return (
-      <Center paddingY={20}>
-        <Spinner size="lg" />
-      </Center>
-    );
+    return <SkeletonRows rows={6} />;
   }
 
   const messages = query.data?.messages ?? [];

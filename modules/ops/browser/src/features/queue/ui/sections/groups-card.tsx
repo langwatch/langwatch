@@ -21,7 +21,7 @@ import {
 import type { GroupInfo } from "@langwatch/ops-contract";
 import { nowInstant } from "@langwatch/time";
 import { MoreVertical, Search } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 
 import { api } from "../../../../behavior/ops-api.ts";
 import { useOpsToaster, useShowErrorToast } from "../../../../behavior/ops-feedback.ts";
@@ -187,13 +187,8 @@ export function GroupsCard({ queueNames }: { queueNames: string[] }) {
             />
           )}
 
-          {hasAccess && (
-            <HStack paddingX={4} paddingTop={2} justify="flex-end">
-              <ReapStrandedGroupsAction />
-            </HStack>
-          )}
-
           <GroupsFilterBar
+            actions={hasAccess ? <ReapStrandedGroupsAction /> : undefined}
             showFilters={allGroups.length > 0}
             statusButtons={statusButtons}
             statusFilter={statusFilter}
@@ -239,7 +234,7 @@ export function GroupsCard({ queueNames }: { queueNames: string[] }) {
                 columnRules={false}
                 containerProps={{ overflow: "visible" }}
                 size="sm"
-                variant="line"
+                variant="embedded"
               >
                 <Table.Header position="sticky" top={0} zIndex={1} bg="bg.panel">
                   <Table.Row>
@@ -692,6 +687,7 @@ type StatusButton = { value: StatusFilter; label: string; count: number; color: 
 
 /** The groups heading with its status filters and search. */
 function GroupsFilterBar({
+  actions,
   showFilters,
   statusButtons,
   statusFilter,
@@ -699,6 +695,7 @@ function GroupsFilterBar({
   search,
   onSearch,
 }: {
+  actions?: ReactNode;
   showFilters: boolean;
   statusButtons: StatusButton[];
   statusFilter: StatusFilter;
@@ -719,6 +716,7 @@ function GroupsFilterBar({
         Groups
       </Text>
       <Spacer />
+      {actions}
       {showFilters && (
         <>
           <HStack gap={1}>

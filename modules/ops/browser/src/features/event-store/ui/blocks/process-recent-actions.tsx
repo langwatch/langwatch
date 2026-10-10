@@ -29,7 +29,7 @@ export function ProcessRecentActions({ rows, now }: { rows: ProcessAction[]; now
             columnRules={false}
             containerProps={{ overflowX: "auto" }}
             size="sm"
-            variant="line"
+            variant="embedded"
           >
             <Table.Body>
               {rows.map((row) => (

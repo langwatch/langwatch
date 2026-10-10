@@ -10,7 +10,7 @@ import {
   sortedDomains,
   type SelfHostedInstance,
 } from "../../model/self-hosted-instance.ts";
-import { EmptyCell, formatDate } from "../elements/admin-cells.tsx";
+import { AdminDate, EmptyCell } from "../elements/admin-cells.tsx";
 import { ShortId } from "../elements/short-id.tsx";
 
 const COLUMN_COUNT = 8;
@@ -29,7 +29,6 @@ export function InstancesTable({
       density="compact"
       columnRules={false}
       containerProps={{ overflowX: "auto" }}
-      variant="line"
       size="sm"
     >
       <Table.Header>
@@ -92,8 +91,12 @@ function InstancesTableRow({
           {ACTIVITY_LABELS[instance.activity]}
         </Badge>
       </Table.Cell>
-      <Table.Cell>{formatDate(instance.lastSeenAt)}</Table.Cell>
-      <Table.Cell>{formatDate(instance.firstSeenAt)}</Table.Cell>
+      <Table.Cell>
+        <AdminDate value={instance.lastSeenAt} display="date" />
+      </Table.Cell>
+      <Table.Cell>
+        <AdminDate value={instance.firstSeenAt} display="date" />
+      </Table.Cell>
       <Table.Cell>
         <SizeCell instance={instance} />
       </Table.Cell>

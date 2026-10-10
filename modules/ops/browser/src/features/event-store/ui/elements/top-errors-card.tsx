@@ -39,7 +39,7 @@ export function TopErrorsCard({
           columnRules={false}
           containerProps={{ overflowX: "auto" }}
           size="sm"
-          variant="line"
+          variant="embedded"
           css={{ "& tr:last-child td": { borderBottom: "none" } }}
         >
           <Table.Header>

@@ -32,8 +32,8 @@ import { useDebounce } from "use-debounce";
 import { useOpsToaster, useShowErrorToast } from "../../../../behavior/ops-feedback.ts";
 import { useOpsRouter as useRouter } from "../../../../behavior/ops-router.ts";
 import { useAdminList, useAdminUpdate } from "../../behavior/use-admin-resource.ts";
-import { Currency, PricingModel } from "../../model/admin-enums.ts";
-import { EmptyCell, formatDate } from "../elements/admin-cells.tsx";
+import { Currency, PRICING_MODEL_LABELS, PricingModel } from "../../model/admin-enums.ts";
+import { AdminDate, EmptyCell, formatDate } from "../elements/admin-cells.tsx";
 import { AdminTable } from "./admin-table-shell.tsx";
 /**
  * Read-facing Organization shape - excludes the s3 credential fields. The
@@ -101,7 +101,6 @@ export default function OrganizationsView() {
           density="compact"
           columnRules={false}
           containerProps={{ overflowX: "auto" }}
-          variant="line"
           size="sm"
           width="full"
         >
@@ -131,17 +130,17 @@ export default function OrganizationsView() {
             )}
             {list.data?.data.map((org) => (
               <Table.Row key={org.id}>
-                <Table.Cell>
-                  <InlineCode variant="neutral">{org.id}</InlineCode>
-                </Table.Cell>
+                <ListTable.IdCell value={org.id} label="organization ID" />
                 <Table.Cell>{org.name}</Table.Cell>
                 <Table.Cell>
                   {org.slug && <InlineCode variant="neutral">{org.slug}</InlineCode>}
                 </Table.Cell>
-                <Table.Cell>{org.pricingModel}</Table.Cell>
+                <Table.Cell>{PRICING_MODEL_LABELS[org.pricingModel]}</Table.Cell>
                 <Table.Cell>{org.currency}</Table.Cell>
                 <Table.Cell>{org.ssoDomain ?? <EmptyCell />}</Table.Cell>
-                <Table.Cell>{formatDate(org.createdAt)}</Table.Cell>
+                <Table.Cell>
+                  <AdminDate value={org.createdAt} display="date" />
+                </Table.Cell>
                 <Table.Cell textAlign="right">
                   <Box width="full" height="full" display="flex" justifyContent="end">
                     <Menu.Root>

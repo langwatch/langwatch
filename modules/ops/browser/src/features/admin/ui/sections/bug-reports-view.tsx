@@ -19,7 +19,7 @@ import { useDebounce } from "use-debounce";
 import { api } from "../../../../behavior/ops-api.ts";
 import { useOpsToaster } from "../../../../behavior/ops-feedback.ts";
 import { useOpsRouter as useRouter } from "../../../../behavior/ops-router.ts";
-import { EmptyCell, formatDateTime } from "../elements/admin-cells.tsx";
+import { AdminDate, EmptyCell, formatDateTime } from "../elements/admin-cells.tsx";
 import { AdminTable } from "./admin-table-shell.tsx";
 const PAGE_SIZE = 25;
 
@@ -109,7 +109,6 @@ function BugReportsTable({
       columnRules={false}
       containerProps={{ overflowX: "auto" }}
       size="sm"
-      variant="line"
     >
       <Table.Header>
         <Table.Row>
@@ -141,7 +140,9 @@ function BugReportsTable({
             _hover={{ backgroundColor: "bg.muted" }}
             onClick={() => onOpen(report.id)}
           >
-            <Table.Cell whiteSpace="nowrap">{formatDateTime(report.createdAt)}</Table.Cell>
+            <Table.Cell whiteSpace="nowrap">
+              <AdminDate value={report.createdAt} display="datetime" />
+            </Table.Cell>
             <Table.Cell maxWidth="320px">
               <Button
                 variant="plain"

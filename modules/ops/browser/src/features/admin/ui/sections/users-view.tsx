@@ -28,7 +28,7 @@ import { useOpsHost } from "../../../../model/ops-host.ts";
 import { Dialog } from "../../../../ui/elements/ops-dialog.tsx";
 import { impersonateUser } from "../../behavior/admin-client.ts";
 import { useAdminList, useAdminUpdate } from "../../behavior/use-admin-resource.ts";
-import { EmptyCell, formatDate, formatDateTime } from "../elements/admin-cells.tsx";
+import { AdminDate, EmptyCell, formatDateTime } from "../elements/admin-cells.tsx";
 import { AdminTable } from "./admin-table-shell.tsx";
 interface OrgRef {
   id: string;
@@ -109,7 +109,6 @@ export default function UsersView() {
           density="compact"
           columnRules={false}
           containerProps={{ overflowX: "auto" }}
-          variant="line"
           size="sm"
           width="full"
         >
@@ -140,18 +139,7 @@ export default function UsersView() {
             )}
             {list.data?.data.map((user) => (
               <Table.Row key={user.id}>
-                <Table.Cell
-                  fontFamily="mono"
-                  fontSize="xs"
-                  color="fg.muted"
-                  maxW="110px"
-                  overflow="hidden"
-                  textOverflow="ellipsis"
-                  whiteSpace="nowrap"
-                  title={user.id}
-                >
-                  {user.id}
-                </Table.Cell>
+                <ListTable.IdCell value={user.id} label="user ID" />
                 <Table.Cell>{user.name ?? <EmptyCell />}</Table.Cell>
                 <Table.Cell>{user.email ?? <EmptyCell />}</Table.Cell>
                 <Table.Cell>
@@ -160,8 +148,12 @@ export default function UsersView() {
                 <Table.Cell>
                   <RefChipList refs={user.projects} resource="projects" />
                 </Table.Cell>
-                <Table.Cell>{formatDate(user.createdAt)}</Table.Cell>
-                <Table.Cell>{formatDateTime(user.lastLoginAt)}</Table.Cell>
+                <Table.Cell>
+                  <AdminDate value={user.createdAt} display="date" />
+                </Table.Cell>
+                <Table.Cell>
+                  <AdminDate value={user.lastLoginAt} display="datetime" />
+                </Table.Cell>
                 <Table.Cell>
                   <UserStatusBadge user={user} />
                 </Table.Cell>

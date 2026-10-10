@@ -1,14 +1,6 @@
 import { Link } from "@langwatch/browser-host/link";
-import {
-  Box,
-  Button,
-  Card,
-  Center,
-  HStack,
-  Spinner,
-  Text,
-  VStack,
-} from "@langwatch/design-system/primitives";
+import { Box, Button, Card, HStack, Text, VStack } from "@langwatch/design-system/primitives";
+import { SkeletonRows } from "@langwatch/design-system/skeletons";
 import { nowInstant } from "@langwatch/time";
 import { ArrowRight, Skull } from "lucide-react";
 
@@ -25,11 +17,7 @@ export function EventSourcingOverview() {
   const dead = api.ops.listDeadLetterCounts.useQuery(undefined, {});
 
   if (fleet.isPending) {
-    return (
-      <Center paddingY={20}>
-        <Spinner size="lg" />
-      </Center>
-    );
+    return <SkeletonRows rows={6} />;
   }
 
   const rows = fleet.data ?? [];

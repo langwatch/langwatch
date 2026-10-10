@@ -75,7 +75,7 @@ export default function IdentityLookupView() {
         isFetching={lookup.isFetching}
         error={lookup.error}
       >
-        <VStack align="stretch" gap={8} width="full" padding={6}>
+        <VStack align="stretch" gap={8} width="full" paddingY={6}>
           {address.length === 0 && (
             <NoDataInfoBlock
               icon={<Search />}
@@ -173,7 +173,6 @@ function PeopleTable({
         density="compact"
         columnRules={false}
         containerProps={{ overflowX: "auto" }}
-        variant="line"
         size="sm"
         width="full"
       >

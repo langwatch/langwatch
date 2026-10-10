@@ -1,13 +1,6 @@
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
-import {
-  Box,
-  Center,
-  EmptyState,
-  HStack,
-  Spinner,
-  Text,
-  VStack,
-} from "@langwatch/design-system/primitives";
+import { Box, Center, EmptyState, HStack, Text, VStack } from "@langwatch/design-system/primitives";
+import { SkeletonRows } from "@langwatch/design-system/skeletons";
 import type { OpsEventSubscriberRegistration } from "@langwatch/ops-contract";
 import { Eye, Info } from "lucide-react";
 import type { ReactNode } from "react";
@@ -41,11 +34,7 @@ function AggregateEventsPlaceholder({
   errorMessage?: ReactNode;
 }) {
   if (loading) {
-    return (
-      <Center flex={1}>
-        <Spinner size="lg" />
-      </Center>
-    );
+    return <SkeletonRows rows={6} />;
   }
   if (errorMessage) return <Center flex={1}>{errorMessage}</Center>;
   return (
@@ -126,11 +115,7 @@ function AggregateSearchScreen({
             </Box>
           )}
 
-          {searchLoading && !searchResults && (
-            <Center paddingY={10}>
-              <Spinner size="lg" />
-            </Center>
-          )}
+          {searchLoading && !searchResults && <SkeletonRows rows={6} />}
 
           {searchError}
 

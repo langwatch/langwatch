@@ -26,7 +26,7 @@ import { useDebounce } from "use-debounce";
 import { useOpsToaster, useShowErrorToast } from "../../../../behavior/ops-feedback.ts";
 import { useOpsRouter as useRouter } from "../../../../behavior/ops-router.ts";
 import { useAdminList, useAdminOne, useAdminUpdate } from "../../behavior/use-admin-resource.ts";
-import { EmptyCell, formatDate } from "../elements/admin-cells.tsx";
+import { AdminDate, EmptyCell, formatDate } from "../elements/admin-cells.tsx";
 import { AdminTable } from "./admin-table-shell.tsx";
 /**
  * Read-facing Project shape - excludes the s3 credential fields. The admin
@@ -91,7 +91,6 @@ export default function ProjectsView() {
           density="compact"
           columnRules={false}
           containerProps={{ overflowX: "auto" }}
-          variant="line"
           size="sm"
           width="full"
         >
@@ -121,9 +120,7 @@ export default function ProjectsView() {
             )}
             {list.data?.data.map((project) => (
               <Table.Row key={project.id}>
-                <Table.Cell fontSize="xs" color="fg.muted">
-                  {project.id}
-                </Table.Cell>
+                <ListTable.IdCell value={project.id} label="project ID" />
                 <Table.Cell maxWidth="280px">
                   <Text truncate title={project.name}>
                     {project.name}
@@ -142,7 +139,9 @@ export default function ProjectsView() {
                     integrated={project.integrated}
                   />
                 </Table.Cell>
-                <Table.Cell>{formatDate(project.createdAt)}</Table.Cell>
+                <Table.Cell>
+                  <AdminDate value={project.createdAt} display="date" />
+                </Table.Cell>
                 <Table.Cell textAlign="right">
                   <Box width="full" height="full" display="flex" justifyContent="end">
                     <Menu.Root>

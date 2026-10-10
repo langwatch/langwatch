@@ -1,14 +1,7 @@
 import { ListTable } from "@langwatch/design-system/list-table";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
-import {
-  Button,
-  Center,
-  HStack,
-  Input,
-  Spinner,
-  Table,
-  VStack,
-} from "@langwatch/design-system/primitives";
+import { Button, HStack, Input, Table, VStack } from "@langwatch/design-system/primitives";
+import { SkeletonRows } from "@langwatch/design-system/skeletons";
 import { HandledErrorAlert } from "@langwatch/error-views";
 import type { OpsPlatformOperator } from "@langwatch/ops-contract";
 import { ShieldCheck } from "lucide-react";
@@ -45,11 +38,7 @@ export function OperatorsContent() {
   });
 
   if (list.isLoading) {
-    return (
-      <Center paddingY={20}>
-        <Spinner />
-      </Center>
-    );
+    return <SkeletonRows rows={6} />;
   }
   if (list.error) {
     return <HandledErrorAlert error={list.error} fallbackTitle="Couldn't load the operators" />;
@@ -71,16 +60,11 @@ export function OperatorsContent() {
             aria-label="Email address of an existing user"
             placeholder="Email address of an existing user"
             value={email}
+            required
             onChange={(event) => setEmail(event.target.value)}
             maxWidth="420px"
           />
-          <Button
-            type="submit"
-            colorPalette="accent"
-            size="sm"
-            loading={grant.isPending}
-            disabled={!email.trim()}
-          >
+          <Button type="submit" colorPalette="accent" size="sm" loading={grant.isPending}>
             Grant
           </Button>
         </HStack>
@@ -90,7 +74,6 @@ export function OperatorsContent() {
         density="compact"
         columnRules={false}
         containerProps={{ overflowX: "auto" }}
-        variant="line"
         size="sm"
       >
         <Table.Header>

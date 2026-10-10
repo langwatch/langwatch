@@ -51,7 +51,7 @@ export default function OpsDashboardScreen() {
           <PageLayout.Heading>Ops dashboard</PageLayout.Heading>
         </VStack>
       </PageLayout.Header>
-      <PageLayout.Subtitle paddingX={6} paddingTop={3}>
+      <PageLayout.Subtitle paddingX="var(--page-inset)" paddingTop={3}>
         Throughput, queue health, and work that needs attention.
       </PageLayout.Subtitle>
       <PageLayout.Container paddingY={5} maxWidth="full">

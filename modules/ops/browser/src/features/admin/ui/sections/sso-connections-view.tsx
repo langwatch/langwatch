@@ -1,4 +1,5 @@
 import { Drawer } from "@langwatch/design-system/drawer";
+import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
 import {
   Badge,
@@ -22,7 +23,7 @@ import { api } from "../../../../behavior/ops-api.ts";
 import { useOpsToaster, useShowErrorToast } from "../../../../behavior/ops-feedback.ts";
 import { useOpsRouter as useRouter } from "../../../../behavior/ops-router.ts";
 import { Dialog } from "../../../../ui/elements/ops-dialog.tsx";
-import { EmptyCell, formatDateTime } from "../elements/admin-cells.tsx";
+import { AdminDate, EmptyCell } from "../elements/admin-cells.tsx";
 import { AdminTable } from "./admin-table-shell.tsx";
 import {
   ConnectionDomains,
@@ -100,7 +101,13 @@ function ConnectionsTable({
   onOpen: (connectionId: string) => void;
 }) {
   return (
-    <Table.Root variant="line" size="md" width="full">
+    <ListTable
+      density="compact"
+      columnRules={false}
+      containerProps={{ overflowX: "auto" }}
+      size="sm"
+      width="full"
+    >
       <Table.Header>
         <Table.Row>
           <Table.ColumnHeader>Organization</Table.ColumnHeader>
@@ -147,7 +154,9 @@ function ConnectionsTable({
             <Table.Cell>
               <ProvedBy connection={connection} />
             </Table.Cell>
-            <Table.Cell>{formatDateTime(connection.updatedAtMs)}</Table.Cell>
+            <Table.Cell>
+              <AdminDate value={connection.updatedAtMs} display="datetime" />
+            </Table.Cell>
             <Table.Cell textAlign="right">
               <Box width="full" height="full" display="flex" justifyContent="end">
                 <RowActions connection={connection} onOpen={onOpen} />
@@ -156,7 +165,7 @@ function ConnectionsTable({
           </Table.Row>
         ))}
       </Table.Body>
-    </Table.Root>
+    </ListTable>
   );
 }
 

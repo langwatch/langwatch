@@ -146,7 +146,7 @@ export function FoundryDrawer({ onClose }: UiFoundryDrawerProps) {
                     </Button>
                   </HStack>
                   {lastTraceId && <SentTraceNotice traceId={lastTraceId} />}
-                  <Text fontSize="10px" color="fg.muted" mt={1} textAlign="center">
+                  <Text textStyle="micro" color="fg.muted" mt={1} textAlign="center">
                     ⌘Enter to send · R to reset
                   </Text>
                 </Box>
@@ -189,7 +189,7 @@ function CompactSpanNode({
       >
         <Text flexShrink={0}>{SPAN_TYPE_ICONS[span.type]}</Text>
         <Text truncate>{span.name}</Text>
-        <Text flexShrink={0} fontSize="10px" color="fg.muted">
+        <Text flexShrink={0} textStyle="micro" color="fg.muted">
           {span.durationMs}ms
         </Text>
       </Flex>
@@ -235,7 +235,7 @@ function SelectedSpanEditor({
       {span.type === "llm" &&
         span.llm?.messages?.map((msg, i) => (
           <Box key={i} mb={1}>
-            <Text fontSize="10px" color="fg.muted" mb={0.5}>
+            <Text textStyle="micro" color="fg.muted" mb={0.5}>
               {msg.role}
             </Text>
             <Input
@@ -298,7 +298,7 @@ function SentTraceNotice({ traceId }: { traceId: string }) {
       <Text fontSize="xs" color={copied ? "green.fg" : "fg.default"} fontWeight="medium" mb={0.5}>
         {copied ? "Trace ID copied!" : "Trace sent: click to copy ID"}
       </Text>
-      <Text fontSize="11px" fontFamily="mono" color="fg.muted" truncate>
+      <Text textStyle="monoSm" color="fg.muted" truncate>
         {traceId}
       </Text>
     </Box>

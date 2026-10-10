@@ -1,3 +1,4 @@
+import { FormattedDate } from "@langwatch/design-system/formatted-date";
 import { InlineCode } from "@langwatch/design-system/inline-code";
 import { ListTable } from "@langwatch/design-system/list-table";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
@@ -22,7 +23,6 @@ import type {
   OperatorFeatureFlag as StoredOperatorFeatureFlag,
   OperatorFeatureFlagCatalogue,
 } from "@langwatch/feature-flag-contract";
-import { format } from "@langwatch/time";
 import { Flag, Settings2 } from "lucide-react";
 import { useState } from "react";
 
@@ -124,7 +124,6 @@ export function OperatorFeatureFlagCatalogueView({
             columnRules={false}
             containerProps={{ overflowX: "auto" }}
             size="sm"
-            variant="line"
           >
             <Table.Header>
               <Table.Row>
@@ -196,7 +195,6 @@ function ScopeSection({
           columnRules={false}
           containerProps={{ overflowX: "auto" }}
           size="sm"
-          variant="line"
         >
           <Table.Header>
             <Table.Row>
@@ -274,12 +272,12 @@ function FlagRow({
       <Table.Cell>
         <VStack align="start" gap={2}>
           <HStack gap={2} wrap="wrap">
-            <Text fontFamily="mono" fontSize="xs" overflowWrap="anywhere">
+            <Text textStyle="monoSm" overflowWrap="anywhere">
               {row.key}
             </Text>
             <ScopeBadge scope={row.scope} />
             {row.scope === "PRODUCT" && sharedInstall && (
-              <Badge colorPalette="red" size="sm" variant="subtle">
+              <Badge colorPalette="yellow" size="sm" variant="subtle">
                 All customers
                 <VisuallyHidden>
                   Enabling this reaches the whole fleet when no targeting rule matches it first;
@@ -288,12 +286,9 @@ function FlagRow({
               </Badge>
             )}
           </HStack>
-          <Box as="details" fontSize="sm" color="fg.muted" maxWidth="64ch">
-            <Box as="summary" cursor="pointer" fontSize="xs" _hover={{ color: "fg.default" }}>
-              Details
-            </Box>
-            <Text paddingTop={2}>{row.description}</Text>
-          </Box>
+          <Text textStyle="caption" color="fg.muted" maxWidth="64ch">
+            {row.description}
+          </Text>
         </VStack>
       </Table.Cell>
       <Table.Cell>
@@ -356,8 +351,8 @@ function FlagRow({
           </Text>
         ) : (
           <VStack align="start" gap={0}>
-            <Text fontSize="xs" whiteSpace="nowrap">
-              {row.updatedAt ? format(row.updatedAt, "dd/MM/yyyy HH:mm:ss") : ""}
+            <Text textStyle="caption" whiteSpace="nowrap">
+              <FormattedDate value={row.updatedAt ?? ""} display="datetime" seconds />
             </Text>
             <HStack gap={2} flexWrap="nowrap">
               <Text fontSize="xs" color="fg.muted" truncate maxWidth="160px">

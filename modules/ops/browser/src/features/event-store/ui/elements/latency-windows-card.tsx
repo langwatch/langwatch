@@ -62,7 +62,7 @@ export function LatencyWindowsCard({ windows }: { windows: LatencyWindows | null
           columnRules={false}
           containerProps={{ overflowX: "auto" }}
           size="sm"
-          variant="line"
+          variant="embedded"
         >
           <Table.Header>
             <Table.Row>

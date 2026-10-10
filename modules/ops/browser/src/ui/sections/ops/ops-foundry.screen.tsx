@@ -38,7 +38,7 @@ export default function OpsFoundryScreen() {
       <Box
         height="calc(100dvh - 144px)"
         minHeight="520px"
-        padding={4}
+        padding="var(--page-inset)"
         w="full"
         overflow="hidden"
         borderTopLeftRadius="inherit"

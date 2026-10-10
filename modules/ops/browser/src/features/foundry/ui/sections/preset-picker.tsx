@@ -178,7 +178,7 @@ export function PresetPicker() {
                   <Text fontSize="sm" fontWeight="medium" color="fg.default">
                     {preset.name}
                   </Text>
-                  <Text fontSize="10px" color="fg.muted">
+                  <Text textStyle="micro" color="fg.muted">
                     {countSpans(preset.config.spans)} spans
                   </Text>
                 </Flex>

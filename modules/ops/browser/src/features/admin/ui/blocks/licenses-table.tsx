@@ -5,7 +5,7 @@ import { Badge, Button, Table, Text, VStack } from "@langwatch/design-system/pri
 import { Inbox, MoreVertical } from "lucide-react";
 
 import { SERVICE_LABELS, type License, type Service } from "../../model/license-terms.ts";
-import { EmptyCell, formatDate } from "../elements/admin-cells.tsx";
+import { AdminDate, EmptyCell, formatDate } from "../elements/admin-cells.tsx";
 import { LicenseStatusBadge } from "../elements/license-status-badge.tsx";
 
 const COLUMN_COUNT = 9;
@@ -34,7 +34,6 @@ export function LicensesTable({
       density="compact"
       columnRules={false}
       containerProps={{ overflowX: "auto" }}
-      variant="line"
       size="sm"
     >
       <Table.Header>
@@ -98,7 +97,9 @@ function LicensesTableRow({
       </Table.Cell>
       <Table.Cell>{license.planType}</Table.Cell>
       <Table.Cell>{license.maxMembers}</Table.Cell>
-      <Table.Cell>{formatDate(license.expiresAt)}</Table.Cell>
+      <Table.Cell>
+        <AdminDate value={license.expiresAt} display="date" />
+      </Table.Cell>
       <Table.Cell>
         <LicenseStatusBadge status={license.status} />
       </Table.Cell>

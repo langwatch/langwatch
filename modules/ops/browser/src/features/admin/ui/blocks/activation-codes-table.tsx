@@ -4,7 +4,7 @@ import { Badge, Button, Table, Text, VStack } from "@langwatch/design-system/pri
 import { Inbox } from "lucide-react";
 
 import { ACTIVATION_CODE_STATUS_COLORS, type ActivationCode } from "../../model/activation-code.ts";
-import { EmptyCell, formatDate } from "../elements/admin-cells.tsx";
+import { AdminDate, EmptyCell } from "../elements/admin-cells.tsx";
 
 const COLUMN_COUNT = 8;
 
@@ -24,7 +24,6 @@ export function ActivationCodesTable({
       density="compact"
       columnRules={false}
       containerProps={{ overflowX: "auto" }}
-      variant="line"
       size="sm"
     >
       <Table.Header>
@@ -58,7 +57,9 @@ export function ActivationCodesTable({
             </Table.Cell>
             <Table.Cell>{code.planType}</Table.Cell>
             <Table.Cell>{code.maxMembers}</Table.Cell>
-            <Table.Cell>{formatDate(code.expiresAt)}</Table.Cell>
+            <Table.Cell>
+              <AdminDate value={code.expiresAt} display="date" />
+            </Table.Cell>
             <Table.Cell>
               {code.reusable ? (
                 <Text fontSize="sm">reusable, {code.redemptionCount} so far</Text>

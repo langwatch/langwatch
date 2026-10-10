@@ -49,7 +49,6 @@ export function PausedSchedulesSection({
           columnRules={false}
           containerProps={{ overflowX: "auto" }}
           size="sm"
-          variant="line"
           css={{ "& tr:last-child td": { borderBottom: "none" } }}
         >
           <Table.Header>

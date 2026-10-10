@@ -1,14 +1,7 @@
 import { ListTable } from "@langwatch/design-system/list-table";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
-import {
-  Badge,
-  Center,
-  EmptyState,
-  HStack,
-  Spinner,
-  Table,
-  Text,
-} from "@langwatch/design-system/primitives";
+import { Badge, HStack, Table, Text } from "@langwatch/design-system/primitives";
+import { SkeletonRows } from "@langwatch/design-system/skeletons";
 import type { OpsScheduledJob, SchedulerAuditEntryView } from "@langwatch/ops-contract";
 import { nowInstant, toEpochMs, readableDate } from "@langwatch/time";
 import { CalendarClock } from "lucide-react";
@@ -53,18 +46,7 @@ export function SchedulerContentView({
   const loop = deriveLoopHealth({ jobs, now });
 
   if (isLoading) {
-    return (
-      <Center paddingY={20}>
-        <EmptyState.Root>
-          <EmptyState.Content>
-            <EmptyState.Indicator>
-              <Spinner size="lg" />
-            </EmptyState.Indicator>
-            <EmptyState.Title>Loading scheduled jobs</EmptyState.Title>
-          </EmptyState.Content>
-        </EmptyState.Root>
-      </Center>
-    );
+    return <SkeletonRows rows={6} />;
   }
 
   if (jobs.length === 0) {
@@ -84,7 +66,6 @@ export function SchedulerContentView({
         density="compact"
         columnRules={false}
         containerProps={{ overflowX: "auto" }}
-        variant="line"
         size="sm"
       >
         <Table.Header>

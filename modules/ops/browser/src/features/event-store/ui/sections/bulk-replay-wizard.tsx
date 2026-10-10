@@ -14,6 +14,7 @@ import {
   Textarea,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { SkeletonRows } from "@langwatch/design-system/skeletons";
 import { nowInstant, toDate } from "@langwatch/time";
 import { useEffect, useMemo, useRef, useState } from "react";
 
@@ -168,11 +169,7 @@ export function BulkReplayWizard({ onReplayStarted }: { onReplayStarted: () => v
   }
 
   if (projectionsQuery.isLoading) {
-    return (
-      <Center paddingY={20}>
-        <Spinner size="lg" />
-      </Center>
-    );
+    return <SkeletonRows rows={6} />;
   }
 
   const projections = projectionsQuery.data?.projections;

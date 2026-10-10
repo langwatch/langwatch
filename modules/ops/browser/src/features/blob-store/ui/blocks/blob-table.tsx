@@ -19,7 +19,6 @@ export function BlobTable({
         density="compact"
         columnRules={false}
         containerProps={{ overflowX: "auto" }}
-        variant="line"
         size="sm"
       >
         <Table.Header>

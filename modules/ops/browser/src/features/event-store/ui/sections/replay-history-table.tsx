@@ -30,7 +30,7 @@ export function ReplayHistoryTable() {
             columnRules={false}
             containerProps={{ overflowX: "auto" }}
             size="sm"
-            variant="line"
+            variant="embedded"
           >
             <Table.Header>
               <Table.Row>
