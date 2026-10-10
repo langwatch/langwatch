@@ -9,13 +9,41 @@
  * @see specs/lwql/eval-functions.feature
  */
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  instanceIdentityTable,
+  LANGWATCH_KEYS,
+  LICENSE,
+} from "@ee/licensing/connect/install/__tests__/installFakes";
+import { resetInstanceIdentity } from "@ee/licensing/connect/install/instanceIdentity";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { PrismaClient } from "~/generated/prisma/client";
-import { instantEvalsEnabled, organizationOfProject } from "../access";
+import {
+  instantEvalsEnabled,
+  instantEvalsReleased,
+  organizationOfProject,
+} from "../access";
+import { resetInstantEvalClassifier } from "../classifier";
 
 const flag = vi.hoisted(() => ({ isEnabled: vi.fn(async () => false) }));
 vi.mock("~/server/featureFlag", () => ({ featureFlagService: flag }));
+
+/**
+ * An install that sets nothing: self-hosted, no judge key of its own, Connect
+ * permitted. The license read below runs for real on it.
+ */
+const env = vi.hoisted(() => ({}) as Record<string, unknown>);
+vi.mock("~/env.mjs", () => ({ env }));
+
+/** The organization row the deployment's classifier reads its license from. */
+const db = vi.hoisted(() => ({
+  row: {
+    license: null as string | null,
+    connectServicesDisabled: [] as string[],
+  },
+  prisma: {} as Record<string, unknown>,
+}));
+vi.mock("~/server/db", () => ({ prisma: db.prisma }));
 
 /** A Prisma that fails loudly, so a reach for it is observable either way. */
 const REACHED = "the gate read the project";
@@ -86,10 +114,105 @@ describe("given the flag is off and the organization switched Instant Evals on i
           projectId: "project-of-an-opted-in-organization",
           isClassifierConfigured: () => true,
           isClassifierAvailableForOrganization: async () => true,
+          isLicensed: async () => false,
           isOptedIn,
         }),
       ).resolves.toBe(true);
       expect(isOptedIn).toHaveBeenCalledWith("organization");
+    });
+  });
+});
+
+describe("given the flag is off on a self-hosted install that judges through LangWatch", () => {
+  describe("when the organization's license names Instant Evals and no admin switched them off", () => {
+    /** @scenario "A license that names Instant Evals releases them without the flag" */
+    it("answers yes from the license, without reading the organization's own switch", async () => {
+      const isOptedIn = vi.fn(async () => false);
+      await expect(
+        instantEvalsReleased({
+          prisma: QUIET_PRISMA,
+          projectId: "project-of-a-licensed-organization",
+          isLicensed: async (organizationId) =>
+            organizationId === "organization",
+          isOptedIn,
+        }),
+      ).resolves.toBe(true);
+      expect(isOptedIn).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when an admin switched hosted judging off", () => {
+    beforeEach(async () => {
+      for (const key of Object.keys(env)) delete env[key];
+      process.env.LANGWATCH_LICENSE_PUBLIC_KEY = LANGWATCH_KEYS.publicKey;
+      resetInstanceIdentity();
+      await resetInstantEvalClassifier();
+      db.row.license = LICENSE.licenseKey;
+      db.row.connectServicesDisabled = ["instant_evals"];
+      db.prisma.organization = { findUnique: async () => ({ ...db.row }) };
+      db.prisma.instanceIdentity = instanceIdentityTable();
+    });
+
+    afterEach(async () => {
+      await resetInstantEvalClassifier();
+      delete process.env.LANGWATCH_LICENSE_PUBLIC_KEY;
+    });
+
+    /** @scenario "An admin who switched hosted judging off keeps it off" */
+    it("answers no from the license read, which sees the admin's switch", async () => {
+      await expect(
+        instantEvalsReleased({
+          prisma: QUIET_PRISMA,
+          projectId: "project-of-a-switched-off-organization",
+          isOptedIn: async () => false,
+        }),
+      ).resolves.toBe(false);
+    });
+
+    it("answers yes for the same license once the admin switches it back on", async () => {
+      // The contrast that makes the answer above the switch's: same license,
+      // same install, only the organization's switch differs.
+      db.row.connectServicesDisabled = [];
+
+      await expect(
+        instantEvalsReleased({
+          prisma: QUIET_PRISMA,
+          projectId: "project-of-a-switched-on-organization",
+          isOptedIn: async () => false,
+        }),
+      ).resolves.toBe(true);
+    });
+
+    it("refuses before asking the license when a project asks whether it may judge", async () => {
+      await expect(
+        instantEvalsEnabled({
+          prisma: QUIET_PRISMA,
+          projectId: "project-of-a-switched-off-organization",
+          isClassifierConfigured: () => true,
+          isClassifierAvailableForOrganization: async () => false,
+          isLicensed: async () => {
+            throw new Error("an unavailable classifier never asks the license");
+          },
+          isOptedIn: async () => false,
+        }),
+      ).resolves.toBe(false);
+    });
+  });
+});
+
+describe("given the flag is on for the project on a licensed install", () => {
+  describe("when the project asks whether it is released", () => {
+    it("answers yes without reading the license", async () => {
+      flag.isEnabled.mockResolvedValue(true);
+      const isLicensed = vi.fn(async () => true);
+      await expect(
+        instantEvalsReleased({
+          prisma: QUIET_PRISMA,
+          projectId: "project-the-operator-released",
+          isLicensed,
+        }),
+      ).resolves.toBe(true);
+      expect(isLicensed).not.toHaveBeenCalled();
     });
   });
 });
@@ -105,6 +228,7 @@ describe("given the flag is on for the project", () => {
           projectId: "project-the-operator-released",
           isClassifierConfigured: () => true,
           isClassifierAvailableForOrganization: async () => true,
+          isLicensed: async () => false,
           isOptedIn,
         }),
       ).resolves.toBe(true);

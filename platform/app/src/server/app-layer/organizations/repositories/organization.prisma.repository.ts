@@ -36,6 +36,11 @@ import { isCustomRole } from "../../../api/enterprise";
 import { CustomRoleNotAssignableError } from "../../../role-bindings/errors";
 import { sessionRevocation } from "../../identity/runtime";
 import {
+  INTERNAL_GOVERNANCE_PROJECT_KIND,
+  NON_DESTINATION_PROJECT_KINDS,
+  projectKindsHiddenFrom,
+} from "../../projects/project-kinds";
+import {
   CannotRemoveSelfAsLastAdminError,
   DeveloperSeatNoSharedAccessError,
   LiteMemberViewerOnlyError,
@@ -562,8 +567,12 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
     return this.prisma.project.findMany({
       // Named projects reach a customer — the plan-limit alert email lists
       // them per project. The governance project's usage stays in the
-      // org-level total rather than becoming a line that reveals it.
-      where: { team: { organizationId }, kind: { not: "internal_governance" } },
+      // org-level total rather than becoming a line that reveals it, and an
+      // aggregate holds no usage of its own (ADR-144), so it has no line.
+      where: {
+        team: { organizationId },
+        kind: { notIn: [...NON_DESTINATION_PROJECT_KINDS] },
+      },
       select: { id: true, name: true },
       orderBy: { name: "asc" },
     });
@@ -870,7 +879,7 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
   }): Promise<FullyLoadedOrganization[]> {
     const { userId, isDemo, demoProjectId } = params;
 
-    return this.prisma.organization.findMany({
+    const organizations = (await this.prisma.organization.findMany({
       where: {
         OR: [
           ...(isDemo
@@ -919,13 +928,28 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
                 // It exists only as a routing/tenancy artifact for IngestionSource
                 // data; never user-visible. See specs/ai-gateway/governance/
                 // architecture-invariants.feature + ui-contract.feature.
-                kind: { not: "internal_governance" },
+                kind: { not: INTERNAL_GOVERNANCE_PROJECT_KIND },
               },
             },
           },
         },
       },
-    }) as Promise<FullyLoadedOrganization[]>;
+    })) as FullyLoadedOrganization[];
+
+    // ADR-144 decision 5: an aggregate reads other people's personal
+    // projects, so it is in the switcher of an organisation admin and nobody
+    // else, whichever team it sits on. The role differs per organisation, and
+    // `members` above is already narrowed to this user, so the filter is
+    // applied here rather than in the one cross-organisation query.
+    for (const organization of organizations) {
+      const hidden = projectKindsHiddenFrom(organization.members[0]?.role);
+      for (const team of organization.teams) {
+        team.projects = team.projects.filter(
+          (project) => !hidden.includes(project.kind),
+        );
+      }
+    }
+    return organizations;
   }
 
   async getOrganizationWithMembers(params: {

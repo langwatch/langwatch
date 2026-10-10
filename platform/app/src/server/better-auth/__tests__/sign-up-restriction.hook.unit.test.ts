@@ -18,7 +18,7 @@ function userCreateBefore({
   governingConnection = null,
 }: {
   allowed: boolean;
-  governingConnection?: { connectionId: string } | null;
+  governingConnection?: { connectionId: string; methodId: string } | null;
 }) {
   const checkSignUp = vi.fn().mockResolvedValue({ allowed });
   const hooks = new BetterAuthDatabaseHooks({
@@ -93,7 +93,10 @@ describe("user.create.before", () => {
     it("creates the account even though the policy refuses the address", async () => {
       const { create, checkSignUp } = userCreateBefore({
         allowed: false,
-        governingConnection: { connectionId: "ssoc_acme" },
+        governingConnection: {
+          connectionId: "ssoc_acme",
+          methodId: "ssoc_acme",
+        },
       });
 
       await expect(create("sam@acme.com")).resolves.not.toBe(false);

@@ -1,12 +1,11 @@
 import { useMemo } from "react";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type {
   InstrumentationScope,
   SpanResourceInfoDto,
 } from "~/server/api/routers/tracesV2.schemas";
 import { api } from "~/utils/api";
 import { useSharedTrace } from "../context/SharedTraceContext";
-import { useDrawerStore } from "../stores/drawerStore";
+import { useTraceQueryArgs } from "./useTraceQueryArgs";
 
 export interface TraceResourcesResult {
   rootSpanId: string | null;
@@ -35,17 +34,14 @@ const NULL_RESULT: TraceResourcesResult = {
 export function useTraceResources(
   traceId: string | null | undefined,
 ): TraceResourcesResult {
-  const { project } = useOrganizationTeamProject();
   const shared = useSharedTrace();
-  const occurredAtMs = useDrawerStore((s) => s.occurredAtMs);
-  const enabled = !!project?.id && !!traceId && !shared;
+  // The drawer's own arguments, so on an aggregate this reads the member the
+  // header and the waterfall read (ADR-144 block F).
+  const { projectId, queryArgs } = useTraceQueryArgs();
+  const enabled = !!projectId && !!traceId && !shared;
 
   const query = api.tracesV2.resourceInfo.useQuery(
-    {
-      projectId: project?.id ?? "",
-      traceId: traceId ?? "",
-      ...(occurredAtMs !== null ? { occurredAtMs } : {}),
-    },
+    { ...queryArgs, traceId: traceId ?? "" },
     {
       enabled,
       staleTime: 60_000,

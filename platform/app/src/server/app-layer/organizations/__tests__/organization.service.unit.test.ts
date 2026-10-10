@@ -20,11 +20,13 @@ const {
   mockCheckLimit,
   mockInvalidateOrganization,
   mockOffboard,
+  mockReconcileAggregates,
 } = vi.hoisted(() => ({
   mockInvalidateOrganization: vi.fn(),
   mockRevokeAllTraceShares: vi.fn(),
   mockCheckLimit: vi.fn(),
   mockOffboard: vi.fn(),
+  mockReconcileAggregates: vi.fn(),
 }));
 
 // Disabling a seat is not a grant write, so the service retires the
@@ -43,12 +45,19 @@ vi.mock("~/server/license-enforcement", () => ({
 }));
 
 // The service reaches the app singleton only for cross-aggregate effects
-// (trace-share revocation, plan resolution); pin the one this suite drives.
-vi.mock("../../app", () => ({
-  getApp: () => ({
+// (trace-share revocation, re-reading aggregate projects after an offboard);
+// pin the ones this suite drives.
+vi.mock("../../app", () => {
+  const app = {
     share: { revokeAllTraceShares: mockRevokeAllTraceShares },
-  }),
-}));
+    projects: {
+      aggregateReconciler: {
+        reconcileOrganizationOrLog: mockReconcileAggregates,
+      },
+    },
+  };
+  return { getApp: () => app, tryGetApp: () => app };
+});
 
 describe("OrganizationService", () => {
   const mockRepo: OrganizationRepository = {
@@ -284,6 +293,22 @@ describe("OrganizationService", () => {
           organizationId: "org-123",
           userId: "user-456",
         });
+      });
+
+      it("re-reads the organization's aggregate projects once the member is gone", async () => {
+        await service.deleteMember({
+          organizationId: "org-123",
+          userId: "user-456",
+          actingUserId: "admin-789",
+        });
+
+        expect(mockReconcileAggregates).toHaveBeenCalledWith({
+          organizationId: "org-123",
+          trigger: "member-offboarded",
+        });
+        expect(mockOffboard.mock.invocationCallOrder[0]).toBeLessThan(
+          mockReconcileAggregates.mock.invocationCallOrder[0]!,
+        );
       });
     });
 

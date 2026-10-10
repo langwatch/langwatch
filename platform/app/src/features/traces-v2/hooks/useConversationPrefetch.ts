@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { api } from "~/utils/api";
 import { useConversationContext } from "./useConversationContext";
-import { useDrawerProjectId } from "./useDrawerProjectId";
+import { useTraceQueryArgs } from "./useTraceQueryArgs";
 
 /** How long to wait after a trace settles before warming siblings. */
 const PREFETCH_DELAY_MS = 600;
@@ -33,7 +33,8 @@ export function useConversationPrefetch(
   conversationId: string | null | undefined,
   currentTraceId: string | null | undefined,
 ): void {
-  const projectId = useDrawerProjectId();
+  // A conversation's turns belong to the member the drawer is on.
+  const { projectId, tenantId } = useTraceQueryArgs();
   const { turns } = useConversationContext(conversationId, currentTraceId);
   const utils = api.useUtils();
 
@@ -48,6 +49,8 @@ export function useConversationPrefetch(
     );
     if (order.length === 0) return;
 
+    // A conversation's turns belong to the member the drawer is on.
+    const tenantArg = tenantId !== null ? { tenantId } : {};
     const timer = setTimeout(() => {
       for (const i of order) {
         const turn = turns[i];
@@ -63,13 +66,14 @@ export function useConversationPrefetch(
           projectId,
           traceId: turn.traceId,
           occurredAtMs: turn.timestamp,
+          ...tenantArg,
           full: Math.abs(i - idx) <= NEAR_RADIUS,
         });
       }
     }, PREFETCH_DELAY_MS);
 
     return () => clearTimeout(timer);
-  }, [projectId, currentTraceId, turns, utils]);
+  }, [projectId, tenantId, currentTraceId, turns, utils]);
 }
 
 /**

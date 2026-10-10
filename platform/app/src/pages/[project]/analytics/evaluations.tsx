@@ -10,6 +10,7 @@ import {
 } from "@chakra-ui/react";
 import { BarChart2 } from "lucide-react";
 import { Fragment, useCallback } from "react";
+import { withAggregateAnalyticsGate } from "~/components/analytics/AggregateAnalyticsGate";
 import {
   CustomGraph,
   type CustomGraphInput,
@@ -511,4 +512,6 @@ function EvaluationsContent() {
   );
 }
 
-export default withPermissionGuard("analytics:view")(EvaluationsContent);
+export default withPermissionGuard("analytics:view")(
+  withAggregateAnalyticsGate("Online Evaluations", EvaluationsContent),
+);

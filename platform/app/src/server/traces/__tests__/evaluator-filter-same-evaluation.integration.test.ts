@@ -11,8 +11,9 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-
+import { tenantScope } from "~/server/app-layer/clients/clickhouse/authorized-reads";
 import { translateFilterToClickHouse } from "~/server/app-layer/traces/filter-to-clickhouse";
+import { expandStatementForProject } from "~/test-utils/authorizationProofs";
 import {
   startTestContainers,
   stopTestContainers,
@@ -108,11 +109,16 @@ let ch: ClickHouseClient;
 
 /** The trace ids a compiled filter selects, sorted. */
 async function matching(filter: string, tenant = tenantId): Promise<string[]> {
-  const compiled = translateFilterToClickHouse(filter, tenant, WINDOW);
+  const compiled = translateFilterToClickHouse(filter, WINDOW);
   if (!compiled) throw new Error(`compiled to nothing: ${filter}`);
+  const statement = expandStatementForProject({
+    query: `SELECT DISTINCT TraceId FROM trace_summaries ts WHERE ${tenantScope("OccurredAt")} AND ${compiled.sql}`,
+    queryParams: compiled.params,
+    projectId: tenant,
+  });
   const result = await ch.query({
-    query: `SELECT DISTINCT TraceId FROM trace_summaries ts WHERE TenantId = {tenantId:String} AND ${compiled.sql}`,
-    query_params: compiled.params,
+    query: statement.query,
+    query_params: statement.queryParams,
     format: "JSONEachRow",
   });
   const rows = await result.json<{ TraceId: string }>();
