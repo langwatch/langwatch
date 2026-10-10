@@ -2204,7 +2204,7 @@ const presentations = {
   authz_grant_not_confirmed: {
     title: "Access could not be confirmed",
     describe: () =>
-      "We could not confirm the access change in time, so nothing was granted. Try again in a moment.",
+      "Your access change is still processing. Refresh to check its status before trying again.",
   },
   auth_rate_limited: {
     title: "Too many attempts",
@@ -4314,7 +4314,7 @@ const presentations = {
       safeProse(str(error, "message", "")) || "Check the destination and try again.",
   },
   test_fire_unavailable: {
-    title: "Nothing to test yet",
+    title: "Test message not sent",
     // `meta.reason` is the sentence the service wrote for this exact scenario
     // ("This automation has no email recipients to test-fire to.") — it names
     // WHICH piece is missing, which the generic line cannot. It is also the

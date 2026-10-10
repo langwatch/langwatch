@@ -75,6 +75,19 @@ describe("explainHandledError", () => {
     });
 
     /** @scenario "meta is read only where the client knows its shape" */
+    it("titles a refused test fire as not sent, its reason naming the fix", () => {
+      const { title, description } = explainHandledError(
+        shape({
+          code: "test_fire_unavailable",
+          meta: { channel: "slack", reason: "Slack no longer accepts this webhook." },
+        }),
+      );
+
+      expect(title).toBe("Test message not sent");
+      expect(description).toBe("Slack no longer accepts this webhook.");
+    });
+
+    /** @scenario "meta is read only where the client knows its shape" */
     it("falls back cleanly when the declared meta is absent", () => {
       const { title, description } = explainHandledError(
         shape({ code: "filter_field_unknown", meta: {} }),
