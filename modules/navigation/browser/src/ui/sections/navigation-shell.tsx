@@ -13,6 +13,7 @@ import {
   type NavigationShellReadyState,
   type NavigationShellState,
 } from "../../behavior/use-navigation-shell-state.ts";
+import { useOrglessAddressRedirect } from "../../behavior/use-orgless-address-redirect.ts";
 import { useProjectAddressRedirect } from "../../behavior/use-project-address-redirect.ts";
 import { APP_HEADER_HEIGHT } from "../../model/menu-widths.ts";
 import { useNavigationHost } from "../../model/navigation-host.ts";
@@ -51,6 +52,7 @@ export function NavigationShell({
     isOrgScope: orgScope,
   });
   useProjectAddressRedirect();
+  useOrglessAddressRedirect({ personalScope });
   const lastReady = useRef<NavigationShellReadyState | null>(null);
   if (reading.status === "ready") lastReady.current = reading;
 
@@ -189,9 +191,10 @@ function ShellContentRow({
           <Box
             width="full"
             height="full"
-            background="bg.surface"
+            background="bg"
             borderTopLeftRadius="xl"
-            borderTopWidth="1px"
+            borderTopWidth={0}
+            boxShadow="inset 0 1px 0 var(--chakra-colors-border-muted)"
             borderLeftWidth="1px"
             borderStyle="solid"
             // In light mode `border.muted` is the same grey as `bg.page`, so the
@@ -201,7 +204,6 @@ function ShellContentRow({
             borderTopRightRadius={langyDockInset > 0 ? "xl" : 0}
             borderRightWidth={langyDockInset > 0 ? "1px" : 0}
             _dark={{
-              boxShadow: "inset 0 1px 0 rgba(255,255,255,0.07)",
               borderColor: "border.muted",
             }}
             overflow="auto"
@@ -210,6 +212,9 @@ function ShellContentRow({
             maxHeight={`calc(100vh - ${APP_HEADER_HEIGHT}px)`}
             position="relative"
             data-tour="main-content"
+            css={{
+              "&:has([data-section-frame])": { borderTopWidth: 0, boxShadow: "none" },
+            }}
           >
             {children}
           </Box>
