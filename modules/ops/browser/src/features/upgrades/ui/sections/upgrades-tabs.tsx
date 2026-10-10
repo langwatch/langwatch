@@ -83,15 +83,27 @@ export function UpgradesTabs({
       lazyMount
       unmountOnExit
     >
-      <Tabs.List marginBottom={6}>
-        <Tabs.Trigger value="overview">Overview</Tabs.Trigger>
-        <Tabs.Trigger value="tenants">Tenant migrations</Tabs.Trigger>
-        {targets.length > 0 && <Tabs.Trigger value="dataplanes">Dataplanes</Tabs.Trigger>}
+      <Tabs.List marginBottom={6} gap={6}>
+        <Tabs.Trigger value="overview" paddingX={0}>
+          Overview
+        </Tabs.Trigger>
+        <Tabs.Trigger value="tenants" paddingX={0}>
+          Tenant migrations
+        </Tabs.Trigger>
+        {targets.length > 0 && (
+          <Tabs.Trigger value="dataplanes" paddingX={0}>
+            Dataplanes
+          </Tabs.Trigger>
+        )}
       </Tabs.List>
-      <Tabs.Content value="overview">{overview}</Tabs.Content>
-      <Tabs.Content value="tenants">{tenants}</Tabs.Content>
+      <Tabs.Content value="overview" padding={0}>
+        {overview}
+      </Tabs.Content>
+      <Tabs.Content value="tenants" padding={0}>
+        {tenants}
+      </Tabs.Content>
       {targets.length > 0 && (
-        <Tabs.Content value="dataplanes">
+        <Tabs.Content value="dataplanes" padding={0}>
           <TargetsTable targets={targets} />
         </Tabs.Content>
       )}
