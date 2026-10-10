@@ -2,6 +2,8 @@ package cell
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -111,16 +113,21 @@ func Produce(ctx context.Context, options ProduceOptions) (string, error) {
 	if load := oneMinuteLoad(); options.MaxLoad > 0 && load > options.MaxLoad {
 		return "", fmt.Errorf("machine load %.0f is above -max-load %.0f", load, options.MaxLoad)
 	}
-	cell, err := prepare(options.Options)
+	light := options.Options
+	if light.Tier == tierHeavy {
+		light.Tier = "S" // prepare checks the light tiers; seedTier does the rest
+	}
+	cell, err := prepare(light)
 	if err != nil {
 		return "", err
 	}
+	cell.options.Tier, cell.report.Tier = options.Tier, options.Tier
 	defer cell.teardown()
 	build := func(ctx context.Context) error {
 		return FromBuild(options.FromDir).Ensure(ctx, cell.logPath("from-build"))
 	}
 	cell.runSteps(ctx, []step{{"build", build}, {"stores", cell.freshStores}, {"from-schema", cell.fromSchema}, {"from-up", cell.fromUp},
-		{"seed", cell.seed}, {"traffic-before", cell.trafficBefore}, {"cut", cell.cut},
+		{"seed", cell.seedTier}, {"traffic-before", cell.trafficBefore}, {"cut", cell.cut},
 		{"capture", func(ctx context.Context) error { return cell.capture(ctx, dir) }}})
 	cell.finishTraffic()
 	writeErr := cell.write()
@@ -128,6 +135,45 @@ func Produce(ctx context.Context, options ProduceOptions) (string, error) {
 		return "", fmt.Errorf("%s (logs in %s)", cell.report.Error, cell.options.RunDir)
 	}
 	return dir, writeErr
+}
+
+// tierHeavy is tier M: seedgen's medium, through main's doors (seed.Heavy).
+const tierHeavy = "M"
+
+// seedTier seeds tier S as the cell does; tier M adds the heavy tenancy by SQL and then the product's
+// own doors at volume, against this cell's URL.
+func (cell *run) seedTier(ctx context.Context) error {
+	if cell.options.Tier != tierHeavy {
+		return cell.seed(ctx)
+	}
+	cell.anchor = time.Now().UTC().Truncate(24 * time.Hour)
+	shape := cell.profile.Shape
+	tenancy := seed.BuildTenancy(seed.TenancyInput{Shape: shape, Seed: cell.options.Seed, Anchor: cell.anchor, Cloud: shape == "saas" || shape == "hybrid", Volume: tierHeavy})
+	sum := sha256.Sum256([]byte(tenancy.SQL()))
+	cell.tenancy, cell.recipe = tenancy, snapshot.Recipe{Version: seed.RecipeVersion, Hash: hex.EncodeToString(sum[:])}
+	if err := psqlFile(ctx, cell.stores.psqlURL(), tenancy.SQL()); err != nil {
+		return fmt.Errorf("tenancy: %w", err)
+	}
+	if err := psqlFile(ctx, cell.stores.psqlURL(), generate.AccountSQL(cell.options.Seed)); err != nil {
+		return fmt.Errorf("seed account: %w", err)
+	}
+	email, password := generate.SeedAccount(cell.options.Seed)
+	cell.seeder = seed.NewSeeder(seed.ProductInput{AppURL: cell.url(), Email: email, Password: password, Label: cell.options.Name()})
+	if err := cell.seeder.Seed(ctx); err != nil {
+		cell.report.Notes = append(cell.report.Notes, "product seeds: "+err.Error())
+	}
+	if err := cell.useSeed(cell.seeder.Session()); err != nil {
+		return err
+	}
+	if err := cell.basePrompt(ctx); err != nil {
+		cell.report.Notes = append(cell.report.Notes, "base prompt (prompt-update writes to it): "+err.Error())
+	}
+	result, err := seed.Heavy(ctx, seed.HeavyInput{App: cell.url(), Email: email, Password: password, Tenancy: tenancy, Seed: cell.options.Seed, Anchor: cell.anchor})
+	cell.report.Notes = append(cell.report.Notes, fmt.Sprintf("heavy seed sent %v, refused %v", result.Sent, result.Refused))
+	if err != nil {
+		cell.report.Notes = append(cell.report.Notes, "heavy seed: "+err.Error())
+	}
+	return nil
 }
 
 // capture stops main's app (its worker stays paused, so queued jobs stay queued) and writes the

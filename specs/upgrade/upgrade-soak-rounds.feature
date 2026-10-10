@@ -222,3 +222,55 @@ Feature: Each soak round proves the upgrade is safe on production-shaped data un
   Scenario: U6: helm upgrade rolls with no unanswered call
     When the run cuts over to the branch and settles
     Then scenario U6 holds
+
+  @unit
+  Scenario: Tier M lays out seedgen's medium tenancy with the rare subscription states
+    When the tenancy is built for tier M
+    Then it holds 12 organizations, 48 projects and 400 users
+    And its subscriptions hold ACTIVE, PENDING, FAILED and CANCELLED
+
+  @unit
+  Scenario: Tier M seeds through main's doors against a URL
+    Given a running main reachable only by its URL
+    When the heavy seed runs
+    Then telemetry reaches the OTLP door with each live project's key
+    And every product and REST kind with a door is created in each new organization
+    And a refused kind is named while the others are still created
+
+  # Self-hosted install paths (W4): tools/upgradelab/selfhosted and cell/selfhosted.go.
+  @unit
+  Scenario: A self-hosted run performs the upgrade guide's commands in order and names each deviation
+    Given the compose and helm plans of a self-hosted run
+    When they reach the upgrade phase
+    Then compose runs the guide's copy, docker compose pull and docker compose up -d, in that order and as written
+    And helm runs the guide's helm upgrade with its deviation named, and records helm repo update as not run
+
+  @unit
+  Scenario: The guide rows fail when a guide command failed or deviated, or compose needed a step the guide omits
+    Given a self-hosted transcript
+    When a guide command exited non-zero, ran with a deviation, or a harness command ran during the upgrade phase
+    Then U2 or U5 fails, naming the command
+
+  @unit
+  Scenario: U6 fails when the probe found the api down during helm upgrade
+    Given the probe's phases during helm upgrade
+    When any phase is down
+    Then U6 fails with the times it was unanswered
+
+  @unit
+  Scenario: E5 passes only when the settled Ops > Upgrades page shows an upgrade state
+    Given the settled shot of Ops > Upgrades
+    When it shows Access Restricted, or no settled shot was taken
+    Then E5 fails
+
+  @unit
+  Scenario: The ADMIN_EMAILS-unset variant boots with no ADMIN_EMAILS at all
+    Given the self-hosted-free-no-admin profile
+    When the operator environment is built
+    Then it holds no ADMIN_EMAILS, while the free variant lists the seed account
+
+  @unit
+  Scenario: E1 fails when the licence copy step is missing or a licensed organisation lost its key
+    Given the ledger and the count of licensed organisations without a key
+    When the copy step is absent, or any organisation lost its key
+    Then E1 fails
