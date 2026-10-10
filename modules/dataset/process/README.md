@@ -859,12 +859,12 @@ None: this module declares no websocket, rawsocket or rawhttp door.
 
 ### Pipeline `dataset_normalization` (aggregate `dataset`)
 
-Declared at `src/eventing/dataset-normalization.pipeline.ts:28`.
+Declared at `src/eventing/dataset-normalization.pipeline.ts:33`.
 
 | Kind         | Name                                                                                           | Handles | Declared at                                         |
 | ------------ | ---------------------------------------------------------------------------------------------- | ------- | --------------------------------------------------- |
-| command      | –                                                                                              | –       | `src/eventing/dataset-normalization.pipeline.ts:33` |
-| lane aliases | `≈ [ { from: "trace_processing:job:datasetNormalize", to: { jobType: "command", lane: "datas…` | –       | `src/eventing/dataset-normalization.pipeline.ts:40` |
+| command      | –                                                                                              | –       | `src/eventing/dataset-normalization.pipeline.ts:38` |
+| lane aliases | `≈ [ { from: "trace_processing:job:datasetNormalize", to: { jobType: "command", lane: "datas…` | –       | `src/eventing/dataset-normalization.pipeline.ts:45` |
 
 ## Configuration
 

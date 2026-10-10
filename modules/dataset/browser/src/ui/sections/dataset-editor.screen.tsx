@@ -29,7 +29,6 @@ export default function DatasetEditorScreen() {
     { projectId: project?.id ?? "", datasetId },
     {
       enabled: !!project && !!datasetId,
-      // needs a read hint: dataset normalisation finished (ready or failed)
     },
   );
 
