@@ -115,3 +115,25 @@ describe("the upgrade gate of an api that upgrades", () => {
     });
   });
 });
+
+describe("the upgrade gate of a process whose gate refuses with an outcome", () => {
+  describe("given a gate answering below-floor", () => {
+    /** @scenario "An image below the installation's floor runs nothing and refuses" */
+    it("refuses by name instead of treating the refusal as upgrading", async () => {
+      const verdict: UpgradeGateVerdict = {
+        admitted: false,
+        outcome: "below-floor",
+        refusal: "this image is below the installation's floor 3.20.1",
+      };
+      const hosted = upgradeGateComponent({
+        server: "gate-refuse-test",
+        role: "worker",
+        gate: { admit: async () => verdict, release: async () => undefined },
+        logger: createTestLogger().logger,
+        reAskMs: 60_000,
+      });
+
+      await expect(hosted.start?.()).rejects.toMatchObject({ code: "upgrade_gate_refused" });
+    });
+  });
+});

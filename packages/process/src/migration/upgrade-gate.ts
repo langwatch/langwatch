@@ -29,7 +29,7 @@ export type UpgradeGateWaiting = Readonly<{
 }>;
 
 export type UpgradeGateVerdict =
-  | Readonly<{ admitted: true } | { admitted: false; refusal: string }>
+  | Readonly<{ admitted: true } | { admitted: false; outcome?: string; refusal: string }>
   | UpgradeGateWaiting;
 
 /** A worker's declared background steps, run by the gate's package (round 14: framework runs). */
@@ -68,7 +68,7 @@ const REFUSED_NEXT = "do what the refusal names, then start this process again";
 const RE_ASK_MS = 10_000;
 
 const isWaiting = (verdict: UpgradeGateVerdict): verdict is UpgradeGateWaiting =>
-  !verdict.admitted && "outcome" in verdict;
+  !verdict.admitted && "outcome" in verdict && verdict.outcome === "upgrading";
 
 export class UpgradeGateRefusedError extends Error {
   readonly code = "upgrade_gate_refused";
