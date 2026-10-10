@@ -195,7 +195,7 @@ export function BatchEvaluationV2EvaluationSummary({
           <>
             <Spacer />
             <HStack>
-              <Box width="12px" height="12px" background="red.500" borderRadius="full" />
+              <Box width="12px" height="12px" background="red.fg" borderRadius="full" />
               <Text>Stopped</Text>
             </HStack>
           </>

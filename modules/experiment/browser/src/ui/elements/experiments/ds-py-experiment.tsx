@@ -174,7 +174,7 @@ export function DSPyExperiment({
           </HStack>
           {runsView === "loading" && <Skeleton width="100%" height="30px" />}
           {runsView === "error" && (
-            <Alert.Root>
+            <Alert.Root status="error">
               <Alert.Indicator />
               Error loading experiment runs
             </Alert.Root>
@@ -414,7 +414,7 @@ function DSPyRunsListStatus({ runsView }: { runsView: QueryView }) {
   }
   if (runsView === "error") {
     return (
-      <Alert.Root>
+      <Alert.Root status="error">
         <Alert.Indicator />
         Error loading experiment runs
       </Alert.Root>
@@ -504,9 +504,9 @@ export function DSPyExperimentRunList({
               cursor="pointer"
               as="button"
               opacity={!selectedRuns || selectedRuns.includes(run.runId) ? 1 : 0.5}
-              background={selectedRuns?.includes(run.runId) ? "gray.200" : "none"}
+              background={selectedRuns?.includes(run.runId) ? "bg.emphasized" : "none"}
               _hover={{
-                background: selectedRuns?.includes(run.runId) ? "gray.200" : "gray.100",
+                background: selectedRuns?.includes(run.runId) ? "bg.emphasized" : "bg.muted",
               }}
               onClick={(e) => {
                 e.stopPropagation();
@@ -529,10 +529,10 @@ export function DSPyExperimentRunList({
                   <VersionBox minWidth={hasAnyVersion ? "48px" : "0"} />
                   <VStack align="start" gap={2} width="100%" paddingRight={2}>
                     <HStack width="100%">
-                      <Skeleton height="12px" background="gray.400" flexGrow={1} />
+                      <Skeleton height="12px" background="bg.emphasized" flexGrow={1} />
                       <Spinner size="xs" flexShrink={0} />
                     </HStack>
-                    <Skeleton width="100%" height="12px" background="gray.400" />
+                    <Skeleton width="100%" height="12px" background="bg.emphasized" />
                   </VStack>
                 </>
               ) : (
@@ -577,7 +577,7 @@ function LoadedRunSummary({
           height="24px"
           minWidth="24px"
           minHeight="24px"
-          background="gray.300"
+          background="border.emphasized"
           borderRadius="100%"
           backgroundColor={getColorForString("colors", run.runId).color}
         />
@@ -590,7 +590,7 @@ function LoadedRunSummary({
               height="12px"
               minWidth="12px"
               minHeight="12px"
-              background="gray.300"
+              background="border.emphasized"
               borderRadius="100%"
               backgroundColor={getColorForString("colors", run.runId).color}
             />
@@ -647,7 +647,7 @@ const QueryStatusRows = ({
   if (view === "loading") {
     return Array.from({ length: 3 }).map((_, index) => (
       <Table.Row key={index}>
-        <Table.Cell background="gray.50">&nbsp;</Table.Cell>
+        <Table.Cell background="bg.subtle">&nbsp;</Table.Cell>
         {Array.from({ length: skeletonCells }).map((_, cell) => (
           <Table.Cell key={cell}>
             <Skeleton width="100%" height="30px" />
@@ -659,7 +659,7 @@ const QueryStatusRows = ({
   if (view === "error") {
     return (
       <Table.Row>
-        <Table.Cell colSpan={colSpan} color="red.600">
+        <Table.Cell colSpan={colSpan} color="red.fg">
           Error loading step data
         </Table.Cell>
       </Table.Row>
@@ -687,7 +687,7 @@ const PredictorRow = ({
   const signature = predictor?.extended_signature ?? predictor?.signature;
   return (
     <Table.Row>
-      <Table.Cell background="gray.50" textAlign="center">
+      <Table.Cell background="bg.subtle" textAlign="center">
         {index + 1}
       </Table.Cell>
       <Table.Cell>{name}</Table.Cell>
@@ -723,7 +723,7 @@ const ExampleRow = ({
   hasTrace: boolean;
 }) => (
   <Table.Row>
-    <Table.Cell background="gray.50" textAlign="center">
+    <Table.Cell background="bg.subtle" textAlign="center">
       {index + 1}
     </Table.Cell>
     <Table.Cell>
@@ -749,7 +749,7 @@ const LLMCallRow = ({ index, llmCall }: { index: number; llmCall: DSPyLLMCall })
   const response = llmCall.response?.choices?.[0]?.message?.content ?? llmCall.response?.output;
   return (
     <Table.Row>
-      <Table.Cell background="gray.50" textAlign="center">
+      <Table.Cell background="bg.subtle" textAlign="center">
         {index + 1}
       </Table.Cell>
       <Table.Cell>{llmCall.model}</Table.Cell>
@@ -799,7 +799,7 @@ const RunColorMark = ({
       <Box
         width="18px"
         height="18px"
-        background="gray.300"
+        background="border.emphasized"
         borderRadius="100%"
         backgroundColor={color}
       />
@@ -934,7 +934,7 @@ export const RunDetails = React.memo(
                 paddingX={4}
                 fontWeight={500}
                 color="fg.muted"
-                background="gray.100"
+                background="bg.muted"
               >
                 <Text>Step {dspyStepSummary.index}</Text>
               </Center>
@@ -976,7 +976,7 @@ export const RunDetails = React.memo(
           >
             {stepView === "loading" && <Skeleton width="100%" height="30px" />}
             {stepView === "error" && (
-              <Alert.Root>
+              <Alert.Root status="error">
                 <Alert.Indicator />
                 Error loading step data
               </Alert.Root>
@@ -1239,8 +1239,7 @@ const compareStepIndex = (a: StepPoint, b: StepPoint) => {
 };
 
 const runColorOf = (runId: string) => {
-  const [name, number] = getColorForString("colors", runId).color.split(".");
-  return getRawColorValue(name && number ? `${name}.${number}` : "gray.300");
+  return getRawColorValue(getColorForString("colors", runId).color);
 };
 
 const bestScoreOf = (data: StepPoint[], runId: string | undefined) =>
@@ -1367,7 +1366,7 @@ export function DSPyRunsScoresChart({
                 value="Best"
                 position="top"
                 offset={10}
-                fill={getRawColorValue("gray.700")}
+                fill={getRawColorValue("fg.muted")}
                 fontSize="12px"
               />
             </ReferenceDot>

@@ -127,7 +127,7 @@ const EvaluationSummaryCard = ({
           <Text color="fg" fontSize="15px" fontWeight="500">
             {name}
           </Text>
-          <HStack align="end" color={score < 0.5 ? "red.500" : "green.500"}>
+          <HStack align="end" color={score < 0.5 ? "red.fg" : "green.fg"}>
             <Text fontSize="26px" fontWeight="300">
               {numeral(score).format(metric === "score" ? "0.00" : "0%")}
             </Text>
@@ -138,13 +138,13 @@ const EvaluationSummaryCard = ({
           <HStack fontSize="11px" textTransform="uppercase" fontWeight="600" color="fg.muted">
             {group.skipped.length && (
               <Text>
-                <StatusDot color="yellow.400" />
+                <StatusDot color="yellow.fg" />
                 {group.skipped.length} skipped
               </Text>
             )}
             {group.error.length && (
               <Text>
-                <StatusDot color="red.400" />
+                <StatusDot color="red.fg" />
                 {group.error.length} error
               </Text>
             )}
@@ -339,7 +339,7 @@ export default function BatchEvaluation({
         align="center"
         alignItems="stretch"
         justify="center"
-        background="gray.50"
+        background="bg.subtle"
         padding={6}
         gap={6}
       >
@@ -377,8 +377,8 @@ export default function BatchEvaluation({
 }
 
 const STATUS_COLORS = new Map<string, string>([
-  ["skipped", "yellow.700"],
-  ["error", "red.700"],
+  ["skipped", "yellow.fg"],
+  ["error", "red.fg"],
 ]);
 
 function statusBucket(status: string): "processed" | "error" | "skipped" | "unknown" {
@@ -395,8 +395,8 @@ function resultColor({
   isScore: boolean;
   evaluation: BatchEvaluation;
 }): string {
-  if (isScore) return evaluation.score < 0.5 ? "red.500" : "green.500";
-  return evaluation.passed ? "green.500" : "red.500";
+  if (isScore) return evaluation.score < 0.5 ? "red.fg" : "green.fg";
+  return evaluation.passed ? "green.fg" : "red.fg";
 }
 
 function resultLabel({
