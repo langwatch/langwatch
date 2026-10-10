@@ -1,7 +1,8 @@
 import { useDrawer } from "@langwatch/browser-host/drawer";
 import { Drawer } from "@langwatch/design-system/drawer";
-import { Box, HStack, Spinner, VStack } from "@langwatch/design-system/primitives";
-import { modelProviderIcons } from "@langwatch/design-system/provider-icons";
+import { HStack } from "@langwatch/design-system/primitives";
+import { isProviderKey, ProviderIconGlyph } from "@langwatch/design-system/provider-icons";
+import { SkeletonRows } from "@langwatch/design-system/skeletons";
 import { useModelProvidersSettings } from "@langwatch/model-provider-client";
 import { modelProviders } from "@langwatch/model-provider-contract";
 
@@ -69,25 +70,19 @@ export const EditModelProviderDrawer = (props: EditModelProviderDrawerProps) => 
       }}
       modal={false}
     >
-      <Drawer.Content bg="bg">
+      <Drawer.Content>
         <Drawer.Header>
-          <HStack>
-            <Drawer.CloseTrigger />
-          </HStack>
+          <Drawer.CloseTrigger />
           <HStack gap={3}>
-            {provider && (
-              <Box width="28px" height="28px">
-                {modelProviderIcons[provider.provider as keyof typeof modelProviderIcons]}
-              </Box>
+            {provider && isProviderKey(provider.provider) && (
+              <ProviderIconGlyph provider={provider.provider} size="28px" />
             )}
             <Drawer.Title>{title}</Drawer.Title>
           </HStack>
         </Drawer.Header>
         <Drawer.Body>
           {isFormDataLoading ? (
-            <VStack height="200px" justify="center">
-              <Spinner />
-            </VStack>
+            <SkeletonRows rows={4} />
           ) : (
             <EditModelProviderForm
               projectId={projectId}

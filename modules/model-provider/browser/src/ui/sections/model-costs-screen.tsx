@@ -5,16 +5,15 @@
  */
 
 import { formatCurrency } from "@langwatch/design-system/format-currency";
+import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import {
   Button,
-  Card,
   Code,
   HStack,
   NativeSelect,
-  Skeleton,
   Spacer,
   Table,
   Text,
@@ -22,7 +21,7 @@ import {
 } from "@langwatch/design-system/primitives";
 import { SearchInput } from "@langwatch/design-system/search-input";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { ArrowDown, ArrowUp, ArrowUpDown, Coins, MoreVertical, Plus, SearchX } from "lucide-react";
+import { Coins, MoreVertical, Plus, SearchX } from "lucide-react";
 import { useState } from "react";
 
 import { modelProviderApi } from "../../behavior/model-provider-api.ts";
@@ -108,9 +107,6 @@ function ModelNameCell(props: { model: string; isCustom: boolean; modelProviderI
 const editorParams = (row: { id?: string; model: string }) =>
   row.id ? { id: row.id } : { cloneModel: row.model };
 
-const SORT_ICONS = { asc: ArrowUp, desc: ArrowDown } as const;
-const ARIA_SORT = { asc: "ascending", desc: "descending" } as const;
-
 function SortHeader(props: {
   label: string;
   sortKey: ModelCostSortKey;
@@ -118,19 +114,15 @@ function SortHeader(props: {
   onSort: (key: ModelCostSortKey) => void;
   minWidth?: string;
 }) {
-  const active = props.sort?.key === props.sortKey ? props.sort.direction : null;
-  const Icon = active ? SORT_ICONS[active] : ArrowUpDown;
+  const active = props.sort?.key === props.sortKey ? props.sort.direction : false;
   return (
-    <Table.ColumnHeader
+    <ListTable.SortHeader
       minWidth={props.minWidth}
-      whiteSpace="nowrap"
-      aria-sort={active ? ARIA_SORT[active] : "none"}
+      sorted={active}
+      onSort={() => props.onSort(props.sortKey)}
     >
-      <Button size="xs" variant="ghost" onClick={() => props.onSort(props.sortKey)}>
-        {props.label}
-        <Icon size={12} />
-      </Button>
-    </Table.ColumnHeader>
+      {props.label}
+    </ListTable.SortHeader>
   );
 }
 
@@ -246,7 +238,7 @@ export default function ModelCostsScreen() {
   return (
     <>
       <PageLayout.Header>
-        <PageLayout.Heading>Model Costs</PageLayout.Heading>
+        <PageLayout.Heading>Model costs</PageLayout.Heading>
         <Spacer />
         <PageLayout.HeaderButton
           primary
@@ -255,7 +247,7 @@ export default function ModelCostsScreen() {
           disabled={!host.hasPermission(MODEL_COST_MANAGE_PERMISSION)}
         >
           <Plus size={14} />
-          Add New Model
+          Add new model
         </PageLayout.HeaderButton>
       </PageLayout.Header>
       <VStack width="full" gap={6} align="start" paddingTop={4}>
@@ -286,7 +278,7 @@ export default function ModelCostsScreen() {
         {noCosts && (
           <NoDataInfoBlock
             title="No model costs"
-            description="Add a model to set what it costs per token"
+            description="Add a model to set what it costs per token."
             icon={<Coins size={24} />}
           />
         )}
@@ -302,94 +294,76 @@ export default function ModelCostsScreen() {
           </NoDataInfoBlock>
         )}
         {!noCosts && !noMatches && (
-          <Card.Root width="full" overflow="hidden">
-            <Card.Body padding={0} overflowX="auto">
-              <Table.Root variant="line" width="full" maxWidth="100%">
-                <Table.Header width="full">
-                  <Table.Row width="full">
-                    <SortHeader
-                      label="Model name"
-                      sortKey="model"
-                      sort={sort}
-                      onSort={onSort}
-                      minWidth="160px"
+          <ListTable containerProps={{ overflowX: "auto" }}>
+            <Table.Header width="full">
+              <Table.Row width="full">
+                <SortHeader
+                  label="Model name"
+                  sortKey="model"
+                  sort={sort}
+                  onSort={onSort}
+                  minWidth="160px"
+                />
+                <Table.ColumnHeader minWidth="160px">Regex match rule</Table.ColumnHeader>
+                <SortHeader
+                  label="Input cost"
+                  sortKey="inputCostPerToken"
+                  sort={sort}
+                  onSort={onSort}
+                />
+                <SortHeader
+                  label="Output cost"
+                  sortKey="outputCostPerToken"
+                  sort={sort}
+                  onSort={onSort}
+                />
+                <Table.ColumnHeader whiteSpace="nowrap">Cache read</Table.ColumnHeader>
+                <Table.ColumnHeader whiteSpace="nowrap">Cache write (5 min)</Table.ColumnHeader>
+                <Table.ColumnHeader whiteSpace="nowrap">Cache write (1 hour)</Table.ColumnHeader>
+                <Table.ColumnHeader whiteSpace="nowrap">Image input</Table.ColumnHeader>
+                <Table.ColumnHeader whiteSpace="nowrap">Image output</Table.ColumnHeader>
+                <ListTable.ActionHeader />
+              </Table.Row>
+            </Table.Header>
+            <Table.Body width="full">
+              {llmModelCosts.isLoading && <ListTable.LoadingRows rows={3} columns={10} />}
+              {visibleRows.map((row) => (
+                <Table.Row
+                  key={row.model}
+                  width="full"
+                  cursor="pointer"
+                  _hover={{ bg: "bg.muted" }}
+                  onClick={() =>
+                    host.openPlatformDrawer({
+                      drawer: "llmModelCost",
+                      params: editorParams(row),
+                    })
+                  }
+                >
+                  <Table.Cell>
+                    <ModelNameCell
+                      model={row.model}
+                      isCustom={!!row.updatedAt}
+                      modelProviderId={providerRows.get(providerOf(row))}
                     />
-                    <Table.ColumnHeader minWidth="160px">Regex match rule</Table.ColumnHeader>
-                    <SortHeader
-                      label="Input cost"
-                      sortKey="inputCostPerToken"
-                      sort={sort}
-                      onSort={onSort}
-                    />
-                    <SortHeader
-                      label="Output cost"
-                      sortKey="outputCostPerToken"
-                      sort={sort}
-                      onSort={onSort}
-                    />
-                    <Table.ColumnHeader whiteSpace="nowrap">Cache read</Table.ColumnHeader>
-                    <Table.ColumnHeader whiteSpace="nowrap">
-                      Cache write (5 minutes)
-                    </Table.ColumnHeader>
-                    <Table.ColumnHeader whiteSpace="nowrap">
-                      Cache write (1 hour)
-                    </Table.ColumnHeader>
-                    <Table.ColumnHeader whiteSpace="nowrap">Image input</Table.ColumnHeader>
-                    <Table.ColumnHeader whiteSpace="nowrap">Image output</Table.ColumnHeader>
-                    <Table.ColumnHeader width="64px" padding={1} />
-                  </Table.Row>
-                </Table.Header>
-                <Table.Body width="full">
-                  {llmModelCosts.isLoading &&
-                    Array.from({ length: 3 }).map((_, rowIndex) => (
-                      <Table.Row key={rowIndex}>
-                        {Array.from({ length: 9 }).map((__, cellIndex) => (
-                          <Table.Cell key={cellIndex}>
-                            <Skeleton height="20px" />
-                          </Table.Cell>
-                        ))}
-                        <Table.Cell padding={1} />
-                      </Table.Row>
-                    ))}
-                  {visibleRows.map((row) => (
-                    <Table.Row
-                      key={row.model}
-                      width="full"
-                      cursor="pointer"
-                      _hover={{ bg: "bg.muted" }}
-                      onClick={() =>
-                        host.openPlatformDrawer({
-                          drawer: "llmModelCost",
-                          params: editorParams(row),
-                        })
-                      }
-                    >
-                      <Table.Cell>
-                        <ModelNameCell
-                          model={row.model}
-                          isCustom={!!row.updatedAt}
-                          modelProviderId={providerRows.get(providerOf(row))}
-                        />
-                      </Table.Cell>
-                      <Table.Cell>
-                        <RegexHighlight pattern={row.regex} />
-                      </Table.Cell>
-                      <RateCell rate={row.inputCostPerToken} isCustom={!!row.id} />
-                      <RateCell rate={row.outputCostPerToken} isCustom={!!row.id} />
-                      <RateCell rate={row.cacheReadCostPerToken} isCustom={!!row.id} />
-                      <RateCell rate={row.cacheCreationCostPerToken} isCustom={!!row.id} />
-                      <RateCell rate={row.cacheCreation1hCostPerToken} isCustom={!!row.id} />
-                      <RateCell rate={row.inputImageCostPerToken} isCustom={!!row.id} />
-                      <RateCell rate={row.outputImageCostPerToken} isCustom={!!row.id} />
-                      <Table.Cell padding={1} onClick={(event) => event.stopPropagation()}>
-                        <ActionsMenu id={row.id} model={row.model} />
-                      </Table.Cell>
-                    </Table.Row>
-                  ))}
-                </Table.Body>
-              </Table.Root>
-            </Card.Body>
-          </Card.Root>
+                  </Table.Cell>
+                  <Table.Cell>
+                    <RegexHighlight pattern={row.regex} />
+                  </Table.Cell>
+                  <RateCell rate={row.inputCostPerToken} isCustom={!!row.id} />
+                  <RateCell rate={row.outputCostPerToken} isCustom={!!row.id} />
+                  <RateCell rate={row.cacheReadCostPerToken} isCustom={!!row.id} />
+                  <RateCell rate={row.cacheCreationCostPerToken} isCustom={!!row.id} />
+                  <RateCell rate={row.cacheCreation1hCostPerToken} isCustom={!!row.id} />
+                  <RateCell rate={row.inputImageCostPerToken} isCustom={!!row.id} />
+                  <RateCell rate={row.outputImageCostPerToken} isCustom={!!row.id} />
+                  <ListTable.ActionCell>
+                    <ActionsMenu id={row.id} model={row.model} />
+                  </ListTable.ActionCell>
+                </Table.Row>
+              ))}
+            </Table.Body>
+          </ListTable>
         )}
       </VStack>
     </>
@@ -449,8 +423,7 @@ function ActionsMenu({ id, model }: { id?: string; model: string }) {
                 {
                   onSuccess: () => {
                     host.succeeded({
-                      title: "Success",
-                      description: "LLM model cost deleted successfully",
+                      title: "Model cost deleted",
                     });
                     void llmModelCosts.refetch();
                   },

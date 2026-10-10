@@ -217,13 +217,12 @@ function GuidedSignInButton({
 }) {
   return (
     <Button
+      textStyle="cardTitle"
       onClick={onStart}
       disabled={connected || disabled}
       w="full"
       h="44px"
       borderRadius="12px"
-      fontSize="13.5px"
-      fontWeight="600"
       gap={2.5}
       bg="fg"
       color="bg.panel"
@@ -250,11 +249,10 @@ function GuidedWaitingRow({ onCancel }: { onCancel: () => void }) {
     <HStack justify="space-between" gap={3} data-testid="codex-waiting">
       <HStack as="output" gap={2} minW={0} color="fg.muted">
         <Spinner size="xs" flexShrink={0} />
-        <Text fontSize="13.5px" fontWeight="500">
-          Waiting for ChatGPT…
-        </Text>
+        <Text textStyle="label">Waiting for ChatGPT…</Text>
       </HStack>
       <Button
+        textStyle="cardTitle"
         variant="outline"
         onClick={onCancel}
         h="36px"
@@ -264,8 +262,6 @@ function GuidedWaitingRow({ onCancel }: { onCancel: () => void }) {
         borderColor="border"
         bg="bg.panel"
         color="fg.muted"
-        fontSize="12.5px"
-        fontWeight="600"
         flexShrink={0}
         _hover={{ bg: "bg.muted", color: "fg" }}
       >
@@ -283,7 +279,7 @@ function GuidedPendingCode({
 }) {
   return (
     <VStack align="stretch" gap={5} mt={1} data-testid="codex-pending">
-      <Text fontSize="12.5px" color="fg.muted">
+      <Text textStyle="bodySm" color="fg.muted">
         Enter this code on OpenAI's device page to approve the sign-in:
       </Text>
       <HStack justify="space-between" gap={3} wrap="wrap">
@@ -329,7 +325,7 @@ function GuidedCodexActions({
   return (
     <VStack align="stretch" gap={4} width="full">
       {phase.name === "error" && (
-        <Text fontSize="11.5px" color="fg.error" role="alert">
+        <Text textStyle="caption" color="fg.error" role="alert">
           {phase.message}
         </Text>
       )}

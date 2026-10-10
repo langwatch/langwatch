@@ -5,15 +5,14 @@
  */
 
 import { Dialog } from "@langwatch/design-system/dialog";
+import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import {
   Box,
   Button,
-  Card,
   HStack,
-  Skeleton,
   Spacer,
   Table,
   Text,
@@ -122,7 +121,7 @@ function ProviderRow({
           system={isSystem}
         />
       </Table.Cell>
-      <Table.Cell textAlign="right">
+      <ListTable.ActionCell>
         {isSystem ? null : (
           <Menu.Root>
             <Tooltip content={rowActionsDisabledReason ?? ""} disabled={!rowActionsDisabledReason}>
@@ -152,7 +151,7 @@ function ProviderRow({
                 >
                   <Box display="flex" alignItems="center" gap={2}>
                     <Edit size={14} />
-                    Edit Provider
+                    Edit provider
                   </Box>
                 </Menu.Item>
                 <Menu.Item
@@ -167,7 +166,7 @@ function ProviderRow({
                 >
                   <Box display="flex" alignItems="center" gap={2}>
                     <PlugZap size={14} />
-                    Test Connection
+                    Test connection
                   </Box>
                 </Menu.Item>
                 <Menu.Item
@@ -188,14 +187,14 @@ function ProviderRow({
                 >
                   <Box display="flex" alignItems="center" gap={2}>
                     <Trash2 size={14} />
-                    Delete Provider
+                    Delete provider
                   </Box>
                 </Menu.Item>
               </Menu.Content>
             )}
           </Menu.Root>
         )}
-      </Table.Cell>
+      </ListTable.ActionCell>
     </Table.Row>
   );
 }
@@ -231,7 +230,7 @@ function ProvidersPanel({
     return (
       <NoDataInfoBlock
         title="No model providers"
-        description="Add a model provider to get started"
+        description="Add a model provider to get started."
         icon={<BrainCircuit size={24} />}
       >
         {/* The empty-state call to action mirrors the page header - same
@@ -252,7 +251,7 @@ function ProvidersPanel({
           >
             <HStack gap={1}>
               <Plus size={14} />
-              <Text>Add Model Provider</Text>
+              <Text>Add model provider</Text>
             </HStack>
           </Button>
         </AddModelProviderMenu>
@@ -261,32 +260,28 @@ function ProvidersPanel({
   }
 
   return (
-    <Card.Root width="full" overflow="hidden">
-      <Card.Body paddingY={0} paddingX={0} overflowX="auto">
-        <Table.Root variant="line" size="md" width="full">
-          <Table.Header>
-            <Table.Row>
-              <Table.ColumnHeader>Provider</Table.ColumnHeader>
-              <Table.ColumnHeader>Scope</Table.ColumnHeader>
-              <Table.ColumnHeader />
-            </Table.Row>
-          </Table.Header>
-          <Table.Body>
-            {enabledProviders.map((provider) => (
-              <ProviderRow
-                key={provider.id ?? `system-${provider.provider}`}
-                connectionTests={connectionTests}
-                onDelete={onDelete}
-                onEdit={onEdit}
-                provider={provider}
-                rowActionsDisabledReason={rowActionsDisabledReason}
-                scopeNameById={scopeNameById}
-              />
-            ))}
-          </Table.Body>
-        </Table.Root>
-      </Card.Body>
-    </Card.Root>
+    <ListTable containerProps={{ overflowX: "auto" }}>
+      <Table.Header>
+        <Table.Row>
+          <Table.ColumnHeader>Provider</Table.ColumnHeader>
+          <Table.ColumnHeader>Scope</Table.ColumnHeader>
+          <ListTable.ActionHeader />
+        </Table.Row>
+      </Table.Header>
+      <Table.Body>
+        {enabledProviders.map((provider) => (
+          <ProviderRow
+            key={provider.id ?? `system-${provider.provider}`}
+            connectionTests={connectionTests}
+            onDelete={onDelete}
+            onEdit={onEdit}
+            provider={provider}
+            rowActionsDisabledReason={rowActionsDisabledReason}
+            scopeNameById={scopeNameById}
+          />
+        ))}
+      </Table.Body>
+    </ListTable>
   );
 }
 
@@ -438,7 +433,7 @@ export default function ModelProvidersScreen() {
           one. */}
       <CodexCodingDefaultsAskHost />
       <PageLayout.Header>
-        <PageLayout.Heading>Model Providers</PageLayout.Heading>
+        <PageLayout.Heading>Model providers</PageLayout.Heading>
         <Spacer />
         {/* Single scope filter for the whole page - narrows the Model Providers
             table and the Default Models table below. See
@@ -465,7 +460,7 @@ export default function ModelProvidersScreen() {
             disabled={!!addProviderDisabledReason}
             data-testid="model-provider-add"
           >
-            <Plus size={14} /> Add Model Provider
+            <Plus size={14} /> Add model provider
           </PageLayout.HeaderButton>
         </AddModelProviderMenu>
       </PageLayout.Header>
@@ -501,6 +496,7 @@ export default function ModelProvidersScreen() {
         )}
 
         <Dialog.Root
+          placement="center"
           open={!!providerToDelete}
           onOpenChange={(details) => {
             if (!details.open) setProviderToDelete(null);
@@ -516,9 +512,8 @@ export default function ModelProvidersScreen() {
                   This permanently deletes the provider and its stored API keys. This cannot be
                   undone.
                 </Text>
-                <Text fontSize="sm" color="fg.muted">
-                  Default model configs that reference this provider will surface as &ldquo;Update
-                  needed&rdquo; in the table below.
+                <Text textStyle="body" color="fg.muted">
+                  Default models that use this provider will need a new provider.
                 </Text>
               </VStack>
             </Dialog.Body>
@@ -658,36 +653,19 @@ function AddModelProviderMenu({
  */
 function ProvidersTableSkeleton() {
   return (
-    <Card.Root width="full" overflow="hidden" data-testid="providers-table-skeleton">
-      <Card.Body paddingY={0} paddingX={0} overflowX="auto">
-        <Table.Root variant="line" size="md" width="full">
-          <Table.Header>
-            <Table.Row>
-              <Table.ColumnHeader>Provider</Table.ColumnHeader>
-              <Table.ColumnHeader>Scope</Table.ColumnHeader>
-              <Table.ColumnHeader />
-            </Table.Row>
-          </Table.Header>
-          <Table.Body>
-            {[0, 1, 2].map((index) => (
-              <Table.Row key={index}>
-                <Table.Cell>
-                  <HStack gap={3} align="center">
-                    <Skeleton width="24px" height="24px" borderRadius="sm" />
-                    <Skeleton width="120px" height="16px" />
-                  </HStack>
-                </Table.Cell>
-                <Table.Cell>
-                  <Skeleton width="80px" height="20px" borderRadius="full" />
-                </Table.Cell>
-                <Table.Cell textAlign="right">
-                  <Skeleton width="24px" height="24px" borderRadius="md" marginLeft="auto" />
-                </Table.Cell>
-              </Table.Row>
-            ))}
-          </Table.Body>
-        </Table.Root>
-      </Card.Body>
-    </Card.Root>
+    <Box width="full" data-testid="providers-table-skeleton">
+      <ListTable containerProps={{ overflowX: "auto" }}>
+        <Table.Header>
+          <Table.Row>
+            <Table.ColumnHeader>Provider</Table.ColumnHeader>
+            <Table.ColumnHeader>Scope</Table.ColumnHeader>
+            <ListTable.ActionHeader />
+          </Table.Row>
+        </Table.Header>
+        <Table.Body>
+          <ListTable.LoadingRows rows={3} columns={3} />
+        </Table.Body>
+      </ListTable>
+    </Box>
   );
 }

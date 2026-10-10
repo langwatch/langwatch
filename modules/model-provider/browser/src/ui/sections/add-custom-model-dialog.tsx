@@ -240,7 +240,7 @@ export function AddCustomModelDialog({
               <HStack width="full" flexDirection={["column", "column", "row"]} gap={4}>
                 <VStack align="start" gap={1} width="full">
                   <Text fontWeight="medium">Supported Parameters</Text>
-                  <Text fontSize="13px" color="fg.muted">
+                  <Text textStyle="bodySm" color="fg.muted">
                     Which sampling parameters this model accepts
                   </Text>
                 </VStack>
@@ -266,7 +266,7 @@ export function AddCustomModelDialog({
               <HStack width="full" flexDirection={["column", "column", "row"]} gap={4}>
                 <VStack align="start" gap={1} width="full">
                   <Text fontWeight="medium">Multimodal Support</Text>
-                  <Text fontSize="13px" color="fg.muted">
+                  <Text textStyle="bodySm" color="fg.muted">
                     Input types this model can process besides text
                   </Text>
                 </VStack>

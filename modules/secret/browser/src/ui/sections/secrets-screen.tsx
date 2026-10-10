@@ -5,6 +5,8 @@
 
 import type { WireOf } from "@langwatch/api/web";
 import { Dialog } from "@langwatch/design-system/dialog";
+import { EmptyValue } from "@langwatch/design-system/empty-value";
+import { FormattedDate } from "@langwatch/design-system/formatted-date";
 import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
@@ -23,7 +25,7 @@ import {
 } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { Secret } from "@langwatch/secret-contract";
-import { readableDate } from "@langwatch/time";
+import { toEpochMs } from "@langwatch/time";
 import { Edit, Key, MoreVertical, Plus, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -96,12 +98,14 @@ function SecretRow({
         </HStack>
       </Table.Cell>
       <Table.Cell>
-        <Text>{secret.createdBy?.name ?? "-"}</Text>
+        <Text>{secret.createdBy?.name ?? <EmptyValue label="Unknown creator" />}</Text>
       </Table.Cell>
       <Table.Cell>
-        <Text color="fg.muted">{readableDate(secret.updatedAt).toLocaleDateString()}</Text>
+        <Text color="fg.muted">
+          <FormattedDate value={toEpochMs(secret.updatedAt)} display="date" />
+        </Text>
       </Table.Cell>
-      <Table.Cell textAlign="right">
+      <ListTable.ActionCell>
         {canManage && (
           <Menu.Root>
             <Menu.Trigger asChild>
@@ -122,7 +126,7 @@ function SecretRow({
               >
                 <Box display="flex" alignItems="center" gap={2}>
                   <Edit size={14} />
-                  Update Value
+                  Update value
                 </Box>
               </Menu.Item>
               <Menu.Item
@@ -133,13 +137,13 @@ function SecretRow({
               >
                 <Box display="flex" alignItems="center" gap={2}>
                   <Trash2 size={14} />
-                  Delete Secret
+                  Delete secret
                 </Box>
               </Menu.Item>
             </Menu.Content>
           </Menu.Root>
         )}
-      </Table.Cell>
+      </ListTable.ActionCell>
     </Table.Row>
   );
 }
@@ -151,7 +155,7 @@ function SecretsTableHeader() {
         <Table.ColumnHeader>Name</Table.ColumnHeader>
         <Table.ColumnHeader>Created by</Table.ColumnHeader>
         <Table.ColumnHeader>Last updated</Table.ColumnHeader>
-        <Table.ColumnHeader width={16} />
+        <ListTable.ActionHeader />
       </Table.Row>
     </Table.Header>
   );
@@ -274,7 +278,7 @@ export default function SecretsScreen() {
               onClick={() => setIsAddDialogOpen(true)}
               data-testid="secret-add"
             >
-              <Plus /> Add Secret
+              <Plus /> Add secret
             </PageLayout.HeaderButton>
           </Tooltip>
         )}
@@ -309,7 +313,7 @@ export default function SecretsScreen() {
           </ListTable>
         )}
 
-        {/* Add Secret Dialog */}
+        {/* Add secret Dialog */}
         <Dialog.Root
           open={isAddDialogOpen}
           onOpenChange={(details) => {
@@ -322,7 +326,7 @@ export default function SecretsScreen() {
         >
           <Dialog.Content>
             <Dialog.Header>
-              <Dialog.Title>Add Secret</Dialog.Title>
+              <Dialog.Title>Add secret</Dialog.Title>
             </Dialog.Header>
             <Dialog.Body>
               <VStack gap={4} align="start">
@@ -398,7 +402,7 @@ export default function SecretsScreen() {
           </Dialog.Content>
         </Dialog.Root>
 
-        {/* Update Value Dialog */}
+        {/* Update value Dialog */}
         <Dialog.Root
           open={!!secretToUpdate}
           onOpenChange={(details) => {
@@ -410,11 +414,11 @@ export default function SecretsScreen() {
         >
           <Dialog.Content>
             <Dialog.Header>
-              <Dialog.Title>Update Value for {secretToUpdate?.name ?? ""}</Dialog.Title>
+              <Dialog.Title>Update value for {secretToUpdate?.name ?? ""}</Dialog.Title>
             </Dialog.Header>
             <Dialog.Body>
               <VStack gap={1} align="start" width="full">
-                <Text fontWeight="medium">New Value</Text>
+                <Text fontWeight="medium">New value</Text>
                 <Input
                   type="password"
                   placeholder="Enter new secret value"

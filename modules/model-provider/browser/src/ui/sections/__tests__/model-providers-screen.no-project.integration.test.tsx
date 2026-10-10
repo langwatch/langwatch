@@ -229,7 +229,7 @@ describe("given the Model Providers screen", () => {
       renderPage(hostWithoutProject());
 
       expect(screen.getByText("No model providers")).toBeTruthy();
-      expect(screen.getByText("Add a model provider to get started")).toBeTruthy();
+      expect(screen.getByText("Add a model provider to get started.")).toBeTruthy();
       expect(screen.queryByText("Create a project first")).toBeNull();
       expect(screen.queryByTestId("empty-state-create-first-project")).toBeNull();
     });
@@ -303,8 +303,8 @@ describe("given the Model Providers screen", () => {
       it("offers editing and deleting it", () => {
         renderPage(hostWithoutProject());
 
-        expect(screen.getByText("Edit Provider")).toBeTruthy();
-        expect(screen.getByText("Delete Provider")).toBeTruthy();
+        expect(screen.getByText("Edit provider")).toBeTruthy();
+        expect(screen.getByText("Delete provider")).toBeTruthy();
         expect(tooltipWith("Create a project first to edit or delete providers.")).toBeNull();
       });
 
@@ -388,7 +388,7 @@ describe("given the Model Providers screen", () => {
       it("opens the setup for the row being edited, carrying the organization", () => {
         const { host } = renderPage(hostWithoutProject());
 
-        fireEvent.click(screen.getByText("Edit Provider"));
+        fireEvent.click(screen.getByText("Edit provider"));
 
         expect(host.drawerOpens).toEqual([
           {
@@ -411,7 +411,7 @@ describe("given the Model Providers screen", () => {
       it("deletes the row it was opened on, scoped to the organization", async () => {
         renderPage(hostWithoutProject());
 
-        fireEvent.click(screen.getByText("Delete Provider"));
+        fireEvent.click(screen.getByText("Delete provider"));
         expect(screen.getByText("Delete OpenAI?")).toBeTruthy();
 
         fireEvent.click(screen.getByText("Delete"));
@@ -431,7 +431,7 @@ describe("given the Model Providers screen", () => {
         mockDeleteProvider.mockRejectedValueOnce(refusal);
         const { host } = renderPage(hostWithoutProject());
 
-        fireEvent.click(screen.getByText("Delete Provider"));
+        fireEvent.click(screen.getByText("Delete provider"));
         fireEvent.click(screen.getByText("Delete"));
 
         await vi.waitFor(() => {
@@ -472,8 +472,8 @@ describe("given the Model Providers screen", () => {
     it("blocks editing and deleting, and says why", () => {
       renderPage(hostWithoutProject(["organization:view"]));
 
-      expect(screen.queryByText("Edit Provider")).toBeNull();
-      expect(screen.queryByText("Delete Provider")).toBeNull();
+      expect(screen.queryByText("Edit provider")).toBeNull();
+      expect(screen.queryByText("Delete provider")).toBeNull();
       expect(
         tooltipWith("You need model provider manage permissions to edit or delete providers."),
       ).toBeTruthy();
@@ -514,14 +514,14 @@ describe("given the Model Providers screen", () => {
       it("offers editing and deleting it", () => {
         renderPage(hostWithProject());
 
-        expect(screen.getByText("Edit Provider")).toBeTruthy();
-        expect(screen.getByText("Delete Provider")).toBeTruthy();
+        expect(screen.getByText("Edit provider")).toBeTruthy();
+        expect(screen.getByText("Delete provider")).toBeTruthy();
       });
 
       it("opens the setup for the row being edited", () => {
         const { host } = renderPage(hostWithProject());
 
-        fireEvent.click(screen.getByText("Edit Provider"));
+        fireEvent.click(screen.getByText("Edit provider"));
 
         expect(host.drawerOpens).toEqual([
           {
@@ -539,7 +539,7 @@ describe("given the Model Providers screen", () => {
       it("deletes the row it was opened on, scoped to the project", async () => {
         renderPage(hostWithProject());
 
-        fireEvent.click(screen.getByText("Delete Provider"));
+        fireEvent.click(screen.getByText("Delete provider"));
         expect(screen.getByText("Delete OpenAI?")).toBeTruthy();
 
         fireEvent.click(screen.getByText("Delete"));

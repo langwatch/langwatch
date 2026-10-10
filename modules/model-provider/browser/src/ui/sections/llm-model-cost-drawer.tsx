@@ -135,7 +135,7 @@ export function LLMModelCostDrawer({
 
   return (
     <Drawer.Root open={true} placement="end" size={"xl"} onOpenChange={() => closeDrawer()}>
-      <Drawer.Content bg="bg">
+      <Drawer.Content>
         <Drawer.Header>
           <Drawer.Title>{drawerTitle({ id, cloneModel })}</Drawer.Title>
           <Drawer.CloseTrigger />
@@ -305,12 +305,12 @@ function LLMModelCostForm({
         >
           <InputGroup
             startElement={
-              <Text paddingX={2} fontFamily="monospace">
+              <Text paddingX={2} fontFamily="mono">
                 /
               </Text>
             }
             endElement={
-              <Text paddingX={2} fontFamily="monospace">
+              <Text paddingX={2} fontFamily="mono">
                 /
               </Text>
             }
