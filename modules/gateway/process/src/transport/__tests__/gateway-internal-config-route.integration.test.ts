@@ -72,6 +72,7 @@ function createSuiteProjects(): ProjectApi {
           organizationId: row.team.organizationId,
           isPersonal: false,
           ownerUserId: null,
+          kind: "application",
         }));
       },
 

@@ -40,6 +40,7 @@ async function mountedCreate({ stashed }: { stashed: StashRevealInput[] }) {
     id: PROJECT_ID,
     teamId: "team_1",
     archivedAt: null,
+    kind: "application",
   };
   const app = await GatewayModule.create({
     channels: MemoryGatewayChannels.create(),
@@ -55,6 +56,7 @@ async function mountedCreate({ stashed }: { stashed: StashRevealInput[] }) {
           organizationId: ORGANIZATION_ID,
           isPersonal: false,
           ownerUserId: null,
+          kind: "application",
         }),
         listIdsByOrganization: async () => [PROJECT_ID],
         listTraceDestinations: async () => [project],

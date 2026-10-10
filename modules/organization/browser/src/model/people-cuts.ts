@@ -27,7 +27,7 @@ export function peopleCutItems({
   requestCount: number;
   joinRequestsEnabled: boolean;
 }): { value: PeopleCut; label: string; count: number }[] {
-  const cuts = [
+  const cuts: { value: PeopleCut; label: string; count: number }[] = [
     { value: "all", label: "Everybody", count: memberCount + openInviteCount + requestCount },
     { value: "members", label: "Members", count: memberCount },
     { value: "invited", label: "Invited", count: openInviteCount },

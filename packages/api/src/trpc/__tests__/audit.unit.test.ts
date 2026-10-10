@@ -536,10 +536,12 @@ describe("handleTrpcCallLogging", () => {
     describe("when the cause is an upgrade_in_progress 503", () => {
       it("logs at warn level, not error", () => {
         const log = createMockLog();
-        const cause = new HandledError("upgrade_in_progress", "upgrading", {
-          httpStatus: 503,
-          fault: "platform",
-        });
+        class UpgradeInProgress extends HandledError {
+          constructor() {
+            super("upgrade_in_progress", "upgrading", { httpStatus: 503, fault: "platform" });
+          }
+        }
+        const cause = new UpgradeInProgress();
         const error = new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "upgrading", cause });
 
         handleTrpcCallLogging({ ...baseArgs, result: { ok: false, error }, log, capture: vi.fn() });
@@ -553,10 +555,12 @@ describe("handleTrpcCallLogging", () => {
 
       it("keeps another platform-fault handled 503 at error", () => {
         const log = createMockLog();
-        const cause = new HandledError("upstream_down", "down", {
-          httpStatus: 503,
-          fault: "platform",
-        });
+        class UpstreamDown extends HandledError {
+          constructor() {
+            super("upstream_down", "down", { httpStatus: 503, fault: "platform" });
+          }
+        }
+        const cause = new UpstreamDown();
         const error = new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "down", cause });
 
         handleTrpcCallLogging({ ...baseArgs, result: { ok: false, error }, log, capture: vi.fn() });

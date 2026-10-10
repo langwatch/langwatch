@@ -106,6 +106,7 @@ describe("GatewayModule.getKeyCaller", () => {
       organizationId: ORGANIZATION_ID,
       isPersonal: false,
       ownerUserId: null,
+      kind: "application",
     });
   });
 
@@ -212,6 +213,7 @@ describe("GatewayModule.getVirtualKeyCaller", () => {
       organizationId: ORGANIZATION_ID,
       isPersonal: false,
       ownerUserId: null,
+      kind: "application",
     });
   });
 
