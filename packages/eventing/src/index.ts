@@ -229,6 +229,11 @@ export * from "./replay/projectionLaneReplay.ts";
 export * from "./replay/types.ts";
 export * from "./services/errorHandling.ts";
 export { type FoldReadAuthorizer, foldReadPurpose } from "./projections/foldReadPurpose.ts";
+export {
+  type CursorScope,
+  type Freshness,
+  freshnessOf,
+} from "./projections/cursor/rules/freshnessOf.ts";
 export * from "./stores/eventStoreUtils.ts";
 export * from "./stores/abstractEventStore.ts";
 export * from "./stores/eventStoreProducerOnly.ts";
