@@ -8,7 +8,9 @@ import type {
   Organization,
   OrganizationInvite,
   OrganizationUser,
+  PendingInvitationsByEmail,
 } from "@langwatch/organization-contract";
+import { skipTenantCheck } from "@langwatch/prisma-client";
 import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 import { NEVER_LANDED_ON_PROJECT_KINDS } from "@langwatch/project-contract";
 import { toDate, type Instant } from "@langwatch/time";
@@ -395,6 +397,44 @@ export class PrismaOrganizationInviteRepository extends OrganizationInviteReposi
     if (invite === null) throw new InviteNotFoundError();
 
     return inviteFromRecord(invite);
+  }
+
+  async findPendingInvitesForAddress({
+    address,
+  }: {
+    address: string;
+  }): Promise<PendingInvitationsByEmail> {
+    const rows = await this.prisma.$queryRaw<
+      {
+        id: string;
+        email: string;
+        organizationId: string;
+        organizationName: string | null;
+        invitedByName: string | null;
+        expiration: Date | null;
+      }[]
+    >`
+      ${skipTenantCheck({
+        // An operator's lookup of one address across every organization, behind ops:manage.
+        SKIP_TENANT_CHECK: true,
+      })}
+      SELECT i."id", i."email", i."organizationId", o."name" AS "organizationName",
+             u."name" AS "invitedByName", i."expiration"
+        FROM "OrganizationInvite" i
+        LEFT JOIN "Organization" o ON o."id" = i."organizationId"
+        LEFT JOIN "User" u ON u."id" = i."requestedBy"
+       WHERE lower(i."email") = lower(${address})
+         AND i."status" = 'PENDING'
+       ORDER BY i."createdAt" DESC
+    `;
+    return rows.map((row) => ({
+      inviteId: row.id,
+      email: row.email,
+      organizationId: row.organizationId,
+      organizationName: row.organizationName,
+      invitedByName: row.invitedByName,
+      expiresAtMs: row.expiration?.getTime() ?? null,
+    }));
   }
 
   async findOldestPendingInviteForAddress({ address }: { address: string }): Promise<{

@@ -47,7 +47,10 @@ export interface IdentityLookupServiceDeps {
     AuthApi,
     "listBrowserSessions" | "revokeAllBrowserSessions" | "endBrowserSessionsForIdentifier"
   >;
-  invitations: Pick<OrganizationApi, "resendInvitation" | "extendInvitation">;
+  invitations: Pick<
+    OrganizationApi,
+    "resendInvitation" | "extendInvitation" | "findPendingInvitationsByEmail"
+  >;
   now?: () => number;
 }
 
@@ -424,24 +427,24 @@ export class IdentityLookupService {
     ];
     const [proposals, invitationRows, claimRows] = await Promise.all([
       history.findProposals({ userId: person.userId }),
-      person.email ? this.deps.reads.findInvitations({ email: person.email }) : [],
+      person.email
+        ? this.deps.invitations.findPendingInvitationsByEmail({ email: person.email })
+        : [],
       this.deps.reads.findClaimsAwaitingReview({ domains }),
     ]);
 
     const now = this.now();
     const undecided = proposals.filter((proposal) => !proposal.decision);
-    const invitations = invitationRows
-      .filter((row) => row.status === "PENDING")
-      .map((row) => ({
-        inviteId: row.inviteId,
-        email: row.email,
-        organizationId: row.organizationId,
-        organizationName: row.organizationName,
-        invitedByName: row.invitedByName,
-        status: row.status,
-        expiresAtMs: row.expiresAtMs,
-        isExpired: row.expiresAtMs !== null && row.expiresAtMs <= now,
-      }));
+    const invitations = invitationRows.map((row) => ({
+      inviteId: row.inviteId,
+      email: row.email,
+      organizationId: row.organizationId,
+      organizationName: row.organizationName,
+      invitedByName: row.invitedByName,
+      status: "PENDING",
+      expiresAtMs: row.expiresAtMs,
+      isExpired: row.expiresAtMs !== null && row.expiresAtMs <= now,
+    }));
     const domainClaims = await this.nameOrganizations({ claims: claimRows });
 
     return {

@@ -53,6 +53,7 @@ import type {
 import type { LimitCheckResult, LimitType } from "./license-limit-type.ts";
 import type {
   PendingInvitationForCaller,
+  PendingInvitationsByEmail,
   PendingInvitationsForCaller,
   InviteLanding,
   OrganizationDirectoryCounts,
@@ -268,6 +269,13 @@ export interface OrganizationApi {
    * organization (ADR-171 v6). Carries the invitation code, so verified addresses only.
    */
   listPendingInvitationsForCaller(by: OrganizationCaller): Promise<PendingInvitationsForCaller>;
+  /**
+   * Every pending invitation on one address, in any organization (main's operator read). An
+   * operator-scope read: only the identity lookup, behind its own operator gate, asks it.
+   */
+  findPendingInvitationsByEmail(
+    input: Readonly<{ email: string }>,
+  ): Promise<PendingInvitationsByEmail>;
   deleteMember(
     input: Readonly<{ organizationId: string; userId: string }>,
     by: OrganizationCaller | null,

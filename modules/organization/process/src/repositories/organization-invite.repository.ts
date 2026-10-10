@@ -4,6 +4,7 @@ import type {
   OrganizationInvite,
   OrganizationUser,
   OrganizationUserRole,
+  PendingInvitationsByEmail,
 } from "@langwatch/organization-contract";
 
 /** The columns a pending or payment-pending invite is written with. */
@@ -126,6 +127,10 @@ export abstract class OrganizationInviteRepository {
     organizationId: string;
     email: string;
   }): Promise<OrganizationInvite>;
+  /** Every pending invite on one address, in any organization, newest first: an operator's read. */
+  abstract findPendingInvitesForAddress(input: {
+    address: string;
+  }): Promise<PendingInvitationsByEmail>;
   /**
    * The oldest pending, unexpired invite on ONE address, in any organization
    * (ADR-171 v6). One address per read: the tenancy guard admits a

@@ -54,6 +54,7 @@ function invitationStub(create: OrganizationInvitations["create"]): Organization
     create,
     revoke: unreachable("revoke"),
     findPendingForAddresses: unreachable("findPendingForAddresses"),
+    findPendingByEmail: unreachable("findPendingByEmail"),
     assertSendAllowed: unreachable("assertSendAllowed"),
     resend: unreachable("resend"),
     extend: unreachable("extend"),

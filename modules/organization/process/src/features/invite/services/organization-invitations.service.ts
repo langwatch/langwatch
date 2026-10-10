@@ -8,6 +8,7 @@ import type {
   OrganizationListedInvite,
   OrganizationPendingInviteApplied,
   OrganizationUserRole,
+  PendingInvitationsByEmail,
 } from "@langwatch/organization-contract";
 
 import type { OrganizationInviteRepository } from "../../../repositories/organization-invite.repository.ts";
@@ -79,6 +80,7 @@ export interface OrganizationInvitations {
       role: OrganizationUserRole;
     }[]
   >;
+  findPendingByEmail(input: Readonly<{ email: string }>): Promise<PendingInvitationsByEmail>;
   revoke(input: Readonly<{ organizationId: string; inviteId: string }>): Promise<void>;
   /**
    * Throttled per INVITATION, because the thing protected is the recipient's
@@ -214,6 +216,13 @@ export class OrganizationInvitationsService implements OrganizationInvitations {
       ),
     );
     return invites.filter((invite) => invite !== null);
+  }
+
+  /** Every pending invitation on one address, in any organization: the operator's lookup. */
+  findPendingByEmail({ email }: Readonly<{ email: string }>): Promise<PendingInvitationsByEmail> {
+    return this.options.repository.findPendingInvitesForAddress({
+      address: email.trim().toLowerCase(),
+    });
   }
 
   create(input: OrganizationInvitationsCreateInput): Promise<OrganizationInvitesCreated> {

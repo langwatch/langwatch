@@ -22,6 +22,7 @@ import {
   type OrganizationListedInvite,
   type OrganizationPendingInviteApplied,
   type OrganizationUserRole,
+  type PendingInvitationsByEmail,
   type PendingInvitationsForCaller,
   type OrganizationApiSeatCheckoutInput,
   type OrganizationSeatCheckoutRedirect,
@@ -84,6 +85,11 @@ export class OrganizationInvitationDoorService {
     return this.deps.invitations.findPendingForAddresses({
       addresses: await this.deps.directory.findProvenAddresses(input),
     });
+  }
+
+  /** Every pending invitation on one address, in any organization: the operator's lookup. */
+  findPendingByEmail(input: Readonly<{ email: string }>): Promise<PendingInvitationsByEmail> {
+    return this.deps.invitations.findPendingByEmail(input);
   }
 
   /**

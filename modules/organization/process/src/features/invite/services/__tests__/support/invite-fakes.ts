@@ -507,6 +507,9 @@ export class FakeOrganizationInviteRepository implements OrganizationInviteRepos
   findProjectSlugsInOrganization = unsupported<
     OrganizationInviteRepository["findProjectSlugsInOrganization"]
   >("findProjectSlugsInOrganization");
+  findPendingInvitesForAddress = unsupported<
+    OrganizationInviteRepository["findPendingInvitesForAddress"]
+  >("findPendingInvitesForAddress");
   findOldestPendingInviteForAddress = unsupported<
     OrganizationInviteRepository["findOldestPendingInviteForAddress"]
   >("findOldestPendingInviteForAddress");
