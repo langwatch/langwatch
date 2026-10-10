@@ -11,6 +11,7 @@ import { drawerSlotRecipe } from "./drawer.recipe.ts";
 import { optionItemRecipe, optionListContent, optionListSizes } from "./option-list.recipe.ts";
 import { sectionNavigationRailRecipe } from "./section-navigation.recipe.ts";
 import { segmentGroupSlotRecipe } from "./segment-group.recipe.ts";
+import { productTextStyles } from "./text-styles.ts";
 
 // Inter and JetBrains Mono are loaded by the CSS @import in the application's
 // globals.scss. This file names the families, it does not fetch them.
@@ -87,6 +88,7 @@ export const designSystemConfig = defineConfig({
     },
   },
   theme: {
+    textStyles: productTextStyles,
     keyframes: {
       // A toast rises a few pixels into place and fades out where it is: no blur, no scale.
       "toast-in": {
@@ -738,7 +740,7 @@ export const designSystemConfig = defineConfig({
               h: "8",
               minW: "8",
               px: "2.5",
-              fontSize: "13px",
+              textStyle: "bodySm",
               _icon: {
                 flexShrink: 1,
                 width: "auto",
@@ -1049,8 +1051,7 @@ export const designSystemConfig = defineConfig({
               trigger: {
                 py: "1",
                 px: "3",
-                textStyle: "sm",
-                fontSize: "13px",
+                textStyle: "bodySm",
               },
             },
           },
@@ -1091,7 +1092,7 @@ export const designSystemConfig = defineConfig({
             _selected: { bg: "bg.selected", _hover: { bg: "bg.selected" } },
           },
           columnHeader: {
-            fontWeight: "bold",
+            fontWeight: "semibold",
             textStyle: "xs",
             textTransform: "uppercase",
             color: "fg.muted",
@@ -1165,12 +1166,13 @@ export const designSystemConfig = defineConfig({
                 lineHeight: "1em",
               },
               columnHeader: {
-                fontSize: "11px",
+                textStyle: "micro",
                 paddingY: 2,
                 paddingX: 3,
               },
               cell: {
-                fontSize: "13px",
+                textStyle: "bodySm",
+                lineHeight: "1em",
                 paddingY: 2,
                 paddingX: 3,
               },
@@ -1244,8 +1246,7 @@ export const designSystemConfig = defineConfig({
             pt: "3",
           },
           title: {
-            textStyle: "md",
-            fontWeight: "500",
+            textStyle: "sectionTitle",
           },
           // A dialog panel is opaque: the blur behind it is the backdrop's, never the panel's.
           content: {

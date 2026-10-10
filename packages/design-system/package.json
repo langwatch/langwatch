@@ -379,6 +379,10 @@
       "types": "./dist/components/forms/small-label.d.ts",
       "default": "./src/components/forms/small-label.tsx"
     },
+    "./typography": {
+      "types": "./dist/components/typography/typography.d.ts",
+      "default": "./src/components/typography/typography.tsx"
+    },
     "./switch": {
       "types": "./dist/components/forms/switch.d.ts",
       "default": "./src/components/forms/switch.tsx"
