@@ -4739,6 +4739,22 @@ const presentations = {
     describe: () =>
       "The user who owns this key no longer exists, so the turn has no one to act as. Mint a new key under a current user.",
   },
+  // An unattended turn refused before it started; the reader is whoever asked for the run.
+  langy_unattended_actor_missing: {
+    title: "Person no longer exists",
+    describe: () =>
+      "The person this run acts as no longer exists, so nothing ran. Request the run for a current member.",
+  },
+  langy_unattended_actor_deactivated: {
+    title: "Account is deactivated",
+    describe: () =>
+      "The person this run acts as has a deactivated account, so nothing ran. Reactivate the account, or request the run for another member.",
+  },
+  langy_unattended_no_langy_access: {
+    title: "No Langy access",
+    describe: () =>
+      "The person this run acts as cannot use Langy in this project, so nothing ran. A workspace admin can grant that access.",
+  },
   langy_api_request_invalid: {
     title: "Invalid request body",
     describe: () =>
