@@ -100,6 +100,7 @@ function observeActiveLink(list: HTMLElement, resize: ResizeObserver, previous: 
   if (active === previous) return active;
   if (previous) resize.unobserve(previous);
   if (active) resize.observe(active);
+  if (active) revealInStrip({ list, active });
   return active;
 }
 
@@ -123,19 +124,72 @@ function positionMarker({
 
   const item = active.getBoundingClientRect();
   const container = list.getBoundingClientRect();
-  const inset = Number.parseFloat(getComputedStyle(list).paddingLeft) || 0;
-  const x = item.left - container.left - inset;
-  const y = item.top - container.top + 8;
-
+  const strip = isStrip();
   if (!positioned) marker.style.transition = "none";
-  marker.style.transform = `translate3d(${x}px, ${y}px, 0)`;
-  marker.style.height = `${Math.max(0, item.height - 16)}px`;
+  if (strip) placeUnderEntry({ marker, item, container });
+  else placeBesideEntry({ marker, item, container, list });
   marker.style.visibility = item.height > 0 ? "visible" : "hidden";
 
   // Establish the initial position before enabling motion between later selections.
   if (!positioned) marker.getBoundingClientRect();
   marker.style.transition = reducedMotion ? "none" : TRANSITION;
   return true;
+}
+
+/** Below the `md` breakpoint the rail lays its entries out as a sideways strip. */
+const STRIP_QUERY = "(max-width: 47.99rem)";
+
+function isStrip() {
+  return typeof window.matchMedia === "function" && window.matchMedia(STRIP_QUERY).matches;
+}
+
+/** A rail: a bar down the entry's left edge, flush with the rail. */
+function placeBesideEntry({
+  marker,
+  item,
+  container,
+  list,
+}: {
+  marker: HTMLElement;
+  item: DOMRect;
+  container: DOMRect;
+  list: HTMLElement;
+}) {
+  const inset = Number.parseFloat(getComputedStyle(list).paddingLeft) || 0;
+  const x = item.left - container.left - inset;
+  const y = item.top - container.top + 8;
+  marker.style.transform = `translate3d(${x}px, ${y}px, 0)`;
+  marker.style.width = "";
+  marker.style.borderRadius = "";
+  marker.style.height = `${Math.max(0, item.height - 16)}px`;
+}
+
+/** A phone's strip: a bar under the entry, so it never sits on the strip's clipped edge. */
+function placeUnderEntry({
+  marker,
+  item,
+  container,
+}: {
+  marker: HTMLElement;
+  item: DOMRect;
+  container: DOMRect;
+}) {
+  const x = item.left - container.left + 8;
+  const y = item.bottom - container.top - 3;
+  marker.style.transform = `translate3d(${x}px, ${y}px, 0)`;
+  marker.style.width = `${Math.max(0, item.width - 16)}px`;
+  marker.style.borderRadius = "2px 2px 0 0";
+  marker.style.height = "3px";
+}
+
+/** Scrolls the strip, not the page, so the current entry is in view when the page opens. */
+function revealInStrip({ list, active }: { list: HTMLElement; active: Element }) {
+  const scroller = list.parentElement;
+  if (!scroller || !isStrip()) return;
+  const item = active.getBoundingClientRect();
+  const view = scroller.getBoundingClientRect();
+  if (item.left >= view.left && item.right <= view.right) return;
+  scroller.scrollLeft += item.left - view.left - (view.width - item.width) / 2;
 }
 
 function navigationDestination(event: MouseEvent): string | null {

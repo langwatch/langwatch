@@ -9,6 +9,7 @@ import type { MouseEvent, ReactNode } from "react";
 
 import { isBrowserClick } from "./back-link.tsx";
 import { PageLayout } from "./page-layout.tsx";
+import { ScrollEdgeFade, useScrollEdges } from "./scroll-fade.tsx";
 import { useSectionNavigationIndicator } from "./use-section-navigation-indicator.ts";
 
 /** How wide the rail is, open and folded to its icons. */
@@ -173,6 +174,7 @@ export function SectionNavigationRail({
   );
   const railStyle = useRecipe({ key: "sectionNavigationRail" });
   const width = collapsed ? SECTION_RAIL_COLLAPSED_WIDTH : SECTION_RAIL_WIDTH;
+  const strip = useScrollEdges();
   return (
     <Box
       as="nav"
@@ -206,54 +208,59 @@ export function SectionNavigationRail({
       >
         {label}
       </Text>
-      <Box flex={1} minHeight={0} overflow="auto">
-        <Stack
-          data-testid="section-navigation-list"
-          position="relative"
-          direction={{ base: "row", md: "column" }}
-          alignItems="stretch"
-          gap={{ base: 1, md: 4 }}
-          paddingX={3}
-          paddingTop={2}
-          paddingBottom={2}
-          minWidth="full"
-          width={{ base: "max-content", md: "full" }}
-        >
-          <SectionNavigationIndicator />
-          {runs.map((run, index) => (
-            <Stack
-              key={run.label ?? index}
-              direction={{ base: "row", md: "column" }}
-              alignItems="stretch"
-              gap={0.5}
-            >
-              {run.label && !collapsed ? (
-                <Text
-                  display={{ base: "none", md: "block" }}
-                  fontSize="11px"
-                  lineHeight="16px"
-                  fontWeight="medium"
-                  color="nav.fgMuted"
-                  paddingX={2}
-                  paddingBottom={1}
-                >
-                  {run.label}
-                </Text>
-              ) : null}
-              {run.links.map((link) => (
-                <SectionNavigationItem
-                  key={link.href}
-                  link={link}
-                  activeHref={activeHref}
-                  collapsed={collapsed}
-                  onNavigate={onNavigate}
-                />
-              ))}
-              {collapsed ? null : run.extra}
-              {collapsed || !run.add ? null : <SectionNavigationAddRow add={run.add} />}
-            </Stack>
-          ))}
-        </Stack>
+      {/* On a phone the rail is a strip that scrolls sideways; the fades mark hidden entries. */}
+      <Box position="relative" flex={1} minHeight={0} display="flex" flexDirection="column">
+        <Box ref={strip.ref} flex={1} minHeight={0} overflow="auto">
+          <Stack
+            data-testid="section-navigation-list"
+            position="relative"
+            direction={{ base: "row", md: "column" }}
+            alignItems="stretch"
+            gap={{ base: 1, md: 4 }}
+            paddingX={3}
+            paddingTop={2}
+            paddingBottom={2}
+            minWidth="full"
+            width={{ base: "max-content", md: "full" }}
+          >
+            <SectionNavigationIndicator />
+            {runs.map((run, index) => (
+              <Stack
+                key={run.label ?? index}
+                direction={{ base: "row", md: "column" }}
+                alignItems="stretch"
+                gap={0.5}
+              >
+                {run.label && !collapsed ? (
+                  <Text
+                    display={{ base: "none", md: "block" }}
+                    fontSize="11px"
+                    lineHeight="16px"
+                    fontWeight="medium"
+                    color="nav.fgMuted"
+                    paddingX={2}
+                    paddingBottom={1}
+                  >
+                    {run.label}
+                  </Text>
+                ) : null}
+                {run.links.map((link) => (
+                  <SectionNavigationItem
+                    key={link.href}
+                    link={link}
+                    activeHref={activeHref}
+                    collapsed={collapsed}
+                    onNavigate={onNavigate}
+                  />
+                ))}
+                {collapsed ? null : run.extra}
+                {collapsed || !run.add ? null : <SectionNavigationAddRow add={run.add} />}
+              </Stack>
+            ))}
+          </Stack>
+        </Box>
+        <ScrollEdgeFade edge="start" visible={strip.start} color="bg.surface" />
+        <ScrollEdgeFade edge="end" visible={strip.end} color="bg.surface" />
       </Box>
       {footer ? <Box flexShrink={0}>{footer}</Box> : null}
     </Box>
@@ -305,6 +312,7 @@ export function SectionNavigationHeader({ children }: { children: ReactNode }) {
       paddingY={0}
       height={SECTION_HEADER_HEIGHT}
       minHeight={SECTION_HEADER_HEIGHT}
+      flexWrap="nowrap"
       css={{
         // The hairline stops short of the rail's line by the gap that line leaves under
         // the header (56px less 48px), so the two meet at the corner with equal space.
@@ -340,6 +348,20 @@ export function SectionNavigationHeader({ children }: { children: ReactNode }) {
     >
       {children}
     </PageLayout.Header>
+  );
+}
+
+/** The sticky header row; narrower than its controls, it scrolls sideways behind edge fades. */
+function SectionHeaderStrip({ children }: { children: ReactNode }) {
+  const strip = useScrollEdges();
+  return (
+    <Box position="sticky" top={0} zIndex={10}>
+      <Box ref={strip.ref} overflowX="auto" overscrollBehaviorX="contain">
+        {children}
+      </Box>
+      <ScrollEdgeFade edge="start" visible={strip.start} color="bg.surface" />
+      <ScrollEdgeFade edge="end" visible={strip.end} color="bg.surface" />
+    </Box>
   );
 }
 
@@ -380,14 +402,14 @@ export function SectionNavigationFrame({
         overflowY="auto"
         overflowX="hidden"
       >
-        <Box position="sticky" top={0} zIndex={10} overflowX="auto" overscrollBehaviorX="contain">
+        <SectionHeaderStrip>
           {header ?? (
             <SectionNavigationHeader>
               <PageLayout.Heading>{pageTitle ?? "Overview"}</PageLayout.Heading>
               {headerActions ? <Box marginLeft="auto">{headerActions}</Box> : null}
             </SectionNavigationHeader>
           )}
-        </Box>
+        </SectionHeaderStrip>
         <Box
           data-testid="section-navigation-content"
           paddingX={6}
