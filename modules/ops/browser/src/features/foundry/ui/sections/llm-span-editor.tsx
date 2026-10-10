@@ -1,4 +1,12 @@
-import { Box, Button, Flex, Input, Text, Textarea } from "@langwatch/design-system/primitives";
+import {
+  Box,
+  Button,
+  Flex,
+  Input,
+  NativeSelect,
+  Text,
+  Textarea,
+} from "@langwatch/design-system/primitives";
 import { Plus, Trash2 } from "lucide-react";
 
 import { useTraceStore } from "../../behavior/trace.store.ts";
@@ -85,29 +93,23 @@ export function LLMSpanEditor({ span }: { span: SpanConfig }) {
             bg="bg.subtle"
             p={2}
           >
-            <select
-              value={msg.role}
-              onChange={(e) =>
-                updateMessage(i, {
-                  role: e.target.value as ChatMessage["role"],
-                })
-              }
-              style={{
-                width: "90px",
-                flexShrink: 0,
-                background: "var(--chakra-colors-bg-subtle)",
-                color: "var(--chakra-colors-fg-default)",
-                border: "1px solid var(--chakra-colors-border)",
-                borderRadius: "4px",
-                padding: "2px 6px",
-                fontSize: "12px",
-              }}
-            >
-              <option value="system">system</option>
-              <option value="user">user</option>
-              <option value="assistant">assistant</option>
-              <option value="tool">tool</option>
-            </select>
+            <NativeSelect.Root width="28" flexShrink={0} size="sm">
+              <NativeSelect.Field
+                aria-label={`Message ${i + 1} role`}
+                value={msg.role}
+                onChange={(e) =>
+                  updateMessage(i, {
+                    role: e.target.value as ChatMessage["role"],
+                  })
+                }
+              >
+                <option value="system">system</option>
+                <option value="user">user</option>
+                <option value="assistant">assistant</option>
+                <option value="tool">tool</option>
+              </NativeSelect.Field>
+              <NativeSelect.Indicator />
+            </NativeSelect.Root>
             <Textarea
               flex={1}
               size="sm"
