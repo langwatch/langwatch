@@ -188,6 +188,7 @@ async function mountWebhook(): Promise<MountableRestApp> {
       trace: traces,
       secret: peer("secret"),
       "api-key": peer("api key"),
+      licensing: peer("licensing"),
     })
     .boot();
   // The runtime hands out the API reference; it forwards every method of the installed
