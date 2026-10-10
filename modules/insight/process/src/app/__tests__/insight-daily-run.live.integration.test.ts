@@ -2,12 +2,16 @@
  * @vitest-environment node
  * One daily run on a running stack: the operator task asks for it, the stack's own worker
  * carries it out with a real Langy turn, and this test reads how it ended from Postgres.
- * Skipped unless `INSIGHT_LIVE_RUN_PROJECT_ID` names a project on a stack that is up.
+ * Skipped unless every variable in `NEEDED` below is set. Never reads the workspace `.env`.
  * @see modules/insight/specs/insight-daily-run.feature
  */
 
 import { spawnSync } from "node:child_process";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { parseEnv } from "node:util";
 
 import {
   PrismaConfigService,
@@ -23,47 +27,97 @@ import { dailyScheduleId } from "../../rules/insight-daily-run.rules.ts";
 /*
  * NEEDS one stack that is up (ui, api, worker): `release_insights` and Langy on for the
  * project, a member with analytics:view, a stored board with a custom chart widget, and a
- * model Langy can reach. INSIGHT_LIVE_DATABASE_URL is that stack's Postgres.
+ * model Langy can reach.
  */
-const projectId = process.env.INSIGHT_LIVE_RUN_PROJECT_ID ?? "";
-const userId = process.env.INSIGHT_LIVE_RUN_USER_ID ?? "";
-const boardId = process.env.INSIGHT_LIVE_RUN_BOARD_ID ?? "";
-const databaseUrl = process.env.INSIGHT_LIVE_DATABASE_URL ?? "";
+const NEEDED = {
+  /** A dotenv file: that stack's whole environment, its DATABASE_URL included. */
+  INSIGHT_LIVE_ENV_FILE: process.env.INSIGHT_LIVE_ENV_FILE ?? "",
+  INSIGHT_LIVE_RUN_PROJECT_ID: process.env.INSIGHT_LIVE_RUN_PROJECT_ID ?? "",
+  INSIGHT_LIVE_RUN_USER_ID: process.env.INSIGHT_LIVE_RUN_USER_ID ?? "",
+  INSIGHT_LIVE_RUN_BOARD_ID: process.env.INSIGHT_LIVE_RUN_BOARD_ID ?? "",
+};
+const envFile = path.resolve(NEEDED.INSIGHT_LIVE_ENV_FILE);
+const projectId = NEEDED.INSIGHT_LIVE_RUN_PROJECT_ID;
+const userId = NEEDED.INSIGHT_LIVE_RUN_USER_ID;
+const boardId = NEEDED.INSIGHT_LIVE_RUN_BOARD_ID;
+const unset = Object.entries(NEEDED).flatMap(([name, value]) => (value === "" ? [name] : []));
+const isLive = unset.length === 0;
 /** Set with a real model: the stand-in model writes no findings block, so it files nothing. */
 const isFilingExpected = process.env.INSIGHT_LIVE_EXPECT_FILED === "1";
-const isLive = [projectId, userId, boardId, databaseUrl].every((value) => value.length > 0);
 
 /** A run waits ten minutes for Langy at most; the worker then records it. */
 const RUN_SETTLES_WITHIN_MS = 12 * 60_000;
-const REPOSITORY_ROOT = fileURLToPath(new URL("../../../../../../", import.meta.url));
-const TASK = ["--filter", "@langwatch/tasks", "task", "insight-daily-run-request"];
+const TASKS_ENTRY = fileURLToPath(
+  new URL("../../../../../../apps/tasks/src/main.ts", import.meta.url),
+);
+
+/** The stack's Postgres, from the file the caller named: the task and these reads share it. */
+function stackDatabaseUrl(): string {
+  const databaseUrl = parseEnv(readFileSync(envFile, "utf8")).DATABASE_URL;
+  if (!databaseUrl) throw new Error("INSIGHT_LIVE_ENV_FILE holds no DATABASE_URL");
+  return databaseUrl;
+}
+
+/**
+ * The operator task as `pnpm task` starts it, but its environment is the caller's file and
+ * nothing inherited. It runs in an empty directory, because the secrets chain falls back on
+ * the `.env` of the directory it runs in.
+ */
+function requestRun(): void {
+  const emptyDirectory = mkdtempSync(path.join(tmpdir(), "insight-live-run-"));
+  try {
+    const task = spawnSync(
+      process.execPath,
+      [
+        "--experimental-transform-types",
+        `--env-file=${envFile}`,
+        TASKS_ENTRY,
+        "insight-daily-run-request",
+        projectId,
+        userId,
+        "dashboard",
+        boardId,
+      ],
+      // PATH and HOME name no stack; every other variable comes from the file.
+      {
+        cwd: emptyDirectory,
+        env: { PATH: process.env.PATH, HOME: process.env.HOME },
+        encoding: "utf8",
+      },
+    );
+    if (task.status !== 0) throw new Error(`the task failed: ${task.stderr}`);
+  } finally {
+    rmSync(emptyDirectory, { recursive: true });
+  }
+}
 
 type RunRow = Prisma.InsightDailyScheduleProjectionGetPayload<object>;
 type InsightRow = Prisma.InsightProjectionGetPayload<object>;
 
-describe.skipIf(!isLive)("given a stack that is up, with a member and a board with widgets", () => {
+/** Why a run without a named stack is skipped, on every skipped line of the report. */
+const skipped = isLive ? "" : ` (skipped: set ${unset.join(", ")})`;
+
+describe.skipIf(!isLive)(`given a stack that is up, with a member and a board${skipped}`, () => {
   const connection = isLive
     ? PrismaConnectionService.create({
         guard: PrismaTenancyGuardService.create(),
         logger: createTestLogger().logger,
-      }).connect(PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }))
+      }).connect(
+        PrismaConfigService.create().resolve({ databaseUrl: stackDatabaseUrl(), log: ["error"] }),
+      )
     : null;
   let row: RunRow;
   let filed: InsightRow[];
 
   beforeAll(async () => {
-    if (!connection) throw new Error("INSIGHT_LIVE_DATABASE_URL is required here");
+    if (!connection) throw new Error("INSIGHT_LIVE_ENV_FILE is required here");
     const database = connection.client;
     const id = dailyScheduleId({ projectId, userId, board: { kind: "dashboard", id: boardId } });
     const read = () =>
       database.insightDailyScheduleProjection.findFirst({ where: { id, projectId } });
     const before = await read();
 
-    const task = spawnSync("pnpm", [...TASK, projectId, userId, "dashboard", boardId], {
-      cwd: REPOSITORY_ROOT,
-      encoding: "utf8",
-    });
-    if (task.status !== 0) throw new Error(`the task failed: ${task.stderr}`);
+    requestRun();
 
     row = await vi.waitFor(
       async () => {
