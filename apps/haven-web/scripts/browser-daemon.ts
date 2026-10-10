@@ -201,7 +201,7 @@ function sessionFile({ lane, as }: { lane: string; as: string }) {
 /** Signs the lane in with its own session, so no lane signs another out; waits out one reload. */
 async function signIn({ lane, as, timeout }: { lane: string; as: string; timeout: number }) {
   const file = sessionFile({ lane, as });
-  const args = ["auth", as, "--out", file, "--stack", STACK, "--agent"];
+  const args = ["browser", "login", "--as", as, "--out", file, "--stack", STACK, "--agent"];
   try {
     await runHaven(HAVEN, args);
   } catch (error) {
