@@ -18,6 +18,7 @@ import {
   type TeamUserRole,
   type User,
   type OrganizationAdmission,
+  auditImpersonationMetadataSchema,
 } from "@langwatch/organization-contract";
 import { nowInstant, Temporal, type Instant } from "@langwatch/time";
 
@@ -792,6 +793,11 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
     const isGateway = row.action.startsWith("gateway.");
     const user = row.userId ? this.memory.users.get(row.userId) : undefined;
     const project = row.projectId ? this.memory.projects.get(row.projectId) : undefined;
+    const actorUserId =
+      row.actorUserId ??
+      auditImpersonationMetadataSchema.safeParse(row.metadata).data?.impersonatorId ??
+      null;
+    const actor = actorUserId ? this.memory.users.get(actorUserId) : undefined;
     return {
       id: row.id,
       createdAt: row.createdAt,
@@ -811,6 +817,8 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
       targetId: row.targetId,
       before: row.before,
       after: row.after,
+      actorUserId,
+      actorUser: actor ? { id: actor.id, name: actor.name, email: actor.email } : null,
     };
   }
 

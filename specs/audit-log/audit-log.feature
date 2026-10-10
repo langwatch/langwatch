@@ -111,10 +111,9 @@ Feature: Unified Audit Log
       | 09:30       | gateway.virtual_key.created  | virtual_key  | gateway  |
       | 10:00       | gateway.budget.updated       | budget       | gateway  |
     When alice visits `/settings/audit-log`
-    Then the table renders all 3 rows in DESC order by created_at
-    And each gateway row carries a small AI Gateway mark, and a platform row carries none
-    And the gateway rows show a Target column with the targetKind + truncated targetId
-    And the platform row leaves the Target cell blank
+    Then the feed lists all 3 entries newest first
+    And each gateway entry carries a small AI Gateway mark, and a platform entry carries none
+    And each entry reads as one sentence naming its target and project, with the recorded action beside it
 
   @integration @unimplemented
   Scenario: Filter by target kind narrows to gateway events only
@@ -158,7 +157,7 @@ Feature: Unified Audit Log
   @integration
   Scenario: A row written by a system actor says so rather than naming nobody
     Given a row whose userId is null, written by a background job
-    Then the Actor column reads "System" rather than rendering empty or a lookup failure
+    Then the entry names "System" as its actor rather than nobody or a lookup failure
     And a row whose userId names a user that no longer resolves reads "User not found"
 
   @unit
@@ -166,32 +165,43 @@ Feature: Unified Audit Log
     Given rows written by a member, a background job, an unidentified caller and a user since deleted
     Then each reads with its own icon and name: the member's avatar and name with the email on hover,
       "System", "Unidentified caller" and "User not found"
-    # API key, SCIM, SSO, Langy and impersonation need the read to carry the credential kind and
-    # actorUserId, which it does not yet.
+    # API key, SCIM, SSO and Langy need a stored credential kind, which waits on a ruling.
+
+  @integration
+  Scenario: An impersonated entry names the operator as well as the person
+    Given a row whose actorUserId (or metadata.impersonatorId) names an operator other than its user
+    Then the entry reads "<operator> as <user>", marked as an impersonation
 
   @unit
   Scenario: An audit row reads as a sentence, with the recorded action kept beside it
     Given a row recorded as "authz.grants.attach"
-    Then the row reads "Attached grant", with the recorded action small and muted beside it
+    Then the entry reads "attached grant" after its actor, with the recorded action small and muted beside it
+
+  @integration
+  Scenario: The feed reads by day
+    Then entries sit under "Today", "Yesterday" or their date ("Oct 8"), newest first
+
+  @integration
+  Scenario: Every entry says where it came from
+    Then every entry's meta line shows its time, its address and the browser and system its user agent
+      names ("Chrome on macOS"), lined up in columns down the page
+
+  @integration
+  Scenario: A change reads inline as its fields, old to new
+    Given a row carrying before and after states
+    Then the entry lists the first changed fields as "field: old → new" and counts the rest
+    And "View diff" opens the whole before and after side by side, with the raw entry a copy away
+
+  @integration
+  Scenario: A failed attempt reads as a failure
+    Given a row carrying an error
+    Then the entry is marked failed and carries the error on its own red line
 
   @unit
   Scenario: A burst of identical events by one actor reads as one row
     Given three consecutive rows with the same actor, action, target, project and outcome
-    Then they read as one row marked "×3"
+    Then they read as one entry marked "×3", which opens onto each repeat's time and address
     And a failed attempt is never folded into a successful one
-
-  @unit
-  Scenario: Columns no row on the page fills are not shown
-    Given no row on the page names a target or a project
-    Then the table has no Target or Project column
-    And the address, user agent and error move into the row's details
-
-  @integration
-  Scenario: Opening a row shows everything the entry stores
-    When alice opens a row
-    Then she sees its exact time, actor, action, target, project, address, user agent, error and id
-    And the before/after diff side by side when the entry carries one, its arguments otherwise
-    And the raw entry as JSON she can copy
 
   @integration
   Scenario: An empty audit history says so
