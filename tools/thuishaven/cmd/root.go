@@ -97,6 +97,13 @@ func Root(ctx context.Context, logger *zap.Logger, version string, args []string
 	if len(args) > 0 {
 		name = args[0]
 	}
+	// The slot wraps every check start; it needs no worktree, so no git and no wiring.
+	if isSlotCommand(args) {
+		if _, _, err := resolveTarget(name, stackFlag, "", isAgent); err != nil {
+			return err
+		}
+		return (deps{isAgent: isAgent}).dispatch(ctx, args[0], args[1:])
+	}
 	cwd, _ := os.Getwd()
 	worktree, target, err := resolveTarget(name, stackFlag, gitTopLevel(cwd), isAgent)
 	if err != nil {
@@ -109,6 +116,12 @@ func Root(ctx context.Context, logger *zap.Logger, version string, args []string
 		return printBareHaven(d)
 	}
 	return d.dispatch(ctx, args[0], args[1:])
+}
+
+// isSlotCommand reports `haven machine slot …`, the one machine-wide command on
+// the start path of every check, which runs against no stack.
+func isSlotCommand(args []string) bool {
+	return len(args) > 1 && args[0] == "machine" && args[1] == "slot"
 }
 
 // runMetaCommand answers the subcommands that need no wiring at all, so `haven
@@ -288,11 +301,10 @@ func wire(logger *zap.Logger, isAgent bool, worktree, target string) deps {
 				Start:   orch.StartWorktreeStack,
 				Down:    orch.DownStack,
 				Destroy: orch.DestroyStack,
-				// Add one service to a live stack; reset a stack's databases.
-				StartService:   orch.StartStackService,
-				ResetDatabases: orch.ResetStackDatabases,
-				Seed:           orch.SeedStack,
-				SeedReport:     orch.SeedReport,
+				// Add one service to a live stack.
+				StartService: orch.StartStackService,
+				Seed:         orch.SeedStack,
+				SeedReport:   orch.SeedReport,
 				// The up's hand-over: the daemon is the one place keepers start.
 				StartKeeper: orch.StartKeeper,
 			},
@@ -1069,9 +1081,36 @@ func resolveKnobSource(key string, layers knobLayers) (string, string, bool) {
 func dotenvKnobs() map[string]string {
 	dotenvOnce.Do(func() {
 		cwd, _ := os.Getwd()
-		dotenvVars = domain.LoadDotenv(gitTopLevel(cwd))
+		dotenvVars = domain.LoadDotenv(dotenvRoot(cwd))
 	})
 	return dotenvVars
+}
+
+// dotenvRoot finds the workspace root .env lives in without spawning git: the
+// nearest ancestor holding a .git entry (a linked worktree's is a file). Under
+// GIT_DIR or GIT_WORK_TREE, or outside any checkout, git itself answers.
+func dotenvRoot(dir string) string {
+	if os.Getenv("GIT_DIR") == "" && os.Getenv("GIT_WORK_TREE") == "" {
+		if root, ok := nearestGitAncestor(dir); ok {
+			return root
+		}
+	}
+	return gitTopLevel(dir)
+}
+
+// nearestGitAncestor walks up from dir to the first directory with a .git entry.
+func nearestGitAncestor(dir string) (string, bool) {
+	for dir != "" {
+		if _, err := os.Lstat(filepath.Join(dir, ".git")); err == nil {
+			return dir, true
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return "", false
+		}
+		dir = parent
+	}
+	return "", false
 }
 
 var (

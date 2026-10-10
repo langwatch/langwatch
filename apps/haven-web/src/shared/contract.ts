@@ -84,10 +84,7 @@ export const stackHomeSchema = z.object({
     canStart: z.boolean(),
     startDir: z.string(),
     canStartService: z.boolean(),
-    canResetDatabases: z.boolean(),
   }),
-  /** The upgrade gate's refusal while it holds the api, "" otherwise. */
-  belowFloor: z.string(),
   /** The seed console: what `haven db seed` takes, its last status line and log tail. */
   seed: z.object({
     canSeed: z.boolean(),
