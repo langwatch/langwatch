@@ -291,6 +291,10 @@
       "types": "./dist/json-value-text.d.ts",
       "default": "./src/json-value-text.ts"
     },
+    "./list-page": {
+      "types": "./dist/components/layout/list-page.d.ts",
+      "default": "./src/components/layout/list-page.tsx"
+    },
     "./list-table": {
       "types": "./dist/components/layout/list-table.d.ts",
       "default": "./src/components/layout/list-table.tsx"

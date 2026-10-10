@@ -172,7 +172,7 @@ describe("the admin single sign-on list", () => {
       };
       rerenderWithOpsHost(<SsoConnectionsView />);
       await waitFor(() => {
-        expect(screen.getByText(/of 60/)).toBeTruthy();
+        expect(screen.getByText(/60 single sign-on · showing/)).toBeTruthy();
       });
 
       // Empty state: its own row, in the table, saying what would change it.
