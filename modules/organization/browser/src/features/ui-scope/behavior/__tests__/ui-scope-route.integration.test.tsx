@@ -133,6 +133,13 @@ describe("given a visitor with no session opening an invitation link", () => {
   });
 });
 
+describe("given a recipient with no session opening an unsubscribe link", () => {
+  /** @scenario "A signed-out recipient reaches the page, not the sign-in screen" */
+  it("renders the landing instead of sending the recipient to sign in", () => {
+    expect(isUiPublicRoute("/unsubscribe")).toBe(true);
+  });
+});
+
 describe("given the addresses that render without a session", () => {
   it("names the same ones the application does", () => {
     expect(isUiPublicRoute("/share/anything")).toBe(true);
