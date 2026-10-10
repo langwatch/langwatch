@@ -2,10 +2,10 @@ import { createHash } from "node:crypto";
 
 import {
   emailActionParamsSchema,
-  renderTriggerEmail,
   type TemplateContext,
   type TriggerSummary,
 } from "@langwatch/automation-contract";
+import { renderTriggerEmail } from "@langwatch/automation-contract/templating";
 import { DispatchError } from "@langwatch/eventing";
 import type { TraceRecord } from "@langwatch/trace-contract";
 

@@ -14,6 +14,7 @@ const { state } = vi.hoisted(() => ({
     provenance: {} as Record<string, { source: string }>,
     membershipQueried: [] as string[],
     departments: [] as Record<string, unknown>[],
+    readError: null as unknown,
   },
 }));
 
@@ -30,7 +31,10 @@ vi.mock("../../../behavior/scim-api.ts", () => {
     scimApi: {
       scimReconciliation: {
         getAll: {
-          useQuery: () => read(() => ({ connections: state.connections, recentChanges: [] })),
+          useQuery: () =>
+            state.readError === null
+              ? read(() => ({ connections: state.connections, recentChanges: [] }))
+              : { data: void 0, isLoading: false, isError: true, error: state.readError },
         },
       },
     },
@@ -79,6 +83,7 @@ beforeEach(() => {
   };
   state.membershipQueried = [];
   state.departments = [];
+  state.readError = null;
 });
 
 describe("given a directory that manages three of four members", () => {
@@ -139,5 +144,16 @@ describe("given governance is on and the organization has departments", () => {
 
     renderWithScimHost(<DirectoryOverviewCard organizationId="org-1" canReadMembership />);
     expect(screen.queryByTestId("directory-card-department-chip")).toBeNull();
+  });
+});
+
+describe("given a plan that does not include directory sync", () => {
+  it("says it is an Enterprise feature rather than that the read failed", () => {
+    state.readError = { data: { error: { code: "enterprise_plan_required" } } };
+
+    renderWithScimHost(<DirectoryOverviewCard organizationId="org-1" canReadMembership />);
+
+    expect(screen.getByTestId("directory-card-enterprise-gate")).toBeInTheDocument();
+    expect(screen.queryByTestId("directory-card-failure")).toBeNull();
   });
 });

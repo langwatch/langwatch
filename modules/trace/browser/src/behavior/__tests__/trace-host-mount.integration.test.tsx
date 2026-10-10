@@ -59,7 +59,7 @@ vi.mock("@langwatch/browser-host/capabilities", async (importOriginal) => {
       session,
       navigation: { navigate: vi.fn(), replace: vi.fn() },
       route: { reading: () => ({ params: {}, query: {} }), setQuery: vi.fn() },
-      feedback: { succeeded: vi.fn(), failed: vi.fn() },
+      feedback: { succeeded: vi.fn(), warned: vi.fn(), informed: vi.fn(), failed: vi.fn() },
     }),
   };
 });

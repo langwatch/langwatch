@@ -4,6 +4,7 @@
  */
 import type { AgentWithFields } from "@langwatch/agent-contract";
 import type { WireOf } from "@langwatch/api/web";
+import { useDrawer } from "@langwatch/browser-host/drawer";
 import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
 import { Link } from "@langwatch/browser-host/link";
 import { CopyButton } from "@langwatch/design-system/copy-button";
@@ -18,6 +19,7 @@ import { useState } from "react";
 import { SetupWithAgentButton } from "../../behavior/lent-setup-with-agent-button.tsx";
 import { useConnectedAgentDetail } from "../../behavior/use-connected-agent-detail.ts";
 import { useCreateWorkflowAgent } from "../../behavior/use-create-workflow-agent.ts";
+import { useRoutedAgentList } from "../../behavior/use-routed-agent-list.ts";
 import { useRoutedCodeAgent } from "../../behavior/use-routed-code-agent.ts";
 import { useRoutedDrawer } from "../../behavior/use-routed-drawer.ts";
 import { useRoutedHttpAgent } from "../../behavior/use-routed-http-agent.ts";
@@ -31,6 +33,7 @@ import {
 } from "../elements/workflow/code/workflow-code-editor.tsx";
 import { AgentCodeEditorDrawer } from "./agent-code-editor-drawer.tsx";
 import { AgentHttpEditorDrawer } from "./agent-http-editor-drawer.tsx";
+import { AgentListDrawer } from "./agent-list-drawer.tsx";
 import { AgentTestPanel } from "./agent-test-panel.tsx";
 import { AgentWorkflowEditorDrawer } from "./agent-workflow-editor-drawer.tsx";
 import { AgentWorkflowTargetEditorDrawer } from "./agent-workflow-target-editor-drawer.tsx";
@@ -50,6 +53,35 @@ export type AgentEditorDrawerProps = {
 export type WorkflowSelectorDrawerProps = {
   onSave?: (agent: WireOf<AgentWithFields>) => void;
 };
+
+/** Flow callbacks (`onSelect`, `onCreateNew`) arrive as props, merged by the drawer host. */
+export function RoutedAgentListDrawer({
+  onSelect,
+  onCreateNew,
+}: {
+  onSelect?: (agent: WireOf<AgentWithFields>) => void;
+  onCreateNew?: () => void;
+}) {
+  const { close } = useRoutedDrawer();
+  const { openDrawer } = useDrawer();
+  const list = useRoutedAgentList();
+  return (
+    <AgentListDrawer
+      open
+      items={list.items}
+      isLoading={list.isLoading}
+      {...(list.errorMessage ? { errorMessage: list.errorMessage } : {})}
+      onClose={close}
+      onSelect={(agent) => {
+        onSelect?.(agent);
+        close();
+      }}
+      onEdit={list.edit}
+      onCreateNew={onCreateNew ?? (() => openDrawer("agentTypeSelector"))}
+      {...list.archive}
+    />
+  );
+}
 
 export function RoutedConnectedAgentDrawer({ agentId }: { agentId?: string }) {
   const { close } = useRoutedDrawer();

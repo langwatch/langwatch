@@ -8,7 +8,7 @@ import {
 } from "@langwatch/observability/metrics/testing";
 import { parseOtlpTraces } from "@langwatch/otlp";
 import type { OtlpSpan, PIIRedactionLevel, RecordSpanCommandData } from "@langwatch/trace-contract";
-import { SPAN_MAX_PAST_MS } from "@langwatch/trace-contract";
+import { SPAN_BACKFILL_MAX_PAST_DAYS, SPAN_MAX_PAST_MS } from "@langwatch/trace-contract";
 import type { IExportTraceServiceRequest } from "@opentelemetry/otlp-transformer";
 import * as root from "@opentelemetry/otlp-transformer/build/src/generated/root.js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -278,6 +278,42 @@ describe("TraceIngestionService.handleOtlpTraceRequest", () => {
       await handle(service, [span({ startTimeUnixNano: String(justInside * 1_000_000) })]);
 
       expect(commands.record).toHaveBeenCalledOnce();
+    });
+  });
+
+  describe("given an in-process backfill that reaches further back", () => {
+    /** @scenario "An in-process backfill admits spans older than the door's 31 days" */
+    it("admits a span within its reach and still drops one past it", async () => {
+      const { commands, service } = fixture();
+      const ninetyDaysAgo = Date.now() - 90 * 24 * 60 * 60 * 1000;
+      const backfill = (days: number) =>
+        service.handleOtlpTraceBackfill({
+          tenantId: "project-1",
+          traceRequest: request([span({ startTimeUnixNano: String(ninetyDaysAgo * 1_000_000) })]),
+          piiRedactionLevel,
+          backfillMaxPastDays: days,
+        });
+
+      expect((await backfill(60)).rejectedSpans).toBe(1);
+      expect(commands.record).not.toHaveBeenCalled();
+      await backfill(120);
+      expect(commands.record).toHaveBeenCalledOnce();
+    });
+
+    /** @scenario "An in-process backfill admits spans older than the door's 31 days" */
+    it("never reaches past the backfill ceiling", async () => {
+      const { commands, service } = fixture();
+      const tooOld = Date.now() - (SPAN_BACKFILL_MAX_PAST_DAYS + 2) * 24 * 60 * 60 * 1000;
+
+      const result = await service.handleOtlpTraceBackfill({
+        tenantId: "project-1",
+        traceRequest: request([span({ startTimeUnixNano: String(tooOld * 1_000_000) })]),
+        piiRedactionLevel,
+        backfillMaxPastDays: 10_000,
+      });
+
+      expect(result.rejectedSpans).toBe(1);
+      expect(commands.record).not.toHaveBeenCalled();
     });
   });
 

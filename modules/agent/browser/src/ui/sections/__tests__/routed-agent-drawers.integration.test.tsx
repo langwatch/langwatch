@@ -38,6 +38,10 @@ vi.mock("../../../model/agent-management-host.ts", () => ({
     project: () => ({ id: "project_1", slug: "acme" }),
     navigate: (to: string) => calls.navigate.push(to),
     failed: vi.fn(),
+    succeeded: vi.fn(),
+    describeFailure: () => "failed",
+    agents: () => ({}),
+    openAgentEditor: vi.fn(),
   }),
 }));
 
@@ -142,6 +146,7 @@ afterAll(() => {
   vi.resetModules();
 });
 const {
+  RoutedAgentListDrawer,
   RoutedAgentCodeEditorDrawer,
   RoutedAgentHttpEditorDrawer,
   RoutedAgentWorkflowEditorDrawer,
@@ -427,5 +432,25 @@ describe("the workflow agent target editor opened by address", () => {
     render(<RoutedAgentWorkflowTargetEditorDrawer agentId="agent_wf" />, { wrapper });
 
     expect(screen.getByTestId("workflow-lookup-error")).toBeTruthy();
+  });
+});
+
+describe("the agent list drawer opened by address", () => {
+  /** @scenario "AgentListDrawer opened by address reads the project's agents itself" */
+  it("lists the project's agents and hands a pick to its flow callback", async () => {
+    listed.rows = [
+      {
+        id: "agent_1",
+        name: "Code Processor",
+        type: "code",
+        updatedAt: "2026-01-02T00:00:00.000Z",
+      },
+    ];
+    const onSelect = vi.fn();
+    render(<RoutedAgentListDrawer onSelect={onSelect} />, { wrapper });
+
+    await userEvent.setup().click(screen.getByText("Code Processor"));
+    expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({ id: "agent_1" }));
+    expect(drawer.closeDrawer).toHaveBeenCalled();
   });
 });

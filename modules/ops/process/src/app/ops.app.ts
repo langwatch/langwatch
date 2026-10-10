@@ -371,6 +371,9 @@ function actingIdentityOf(operator: OpsOperator | null): OpsOperator {
 /** How far back an event-log search reaches when the caller names no bound. */
 const EVENT_LOG_SEARCH_LOOKBACK_MS = 365 * 24 * 60 * 60 * 1000;
 
+/** Who asks for the pass `upgrade` requests when it finishes: the event's tenant. */
+const UPGRADE_PASS_REQUESTER = "platform:upgrade";
+
 /** What every audited row on the support inbox points at. */
 const BUG_REPORT_TARGET_KIND = "bugReport";
 
@@ -1661,6 +1664,11 @@ export class OpsModule implements OpsApi {
   /** The startup convergence's pass, for the tasks process's own task; not on {@link OpsApi}. */
   systemMigrationPass(): SystemMigrationPass {
     return ({ signal }) => this.#dependencies.systemMigrations.runConvergencePass({ signal });
+  }
+
+  /** The pass `upgrade` asks a worker for once it finishes; not on {@link OpsApi}. */
+  requestSystemMigrationPassAfterUpgrade(): Promise<void> {
+    return this.#dependencies.systemMigrations.startPass({ actorUserId: UPGRADE_PASS_REQUESTER });
   }
 
   /** One requested run of `ops_projection_replay`, on its worker; not on {@link OpsApi}. */

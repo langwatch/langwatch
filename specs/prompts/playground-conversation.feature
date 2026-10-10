@@ -136,6 +136,11 @@ Feature: Prompt Playground conversation
     Then the conversation shows the rate-limit copy from the error registry
     And the provider's own message is not shown
 
+  @unit
+  Scenario: A provider failure shows our rate-limit copy when the engine reports a bare 429
+    When the engine fails the run with a plain message and the provider's 429 status
+    Then the failure is classified as a rate limit, not as unknown
+
   @integration
   Scenario: A configuration failure is reported in the conversation
     Given the prompt references a model that is not configured

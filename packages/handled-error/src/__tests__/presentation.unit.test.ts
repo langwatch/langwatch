@@ -1112,3 +1112,21 @@ describe("UNKNOWN_ERROR_PRESENTATION", () => {
     );
   });
 });
+
+describe("model_provider_invalid", () => {
+  /** @scenario "A refused endpoint on save says why" */
+  it("names the base URL when the endpoint was refused", () => {
+    const { description } = explainHandledError(
+      shape({ code: "model_provider_invalid", meta: { reason: "endpoint_not_allowed" } }),
+    );
+
+    expect(description).toContain("base URL");
+  });
+
+  /** @scenario "A refused endpoint on save says why" */
+  it("still says something specific without a reason", () => {
+    const { title } = explainHandledError(shape({ code: "model_provider_invalid" }));
+
+    expect(title).toBe("That provider can't be saved");
+  });
+});

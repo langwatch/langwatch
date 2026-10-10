@@ -34,6 +34,7 @@ export interface ZodIssue {
   code: string;
   expected?: string;
   received?: string;
+  minimum?: number | bigint;
   path: string[];
   message: string;
 }
@@ -53,6 +54,11 @@ export interface ZodErrorStructure {
 export function getZodIssueMessage(issue: ZodIssue): string {
   // For invalid_type with undefined, show "Required"
   if (issue.code === "invalid_type" && issue.received === "undefined") {
+    return "This field is required";
+  }
+
+  // An empty required string fails as too_small with a minimum of 1
+  if (issue.code === "too_small" && Number(issue.minimum) === 1) {
     return "This field is required";
   }
 

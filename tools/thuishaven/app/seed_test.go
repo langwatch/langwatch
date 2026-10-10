@@ -3,7 +3,9 @@ package app
 import (
 	"context"
 	"errors"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -104,6 +106,27 @@ func TestSeedDrivesSeedgenAgainstTheStack(t *testing.T) {
 	}
 	if line := o.SeedStatusLine("feat-x"); !strings.Contains(line, "done") {
 		t.Errorf("status line = %q", line)
+	}
+	if !strings.Contains(sup.shells[0], "'--run-dir' '"+o.seedRunsDir("feat-x")+"/") || strings.Contains(sup.shells[0], "--resume") {
+		t.Errorf("the first run is not recorded under the stack: %s", sup.shells[0])
+	}
+}
+
+// @scenario "Seeding again with the same seed adds nothing"
+func TestSeedingAgainResumesTheRunRecord(t *testing.T) {
+	sup := &fakeSupervisor{}
+	o := seedOrchestrator(t, sup, seedStack())
+	args := []string{"--size", "tiny", "--seed", "7"}
+	record := o.runRecordArgs("feat-x", args)
+	dir := record[len(record)-1]
+	if err := os.MkdirAll(dir, 0o750); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "run.json"), []byte("{}"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if again := o.runRecordArgs("feat-x", args); again[len(again)-1] != "--resume" {
+		t.Fatalf("a recorded run is not resumed: %v", again)
 	}
 }
 

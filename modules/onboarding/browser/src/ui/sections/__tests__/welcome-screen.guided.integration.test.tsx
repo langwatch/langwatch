@@ -80,11 +80,8 @@ type MutateOptions = {
 const initializeOrganization =
   vi.fn<(input: Record<string, unknown>, options: MutateOptions) => void>();
 const invalidateOrganizations = vi.fn();
-/** What the join lookup answers for the reader's own verified address. */
-let joinLookup: unknown;
-vi.mock("../../../behavior/use-join-lookup.ts", () => ({
-  useJoinLookup: () => ({ data: joinLookup }),
-}));
+/** Organization's lent way back to the team, when the test lends one. */
+let lentJoinInstead: ComponentType<{ origin?: "web" | "cli" }> | null = null;
 vi.mock("../../../behavior/onboarding-api.ts", () => {
   const api = {
     onboarding: {
@@ -201,7 +198,9 @@ class WelcomeTestHost extends OnboardingHostApi {
     return { setSampleChoice() {} };
   }
   joinOffers() {
-    return [];
+    return lentJoinInstead
+      ? [{ key: "organization", JoinOffer: () => null, JoinInstead: lentJoinInstead }]
+      : [];
   }
 }
 
@@ -463,7 +462,7 @@ describe("WelcomeScreen in the classic variant", () => {
     organizations = [];
     routerState.query = {};
     hardRedirects.length = 0;
-    joinLookup = undefined;
+    lentJoinInstead = null;
     initializeOrganization.mockReset();
     initializeOrganization.mockImplementation((_input, options) =>
       options.onSuccess?.({ organizationId: "org_new", projectSlug: "acme-proj" }),
@@ -484,20 +483,21 @@ describe("WelcomeScreen in the classic variant", () => {
 
   describe("given the reader's domain matches an organization already on LangWatch", () => {
     /** @scenario "Creating an organization on a matching domain is nudged, never blocked" */
-    it("offers joining in a notice and still creates the organization", async () => {
-      joinLookup = {
-        outcome: "ask",
-        organizations: [{ organizationId: "org_acme", name: "Acme", colleagueCount: 3 }],
-      };
+    it("draws the lent way back under the step and still creates the organization", async () => {
+      lentJoinInstead = ({ origin }) => (
+        <button type="button" data-testid="join-instead" data-origin={origin}>
+          Join Acme instead
+        </button>
+      );
       renderWelcome();
 
-      const notice = await screen.findByTestId("join-instead-notice");
-      expect(notice).toHaveTextContent("Acme is already on LangWatch");
-      expect(screen.getByRole("link", { name: "Join instead" })).toHaveAttribute(
-        "href",
-        "/auth/join",
-      );
-      expect(screen.getByLabelText("Organization name")).toBeEnabled();
+      const action = await screen.findByTestId("join-instead");
+      expect(action).toHaveAttribute("data-origin", "web");
+      const name = screen.getByLabelText("Organization name");
+      expect(name).toBeEnabled();
+      expect(
+        next().compareDocumentPosition(action) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
       cleanup();
 
       await finishClassicFlow();
@@ -548,5 +548,30 @@ describe("WelcomeScreen in the classic variant", () => {
         expect(hardRedirects).toEqual(["/onboarding/product?projectSlug=acme-proj"]);
       },
     );
+  });
+});
+
+describe("WelcomeScreen going back from the intent step", () => {
+  beforeEach(() => {
+    flags.experiment_onboarding_langy_guided = false;
+    flags.release_ui_ai_governance_enabled = true;
+    organizations = [];
+    routerState.query = {};
+  });
+
+  /** @scenario "Going back to the organization step keeps what was typed" */
+  it("keeps the organization name and the terms tick", async () => {
+    renderWelcome();
+    await screen.findByLabelText("Organization name");
+    fireEvent.change(screen.getByLabelText("Organization name"), { target: { value: "ACME" } });
+    fireEvent.click(screen.getByRole("checkbox"));
+    await waitFor(() => expect(next()).toBeEnabled());
+    fireEvent.click(next());
+    await userEvent.click(await screen.findByText("Track AI coding agents"));
+
+    fireEvent.click(screen.getByRole("button", { name: "Back" }));
+
+    expect(await screen.findByLabelText("Organization name")).toHaveValue("ACME");
+    expect(screen.getByRole("checkbox")).toBeChecked();
   });
 });

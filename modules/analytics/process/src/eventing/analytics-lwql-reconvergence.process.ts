@@ -14,6 +14,8 @@ export const lwqlReconvergenceSchema = z.object({
   scheduledFor: z.number().int(),
   /** The last probe the budget allows; a model still config-owned then is given up on. */
   final: z.boolean(),
+  /** A boot's first probe also fills missing key-map rows, as main did at each start. */
+  fillKeyMap: z.boolean().default(false),
 });
 
 export const lwqlReconvergenceStateSchema = z.object({
@@ -68,6 +70,7 @@ export function lwqlReconvergenceWake({
         ctx.intent("reconverge", `reconverge:${bootedAt}:${elapsedMs}`, {
           scheduledFor: at,
           final: gaveUp,
+          fillKeyMap: watch.elapsedMs === 0,
         }),
       ],
     };

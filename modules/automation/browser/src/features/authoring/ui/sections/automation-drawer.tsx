@@ -11,12 +11,12 @@ import {
   defaultsForSourceKind,
   EXAMPLE_MATCHES,
   TEMPLATE_VARIABLES,
-  renderTriggerEmail,
   renderTriggerSlack,
   renderWebhookBody,
   buildExampleGraphAlertTemplateContext,
   buildExampleReportTemplateContext,
   buildTemplateContext,
+  type AutomationApiPreviewEmailInput,
   type GraphAlertTemplateContext,
   type ReportTemplateContext,
   type TemplateContext,
@@ -36,6 +36,7 @@ import { Tooltip } from "@langwatch/design-system/tooltip";
 import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import type { NamedSlackConnection } from "@langwatch/slack-contract";
 import { nowInstant } from "@langwatch/time";
+import { findWebhookUrlProblemMessage } from "@langwatch/webhook-contract";
 import { Mail, Send } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
@@ -158,8 +159,13 @@ function deliveryTodo(draft: AutomationDraft): string {
       return draft.slices[TriggerAction.ADD_TO_DATASET].datasetId
         ? "map the dataset's columns"
         : "choose a dataset";
-    case TriggerAction.SEND_WEBHOOK:
-      return "enter a valid endpoint URL and content type";
+    case TriggerAction.SEND_WEBHOOK: {
+      const url = draft.slices[TriggerAction.SEND_WEBHOOK].url.trim();
+      const problem = url ? findWebhookUrlProblemMessage(url) : null;
+      return problem
+        ? problem.replace(/\.$/, "").replace(/^./, (first) => first.toLowerCase())
+        : "enter a valid endpoint URL and content type";
+    }
     case TriggerAction.SEND_SLACK_MESSAGE:
       return draft.slices[TriggerAction.SEND_SLACK_MESSAGE].slackIntegrationId
         ? "choose a Slack channel"
@@ -357,10 +363,9 @@ export function AutomationDrawer({
   // example URLs come out plausible (`/<slug>/traces/<trace>`). Pulled
   // directly from the shared templating module — no more parallel client copy.
 
-  // Live preview for the active notify channel, client-side via the shared
-  // templating module. No debounce -- Liquid renders are sub-millisecond,
-  // so every keystroke updates. A monotonic token guards against a slow
-  // render returning out of order.
+  // Live preview for the active notify channel: email renders on the server
+  // (debounced); Slack and webhook render here, and a monotonic token guards
+  // against a slow render returning out of order.
   const channel = notifyChannel(draft);
   // Resolve the selected graph's name + the monitored series' human label
   // so the alert preview / test-fire / conditions summary read like the
@@ -394,12 +399,30 @@ export function AutomationDrawer({
     () => ({ ...INITIAL_DRAFT, action: draft.action, slices: draft.slices }),
     [draft.action, draft.slices],
   );
-  const preview = useNotifyPreview({
-    channel: section === "configuration" ? channel : null,
+  const emailPreview = useEmailPreview({
+    enabled: section === "configuration" && channel === "email",
+    projectId,
+    draft: previewDraft,
+    name: draft.name,
+    alertType: draft.alertType,
+    graphAlert: isGraphAlert
+      ? {
+          graphName: graphName ?? undefined,
+          metricLabel: seriesLabel ?? undefined,
+          operator: draft.graphAlert.operator,
+          threshold: draft.graphAlert.threshold,
+          timePeriodMinutes: draft.graphAlert.timePeriod,
+        }
+      : null,
+    report: isReport ? { sourceKind: draft.report.sourceKind } : null,
+  });
+  const localPreview = useNotifyPreview({
+    channel: section === "configuration" && channel !== "email" ? channel : null,
     draft: previewDraft,
     context: previewContext,
     sourceKind: previewSourceKindOf({ isGraphAlert, isReport }),
   });
+  const preview = channel === "email" ? emailPreview : localPreview;
 
   // Edit mode must not render the (blank) INITIAL_DRAFT form while the saved
   // row is still loading: a keystroke during the load makes the hydration
@@ -883,7 +906,7 @@ function previewSourceKindOf({
   return "trace";
 }
 
-type PreviewChannel = NonNullable<ReturnType<typeof notifyChannel>>;
+type PreviewChannel = Exclude<NonNullable<ReturnType<typeof notifyChannel>>, "email">;
 type PreviewContext = TemplateContext | GraphAlertTemplateContext | ReportTemplateContext;
 
 /** The rendered message a channel would send, under the same defaults and delivery rules. */
@@ -926,22 +949,7 @@ async function renderNotifyPreview({
         return {};
     }
   })();
-  if (channel === "email") {
-    const rendered = await renderTriggerEmail({
-      subjectTemplate: templates.emailSubjectTemplate,
-      bodyTemplate: templates.emailBodyTemplate,
-      context: previewContext,
-      defaults: previewDefaults,
-    });
-    return {
-      channel: "email",
-      subject: rendered.subject,
-      html: rendered.html,
-      usedDefault: rendered.usedDefault,
-      missingVariables: rendered.missingVariables,
-      errors: rendered.errors,
-    };
-  } else if (channel === "webhook") {
+  if (channel === "webhook") {
     // The webhook's body lives in its slice (actionParams), not the
     // template columns — read it straight off the draft.
     const slice = draft.slices[TriggerAction.SEND_WEBHOOK];
@@ -987,6 +995,52 @@ async function renderNotifyPreview({
   }
 }
 
+const EMAIL_PREVIEW_DEBOUNCE_MS = 300;
+
+/** The server renders the email (it sanitises HTML); the last good preview stays up while it reloads. */
+function useEmailPreview({
+  enabled,
+  projectId,
+  draft,
+  name,
+  alertType,
+  graphAlert,
+  report,
+}: {
+  enabled: boolean;
+  projectId: string;
+  draft: AutomationDraft;
+  name: string;
+  alertType: AutomationDraft["alertType"];
+  graphAlert: AutomationApiPreviewEmailInput["graphAlert"];
+  report: AutomationApiPreviewEmailInput["report"];
+}): NotifyPreview | undefined {
+  const input = useMemo<AutomationApiPreviewEmailInput>(
+    () => ({
+      projectId,
+      trigger: { name: name || "Your automation", alertType },
+      draft: templatesFromDraft(draft),
+      graphAlert,
+      report,
+    }),
+    [projectId, name, alertType, draft, graphAlert, report],
+  );
+  const inputKey = JSON.stringify(input);
+  const [debounced, setDebounced] = useState(input);
+  useEffect(() => {
+    const t = setTimeout(() => setDebounced(input), EMAIL_PREVIEW_DEBOUNCE_MS);
+    return () => clearTimeout(t);
+    // keyed on the serialised input: graphAlert and report arrive as fresh objects each render
+  }, [inputKey]);
+
+  const query = api.automation.previewTriggerEmail.useQuery(debounced, {
+    enabled: enabled && projectId !== "",
+    placeholderData: (previous) => previous,
+    retry: false,
+  });
+  return query.data ? { channel: "email", ...query.data } : undefined;
+}
+
 /** Re-renders the preview when its channel, slice or context changes; the latest render wins. */
 function useNotifyPreview({
   channel,
@@ -994,7 +1048,7 @@ function useNotifyPreview({
   context,
   sourceKind,
 }: {
-  channel: ReturnType<typeof notifyChannel> | null;
+  channel: PreviewChannel | null;
   draft: AutomationDraft;
   context: PreviewContext;
   sourceKind: PreviewSourceKind;

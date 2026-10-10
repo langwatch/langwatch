@@ -4,7 +4,7 @@
  * Settings → General: role-based access control for workspace, project, and storage credentials.
  */
 
-import { cleanup, screen } from "@testing-library/react";
+import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { calls } = vi.hoisted(() => ({
@@ -165,5 +165,18 @@ describe("when the reader manages an organization whose storage is configured", 
     const secret = screen.getByPlaceholderText("Stored; enter a new value to replace it");
 
     expect(secret).toHaveProperty("value", "");
+  });
+});
+
+describe("when the organization form is saved with the name cleared", () => {
+  /** @scenario A blank organization name is refused on the field */
+  it("shows that the name is required and sends nothing", async () => {
+    renderWithProjectHost(<ProjectSettingsScreen />);
+
+    fireEvent.change(screen.getByDisplayValue("Acme"), { target: { value: "" } });
+    fireEvent.click(screen.getAllByRole("button", { name: "Save Changes" })[0]!);
+
+    expect(await screen.findByText("Name is required")).toBeTruthy();
+    expect(calls.updateOrganization).not.toHaveBeenCalled();
   });
 });

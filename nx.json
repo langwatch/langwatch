@@ -291,6 +291,15 @@
       },
       {
         "filter": {
+          "projects": ["@langwatch/paymentsim-web"]
+        },
+        "cache": true,
+        "dependsOn": ["^build"],
+        "inputs": ["production", "^production", "jsBuild"],
+        "outputs": ["{workspaceRoot}/services/paymentsim/web/dist"]
+      },
+      {
+        "filter": {
           "projects": ["@langwatch/telemetrysim-web"]
         },
         "cache": true,

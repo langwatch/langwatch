@@ -22,7 +22,6 @@ import {
   type CliAccessSession,
   type CliSessionTokens,
   type CliTokenRecordEntry,
-  type InviteLanding,
   type LegacySsoAccessQuery,
   type ReleaseHeldAccountResult,
   type SaveSignInSecurityInput,
@@ -66,7 +65,7 @@ import {
 } from "@langwatch/identity-contract";
 import { NotificationService } from "@langwatch/notification-contract";
 import { createLogger, type Logger } from "@langwatch/observability";
-import { OrganizationApi } from "@langwatch/organization-contract";
+import { OrganizationApi, type InviteLanding } from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
 import { ProjectApi } from "@langwatch/project-contract";
 import {
@@ -1199,13 +1198,13 @@ export class AuthModule implements AuthApiContract {
     await context.internalAdapter.createAccount(row);
   }
 
-  /** No process composes the invitation reads yet; see policies-DS-2d Risks. */
-  async readInviteLanding(_input: Readonly<{ inviteCode: string }>): Promise<InviteLanding> {
-    throw this.#invitesUnavailable();
+  /** Invitations are organization's; the code is the authorization. */
+  readInviteLanding(input: Readonly<{ inviteCode: string }>): Promise<InviteLanding> {
+    return this.#dependencies.organizations.getInviteLanding(input);
   }
 
-  async requestFreshInvite(_input: Readonly<{ inviteCode: string }>): Promise<void> {
-    throw this.#invitesUnavailable();
+  requestFreshInvite(input: Readonly<{ inviteCode: string }>): Promise<void> {
+    return this.#dependencies.organizations.requestFreshInvite(input);
   }
 
   resolveAuthProvider(): Promise<string> {
@@ -1229,14 +1228,6 @@ export class AuthModule implements AuthApiContract {
     }
 
     return this.#signUp;
-  }
-
-  #invitesUnavailable(): AuthUnavailableError {
-    return new AuthUnavailableError({
-      capability:
-        "invitation service, so it cannot ask this organization's admins to reissue the invitation",
-      processName: this.#processName,
-    });
   }
 }
 

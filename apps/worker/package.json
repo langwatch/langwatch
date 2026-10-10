@@ -18,7 +18,7 @@
   "scripts": {
     "start": "node --experimental-transform-types --import @langwatch/observability/register $(test -f ../../.env && echo --env-file=../../.env) src/main.ts",
     "predev": "bash ../../dev/scripts/devscripts.sh ensure-built",
-    "dev": "node ../../dev/scripts/dev-supervisor.mjs --watch -- node --experimental-transform-types $(test -f ../../.env && echo --env-file=../../.env) src/main.ts",
+    "dev": "node --experimental-transform-types $(test -f ../../.env && echo --env-file=../../.env) src/main.ts",
     "typecheck": "tsc -b tsconfig.test.json",
     "pretest": "bash ../../dev/scripts/devscripts.sh ensure-built @langwatch/mail",
     "test": "vitest run",

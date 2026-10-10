@@ -240,6 +240,21 @@ var Prereqs = []Prereq{{
 		Install:  "brew install go",
 	}},
 }, {
+	Key:         "bun",
+	Name:        "Bun",
+	Summary:     "builds the langy-worker binary `haven up +langy` runs",
+	Requirement: PrereqRecommended,
+	After:       []string{"brew"},
+	Detail: "services/langyworker builds with `bun run scripts/build-binary.ts`\n" +
+		"    (bun >= 1.3.13). Without it the stack still comes up, minus Langy:\n" +
+		"    `haven up +langy` cannot build the worker, so Langy is off for that run.",
+	Candidates: []Candidate{{
+		Key:      "bun",
+		Label:    "bun",
+		Binaries: []string{"bun"},
+		Install:  "brew install bun",
+	}},
+}, {
 	// The trap this entry exists to name: golangci-lint's pinned release
 	// cannot read export data from a Go newer than go.work's, and a
 	// golangci-lint at any OTHER version satisfies nothing either, however

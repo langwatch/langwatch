@@ -44,9 +44,11 @@ class SourceDisabledError extends HandledError {
 function ingestionSourceDeployment({
   sourcePolicy,
   usageLimit = async () => undefined,
+  ingestSourceType = "copilot_vscode",
 }: {
   sourcePolicy?: NonNullable<OtlpIngestCredential["identity"]["sourcePolicy"]>;
   usageLimit?: () => Promise<void>;
+  ingestSourceType?: OtlpIngestCredential["identity"]["ingestSourceType"];
 }) {
   const otlpTraces = vi.fn(async () => ({}));
   const credential: OtlpIngestCredential = {
@@ -54,7 +56,7 @@ function ingestionSourceDeployment({
     identity: {
       apiKeyId: "key_real",
       organizationId: PROJECT.organizationId,
-      ingestSourceType: "copilot_vscode",
+      ingestSourceType,
       ingestionTemplateId: null,
       ...(sourcePolicy ? { sourcePolicy } : {}),
     },
@@ -183,6 +185,21 @@ describe("given an organization whose month's count has reached its plan's allow
         activePlanName: "Free",
       });
       expect(otlpTraces).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe("given a project key and a valid export", () => {
+  /** @scenario "An in-process backfill admits spans older than the door's 31 days" */
+  it("hands the export on without a backfill reach, so the door keeps its 31 days", async () => {
+    const { post, otlpTraces } = ingestionSourceDeployment({ ingestSourceType: null });
+
+    const response = await post(validBody);
+
+    expect(response.status).toBe(200);
+    expect(otlpTraces).toHaveBeenCalledWith({
+      tenantId: PROJECT.id,
+      traceRequest: expect.anything(),
     });
   });
 });

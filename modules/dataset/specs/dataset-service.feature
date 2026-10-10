@@ -129,6 +129,12 @@ Feature: Shared Dataset service
     When the browser reads that dataset
     Then the answer carries the size as a plain number the response can hold
 
+  @unit @regression
+  Scenario: A dataset stored with upload confirm columns still lists
+    Given a dataset whose stored columns still carry the upload's source header, as main stores them
+    When the project's datasets are read
+    Then the columns read as name and type and the dataset lists, never a 422 for the whole project
+
   @integration
   Scenario: A storage migration pages one project's datasets by id, archived ones included
     Given a project holding a live and an archived dataset, and another project holding one

@@ -38,6 +38,21 @@ Feature: haven install checks the machine's prerequisites
       Then rtk is reported missing and marked optional
       And the machine is still reported ready
 
+    Scenario: Bun is offered so a fresh machine can run Langy
+      Given bun is not installed
+      And every required prerequisite is present
+      When the developer runs "haven install --list"
+      Then bun is reported missing and marked recommended
+      And the report names "brew install bun"
+      And "haven install --yes" installs it
+
+    Scenario: A Langy that cannot build for want of bun says how to fix it
+      Given bun is not installed
+      When the developer runs "haven up +langy"
+      Then the langy-worker build is not attempted
+      And the line says "bun is missing: run `haven install`"
+      And the rest of the stack comes up without Langy
+
     Scenario: Everything present reports ready and installs nothing
       Given every prerequisite is present
       When the developer runs "haven install"

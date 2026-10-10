@@ -253,18 +253,16 @@ function throughSubquery({
 
 /**
  * Reports an `OR` that can disjoin a tenant predicate away (in or enclosing its group), unless
- * beneath a fencing set, enclosing none, with no subquery between (else refused). Otherwise the
- * depth rule, except beneath a predicate binding the claimed tenant. Unbalanced: depth.
+ * beneath a fencing set, enclosing none, with no subquery between (else refused). An `OR` reaching
+ * none in its own scope is left to the unbound-read check (WEB-985, WEB-5300). Unbalanced: depth.
  */
 function hasWeakeningDisjunction({
   masked,
   predicateIndex,
-  scopingIndexes,
   fencingIndexes = [],
 }: {
   masked: string;
   predicateIndex: number;
-  scopingIndexes: readonly number[];
   fencingIndexes?: readonly number[];
 }): boolean {
   const { disjunctions, predicateDepth } = disjunctionsOf({ masked, predicateIndex });
@@ -275,7 +273,6 @@ function hasWeakeningDisjunction({
   const tenantGroups = matchesOf({ pattern: ANY_TENANT_PREDICATE, masked }).map((match) =>
     groupOf(tokenIndex(match)),
   );
-  const scopingGroups = scopingIndexes.map(groupOf);
   const fencingGroups = fencingIndexes.map(groupOf);
   const subqueries = new Set(
     matchesOf({ pattern: SELECT_TOKEN, masked }).map((match) => groupOf(match.index)),
@@ -292,11 +289,12 @@ function hasWeakeningDisjunction({
     const group = groupOf(each.index);
     if (inSubqueryBeneathFence(group)) return true;
     if (fenced(group)) return false;
-    if (tenantGroups.some((inner) => encloses({ parent, outer: group, inner }))) return true;
-    const beneathScope = scopingGroups.some(
-      (outer) => outer !== group && encloses({ parent, outer, inner: group }),
+    // A predicate inside a subquery scopes only that subquery's read; an outer OR cannot reach it.
+    return tenantGroups.some(
+      (inner) =>
+        encloses({ parent, outer: group, inner }) &&
+        !throughSubquery({ parent, subqueries, outer: group, inner }),
     );
-    return !beneathScope && each.depth <= predicateDepth;
   });
 }
 
@@ -685,10 +683,7 @@ export function checkTenantScope({
       : { kind: "missing-predicate" };
   }
 
-  const scopingIndexes = matchesOf({ pattern: BOUND_TENANT_PREDICATE, masked: statement })
-    .filter((match) => params?.[match[1] as string] === tenantId)
-    .map(tokenIndex);
-  if (hasWeakeningDisjunction({ masked: statement, predicateIndex: bound.index, scopingIndexes })) {
+  if (hasWeakeningDisjunction({ masked: statement, predicateIndex: bound.index })) {
     return { kind: "weakening-disjunction" };
   }
   if (conjunctReach({ shape, match: bound }) === null) return { kind: "predicate-not-and-term" };
@@ -705,9 +700,16 @@ export function checkTenantScope({
       actual: supplied,
     };
   }
-  const binds = matchesOf({ pattern: BOUND_TENANT_PREDICATE, masked: statement }).filter(
-    (match) => params?.[match[1] as string] === tenantId,
-  );
+  const binds = [
+    ...matchesOf({ pattern: BOUND_TENANT_PREDICATE, masked: statement }).filter(
+      (match) => params?.[match[1] as string] === tenantId,
+    ),
+    // A fence the proof expanded to the caller's own project alone binds exactly as `= {t}` does.
+    ...matchesOf({ pattern: BOUND_TENANT_SET, masked: statement }).filter((match) => {
+      const values = boundBy({ match, params });
+      return values.length > 0 && values.every((value) => value === tenantId);
+    }),
+  ];
   return hasUnboundRead({ shape, binds }) ? { kind: "unbound-read" } : null;
 }
 
@@ -751,7 +753,6 @@ function checkTenantSetScope({
   const weakened = hasWeakeningDisjunction({
     masked: statement,
     predicateIndex: bound.index,
-    scopingIndexes: sets.filter(bindsOnlyDeclared).map(tokenIndex),
     fencingIndexes,
   });
   if (weakened) return { kind: "weakening-disjunction" };

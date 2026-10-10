@@ -192,5 +192,44 @@ describe("AutomationSlackClaimReconcileService", () => {
         expect(outcome).toEqual({ claimed: 3, skipped: 0, released: 4, kept: 1 });
       });
     });
+
+    describe("when the reconcile runs a second time over the state the first left", () => {
+      it("claims and releases nothing", async () => {
+        const triggers = MemoryTriggerRepository.create(MemoryAutomationStore.create());
+        await slackTrigger({ triggers, id: "active", connectionId: "c1" });
+        const claims = [claimOf({ connectionId: "c1", claimantId: "stale" })];
+        const { slack, released } = slackOver(claims);
+        const claimed: string[] = [];
+        const service = AutomationSlackClaimReconcileService.create({
+          slack: Object.assign(slack, {
+            releaseConnection: ({ claimantId }: { claimantId: string }) => {
+              claims.splice(0, claims.length, ...claims.filter((c) => c.claimant.id !== claimantId));
+              released.push(claimantId);
+              return Promise.resolve();
+            },
+          }),
+          triggers,
+          slackConnections: {
+            updateConnectionClaim: ({ trigger }) => {
+              claimed.push(trigger.id);
+              claims.push({
+                connectionId: "c1",
+                projectId: PROJECT,
+                claimant: { id: trigger.id, label: trigger.name },
+              });
+              return Promise.resolve();
+            },
+          },
+        });
+
+        const first = await service.reconcile({ dryRun: false });
+        const second = await service.reconcile({ dryRun: false });
+
+        expect(first).toMatchObject({ claimed: 1, released: 1 });
+        expect(second).toEqual({ claimed: 0, skipped: 0, released: 0, kept: 1 });
+        expect(claimed).toEqual(["active"]);
+        expect(released).toEqual(["stale"]);
+      });
+    });
   });
 });

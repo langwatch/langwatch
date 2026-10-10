@@ -26,6 +26,7 @@ import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import { MAX_SUITE_REPEAT_COUNT } from "@langwatch/suite-contract";
 import { ChevronDown, ChevronRight, Play } from "lucide-react";
 import { useCallback, useRef, useState } from "react";
+import { Controller } from "react-hook-form";
 
 import { useAgents } from "../../../behavior/agents/use-agents.ts";
 import { FormServerError } from "../../../behavior/errors.tsx";
@@ -186,10 +187,18 @@ export function SuiteFormDrawer(props: SuiteFormDrawerProps) {
                   <Text fontSize="sm" fontWeight="medium">
                     Name *
                   </Text>
-                  <Input
-                    placeholder="e.g., Critical Path Run Plan"
-                    {...form.register("name")}
-                    borderColor={errors.name ? "red.500" : undefined}
+                  {/* Controllers, not `register`: the compiler memoises register's ref, and the
+                      form resets once the suite loads, which would drop every keystroke after. */}
+                  <Controller
+                    control={form.control}
+                    name="name"
+                    render={({ field }) => (
+                      <Input
+                        placeholder="e.g., Critical Path Run Plan"
+                        {...field}
+                        borderColor={errors.name ? "red.500" : undefined}
+                      />
+                    )}
                   />
                   {errors.name && (
                     <Text fontSize="xs" color="red.fg">
@@ -203,10 +212,16 @@ export function SuiteFormDrawer(props: SuiteFormDrawerProps) {
                   <Text fontSize="sm" fontWeight="medium">
                     Description (optional)
                   </Text>
-                  <Textarea
-                    placeholder="Core journeys that must pass before deploy"
-                    {...form.register("description")}
-                    rows={2}
+                  <Controller
+                    control={form.control}
+                    name="description"
+                    render={({ field }) => (
+                      <Textarea
+                        placeholder="Core journeys that must pass before deploy"
+                        {...field}
+                        rows={2}
+                      />
+                    )}
                   />
                   {errors.description && (
                     <Text fontSize="xs" color="red.fg">
@@ -339,16 +354,21 @@ export function SuiteFormDrawer(props: SuiteFormDrawerProps) {
                       <VStack align="start" gap={1}>
                         <HStack gap={2} align="center">
                           <Text fontSize="sm">Repeat count</Text>
-                          <Input
-                            type="number"
-                            size="sm"
-                            width="80px"
-                            min={1}
-                            max={MAX_SUITE_REPEAT_COUNT}
-                            {...form.register("repeatCount", {
-                              valueAsNumber: true,
-                            })}
-                            borderColor={errors.repeatCount ? "red.500" : undefined}
+                          <Controller
+                            control={form.control}
+                            name="repeatCount"
+                            render={({ field }) => (
+                              <Input
+                                type="number"
+                                size="sm"
+                                width="80px"
+                                min={1}
+                                max={MAX_SUITE_REPEAT_COUNT}
+                                {...field}
+                                onChange={(event) => field.onChange(event.target.valueAsNumber)}
+                                borderColor={errors.repeatCount ? "red.500" : undefined}
+                              />
+                            )}
                           />
                           <Text fontSize="xs" color="fg.muted">
                             times per scenario x target (max {MAX_SUITE_REPEAT_COUNT})

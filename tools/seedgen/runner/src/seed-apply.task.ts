@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import { createInterface } from "node:readline";
 import type { Readable, Writable } from "node:stream";
 import { parseArgs } from "node:util";
@@ -5,18 +6,29 @@ import { parseArgs } from "node:util";
 import { Task } from "@langwatch/task";
 
 import { seedActionSchema, type SeedReply, unresolvedRefOf } from "./protocol.ts";
-import { applySeedAction, type SeedApis } from "./seed-kinds.ts";
+import { applySeedAction, type SeedApis, type SeedSettings } from "./seed-kinds.ts";
 
 const DEFAULT_CONCURRENCY = 8;
 const MAX_CONCURRENCY = 64;
 
-function concurrencyOf(args: readonly string[]): number {
-  const { values } = parseArgs({ args: [...args], options: { concurrency: { type: "string" } } });
+/**
+ * `--password-hash-file` names the file seedgen wrote the dev password's hash to, so neither the
+ * password nor its hash crosses the command line or the environment.
+ */
+async function optionsOf(
+  args: readonly string[],
+): Promise<{ concurrency: number; settings: SeedSettings }> {
+  const { values } = parseArgs({
+    args: [...args],
+    options: { concurrency: { type: "string" }, "password-hash-file": { type: "string" } },
+  });
   const concurrency = Number(values.concurrency ?? DEFAULT_CONCURRENCY);
   if (!Number.isInteger(concurrency) || concurrency < 1 || concurrency > MAX_CONCURRENCY) {
     throw new Error(`seed:apply --concurrency takes a whole number from 1 to ${MAX_CONCURRENCY}`);
   }
-  return concurrency;
+  const hashFile = values["password-hash-file"];
+  const passwordHash = hashFile ? (await readFile(hashFile, "utf8")).trim() : null;
+  return { concurrency, settings: { passwordHash: passwordHash || null } };
 }
 
 /**
@@ -40,7 +52,7 @@ export class SeedApplyTask extends Task {
   }
 
   async run({ args, signal }: { args: readonly string[]; signal: AbortSignal }): Promise<void> {
-    const concurrency = concurrencyOf(args);
+    const { concurrency, settings } = await optionsOf(args);
     const inFlight = new Set<Promise<void>>();
     let failure: unknown;
     const reply = (line: SeedReply): void => {
@@ -63,7 +75,7 @@ export class SeedApplyTask extends Task {
         throw new Error(`seed:apply line ${lineNumber} has an unresolved $ref in "${unresolved}"`);
       }
       while (inFlight.size >= concurrency) await Promise.race(inFlight);
-      const applying = applySeedAction({ action: action.data, apis: this.#apis })
+      const applying = applySeedAction({ action: action.data, apis: this.#apis, settings })
         .then(reply)
         .catch((error: unknown) => {
           failure ??= error;

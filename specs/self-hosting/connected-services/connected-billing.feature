@@ -29,6 +29,12 @@ Feature: Billing a connected self-hosted customer
     And bank transfer is offered on its invoices
 
   @unit
+  Scenario: Onboarding a connected customer records connected_customer_onboarded
+    When an operator onboards "ACME" with a term of one year and a commit of 1000 USD
+    Then billing records a connected_customer_onboarded fact for "ACME" naming the operator
+    And billing calls no licensing operation to sync the contract budget
+
+  @unit
   Scenario: Onboarding subscribes the customer to metered usage invoiced quarterly
     When an operator onboards "ACME"
     Then "ACME" has a subscription whose only item is metered hosted usage
@@ -114,6 +120,13 @@ Feature: Billing a connected self-hosted customer
     When an operator renews "ACME" for a second term with a commit of 2000 USD
     Then "ACME" still has one usage subscription
     And its budget is reset and set to 2000 USD for the new term
+
+  @unit
+  Scenario: Renewal records connected_term_renewed and the budget resets
+    Given "ACME" was onboarded for a first term
+    When an operator renews "ACME" for a second term
+    Then billing records a connected_term_renewed fact for "ACME" naming the operator
+    And billing calls no licensing operation to reset or sync the contract budget
 
   @unit
   Scenario: The renewal credit waits for the last usage invoice of the old term

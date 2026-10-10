@@ -1,3 +1,4 @@
+import { CodePreview } from "@langwatch/design-system/code-preview";
 import { Menu } from "@langwatch/design-system/menu";
 import { Button, HStack, useDisclosure, VStack } from "@langwatch/design-system/primitives";
 import { SegmentedControl } from "@langwatch/design-system/segmented-control";
@@ -7,7 +8,6 @@ import { CheckIcon, ChevronDownIcon } from "lucide-react";
 import React, { createContext, useContext, useMemo, useState } from "react";
 
 import type { PrismLanguage } from "../../model/prism-language.ts";
-import { RenderCode } from "./code/render-code.tsx";
 import type { Snippet, Target } from "./prompt/api-snippet/openapi-snippet.types.ts";
 
 /**
@@ -149,21 +149,13 @@ export function GenerateApiSnippetDialog({
             </VStack>
           </Dialog.Header>
           <Dialog.Body>
-            <RenderCode
+            <CodePreview
               code={useTabs ? (activeTab?.content ?? "") : (selectedSnippet?.content ?? "")}
               language={
                 useTabs
                   ? (activeTab?.language ?? "bash")
                   : SnippetTargetToPrismLanguageMap[selectedTarget]
               }
-              style={{
-                fontSize: "12px",
-                lineHeight: "1.5",
-                fontFamily: "monospace",
-                whiteSpace: "pre-wrap",
-                padding: "20px",
-                borderRadius: "5px",
-              }}
             />
           </Dialog.Body>
           <Dialog.Footer></Dialog.Footer>

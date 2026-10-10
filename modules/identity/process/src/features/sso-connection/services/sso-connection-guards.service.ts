@@ -459,6 +459,11 @@ export class SsoConnectionGuardsService {
     return this.edits.registerReplacementConnection(data);
   }
 
+  /** Frees the registration slot a command claimed when its commit failed before staging. */
+  releaseRegistrationSlot(claim: { organizationId: string; commandId: string }): Promise<void> {
+    return this.checks.releaseRegistrationSlot(claim);
+  }
+
   /** Which of the pair decides an ordinary sign-in. Locked once finalization
    *  has started: past that point the legacy route is being dismantled. */
   selectMigrationRoute(data: SelectMigrationRouteCommandData): Promise<SsoConnectionFactInput[]> {

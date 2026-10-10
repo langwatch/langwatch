@@ -111,6 +111,8 @@ beforeEach(() => {
   toasts.length = 0;
   setUiFeedbackHost({
     succeeded: () => undefined,
+    warned: () => undefined,
+    informed: () => undefined,
     failed: (failure) => void toasts.push(failure.fallbackTitle ?? ""),
   });
   calls.createWorkflow.mockResolvedValue({ workflow: { id: "workflow_new" } });

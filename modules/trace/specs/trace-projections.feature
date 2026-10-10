@@ -62,3 +62,9 @@ Feature: Trace rollups and span storage fold idempotently
     Given main queued a log-contributed or metric-correlated event with no metadata field
     When this release's worker parses the queued trace fold job
     Then the event parses and folds instead of blocking its trace's group
+
+  @unit
+  Scenario: A span_received job main queued without span ids in its metadata parses on this worker
+    Given main queued a span_received event read back from the event log, its metadata only a traceparent or absent
+    When this release's worker parses it for a peer subscriber such as traceEvaluationTrigger or traceSpanMetricsSync
+    Then the event parses and runs instead of being refused and blocking its trace's group

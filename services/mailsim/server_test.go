@@ -65,7 +65,7 @@ func TestCaughtHTMLHeadersAreSandboxed(t *testing.T) {
 	// The sandbox grants popups and nothing else: a link can be opened, and
 	// scripts, forms, same-origin access and top-level navigation stay refused.
 	csp := rec.Header().Get("Content-Security-Policy")
-	assert.Equal(t, "sandbox allow-popups allow-popups-to-escape-sandbox; default-src 'none'; style-src 'unsafe-inline'; img-src data:", csp)
+	assert.Equal(t, "sandbox allow-popups allow-popups-to-escape-sandbox; default-src 'none'; style-src 'unsafe-inline'; img-src https: data:", csp)
 	for _, forbidden := range []string{"allow-scripts", "allow-same-origin", "allow-forms", "allow-top-navigation;"} {
 		assert.NotContains(t, csp, forbidden, "a caught message must not be granted %s", forbidden)
 	}

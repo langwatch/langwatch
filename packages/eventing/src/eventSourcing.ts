@@ -158,6 +158,7 @@ export class EventSourcing {
   private readonly _laneAliases = new Map<string, { pipeline: string; alias: LaneAlias }[]>();
   private _initialized = false;
   private _consumersHeld = false;
+  private _consumersStopped: Promise<void> | undefined;
   private _loggedDisabledWarning = false;
 
   // Options
@@ -667,6 +668,20 @@ export class EventSourcing {
    * Gracefully closes all pipelines, the projection registry, and the global queue.
    */
   async close(): Promise<void> {
+    await this.stopConsumers();
+    // Close registry AFTER the queue, never before (see ADR-###).
+    if (this.projectionRegistry.isInitialized) {
+      await this.projectionRegistry.close();
+    }
+  }
+
+  /** Takes no new work and waits for in-flight work; idempotent, so `close` may follow. */
+  stopConsumers(): Promise<void> {
+    this._consumersStopped ??= this.drainConsumers();
+    return this._consumersStopped;
+  }
+
+  private async drainConsumers(): Promise<void> {
     if (this._processRuntimeInstance) {
       try {
         await this._processRuntimeInstance.stop();
@@ -684,10 +699,6 @@ export class EventSourcing {
     // Close the global queue after all consumers are shut down
     if (this._globalQueue) {
       await this._globalQueue.close();
-    }
-    // Close registry AFTER the queue, never before (see ADR-###).
-    if (this.projectionRegistry.isInitialized) {
-      await this.projectionRegistry.close();
     }
     this.pipelines.clear();
   }

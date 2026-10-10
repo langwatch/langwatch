@@ -274,6 +274,8 @@ describe("useExportTraces()", () => {
       const failures: TraceFailureNotice[] = [];
       const host: UiFeedbackSink = {
         succeeded: () => void 0,
+        warned: () => void 0,
+        informed: () => void 0,
         failed: (failure) => {
           failures.push(failure);
         },

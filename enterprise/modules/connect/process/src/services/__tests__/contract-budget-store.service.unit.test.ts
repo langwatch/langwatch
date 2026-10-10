@@ -49,6 +49,8 @@ function budget(overrides: Partial<GatewayBudgetWithSeats>): GatewayBudgetWithSe
 
 function storeOver(budgets: GatewayBudgetWithSeats[]) {
   const updated: Parameters<GatewayApi["updateBudget"]>[0][] = [];
+  const created: Parameters<GatewayApi["createBudget"]>[0][] = [];
+  const resets: Parameters<GatewayApi["resetBudget"]>[0][] = [];
   const store = ContractBudgetStoreService.create({
     gateway: createApiFixture<GatewayApi>({
       listBudgetsWithHealth: async () => ({
@@ -57,13 +59,21 @@ function storeOver(budgets: GatewayBudgetWithSeats[]) {
         readAt: AT,
         scopeReach: new Map(),
       }),
+      createBudget: async (input) => {
+        created.push(input);
+        return budget({});
+      },
       updateBudget: async (input) => {
         updated.push(input);
         return budget({});
       },
+      resetBudget: async (input) => {
+        resets.push(input);
+        return budget({});
+      },
     }),
   });
-  return { store, updated };
+  return { store, updated, created, resets };
 }
 
 describe("the contract budget kept in the gateway's budget table", () => {
@@ -76,6 +86,7 @@ describe("the contract budget kept in the gateway's budget table", () => {
         id: "budget-1",
         limitUsdCents: 125050,
         capSetByCustomer: true,
+        lastResetAt: null,
       });
     });
   });
@@ -110,6 +121,41 @@ describe("the contract budget kept in the gateway's budget table", () => {
           metadata: { connect_cap_set_by: "customer" },
           actorUserId: "system:connect-license",
         },
+      ]);
+    });
+  });
+
+  describe("when the contract budget is created", () => {
+    /** @scenario "A new contract budget is a blocking organization budget under the contract's id" */
+    it("writes a blocking organization budget under the contract's id, capped by LangWatch", async () => {
+      const { store, created } = storeOver([]);
+
+      await store.create({ organizationId: "org-1", limitUsdCents: 50000, operatorId: "op-1" });
+
+      expect(created).toMatchObject([
+        {
+          organizationId: "org-1",
+          scope: { kind: "ORGANIZATION", organizationId: "org-1" },
+          window: "MANUAL",
+          limitUsd: "500.00",
+          onBreach: "BLOCK",
+          externalId: CONTRACT_BUDGET_EXTERNAL_ID,
+          metadata: { connect_cap_set_by: "langwatch" },
+          allowUnreachable: true,
+          actorUserId: "op-1",
+        },
+      ]);
+    });
+  });
+
+  describe("when a new window starts", () => {
+    it("resets that budget through the gateway, acting as the operator", async () => {
+      const { store, resets } = storeOver([budget({})]);
+
+      await store.reset({ organizationId: "org-1", id: "budget-1", actorId: "operator-1" });
+
+      expect(resets).toEqual([
+        { id: "budget-1", organizationId: "org-1", actorUserId: "operator-1" },
       ]);
     });
   });

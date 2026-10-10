@@ -71,7 +71,7 @@ export function bootBackendEntry(): Promise<void> {
   return startBackend({ startWorker, startApi })
     .then((started) => {
       halves = started;
-      // The watch supervisor ends a boot on this line (LANGWATCH_DEV_READY_PATTERN).
+      // `haven reload` waits for this line.
       process.stdout.write(`${JSON.stringify({ level: "info", msg: BACKEND_READY_MSG })}\n`);
     })
     .catch((error) => {

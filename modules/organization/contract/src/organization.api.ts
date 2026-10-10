@@ -54,6 +54,7 @@ import type { LimitCheckResult, LimitType } from "./license-limit-type.ts";
 import type {
   PendingInvitationForCaller,
   PendingInvitationsForCaller,
+  InviteLanding,
   OrganizationDirectoryCounts,
   OrganizationInviteAccepted,
   OrganizationInviteCreated,
@@ -687,6 +688,13 @@ export interface OrganizationApi {
     input: Readonly<{ inviteCode: string }>,
     by: OrganizationCaller,
   ): Promise<OrganizationInviteAccepted>;
+  /**
+   * The invitation behind a code, for whoever holds it. Missing and revoked both throw
+   * `InviteNotFoundError`, so a guessed code learns nothing; expired throws `InviteExpiredError`.
+   */
+  getInviteLanding(input: Readonly<{ inviteCode: string }>): Promise<InviteLanding>;
+  /** Tells an expired invitation's admins somebody is waiting; mints nothing (D11). */
+  requestFreshInvite(input: Readonly<{ inviteCode: string }>): Promise<void>;
   /**
    * Applies the PENDING invitation this address already holds here, for a
    * caller that never saw an invitation code. Its role and team assignments

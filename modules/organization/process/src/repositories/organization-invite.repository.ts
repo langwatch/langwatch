@@ -28,6 +28,11 @@ export type InviteWithOrganization = OrganizationInvite & {
   organization: Organization | null;
 };
 
+/** One invitation as its link's landing reads it: the organization and who asked. */
+export type InviteWithOrganizationAndRequester = InviteWithOrganization & {
+  requestedByUser: { name: string | null } | null;
+};
+
 /**
  * The rows behind an organization's invitations: the invites themselves, and
  * the memberships, teams, custom roles and projects an invitation is validated
@@ -107,6 +112,10 @@ export abstract class OrganizationInviteRepository {
   abstract getInviteByCodeWithOrganization(input: {
     inviteCode: string;
   }): Promise<InviteWithOrganization>;
+  /** Throws `InviteNotFoundError`. */
+  abstract getInviteLandingByCode(input: {
+    inviteCode: string;
+  }): Promise<InviteWithOrganizationAndRequester>;
   abstract findAdminEmails(input: { organizationId: string }): Promise<string[]>;
   /** The live projects' slugs in these teams. */
   abstract findProjectSlugsForTeams(input: { teamIds: string[] }): Promise<string[]>;

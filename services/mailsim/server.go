@@ -106,7 +106,7 @@ func setUIHeaders(w http.ResponseWriter) {
 // setUIHeaders: a caught message's HTML is untrusted input, not this
 // service's own page and not a JSON answer, so it gets its own header shape
 // rather than inheriting either. `default-src 'none'` refuses every network
-// fetch a tracking pixel might attempt; X-Frame-Options: SAMEORIGIN is what
+// fetch except images over https, as a mail client loads them; X-Frame-Options: SAMEORIGIN is what
 // lets the inbox itself frame it while refusing every other page.
 //
 // The sandbox allows exactly one thing: opening a link in a new tab. A
@@ -118,7 +118,7 @@ func setUIHeaders(w http.ResponseWriter) {
 func setCaughtHTMLHeaders(w http.ResponseWriter) {
 	setBaseHeaders(w)
 	w.Header().Set("Content-Security-Policy",
-		"sandbox allow-popups allow-popups-to-escape-sandbox; default-src 'none'; style-src 'unsafe-inline'; img-src data:")
+		"sandbox allow-popups allow-popups-to-escape-sandbox; default-src 'none'; style-src 'unsafe-inline'; img-src https: data:")
 	w.Header().Set("X-Frame-Options", "SAMEORIGIN")
 }
 

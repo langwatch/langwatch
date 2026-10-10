@@ -21,6 +21,7 @@ const { state, calls } = vi.hoisted(() => ({
     members: [] as Record<string, unknown>[],
     provenance: {} as Record<string, { source: string }>,
     membersError: null as Error | null,
+    tokensError: null as unknown,
     /** Recorded requests, keyed by the tenant AND connection they were asked
      *  for: a feed answered for any other key is a feed nobody may read. */
     requests: {} as Record<string, Record<string, unknown>[]>,
@@ -62,7 +63,15 @@ vi.mock("../../../behavior/scim-api.ts", () => ({
       scimReconciliation: { invalidate: calls.invalidate },
     }),
     scimToken: {
-      list: { useQuery: () => ({ data: state.rows, isLoading: false }) },
+      list: {
+        useQuery: () => ({
+          data: state.rows,
+          isLoading: false,
+          isError: state.tokensError !== null,
+          error: state.tokensError,
+          refetch: vi.fn(),
+        }),
+      },
       connections: { useQuery: () => ({ data: state.connections, isLoading: false }) },
       generate: {
         useMutation: () => ({
@@ -232,6 +241,18 @@ describe("given no token has been generated yet", () => {
     renderWithScimHost(<ScimScreen />);
 
     expect(screen.getByText(/no provisioning token has been issued yet/i)).toBeTruthy();
+  });
+});
+
+describe("given the plan does not include provisioning", () => {
+  it("says it is an Enterprise feature and offers no retry", () => {
+    state.tokensError = { data: { error: { code: "enterprise_plan_required" } } };
+
+    renderWithScimHost(<ScimScreen />);
+
+    expect(screen.getByTestId("scim-enterprise-gate")).toBeTruthy();
+    expect(screen.queryByText(/couldn't load your provisioning tokens/i)).toBeNull();
+    state.tokensError = null;
   });
 });
 

@@ -427,6 +427,9 @@ export class ApiDoorService {
             targetKind: entry.targetKind,
             targetId: entry.targetId,
             metadata: entry.metadata,
+            actorUserId: entry.actorUserId,
+            ipAddress: entry.ipAddress,
+            userAgent: entry.userAgent,
           }),
         );
       },

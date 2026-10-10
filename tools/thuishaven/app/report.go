@@ -116,7 +116,11 @@ func (o *Orchestrator) serverHealth(ctx context.Context) map[string]health {
 func (o *Orchestrator) colimaHealth(ctx context.Context) health {
 	needs := domain.ContainerNeeds(o.containerNeedInputs())
 	if len(needs) == 0 {
-		return health{OK: true, Detail: "not needed (ClickHouse and observability run natively)"}
+		detail := "not needed (ClickHouse and observability run natively)"
+		if rt, ok := o.container.(idleStoppable); ok && rt.StoppedByHaven() {
+			detail += "; stopped by haven"
+		}
+		return health{OK: true, Detail: detail}
 	}
 	state := "stopped"
 	isRunning := o.container.IsRunning(ctx)

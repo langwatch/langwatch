@@ -69,6 +69,21 @@ describe("EventLogKeepForeverService", () => {
     });
   });
 
+  describe("when the step runs a second time with no checkpoint", () => {
+    it("starts no rewrite on a target a finished rewrite already holds", async () => {
+      const { retroactive, run } = harness({ privateOrganizations: ["org-private"] });
+      await run();
+
+      const second = await run();
+
+      expect(second.done).toEqual(["shared", "org-private"]);
+      expect(await retroactive.findKeepForeverRewrites({})).toHaveLength(1);
+      expect(
+        await retroactive.findKeepForeverRewrites({ organizationId: "org-private" }),
+      ).toHaveLength(1);
+    });
+  });
+
   describe("when the step is a dry run", () => {
     it("lists the targets it would rewrite and rewrites nothing", async () => {
       const { retroactive, saved, run } = harness();

@@ -658,13 +658,8 @@ function MethodChoice({
   onFederatedMethodChosen: (method: SignInMethod) => void;
 }) {
   return (
-    <AuthCard title="Choose how to sign in">
-      {addressConfirmed ? (
-        <HStack gap={3}>
-          <SuccessPulse label="Email address confirmed" />
-          <Text data-testid="verified-address">{verifiedEmail} is confirmed.</Text>
-        </HStack>
-      ) : (
+    <AuthCard title="Create your account">
+      {addressConfirmed ? null : (
         <Text data-testid="unconfirmed-address">
           This installation does not send email, so {verifiedEmail} is not confirmed. Choose a
           password to finish.
@@ -678,6 +673,7 @@ function MethodChoice({
           // becomes an offer once there is one to enrol (D07).
           methodSet={enrollment.methodSet.filter((method) => method.kind !== "passkey")}
           reasonCode={enrollment.reasonCode}
+          showGuidance={false}
           lastUsedMethodId={lastUsedMethodId}
           onFederatedMethodChosen={onFederatedMethodChosen}
           callbackUrl={callbackUrl}

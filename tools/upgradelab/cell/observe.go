@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os/exec"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -171,6 +172,62 @@ return rows`
 	out, _ := exec.CommandContext(ctx, "redis-cli", "-p", port, "EVAL", script, "0").Output() // #nosec G204 -- fixed script.
 	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
 	return strings.Join(lines[:min(len(lines), 25)], "\n")
+}
+
+// QueueByKind groups the group-queue's waiting jobs by job kind (the group key without tenant and
+// aggregate): jobs, groups and when the earliest and latest are due, from the zset scores (ms).
+func QueueByKind(ctx context.Context, port string) string {
+	script := `local rows = {}
+for _, key in ipairs(redis.call('KEYS', '*:gq:group:*:jobs')) do
+  local first = redis.call('ZRANGE', key, 0, 0, 'WITHSCORES')
+  local last = redis.call('ZRANGE', key, -1, -1, 'WITHSCORES')
+  if first[2] then table.insert(rows, key .. ' ' .. redis.call('ZCARD', key) .. ' ' .. first[2] .. ' ' .. last[2]) end -- if
+end -- for
+return rows`
+	out, _ := exec.CommandContext(ctx, "redis-cli", "-p", port, "EVAL", script, "0").Output() // #nosec G204 -- fixed script.
+	return groupQueueKinds(string(out), time.Now().UnixMilli())
+}
+
+type queueKind struct {
+	jobs, groups     int
+	earliest, latest float64
+}
+
+func groupQueueKinds(out string, nowMs int64) string {
+	kinds := map[string]*queueKind{}
+	for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) != 4 {
+			continue
+		}
+		parts := strings.Split(strings.TrimSuffix(fields[0][strings.Index(fields[0], ":gq:group:")+len(":gq:group:"):], ":jobs"), "/")
+		if len(parts) < 3 {
+			continue
+		}
+		name := strings.Join(parts[1:len(parts)-1], "/")
+		jobs, _ := strconv.Atoi(fields[1])
+		first, _ := strconv.ParseFloat(fields[2], 64)
+		last, _ := strconv.ParseFloat(fields[3], 64)
+		kind := kinds[name]
+		if kind == nil {
+			kind = &queueKind{earliest: first, latest: last}
+			kinds[name] = kind
+		}
+		kind.jobs, kind.groups = kind.jobs+jobs, kind.groups+1
+		kind.earliest, kind.latest = min(kind.earliest, first), max(kind.latest, last)
+	}
+	names := make([]string, 0, len(kinds))
+	for name := range kinds {
+		names = append(names, name)
+	}
+	sort.Slice(names, func(a, b int) bool { return kinds[names[a]].jobs > kinds[names[b]].jobs })
+	rows := []string{}
+	for _, name := range names {
+		kind := kinds[name]
+		rows = append(rows, fmt.Sprintf("%s: %d jobs in %d groups, due %+.0f s to %+.0f s", name, kind.jobs, kind.groups,
+			(kind.earliest-float64(nowMs))/1000, (kind.latest-float64(nowMs))/1000))
+	}
+	return strings.Join(rows, "\n")
 }
 
 // clickhouseQuery posts one statement to a server or database URL and answers its TSV.

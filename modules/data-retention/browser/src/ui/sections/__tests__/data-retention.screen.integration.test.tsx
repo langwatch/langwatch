@@ -107,6 +107,8 @@ const availableScopes: RetentionAvailableScopes = {
 class TestRetentionHost extends DataRetentionHostApi {
   readonly writes: Readonly<Record<string, string | undefined>>[] = [];
   readonly successes: RetentionSuccessNotice[] = [];
+  readonly warnings: RetentionSuccessNotice[] = [];
+  readonly infos: RetentionSuccessNotice[] = [];
   readonly failures: RetentionFailureNotice[] = [];
 
   constructor(
@@ -150,6 +152,14 @@ class TestRetentionHost extends DataRetentionHostApi {
     this.successes.push(notice);
   }
 
+  warned(notice: RetentionSuccessNotice): void {
+    this.warnings.push(notice);
+  }
+
+  informed(notice: RetentionSuccessNotice): void {
+    this.infos.push(notice);
+  }
+
   failed(failure: RetentionFailureNotice): void {
     this.failures.push(failure);
   }
@@ -167,6 +177,7 @@ describe("given the retention policies page", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     snapshotRef.current.canConfigureRetention = true;
+    snapshotRef.current.effective = { traces: 49, scenarios: 49, experiments: 49 };
     snapshotRef.current.rules = [
       {
         scopeType: "TEAM",
@@ -205,6 +216,14 @@ describe("given the retention policies page", () => {
       renderScreen(new TestRetentionHost());
 
       expect(screen.getByText(/override the platform default of/)).toHaveTextContent("49 days");
+    });
+
+    it("names the deployment's own default, not a fixed constant", () => {
+      snapshotRef.current.rules = [];
+      snapshotRef.current.effective = { traces: 7, scenarios: 7, experiments: 7 };
+      renderScreen(new TestRetentionHost());
+
+      expect(screen.getByText(/override the platform default of/)).toHaveTextContent("7 days");
     });
   });
 

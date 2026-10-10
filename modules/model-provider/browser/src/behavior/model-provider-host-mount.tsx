@@ -146,6 +146,14 @@ class HostServiceModelProviderHost extends ModelProviderHostApi {
     this.feedback.succeeded(notice);
   }
 
+  warned(notice: ModelProviderSuccessNotice): void {
+    this.feedback.warned(notice);
+  }
+
+  informed(notice: ModelProviderSuccessNotice): void {
+    this.feedback.informed(notice);
+  }
+
   failed(failure: ModelProviderFailureNotice): void {
     this.feedback.failed(failure);
   }

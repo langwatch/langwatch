@@ -583,7 +583,6 @@ export class IdentityModule
     const ssoConnectionGraph = composeSsoConnectionGraph({
       breakGlass,
       repositories: setup.repositories,
-      eventStore: eventStores.of({ pipeline: SSO_CONNECTION_PIPELINE_NAME }),
       commands: identityEventing,
       directoryMove: SsoConnectionDirectoryMoveService.create({
         connections: ssoConnectionReads,

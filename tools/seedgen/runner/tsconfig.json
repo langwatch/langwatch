@@ -35,6 +35,15 @@
       "path": "../../../modules/trace/contract/tsconfig.build.json"
     },
     {
+      "path": "../../../modules/organization/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../modules/project/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../modules/user/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/test-harness/tsconfig.build.json"
     },
     {

@@ -10,6 +10,7 @@ const { state, calls } = vi.hoisted(() => ({
   state: {
     mine: [] as { joinRequestId: string; organizationId: string }[],
     offer: { outcome: "none" } as unknown,
+    lookup: undefined as unknown,
     invitations: { data: [] as unknown[], isPending: false, isSuccess: true, isError: false },
   },
   calls: {
@@ -35,6 +36,7 @@ vi.mock("@langwatch/identity-client", () => {
       identity: {
         joinRequests: {
           offer: { useQuery: () => ({ data: state.offer, isPending: false }) },
+          lookup: { useQuery: () => ({ data: state.lookup, isPending: false }) },
           mine: { useQuery: () => ({ data: state.mine, isPending: false }) },
           dismissOffer: idle,
           request: recording(calls.request),
@@ -81,6 +83,7 @@ const invitation = { inviteCode: "code_1", organizationName: "Acme", role: "DEVE
 beforeEach(() => {
   state.mine = [];
   state.offer = { outcome: "none" };
+  state.lookup = undefined;
   state.invitations = { data: [], isPending: false, isSuccess: true, isError: false };
   calls.request.length = 0;
   calls.admit.length = 0;
@@ -247,5 +250,34 @@ describe("given the welcome screen reached from the terminal", () => {
     fireEvent.click(screen.getByRole("button", { name: "Ask to join Acme" }));
 
     expect(calls.request).toEqual([{ organizationId: "org_acme", origin: "cli" }]);
+  });
+});
+
+describe("given the welcome screen after the offer was declined at sign-up", () => {
+  /** @scenario "Declining the team at sign-up is not asked again during onboarding" */
+  it("draws no takeover over the organization form", () => {
+    state.lookup = { outcome: "ask", organizations: [acme] };
+
+    renderWithOrganizationHost(
+      <JoinYourTeamTakeover
+        currentOrganizationId={null}
+        fallback={<div data-testid="beneath" />}
+      />,
+    );
+
+    expect(screen.queryByTestId("join-team-takeover")).not.toBeInTheDocument();
+    expect(screen.getByTestId("beneath")).toBeInTheDocument();
+  });
+
+  /** @scenario "Joining from the organization step runs the same request as the offer" */
+  it("names the organization on the wait that follows a request from the form", () => {
+    state.lookup = { outcome: "ask", organizations: [acme] };
+    state.mine = [{ joinRequestId: "jr_1", organizationId: "org_acme" }];
+
+    renderWithOrganizationHost(<JoinYourTeamTakeover currentOrganizationId={null} />);
+
+    expect(screen.getByTestId("join-team-waiting")).toHaveTextContent(
+      "Your request to join Acme is with their administrators.",
+    );
   });
 });

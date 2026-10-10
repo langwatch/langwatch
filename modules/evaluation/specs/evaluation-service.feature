@@ -113,6 +113,12 @@ Feature: Evaluation service boundary
     Then the ledger holds one entry under the id the call chose, inside its project only
 
   @unit
+  Scenario: An evaluate call outside a trace still records its cost
+    Given an evaluate call from an experiment workbench, which names no trace
+    When the evaluator's cost is recorded
+    Then the entry is written without a trace id rather than failing the evaluation
+
+  @unit
   Scenario: An evaluate call reads the monitor it names by slug from the monitor module
     Given a process that installs the evaluation feature beside a monitor owner
     When an evaluate call names a monitor slug the project holds
@@ -284,6 +290,13 @@ Feature: Evaluation service boundary
     Given langevals answers an evaluation with a skipped result whose cost is null
     When an evaluator is run over the data
     Then the result is skipped with its details and a null cost
+
+  @unit
+  Scenario: An evaluator's declared extra fields reach langevals as sent
+    Given a comparison evaluator run over data carrying its candidates and a field it does not declare
+    When the evaluator is run over the data
+    Then langevals receives the candidates and the row index as sent
+    And the undeclared field is not sent
 
   @unit
   Scenario: A langevals answer that is not an evaluation result fails the run naming the evaluator

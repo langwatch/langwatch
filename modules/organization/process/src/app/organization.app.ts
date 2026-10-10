@@ -36,6 +36,7 @@ import {
   type OrganizationInviteExtended,
   type OrganizationInviteResent,
   type OrganizationListedInvite,
+  type InviteLanding,
   type OrganizationInviteAccepted,
   type OrganizationPendingInviteApplied,
   type OrganizationJoinOrigin,
@@ -1616,6 +1617,14 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
     by: OrganizationCaller,
   ): Promise<OrganizationInviteAccepted> {
     return this.#invitationDoor.accept(input, by);
+  }
+
+  async getInviteLanding(input: Readonly<{ inviteCode: string }>): Promise<InviteLanding> {
+    return this.#invitationDoor.landing(input);
+  }
+
+  async requestFreshInvite(input: Readonly<{ inviteCode: string }>): Promise<void> {
+    return this.#invitationDoor.requestFresh(input);
   }
 
   async applyPendingInvite(

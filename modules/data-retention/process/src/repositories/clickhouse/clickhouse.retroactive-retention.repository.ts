@@ -23,7 +23,8 @@ const mutationRowSchema = z
     mutationId: z.string(),
     table: z.string(),
     isDone: z.number(),
-    partsToDo: z.number(),
+    // `parts_to_do` is Int64, which ClickHouse's JSON output sends as a string.
+    partsToDo: z.coerce.number(),
     createTime: z.string(),
     // Selected only so eventing's rewrite can be read back for its category
     // marker; dropped before a row leaves this repository.
@@ -205,7 +206,7 @@ export class ClickHouseRetroactiveRetentionRepository implements RetroactiveRete
         FROM system.mutations
         WHERE database = currentDatabase()
           AND table IN {tables:Array(String)}
-          AND position(command, '_retention_days') > 0
+          AND position(command, '_retention_days = 0') > 0
         ORDER BY create_time DESC
       `,
       params: { tables: this.eventLogRetention.tables },

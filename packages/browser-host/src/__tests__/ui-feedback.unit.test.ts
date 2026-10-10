@@ -284,5 +284,18 @@ describe("given a failure a screen hands over", () => {
         },
       ]);
     });
+
+    it("draws a warning as a warning and a plain fact as information", () => {
+      const { toaster, toasts } = recordingToaster();
+      const feedback = BrowserUiFeedback.create(toaster);
+
+      feedback.warned({ title: "Saved 7 of 9 updates" });
+      feedback.informed({ title: "Your license is up to date" });
+
+      expect(toasts).toEqual([
+        { title: "Saved 7 of 9 updates", type: "warning" },
+        { title: "Your license is up to date", type: "info" },
+      ]);
+    });
   });
 });

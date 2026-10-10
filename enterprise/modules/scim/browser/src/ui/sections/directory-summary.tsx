@@ -16,10 +16,11 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import { StatusChip, type StatusChipTone } from "@langwatch/design-system/settings-card";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { DirectorySummaryProps } from "@langwatch/enterprise-scim-client";
 import { HandledErrorAlert } from "@langwatch/error-views";
 import { nowInstant, readableDate } from "@langwatch/time";
-import { Boxes, Clock, Plug, Plus, Users, UserX } from "lucide-react";
+import { Boxes, Clock, Info, Plug, Plus, Users, UserX } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { useDirectoryFacts } from "../../behavior/use-directory-facts.ts";
@@ -54,9 +55,7 @@ export default function DirectorySummary({
   return (
     <VStack align="stretch" gap={3} width="full">
       <SimpleGrid columns={{ base: 1, sm: 2, lg: 5 }} gap={3} data-testid="directory-summary">
-        <Fact label="Sources" icon={<Plug size={14} />}>
-          <DirectorySources connections={facts.connections} />
-        </Fact>
+        <DirectorySources connections={facts.connections} />
         <Fact label="Last directory change" icon={<Clock size={14} />}>
           <FactNumber
             muted={facts.lastPushedAtMs === null}
@@ -126,7 +125,7 @@ function MembersOutsideDirectory({
 }) {
   return (
     <Fact
-      label="Members it does not manage"
+      label="Not managed by directory"
       hint="Your directory did not create these accounts, so removing them there will not remove them here."
       icon={<UserX size={14} />}
     >
@@ -143,47 +142,53 @@ function MembersOutsideDirectory({
 function DirectorySources({ connections }: { connections: DirectoryFactsRead["connections"] }) {
   if (connections.length === 0) {
     return (
-      <VStack align="start" gap={1}>
-        <StatusChip
-          label="Not set up yet"
+      <Fact
+        label="Sources"
+        icon={<Plug size={14} />}
+        caption={
+          <Text asChild fontSize="xs" color="orange.fg">
+            <Link unstyled href={AUTHENTICATION_PAGE} data-testid="connect-identity-provider">
+              Connect a provider →
+            </Link>
+          </Text>
+        }
+      >
+        <FactNumber
+          muted
           title="No identity provider is connected, so nothing is provisioned here automatically."
           data-testid="directory-source-chip"
-        />
-        <Text fontSize="xs" color="fg.muted">
-          Nobody is provisioned here automatically.
-        </Text>
-        <Text asChild fontSize="xs" color="orange.fg">
-          <Link unstyled href={AUTHENTICATION_PAGE} data-testid="connect-identity-provider">
-            Connect an identity provider →
-          </Link>
-        </Text>
-      </VStack>
+        >
+          Not set up
+        </FactNumber>
+      </Fact>
     );
   }
 
   const shown = connections.slice(0, SOURCES_SHOWN);
   const rest = connections.length - shown.length;
   return (
-    <HStack gap={1} flexWrap="wrap">
-      {shown.map((connection) => (
-        <StatusChip
-          key={connection.connectionId}
-          label={`${connection.providerId} · ${connection.status.headline}`}
-          tone={sourceTone(connection.status.tone)}
-          title={connection.status.headline}
-          data-testid="directory-source-chip"
-        />
-      ))}
-      {rest > 0 && <Text fontSize="xs" color="fg.muted">{`+${rest} more`}</Text>}
-      <Link
-        unstyled
-        href={AUTHENTICATION_PAGE}
-        aria-label="Connect another identity provider"
-        title="Connect another identity provider"
-      >
-        <Plus size={16} />
-      </Link>
-    </HStack>
+    <Fact label="Sources" icon={<Plug size={14} />}>
+      <HStack gap={1} flexWrap="wrap">
+        {shown.map((connection) => (
+          <StatusChip
+            key={connection.connectionId}
+            label={`${connection.providerId} · ${connection.status.headline}`}
+            tone={sourceTone(connection.status.tone)}
+            title={connection.status.headline}
+            data-testid="directory-source-chip"
+          />
+        ))}
+        {rest > 0 && <Text fontSize="xs" color="fg.muted">{`+${rest} more`}</Text>}
+        <Link
+          unstyled
+          href={AUTHENTICATION_PAGE}
+          aria-label="Connect another identity provider"
+          title="Connect another identity provider"
+        >
+          <Plus size={16} />
+        </Link>
+      </HStack>
+    </Fact>
   );
 }
 
@@ -236,36 +241,42 @@ function DirectorySummarySkeleton() {
   );
 }
 
-/** One independently readable directory fact. */
+/** One independently readable directory fact: label line, the big value, one short caption. */
 function Fact({
   label,
   hint,
+  caption,
   icon,
   children,
 }: {
   label: string;
+  /** The long explanation, behind an info icon by the label. */
   hint?: string;
+  caption?: ReactNode;
   icon: ReactNode;
   children: ReactNode;
 }) {
   return (
-    <Card.Root borderRadius="xl" minWidth={0}>
-      <Card.Body paddingX={4} paddingY={3}>
-        <VStack align="start" gap={1.5} minWidth={0}>
-          <HStack gap={1.5} color="fg.muted">
+    <Card.Root borderRadius="xl" minWidth={0} height="full">
+      <Card.Body paddingX={3} paddingY={3}>
+        <VStack align="start" gap={1} minWidth={0}>
+          <HStack gap={1.5} color="fg.muted" whiteSpace="nowrap">
             {icon}
             <Text fontSize="xs" fontWeight={500} lineHeight="1.3">
               {label}
             </Text>
+            {hint && (
+              <Tooltip content={hint}>
+                <span aria-label={hint} style={{ display: "inline-flex" }}>
+                  <Info size={12} />
+                </span>
+              </Tooltip>
+            )}
           </HStack>
           <HStack align="center" minWidth={0} maxWidth="full">
             {children}
           </HStack>
-          {hint && (
-            <Text fontSize="xs" color="fg.muted" lineHeight="1.35" title={hint} lineClamp={2}>
-              {hint}
-            </Text>
-          )}
+          {caption}
         </VStack>
       </Card.Body>
     </Card.Root>

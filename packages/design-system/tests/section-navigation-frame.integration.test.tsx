@@ -35,6 +35,23 @@ describe("SectionNavigationFrame", () => {
       expect(screen.getByText("Page body")).toBeTruthy();
     });
 
+    it("drops the visible heading when hideTitle is set, keeping the accessible name", () => {
+      renderWithDesignSystem(
+        <SectionNavigationFrame
+          label="Section"
+          hideTitle
+          links={LINKS}
+          activeHref="/section"
+          onNavigate={() => {}}
+        >
+          <p>Page body</p>
+        </SectionNavigationFrame>,
+      );
+
+      expect(screen.queryByTestId("section-navigation-title")).toBeNull();
+      expect(screen.getByRole("navigation", { name: "Section navigation" })).toBeTruthy();
+    });
+
     it("marks only the active entry as the current page", () => {
       renderWithDesignSystem(
         <SectionNavigationFrame

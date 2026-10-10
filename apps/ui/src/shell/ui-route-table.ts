@@ -763,7 +763,7 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
           },
           {
             path: "/:project/setup",
-            page: "pages/[project]/setup",
+            redirect: { from: "/:project/setup", to: "/:project" },
           },
           {
             path: "/:project/workflows",

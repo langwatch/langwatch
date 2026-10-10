@@ -39,7 +39,7 @@ import type { AvailableSource, FieldMapping as UIFieldMapping } from "@langwatch
 import debounce from "lodash-es/debounce";
 import { ExternalLink } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { FormProvider, type UseFormReturn, useForm } from "react-hook-form";
+import { Controller, FormProvider, type UseFormReturn, useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 
 import { ComparisonConfigForm } from "../../../behavior/lent-peers.tsx";
@@ -440,7 +440,8 @@ export function useEvaluatorEditorController(
   });
 
   const isSaving = createMutation.isPending || updateMutation.isPending;
-  const name = form.watch("name");
+  // The React Compiler memoises `form.watch()` on the stable form; useWatch subscribes.
+  const name = useWatch({ control: form.control, name: "name" });
 
   // A comparison with fewer than two variants judges nothing (the
   // orchestrator skips it), so gate Save/Apply on it. Filter empty slots,
@@ -663,15 +664,23 @@ export function EvaluatorEditorBody({ controller }: { controller: EvaluatorEdito
           </Text>
         )}
 
-        <Field.Root required invalid={!!form.formState.errors.name}>
-          <Field.Label>Evaluator Name</Field.Label>
-          <Input
-            {...form.register("name")}
-            placeholder="Enter evaluator name"
-            data-testid="evaluator-name-input"
-          />
-          <Field.ErrorText>{form.formState.errors.name?.message}</Field.ErrorText>
-        </Field.Root>
+        {/* A Controller, not `register`: the compiler memoises register's ref, so a form.reset()
+            would unregister the field and every keystroke after it is dropped. */}
+        <Controller
+          control={form.control}
+          name="name"
+          render={({ field, fieldState }) => (
+            <Field.Root required invalid={!!fieldState.error}>
+              <Field.Label>Evaluator Name</Field.Label>
+              <Input
+                {...field}
+                placeholder="Enter evaluator name"
+                data-testid="evaluator-name-input"
+              />
+              <Field.ErrorText>{fieldState.error?.message}</Field.ErrorText>
+            </Field.Root>
+          )}
+        />
 
         {hasSettings && evaluatorType && settingsSchema && (
           <DynamicZodForm

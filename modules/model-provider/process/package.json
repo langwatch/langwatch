@@ -50,6 +50,7 @@
     "@langwatch/secrets": "workspace:*",
     "@langwatch/task": "workspace:*",
     "@langwatch/time": "workspace:*",
+    "@langwatch/trace-contract": "workspace:*",
     "@langwatch/upgrade": "workspace:*",
     "@openrouter/sdk": "^0.3.12",
     "@trpc/server": "catalog:",

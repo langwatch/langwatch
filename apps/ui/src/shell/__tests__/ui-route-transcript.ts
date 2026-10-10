@@ -133,7 +133,7 @@ export const expectedUiRouteTranscript: readonly string[] = [
   "    redirect /:project/messages/:trace -> /:project/traces (from /:project/messages/:trace) [pin drawer.open=traceV2Details drawer.traceId=:trace]",
   "    redirect /:project/messages/:trace/:openTab -> /:project/traces (from /:project/messages/:trace/:openTab) [pin drawer.open=traceV2Details drawer.traceId=:trace]",
   "    redirect /:project/messages/:trace/:openTab/:span -> /:project/traces (from /:project/messages/:trace/:openTab/:span) [pin drawer.open=traceV2Details drawer.traceId=:trace drawer.span=:span]",
-  "    route /:project/setup -> pages/[project]/setup",
+  "    redirect /:project/setup -> /:project (from /:project/setup)",
   "    route /:project/workflows -> pages/[project]/workflows",
   "    route /:project/analytics -> pages/[project]/analytics/index",
   "    route /:project/analytics/evaluations -> pages/[project]/analytics/evaluations",

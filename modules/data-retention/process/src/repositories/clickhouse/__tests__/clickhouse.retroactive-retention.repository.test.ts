@@ -342,6 +342,23 @@ describe("ClickHouseRetroactiveRetentionRepository", () => {
     expect(query.sql).not.toContain("weird'\\id");
   });
 
+  /** @scenario "Retention settings show in-flight rewrites as ClickHouse reports them" */
+  it("reads parts_to_do as a number when ClickHouse sends the Int64 as a string (WEB-1004)", async () => {
+    const { repository } = createRepository([
+      {
+        mutationId: "mut-1",
+        table: "stored_spans",
+        isDone: 0,
+        partsToDo: "7",
+        createTime: "2026-01-01T00:00:00",
+      },
+    ]);
+
+    const progress = await repository.findMutationProgress({ projectId: "project-1" });
+
+    expect(progress).toMatchObject([{ mutationId: "mut-1", partsToDo: 7, isDone: false }]);
+  });
+
   it("parameterizes mutation cancellation and scopes it to the tenant", async () => {
     const { commands, repository } = createRepository([]);
 

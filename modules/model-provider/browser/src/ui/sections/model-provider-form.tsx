@@ -41,6 +41,10 @@ import { useModelProviderForm } from "../../behavior/use-model-provider-form.ts"
 import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project.ts";
 import type { AdvancedGatewayPayload } from "../../behavior/use-provider-form-submit.ts";
 import { useRequiredCredentialKeys } from "../../behavior/use-required-credential-keys.ts";
+// DefaultProviderSection has been moved out of this drawer to a page-level
+// section on the model-providers settings page (DefaultModelsSection). See
+// specs/model-providers/hierarchical-default-models.feature.
+import { embeddedProviderLabel } from "../../model/embedded-provider-setup.ts";
 import {
   getEmptyRequiredCredentialKeys,
   hasUserEnteredNewApiKey,
@@ -49,9 +53,7 @@ import {
 import { useModelProviderHost } from "../../model/model-provider-host.ts";
 import { parseZodFieldErrors, type ZodErrorStructure } from "../../model/zod-field-errors.ts";
 import { CodexSignIn } from "./codex-sign-in.tsx";
-// DefaultProviderSection has been moved out of this drawer to a page-level
-// section on the model-providers settings page (DefaultModelsSection). See
-// specs/model-providers/hierarchical-default-models.feature.
+import { EmbeddedProviderForm } from "./embedded-provider-form.tsx";
 import { GuidedProviderForm } from "./guided-provider-form.tsx";
 import {
   ADVANCED_ACCORDION_VALUE,
@@ -494,7 +496,8 @@ function ProviderAdvancedArea({
 
 /**
  * `"new"` never resolves, so the Add Model Provider menu can stand up a second instance. The
- * guided step instead edits the provider's stored row, a server-environment one included (main).
+ * guided and embedded setups instead edit the provider's stored row, a server-environment one
+ * included (main).
  */
 function resolveEditedRow<T extends { id: string; provider: string }>({
   guided,
@@ -502,6 +505,7 @@ function resolveEditedRow<T extends { id: string; provider: string }>({
   modelProviderId,
   providerKey,
 }: {
+  /** Guided or embedded: either edits the stored row of this type. */
   guided: boolean;
   providers: readonly T[];
   modelProviderId: string | undefined;
@@ -605,6 +609,7 @@ export const EditModelProviderForm = ({
   providerKey,
   onSaved: onSavedBy,
   guided = false,
+  embedded = false,
   onFailed,
 }: EditModelProviderFormProps) => {
   const { providers } = useModelProvidersSettings({
@@ -656,8 +661,14 @@ export const EditModelProviderForm = ({
   // without colliding with the first.
   const isTargetingSpecificRow = isResolvableProviderId(modelProviderId);
   const existingRow = useMemo(
-    () => resolveEditedRow({ guided, providers: allProviders, modelProviderId, providerKey }),
-    [guided, allProviders, modelProviderId, providerKey],
+    () =>
+      resolveEditedRow({
+        guided: guided || embedded,
+        providers: allProviders,
+        modelProviderId,
+        providerKey,
+      }),
+    [guided, embedded, allProviders, modelProviderId, providerKey],
   );
 
   // Two DISTINCT concerns, deliberately not collapsed into one flag: - Whether we can SUBMIT.
@@ -912,6 +923,37 @@ export const EditModelProviderForm = ({
         onConnect={() => void handleSave()}
         projectId={project?.id ?? ""}
         onFailed={onFailed}
+      />
+    );
+  }
+
+  if (embedded) {
+    return (
+      <EmbeddedProviderForm
+        provider={provider}
+        providerName={embeddedProviderLabel({ providerKey: provider.provider, providerName })}
+        isOAuthDeviceProvider={isOAuthDeviceProvider}
+        state={state}
+        actions={actions}
+        azureGatewaySwitch={
+          <ApiGatewaySwitch
+            actions={actions}
+            isLlmProvider={isLlmProvider}
+            provider={provider}
+            state={state}
+          />
+        }
+        fieldErrors={fieldErrors}
+        setFieldErrors={setFieldErrors}
+        refusal={apiKeyValidationError}
+        clearRefusal={clearApiKeyError}
+        isBusy={isBusy}
+        canResolveTarget={!cannotResolveTarget}
+        saveLabel={saveLabel}
+        onSave={() => void handleSave()}
+        projectId={project?.id ?? ""}
+        onConnected={() => onSaved?.()}
+        onFailed={(code) => onFailed?.({ provider: provider.provider, code })}
       />
     );
   }

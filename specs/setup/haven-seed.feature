@@ -86,6 +86,49 @@ Feature: haven seed fills a stack with every kind of data, at any size, without 
     And "--json" prints the same as one object
 
   @unit
+  Scenario: The access block lists every seeded org and its logins
+    Given a seed whose run record holds the ids the product returned
+    When "haven seed" prints its access block
+    Then it lists each org the product created, with its id, persona and member logins
+    And an org or user the product never returned an id for is not listed
+    And every login's password is the one dev password, masked unless "--reveal" is given
+
+  @unit
+  Scenario: The seeded admin is an admin of every org the seed creates
+    Given the stack's admin email
+    When a seed creates organizations
+    Then the admin account is found or created once
+    And each org's owner admits the admin with an admin role on the org and its main team
+
+  @unit
+  Scenario: haven seed creates the orgs it is asked for
+    When I run "haven seed --org name=acme,users=4 --org name=globex,persona=enterprise"
+    Then exactly those orgs are planned, named as asked, each with its owner and users
+    And a malformed name, an unknown key, a plan that is not built yet or a user count out of range is refused naming --org
+
+  @unit
+  Scenario: haven seed --into sends telemetry into one existing project
+    When I run "haven seed --into <org-id>/<project-id>"
+    Then no user, org, project or membership is created
+    And every telemetry chunk lands in that project
+    And --into with --org, or without a project, is refused naming --into
+
+  @unit
+  Scenario: Old telemetry lands at its own time so retention can be tested
+    When I run "haven seed --days 30 --age 90d"
+    Then every trace, log and metric is timed between 120 and 90 days ago
+    And the data goes through the owners' ingest, so tenancy and the retention policy apply to it
+    And an age that is negative, not whole days, or reaching past 365 days with --days is refused naming --age
+
+  @unit
+  Scenario: Each project gets long conversations whose turns share one conversation id
+    When I run "haven seed --conversations 2 --turns 15"
+    Then each project gets two conversations of fifteen turns, one trace per turn, minutes apart
+    And every turn carries its conversation's gen_ai.conversation.id
+    And their spans come out of the span budget, so the span count stays exact
+    And a budget too small for them seeds none, and bad counts are refused naming the flag
+
+  @unit
   Scenario: haven seed refuses a stack that is not up
     Given the stack's api or worker is not running
     When I run "haven seed"

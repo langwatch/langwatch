@@ -15,7 +15,13 @@ import {
 } from "@langwatch/design-system/primitives";
 import type { ScopeTriadEntry } from "@langwatch/design-system/scope-chip-picker";
 import { useEffect, useState } from "react";
-import { type FieldErrors, type UseFormRegister, useForm, useWatch } from "react-hook-form";
+import {
+  type Control,
+  type UseFormRegister,
+  useForm,
+  useFormState,
+  useWatch,
+} from "react-hook-form";
 
 import { authzApi } from "../../behavior/authz-api.ts";
 import { useAuthzHost } from "../../model/authz-host.ts";
@@ -84,31 +90,30 @@ function useRoleForm({ open, organizationId, editing, onClose }: RoleDialogProps
   const [previewScope, setPreviewScope] = useState<ScopeTriadEntry[]>([
     { scopeType: "ORGANIZATION", scopeId: organizationId },
   ]);
-  const {
-    control,
-    register,
-    handleSubmit,
-    reset,
-    setValue,
-    formState: { errors },
-  } = useForm<RoleFormValues>({ defaultValues: { name: "", description: "", permissions: [] } });
+  const { control, register, handleSubmit, reset, setValue } = useForm<RoleFormValues>({
+    defaultValues: { name: "", description: "", permissions: [] },
+  });
   const permissions = useWatch({ control, name: "permissions" }) ?? [];
 
   // Mounted once and reused, so each opening refills it from the role in hand.
   useEffect(() => {
     if (!open) return;
-    reset({
-      name: editing?.name ?? "",
-      description: editing?.description ?? "",
-      permissions: (editing?.permissions ?? []).filter(isRegistryPermission),
-    });
+    reset(
+      {
+        name: editing?.name ?? "",
+        description: editing?.description ?? "",
+        permissions: (editing?.permissions ?? []).filter(isRegistryPermission),
+      },
+      // The compiled form never re-calls register(), so the reset keeps its fields (WEB-5030).
+      { keepFieldsRef: true },
+    );
     setPreviewScope([{ scopeType: "ORGANIZATION", scopeId: organizationId }]);
   }, [open, editing, organizationId, reset]);
 
   const { saving, save } = useRoleMutations({ organizationId, editing, onClose });
 
   return {
-    errors,
+    control,
     permissions,
     previewScope,
     register,
@@ -156,7 +161,7 @@ function useRoleMutations({
 
 function RoleFormBody({
   organizationId,
-  errors,
+  control,
   permissions,
   previewScope,
   register,
@@ -170,7 +175,7 @@ function RoleFormBody({
     <form id="role-form" onSubmit={(event) => void submit(event)}>
       <Grid templateColumns={{ base: "1fr", lg: "1.4fr 1fr" }} gap={8} alignItems="start">
         <VStack align="stretch" gap={5}>
-          <RoleIdentityFields register={register} errors={errors} />
+          <RoleIdentityFields register={register} control={control} />
 
           <Box>
             <Text fontSize="sm" fontWeight="semibold">
@@ -211,11 +216,13 @@ function RoleFormBody({
 /** What the role is called, and who it is for. */
 function RoleIdentityFields({
   register,
-  errors,
+  control,
 }: {
   register: UseFormRegister<RoleFormValues>;
-  errors: FieldErrors<RoleFormValues>;
+  control: Control<RoleFormValues>;
 }) {
+  // A subscription here, so a refused submit re-renders the field as invalid (as WEB-5602).
+  const { errors } = useFormState({ control, name: "name" });
   return (
     <>
       <Field.Root invalid={!!errors.name}>

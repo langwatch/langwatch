@@ -109,6 +109,12 @@ export abstract class GovernanceHostApi {
 
   abstract succeeded(notice: GovernanceSuccessNotice): void;
 
+  /** A caution that is not a failure, drawn as a warning. */
+  abstract warned(notice: GovernanceSuccessNotice): void;
+
+  /** A plain fact, drawn as information. */
+  abstract informed(notice: GovernanceSuccessNotice): void;
+
   abstract failed(failure: GovernanceFailureNotice): void;
 }
 

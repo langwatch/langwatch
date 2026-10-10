@@ -51,6 +51,8 @@ export type GovernanceHostRecording = {
   navigations: string[];
   queries: { next: GovernanceQuery; replace: boolean }[];
   successes: GovernanceSuccessNotice[];
+  warnings: GovernanceSuccessNotice[];
+  infos: GovernanceSuccessNotice[];
   failures: GovernanceFailureNotice[];
 };
 
@@ -96,7 +98,14 @@ export class FakeGovernanceHost extends GovernanceHostApi {
   static create(options: FakeGovernanceHostOptions = {}): FakeGovernanceHost {
     return new FakeGovernanceHost({
       options,
-      recording: { navigations: [], queries: [], successes: [], failures: [] },
+      recording: {
+        navigations: [],
+        queries: [],
+        successes: [],
+        warnings: [],
+        infos: [],
+        failures: [],
+      },
       query: options.query ?? {},
     });
   }
@@ -204,6 +213,14 @@ export class FakeGovernanceHost extends GovernanceHostApi {
 
   succeeded(notice: GovernanceSuccessNotice): void {
     this.recording.successes.push(notice);
+  }
+
+  warned(notice: GovernanceSuccessNotice): void {
+    this.recording.warnings.push(notice);
+  }
+
+  informed(notice: GovernanceSuccessNotice): void {
+    this.recording.infos.push(notice);
   }
 
   failed(failure: GovernanceFailureNotice): void {

@@ -279,6 +279,14 @@ class HostServicePersonalWorkspaceHost extends PersonalWorkspaceHostApi {
     this.feedback.succeeded(notice);
   }
 
+  warned(notice: PersonalSuccessNotice): void {
+    this.feedback.warned(notice);
+  }
+
+  informed(notice: PersonalSuccessNotice): void {
+    this.feedback.informed(notice);
+  }
+
   failed(failure: PersonalFailureNotice): void {
     this.feedback.failed(failure);
   }

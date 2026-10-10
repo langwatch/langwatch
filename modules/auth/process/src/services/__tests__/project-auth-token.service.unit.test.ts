@@ -19,6 +19,7 @@ const ACME: ResolvedApiKeyCredential = {
     organizationId: "org-1",
     isPersonal: false,
     ownerUserId: null,
+    kind: "application",
   },
 };
 

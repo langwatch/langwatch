@@ -17,9 +17,12 @@
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/log-contract": "workspace:*",
     "@langwatch/metric-contract": "workspace:*",
+    "@langwatch/organization-contract": "workspace:*",
     "@langwatch/process": "workspace:*",
+    "@langwatch/project-contract": "workspace:*",
     "@langwatch/task": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
+    "@langwatch/user-contract": "workspace:*",
     "zod": "catalog:"
   },
   "devDependencies": {

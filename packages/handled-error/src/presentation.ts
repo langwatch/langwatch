@@ -1379,6 +1379,13 @@ const presentations = {
     describe: () =>
       "Saving this would remove the credentials already stored for this provider. Leave the credential fields as they are to keep them, or empty them yourself if removing them is what you want.",
   },
+  model_provider_invalid: {
+    title: "That provider can't be saved",
+    describe: (error) =>
+      strEq(error, "reason", "endpoint_not_allowed")
+        ? "The base URL can't be used. Check it is a full address such as https://inference.acme.internal/v1 that resolves to a public host, then save again."
+        : "Check the provider's fields, then save again.",
+  },
   model_provider_custom_keys_missing: {
     title: "This provider has no credentials saved",
     describe: () => "Add the provider's API key in Model Providers settings, then try again.",

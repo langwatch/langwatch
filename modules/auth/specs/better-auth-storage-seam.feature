@@ -58,3 +58,11 @@ Feature: Better Auth's storage seam
     When they sign in and read their session
     Then the session payload names them
     And it carries no signupConfirmationPending field
+
+  @unit
+  Scenario: A sealed provider row reads back opened wherever single sign-on reads it
+    Given identity stored a provider row with its dialing document sealed
+    When single sign-on reads the row, including the row an update returns inside a transaction
+    Then the dialing document it gets is the opened one
+    # The account-link lock re-reads the row through an update and parses it;
+    # a sealed document there failed the callback for an existing person.

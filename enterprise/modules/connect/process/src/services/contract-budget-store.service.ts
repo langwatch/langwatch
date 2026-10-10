@@ -10,11 +10,14 @@ const CENTS = 100;
 
 const contractBudgetMetadataSchema = z.object({ [CAP_SET_BY]: z.string().optional() });
 
-type GatewayBudgets = Pick<GatewayApi, "listBudgetsWithHealth" | "updateBudget">;
+type GatewayBudgets = Pick<
+  GatewayApi,
+  "listBudgetsWithHealth" | "createBudget" | "updateBudget" | "resetBudget"
+>;
 
 /**
  * The contract budget kept in the gateway's own budget table, reached through the gateway's
- * operations, as main's `PrismaContractBudgetStore` kept it. Licensing creates and resets it.
+ * operations, as main's `PrismaContractBudgetStore` kept it.
  */
 export class ContractBudgetStoreService implements ContractBudgetStore {
   static create({ gateway }: { gateway: GatewayBudgets }): ContractBudgetStoreService {
@@ -35,7 +38,35 @@ export class ContractBudgetStoreService implements ContractBudgetStore {
       id: budget.id,
       limitUsdCents: Math.round(Number(budget.limitUsd.toString()) * CENTS),
       capSetByCustomer: metadata.success && metadata.data[CAP_SET_BY] === "customer",
+      lastResetAt: budget.lastResetAt,
     };
+  }
+
+  async create({
+    organizationId,
+    limitUsdCents,
+    operatorId,
+  }: {
+    organizationId: string;
+    limitUsdCents: number;
+    operatorId: string;
+  }): Promise<void> {
+    await this.gateway.createBudget({
+      organizationId,
+      scope: { kind: "ORGANIZATION", organizationId },
+      name: "Hosted services contract",
+      description:
+        "Hard stop for LangWatch-hosted services used by this customer's self-hosted installs.",
+      // The period is the contract term, moved by renewal and not by a calendar.
+      window: "MANUAL",
+      limitUsd: (limitUsdCents / CENTS).toFixed(2),
+      onBreach: "BLOCK",
+      externalId: CONTRACT_BUDGET_EXTERNAL_ID,
+      metadata: { [CAP_SET_BY]: "langwatch" },
+      // The managed key that reaches it is created on the install's first call.
+      allowUnreachable: true,
+      actorUserId: operatorId,
+    });
   }
 
   async setLimit({
@@ -58,5 +89,17 @@ export class ContractBudgetStoreService implements ContractBudgetStore {
       metadata: { [CAP_SET_BY]: capSetByCustomer ? "customer" : "langwatch" },
       actorUserId: actorId,
     });
+  }
+
+  async reset({
+    organizationId,
+    id,
+    actorId,
+  }: {
+    organizationId: string;
+    id: string;
+    actorId: string;
+  }): Promise<void> {
+    await this.gateway.resetBudget({ id, organizationId, actorUserId: actorId });
   }
 }
