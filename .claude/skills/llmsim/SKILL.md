@@ -6,15 +6,19 @@ user-invocable: true
 
 # llmsim
 
-Answers OpenAI chat completions, embeddings and models and Anthropic messages from a
-seeded Markov chain: the same prompt gets the same answer, at no cost. Code:
-`services/llmsim`, console `apps/llmsim-web`.
+Answers OpenAI chat completions, embeddings and models, Anthropic messages, Gemini and
+Vertex generateContent, and Bedrock Converse from a seeded Markov chain: the same prompt
+gets the same answer, at no cost. Code: `services/llmsim`, console `apps/llmsim-web`.
 
 ## Run it
 
 - Opt-in: `haven up +llm` (sticky). Hosted in the `sims` lane.
 - Console: `https://llm.<slug>.langwatch.localhost`; `haven status` shows the loopback
   port for drivers (`POST /v1/chat/completions`, `/v1/messages`, `/v1/responses`, `/v1/embeddings`).
+  Also `POST /v1beta/models/<m>:generateContent` and `:streamGenerateContent` (`?alt=sse`
+  for SSE, else a JSON array), the Vertex path `/v1/projects/<p>/locations/<l>/publishers/google/models/<m>:generateContent`,
+  and Bedrock `POST /model/<modelId>/converse` and `/converse-stream` (AWS event stream; the
+  AWS SDK works with any keys via `BaseEndpoint`). These wires name the model in the path.
   Calls tab: filter, per-call detail, Clear calls. Settings tab: forced error, seed and the
   per-call override headers.
 - The loopback port is stable per stack (a slug hash in 21000-21999, probed if taken), so seeded providers survive `haven up` restarts.
@@ -26,7 +30,8 @@ seeded Markov chain: the same prompt gets the same answer, at no cost. Code:
 
 - Models: `markov-small`, `markov-json`, `markov-tools`, `langy-echo`, `text-embedding-llmsim`; any name works.
 - `canned-hello`, `canned-ok`, `canned-json` return that fixed text for every prompt.
-- `error-429` / `error-500` in the model name, or header `X-Llmsim-Error`, force that error.
+- `error-429` / `error-500` in the model name, or header `X-Llmsim-Error`, force that error,
+  in the caller's dialect (Google `RESOURCE_EXHAUSTED`, Bedrock `ThrottlingException`).
 - The seed gives the OpenAI provider custom models `error-429` and `error-500` (on a newly created row), so any member can pick them in a model selector.
 - `X-Llmsim-Seed` pins or (`random`) varies the answer; `X-Llmsim-Mode: langy` echoes.
 - `response_format` json_schema and forced tools get schema-valid output.

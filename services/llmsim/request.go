@@ -33,6 +33,7 @@ type request struct {
 	maxTokens    int
 	stream       bool
 	includeUsage bool
+	altSSE       bool // Gemini: stream as SSE (?alt=sse), not a JSON array
 	seedBytes    []byte
 }
 

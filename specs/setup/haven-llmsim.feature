@@ -1,12 +1,12 @@
 @unit
 Feature: llmsim, a local LLM provider stand-in run by haven
   The playground, evaluators, scenario runs and Langy all call a model. llmsim
-  answers those calls on a laptop from a seeded Markov chain, in the OpenAI and
-  Anthropic wire formats the gateway and LiteLLM really speak, so a stack can
+  answers those calls on a laptop from a seeded Markov chain, in the OpenAI,
+  Anthropic, Gemini, Vertex and Bedrock Converse wire formats the gateway and LiteLLM really speak, so a stack can
   exercise every model path for $0 and get the same answer for the same prompt.
   It accepts any key and checks none: it is a dev shim.
 
-  # Bound by Go tests in services/llmsim/llmsim_test.go and
+  # Bound by Go tests in services/llmsim/*_test.go and
   # tools/thuishaven/domain/overlay_llm_test.go and tools/thuishaven/app/plan_llm_test.go, by their `// @scenario`
   # annotations. The playground scenario waits on a browser run against a stack.
 
@@ -72,6 +72,25 @@ Feature: llmsim, a local LLM provider stand-in run by haven
     When a model name contains "error-429"
     Then llmsim answers 429 with Retry-After and an OpenAI rate_limit_error body
     And an X-Llmsim-Error 500 header on a messages call answers an Anthropic error body
+
+  Scenario: Gemini and Vertex generateContent are answered in Google's shape
+    When a client calls generateContent on a Gemini models path or a Vertex publishers path
+    Then the answer is a GenerateContentResponse with role "model" parts, a finishReason and usageMetadata
+    And the same prompt gets the same text, and the call is recorded under the gemini or vertex dialect
+    And streamGenerateContent streams chunks that join to that text, as SSE with alt=sse or else as a JSON array
+    And a functionCallingConfig mode ANY calls the allowed function with arguments built from its OBJECT/STRING schema
+    And a responseSchema answers JSON that satisfies it
+
+  Scenario: Bedrock Converse and ConverseStream are answered for the AWS SDK
+    When the AWS SDK calls Converse or ConverseStream on llmsim with any signing keys
+    Then Converse answers an assistant message, a stop reason and token usage
+    And ConverseStream answers an AWS event stream whose text deltas join to that message
+    And a forced tool choice answers a toolUse block whose input satisfies its schema, with stop reason tool_use
+
+  Scenario: A forced error on a path-named model answers in that provider's shape
+    When the model a Gemini, Vertex or Bedrock path names contains "error-429" or "error-400"
+    Then Gemini and Vertex answer {"error": {code, message, status}} with RESOURCE_EXHAUSTED for 429
+    And Bedrock answers X-Amzn-ErrorType ThrottlingException or ValidationException, which the AWS SDK maps
 
   Scenario: Langy mode echoes a plain message
     Given the model is "langy-echo" or the call carries X-Llmsim-Mode "langy"
