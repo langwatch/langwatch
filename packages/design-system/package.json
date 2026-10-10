@@ -439,6 +439,10 @@
       "types": "./dist/components/layout/settings-card.d.ts",
       "default": "./src/components/layout/settings-card.tsx"
     },
+    "./scroll-fade": {
+      "types": "./dist/components/layout/scroll-fade.d.ts",
+      "default": "./src/components/layout/scroll-fade.tsx"
+    },
     "./section-navigation-frame": {
       "types": "./dist/components/layout/section-navigation-frame.d.ts",
       "default": "./src/components/layout/section-navigation-frame.tsx"

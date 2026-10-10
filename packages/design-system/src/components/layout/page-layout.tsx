@@ -98,11 +98,14 @@ function Header({
       ref={mergeRefs(headerRef, ref)}
       data-page-header
       data-scrolled={scrolled ? "true" : "false"}
-      height="shellHeader"
+      // A phone wraps the actions under the title instead of squeezing the title.
+      height={{ base: "auto", md: "shellHeader" }}
       minHeight="shellHeader"
+      flexWrap={{ base: "wrap", md: "nowrap" }}
+      rowGap={2}
       flexShrink={0}
       paddingX={6}
-      paddingY={1.5}
+      paddingY={{ base: 2, md: 1.5 }}
       alignItems="center"
       width="full"
       borderBottomWidth={withBorder ? "1px" : 0}
@@ -120,7 +123,7 @@ function Header({
     >
       {children}
       {actions && (
-        <HStack marginStart="auto" flexShrink={0} gap={2}>
+        <HStack marginStart="auto" flexShrink={0} maxWidth="full" flexWrap="wrap" gap={2}>
           {actions}
         </HStack>
       )}
@@ -148,7 +151,8 @@ function Heading({ children, ...props }: PropsWithChildren<HeadingProps>) {
       fontWeight="semibold"
       letterSpacing="-0.01em"
       minWidth={0}
-      overflowWrap="anywhere"
+      // break-word, not anywhere: a title shrinks to its longest word, never to one letter.
+      overflowWrap="break-word"
       {...props}
     >
       {children}

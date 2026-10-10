@@ -47,3 +47,19 @@ Feature: Shared components sit cleanly on the page
     When the reader looks at the empty state
     Then it is exactly as wide as the column
     And its title's centre lines up with the column's centre
+
+  @integration
+  Scenario: A page header on a phone wraps its actions under the title
+    Given a page header with a title and two actions on a narrow screen
+    When the reader looks at the header
+    Then the header wraps its actions onto a new row instead of squeezing the title
+    And the title breaks only between words, never one letter per line
+
+  @integration
+  Scenario: A list table wider than its card scrolls sideways with a fade on the hidden edge
+    Given a list table whose columns are wider than its card
+    When the reader looks at the table
+    Then the table scrolls sideways inside the card and its headers never wrap
+    And a fade marks the edge that still hides columns
+    When the reader scrolls to the last column
+    Then the fade moves to the edge the first columns went behind
