@@ -85,3 +85,14 @@ Feature: OTLP ingestion doors refuse what they cannot safely hold
       When it exports a metric batch to the metric door
       Then the batch is accepted
       And its data point is sent on to the metric pipeline against the credential's own project
+
+  Rule: The trace door asks for the key before it reads the path alias or the body
+
+    @integration
+    Scenario: The trace door refuses a missing key before it judges the exporter path
+      Given the trace door verifies the exporter's key before the body (Alex, 2026-10-10, W02-DOOR-SHAPE)
+      When an exporter with no key posts to an exporter path the receiver does not recognise
+      Then the export is refused as unauthenticated, in the receiver's own body
+      When an exporter with a valid key posts to that same path
+      Then the export is answered as not found
+      And nothing is recorded

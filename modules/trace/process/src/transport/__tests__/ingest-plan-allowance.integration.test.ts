@@ -17,7 +17,7 @@ import { TraceIngestAllowanceService } from "../../features/ingestion/services/t
 import type { TraceIngestCredentialService } from "../../features/ingestion/services/trace-ingest-credential.service.ts";
 import type { TraceIngestionService } from "../../features/ingestion/services/trace-ingestion.service.ts";
 import { CollectorApi, collectorRest } from "../collector.rest.ts";
-import { otlpIngestRest } from "../otlp-ingest.rest.ts";
+import { otlpIngestDoor, otlpIngestRest } from "../otlp-ingest.rest.ts";
 
 const PROJECT = { id: "project-1", teamId: "team-1", organizationId: "organization-1" };
 
@@ -99,6 +99,9 @@ function bootIngestDoors(assertWithinUsageLimit: EntitlementApi["assertWithinUsa
     }),
   });
   const runtime = createRestRuntime({
+    doors: {
+      otlp_ingest: otlpIngestDoor((input) => apis.reference(TraceApi).otlpCredential(input)),
+    },
     authorization: restTestAuthorization(),
     identity: { authenticate: () => ({ authenticated: false }) as never },
   });
@@ -116,6 +119,7 @@ function bootIngestDoors(assertWithinUsageLimit: EntitlementApi["assertWithinUsa
   });
   const otlp = runtime.mount(otlpIngestRest.router(), {
     ...mounted,
+    credential: "otlp_ingest",
     app: () => apis.reference(TraceApi),
   });
   const headers = { "Content-Type": "application/json", "X-Auth-Token": "sk-lw-ingest" };

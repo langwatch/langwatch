@@ -218,6 +218,7 @@ export type RestDoorCredential = Extract<
   | "instance_admin"
   | "session_key"
   | "cli_token"
+  | "otlp_ingest"
   | "browser"
 >;
 
@@ -236,6 +237,7 @@ export const DOOR_SCOPE_TIER = {
   instance_admin: null,
   session_key: "project",
   cli_token: "organization",
+  otlp_ingest: "project",
 } as const satisfies Record<RestDoorCredential, AuthzDeclaredScopeId["tier"] | null>;
 
 /** The scope a handler on `Door` is handed: the tier that door resolves. */

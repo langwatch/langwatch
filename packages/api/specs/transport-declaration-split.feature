@@ -407,6 +407,15 @@ Feature: Transport declaration split
     And the handler reads none of the key's headers
 
   @integration
+  Scenario: The OTLP ingest door verifies the exporter's key before the body
+    Given a family behind the OTLP ingest door, bound by the module that owns ingestion keys (Alex, 2026-10-10, W02-DOOR-SHAPE)
+    When an exporter presents a key the owning module accepts
+    Then the handler is handed the holder's actor, its project as the scope and the resolution as the session
+    When an exporter presents no key, or one the module refuses
+    Then the module's own refusal answers before the body is read, and the handler never runs
+    And a family no module bound the door for lets nobody in
+
+  @integration
   Scenario: A route admits only the key kinds it names
     Given a route behind the project door names the key kinds it admits (Alex, 2026-10-05, E7)
     When a caller presents a key of a kind the route does not name

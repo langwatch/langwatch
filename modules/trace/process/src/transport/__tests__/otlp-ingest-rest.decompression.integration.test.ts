@@ -28,7 +28,7 @@ import { TraceBlobStoreService } from "../../features/media/services/trace-blob-
 import { MemoryTraceSpanDedupRepository } from "../../repositories/memory/memory.trace-span-dedup.repository.ts";
 import { MemoryTraceRepositories } from "../../repositories/memory/memory.trace.repositories.ts";
 import { traceProcessModule } from "../../trace.module.ts";
-import { otlpIngestRest } from "../otlp-ingest.rest.ts";
+import { otlpIngestDoor, otlpIngestRest } from "../otlp-ingest.rest.ts";
 
 const PROJECT = {
   id: "project-123",
@@ -137,6 +137,9 @@ function deployment() {
   apis.ready();
 
   const runtime = createRestRuntime({
+    doors: {
+      otlp_ingest: otlpIngestDoor((input) => apis.reference(TraceApi).otlpCredential(input)),
+    },
     authorization: restTestAuthorization(),
     identity: {
       authenticate: () => {
@@ -151,7 +154,7 @@ function deployment() {
     ? [
         runtime.mount(otlpIngestRest.router(), {
           app: () => apis.reference(TraceApi),
-          credential: "public",
+          credential: "otlp_ingest",
           onError: canonicalErrorResponse,
         }),
       ]

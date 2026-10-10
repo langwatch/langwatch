@@ -29,7 +29,7 @@ import { MemoryTraceSpanDedupRepository } from "../../repositories/memory/memory
 import { MemoryTraceRepositories } from "../../repositories/memory/memory.trace.repositories.ts";
 import type { TraceProcessingCommands } from "../../services/trace-processing-commands.service.ts";
 import { traceProcessModule } from "../../trace.module.ts";
-import { otlpIngestRest } from "../otlp-ingest.rest.ts";
+import { otlpIngestDoor, otlpIngestRest } from "../otlp-ingest.rest.ts";
 
 const doorLog = vi.hoisted(() => ({
   loggerName: "langwatch:otel:v1:traces",
@@ -205,6 +205,9 @@ function deployment(
   apis.ready();
 
   const runtime = createRestRuntime({
+    doors: {
+      otlp_ingest: otlpIngestDoor((input) => apis.reference(TraceApi).otlpCredential(input)),
+    },
     authorization: restTestAuthorization(),
     identity: {
       authenticate: () => {
@@ -224,9 +227,7 @@ function deployment(
     ? [
         runtime.mount(otlpIngestRest.router(), {
           app: () => apis.reference(TraceApi),
-          // The receiver binds NO transport fact: it is declared public and
-          // resolves the project credential inside its handler.
-          credential: "public",
+          credential: "otlp_ingest",
           onError: canonicalErrorResponse,
         }),
       ]
@@ -396,6 +397,23 @@ describe("given the trace module as a process composes it", () => {
         message:
           "Authentication token is required. Use X-Auth-Token header, Authorization: Bearer token, or Authorization: Basic base64(projectId:token).",
       });
+      expect(recordedSpans).toHaveLength(0);
+    });
+  });
+
+  describe("when an exporter posts to a path the receiver does not recognise", () => {
+    /** @scenario "The trace door refuses a missing key before it judges the exporter path" */
+    it("refuses a missing key with 401 before the path's 404", async () => {
+      const { post, recordedSpans } = deployment();
+
+      const anonymous = await post("/not-an-exporter/v1/traces", otlpTraceBody(), {
+        "X-Auth-Token": "",
+      });
+      const keyed = await post("/not-an-exporter/v1/traces", otlpTraceBody());
+
+      expect(anonymous.status).toBe(401);
+      expect(await anonymous.json()).toMatchObject({ message: expect.any(String) });
+      expect(keyed.status).toBe(404);
       expect(recordedSpans).toHaveLength(0);
     });
   });

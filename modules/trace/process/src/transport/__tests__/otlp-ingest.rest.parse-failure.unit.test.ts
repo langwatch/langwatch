@@ -12,7 +12,7 @@ import type { OtlpIngestCredential, TraceApi } from "@langwatch/trace-contract";
 import type * as LangWatch from "langwatch";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { otlpIngestRest } from "../otlp-ingest.rest.ts";
+import { otlpIngestDoor, otlpIngestRest } from "../otlp-ingest.rest.ts";
 
 const doorLog = vi.hoisted(() => ({
   loggerName: "langwatch:otel:v1:traces",
@@ -76,6 +76,7 @@ function mount() {
     otlpUsageLimit: async () => {},
   });
   const hono = createRestRuntime({
+    doors: { otlp_ingest: otlpIngestDoor((input) => app.otlpCredential(input)) },
     authorization: restTestAuthorization(),
     identity: {
       authenticate: () => {
@@ -84,7 +85,7 @@ function mount() {
     },
   }).mount(otlpIngestRest.router(), {
     app: () => app,
-    credential: "public",
+    credential: "otlp_ingest",
     onError: (error) => {
       throw error;
     },

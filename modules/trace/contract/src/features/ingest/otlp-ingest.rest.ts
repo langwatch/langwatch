@@ -3,7 +3,7 @@
  * server transport file instead, keeping this contract free of the DOM-lib
  * `Request` dependency neither the browser SDK nor another module needs.
  */
-import type { OtlpSourcePolicy } from "@langwatch/otlp";
+import { otlpSourcePolicySchema } from "@langwatch/otlp";
 import type { IExportTraceServiceRequest } from "@opentelemetry/otlp-transformer";
 import { z } from "zod";
 
@@ -16,25 +16,26 @@ export type OtlpIngestCredentialInput = Readonly<{
   xProjectId: string | null;
 }>;
 
-export type OtlpIngestProject = Readonly<{
-  id: string;
-  teamId: string;
-  organizationId: string;
-}>;
+const otlpIngestProjectSchema = z.object({
+  id: z.string(),
+  teamId: z.string(),
+  organizationId: z.string(),
+});
+export type OtlpIngestProject = Readonly<z.infer<typeof otlpIngestProjectSchema>>;
 
-type OtlpIngestIdentity = Readonly<{
-  apiKeyId: string | null;
-  organizationId: string;
-  ingestSourceType: string | null;
-  ingestionTemplateId: string | null;
-  sourcePolicy?: OtlpSourcePolicy;
-}>;
-
-/** A resolved receiver credential; a refusal is thrown, and the receiver renders it. */
-export type OtlpIngestCredential = Readonly<{
-  project: OtlpIngestProject;
-  identity: OtlpIngestIdentity;
-}>;
+/** A resolved receiver credential, handed by the OTLP ingest door as the route's session. */
+export const otlpIngestCredentialSchema = z.object({
+  project: otlpIngestProjectSchema,
+  identity: z.object({
+    apiKeyId: z.string().nullable(),
+    organizationId: z.string(),
+    ingestSourceType: z.string().nullable(),
+    ingestionTemplateId: z.string().nullable(),
+    sourcePolicy: otlpSourcePolicySchema.optional(),
+  }),
+});
+/** A refusal is thrown, and the receiver renders it. */
+export type OtlpIngestCredential = Readonly<z.infer<typeof otlpIngestCredentialSchema>>;
 
 export type OtlpTraceCollectionResult = Readonly<{
   rejectedSpans?: number;

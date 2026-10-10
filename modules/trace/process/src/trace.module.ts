@@ -1,4 +1,5 @@
 import {
+  bindRestCredential,
   bindRestMiddleware,
   principalOfCredential,
   projectCredentialOfRequest,
@@ -17,7 +18,7 @@ import { traceRepositories } from "./repositories/trace-repositories.registry.ts
 import { TraceIndexMaterialisationService } from "./services/trace-index-materialisation.service.ts";
 import { collectorRest } from "./transport/collector.rest.ts";
 import { exportProgressTrpcTransport } from "./transport/export-progress.trpc.ts";
-import { otlpIngestRest } from "./transport/otlp-ingest.rest.ts";
+import { otlpIngestDoor, otlpIngestRest } from "./transport/otlp-ingest.rest.ts";
 import { sharedTraceTrpcTransport } from "./transport/shared-trace.trpc.ts";
 import { spansTrpcTransport } from "./transport/spans.trpc.ts";
 import { traceEditOverlayTrpcTransport } from "./transport/trace-edit-overlay.trpc.ts";
@@ -63,7 +64,7 @@ export const traceProcessModule: PublishedProcessModule<"trace", TraceApi, Trace
       // of the REST families — the path alias's wildcard must come after it.
       otlpIngestRest,
     )
-    .withTransportFacts(() => [
+    .withTransportFacts(({ app }) => [
       // The v1 trace reads answer through the key's own grants, so the routes
       // read the CREDENTIAL - its api key id and the member it acts as - rather
       // than whoever holds it. A legacy project key names neither.
@@ -71,6 +72,8 @@ export const traceProcessModule: PublishedProcessModule<"trace", TraceApi, Trace
         const credential = projectCredentialOfRequest(context.req.raw);
         return { principal: principalOfCredential(credential) };
       }),
+      // The OTLP receiver's key, resolved before the body is read (W02-DOOR-SHAPE, 2026-10-10).
+      bindRestCredential("otlp_ingest", () => otlpIngestDoor((input) => app.otlpCredential(input))),
     ])
     .withEventing(traceProcessingEventing)
     .withEventing(traceProjectMilestonesEventing)

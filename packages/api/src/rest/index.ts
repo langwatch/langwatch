@@ -297,6 +297,11 @@ export { bindRestCredential, type RestCredentialBinding, type RestDoor } from ".
 export { BearerIdentity } from "./bearer-identity.ts";
 export { SessionKeyIdentity } from "./session-key-identity.ts";
 export {
+  OtlpIngestIdentity,
+  type OtlpIngestHolder,
+  type OtlpIngestPresented,
+} from "./otlp-ingest-identity.ts";
+export {
   CliTokenIdentity,
   type CliTokenHolder,
   type CliTokenPermissionQuestion,

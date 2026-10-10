@@ -161,6 +161,7 @@ export type Credential =
   | "instance_admin"
   | "session_key"
   | "cli_token"
+  | "otlp_ingest"
   | "public";
 
 /** An authenticated caller, normalized with a stable identifier for every kind. */
@@ -677,6 +678,7 @@ export function securityRequirement(credential: Credential): readonly Record<str
     case "project":
     case "api_key":
     case "session_key":
+    case "otlp_ingest":
       return [{ project_api_key: [] }];
     case "organization":
       return [{ admin_api_key: [] }];

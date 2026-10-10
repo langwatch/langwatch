@@ -1812,7 +1812,8 @@ office deactivates only through user, so it keeps no picked date (Alex, 2026-10-
 - No key, token or secret is minted while the actor carries an impersonator (Alex, 2026-10-01). An endpoint that mints
   declares `.mintsCredential(permission)` and the tRPC and REST runtime refuses it before the handler; a service
   guard per door stays for callers that are not a transport. Door names are the typed snake_case union `api_key`,
-  `scim_token`, `internal_secret`, `instance_admin`, `session_key`, `cli_token`.
+  `scim_token`, `internal_secret`, `instance_admin`, `session_key`, `cli_token`, `otlp_ingest` (an OTLP exporter's
+  key, bound by trace; verified before the body and handed over as `session`, Alex 2026-10-10 W02-DOOR-SHAPE).
 - The CLI token door hands a handler `session` beside `actor` (Alex, 2026-10-01): the route declares
   `.withCredential("cli_token", { session: schema })`, the framework parses it (a mismatch answers 401) and types
   the handler by `z.output`. The actor carries authz vocabulary only; logs redact `session.tokenKey` at a fixed path.

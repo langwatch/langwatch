@@ -477,6 +477,7 @@ export const CREDENTIAL_CLASS_BY_DOOR = {
   instance_admin: "instance_admin_api_key",
   session_key: "project_api_key",
   cli_token: "cli_access_token",
+  otlp_ingest: "project_api_key",
   browser: "session",
   internal_secret: "internal_secret",
   public: "none",

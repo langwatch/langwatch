@@ -3050,6 +3050,7 @@ const HANDLER_CREDENTIAL = {
   instance_admin: "apiKey",
   session_key: "apiKey",
   cli_token: "apiKey",
+  otlp_ingest: "apiKey",
   browser: "session",
   internal_secret: "internal",
 } as const satisfies Record<Exclude<Credential, "public">, HandlerCredential>;
