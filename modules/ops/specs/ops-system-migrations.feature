@@ -36,6 +36,13 @@ Feature: Ops runs the system migration passes and names their cohorts
     And the tenant steps that pass drives settle without waiting for the hourly re-drive
 
   @unit
+  Scenario: The pass a finished upgrade requests is asked under the platform tenant
+    Given an upgrade run that has finished
+    When it asks a worker for a system-migrations pass
+    Then the request's tenant is the platform tenant, which the event store routes to the shared cluster
+    And the request is never refused as a tenant with no known organisation
+
+  @unit
   Scenario: The worker's re-drive discovers a tenant migration no pass has run
     Given an installation where no parked or held tenant exists
     And an automatic tenant migration, registered or declared, that no tenant has met yet

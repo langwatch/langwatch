@@ -9,7 +9,11 @@ import { BearerIdentity } from "@langwatch/api/rest";
  */
 import { AuditLogApi, type RecordAuditLogCommand } from "@langwatch/audit-log-contract";
 import { AuthApi, type AuthApi as AuthApiContract } from "@langwatch/auth-contract";
-import { AuthzApi, type AuthzApi as AuthzApiContract } from "@langwatch/authz-contract";
+import {
+  AuthzApi,
+  type AuthzApi as AuthzApiContract,
+  PLATFORM_TENANT_ID,
+} from "@langwatch/authz-contract";
 import { AutomationApi } from "@langwatch/automation-contract";
 import { CodingAgentApi } from "@langwatch/coding-agent-contract";
 import { releaseVersionOf } from "@langwatch/config";
@@ -371,8 +375,8 @@ function actingIdentityOf(operator: OpsOperator | null): OpsOperator {
 /** How far back an event-log search reaches when the caller names no bound. */
 const EVENT_LOG_SEARCH_LOOKBACK_MS = 365 * 24 * 60 * 60 * 1000;
 
-/** Who asks for the pass `upgrade` requests when it finishes: the event's tenant. */
-const UPGRADE_PASS_REQUESTER = "platform:upgrade";
+/** Who asks for the pass `upgrade` requests: the event's tenant, routed to the shared cluster. */
+const UPGRADE_PASS_REQUESTER = PLATFORM_TENANT_ID;
 
 /** What every audited row on the support inbox points at. */
 const BUG_REPORT_TARGET_KIND = "bugReport";
