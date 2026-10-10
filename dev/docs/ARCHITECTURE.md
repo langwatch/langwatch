@@ -1490,6 +1490,9 @@ host clocks differ, which is the accepted ceiling (Alex, 2026-10-09).
 A step that moves a stored value to a new shape annotates the old shape (an inline anomaly webhook
 destination gains an optional `endpointId`) so a rolled-back image still reads it, and a contract step
 after the floor rewrites it to the new shape (Alex, 2026-10-09, D1-A).
+An image is the newest stamped release (`packages/upgrade/releases/`) only when it ships no step
+beyond the stamped ones; otherwise it names itself "unreleased", and its unstamped steps show under
+the Unreleased row (Alex, 2026-10-10, IMAGE-IDENTITY).
 
 **A contract step never drops unarchived data** (Alex, 2026-10-09, ARCHIVE-OR-FAIL). Archive-or-fail
 lives in `packages/upgrade`: a contract's SQL names each table it retires with `-- archive: <table>`

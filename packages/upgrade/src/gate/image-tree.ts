@@ -2,7 +2,7 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import type { ManifestStep } from "../manifest/manifest.ts";
+import type { ManifestStep, ReleaseManifest } from "../manifest/manifest.ts";
 import {
   gooseStepId,
   prismaStepId,
@@ -55,6 +55,23 @@ export function imageGateSteps({
     blockingSteps: [...blocking].toSorted(),
     declaredSteps: tree.codeSteps.filter((step) => step.mode !== "blocking").map(({ id }) => id),
   };
+}
+
+/**
+ * The release this image is (IMAGE-IDENTITY): the newest stamped manifest only when the tree
+ * ships no step beyond the stamped ones, else null, "unreleased".
+ * Spec: specs/upgrade/release-manifests.feature.
+ */
+export function imageRelease({
+  manifests,
+  tree,
+}: {
+  manifests: readonly ReleaseManifest[];
+  tree: ReleaseTreeSteps;
+}): string | null {
+  const stamped = new Set(manifests.flatMap((manifest) => manifest.steps.map(({ id }) => id)));
+  const unstamped = [...treeStepIds({ tree })].some((id) => !stamped.has(id));
+  return unstamped ? null : (manifests.at(-1)?.release ?? null);
 }
 
 /** Every Prisma folder and goose file this image ships, as steps (ids per blitz plan 5.3). */

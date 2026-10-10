@@ -120,6 +120,21 @@ Feature: Release manifests order every migration step release by release
     When the image plans its upgrade
     Then the plan holds exactly one virtual release carrying those steps
 
+  # IMAGE-IDENTITY (Alex, 2026-10-10): the image names a release only when it is that release.
+  @unit
+  Scenario: An image shipping only stamped steps names itself the newest release
+    Given release manifests stamped up to 3.20.1
+    And an image whose every schema and code step a manifest lists
+    When the image's release is derived
+    Then the image names itself 3.20.1
+
+  @unit
+  Scenario: An image shipping a step beyond the stamped ones names itself unreleased
+    Given release manifests stamped up to 3.20.1
+    And an image shipping a step no manifest lists
+    When the image's release is derived
+    Then the image names itself unreleased
+
   # Preview to a target (upgrade-ui plan 6.1.2, U6; Q-U3 ruled: the preview runs from the target
   # image's CLI, so this image never fetches another release's manifests).
   @unit

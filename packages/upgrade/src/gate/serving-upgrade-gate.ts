@@ -24,7 +24,7 @@ import {
 import { isDeclaredMigrationStep, isMigrationStep } from "../step/migration-step.ts";
 import { type FirstInstallUpgrade, spawnFirstInstallUpgrade } from "./first-install-upgrade.ts";
 import { IMAGE_CODE_STEPS_FILE, readImageCodeSteps } from "./image-code-steps.ts";
-import { imageGateSteps, readImageTree } from "./image-tree.ts";
+import { imageGateSteps, imageRelease, readImageTree } from "./image-tree.ts";
 import {
   type ServingRole,
   type ServingVerdict,
@@ -440,7 +440,7 @@ export async function servingUpgradeGate({
   warn?: ServingGateWarn;
 }): Promise<UpgradeGate> {
   const tree = servingImageTree();
-  const release = loadReleases().manifests.at(-1)?.release ?? null;
+  const release = imageRelease({ manifests: loadReleases().manifests, tree });
   return secrets.into(storesOwner.secrets.database, (database) =>
     secrets.into(storesOwner.secrets.clickhouse, (clickhouse) =>
       secrets.into(storesOwner.secrets.clickhouseRoutes, (routes) =>

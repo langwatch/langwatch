@@ -23,7 +23,7 @@ import {
   type UpgradeClickHouse,
   type UpgradePostgres,
 } from "@langwatch/upgrade";
-import { IMAGE_MIGRATION_DIRECTORIES, readImageTree } from "@langwatch/upgrade/gate";
+import { IMAGE_MIGRATION_DIRECTORIES, imageRelease, readImageTree } from "@langwatch/upgrade/gate";
 import {
   compareReleases,
   loadReleases,
@@ -741,7 +741,8 @@ async function runWithCodeSteps({
   const database = input.connections.database;
   if (!database) throw new Error("DATABASE_URL is required to upgrade");
   const releases = loadReleases();
-  const newest = releases.manifests.at(-1)?.release ?? null;
+  const tree = readImageTree({ codeSteps: steps.map(codeStepOf) });
+  const release = imageRelease({ manifests: releases.manifests, tree });
   const { targets } = clickhouseTargets(input);
   const sharedUrl = targets.find((target) => target.name === "shared")?.url;
   const logger = createLogger("langwatch:tasks:upgrade");
@@ -755,24 +756,21 @@ async function runWithCodeSteps({
       postgres: database.sql,
       clickhouse: shared ? sqlReader({ client: shared }) : undefined,
       image: {
-        release: newest,
-        steps: imageSteps({
-          release: newest ?? "0.0.0",
-          tree: readImageTree({ codeSteps: steps.map(codeStepOf) }),
-        }),
+        release,
+        steps: imageSteps({ release: release ?? "0.0.0", tree }),
       },
       // Registered on the ledger, run only here: tenant steps are ops' pass (S6-WIRE).
       codeSteps: steps.filter(isMigrationStep),
       releases,
       applier: releaseSteppingApplier({
-        imageRelease: newest,
+        imageRelease: release,
         manifests: releases.manifests,
         onePass: oneReleaseApplier({ input }),
         stepTo: stepSchemaTo({ input }),
         say: (line) => writeLine({ logger, line }),
       }),
       reconcilers: reconcilers({ input }),
-      identity: { image: newest ?? "unreleased", host: hostname() },
+      identity: { image: release ?? "unreleased", host: hostname() },
       log: runnerLog(),
       hints: readHints({ input }),
       ...(upcasts === undefined ? {} : { upcasts }),
@@ -783,7 +781,7 @@ async function runWithCodeSteps({
       return 0;
     }
     if (command.command === "plan") {
-      await printPlan({ command, runner, image: { release: newest }, write });
+      await printPlan({ command, runner, image: { release }, write });
       return 0;
     }
     const outcome = await runner.run({ signal: input.signal });
