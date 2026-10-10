@@ -100,14 +100,7 @@ function ProjectItemIcon({ item }: { item: ProjectPickItem }) {
 
 function ProjectItemRow({ item, isCurrent }: { item: ProjectPickItem; isCurrent: boolean }) {
   return (
-    <Combobox.Item
-      item={item}
-      borderRadius="md"
-      paddingX={2}
-      paddingY={1.5}
-      fontSize="13px"
-      _highlighted={{ background: "bg.subtle" }}
-    >
+    <Combobox.Item item={item}>
       <HStack gap={2} width="full">
         <ProjectItemIcon item={item} />
         <Combobox.ItemText flex={1} truncate>

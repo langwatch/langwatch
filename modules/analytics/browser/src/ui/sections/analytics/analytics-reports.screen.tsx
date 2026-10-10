@@ -213,17 +213,17 @@ function ReportsContent() {
         isEditable: canRenameDashboard,
         onTitleSave: handleTitleSave,
       }}
-      primaryAction={
-        project && canAddChart ? (
-          <AddChartButton
-            opensDrawer={customChartPlaygroundEnabled}
-            href={addChartUrl}
-            onOpenDrawer={() => setIsAddChartOpen(true)}
-          />
-        ) : null
-      }
       extraHeaderButtons={
-        <DashboardAutoRefreshMenu option={autoRefresh.option} onChange={autoRefresh.setOption} />
+        <>
+          <DashboardAutoRefreshMenu option={autoRefresh.option} onChange={autoRefresh.setOption} />
+          {project && canAddChart ? (
+            <AddChartButton
+              opensDrawer={customChartPlaygroundEnabled}
+              href={addChartUrl}
+              onOpenDrawer={() => setIsAddChartOpen(true)}
+            />
+          ) : null}
+        </>
       }
     >
       {/* The workbench builder's own save path is disabled while the

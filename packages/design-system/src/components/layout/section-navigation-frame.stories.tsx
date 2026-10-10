@@ -15,9 +15,10 @@ import {
   Users,
   Zap,
 } from "lucide-react";
+import { useState } from "react";
 
 import { PageLayout } from "./page-layout.tsx";
-import { SectionNavigationFrame } from "./section-navigation-frame.tsx";
+import { SectionNavigationFrame, SectionNavigationHeader } from "./section-navigation-frame.tsx";
 
 /** Stands in for the shell's page card: a fixed-height column that scrolls, as the app gives it. */
 const InShellCard: Decorator = (Story) => (
@@ -26,9 +27,8 @@ const InShellCard: Decorator = (Story) => (
     display="flex"
     flexDirection="column"
     overflowY="auto"
-    background="bg.surface"
+    background="bg.card"
     borderTopLeftRadius="xl"
-    borderTopWidth="1px"
     borderLeftWidth="1px"
     borderColor="border"
   >
@@ -37,9 +37,9 @@ const InShellCard: Decorator = (Story) => (
 );
 
 const header = (title: string) => (
-  <PageLayout.Header>
+  <SectionNavigationHeader>
     <PageLayout.Heading>{title}</PageLayout.Heading>
-  </PageLayout.Header>
+  </SectionNavigationHeader>
 );
 
 const paragraphs = (count: number) => (
@@ -135,9 +135,9 @@ export const ManyItems: Story = {
   },
 };
 
-/** The page header already names the section, so the rail drops its title. */
-export const WithoutTitle: Story = {
-  args: { hideTitle: true },
+/** The landing page names Overview beside its persistent section title. */
+export const Overview: Story = {
+  args: { pageTitle: "Overview", header: void 0 },
 };
 
 export const HeaderWithActions: Story = {
@@ -150,12 +150,12 @@ export const HeaderWithActions: Story = {
     ],
     activeHref: "/auth/connectors",
     header: (
-      <PageLayout.Header>
+      <SectionNavigationHeader>
         <PageLayout.Heading>Connectors</PageLayout.Heading>
         <Spacer />
         <PageLayout.HeaderButton>Docs</PageLayout.HeaderButton>
         <PageLayout.HeaderButton primary>Add connector</PageLayout.HeaderButton>
-      </PageLayout.Header>
+      </SectionNavigationHeader>
     ),
     children: paragraphs(4),
   },
@@ -254,3 +254,26 @@ export const WithCounts: Story = {
 export const Collapsed: Story = {
   args: { ...RowActionsAndFooter.args, collapsed: true },
 };
+
+function MovingSelectionExample() {
+  const [activeHref, setActiveHref] = useState("/analytics/overview");
+  const links = [
+    { label: "Overview", href: "/analytics/overview" },
+    { label: "Users", href: "/analytics/users" },
+    { label: "Dashboard 1", href: "/analytics/dashboard" },
+  ];
+
+  return (
+    <SectionNavigationFrame
+      label="Analytics"
+      links={links}
+      activeHref={activeHref}
+      onNavigate={setActiveHref}
+      pageTitle={links.find((link) => link.href === activeHref)?.label}
+    >
+      <Text>Choose a page to move the single marker. With reduced motion enabled, it jumps.</Text>
+    </SectionNavigationFrame>
+  );
+}
+
+export const MovingSelection: Story = { render: () => <MovingSelectionExample /> };

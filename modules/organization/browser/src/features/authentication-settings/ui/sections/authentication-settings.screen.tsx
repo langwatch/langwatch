@@ -1,4 +1,3 @@
-import { PageLayout } from "@langwatch/design-system/page-layout";
 /**
  * /settings/authentication, in the settings chrome as on main: how everyone signs in and how
  * accounts arrive (the cards sso and scim declare), then the organization's own policies.
@@ -45,11 +44,7 @@ export default function AuthenticationSettingsScreen() {
     <>
       <SectionNavigationFrame
         label="Authentication"
-        header={
-          <PageLayout.Header>
-            <PageLayout.Heading>Authentication</PageLayout.Heading>
-          </PageLayout.Header>
-        }
+        pageTitle="Overview"
         links={AUTHENTICATION_LINKS}
         activeHref="/settings/authentication"
         onNavigate={(href) => host.navigate(href)}
@@ -97,10 +92,12 @@ export function AuthenticationSettings({
         </VStack>
       )}
 
-      <VStack align="stretch" gap={4}>
-        <VStack align="stretch" gap={1}>
-          <Heading size="sm">Organization policies</Heading>
-          <Text color="fg.muted" fontSize="sm">
+      <VStack align="stretch" gap={2} maxWidth="2xl" width="full">
+        <VStack align="stretch" gap={0.5}>
+          <Text as="h2" fontSize="sm" fontWeight="semibold">
+            Organization policies
+          </Text>
+          <Text color="fg.muted" fontSize="xs" lineHeight="short">
             Manage who can join and how accounts stay secure. These policies also apply when your
             organization uses password sign-in.
           </Text>

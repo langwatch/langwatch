@@ -1,9 +1,18 @@
 import { defineRecipe } from "@chakra-ui/react";
 
-// Structural navigation inherits the content ground; its frame owns the hairline.
 export const sectionNavigationRailRecipe = defineRecipe({
   base: {
     background: "transparent",
-    borderColor: "border.card",
+    _after: {
+      content: '""',
+      display: { base: "none", md: "block" },
+      position: "absolute",
+      right: 0,
+      top: "56px",
+      bottom: "16px",
+      width: "1px",
+      background: "border.muted",
+      pointerEvents: "none",
+    },
   },
 });

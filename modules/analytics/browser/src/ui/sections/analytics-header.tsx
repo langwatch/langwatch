@@ -1,5 +1,6 @@
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Box, HStack, Input, Spacer } from "@langwatch/design-system/primitives";
+import { SectionNavigationHeader } from "@langwatch/design-system/section-navigation-frame";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { Edit2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -14,7 +15,6 @@ export interface AnalyticsHeaderProps {
   title: string;
   isEditable?: boolean;
   onTitleSave?: (newTitle: string) => void;
-  primaryAction?: React.ReactNode;
   extraHeaderButtons?: React.ReactNode;
 }
 
@@ -22,7 +22,6 @@ export function AnalyticsHeader({
   title,
   isEditable,
   onTitleSave,
-  primaryAction,
   extraHeaderButtons,
 }: AnalyticsHeaderProps) {
   const host = useAnalyticsHost();
@@ -60,63 +59,48 @@ export function AnalyticsHeader({
   };
 
   return (
-    <PageLayout.Header
-      height="auto"
-      minHeight="48px"
-      flexDirection="column"
-      alignItems="stretch"
-      paddingY={2}
-    >
-      <HStack minWidth={0} minHeight="32px">
-        <Box minWidth={0}>
-          {isEditing ? (
-            <Input
-              ref={inputRef}
-              value={editingTitle}
-              onChange={(e) => setEditingTitle(e.target.value)}
-              onBlur={handleFinishEdit}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") handleFinishEdit();
-                if (e.key === "Escape") {
-                  setIsEditing(false);
-                  setEditingTitle("");
-                }
-              }}
-              fontSize="md"
-              fontWeight="500"
-              variant="flushed"
-              width="full"
-              minWidth={0}
-            />
-          ) : (
-            <HStack
-              minWidth={0}
-              cursor={isEditable ? "pointer" : "default"}
-              onClick={handleStartEdit}
-              _hover={isEditable ? { "& .edit-icon": { opacity: 1 } } : undefined}
+    <SectionNavigationHeader>
+      {isEditing ? (
+        <Input
+          ref={inputRef}
+          value={editingTitle}
+          onChange={(e) => setEditingTitle(e.target.value)}
+          onBlur={handleFinishEdit}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") handleFinishEdit();
+            if (e.key === "Escape") {
+              setIsEditing(false);
+              setEditingTitle("");
+            }
+          }}
+          fontSize="md"
+          fontWeight="500"
+          variant="flushed"
+          width="auto"
+          minWidth="200px"
+        />
+      ) : (
+        <HStack
+          cursor={isEditable ? "pointer" : "default"}
+          onClick={handleStartEdit}
+          _hover={isEditable ? { "& .edit-icon": { opacity: 1 } } : undefined}
+        >
+          <PageLayout.Heading>{title}</PageLayout.Heading>
+          {isEditable && (
+            <Box
+              className="edit-icon"
+              opacity={0}
+              transition="opacity 0.2s"
+              color="fg.subtle"
+              paddingTop={1}
             >
-              <PageLayout.Heading truncate title={title}>
-                {title}
-              </PageLayout.Heading>
-              {isEditable && (
-                <Box
-                  flexShrink={0}
-                  className="edit-icon"
-                  opacity={0}
-                  transition="opacity 0.2s"
-                  color="fg.subtle"
-                  paddingTop={1}
-                >
-                  <Edit2 size={16} />
-                </Box>
-              )}
-            </HStack>
+              <Edit2 size={16} />
+            </Box>
           )}
-        </Box>
-        <Spacer />
-        {primaryAction ? <Box flexShrink={0}>{primaryAction}</Box> : null}
-      </HStack>
-      <HStack gap={2} flexWrap="wrap" minWidth={0}>
+        </HStack>
+      )}
+      <Spacer />
+      <HStack gap={2}>
         <FilterToggle />
         <AnalyticsPeriodPicker
           period={{ startDate, endDate }}
@@ -126,6 +110,7 @@ export function AnalyticsHeader({
         />
         <Tooltip content="Show traces behind those metrics">
           <PageLayout.HeaderButton
+            variant="ghost"
             onClick={() => {
               // Trace Explorer keeps its time range in the URL fragment
               // (#<lens>?from=<ms>&to=<ms>), so carry the analytics period
@@ -141,6 +126,6 @@ export function AnalyticsHeader({
         </Tooltip>
         {extraHeaderButtons}
       </HStack>
-    </PageLayout.Header>
+    </SectionNavigationHeader>
   );
 }

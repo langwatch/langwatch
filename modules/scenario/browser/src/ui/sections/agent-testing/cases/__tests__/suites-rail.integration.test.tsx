@@ -200,7 +200,7 @@ describe("the test suites rail", () => {
       externalSets: [{ setId: "nightly-ci", lastRunTimestamp: 1 }],
     });
 
-    expect(screen.getByText("Test Suites")).toBeInTheDocument();
+    expect(screen.getByText("Agent Testing")).toBeInTheDocument();
     expect(screen.getByText("From Code")).toBeInTheDocument();
     expect(railEntries()).toEqual([
       "suite-rail-item-Refunds",
@@ -225,7 +225,7 @@ describe("the test suites rail", () => {
     expect(screen.queryByTestId("suite-rail-item-All scenarios")).not.toBeInTheDocument();
     expect(screen.queryByText("All scenarios")).not.toBeInTheDocument();
     // The headings are plain labels: their destination is gone.
-    expect(screen.getByText("Test Suites").tagName).not.toBe("BUTTON");
+    expect(screen.getByText("Agent Testing").tagName).not.toBe("BUTTON");
     expect(screen.getByText("From Code").tagName).not.toBe("BUTTON");
   });
 

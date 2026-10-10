@@ -1,15 +1,19 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   SectionNavigationFrame,
+  SectionNavigationItem,
   SectionNavigationRail,
 } from "../src/components/layout/section-navigation-frame.tsx";
 import { renderWithDesignSystem } from "../src/testing/index.tsx";
 
-afterEach(() => cleanup());
+afterEach(() => {
+  cleanup();
+  vi.restoreAllMocks();
+});
 
 const LINKS = [
   { label: "Overview", href: "/section" },
@@ -38,11 +42,11 @@ describe("SectionNavigationFrame", () => {
       expect(screen.getByText("Page body")).toBeTruthy();
     });
 
-    it("drops the visible heading when hideTitle is set, keeping the accessible name", () => {
+    it("shows the section title beside the current sub-page heading", () => {
       renderWithDesignSystem(
         <SectionNavigationFrame
           label="Section"
-          hideTitle
+          pageTitle="Details"
           links={LINKS}
           activeHref="/section"
           onNavigate={() => {}}
@@ -51,7 +55,8 @@ describe("SectionNavigationFrame", () => {
         </SectionNavigationFrame>,
       );
 
-      expect(screen.queryByTestId("section-navigation-title")).toBeNull();
+      expect(screen.getByTestId("section-navigation-title").textContent).toBe("Section");
+      expect(screen.getByRole("heading", { name: "Details" })).toBeTruthy();
       expect(screen.getByRole("navigation", { name: "Section navigation" })).toBeTruthy();
     });
 
@@ -170,7 +175,7 @@ describe("SectionNavigationFrame", () => {
 
   describe("given a folded rail with a footer", () => {
     /** @scenario "A folded rail keeps its entries reachable by name" */
-    it("names each entry by its label and drops the title, labels, extras and controls", () => {
+    it("names each entry and retains the section title while folding its controls", () => {
       renderWithDesignSystem(
         <SectionNavigationRail
           label="Suites"
@@ -195,7 +200,7 @@ describe("SectionNavigationFrame", () => {
 
       expect(screen.getByRole("link", { name: "nightly" })).toBeTruthy();
       const rail = screen.getByRole("navigation", { name: "Suites navigation" });
-      expect(rail.textContent).not.toContain("Suites");
+      expect(screen.getByTestId("section-navigation-title").textContent).toBe("Suites");
       expect(rail.textContent).not.toContain("From code");
       expect(rail.textContent).not.toContain("New suite");
       expect(screen.queryByRole("button", { name: "Actions for nightly" })).toBeNull();
@@ -250,6 +255,147 @@ describe("SectionNavigationFrame", () => {
         />,
       );
       expect(screen.queryByRole("button", { name: "New suite" })).toBeNull();
+    });
+  });
+});
+
+describe("Section navigation selection marker", () => {
+  let paintedMarkerPositions: string[];
+  beforeEach(() => {
+    paintedMarkerPositions = [];
+    const computedStyle = globalThis.getComputedStyle;
+    vi.spyOn(globalThis, "getComputedStyle").mockImplementation((element) => {
+      const style = computedStyle(element);
+      if (element.getAttribute("data-testid") === "section-navigation-list") {
+        Object.defineProperty(style, "paddingLeft", { value: "12px" });
+      }
+      return style;
+    });
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (
+      this: HTMLElement,
+    ) {
+      if (this.dataset.testid === "section-navigation-indicator") {
+        paintedMarkerPositions.push(this.style.transform);
+      }
+      if (this.dataset.testid === "section-navigation-list") return new DOMRect(100, 100, 176, 300);
+      if (this.getAttribute("href") === "/section") return new DOMRect(112, 108, 152, 32);
+      if (this.getAttribute("href") === "/section/details") return new DOMRect(112, 178, 152, 40);
+      return new DOMRect();
+    });
+  });
+
+  const rail = (activeHref: string) => (
+    <SectionNavigationRail
+      label="Section"
+      links={LINKS}
+      activeHref={activeHref}
+      onNavigate={() => {}}
+    />
+  );
+
+  describe("when the controlled selection changes", () => {
+    /** @scenario "One marker follows the active entry" */
+    it("moves the same marker to the new link and hides it without a selection", async () => {
+      const { rerender } = renderWithDesignSystem(rail("/section"));
+      const marker = screen.getByTestId("section-navigation-indicator");
+      expect(marker.style.transform).toBe("translate3d(0px, 16px, 0)");
+      expect(marker.style.height).toBe("16px");
+      expect(marker.style.visibility).toBe("visible");
+      expect(marker.style.transition).toBe("transform 180ms ease-out, height 180ms ease-out");
+
+      rerender(rail("/section/details"));
+      await waitFor(() => expect(marker.style.transform).toBe("translate3d(0px, 86px, 0)"));
+      expect(marker.style.height).toBe("24px");
+      expect(screen.getAllByTestId("section-navigation-indicator")).toEqual([marker]);
+      expect(screen.getByRole("link", { name: "Details" }).getAttribute("aria-current")).toBe(
+        "page",
+      );
+
+      rerender(rail(""));
+      await waitFor(() => expect(marker.style.visibility).toBe("hidden"));
+    });
+  });
+
+  describe("when a route replaces its rail", () => {
+    /** @scenario "A replacement rail continues the selection movement" */
+    it("establishes the previous position before moving the replacement marker", async () => {
+      const page = (href: string) => (
+        <SectionNavigationRail
+          key={href}
+          label="Section"
+          links={LINKS}
+          activeHref={href}
+          onNavigate={() => {}}
+        />
+      );
+      const { rerender } = renderWithDesignSystem(page("/section"));
+      paintedMarkerPositions = [];
+      fireEvent.click(screen.getByRole("link", { name: "Details" }));
+
+      rerender(page("/section/details"));
+
+      expect(paintedMarkerPositions).toEqual(["translate3d(0px, 16px, 0)"]);
+      const marker = screen.getByTestId("section-navigation-indicator");
+      await waitFor(() => expect(marker.style.transform).toBe("translate3d(0px, 86px, 0)"));
+      expect(marker.style.transition).toBe("transform 180ms ease-out, height 180ms ease-out");
+      expect(screen.getAllByTestId("section-navigation-indicator")).toHaveLength(1);
+    });
+  });
+
+  describe("given a reader who prefers reduced motion", () => {
+    /** @scenario "Reduced motion moves the marker without animation" */
+    it("updates position with no transition", async () => {
+      renderWithDesignSystem(<span />);
+      const originalMatchMedia = window.matchMedia;
+      vi.spyOn(window, "matchMedia").mockImplementation((query) => {
+        const media = originalMatchMedia(query);
+        Object.defineProperty(media, "matches", {
+          configurable: true,
+          value: query === "(prefers-reduced-motion: reduce)",
+        });
+        return media;
+      });
+      const { rerender } = renderWithDesignSystem(rail("/section"));
+      const marker = screen.getByTestId("section-navigation-indicator");
+      expect(marker.style.transition).toBe("none");
+
+      rerender(rail("/section/details"));
+      await waitFor(() => expect(marker.style.transform).toBe("translate3d(0px, 86px, 0)"));
+      expect(marker.style.height).toBe("24px");
+      expect(marker.style.transition).toBe("none");
+    });
+  });
+
+  describe("given a nested dashboard list in the extra slot", () => {
+    /** @scenario "The marker follows entries supplied by a nested list" */
+    it("tracks the nested current link even when the rail activeHref stays empty", async () => {
+      const nestedRail = (activeHref: string) => (
+        <SectionNavigationRail
+          label="Analytics"
+          activeHref=""
+          onNavigate={() => {}}
+          groups={[
+            {
+              links: [],
+              extra: LINKS.map((link) => (
+                <SectionNavigationItem
+                  key={link.href}
+                  link={link}
+                  activeHref={activeHref}
+                  onNavigate={() => {}}
+                />
+              )),
+            },
+          ]}
+        />
+      );
+      const { rerender } = renderWithDesignSystem(nestedRail("/section"));
+      const marker = screen.getByTestId("section-navigation-indicator");
+      expect(marker.style.transform).toBe("translate3d(0px, 16px, 0)");
+
+      rerender(nestedRail("/section/details"));
+      await waitFor(() => expect(marker.style.transform).toBe("translate3d(0px, 86px, 0)"));
+      expect(screen.getAllByTestId("section-navigation-indicator")).toEqual([marker]);
     });
   });
 });

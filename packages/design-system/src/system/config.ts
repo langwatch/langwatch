@@ -8,6 +8,7 @@ import { defineConfig, defineRecipe, defineSlotRecipe } from "@chakra-ui/react";
 import { colorSystem } from "../color-mode/color-system.ts";
 import { alertSlotRecipe, deepeningMesh, statusMesh } from "./alert.recipe.ts";
 import { drawerSlotRecipe } from "./drawer.recipe.ts";
+import { optionItemRecipe, optionListContent, optionListSizes } from "./option-list.recipe.ts";
 import { sectionNavigationRailRecipe } from "./section-navigation.recipe.ts";
 
 // Inter and JetBrains Mono are loaded by the CSS @import in the application's
@@ -1001,34 +1002,19 @@ export const designSystemConfig = defineConfig({
       }),
       menu: defineSlotRecipe({
         slots: ["item", "content"],
-        base: {
-          content: {
-            background: "bg.overlay",
-            border: "1px solid",
-            borderColor: "border.card",
-            borderRadius: "lg",
-            boxShadow: "lg",
-          },
-          item: {
-            _highlighted: { bg: "bg.hover" },
-            cursor: "pointer",
-          },
-        },
+        base: { content: optionListContent, item: optionItemRecipe.base },
         variants: {
-          size: {
-            md: {
-              item: {
-                _icon: {
-                  flexShrink: 1,
-                  width: "auto",
-                  height: "auto",
-                  maxWidth: "16px",
-                  maxHeight: "16px",
-                },
-              },
-            },
+          size: optionListSizes,
+          variant: {
+            subtle: { item: optionItemRecipe.base },
+            solid: { item: optionItemRecipe.base },
           },
         },
+      }),
+      combobox: defineSlotRecipe({
+        slots: ["item", "content"],
+        base: { content: optionListContent, item: optionItemRecipe.base },
+        variants: { size: optionListSizes },
       }),
       table: defineSlotRecipe({
         slots: ["root", "row", "cell", "columnHeader", "header", "body"],
@@ -1231,7 +1217,7 @@ export const designSystemConfig = defineConfig({
         },
       }),
       select: defineSlotRecipe({
-        slots: ["trigger", "content"],
+        slots: ["trigger", "content", "item"],
         base: {
           trigger: {
             cursor: "pointer",
@@ -1239,17 +1225,8 @@ export const designSystemConfig = defineConfig({
             bg: "bg.control",
             borderColor: "border.control",
           },
-          content: {
-            background: "bg.overlay",
-            border: "1px solid",
-            borderColor: "border.card",
-            borderRadius: "lg",
-            boxShadow: "lg",
-          },
-          item: {
-            _highlighted: { bg: "bg.hover" },
-            borderRadius: "lg",
-          },
+          content: optionListContent,
+          item: optionItemRecipe.base,
         },
         variants: {
           variant: {
@@ -1257,40 +1234,7 @@ export const designSystemConfig = defineConfig({
             subtle: { trigger: { bg: "bg.control", borderColor: "border.control" } },
             ghost: { trigger: { bg: "transparent", _expanded: { bg: "bg.hover" } } },
           },
-          size: {
-            xs: {
-              content: {
-                padding: 0,
-              },
-              item: {
-                marginX: 1,
-              },
-            },
-            sm: {
-              content: {
-                padding: 0,
-              },
-              item: {
-                marginX: 1,
-              },
-            },
-            md: {
-              content: {
-                padding: 0,
-              },
-              item: {
-                marginX: 2,
-              },
-            },
-            lg: {
-              content: {
-                padding: 0,
-              },
-              item: {
-                marginX: 2,
-              },
-            },
-          },
+          size: optionListSizes,
         },
       }),
       popover: defineSlotRecipe({

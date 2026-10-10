@@ -35,14 +35,12 @@ export default function AnalyticsLayout({
   railEntry,
   activeDashboardId,
   analyticsHeaderProps,
-  primaryAction,
   extraHeaderButtons,
 }: PropsWithChildren<{
   title: string;
   railEntry?: AnalyticsRailEntry;
   activeDashboardId?: string;
   analyticsHeaderProps?: Omit<AnalyticsHeaderProps, "title">;
-  primaryAction?: React.ReactNode;
   extraHeaderButtons?: React.ReactNode;
 }>) {
   const host = useAnalyticsHost();
@@ -80,12 +78,10 @@ export default function AnalyticsLayout({
     <SavedViewsScope>
       <SectionNavigationFrame
         label="Analytics"
-        hideTitle
         header={
           <AnalyticsHeader
             title={title}
             {...analyticsHeaderProps}
-            primaryAction={primaryAction}
             extraHeaderButtons={extraHeaderButtons}
           />
         }

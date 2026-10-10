@@ -5,6 +5,7 @@
  */
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { cleanup, screen } from "@testing-library/react";
+import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@langwatch/feature-flag-client", () => ({
@@ -32,6 +33,9 @@ vi.mock("../../../../behavior/agent-testing/use-agent-testing-live-updates.ts", 
 vi.mock("../../../../behavior/scenarios/use-scenarios.ts", () => ({
   useScenarios: () => ({ data: [{ id: "a" }, { id: "b" }] }),
 }));
+vi.mock("../../../../behavior/suites/use-test-suites.ts", () => ({
+  useTestSuites: () => ({ data: [] }),
+}));
 vi.mock("../../../../behavior/suites/use-suites.ts", () => ({
   useSuites: () => ({ data: [] }),
 }));
@@ -40,7 +44,9 @@ vi.mock("../../agent-testing/use-agent-testing-page-flows.ts", () => ({
   useHydrateViewFromUrl: () => {},
 }));
 vi.mock("../../agent-testing/cases/test-cases-tab.tsx", () => ({
-  TestCasesTab: () => <div data-testid="cases-tab" />,
+  TestCasesTab: ({ header }: { header: (title: string) => ReactNode }) => (
+    <div data-testid="cases-tab">{header("Default")}</div>
+  ),
 }));
 vi.mock("../../agent-testing/results/results-tab.tsx", () => ({
   ResultsTab: () => <div data-testid="results-tab" />,
@@ -62,7 +68,7 @@ describe("the Agent Testing address with the release flag on", () => {
     it("shows the page with its header and its tabs", () => {
       renderWithDesignSystem(<AgentTestingRoute />);
 
-      expect(screen.getByRole("heading", { name: "Agent Testing" })).toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: "Default" })).toBeInTheDocument();
       expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual([
         expect.stringContaining("Scenarios"),
         expect.stringContaining("Results"),

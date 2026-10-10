@@ -4,6 +4,7 @@
  */
 
 import { CloseButton } from "@langwatch/design-system/close-button";
+import { EmptyOptionsHint } from "@langwatch/design-system/option-list";
 import {
   Badge,
   Box,
@@ -16,6 +17,7 @@ import {
 } from "@langwatch/design-system/primitives";
 import { Select } from "@langwatch/design-system/select";
 import { Plus, Users } from "lucide-react";
+import { useId } from "react";
 
 import { ReviewerAvatar } from "../elements/reviewer-avatar.tsx";
 
@@ -42,6 +44,7 @@ export function QueueParticipants({
   onSend: () => void;
   isSending: boolean;
 }) {
+  const emptyHintId = useId();
   const options = [
     ...queues.map((queue) => ({
       label: queue.name ?? "",
@@ -68,6 +71,7 @@ export function QueueParticipants({
 
       <Select.Root
         collection={collection}
+        disabled={options.length === 0}
         multiple
         value={annotators.map((annotator) => annotator.id)}
         onValueChange={(next) => {
@@ -75,7 +79,11 @@ export function QueueParticipants({
           setAnnotators(picked.map((option) => ({ id: option.value, name: option.label })));
         }}
       >
-        <Select.Trigger width="full" data-testid="annotation-queue-participants-trigger">
+        <Select.Trigger
+          width="full"
+          aria-describedby={options.length === 0 ? emptyHintId : void 0}
+          data-testid="annotation-queue-participants-trigger"
+        >
           <Select.ValueText placeholder="Add Participants">
             {(items) => (
               <HStack flexWrap="wrap" gap={1} paddingY={2}>
@@ -169,6 +177,18 @@ export function QueueParticipants({
           </Box>
         </Select.Content>
       </Select.Root>
+      {options.length === 0 && (
+        <EmptyOptionsHint
+          id={emptyHintId}
+          action={
+            <Button variant="plain" size="sm" onClick={onCreateQueue}>
+              Create a queue
+            </Button>
+          }
+        >
+          No participants or queues are available. Create a queue to get started.
+        </EmptyOptionsHint>
+      )}
       <Spacer />
       <HStack width="full">
         <Spacer />

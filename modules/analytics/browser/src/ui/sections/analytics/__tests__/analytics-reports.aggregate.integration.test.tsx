@@ -54,19 +54,16 @@ vi.mock("../../analytics-layout.tsx", () => ({
   default: ({
     title,
     analyticsHeaderProps,
-    primaryAction,
     extraHeaderButtons,
     children,
   }: {
     title: string;
     analyticsHeaderProps?: { isEditable?: boolean };
-    primaryAction?: React.ReactNode;
     extraHeaderButtons?: React.ReactNode;
     children?: React.ReactNode;
   }) => (
     <div>
       <h1 data-editable={String(!!analyticsHeaderProps?.isEditable)}>{title}</h1>
-      {primaryAction}
       {extraHeaderButtons}
       {children}
     </div>

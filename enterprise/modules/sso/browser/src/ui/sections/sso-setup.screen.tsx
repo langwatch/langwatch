@@ -1,5 +1,4 @@
 import { useOptionalUiHostServices } from "@langwatch/browser-host/capabilities";
-import { PageLayout } from "@langwatch/design-system/page-layout";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * An organization's own single sign-on setup: one read, and the steps that
@@ -79,11 +78,7 @@ export default function SsoSetupScreen() {
     <>
       <SectionNavigationFrame
         label="Authentication"
-        header={
-          <PageLayout.Header>
-            <PageLayout.Heading>Identity provider</PageLayout.Heading>
-          </PageLayout.Header>
-        }
+        pageTitle="Identity provider"
         links={AUTHENTICATION_LINKS}
         activeHref="/settings/authentication/provider"
         onNavigate={(href) => navigation?.navigate(href)}

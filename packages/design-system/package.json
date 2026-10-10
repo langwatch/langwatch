@@ -359,6 +359,10 @@
       "types": "./dist/components/scope/scope-filter.d.ts",
       "default": "./src/components/scope/scope-filter.tsx"
     },
+    "./option-list": {
+      "types": "./dist/components/forms/option-list.d.ts",
+      "default": "./src/components/forms/option-list.tsx"
+    },
     "./select": {
       "types": "./dist/components/forms/select.d.ts",
       "default": "./src/components/forms/select.tsx"
