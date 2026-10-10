@@ -60,10 +60,6 @@ const CHANNEL_SCHEMAS: Record<TriggerActionValue, ZodType> = {
   [TriggerAction.ADD_TO_ANNOTATION_QUEUE]: annotationQueueProvider.actionParamsSchema,
 };
 
-export function channelActionParamsSchema(action: TriggerActionValue): ZodType {
-  return CHANNEL_SCHEMAS[action];
-}
-
 /** Every field name any channel delivers by: one channel's field is delivery wherever found. */
 const EVERY_CHANNELS_DELIVERY_FIELDS = new Set(
   Object.values(CHANNEL_SCHEMAS).flatMap((schema) => [...deliveryFieldNames(schema)]),
